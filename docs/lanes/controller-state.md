@@ -54,6 +54,20 @@ tickets — Plan 6 / visibility), the `notifications-gateway` web-side harness (
 account-side access error had already committed real, correct work before its final report call errored —
 **treat a failed dispatch as UNVERIFIED, not as EMPTY**: read the tree and the log before re-dispatching.
 
+## ⏹ SATURDAY CLOSE, 20:52 IST — the Monday queue's first two items LANDED; `main` is `bf1c517`, gate + all three checks GREEN; every lane released; the session meter halts everything within the half hour. MONDAY STARTS AT LANE F PASS 2.
+
+| what | value |
+|---|---|
+| `main` (20:48) | **`bf1c517`** — after `628befb` (P43): #226 (docs) · **#227 (Lane C: Lane F pass 1 — `scripts/check-case-citations.mjs` + fixtures, `pnpm check:citations`, its own UNGATED CI job `check-citations` in `gate`'s needs; every ✅ id must appear in a test/e2e file; RATCHET — a per-file baseline of uncited counts that may only go down; reviewer's Critical fixed before opening: range-form ✅ lines (`**3.89–3.94**`) collapsed to their first id and hid 50 cited ids; 13.204–13.209; zero turbo-input files; `ba6f9e6`)** · **#228 (controller: two comment lines citing 7.251 from the 7.249b/7.249e rank-reason pins that witness it — THE RATCHET'S FIRST CATCH, at merged `ba6f9e6`: §07 uncited 78 → 79 because C's baseline was computed before A's #225 minted 7.249–7.253; neither lane could have gated the combination; `bf1c517`)**. All (CI waived, owner 15:20) |
+| **forced gate at `bf1c517`** | lock v3.3 pid 27075, install 0, rebuild 0, **`check:env` 0**: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m56s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed \| 5 skipped (3671) / 285 files** (= `628befb`; #227/#228 add no test). **`check:citations` 0 — 1529 ✅ ids / 714 cited / 815 uncited, "ratchet holds exactly on every file"** (§11 0 uncited; §09 219/219 and §10 66/66 uncited; §13 153/160). **`check:runbook` 0.** `check-case-ids` 0 (1614, highest 13.209). Zero orphans. *(At `ba6f9e6`, before #228, `check:citations` was EXIT 1 on §07 — recorded, repaired, re-measured.)* |
+| ledger | **177/177** (P43 and pass 1 have no rows) |
+| open PRs | none |
+| lanes | **ALL FIVE RELEASED**, state files on `main` each carry a controller line saying nothing is in flight (A #226, C this PR, E #223, B #216, D #213). Do not relaunch any |
+| meters | **SESSION 86% at 20:49, ~26%/hour → 100% at ~21:20**; weekly **90%** (reset Mon 06:30). The controller stops here |
+| Monday | `gisik-nokma-lanes/override-serial-monday.md` §1: (a) nothing open · (b) T16 done · (b′) P43 DONE · **(c) pass 1 DONE — the standing rule: any PR touching a catalogue file leaves its uncited count ≤ the baseline, and a new ✅ is cited by id in its test** · **START AT (d) semantic extraction** · (e) comment tightening · (f) carried items · the per-file citation BACKFILL (§09/§10 first) · (g) the client-as-producer cluster. Launch: `tmux kill-session -t gisik && cd gisik-nokma-lanes && ./start-serial.sh override-serial-monday.md` |
+
+**Kept from the last hour.** (1) **A ratchet computed on a branch is a fact about that branch's base** — the first merge after it can trip it through nobody's fault; the controller's forced-gate script now runs `check:citations` and `check:runbook` beside the gate, and a red there is repaired on `main` at once with the smallest change (two comment lines), recorded, re-measured. (2) C's range-form Critical: a parser that silently reduces a range to its first id hides exactly the cited ids it was built to count — **a self-test must plant one defect per STYLE the real files use**, and C's first measurement (1029) was wrong twice over before the fixture existed. (3) Both meters bind: the session meter (5 h, account-wide) can halt the machine BEFORE its own reset when five lanes burn together; plan the evening on whichever is closer to 100%.
+
 ## ▶ OWNER 20:03: "we can start the monday queue" — the first two items DISPATCHED TONIGHT with the remaining weekly quota (~14%); two lanes only, B/D/E stay released
 
 **Owner, 20:03, on the controller's three options (fix Actions billing / start the Monday queue now with one or two cheap
