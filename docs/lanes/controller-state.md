@@ -1,5 +1,68 @@
 # Cross-lane controller — live state
 
+## ⏩ CONTROLLER `gisik-nokma-0c` RESUMED SUNDAY 20:53 IST — BEFORE THE WEEKLY RESET, NOT AFTER IT. RULING P44: LANE F PASS 2 IS A+C. PR #230 MERGED. SESSION METER AT THE WALL (98%, resets 10:20pm); WEEKLY 92% (resets Mon 6:30am).
+
+**How this session started, for the next restart's benefit.** This controller (`gisik-nokma-0c`) and a fresh
+executor (`gisik-nokma-exec-65`, tmux `gisik:1`) were both already live at 20:53:59 IST — about a minute after
+the Saturday-close block below was written and said "dispatch nothing new … the controller stops here" pending
+Monday's actual weekly reset (Mon 2026-09-07 06:30 IST). **Neither this controller nor the limit-resumer (its log
+shows zero action on this project tonight) caused the restart; who/what did is unrecorded.** Put to the owner
+directly rather than guessed at: owner's answer was **"Continue, manage normally."** Recorded so a future reader
+does not mistake a live executor for a rogue one, and does not re-litigate whether to act on it.
+
+**RULING P44 (2026-09-06 ~21:20, owner, escalated by this controller per its own rule 1 — a ruling request is
+never the Sonnet loop's to decide):** Lane F pass 2 as scheduled (`graphify extract --mode deep` over the four
+client packages, hunting duplicate visibility-decision logic) **cannot produce what it was scheduled to
+produce** — `cli.py`'s `--mode deep` branch draws `semantic_files` from `("document","paper","image")` in both
+the normal and deep paths; code is in neither, so deep mode over a code corpus is byte-for-byte the AST pass the
+post-commit hook already runs (179 links, 100% `_origin=ast`, zero inferred). The competing hypothesis — missing
+LLM backend key — was refuted, not assumed: `--code-only`'s own gate comment says it exists so a mixed repo
+doesn't hard-fail with no backend configured, not to skip a configured deep mode. **Owner ruled A+C, both:**
+**(A)** substitute `semble find_related` for the named mechanism, zero token cost, same goal — first candidate
+already ranked: `packages/app-core/src/precheck.ts:375` ↔ `rule-engine`, 0.61–0.67, "solves the same problem,
+never calls the other"; write ranked candidates as **named-owner rows, not fixes**. **(C)** keep going on the
+citation backfill (§09/§10, mechanical, zero subagents, ratchet-verifiable) — already the safe default the
+executor picked before the ruling arrived, since it needs none.
+
+**PR #230 MERGED** (`exec/52-lane-f-pass2-semantic` → `main`, squash, branch deleted). Head `3edd02e` verified
+independently before merging: local = origin = PR head, worktree clean, non-docs delta = 19 files / +344 −1, ALL
+test files + the citation baseline JSON + the handoff doc — **zero source lines touched**, matching the
+"comments-only" claim. CI is the same GitHub Actions billing block as every merge tonight (`gh api
+.../check-runs` on the exact head: 0 steps on every job, `gate`/`scope`/`check-citations`/`check-runbook` all
+FAILURE-at-zero-steps) — owner's standing CI waiver (15:20) applies, same as #225–#229. Merged sha **`1bc6e014`**.
+
+**Forced gate at `1bc6e014`** (this controller's own run, scratchpad `gate.sh`, lock v3.3): `INSTALL_EXIT=0`,
+`REBUILD_EXIT=0`, `CHECK_ENV_EXIT=0`, `CHECK_CITATIONS_EXIT=0`, `CHECK_RUNBOOK_EXIT=0`, **`GATE_EXIT=0` · 30/30 ·
+0 cached · 1m43s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed | 5 skipped (3671) / domain 464, ui 37,
+rule-engine 282, editor 178, sync-client 89, app-core 1107, web 138, desktop 5, mobile 20, server 1346|5** —
+**identical to the pre-#230 count**, which for a comments-only PR is the prediction under test, not decoration.
+`check:citations`: §10 **66 cited / 0 uncited** (was 0/66); §09 still 0/219 (batch 1 in flight, uncommitted, see
+below); repo-wide 780 cited / 749 uncited, ratchet holds exactly on every file. `check:runbook`: 14 references /
+12 distinct, all resolve. `pnpm check:tasks` at `1bc6e014`: **`CHECK_EXIT=0` · 177/177 (100.0%)**, unchanged (a
+Lane F pass, no ledger row, matching #227–#229's precedent).
+
+**§09 in flight, NOT landed.** Executor pushed a final handoff on `exec/53-cite-section-09` (head `a498bdb`,
+reachable per `git branch -r --contains`) and stopped dispatching for the night at the session-meter wall.
+That branch carries **no committed diff** — its base is #230's now-merged head, so rebasing onto `1bc6e014`
+empties it of commits; the only content is a batch-1 subagent's **uncommitted, unverified** edits to six test
+files (`packages/domain/test/doc-embeds`, `packages/editor/test/{doc-text-conformance,mention,rule-census,
+schema,ticket-image}`), deliberately left uncommitted because the ratchet baseline for §09 was not yet hit —
+`check:citations` will read FAIL on that tree until `09-editor-attachments.md`'s baseline entry is set to the
+real remaining count, which is expected, not a regression. §09's mapping (219 ✅ rows, 218 naming a full test
+path in parens, 41 files, 98 editor / 113 server / 7 domain) and the owed mutation check (pull the sole `9.11`
+citation — a real prefix of live `9.115`–`9.118` — predict `EXIT=1` naming `9.11` alone, the same method that
+made §10's zero mean something) are written in full in that handoff. **Whoever restarts the executor reads
+`exec/53-cite-section-09`'s `docs/lanes/executor-state.md` first**, decides whether the batch-1 edits are worth
+keeping (verify + gate before committing — do not commit a partial state as though it had been checked, the
+exact failure this series keeps naming), then continues batch 2 (server, 113 rows).
+
+**Meters at write time (21:4x IST):** session **98%** (resets 10:20pm tonight — separate from and tighter than
+weekly right now); weekly **92%** (resets Mon 2026-09-07 06:30 IST, unchanged). **This controller dispatches
+nothing further tonight either.** Next controller/executor restart: after the session meter's own 10:20pm
+reset if the owner wants another short serial push tonight, or after the real Monday weekly reset per the
+18:41 instruction below — either way, start from `exec/53-cite-section-09`, not from `override-serial-monday.md`
+§0 as written (its own preconditions — "Monday", "after 06:30" — are stale the moment this section exists).
+
 **This file is the controller's restart surface.** A controller relaunched from
 `gisik-nokma-lanes/dispatch-controller-serial.md` recovers only what is written here. Refreshed at every
 decision boundary. *(The brief was renamed 2026-09-01: `dispatch-main-controller.md` is the dead
