@@ -1,4 +1,4 @@
-# Lane C — executor state (Plan 11 T11+T12, checkpointed ahead of the 09:40 session-limit window)
+# Lane C — executor state (Plan 11 T11+T12: PR #183 OPEN, awaiting controller merge)
 
 **This file is Lane C's restart surface, and nobody else's.** `executor-state.md` is Lane A's,
 `executor-state-B.md`/`-D.md`/`-E.md` belong to their own lanes — never edit them. A Lane C session
@@ -6,207 +6,80 @@ relaunched from the controller's override recovers only what is written here.
 
 > **Shas in narrative prose below are facts about when they were written.** Verify with
 > `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
-> commits and will lie to you. **Every anchor below was measured shortly before the 09:40 checkpoint and
-> is already stale for `origin/main`** — re-fetch before trusting any of it.
+> commits and will lie to you.
 
 ---
 
-## ⛔ CORRECTION, WRITTEN AFTER THE CHECKPOINT ABOVE: `cf5b3c5` CARRIES AN UNRESOLVED CRITICAL — DO NOT TRUST "REVIEWED"
+## STATUS: PR #183 OPEN — https://github.com/bkirosangma/gisik-nokma/pull/183
 
-**The background workflow (`ww599joaw` / `wf_b926b912-c39`) was NOT killed by the session-limit window — it
-ran to completion and its result arrived after the checkpoint below was already written and pushed.** That
-result revealed a real bug in this session's own orchestration script: after one fix round, it re-reviewed
-T11's code, got `needs_fix` a SECOND time (one Critical, three Important survived), and then proceeded to
-run the commit step UNCONDITIONALLY anyway — the script only gated the fix-loop on the FIRST review's
-verdict, not the LAST one. **`cf5b3c5` therefore shipped with defects its own review process had already
-found and never fixed.** Anything below this block that says T11 is "reviewed" or "clean" describes what
-this session believed BEFORE this arrived, not the true state. Treat `cf5b3c5` as unreviewed until the fix
-below is independently re-verified.
+Head sha `636db92` on `exec/30-plan11-backups`, rebased onto `origin/main` at `3e6d606`. Local gate green:
+`GATE_EXIT=0`, 30/30 tasks, 0 cached, **3439 tests / 269 test files**, node `v22.22.2`. `check:env` and
+`check-case-ids.mjs` both exit 0 on their own. Nothing left to do here except wait for controller review/CI,
+UNLESS the CI-vs-local restore-drill skip discrepancy below turns up something (see "What to check when CI
+runs").
 
-**CRITICAL, unresolved as of this write:** the backup worker cannot boot as deployed.
-`apps/server/src/ops/backup-daemon-main.ts`'s `main()` calls `loadConfig(process.env)`
-(`apps/server/src/config.ts`), which requires `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` and `WEB_ORIGIN` with
-no defaults. The backup worker's env block in `deploy/do/app.yaml` sets none of those three — reproduced
-under `env -i` with that literal env block: exit 1, `invalid server configuration — check: BETTER_AUTH_URL,
-BETTER_AUTH_SECRET, WEB_ORIGIN`, before the sink, pool, or alerter are even constructed. This breaks the DO
-worker AND the `pnpm --filter @gisik-nokma/server run ops:backup-once` manual runbook path identically — no
-nightly dump, no weekly export, no alert, because `alerterFromConfig` is never reached. A silent no-op at
-the deployment layer, not a code bug that shows up in a normal test run (none of T11's own tests boot the
-daemon under the worker's real env block — that gap is itself worth naming for whoever writes the next
-"boots under X" check).
+## THE STORY, SHORT, FOR THE NEXT SESSION THAT NEEDS IT
 
-**Three Important, also unresolved as of this write:**
-1. `msUntilNextUtc` (`schedule.ts`) has no validation on its `dayOfWeek` parameter, and
-   `backup-daemon-main.ts` passes `Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0')` straight through.
-   `getUTCDay()` only returns 0-6, so `7`, `-1`, or a non-numeric string (→ `NaN`) make the function's
-   while-loop condition permanently true — spins forever, synchronously, BEFORE the daemon logs anything.
-   Reproduced for all three, killed at 8s each.
-2. `pg-dump.ts`'s spawn-failure path (pg_dump missing/off PATH — the child process's `error` event) leaves
-   a **zero-byte object uploaded at the dump's normal dated key**, because the sink was already handed the
-   (now-erroring) stdout stream and the existing cleanup (`stdout.destroy()` + `sink.discard(key)`) only
-   runs on the `exitCode !== 0` branch, never on the spawn-error branch. Reproduced: put completed at 0
-   bytes, `discarded = []`. This is the exact hazard a sibling test case (13.30) already exists to close —
-   but only for the non-zero-exit half, not this one.
-3. `error-alerter-shim.ts` (the temporary placeholder for Plan 11 Task 3's real
-   `apps/server/src/alerts/error-alerter.ts`, on unmerged `origin/exec/23-plan11`) claims retiring it is a
-   one-line import swap with nothing else to change. False in two ways: (a) the shim's `notify` is typed
-   `void | Promise<void>`; the real one is exactly `Promise<void>`. (b) the real `alerterFromConfig`
-   treats only a STRICT `null` as "no alerter"; `backup-daemon-main.ts` calls it with
-   `process.env.ALERT_WEBHOOK_URL ?? null`, which leaves an EMPTY STRING as an empty string (not null) —
-   and `.env.example` ships `ALERT_WEBHOOK_URL=` empty by default, with the worker's own env block
-   declaring it a `SECRET` that DigitalOcean can resolve to empty. Retiring the shim as documented would
-   silently start POSTing to `fetch('')` and throwing on every failure in the default deployment.
+1. Branch cut from `origin/main` at `56cd091` (after #146 merged) per the controller's re-task ("Lane C
+   takes Plan 11 T11+T12 after #146").
+2. A Workflow-tool background job implemented, reviewed, and committed T11 then T12. **Its own bug**: the
+   fix→re-review loop gated on the FIRST review's verdict, not the last — so when a SECOND review round on
+   T11 still found one Critical + three Important, the script committed anyway (`cf5b3c5`, since rewritten
+   by rebase). **The lesson, worth carrying into any future Workflow script with a fix→re-review loop: gate
+   on the LAST verdict, always.**
+3. Session hit the account-wide limit mid-flight; checkpointed uncommitted work honestly (labeled WIP) and
+   pushed before the halt, per the controller's instruction.
+4. On resume: the workflow's result arrived (it had finished, not been killed) and revealed the unresolved
+   Critical. **Corrected the handoff immediately** rather than let a stale "reviewed" claim stand, then
+   dispatched a second, narrower fix+review workflow.
+5. That workflow's agents ALSO errored on the (still-recovering) session limit before returning. On the
+   controller's resume instruction: **read the actual diffs myself, verified all four fixes by hand**
+   (including reproducing the boot fix under `env -i` with `deploy/do/app.yaml`'s literal backup-worker env
+   block), ran the affected tests (41 passed), and committed with an honest message crediting the
+   verification method used.
+6. Rebased onto the (by-then-current) `origin/main` at `3e6d606`. Two conflicts, both simple keep-both:
+   `apps/server/package.json` scripts (mine beside Lane D's `seed:*`/`sweep:*`) and
+   `test-cases/13-deployment-dogfooding.md` (Lane D's Task 9/10 cases vs my Task 11 cases, both appended
+   after the same line — no semantic overlap, kept both in task order).
+7. Ran restore-drill.test.ts for the first time ever (it had been committed but never executed): 5 passed /
+   5 skipped, the skip disclosed on stderr as a client/server major-version mismatch (18 vs 16 locally).
+8. Full gate green post-rebase. Force-pushed (rebase rewrote already-pushed history) and opened PR #183.
 
-**The process lesson, in the controller's words, recorded here verbatim because it generalizes past this
-session:** *"an orchestration script that proceeds to commit regardless of the second review's verdict is a
-check that cannot fail, in orchestration form — every fix→re-review loop gates on the LAST verdict, not the
-first."* Any future Workflow-tool script in this project with a fix→re-review loop must check the loop's
-own exit condition against whichever review ran LAST, not assume one round is enough and commit
-unconditionally afterward.
+## WHAT TO CHECK WHEN CI RUNS ON #183 — the controller's instruction, don't skip it
 
-**T12 is NOT affected — it is genuinely clean.** Its own fix→re-review loop (same script, same bug
-class, but the SECOND review happened to return `pass`) landed a real `pass` verdict with only three
-disclosed Minors, committed at `91b3b81`. No reason to distrust T12's commit.
+**Locally the restore drill's round-trip half SKIPS** (client 18 vs server 16 — this machine's libpq vs the
+compose Postgres). **CI installs `postgresql-client-16`** (this same branch's own Task 14 CI work), so in
+CI that half should actually RUN, not skip. Read the `server-tests` shard's real step output once CI
+finishes and confirm it shows something like "N passed, 0 skipped" for `restore-drill.test.ts`, not the
+same 5-skipped shape as local. **If CI shows the same skip, that is a live finding, not a shrug** — the
+controller named this explicitly: a skip that discloses its reason locally and silently persists in CI is
+the "check that cannot fail" class in its deployment costume. Put the real CI number in the PR body/thread
+once known.
 
-**A fix round for T11's four findings is being dispatched now** (script:
-`t11-critical-fix.js` in this session's scratchpad),as a NEW commit on top of `91b3b81` — `cf5b3c5` is
-already pushed to `origin/exec/30-plan11-backups` and will not be rewritten. **If a session-limit halt
-catches this fix round mid-flight, this correction (pushed alongside this commit) is what protects the
-branch from being read as done when it is not.**
+## KNOWN, DISCLOSED LIMITATIONS (already stated in the PR body and in-code — not new work items)
 
----
+- No automated test proves a cross-version restore (`pg_restore` older or newer than the `pg_dump` that
+  wrote the archive) — `restore.sh`'s usage text and `deploy/do/README.md` both say so, naming the specific
+  failure (a newer `pg_restore` sends settings like `transaction_timeout` an older server rejects).
+- The backup worker's boot fix was verified under a synthetic `env -i` block, not against real DigitalOcean
+  Spaces credentials or an actual deployed worker.
+- `error-alerter-shim.ts` is temporary. Lane E's Plan 11 Task 3 (`apps/server/src/alerts/error-alerter.ts`)
+  is still on `origin/exec/23-plan11`, not `main`, as of `3e6d606`. **Whoever rebases past T3 first: delete
+  the shim, repoint its two importers (`schedule.ts`, `backup-daemon-main.ts`) at
+  `../alerts/error-alerter.js` — nothing else should need to change**, per the shim's own header (a checked
+  claim, not a hope — verified against the real module by `git show origin/exec/23-plan11:...` before this
+  PR opened).
 
-## WHY THIS CHECKPOINT EXISTS
+## NEXT ERRANDS, QUEUED, NOT STARTED (per the controller's instruction — after #183 merges)
 
-The controller warned at 09:40 that the account-wide session meter read 87% and every pane was projected
-to halt around 10:05 until the 12:20 reset, taking any running background workflow down with it. This
-session's Plan 11 T11+T12 work was mid-flight in a Workflow tool background task (`ww599joaw`,
-`wf_b926b912-c39`) at the time — the controller's instruction was to commit and push whatever had already
-landed in the worktree, with an honest message, rather than let it evaporate. **That checkpoint is done**:
-commit `1c5df30` on `exec/30-plan11-backups`, pushed to `origin/exec/30-plan11-backups`. It is explicitly
-labeled WIP/unverified in its own commit message — do not treat it as reviewed or gate-clean.
-
-## LIVE ANCHORS — measured ~09:42 IST, RE-VERIFY BEFORE TRUSTING, origin/main has already moved once since
-
-| anchor | value | how verified |
-|---|---|---|
-| worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8` | `pwd` |
-| branch | `exec/30-plan11-backups` (cut fresh from `origin/main` at `56cd091`, after #146 merged) | `git branch --show-current` |
-| HEAD | `1c5df30` (the WIP checkpoint commit, on top of `cf5b3c5`) | `git rev-parse HEAD` |
-| `cf5b3c5` | T11's real, reviewed commit — "feat(ops): nightly pg_dump and weekly ledger export..." | `git log --oneline` |
-| `1c5df30` | WIP checkpoint — T11 follow-up fixes (PGPASSWORD gate exemption, DO Spaces worker env fix, object-sink discard test) + T12's in-progress files (restore.sh, restore-drill.test.ts, catalogue entries) | see commit body for the full honest inventory |
-| `origin/main` at branch cut | `56cd091` | `git rev-parse origin/main` at cut time |
-| `origin/main` LATEST KNOWN (controller messages received this session, NOT independently re-verified past this point) | `2d90a03` per a `git show origin/main:...` I ran seconds before writing this file — but I have NOT diffed what moved beyond `aa17046` (the last sha the controller explicitly named to me) | **re-fetch and read `git log aa17046..origin/main` before rebasing** |
-| controller-named rebase target as of the last explicit instruction | `aa17046` (#167 Lane D sweeps, #169 Lane A my-work/contests-route/seed.ts) — **but `origin/main` has moved past this too (to `2d90a03`), unexplained to this session** | do not assume `aa17046` is still the tip |
-| gate | **NOT RUN in this checkpoint.** No `pnpm turbo run build test typecheck` since the branch was cut. Do not report or imply a gate result until one is actually run. | n/a |
-| Gate Lock version in force | **v3.2** (controller ruling, this session) — noclobber-file lock, dead-pid-only reclaim, 10-min+idle-machine empty-file reclaim, single backgrounded invocation, name the script `gate.sh` or `locked-test.sh` so the peers-check can see it. v1/v2/v3/v3.1 are all superseded; do not copy them from memory or from an old message. Reference copy: `docs/lanes/gate-lock/` on `origin/exec/23-plan11` at `e814f49`. | controller messages this session |
-
-## WHAT IS ACTUALLY DONE, VERIFIED, AND SAFE TO TRUST
-
-- **T11 (Backups), core implementation: DONE, reviewed, committed at `cf5b3c5`.** This went through the
-  full implement → independent-opus-review → commit cycle inside the background workflow before the
-  checkpoint fired. Six files under `apps/server/src/ops/` (`object-sink.ts`, `export-ledger.ts`,
-  `pg-dump.ts`, `schedule.ts`, `backup-daemon-main.ts`, `fetch-backup.ts`), three test files under
-  `apps/server/test/ops/` (`schedule.test.ts`, `export-ledger.test.ts`, `pg-dump.test.ts`),
-  `apps/server/package.json`'s two new script lines (`ops:backup-once`, `ops:fetch-backup`, both `tsx
-  src/ops/...` per Lane E's correction — NOT `node dist/...`), and catalogue entries. I have **not**
-  re-run its test suite since that commit; the review that passed it ran inside the same workflow
-  invocation, not independently by me afterward. Re-run before trusting if resuming after a gap:
-  `source ~/.nvm/nvm.sh && nvm use 22 && export PATH=/opt/homebrew/opt/libpq/bin:$PATH && cd apps/server
-  && pnpm exec vitest run test/ops/schedule.test.ts test/ops/export-ledger.test.ts test/ops/pg-dump.test.ts`.
-
-## WHAT IS IN THE WIP CHECKPOINT (`1c5df30`) — NOT independently verified, NOT reviewed, NOT gated
-
-- **T11 follow-up**, apparently produced during T11's fix round but never staged by my own overly-narrow
-  commit-agent file list (my mistake — I told the commit agent to stage only the ops/ source+test files,
-  package.json, Features.md and test-cases/13; I did not anticipate the implementer would also touch
-  `.env.example`, `deploy/do/app.yaml`, or `scripts/check-env-example.mjs`, so those sat uncommitted until
-  this checkpoint):
-  - `scripts/check-env-example.mjs`: adds `PGPASSWORD` to the `IGNORE` set, with a stated reason —
-    `apps/server/src/ops/pg-dump.ts` writes it into a child process's environment (not argv) so the
-    database password never appears where `ps` can read it, and it is derived from the already-documented
-    `DATABASE_URL` rather than something an operator should set directly. **Read `pg-dump.ts` and confirm
-    this claim before trusting it** — I have not independently verified `pg-dump.ts` actually does this;
-    it may be a real, good finding, or the implementer's own justification for a shortcut. Check.
-  - `deploy/do/app.yaml` + `.env.example`: settle the "does the backup daemon share the app's
-    `OBJECT_STORE_S3_*` credentials" question left open by my own T15 work (yes, it does, taking only its
-    bucket from `BACKUP_S3_BUCKET`), and claim to fix a real bug — the backup worker block was missing
-    `OBJECT_STORE_S3_ENDPOINT`/`_REGION`/`_FORCE_PATH_STYLE`, which (the diff claims) would have made the
-    AWS SDK default to `us-east-1` and sent DO Spaces credentials to Amazon on the first real run. **This
-    is a plausible and well-reasoned claim (matches known AWS SDK default-region behavior) but I have not
-    independently confirmed it** — no test exercises `deploy/do/app.yaml` (it's a spec file, not applied
-    to a live app), so this is confirmable only by re-reading the AWS SDK's own default-resolution
-    behavior or by testing `s3SinkFromEnv`'s refusal path directly.
-  - `apps/server/test/ops/object-sink.test.ts` (new, not in my original file list): direct unit coverage
-    of `s3SinkFromEnv`, including a `discard()` idempotency case — implies `ObjectSink` grew a `discard`
-    method beyond the three the plan/my instructions specified (`put` only was asked for). **Read
-    `object-sink.ts` itself to confirm what `ObjectSink`'s actual interface now is** — I have not
-    re-read it since the checkpoint; if `discard` exists, it needs to appear in Features.md's bullet too.
-- **T12 (restore drill), in progress, not committed as a clean reviewed unit:**
-  - `scripts/restore.sh` — the scratch-database guard, executable, PLUS a real finding beyond what I
-    asked for: `pg_restore` must be **at least as new as** the `pg_dump` that wrote the archive **and no
-    newer than the target server's major version** — a `pg_restore` newer than the server sends settings
-    (named example: `SET transaction_timeout = 0`, a PG17+ parameter) the older server rejects, so
-    restoring into an older server can exit non-zero even though the data landed. Stated as "measured by
-    hand, 2026-09-06" and "not covered by any automated test in this repo" — an honest limitation, not a
-    gap to silently close.
-  - `apps/server/test/ops/restore-drill.test.ts` (329 lines, reads complete — ends cleanly on the
-    planted-drift case, not truncated) — **never run against Postgres in this checkpoint.** Do not assume
-    it passes.
-  - `deploy/do/README.md` — presumably carries the same cross-version restore sentence; not diffed in
-    detail before this write, only confirmed the sentence is present via grep.
-  - `Features.md` (+29 lines) and `test-cases/13-deployment-dogfooding.md` (+62 lines) — catalogue entries
-    for both T11's follow-up and T12; **`scripts/check-case-ids.mjs` has NOT been re-run since these
-    landed.** Run it before trusting the numbering (my instructions told the implementer to mint from
-    13.9; confirm no collision and no gap before relying on it).
-
-## NEXT STEPS, IN ORDER, ON RESUME
-
-1. **Re-fetch `origin/main` and read what moved since `56cd091`** (known: #146, then further merges the
-   controller named — #154 at `de88248`, #167+#169 at `aa17046` — and `origin/main` was already at
-   `2d90a03` per a spot-check moments before this write, unexplained). Do not assume `aa17046` is still
-   the tip.
-2. **Re-run T11's three test files** (schedule/export-ledger/pg-dump) to re-confirm `cf5b3c5` is still
-   good — nothing should have changed it, but confirm rather than assume.
-3. **Independently verify the four WIP-checkpoint claims listed above** (PGPASSWORD's actual origin in
-   pg-dump.ts, the AWS-SDK-default-region claim, `object-sink.ts`'s actual current interface including
-   `discard`, and whether `deploy/do/README.md`'s diff matches what `restore.sh` claims) — these were
-   never independently reviewed; treat them as an implementer's unverified self-report, not as fact.
-4. **Run `node scripts/check-case-ids.mjs` and `node scripts/check-env-example.mjs`** from the repo root;
-   fix anything that fails before proceeding.
-5. **Run T12's restore-drill.test.ts for the first time** (`export PATH=/opt/homebrew/opt/libpq/bin:$PATH`
-   needed for `pg_dump`/`pg_restore`). If it fails, this is genuinely new information, not a regression —
-   nothing in this checkpoint has been executed yet.
-6. **Resume or re-run the T12 review/fix cycle** — the background workflow (`wf_b926b912-c39`) may still
-   be resumable via `Workflow({scriptPath: ..., resumeFromRunId: "wf_b926b912-c39"})` if the harness
-   preserved it; if not, re-run the T12 implement→review→fix→commit sequence fresh against what's already
-   on disk (do not re-implement — verify and review what exists, since the files read as complete).
-7. **Split the WIP checkpoint into clean, reviewed commits** before opening the PR: the plan was always
-   two commits (T11 "feat", T12 "feat") — `1c5df30` is neither; it is scaffolding to survive the quota
-   window. Rewrite history (`git reset --soft cf5b3c5` and re-commit in clean pieces) or accept a third
-   honest commit that supersedes the WIP label once everything above is verified — controller's call on
-   which is cleaner for review, but the PR must not carry a commit literally titled "wip" without at least
-   a follow-up commit explaining resolution.
-8. **Rebase onto whatever `origin/main` actually is by then, keep-both on `apps/server/package.json`'s
-   scripts block** (ops:* beside seed:* and sweep:*, per the controller's #154/#167+#169 messages),
-   `pnpm install` after, re-run `check-case-ids.mjs` and `check-env-example.mjs` again post-rebase.
-9. **Run the full gate under Gate Lock v3.2** (name the script `gate.sh`, libpq PATH export inside the
-   same backgrounded invocation) before pushing further or opening the PR.
-10. **THEN** push and open one PR for T11+T12 (or T11 alone if T12 genuinely doesn't converge — say which),
-    per the override brief. Report to `gisik-nokma-0d` with head sha, `Tasks:` line, test count, node
-    version, `0 cached`, `check:env` on its own line, and the honest sentence about what was not verified.
-11. **Do not start the two follow-up errands** (`ops:sweep-orphans`, scheduling `sweep-notifications`,
-    both to fold into `src/ops/schedule.ts`) until T11+T12's PR is open — they were explicitly queued
-    "after T11+T12, not now" by the controller.
+- `ops:sweep-orphans` (monthly, 30-day, object-store orphans with no ledger event) and scheduling
+  `tools/sweep-notifications.ts` — both fold into `src/ops/schedule.ts`'s existing scheduler, not a second
+  one. Lane D takes the two data-retention sweeps in `src/tools/` separately.
 
 ## THINGS A RESTARTED SESSION MUST NOT ASSUME
 
-- **`1c5df30` is not evidence of anything passing.** It is an unverified snapshot. Every claim inside its
-  commit message is the checkpoint-writer's best understanding of what a background agent reported, not
-  independently confirmed.
-- **The background workflow may or may not still be running or resumable.** Check `/workflows` or attempt
-  the `resumeFromRunId` above; do not assume either outcome.
-- **`origin/main` has moved past every sha named to this session by message.** Re-fetch before trusting
-  any rebase target.
-- **No gate has run on this branch at all yet.** Not once. Do not report a task count or test count for
-  this branch until one actually runs.
+- `origin/main` has certainly moved again since `3e6d606` — refetch before trusting any anchor above.
+- Do not re-implement T11 or T12. Do not start the sweep-orphans/sweep-notifications errand before #183
+  merges.
+- A gate result is a fact about the tree it ran against at that moment, not about "the branch" in general —
+  re-verify before relying on the numbers above if any time has passed or any commit landed since.
