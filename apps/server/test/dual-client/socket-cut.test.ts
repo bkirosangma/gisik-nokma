@@ -7,6 +7,7 @@ import {
   plainTextToDoc,
   STREAM_CLOSE_CODES,
   type IngestResult,
+  type StreamErrorCode,
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import {
@@ -159,6 +160,22 @@ type Fixture = {
   seqOf(eventId: string): Promise<number>;
   /** Every raw `ws` socket the VIEWER's engine has opened, in connection order. */
   viewerSockets: WsWebSocket[];
+  /**
+   * The CLIENT's end of each of those connections, in the same order.
+   *
+   * `viewerSockets` above is the SERVER's end — the object
+   * `app.websocketServer` emits and `hub.ts` reads `bufferedAmount` off. This
+   * is the object `webSocketFactory` built, and the distinction is the whole
+   * subject of 12.344: the two ends of one connection see different events,
+   * and a protocol ping is visible ONLY here.
+   */
+  viewerClientSockets: WsWebSocket[];
+  /** Every TEXT frame the CLIENT's end actually received, in arrival order. */
+  clientFrames: string[];
+  /** One entry per PROTOCOL ping the CLIENT's end saw, timestamped. */
+  clientPings: number[];
+  /** One entry per PROTOCOL pong the SERVER's end saw, timestamped. */
+  serverPongs: number[];
   /** Every close code/reason the VIEWER's client actually observed. */
   closes: CloseRecord[];
   /** One entry per `GET /v1/sync/bootstrap/ticket` the transport really issued. */
@@ -320,6 +337,10 @@ async function buildFixture(): Promise<Fixture> {
   // ---- the VIEWER's real client -------------------------------------------
 
   const viewerSockets: WsWebSocket[] = [];
+  const viewerClientSockets: WsWebSocket[] = [];
+  const clientFrames: string[] = [];
+  const clientPings: number[] = [];
+  const serverPongs: number[] = [];
   const closes: CloseRecord[] = [];
   const pullAttempts = new Map<string, number>();
   const statuses: SyncStatus[] = [];
@@ -334,7 +355,14 @@ async function buildFixture(): Promise<Fixture> {
   // appending rather than overwriting, so a later cut can always name the
   // socket that is live NOW.
   app.websocketServer.on('connection', (socket, request) => {
-    if (request.headers.authorization === `Bearer ${viewerUser.token}`) viewerSockets.push(socket);
+    if (request.headers.authorization !== `Bearer ${viewerUser.token}`) return;
+    viewerSockets.push(socket);
+    // AN ADDITIONAL `pong` listener, beside the route's own (`routes.ts:290`,
+    // which stamps `lastHeardAt`). `ws` emits to every listener, so this
+    // observes the heartbeat's answer without standing in for it — and it is
+    // the only place the answer is visible at all, because a protocol pong is
+    // routed to this event and never to `message`.
+    socket.on('pong', () => serverPongs.push(Date.now()));
   });
 
   const heldPull = deferred<Response>();
@@ -389,6 +417,23 @@ async function buildFixture(): Promise<Fixture> {
     socket.on('close', (code: number, reason: Buffer) => {
       closes.push({ code, reason: reason.toString() });
     });
+    viewerClientSockets.push(socket);
+    // `on('message')` for the same reason `on('close')` is here: the transport
+    // OWNS `onmessage` and hands the parsed frame to the engine, so the BYTES
+    // the server actually sent are visible nowhere else on the client. `ws`'s
+    // `onmessage` setter adds its own listener and does not clobber this one.
+    socket.on('message', (data: Buffer) => {
+      clientFrames.push(data.toString('utf8'));
+    });
+    // OBSERVING the protocol ping, not answering it. `ws` has ALREADY sent its
+    // automatic pong by the time this fires (`lib/websocket.js` pongs inside
+    // the receiver's own `ping` handler, before it emits the event), so this
+    // listener changes nothing on the wire — which is exactly what makes it a
+    // usable control for 12.344, where the case adds a second listener that
+    // does.
+    socket.on('ping', () => {
+      clientPings.push(Date.now());
+    });
     return socket as unknown as WebSocketLike;
   };
 
@@ -423,6 +468,10 @@ async function buildFixture(): Promise<Fixture> {
       return Number(row.workspace_seq);
     },
     viewerSockets,
+    viewerClientSockets,
+    clientFrames,
+    clientPings,
+    serverPongs,
     closes,
     pullAttempts,
     statuses,
@@ -866,6 +915,191 @@ describe('12.290 — a real socket, really cut, mid-pull', () => {
         'catching-up',
         'live',
       ]);
+    },
+    120_000,
+  );
+});
+
+/**
+ * Every frame of one type the CLIENT's raw socket actually received, parsed.
+ *
+ * Read off the BYTES rather than off the engine: `http-transport.ts`'s
+ * `onmessage` drops what it does not recognise and hands the rest to the
+ * engine already narrowed, so a frame the client is not supposed to get is
+ * exactly the frame that vanishes there. Everything the server sends on this
+ * socket is JSON — `sendFrame` is `socket.send(JSON.stringify(frame))` — so a
+ * parse failure here would itself be a finding.
+ */
+function framesOfType(raw: readonly string[], type: string): Array<Record<string, unknown>> {
+  return raw
+    .map((text) => JSON.parse(text) as Record<string, unknown>)
+    .filter((frame) => frame.type === type);
+}
+
+/**
+ * The code is TYPED rather than spelled inline: `StreamErrorCode` is the union
+ * `stream-frames.ts` exports, so renaming the member reddens this at COMPILE
+ * time instead of leaving a literal that quietly stops matching — 12.327's own
+ * lesson, applied to the other end of the same wire. **The MESSAGE has no
+ * constant to read** — it is an inline literal at `stream/routes.ts:347` — so
+ * it is copied deliberately, and a re-wording is meant to redden this case.
+ */
+const BAD_MESSAGE_CODE: StreamErrorCode = 'bad-message';
+const BAD_MESSAGE_TEXT = 'expected {type:"subscribe", workspaceId, afterSeq}';
+
+describe('12.344 — a PROTOCOL ping, answered as if it were an application frame', () => {
+  /**
+   * ## The hazard 12.361 named and left unbuilt, built
+   *
+   * 12.328 deleted a text `ping`/`pong` protocol nothing implements, on source
+   * evidence: `stream/routes.ts:319` sends `socket.ping()`, a WebSocket
+   * PROTOCOL control frame, and `ws` answers it automatically and routes the
+   * answer to a dedicated `socket.on('pong')` listener (`:290`) — never to
+   * `message`. `WebSocketLike` (`http-transport.ts`) exposes only
+   * `onopen`/`onmessage`/`onclose`/`onerror`, so **a client built against that
+   * abstraction cannot see a protocol ping at all**, let alone mishandle one.
+   *
+   * 12.361 then recorded what that reasoning does NOT cover: `webSocketFactory`
+   * is an injected seam, so the rule is a property of what gets injected, and a
+   * shell that injected a real `ws` socket and wired its `on('ping')` to a TEXT
+   * reply would be answered `bad-message`. It named this fixture as the one
+   * place in the repo where that is buildable — real `ws` on both ends of a
+   * real upgrade — and left it to whoever owns the file. This is that case.
+   *
+   * ## Why it is a PAIR, and what the pairing buys
+   *
+   * A single run showing `bad-message` after a ping proves nothing on its own:
+   * the frame could be an artifact of the connection, of the heartbeat, or of
+   * anything else this fixture does. So the control and the hazard are **the
+   * same socket, the same `.ping()` call, one line apart** — the only
+   * difference between them is the listener the case adds in between. The
+   * control must genuinely run and genuinely pass: a heartbeat answered by
+   * `ws`'s default alone draws NO complaint, which is also what production does
+   * today, on every connection, thirty seconds at a time.
+   *
+   * ## What is really happening, so the ping is not merely asserted
+   *
+   * The ping is not waited for — 30 s is `DEFAULT_HEARTBEAT_MS` and this
+   * fixture does not inject a scheduler. It is SENT, from the case, on the
+   * SERVER's end of the live connection (the same handle
+   * `forceSlowConsumer` shadows `bufferedAmount` on), so a real control frame
+   * crosses a real TCP connection at a moment the case chooses. Its arrival is
+   * measured on the client's own `ws` instance, and the automatic pong is
+   * measured coming back on the server's — in BOTH phases, because "the added
+   * handler does not disable the default" is only falsifiable if the default is
+   * still seen firing underneath it.
+   */
+  it(
+    '12.344 the control draws no complaint; the same socket, wired to answer the ping with a text {"type":"pong"}, earns bad-message',
+    async () => {
+      const f = await buildFixture();
+      await f.engine.start(f.workspaceId);
+      await awaitLive(f, 'the only subscription');
+
+      // BOTH ENDS OF ONE CONNECTION, named separately because they see
+      // different events: the ping is sendable only from the server's end and
+      // observable only on the client's.
+      expect(f.viewerSockets, 'one accepted upgrade').toHaveLength(1);
+      expect(f.viewerClientSockets, 'one client socket, the other end of it').toHaveLength(1);
+      const serverEnd = f.viewerSockets[0]!;
+      const clientEnd = f.viewerClientSockets[0]!;
+
+      // THE RECORDER IS ALREADY NON-EMPTY, before anything is pinged. `hub.ts`
+      // sends exactly one `caught-up` per subscription, so this is a reading
+      // taken from the product rather than a step the case had to arrange — and
+      // it is what stops "no error frame" below from being a sentence about a
+      // recorder that never worked.
+      expect(framesOfType(f.clientFrames, 'caught-up'), 'the subscription sent its one caught-up').toHaveLength(1);
+      expect(f.clientPings, 'nothing has been pinged yet').toEqual([]);
+
+      // ---- (1) THE CONTROL: a real ping, and `ws`'s default reaction alone --
+      serverEnd.ping();
+      await vi.waitFor(
+        () => {
+          expect(f.clientPings.length, 'the protocol ping never reached the client').toBeGreaterThanOrEqual(1);
+          expect(f.serverPongs.length, 'the client never answered at the protocol layer').toBeGreaterThanOrEqual(1);
+        },
+        { timeout: 15_000, interval: 5 },
+      );
+      const pongsAfterControl = f.serverPongs.length;
+
+      // THE ORDERING CLOSER, and it is an argument rather than a sleep. Frames
+      // reach the client in the order the server wrote them, so if the server
+      // were going to answer ANYTHING the client sent in response to that ping,
+      // that answer is written before the event frame for a commit made after
+      // it was seen. A visible commit, and then its own frame on the wire, is
+      // therefore a point past which "no complaint" is a fact about the whole
+      // round trip and not about how long the case was willing to wait.
+      const looseTicketId = newUlid();
+      const nudge = await f.commit({
+        entity: { kind: 'ticket', id: looseTicketId },
+        type: 'ticket.created',
+        payload: { typeId: TASK_TYPE, projectId: f.projectId, parentId: null, title: 'A ticket the VIEWER can see' },
+      });
+      await vi.waitFor(
+        () => {
+          expect(
+            framesOfType(f.clientFrames, 'event').map((frame) => (frame.envelope as { id?: string } | null)?.id),
+            'the ordering closer never arrived on the wire',
+          ).toContain(nudge.id);
+        },
+        { timeout: 20_000, interval: 10 },
+      );
+      expect(
+        framesOfType(f.clientFrames, 'error'),
+        'THE CONTROL: a heartbeat answered by ws’s default alone draws no complaint',
+      ).toEqual([]);
+
+      // ---- (2) THE HAZARD: one added listener, nothing else changed --------
+      // The shell 12.361 describes: something that "answers" a low-level ping
+      // the way it would answer an application-level message. `ws`'s automatic
+      // pong has already gone out by the time this runs, so this is an EXTRA
+      // frame on top of the default rather than a replacement for it — which is
+      // why the pong count is asserted to keep growing below.
+      clientEnd.on('ping', () => {
+        clientEnd.send(JSON.stringify({ type: 'pong' }));
+      });
+      const pingsBeforeHazard = f.clientPings.length;
+      serverEnd.ping();
+
+      await vi.waitFor(
+        () => {
+          expect(f.clientPings.length, 'the second ping never reached the client').toBeGreaterThan(pingsBeforeHazard);
+          expect(
+            f.serverPongs.length,
+            'the added listener SUPPRESSED ws’s automatic pong — the hazard would then be a different one',
+          ).toBeGreaterThan(pongsAfterControl);
+          expect(framesOfType(f.clientFrames, 'error').length, 'no complaint came back').toBeGreaterThanOrEqual(1);
+        },
+        { timeout: 15_000, interval: 5 },
+      );
+
+      // EVERY error frame, not just the first. `DEFAULT_HEARTBEAT_MS` is 30 s
+      // and this run is far shorter, so in practice there is exactly one — but
+      // a spontaneous heartbeat landing while the listener is wired would draw
+      // another identical complaint, and a case that pinned the count would go
+      // red for a reason that is not its subject. What is pinned is the SHAPE,
+      // of all of them.
+      const errors = framesOfType(f.clientFrames, 'error');
+      for (const error of errors) {
+        expect(error, 'the stray text frame was answered as a malformed subscribe').toEqual({
+          type: 'error',
+          workspaceId: null,
+          code: BAD_MESSAGE_CODE,
+          message: BAD_MESSAGE_TEXT,
+        });
+      }
+
+      // ---- (3) A COMPLAINT, NOT A DISCONNECT ------------------------------
+      // `routes.ts` answers a malformed frame and keeps the connection; only a
+      // THROWN handler closes (1011). Asserted so the case's subject stays "the
+      // server answers bad-message" rather than "the socket died somehow", and
+      // so the pair above is provably the same socket start to finish.
+      expect(f.closes, 'nothing was closed').toEqual([]);
+      expect(f.viewerSockets, 'one connection for both halves of the pair').toHaveLength(1);
+      expect(f.viewerClientSockets, 'and one client socket for both halves').toHaveLength(1);
+      expect(f.engine.status(), 'the engine is still live').toBe('live');
+      expect(f.statuses, 'no reconnect happened at any point').toEqual(['connecting', 'catching-up', 'live']);
     },
     120_000,
   );
