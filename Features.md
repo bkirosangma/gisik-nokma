@@ -1602,3 +1602,123 @@ completion of Plan 11 as a whole from this section's presence.)*
   IST regardless of any per-database `ALTER`, which is exactly the unfalsifiable-demo trap the plan's own
   suggested proof text would have fallen into. `scripts/check-db-timezone.mjs`, root `package.json`'s
   `check:db-tz` script
+- ⚙️ **Backups — a nightly `pg_dump`, a weekly ledger export, and a daemon that phones home when
+  either fails (Task 11)** — `exportLedger` writes the whole ledger as gzipped ndjson, one envelope per
+  line, in `readLedger`'s canonical replay order, to `ledger/YYYY-MM-DD.ndjson.gz`. **This export, not
+  the dump, is the fundamental recovery artifact**: every projection rebuilds from the ledger (Plan 1's
+  rebuild path and the verify-projections gate prove it continuously), so the ndjson alone is
+  sufficient. **Known ceiling, recorded rather than discovered:** `readLedger` materialises the whole
+  `events` table before a byte is written, so this job's peak memory scales with the ledger even though
+  its gzip/upload half is streamed — the multipart-streaming claim below is true of `pg_dump` and not of
+  this. On the `basic-xxs` (512 MB) worker the deploy spec provisions, it is the one job whose OOM means
+  no recovery artifact (case 13.34). `dumpDatabaseToSink` streams a custom-format `pg_dump` straight to
+  `pg/YYYY-MM-DDTHH-mm.dump` without buffering it — the *convenient* restore — and on a non-zero exit it
+  **discards the key it was writing to** before throwing, because the sink was handed `child.stdout`
+  before the exit code existed and a truncated archive at a normal-looking dated key is what a restore
+  drill reaching for "the latest dump" would pick up. Its connection password travels in `PGPASSWORD`,
+  never in argv, where any process on the host could read it. `msUntilNextUtc` computes the delay to the
+  next `HH:MM` UTC, optionally constrained to a day-of-week, and `startBackupDaemon` runs both jobs on
+  that clock, writing **every** failure to stderr as structured JSON *itself* and then handing it to an
+  `ErrorAlerter`, and re-arming rather than dying, because a backup that fails silently is a lie about
+  being backed up. The stderr line lives in the daemon and not in the alerter on purpose: every alerter
+  the daemon can be handed may be silent (Task 3's `NoopErrorAlerter` is empty, and the default
+  deployment gets it), so an alerter-only witness would have gone quiet the moment the shim below was
+  retired. `backup-daemon-main.ts` is the worker entry `deploy/do/app.yaml` names (`node
+  dist/ops/backup-daemon-main.js`, confirmed against `tsconfig.json`'s `rootDir`/`outDir`); `--once` runs
+  **both** jobs to completion — ledger export first, neither able to veto the other — reports both
+  outcomes and exits non-zero if either failed, which is what the manual/runbook backup uses; `SIGTERM`
+  stops the schedule and ends the pool.
+  `apps/server/src/ops/{schedule,export-ledger,pg-dump,backup-daemon-main}.ts`, `apps/server/package.json`'s
+  `ops:backup-once` script
+- ⚙️ **The backup object sink — a second, deliberately separate S3 client, and why it is not the
+  attachment one** — `s3TargetFromEnv`/`s3SinkFromEnv` build a near-put-only `ObjectSink` (multipart via
+  `@aws-sdk/lib-storage`, so a multi-gigabyte dump never lands in the worker's memory; plus a `discard`
+  that aborts an in-flight upload and deletes the key, so a failed dump leaves nothing behind — abort and
+  delete are both needed, because an unaborted multipart upload leaves paid-for parts no listing shows)
+  and `fetch-backup.ts` is its read half, pulling one object down for a restore. It reads the **live**
+  `OBJECT_STORE_S3_*` credential names — the plan's own `S3_ENDPOINT`/`S3_ACCESS_KEY` draft names
+  nothing reads are not used — and takes only its BUCKET from a separate variable (`BACKUP_S3_BUCKET`),
+  so backups can never land in the attachment bucket. `deploy/do/app.yaml`'s backup worker recorded that
+  reuse as an **UNRESOLVED** assumption and this settles it, amending that file in the same change set:
+  the worker now sets endpoint, region and path-style alongside the credential pair. It has to.
+  `s3TargetFromEnv` REFUSES to boot without `OBJECT_STORE_S3_ENDPOINT` and `OBJECT_STORE_S3_REGION`,
+  naming them — **stricter than `createObjectStoreFromEnv`, deliberately**, not a mirror of it. An
+  earlier revision required only bucket and credentials and defaulted the region to `us-east-1`, and
+  that was measured to resolve `https://s3.us-east-1.amazonaws.com/gisik-nokma-backups` from the literal
+  environment the worker supplied: DO Spaces credentials posted at Amazon, nightly, invisible in dev
+  because `.env.example` sets both for MinIO. A backup destination has no local-disk fallback to degrade
+  to, so an unset one is a boot-time refusal rather than a default pointing at another provider. It
+  deliberately does **not**
+  reuse `attachments/object-store.ts`'s `assertValidObjectKey`: that validator refuses any key
+  containing a dot and is right to, because attachment keys derive from caller-supplied input where a
+  `..` is a traversal attempt (its own planted-defect test pins that). Backup keys are server-generated
+  from a timestamp and legitimately carry dots, so widening a live security control in one subsystem to
+  suit another was rejected in favour of two separate implementations — the reasoning is recorded in the
+  file so nobody "fixes" it back. Every credential is destructured off `env` rather than read as
+  `env.NAME`, the one shape `scripts/check-env-example.mjs`'s D2 detector can see — load-bearing for a
+  future backup-only variable rather than for these five, which the gate already attributes to
+  `attachments/store-config.ts` (its `record()` is first-write-wins and the walker reaches `attachments/`
+  first); proven by adding a genuinely new name to this file's destructuring and watching the gate fail
+  naming this path (case 13.20).
+  `apps/server/src/ops/{object-sink,fetch-backup}.ts`, `apps/server/package.json`'s `ops:fetch-backup`
+  script
+- ⚙️ **`error-alerter-shim.ts` — a named placeholder, not a second implementation** — Task 3's real
+  `apps/server/src/alerts/error-alerter.ts` is unmerged, so this file exports the same two names
+  (`ErrorAlerter`, `alerterFromConfig`) with the same shapes, logs every failure as structured JSON to
+  stderr regardless, and posts best-effort to `ALERT_WEBHOOK_URL` — catching and logging a send failure
+  rather than letting the failure to report a failure become a second failure. Writing `src/alerts/`
+  here would have landed a competing implementation the moment Task 3 merges; the file's header says so
+  and names the one-line change (delete it, repoint two imports) that retires it. That change really is
+  one line now: the never-silent property lives in `startBackupDaemon`'s own catch, not here, so
+  swapping in Task 3's logging-free `WebhookErrorAlerter` or empty `NoopErrorAlerter` cannot make a
+  backup failure silent.
+  `apps/server/src/ops/error-alerter-shim.ts`
+- ⚙️ **The restore drill — `restore.sh`'s scratch-only guard, and the automated proof that a restored
+  database still verifies (Task 12)** — `scripts/restore.sh <dump-file> <target-database-url>
+  [--force-live]` runs `pg_restore --no-owner --no-privileges` and then prints the `verify:projections`
+  command, because **a restore is not done until the freshness gate is clean** — the script deliberately
+  does not claim success on its own. Its guard reads the database name out of the target URL and
+  **refuses any name not containing `scratch`, `restore` or `drill`** unless `--force-live` is passed:
+  restoring over a live database is a deliberate act, not a typo away. The guard runs BEFORE the
+  dump-file existence check, so a mistyped target is answered with the target, not sent looking for a
+  file. `apps/server/test/ops/restore-drill.test.ts` dumps a seeded database, restores into a bare
+  scratch database and accepts the restore only when **the row count crossed** (the restored `events`
+  count matches the count measured in the source, with a `> 0` floor) **and** `verifyProjections` is
+  clean **and** the restored ledger still refuses an UPDATE; a planted-drift case corrupts
+  `proj_entity_heads` and requires the gate to name that table. The count check is not decoration:
+  measured by restoring `--schema-only`, the verify-clean case still PASSED against an empty database
+  while the count case failed `expected +0 to be 21` — an empty structure verifies clean, so verify
+  alone could never have proven a restore restored anything. The script itself is executed by the suite
+  rather than described by it — refusal, the same invocation one word different in the name getting past
+  the guard, `--force-live`, the usage text, and a real happy-path restore into a second scratch database
+  whose row count is then read back from the database.
+  **For a URL-shaped DSN, the password never reaches argv or the terminal.** `restore.sh` splits it in bash — the
+  same split `src/ops/pg-dump.ts`'s `splitDatabaseUrl` performs for the daemon (case 13.31), including
+  the percent-decode, so the two halves of the pair agree on one DSN — and hands the credential to libpq
+  through `PGPASSWORD`. `pg_restore` is invoked with a password-free URL, and the `verify:projections`
+  next-step line it prints is password-free too, with a note telling the operator to re-supply it. This
+  is an operator script run on the ops box during an incident, where argv is world-readable (`ps -ef`)
+  and terminal scrollback outlives the incident. Both halves are asserted, and the exit-0 restore beside
+  them is what shows the credential was REROUTED rather than merely deleted. **The stated limit:** a DSN
+  the split cannot parse — libpq's non-URL conninfo form, `host=... password=...` — falls through
+  untouched and keeps the old argv behaviour. That is the same fail-open-on-parse choice
+  `splitDatabaseUrl` makes, for the same reason (refusing would break a form the tool accepts), and it is
+  a real remaining exposure for anyone who restores with a conninfo string rather than a URL.
+  **Version rule, and the one thing here NO automated test covers:** the `pg_restore` used must be at
+  least as new as the `pg_dump` that produced the archive AND no newer than the target server's major
+  version. Measured 2026-09-06: `pg_restore` 18.4 opens every restore with `SET transaction_timeout = 0`
+  (PG17+), which a 16 server rejects — the data lands and the exit code is still non-zero. The rule is
+  printed by `restore.sh` on the path that actually restores (not only by `usage()`, which an operator
+  who typed the command correctly never sees), and stated in `deploy/do/README.md`.
+  **Skew is the ONLY thing allowed to skip the round trip.** The suite gates on client-major ≤
+  server-major, not merely on the binaries existing, and skips loudly (naming both majors) on a skewed
+  workstation rather than reddening; CI runs it on the matched pair `ci.yml` already pins
+  (`postgres:16-alpine` + `postgresql-client-16`). Every OTHER reason a version probe might come back
+  empty — no `psql`, no libpq on `PATH`, Postgres down or not yet ready, unparseable output — is a
+  **failure**, asserted by an always-running precondition test that names the probe and quotes its error.
+  It has to be: the probes used to fail open, `check-no-silent-skips.mjs` cannot see a partially skipped
+  file (the four ungated guard cases always contribute passes), and a readiness blip in CI would
+  otherwise have turned the whole round trip — count, verify, and the only execution of `restore.sh`'s
+  happy path — into a green skip. The trade is disclosed: a machine with no libpq at all now reddens
+  here where it used to skip. The guard cases need only bash and are ungated, so they run everywhere.
+  `scripts/restore.sh`, `apps/server/test/ops/restore-drill.test.ts`, `deploy/do/README.md`

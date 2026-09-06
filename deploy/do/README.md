@@ -18,6 +18,20 @@ Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` /
    backups stay on Standard, which matches the design (nightly dumps and
    weekly ledger exports are read back during the monthly restore drill, so
    a cold tier optimised for never-reading would be the wrong shape).
+   **Version rule for that drill, and for a real disaster:** the `pg_restore`
+   the operator runs must be **at least as new as the `pg_dump` that produced
+   the archive, and no newer than the target server's major version** — a
+   reader older than the archive format refuses outright, and a `pg_restore`
+   newer than the server sends settings the server rejects (measured
+   2026-09-06: `pg_restore` 18.4 opens every restore with `SET
+   transaction_timeout = 0`, a PG17+ parameter, so a 16 server answers
+   `unrecognized configuration parameter` and the restore exits non-zero even
+   though every row landed). On DO managed Postgres the server major is DO's
+   choice and the client is whatever the operator's laptop carries, so this is
+   an operational rule, not a theoretical one. **No automated test in this
+   repo covers either direction** — CI pins a matched pair
+   (`postgres:16-alpine` beside `postgresql-client-16`) precisely so it never
+   exercises the skew; `scripts/restore.sh`'s usage text repeats the rule.
 3. Nothing to substitute in `app.yaml` beyond the SECRET values below — the
    hosts and the two `BUILD_TIME` envs on `web` (`SERVER_ORIGIN`,
    `NEXT_PUBLIC_SERVER_URL`) are already the real production values.

@@ -52,7 +52,18 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // node_modules, dist, .next and *.test.* files, so widening this costs one
 // config file and covers the whole app.
 const ROOTS = ['apps/server/src', 'apps/web', 'packages'];
-const IGNORE = new Set(['NODE_ENV', 'CI', 'PATH', 'HOME', 'TEST_DATABASE_ADMIN_URL']);
+// Variables this codebase does not READ as its own configuration. The gate's
+// subject is the contract between an operator and the app: a name the code
+// reads out of its environment must be documented, or a deployment can be
+// missing a setting nobody can see. These are the other direction or no
+// direction at all -- ambient process variables (PATH, HOME), the runner's own
+// (NODE_ENV, CI), a test-only admin url, and PGPASSWORD, which
+// `src/ops/pg-dump.ts` WRITES into a child process's environment so the
+// database password never appears in argv where `ps` can read it. Its value
+// comes from DATABASE_URL, which IS documented; an operator must never set
+// PGPASSWORD themselves, so documenting it in .env.example would invite
+// exactly the wrong thing.
+const IGNORE = new Set(['NODE_ENV', 'CI', 'PATH', 'HOME', 'TEST_DATABASE_ADMIN_URL', 'PGPASSWORD']);
 // Where the server's configuration contract is declared. A tripwire, not a
 // detector: if this file stops contributing variables, the gate is no longer
 // covering the thing it exists to cover.

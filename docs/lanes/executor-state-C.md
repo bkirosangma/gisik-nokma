@@ -1,4 +1,4 @@
-# Lane C — executor state (Plan 11 T14 done, T15 in flight)
+# Lane C — executor state (Plan 11 T11+T12: PR #183 OPEN, awaiting controller merge)
 
 **This file is Lane C's restart surface, and nobody else's.** `executor-state.md` is Lane A's,
 `executor-state-B.md`/`-D.md`/`-E.md` belong to their own lanes — never edit them. A Lane C session
@@ -10,112 +10,76 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
-## SAFETY CORRECTIONS received from peers — adopt all, they still bind
+## STATUS: PR #183 OPEN — https://github.com/bkirosangma/gisik-nokma/pull/183
 
-**1. Reap by `ppid=1`, never `pgrep -f vitest`.** `pgrep -f vitest` matches every lane session's own
-command line (each embeds brief text containing the word "vitest") plus any peer's live test run.
-`pkill -f vitest` or killing its output would kill lanes A–E and a peer's live gate.
+Head sha `636db92` on `exec/30-plan11-backups`, rebased onto `origin/main` at `3e6d606`. Local gate green:
+`GATE_EXIT=0`, 30/30 tasks, 0 cached, **3439 tests / 269 test files**, node `v22.22.2`. `check:env` and
+`check-case-ids.mjs` both exit 0 on their own. Nothing left to do here except wait for controller review/CI,
+UNLESS the CI-vs-local restore-drill skip discrepancy below turns up something (see "What to check when CI
+runs").
 
-    ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
+## THE STORY, SHORT, FOR THE NEXT SESSION THAT NEEDS IT
 
-Read the list before killing anything; expect it EMPTY.
+1. Branch cut from `origin/main` at `56cd091` (after #146 merged) per the controller's re-task ("Lane C
+   takes Plan 11 T11+T12 after #146").
+2. A Workflow-tool background job implemented, reviewed, and committed T11 then T12. **Its own bug**: the
+   fix→re-review loop gated on the FIRST review's verdict, not the last — so when a SECOND review round on
+   T11 still found one Critical + three Important, the script committed anyway (`cf5b3c5`, since rewritten
+   by rebase). **The lesson, worth carrying into any future Workflow script with a fix→re-review loop: gate
+   on the LAST verdict, always.**
+3. Session hit the account-wide limit mid-flight; checkpointed uncommitted work honestly (labeled WIP) and
+   pushed before the halt, per the controller's instruction.
+4. On resume: the workflow's result arrived (it had finished, not been killed) and revealed the unresolved
+   Critical. **Corrected the handoff immediately** rather than let a stale "reviewed" claim stand, then
+   dispatched a second, narrower fix+review workflow.
+5. That workflow's agents ALSO errored on the (still-recovering) session limit before returning. On the
+   controller's resume instruction: **read the actual diffs myself, verified all four fixes by hand**
+   (including reproducing the boot fix under `env -i` with `deploy/do/app.yaml`'s literal backup-worker env
+   block), ran the affected tests (41 passed), and committed with an honest message crediting the
+   verification method used.
+6. Rebased onto the (by-then-current) `origin/main` at `3e6d606`. Two conflicts, both simple keep-both:
+   `apps/server/package.json` scripts (mine beside Lane D's `seed:*`/`sweep:*`) and
+   `test-cases/13-deployment-dogfooding.md` (Lane D's Task 9/10 cases vs my Task 11 cases, both appended
+   after the same line — no semantic overlap, kept both in task order).
+7. Ran restore-drill.test.ts for the first time ever (it had been committed but never executed): 5 passed /
+   5 skipped, the skip disclosed on stderr as a client/server major-version mismatch (18 vs 16 locally).
+8. Full gate green post-rebase. Force-pushed (rebase rewrote already-pushed history) and opened PR #183.
 
-**2. The gate lock — a bare `echo $$ > pid` pattern never actually holds it** (each Bash tool call is a
-fresh shell, so the pid dies in seconds and every peer's stale-check reclaims almost immediately). Use an
-`mkdir`-based lock, ONE `run_in_background: true` invocation, never split across calls or foregrounded:
-acquire by looping `mkdir /tmp/gisik-gate.lock`, record `$$` in `pid` inside it, `trap` cleanup on EXIT,
-then run `pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1; echo
-GATE_EXIT=$? >> gate.log` inside the held lock. This session's own script:
-`scripts/laneC-gate.sh` pattern (kept in the session scratchpad, not committed) — reap orphans first,
-then wait-and-acquire, then run.
+## WHAT TO CHECK WHEN CI RUNS ON #183 — the controller's instruction, don't skip it
 
-**3. Verify shared external state independently before trusting a peer's word or a stale gate log** —
-Postgres reachability, whether a branch a peer describes has actually merged, whether `origin/main`
-moved again since your last fetch. This session hit exactly that last one twice in one restart (below).
+**Locally the restore drill's round-trip half SKIPS** (client 18 vs server 16 — this machine's libpq vs the
+compose Postgres). **CI installs `postgresql-client-16`** (this same branch's own Task 14 CI work), so in
+CI that half should actually RUN, not skip. Read the `server-tests` shard's real step output once CI
+finishes and confirm it shows something like "N passed, 0 skipped" for `restore-drill.test.ts`, not the
+same 5-skipped shape as local. **If CI shows the same skip, that is a live finding, not a shrug** — the
+controller named this explicitly: a skip that discloses its reason locally and silently persists in CI is
+the "check that cannot fail" class in its deployment costume. Put the real CI number in the PR body/thread
+once known.
 
-## STATUS AS OF THIS WRITE, 2026-09-06 ~07:45 IST
+## KNOWN, DISCLOSED LIMITATIONS (already stated in the PR body and in-code — not new work items)
 
-**T14 is MERGED** — PR #134 at `3571d38` on `main`, promoted to done (11/14) at `cc42d01` (#144), both
-confirmed reachable via `git branch --contains`. Nothing to do there; do not re-implement it.
+- No automated test proves a cross-version restore (`pg_restore` older or newer than the `pg_dump` that
+  wrote the archive) — `restore.sh`'s usage text and `deploy/do/README.md` both say so, naming the specific
+  failure (a newer `pg_restore` sends settings like `transaction_timeout` an older server rejects).
+- The backup worker's boot fix was verified under a synthetic `env -i` block, not against real DigitalOcean
+  Spaces credentials or an actual deployed worker.
+- `error-alerter-shim.ts` is temporary. Lane E's Plan 11 Task 3 (`apps/server/src/alerts/error-alerter.ts`)
+  is still on `origin/exec/23-plan11`, not `main`, as of `3e6d606`. **Whoever rebases past T3 first: delete
+  the shim, repoint its two importers (`schedule.ts`, `backup-daemon-main.ts`) at
+  `../alerts/error-alerter.js` — nothing else should need to change**, per the shim's own header (a checked
+  claim, not a hope — verified against the real module by `git show origin/exec/23-plan11:...` before this
+  PR opened).
 
-**T15 is committed and gated green on branch `exec/28-plan11-do-spec`, not yet pushed/PR'd as of this
-write — check below before assuming it still isn't.** Restarted this session cut the branch fresh from
-`origin/main` (`git checkout -b exec/28-plan11-do-spec origin/main`, base `3571d38`), cherry-picked the
-prior session's WIP commit (`2df7cf5`, held on the old branch `exec/24-plan11-ci-deploy` for exactly this
-reason), then amended it into a real commit (dropped the "WIP" message) after folding in cross-lane
-review from Lane E and rebasing.
+## NEXT ERRANDS, QUEUED, NOT STARTED (per the controller's instruction — after #183 merges)
 
-## LIVE ANCHORS — verified 2026-09-06 ~07:48 IST, re-verify before trusting
-
-| anchor | value | how verified |
-|---|---|---|
-| worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8` | `pwd` |
-| branch | `exec/28-plan11-do-spec` (NEW — the old `exec/24-plan11-ci-deploy` is merged, left alone) | `git branch --show-current` |
-| HEAD | `c48302c` | `git rev-parse HEAD` |
-| `origin/main` at last rebase | `1b72900` (Closure 5 / Ruling P37, #139) | `git rev-parse origin/main`, `git branch --contains 1b72900` includes this branch |
-| ahead of `origin/main` | 1 commit (T15, real message) | `git log origin/main..HEAD --oneline` |
-| `pnpm check:env` | exit 0, 47 documented / 26 referenced, unchanged by this branch's additions | ran directly on the rebased tree |
-| `scripts/check-case-ids.mjs` | exit 0, 1272 unique ids, highest `13.76`, self-test passes | ran directly on the rebased tree |
-| `scripts/check-db-timezone.mjs` | exit 0 against shared dev Postgres (`localhost:54329`), prints `Asia/Kolkata` | ran directly |
-| full forced gate at `3571d38`+T15 (BEFORE the Closure-5 rebase) | green: `GATE_EXIT=0`, 30/30 tasks, 0 cached, 253 files / 3320 tests, 1m45s | `/tmp/laneC-gate2.log` — **superseded by the re-gate below, kept only as a data point** |
-| full forced gate at `c48302c` (AFTER rebasing past Closure 5, HEAD before the handoff commit) | **green: `GATE_EXIT=0`, 30/30 tasks, 0 cached, 256 files / 3334 tests, 1m27s** — `origin/main` re-fetched immediately after and confirmed unchanged (`1b72900`) before trusting this | `/tmp/laneC-gate3.log`, summed directly from its per-package `Test Files`/`Tests` lines, not estimated |
-
-**The trap this restart actually hit, twice, worth naming for the next one:** `origin/main` moved TWICE
-between "fetch and branch" and "ready to commit" — once by two docs-only commits (safe to ignore), once
-by a real code merge (Lane B's Closure 5, `visible-events-for.ts`/sync surface) that landed **during the
-gate run this session had already kicked off against the pre-Closure-5 tree**. A gate that passed against
-a tree you then rebased past is not evidence about the tree you're now on — **re-verify `origin/main`'s
-sha immediately before trusting any completed gate, not just before starting one.**
-
-## WHAT'S IN THE T15 COMMIT
-
-`deploy/do/app.yaml` + `deploy/do/README.md` (DigitalOcean App Platform spec: server/web/backup-worker,
-region `blr`, managed Postgres, object storage + backup env vars named against the ACTUAL schema —
-`OBJECT_STORE_S3_*`/`SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, not the plan's unread `S3_*`/
-`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` draft; `MAGIC_LINK_FROM=contact@artsourced.in` per the 2026-09-02
-owner correction; not applied to any live app), `scripts/check-db-timezone.mjs` (falsifiable against a
-throwaway UTC-forced database, re-verified against the shared dev Postgres this restart), root
-`package.json` (+`check:db-tz` script, +`pg` devDependency `^8.13.0`→resolved `8.23.0`) + regenerated
-`pnpm-lock.yaml` (cleared with Lane E as manifest owner — confirmed by Lane E directly, no collision),
-`Features.md` + `test-cases/13-deployment-dogfooding.md` (13.7/13.8 flipped `❌`→`🧪` now the files
-actually exist on this branch).
-
-**Two items folded in from Lane E's cross-lane review during this restart, both phrased to hold
-regardless of merge order** (Lane E flagged that the first draft of both was only true *because* of an
-assumed merge order — the exact "checks that cannot fail" class this whole series hunts):
-- README's `DATABASE_CA_CERT`/`sslmode` item now states the CA-discard as a present-tense fact about
-  `main` today (not "Lane E fixed it"), naming Lane E's T1 `withoutSslParameters` (`apps/server/src/db.ts`,
-  on unmerged `origin/exec/23-plan11`) as the fix and stating plainly "until that lands, a CA set here has
-  no effect."
-- `app.yaml`'s `TRUST_PROXY` comment now names the rightmost-XFF rate-limit-key fix as "Plan 11 T2 (not
-  yet on main)" and states the forged-header gap is open on whatever's on `main` today — not contingent on
-  which PR merges first.
-
-Confirmed directly against Lane E's branch (`origin/exec/23-plan11` at `f7c9b0f` when checked, later
-`T2 committed and green` per Lane E's own report): `DEPLOY_SHA`, `TRUST_PROXY`, `RATE_LIMIT_*`,
-`ALERT_WEBHOOK_URL`, `SMTP_URL`, `MAGIC_LINK_FROM`, `DATABASE_CA_CERT` all land in `config.ts` under the
-exact names this spec already uses — no renaming needed when Lane E's branch merges.
-
-## NEXT STEPS, IN ORDER
-
-1. **Re-verify `origin/main`'s sha right now** — do not trust the "AFTER rebasing past Closure 5" gate
-   row above without re-fetching first; another lane may have merged again since this was written.
-2. Confirm the re-gate's `GATE_EXIT=` line is `0` at the CURRENT `origin/main` sha. If `origin/main` moved
-   again while that gate ran, rebase again and re-gate again — do not commit/push on a stale gate.
-3. Push `exec/28-plan11-do-spec`, open the T15 PR. Report to `gisik-nokma-0d`: head sha, `Tasks:` line,
-   test count, node version, `0 cached`, `check:env` on its own line, and the honest sentence: "the spec
-   was not applied to any live app."
-4. Do NOT start any other Plan 11 task without a controller message (Lane D has T7/T8/T9/T10, Lane E has
-   everything else named in the file map from the override brief).
+- `ops:sweep-orphans` (monthly, 30-day, object-store orphans with no ledger event) and scheduling
+  `tools/sweep-notifications.ts` — both fold into `src/ops/schedule.ts`'s existing scheduler, not a second
+  one. Lane D takes the two data-retention sweeps in `src/tools/` separately.
 
 ## THINGS A RESTARTED SESSION MUST NOT ASSUME
 
-- Any sha in this file is stale the moment another lane's PR merges — `origin/main` moved three times in
-  the roughly 20 minutes this restart took to get T15 from cherry-pick to gate. `git fetch` and compare
-  before trusting an anchor, including the ones in this file.
-- A gate log's `GATE_EXIT=0` is evidence about the tree it ran against, not about "the branch" in general —
-  check the log's own timestamp against `git log -1 --format=%cd` and against whether you've rebased since.
-- Lane E's branch (`origin/exec/23-plan11`) is unmerged and moving — anything cited from it above
-  (`DEPLOY_SHA`, `TRUST_PROXY` semantics, the CA fix) is real on that branch, not yet on `main`. The T15
-  files are written so their prose stays true either way; re-check that a later edit hasn't broken that
-  property if you touch them again.
+- `origin/main` has certainly moved again since `3e6d606` — refetch before trusting any anchor above.
+- Do not re-implement T11 or T12. Do not start the sweep-orphans/sweep-notifications errand before #183
+  merges.
+- A gate result is a fact about the tree it ran against at that moment, not about "the branch" in general —
+  re-verify before relying on the numbers above if any time has passed or any commit landed since.
