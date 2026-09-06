@@ -21,6 +21,7 @@ export { createReplica } from './replica/replica.js';
 export type {
   BootstrapResponse,
   BootstrapTicket,
+  TicketBootstrap,
   LocalContest,
   Me,
   Replica,
@@ -32,7 +33,7 @@ export { buildLocalEngineContext, buildPendingOverlay } from './precheck/local-c
 export type { LocalContextDeps, PendingOverlay } from './precheck/local-context.js';
 export { backoffMs, createOutbox } from './outbox/outbox.js';
 export type { EnqueueResult, Outbox, OutboxItem, PendingTicket, SyncEventResult } from './outbox/outbox.js';
-export { createSyncEngine } from './engine/sync-engine.js';
+export { createSyncEngine, TicketPullNotFound } from './engine/sync-engine.js';
 export type {
   ApplyFailure,
   ReconcileAnswer,

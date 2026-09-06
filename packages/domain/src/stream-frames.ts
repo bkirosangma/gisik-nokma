@@ -129,6 +129,27 @@ export type ClientStreamFrame = SubscribeFrame;
 export const STREAM_ERROR_CODES = ['bad-message', 'not-a-member', 'already-subscribed'] as const;
 export type StreamErrorCode = (typeof STREAM_ERROR_CODES)[number];
 
+/**
+ * One ticket a reach notice names, and the server's head position for it.
+ *
+ * **`headSeq` is what makes the notice usable, and ruling P37.2 added it after
+ * an id-only notice was MEASURED not to work.** The client cannot tell a
+ * complete local copy from a STALE PARTIAL one by asking whether it holds the
+ * ticket, and it cannot ask the server either: a notice only ever names ids the
+ * viewer can see NOW, and `reconcile` only ever answers about ids they CANNOT —
+ * complementary predicates over the same `canSee`, so their intersection is
+ * empty by construction. Staleness here is about CONTENT; `canSee` answers
+ * about AUDIENCE. One integer settles it: the client pulls iff its own highest
+ * `workspaceSeq` for that ticket is below this one.
+ *
+ * It discloses nothing a moment's patience would not: the viewer may already
+ * read this ticket in full, and the pull that follows delivers its whole
+ * history. And it keeps the amplifier bound — a client already current on the
+ * subtree compares equal and fetches nothing, which is the property case 12.276
+ * measures.
+ */
+export type ReachGrantedTicket = { id: string; headSeq: number };
+
 export type ServerStreamFrame =
   | { type: 'event'; envelope: LedgerEvent }
   | { type: 'purge'; workspaceId: string; entityId: string }
@@ -152,6 +173,58 @@ export type ServerStreamFrame =
    * whole workspace's replica for the loss of one project.
    */
   | { type: 'scope-revoked'; workspaceId: string; projectId?: never }
+  /**
+   * **The reader's reach just grew, and here are the ids it now admits.**
+   * Ruling P37.1 / closure 5b(d) — the fourth member, and the first added since
+   * the union was reconciled with its client mirror.
+   *
+   * ## Why a NOTICE and not the history itself
+   *
+   * Closure 5 pushed the history: a widening streamed the ticket's whole
+   * pre-cursor tail, and every one of those envelopes sits at or below the
+   * subscriber's cursor by construction, so NONE of them moved it. A
+   * slow-consumer close mid-burst therefore left the client at the same cursor,
+   * to be handed the identical burst on reconnect and cut short again —
+   * permanently and silently (case 12.290). The obvious repair, yielding the
+   * trigger first so the cursor advances before the burst, is unsafe:
+   * `ticket.reparented` is FOLDED, so a client that never held the ticket would
+   * replay a transition with no `ticket.created` and stall terminally.
+   *
+   * So the direction inverts, into the shape `/v1/sync/reconcile` already uses
+   * for the narrow side: **the server names ids, the client fetches what it
+   * lacks** through `GET /v1/sync/bootstrap/ticket`. Bounded by construction —
+   * a list of ids is a list of ids however long the histories behind it are —
+   * and a client that already holds the subtree does no work at all, which is
+   * what bounds the amplifier `check-permission.ts` does not: it does not
+   * refuse a `visibility.set` that sets the mode a ticket already has.
+   *
+   * ## This is NOT 6.101's purge walk coming back the other way
+   *
+   * The server enumerating ids to a client is the exact inversion of
+   * `reconcile-route.ts`'s safety argument, so the distinction has to be
+   * stated rather than left to be re-derived. A purge names an entity to a
+   * device that may never have held it — the recipient learns a ticket exists
+   * and is now hidden, which is news. A notice names ids the recipient is at
+   * that moment ENTITLED TO READ IN FULL, and would read in full a moment later
+   * by asking. Nothing in it is a disclosure, because the whole point is that
+   * the reader may now have the contents. **A widening self-selects; a
+   * narrowing self-excludes** — `grant-backfill.ts`'s own asymmetry, and the
+   * reason a trigger this coarse stays legal under 6.82 and 6.94.
+   *
+   * ## No cursor, deliberately
+   *
+   * Like `purge` and `scope-revoked` it carries no resume position, and for a
+   * sharper reason than they do: it must be re-delivered if the client is cut
+   * off before it finishes pulling. Its trigger event follows it and IS above
+   * the cursor, so a subscription that dies here resumes at the same place and
+   * regenerates both.
+   *
+   * `tickets` may name a ticket the client already holds — the server does not
+   * know a device's holdings and must not model them. Each entry carries that
+   * ticket's head position so the client can tell a copy it holds COMPLETELY
+   * from a stale partial one; see `ReachGrantedTicket`.
+   */
+  | { type: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] }
   | { type: 'caught-up'; workspaceId: string; seq: number }
   | { type: 'error'; workspaceId: string | null; code: StreamErrorCode; message: string };
 
@@ -197,6 +270,22 @@ export const serverStreamFrameSchema = z.discriminatedUnion('type', [
     .object({ type: z.literal('purge'), workspaceId: ulidString, entityId: ulidString })
     .strict(),
   z.object({ type: z.literal('scope-revoked'), workspaceId: ulidString }).strict(),
+  z
+    .object({
+      // `ulidString` per element, not `z.string()`: a notice is a list of
+      // TICKET ids and nothing else, so a mock that put a slug or a name in
+      // here fails at this schema rather than at the client's pull.
+      type: z.literal('reach-granted'),
+      workspaceId: ulidString,
+      // `headSeq` is a WORKSPACE sequence and therefore `>= 1`: it is assigned
+      // inside the appending transaction under `lockWorkspace`, so a mock that
+      // has not spoken to a ledger has nothing true to put here — the same
+      // property that makes `envelope.workspaceSeq` hard to fake.
+      tickets: z
+        .array(z.object({ id: ulidString, headSeq: z.number().int().min(1) }).strict())
+        .min(1),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('caught-up'),

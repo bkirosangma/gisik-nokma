@@ -217,33 +217,60 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
         // `entity.kind` is nested, so a top-level `kind` is a sound test for an
         // instruction — `visible-events-for.ts` states this discrimination rule
         // where `SyncItem` is defined, because the plan's own header documents
-        // a two-way union over a three-member type.
-        if (item.kind === 'purge') {
-          send(sub, { type: 'purge', workspaceId: sub.workspaceId, entityId: item.entityId });
-        } else {
-          if (item.projectId !== undefined) {
-            // Fail closed. The frame's `projectId` is `?: never` because no
-            // emitter produces one; dropping the narrowing here would tell the
-            // replica to empty a whole workspace for the loss of one project,
-            // and inventing a wire field on the fly would ship a protocol
-            // nobody agreed. Reachable only through an injected
-            // `visibleEvents`, which is what makes the branch testable today.
-            throw new Error(
-              `stream: scope-revoked carried a projectId (${item.projectId}) and the frame has no field for it`,
-            );
+        // a two-way union over a type that now has four members.
+        //
+        // A SWITCH with no `default`, and it replaced an `if/else` when the
+        // fourth member landed. The old shape read "purge, otherwise
+        // scope-revoked", so a new instruction would have been handled AS a
+        // revocation — and a revocation detaches the subscription and tells the
+        // replica to empty itself. What saved it was an accident of field
+        // names (`item.projectId` does not exist on the new member, so tsc
+        // objected); this shape makes it a compile error on purpose, the way
+        // `audienceOf` and `canSeeResolved` already do it.
+        switch (item.kind) {
+          case 'purge':
+            send(sub, { type: 'purge', workspaceId: sub.workspaceId, entityId: item.entityId });
+            break;
+          case 'reach-granted':
+            // No cursor advance, deliberately, and NOT for `purge`'s reason.
+            // A purge cannot advance one because it names no position; this one
+            // must not, because it has to be RE-DELIVERED if the socket dies
+            // before the client finishes pulling. Its trigger event follows it
+            // and is above the cursor, so a subscription that dies here resumes
+            // at the same place and regenerates both.
+            //
+            // `sub.workspaceId` rather than `item.workspaceId`, for the reason
+            // spelled out at `scope-revoked` below: the hub registered the
+            // former and vouches for it; the latter is whatever the injectable
+            // filter seam yielded, and this module holds no second opinion
+            // about anything the filter says.
+            send(sub, { type: 'reach-granted', workspaceId: sub.workspaceId, tickets: item.tickets });
+            break;
+          case 'scope-revoked': {
+            if (item.projectId !== undefined) {
+              // Fail closed. The frame's `projectId` is `?: never` because no
+              // emitter produces one; dropping the narrowing here would tell the
+              // replica to empty a whole workspace for the loss of one project,
+              // and inventing a wire field on the fly would ship a protocol
+              // nobody agreed. Reachable only through an injected
+              // `visibleEvents`, which is what makes the branch testable today.
+              throw new Error(
+                `stream: scope-revoked carried a projectId (${item.projectId}) and the frame has no field for it`,
+              );
+            }
+            // `sub.workspaceId`, not `item.workspaceId`: the hub registered the
+            // former and vouches for it, while the latter is whatever the
+            // injectable filter seam yielded — and this module's header says it
+            // holds no second opinion about anything the filter says. They
+            // coincide today, which is exactly why the less trustworthy spelling
+            // would survive unnoticed. The `purge` above already reads
+            // `sub.workspaceId`.
+            send(sub, { type: 'scope-revoked', workspaceId: sub.workspaceId });
+            // Terminal — see the header. Ends this workspace's subscription and
+            // leaves the socket and its other subscriptions alone.
+            detach(sub);
+            return;
           }
-          // `sub.workspaceId`, not `item.workspaceId`: the hub registered the
-          // former and vouches for it, while the latter is whatever the
-          // injectable filter seam yielded — and this module's header says it
-          // holds no second opinion about anything the filter says. They
-          // coincide today, which is exactly why the less trustworthy spelling
-          // would survive unnoticed. The `purge` two lines above already reads
-          // `sub.workspaceId`.
-          send(sub, { type: 'scope-revoked', workspaceId: sub.workspaceId });
-          // Terminal — see the header. Ends this workspace's subscription and
-          // leaves the socket and its other subscriptions alone.
-          detach(sub);
-          return;
         }
       } else {
         send(sub, { type: 'event', envelope: item });

@@ -40,7 +40,8 @@ type PingFrame = { type: 'ping' };
  * ## Why this is hand-rolled and does NOT call `serverStreamFrameSchema`
  *
  * `@gisik-nokma/domain` publishes `serverStreamFrameSchema`, a zod discriminated
- * union over all five frames, and it was written for exactly this consumer. It is
+ * union over every published frame — FIVE when this was written, SIX since closure 5b added
+ * `reach-granted` — and it was written for exactly this consumer. It is
  * used HERE as the test's oracle rather than as this function's implementation,
  * for three measured reasons:
  *
@@ -63,7 +64,9 @@ type PingFrame = { type: 'ping' };
  *    import above is a TYPE import and is erased.
  *
  * What the test does instead: it feeds `serverStreamFrameSchema`-valid fixtures of
- * all five frames through `parseFrame` and asserts each survives. The relationship
+ * every published frame through `parseFrame` and asserts each survives — which is
+ * what caught `reach-granted` being dropped here in silence, twice: first for a
+ * missing fixture, then for a missing branch. The relationship
  * pinned is one-directional and deliberate — **everything the published schema
  * accepts, this parser accepts** — and this parser is additionally permissive
  * about id shape, which is what reason 1 argues for.
@@ -107,6 +110,36 @@ export function parseFrame(data: unknown): ServerStreamFrame | PingFrame | null 
   // this client may honour, and nothing here reads one.
   if (frame.type === 'scope-revoked' && typeof frame.workspaceId === 'string') {
     return { type: 'scope-revoked', workspaceId: frame.workspaceId };
+  }
+  // Closure 5b(d), ruling P37.1 — "your reach grew, and here are the ids it now
+  // admits". This is the SECOND independent reader of this wire; the other is
+  // `@gisik-nokma/sync-client`'s `net/http-transport.ts`, and the two are linked
+  // by nothing but `serverStreamFrameSchema` and the case that walks its option
+  // list. **The compiler could not find this branch** — the five other consumers
+  // of the union on this branch were type errors and this one was a runtime
+  // `null`, caught only because `test/online/stream.test.ts` asserts every
+  // published member round-trips. Without it the notice would be silently
+  // dropped here while the trigger behind it was accepted, which is exactly the
+  // failure mode `parseFrame`'s own closing comment warns about.
+  //
+  // Elements are FILTERED rather than the frame refused whole, matching the
+  // transport's handling and for its reason: a dropped id costs one un-pulled
+  // ticket that the next widening names again, where refusing the frame would
+  // discard the good ids with the bad one.
+  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string' && Array.isArray(frame.tickets)) {
+    const tickets = frame.tickets.filter(
+      (t): t is { id: string; headSeq: number } =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof (t as { id?: unknown }).id === 'string' &&
+        (t as { id: string }).id !== '' &&
+        // `headSeq` decides whether a ticket is fetched at all, and `NaN < n` is
+        // false — so a junk value would SILENTLY skip the pull this notice
+        // exists to cause, rather than failing loudly. Checked, not trusted.
+        Number.isInteger((t as { headSeq?: unknown }).headSeq),
+    );
+    if (tickets.length === 0) return null;
+    return { type: 'reach-granted', workspaceId: frame.workspaceId, tickets };
   }
   if (frame.type === 'caught-up' && typeof frame.seq === 'number' && typeof frame.workspaceId === 'string') {
     return { type: 'caught-up', workspaceId: frame.workspaceId, seq: frame.seq };

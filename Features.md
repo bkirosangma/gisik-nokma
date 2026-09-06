@@ -1459,19 +1459,56 @@ survived a whole task.)*
   replica. The stale copy that remains is the accepted under-purge residual of case 6.104 — **recorded,
   and deliberately not pinned by a test**, because 6.104's owner is Plan 10 and an assertion would be a
   test that closing the gap must break.
-- ✅ **A re-widened ticket comes back even if the client read something else meanwhile — backfill on
-  newly granted visibility** *(this bullet was ⚙️ and described the DEFECT; closure 5 closed it)* — when
-  an event widens a ticket's audience, the catch-up filter hands that ticket's pre-cursor history, and
-  every inheriting descendant's, to everyone in the NEW audience, cursor notwithstanding. The trigger is
-  the visibility event itself and never a reconstructed prior audience — there is no before-image to
+- ✅ **A re-widened ticket comes back even if the client read something else meanwhile — a bounded
+  NOTICE on newly granted visibility, and the client pulls what it lacks** *(this bullet was ⚙️ and
+  described the DEFECT; closure 5 closed it by PUSHING the history, and closure 5b re-shaped it under
+  ruling P37.1 because pushing wedged)* — when an event widens a ticket's audience, everyone in the NEW
+  audience is sent a `reach-granted` frame naming that ticket and every inheriting descendant, and each
+  client fetches the ones it does not already hold through `GET /v1/sync/bootstrap/ticket`. The trigger
+  is the visibility event itself and never a reconstructed prior audience — there is no before-image to
   reconstruct and re-deriving one is banned — and what makes that coarse trigger safe is an asymmetry
   rather than a check: a narrowing is invisible to the person it narrowed away, so it never becomes their
-  trigger. A widening self-selects; a narrowing self-excludes. Over-delivery to someone who already held
-  the ticket is harmless because replay is idempotent, which is measured rather than assumed.
+  trigger. A widening self-selects; a narrowing self-excludes.
+  *Why it is a notice and not the history:* the pushed form was an atomic burst that advanced no cursor,
+  so a slow-consumer close mid-burst left the client reconnecting into the identical burst for ever. A
+  list of ids is a list of ids however long the histories behind it are. It also bounds an amplifier the
+  permission check does not: a member may re-issue a visibility change that changes nothing, and a client
+  that already holds the subtree now does no work for it at all. *And it is not a purge walk arriving
+  from the other direction* — a purge names an entity to a device that may never have held it, which is
+  news; a notice names ids the recipient may at that moment read in full.
   *The defect it replaces, kept because it is what the tests measure:* the sync cursor is the highest
   sequence DELIVERED, so one unrelated commit between a narrowing and a re-widening left the client
   holding two events where the server held four, permanently, with no purge, no backfill and no resync
-  path. Cases 12.274-12.283. `apps/server/src/visibility/grant-backfill.ts`
+  path. Cases 12.274-12.283. `apps/server/src/visibility/grant-backfill.ts`,
+  `apps/server/src/sync/sync-routes.ts`, `packages/sync-client/src/replica/replica.ts`,
+  `packages/sync-client/src/engine/sync-engine.ts`
+- ✅ **`GET /v1/sync/bootstrap/ticket` — one ticket's replica payload, so a client can fetch what a
+  notice named** *(closure 5b(d))* — the snapshot, the tail, and the workspace's definitions, which
+  travel WHOLE rather than scoped to the ticket's own workflows because a scoped list missing one
+  intermediate version fails silently at the fold and throws a step later. A ticket the caller may not
+  see and a ticket that never existed get the identical 404: splitting them would make
+  presence-versus-absence an oracle, the disclosure the reconcile door already refuses. The response
+  carries no stream cursor, and the omission is load-bearing — a per-ticket pull that moved the workspace
+  cursor would skip every intervening event for every other ticket and look exactly like convergence.
+  Cases 12.299-12.303. `apps/server/src/sync/sync-routes.ts`
+- ✅ **A pull that fails is remembered, not fatal and not forgotten** *(closure 5b(d))* — the ids a
+  notice named are recorded in durable client storage, so a pull that fails or times out leaves the
+  cursor free to advance while the id stays owed, and the next catch-up retries it. Both alternatives are
+  wrong: throwing reaches the engine's stall, which is a one-way latch that only a process restart
+  clears, so a brief network wobble would brick the device; swallowing and forgetting advances the cursor
+  with the ids lost and no path back, because a fresh bootstrap is refused over an existing local
+  baseline. Each pull is bounded by a timeout enforced in the ENGINE rather than the transport, because
+  the transport has other implementors and a wait that never ends would stop the serial apply chain in
+  total silence. Cases 12.292-12.298, 12.305-12.308.
+  - ✅ **…and an id the server will never serve is dropped — keyed to the NOTICE, not to the status code**
+    *(ruling P37.3)* — remembering without a bound was a quiet permanent leak: a revoked project left one
+    HTTP request per catch-up, for ever. The drop cannot key on the 404, because the route answers "you may
+    not see it" and "it never existed" identically **by design**, so the device cannot tell a phantom from a
+    re-widening that raced the pull. Each pending entry instead carries the `workspaceSeq` of the notice that
+    named it, and the 404 drops the entry only if that seq is still the one the pull was issued for — a later
+    notice has already replaced it, so the entry survives and the next catch-up fetches it. **A 404 is never
+    the last word; the next notice is.** Cases 12.317-12.318.
+  `packages/sync-client/src/replica/replica.ts`, `packages/sync-client/src/engine/sync-engine.ts`
 - ✅ **`POST /v1/sync/reconcile` — the client names what it holds and the server says what is no longer
   theirs** *(closure 5's other half; it closes case 6.104, the stale copy nobody takes away)* — a member
   un-shared by a plain visibility change used to keep the copy until a full resync, because a
@@ -1479,12 +1516,36 @@ survived a whole task.)*
   direction instead: the device presents its ids, the server answers only about those, and existence is
   never consulted — a fabricated id comes back exactly as a genuine loss does, so the reply's SHAPE
   carries no oracle either. The engine deletes only what it itself presented, because a purge is
-  destructive and local and this device does not need to trust the server to be safe from it. Nothing
-  calls it on a schedule yet; when a device should reconcile is a product decision no plan states.
-  Cases 12.284-12.289. `apps/server/src/sync/reconcile-route.ts`, `packages/sync-client/src/engine/sync-engine.ts`
-- ⚙️ **The backfill is an ATOMIC burst, and a large one can wedge a subscriber — disclosed, capped, not
-  closed** *(ruling P37.1)* — every backfilled envelope sits at or below the client's cursor, so none of
-  them advances it, and the only one that does arrives last. A slow-consumer close before that point
+  destructive and local and this device does not need to trust the server to be safe from it.
+  **The schedule is catch-up completion — which is once per RECONNECT, not once per catch-up**
+  *(closure 5b, case 12.288)*, because the hub sends that frame once per subscription. The moment a
+  device's cursor is current is the moment its holdings may be stale, because a narrowing sends the
+  losing device nothing at all. Gating instead on "the catch-up delivered something" would skip the
+  zero-frame catch-up, which is precisely the case reconcile exists for, so the bound is a minimum
+  interval rather than activity: reconnects are on a fixed delay with no growth, and a flapping socket
+  would otherwise reconcile every two seconds for ever. **Because that schedule is per-reconnect, a
+  grant notice ALSO reconciles the ids it names, before deciding what to pull** *(closure 5c's minimal
+  form)* — otherwise a device on a stable socket that was narrowed and re-widened would keep a stale
+  partial copy indefinitely, the holdings filter being unable to tell it from a complete one. A failure there is swallowed — reconcile is idempotent and the
+  next catch-up retries — and concurrent callers share one in-flight run. **A guest gets the same
+  answers as a member**, which closes case 6.102: the door asks only `canSee`, and `canSee` resolves a
+  guest through the explicit share list exactly as it resolves a member through a project, so nothing
+  about it was ever role-aware — what was missing was the measurement.
+  Cases 12.284-12.289, 12.304. `apps/server/src/sync/reconcile-route.ts`, `packages/sync-client/src/engine/sync-engine.ts`
+- 🟡 **The backfill was an ATOMIC burst that could wedge a subscriber — the MECHANISM is gone; the
+  convergence it asked for is not measured end to end** *(ruling P37.1; disclosed and capped by closure
+  5, re-shaped by closure 5b)* — the grant side streams no history at all now, so the non-progressing
+  burst does not exist, and the 200-ticket cap survives bounding the WALK and the client's pull fan-out
+  rather than the wire. **It is 🟡 rather than ✅ deliberately:** the ruling's flip condition was a
+  slow-consumer close MID-PULL followed by convergence on reconnect, and nothing in this repo can cut a
+  socket — the dual-client rig has none by construction and the engine's tests use a fake transport with
+  no buffer bound. The re-delivery chain is argued from the code and measured link by link, never end to
+  end. What IS measured is what makes the wedge unreachable rather than merely smaller: a failed or
+  timed-out pull leaves its id in durable client storage and the next catch-up retries it, so
+  convergence after an interruption does not depend on the notice arriving twice. Case 12.290 carries
+  the remaining measurement; *owner: unassigned — it needs a harness that can cut a socket mid-drain.* *The defect it replaces, kept
+  because it constrained the fix:* every backfilled envelope sat at or below the client's cursor, so none of
+  them advanced it, and the only one that did arrived last. A slow-consumer close before that point
   leaves the client reconnecting into the identical burst for ever, because the cursor is persisted only
   on catch-up and a fresh bootstrap is refused over an existing local baseline. An interim cap bounds the
   WALK at 200 tickets — breadth-first, so the trigger ticket and the shallowest descendants survive — and
@@ -1492,11 +1553,17 @@ survived a whole task.)*
   first is unsafe and the code says so**: `ticket.reparented` is folded, so a client that never held the
   ticket would replay a transition with no creation event and stall its engine. Case 12.290 owns the
   residual, 12.291 pins the cap. `apps/server/src/visibility/grant-backfill.ts`
-- ⚙️ **Still open on the same surface, named rather than left to be inferred** — visibility that widens
-  because the READER's reach grew (`membership.granted`, `project.member_added`) rather than the ticket's
-  carries the identical pre-cursor gap and is out of ruling P37's scope (case 12.283); and case 6.102's
-  guest side of the reconcile is the same primitive, unmeasured for a guest. *Owner of both: the WS
-  catch-up/purge protocol, unassigned to any task.*
+- ✅ **Visibility that widens because the READER's reach grew, not the ticket's** *(closure 5b, case
+  12.283)* — `membership.granted` and `project.member_added` reveal tickets whose history sits below the
+  client's cursor, the identical gap. It could not be another entry in the ticket-event trigger list, for
+  a structural reason rather than a scoping choice: these are roster events filed against the roster
+  entity, so there is no ticket to start a subtree walk from, and the question inverts with the widening
+  — not who can now see this ticket, but which tickets can this viewer now see. It answers with what the
+  reader can see NOW rather than what they gained, because there is no before-image to subtract, using
+  the same visibility predicate every read endpoint uses rather than a second definition of it. It
+  therefore over-names, which is affordable only because the client drops ids it already holds without
+  asking the server anything. `apps/server/src/visibility/grant-backfill.ts`,
+  `apps/server/src/visibility/visible-events-for.ts`
 - ⚙️ **A contest filed against a ticket that never came to exist reaches nobody** — surfaced by the
   reopen scenario and asserted as product behaviour: `canSee` is false for a ticket with no
   `proj_visibility` row, so the child's `claim.contested` is streamed to no one. The claimant's only

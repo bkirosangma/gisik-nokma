@@ -1,10 +1,16 @@
-import type { LedgerEvent } from '@gisik-nokma/domain';
+import type { LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
 
 /**
  * What sync-down hands a replica — the CLIENT-SIDE MIRROR of
  * `apps/server/src/visibility/visible-events-for.ts`.
  *
- * ## Three members, not two
+ * ## FOUR members, not two
+ *
+ * *This heading said "Three members" until closure 5b added `reach-granted`
+ * (ruling P37.1). The count is kept accurate rather than generalised away,
+ * because the whole point of the section below is that a reader who trusts a
+ * SMALLER count drops an instruction — which is what happened to
+ * `scope-revoked`.*
  *
  * Plan 10 Task 9's own Interfaces list names only `SyncItem` and
  * `PurgeInstruction`, and Plan 4 Task 11's header pins the union at those two.
@@ -70,10 +76,27 @@ export type PurgeInstruction = { kind: 'purge'; entityId: string };
  */
 export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: string; projectId?: string };
 
-export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
+/**
+ * "Your reach grew; here are the ids it now admits." Ruling P37.1, closure
+ * 5b(d) — the pull-shaped replacement for the grant-side history burst.
+ *
+ * The replica's handling is deliberately small: record the ids it does NOT
+ * already hold as owed, and stop. It cannot pull — it has no transport — so
+ * fetching is the sync engine's job, and keeping the split means the replica
+ * stays a store rather than becoming a second client.
+ *
+ * `tickets` may name tickets this device already holds — the server does not
+ * model a device's holdings and must not start. Each entry carries the ticket's
+ * HEAD SEQ (ruling P37.2), which is what lets the client tell a copy it holds
+ * COMPLETELY from a stale partial one. An id-only notice could not: holding a
+ * ticket says nothing about holding all of it.
+ */
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /** The two members that carry a top-level `kind`. */
-export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction;
+export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /**
  * `true` when `item` is an instruction rather than an event envelope.

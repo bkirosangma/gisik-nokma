@@ -1,5 +1,6 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
-import type { BootstrapResponse } from '../replica/replica.js';
+import type { BootstrapResponse, TicketBootstrap } from '../replica/replica.js';
+import { TicketPullNotFound } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -51,7 +52,7 @@ export function streamUrl(baseUrl: string): string {
  * copy and its five members omit `scope-revoked`, so a revoked device would be
  * told nothing and keep showing work it was removed from.
  */
-type HandledFrameType = 'event' | 'purge' | 'scope-revoked' | 'caught-up' | 'error';
+type HandledFrameType = 'event' | 'purge' | 'scope-revoked' | 'reach-granted' | 'caught-up' | 'error';
 
 type AssertTrue<T extends true> = T;
 
@@ -157,6 +158,26 @@ export function createHttpTransport(opts: {
       return (await res.json()) as ReconcileAnswer;
     },
 
+    async bootstrapTicket(workspaceId: string, ticketId: string): Promise<TicketBootstrap> {
+      const res = await doFetch(
+        `${opts.baseUrl}/v1/sync/bootstrap/ticket?workspaceId=${encodeURIComponent(workspaceId)}&ticketId=${encodeURIComponent(ticketId)}`,
+        { headers },
+      );
+      // A 404 throws like every other non-2xx, and that is the point rather than
+      // an oversight: the server answers 404 identically for a ticket the caller
+      // may not see and one that never existed, so returning `null` for it would
+      // hand the caller a distinction the server refuses to make and the
+      // existence oracle `reconcile-route.ts` exists to deny. The engine's drain
+      // treats every rejection alike — the id stays pending and the next
+      // catch-up retries.
+      // 404 is TYPED rather than generic — ruling P37.3. The drain must be able
+      // to tell "nothing travels" from a network failure without matching on a
+      // message string, and only this implementor speaks HTTP at all.
+      if (res.status === 404) throw new TicketPullNotFound(ticketId);
+      if (!res.ok) throw new Error(`bootstrapTicket failed: ${res.status}`);
+      return (await res.json()) as TicketBootstrap;
+    },
+
     openStream(workspaceId: string, afterSeq: number, handlers: StreamHandlers): StreamHandle {
       const socket = factory(streamUrl(opts.baseUrl));
       // Token via subprotocol is what the plan's snippet reaches for; the
@@ -214,6 +235,38 @@ export function createHttpTransport(opts: {
           // instruction carrying one, so a `projectId` on the wire is not a
           // narrowing this client may honour — nothing here reads one.
           handlers.onItem({ kind: 'scope-revoked', workspaceId });
+          return;
+        }
+        if (frame.type === 'reach-granted') {
+          // Ruling P37.1, closure 5b(d): the reader's reach grew and these are
+          // the ids it now admits. Validated the way every other id-bearing
+          // frame here is — a non-empty array of `{id, headSeq}` — because the
+          // ids go straight into a durable pending set and then into request
+          // URLs, and `headSeq` goes straight into the comparison that decides
+          // whether a ticket is fetched at all.
+          //
+          // Filtered rather than refused WHOLE on a bad element, unlike
+          // `caught-up` above. The asymmetry is the consequence, not a
+          // preference: a bad cursor is terminal and survives restarts, whereas
+          // a dropped id costs one un-pulled ticket that the NEXT widening
+          // names again. Refusing the whole frame over one bad element would
+          // discard the good ids with it.
+          if (!Array.isArray(frame.tickets)) return;
+          const tickets = frame.tickets.filter(
+            (t: unknown): t is { id: string; headSeq: number } =>
+              typeof t === 'object' &&
+              t !== null &&
+              typeof (t as { id?: unknown }).id === 'string' &&
+              (t as { id: string }).id !== '' &&
+              // `headSeq` decides whether a ticket is FETCHED, so a junk value
+              // must not reach the comparison: `NaN < n` is false, which would
+              // silently SKIP the pull this notice exists to cause. Integer and
+              // finite, checked here rather than trusted — the same reason
+              // `caught-up.seq` is checked one branch down.
+              Number.isInteger((t as { headSeq?: unknown }).headSeq),
+          );
+          if (tickets.length === 0) return;
+          handlers.onItem({ kind: 'reach-granted', workspaceId, tickets });
           return;
         }
         if (frame.type === 'caught-up') {

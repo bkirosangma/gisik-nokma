@@ -1582,16 +1582,26 @@ describe('the stream union — RECONCILED: the client now has a member for every
       /export type \w+ =\s*\|?\s*\{\s*type: '/.test(dataSource),
       'data-source.ts declares a second stream-frame union — closure 3 removed exactly this',
     ).toBe(false);
-    // The pin and its own positive control: the union is these five members and
-    // no others. "Exactly five" is measured here rather than asserted in prose,
+    // The pin and its own positive control: the union is these SIX members and
+    // no others. "Exactly six" is measured here rather than asserted in prose,
     // and the day somebody narrows that union back — or lets it drift ahead of
     // the server — this case goes red, which is the whole point of the file.
     // It was `['event', 'purge', 'caught-up', 'error']` until Plan 6 Task 8, and
     // this line going red is what reported the reconciliation.
+    //
+    // **`reach-granted` was added by closure 5b(d) (ruling P37.1), and this line
+    // going red is again what reported it.** It was the EIGHTH consumer of that
+    // union on that branch and the second of two the compiler could not find —
+    // the other being `app-core`'s `parseFrame`, which returned `null`. Six of
+    // the eight were type errors; the two that were not were both caught by
+    // cases like this one, which derive a shape from SOURCE TEXT rather than
+    // from a type. That is the argument for this whole file, restated by an
+    // event rather than by its docblock.
     expect(CLIENT_STREAM_TYPES).toEqual([
       'event',
       'purge',
       'scope-revoked',
+      'reach-granted',
       'caught-up',
       'error',
     ]);

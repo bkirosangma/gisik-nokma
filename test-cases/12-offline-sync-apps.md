@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE ON THIS BRANCH IS `12.291`; Lane A's block 12.240–12.259 is EXHAUSTED at `12.259`; **Lane A's CURRENT block is 12.320–12.339** (controller-allocated 2026-09-06, used through `12.322` — Lane B holds 12.290–12.319, next free block 12.340 ON REQUEST). A LANE DOES NOT DERIVE THE NEXT FREE ID HERE — IT USES ITS ALLOCATED BLOCK.** Blocks, controller-allocated 2026-09-06 after this file collided twice in one day: **Lane D 12.224–12.227** (Task 17, Expo) · **Lane C 12.228–12.239** (Task 16, Tauri) · **Lane A 12.240–12.259** · **Lane B 12.260–12.289** (Tasks 14, 15; EXHAUSTED) **and 12.290–12.319** (allocated 2026-09-06 when the first block ran out; 12.290–12.291 in use). **The next free block is `12.320`, and it is allocated by the controller ON REQUEST ONLY.** Recount the MAXIMUM against `origin/main` at every rebase — that is the control — but never mint from it. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). and said `12.274` until closure 5 (ruling P37) added 12.275-12.289 and FLIPPED 12.274 itself from a recorded defect to the case that proves it closed — the first time a line in this file changed status because the product changed under it rather than because a test was added. Lane B's block 12.260-12.289 was EXHAUSTED at 12.289 and the controller allocated 12.290-12.319 the same hour; ruling P37.1's two cases are 12.290-12.291, so this line said `12.289` for the minutes between closure 5's catalogue commit and its review round — inside one change set, which is the staleness this parenthesis exists to record. Updating the header is not the whole job: grep the file for the old maximum.)* **⚠️ THE RECOUNT PATTERN, VERBATIM, BECAUSE THE OBVIOUS ONE IS BLIND TO HALF THIS FILE.** Case ids appear in TWO styles — `- 12.274 🚫 …` and `- **12.240** ✅ …` — and `grep -o '^- 12\.[0-9]*'`, which is what a lane naturally writes, matches the first and **silently misses the second**. Measured 2026-09-06: 215 plain, 4 bold, 219 real. The control exists to catch a BLOCK COLLISION and in that form it structurally cannot see one against a bold-style id — two lanes could both recount, both read "zero duplicates", and both be wrong, which is the exact double-mint this file has already paid for twice. Use:
+**HIGHEST ID IN USE ON THIS BRANCH IS `12.318`; Lane A's block 12.240–12.259 is EXHAUSTED at `12.259`; **Lane A's CURRENT block is 12.320–12.339** (controller-allocated 2026-09-06, used through `12.322` — Lane B holds 12.290–12.319, next free block 12.340 ON REQUEST). A LANE DOES NOT DERIVE THE NEXT FREE ID HERE — IT USES ITS ALLOCATED BLOCK.** Blocks, controller-allocated 2026-09-06 after this file collided twice in one day: **Lane D 12.224–12.227** (Task 17, Expo) · **Lane C 12.228–12.239** (Task 16, Tauri) · **Lane A 12.240–12.259** · **Lane B 12.260–12.289** (Tasks 14, 15; EXHAUSTED) **and 12.290–12.319** (allocated 2026-09-06 when the first block ran out; **12.290–12.318 in use** after closure 5b and ruling P37.3’s pair). **The next free block is `12.340`, and it is allocated by the controller ON REQUEST ONLY** — `12.320–12.339` went to Lane A on 2026-09-06 and this sentence still said `12.320` after it did, contradicting the clause at the head of this very line. Recount the MAXIMUM against `origin/main` at every rebase — that is the control — but never mint from it. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). and said `12.274` until closure 5 (ruling P37) added 12.275-12.289 and FLIPPED 12.274 itself from a recorded defect to the case that proves it closed — the first time a line in this file changed status because the product changed under it rather than because a test was added. Lane B's block 12.260-12.289 was EXHAUSTED at 12.289 and the controller allocated 12.290-12.319 the same hour; ruling P37.1's two cases are 12.290-12.291, so this line said `12.289` for the minutes between closure 5's catalogue commit and its review round — inside one change set, which is the staleness this parenthesis exists to record. Updating the header is not the whole job: grep the file for the old maximum.)* **⚠️ THE RECOUNT PATTERN, VERBATIM, BECAUSE THE OBVIOUS ONE IS BLIND TO HALF THIS FILE.** Case ids appear in TWO styles — `- 12.274 🚫 …` and `- **12.240** ✅ …` — and `grep -o '^- 12\.[0-9]*'`, which is what a lane naturally writes, matches the first and **silently misses the second**. Measured 2026-09-06: 215 plain, 4 bold, 219 real. The control exists to catch a BLOCK COLLISION and in that form it structurally cannot see one against a bold-style id — two lanes could both recount, both read "zero duplicates", and both be wrong, which is the exact double-mint this file has already paid for twice. Use:
 > ```
 > grep -oE '^- (\*\*)?12\.[0-9]+' test-cases/12-offline-sync-apps.md | sed -E 's/^- (\*\*)?//' | sort -t. -k2 -n
 > ```
@@ -1930,56 +1930,100 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
 `apps/server/test/dual-client/grant-backfill.test.ts` (against two real replicas) and
 `apps/server/test/visibility/grant-backfill.test.ts` (at the filter, where the decision is made).
 
-- 12.275 ✅ **12.274's probe, executable and green.** Narrow → ONE unrelated visible commit → re-widen.
-  B ends holding all four of the ticket's events, `replicasEqual` in both directions, and the SERVER's
-  `proj_tickets` equals the folded replica. **The control is the case:** the workspace_seq of the
-  narrowing and of the row filed after it are both asserted BELOW B's cursor before the widening, so a
-  green run cannot be 12.270's quiet shape. Both cursors stand at the stream head afterwards.
-- 12.276 ✅ **Replay is idempotent — MEASURED, because P37 makes over-delivery acceptable only if it is.**
-  A ticket's whole history handed back to a replica that already holds it: `applyServerItem` answers
-  `[false, false, false]`, and the ticket, the full local history, the contest table and the cursor are
-  all equal to what they were. The rows, not a count. Vacuity is excluded first — the replica is asserted
-  to hold three events and a non-null confirmed state before anything is re-delivered.
+- 12.275 ✅ **A re-widened ticket comes back even if the client read something else meanwhile — and it
+  takes BOTH halves of closure 5 to make it.** *(REWRITTEN by closure 5b. The old entry said "the control
+  is the case"; that is no longer true — the RECONCILE is.)* This is 12.274's own script: narrow, one
+  unrelated visible commit so the cursor passes the narrowing, re-widen. **A straight port would have been
+  green-looking and false.** The client's filter is *"do I hold this ticket"*, and a narrowing purges
+  nothing (6.101 struck the walk; 6.104 is the disclosed residual), so B holds a STALE PARTIAL copy right
+  through the narrowing — the notice names a ticket B "holds", nothing is fetched, and 12.274's
+  divergence survives wearing closure 5's clothes. What closes it is `reconcile` purging the stale copy
+  FIRST, so the later notice finds a ticket B does not hold. The `reconcile` call is therefore asserted as
+  a step of the real path (`{presented: 2, purged: [ticketId]}`), not slipped in as setup. Asserts the
+  wire (exactly one notice naming exactly that ticket; the drain's only envelope is the widening, because
+  the pushed tail is gone), the pull (exactly that one id, pending set empty), and convergence (full
+  `TicketState` equality, `projTicket` equality, both cursors at the head). **The equality is load-bearing
+  for a NEW reason:** A's state is the incremental `applyServerItem` fold and B's was rebuilt by
+  `refoldTicket` inside `loadTicketBootstrap`, so it now compares two different construction paths.
+  *Residual recorded at the case and in `grant-backfill.ts`: `RECONCILE_MIN_INTERVAL_MS` bounds the
+  reconcile, so a narrow-and-re-widen inside that window leaves the stale copy with no repair — 12.274 at
+  reduced width.* **⚠️ THE "BOUNDED IN TIME" CLAIM THAT STOOD HERE WAS WRONG, and the branch review found
+  it.** It said `RECONCILE_MIN_INTERVAL_MS` bounded the window. It does not: `hub.ts` sends `caught-up`
+  once per SUBSCRIPTION (`caughtUpSent`), so the automatic reconcile is once per RECONNECT — and a
+  narrow-and-re-widen with no reconnect between them never reconciles at all. **On a stable socket the
+  "bounded" residual was the FULL defect**, and this case was green only because it calls
+  `b.engine.reconcile()` by hand. *The wrong sentence is recorded rather than deleted: "bounded in time"
+  is exactly the reassurance a later reader takes on trust.*
+  **CLOSED in the same PR by closure 5c's minimal form** (controller ruling, 2026-09-06): the client's
+  `reach-granted` handler reconciles the ids the notice NAMED before deciding what to pull, and re-owes
+  anything that purged — so the schedule and the reconnect latch are irrelevant for exactly the tickets
+  at risk. Cases 12.312 and 12.313.
+- 12.276 ✅ **A repeated no-op `visibility.set` costs a holding client NOTHING** *(retitled: it used to
+  measure "the same history handed back twice is idempotent", which was the push shape's property and has
+  no subject now)*. This is the amplifier bound ruling P37.1 claims, measured rather than cited —
+  `check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so
+  without this property one member could make the server re-serve a subtree per commit. The notice is
+  witnessed on the wire first, then the pull count is exactly zero, the pending set empty and the local
+  history gains exactly the trigger. **Same-run positive control:** widening a ticket the client never
+  held costs exactly one pull, and its history arrives BY PULL and not by push (the drain's envelope list
+  is the trigger alone). Then the loop closes — a further no-op on that now-held ticket costs zero again.
 - 12.277 ✅ **A viewer OUTSIDE the new audience receives nothing, and a narrowing is not a trigger for the
-  person it narrowed away.** The excluding fixture P37 names. The narrowed ticket's id appears in NO field
-  of ANY yielded item; the insider, from the same cursor on the same call, does get the backfill.
-  *This is the one case the trigger-list mutation does NOT redden, and that is the informative half: its
-  property is held by `visibleEventsFor`'s own `canSee`, not by the trigger list. A widening self-selects,
-  a narrowing self-excludes, and that is why no before-image is needed and 6.82/6.94 stay untouched.*
-- 12.278 ✅ **A widening hands back the ticket's pre-cursor history AND every inheriting descendant's** —
-  parent, child and grandchild, eight envelopes, each delivered exactly once (`new Set(ids).size ===
-  ids.length`, so the per-drain ledger is asserted rather than assumed). The viewer is current at the head
-  first and receives nothing, so the delivery is the backfill's doing and not the ordinary range's.
+  person it narrowed away.** *(REWRITTEN by closure 5b: the observation moved from "which history
+  envelopes arrived" to "which ids the notice named".)* The excluding fixture P37 names. Asserted as ONE
+  exact drain list, which fails if a notice appears at all; the insider, from the same cursor on the same
+  call, does get the notice. **The vacuity trap this case is famous for SURVIVED the reshape and got
+  worse**: its old control read `JSON.stringify(delivered).toContain(ticket)`, which passed because the
+  narrowing event itself carries the ticket id — and under the notice shape the trigger still travels
+  beside the notice, while the ids are now the entire payload. So the control asserts the NOTICE's
+  `ticketIds`, never a dump. *A widening self-selects, a narrowing self-excludes, and that is why no
+  before-image is needed and 6.82/6.94 stay untouched.*
+- 12.278 ✅ **A widening NAMES the ticket and every inheriting descendant** *(was: "hands back the
+  pre-cursor history … eight envelopes")* — parent, child and grandchild, in the walk's breadth-first
+  order, with no duplicates, asserted as one exact sequence that also pins two further properties: the
+  notice arrives BEFORE its trigger, and the trigger is the drain's only envelope. Under the push shape
+  this drain carried eight; it now carries one plus a notice.
 - 12.279 ✅ **A descendant that AUTHORED its own audience is pruned** — the ancestor's widening does not
-  reach it, and its id appears nowhere in the answer. Positive control on the same call: the parent's
-  history did come back. This is `reResolveSubtree`'s own prune, applied read-only.
-- 12.280 ✅ **An inheriting child in ANOTHER project is refused by the backfill's own `canSee`.** The case
-  exists to make that guard killable: for every ORDINARY descendant the guard is redundant (an inheriting
-  child copies the authoring ancestor's `resolved_mode` and `resolved_user_ids`, so `canSee` returns the
-  answer the caller already had), and it is load-bearing only where the inherited mode is `'project'` and
-  the child's OWN `project_id` differs — because `canSeeResolved` asks `eff.projects.has(v.projectId)`
-  against the CHILD's row. **Without this fixture the guard would be unkillable and would have had to be
-  dropped**, on `stream/hub.ts`'s own precedent of four masked `sub.ended` guards.
+  name it. Asserted as the notice's exact id list, so the exclusion and its positive control are one
+  assertion rather than a `toContain`/`not.toContain` pair. This is `reResolveSubtree`'s own prune,
+  applied read-only.
+- 12.280 ✅ **An inheriting child in ANOTHER project is refused by the notice's own `canSee`.** The case
+  exists to make that guard killable: for every ORDINARY descendant the guard is redundant, and it is
+  load-bearing only where the inherited mode is `'project'` and the child's OWN `project_id` differs —
+  because `canSeeResolved` asks `eff.projects.has(v.projectId)` against the CHILD's row. **Without this
+  fixture the guard would be unkillable and would have had to be dropped**, on `stream/hub.ts`'s own
+  precedent of four masked `sub.ended` guards. **Under the notice shape it matters MORE than it did**:
+  the ids ARE the payload now, so this guard is the only thing between a subtree walk and a notice naming
+  ids the reader may not see.
 - 12.281 ✅ **`ticket.reparented` is a trigger too** — inheritance is an audience, so moving an unauthored
   ticket under a visible parent widens it exactly as a `visibility.set` does. The payload field is
-  `newParentId`; `parentId` is the plan text's spelling and leaves `parent_id` unchanged for ever.
-- 12.282 ✅ **Bounded to PRE-cursor rows, and once per widening.** An event above the cursor arrives
-  exactly once (from the ordinary range, not also as backfill), and a second drain from the advanced
-  cursor yields nothing — the trigger is out of range, so the cost is one backfill per subscriber per
-  widening rather than one per drain.
-- 12.283 🚫 **The THIRD shape of grant, recorded and NOT built.** Visibility also widens when the READER's
-  reach grows rather than the ticket's — `membership.granted` at a higher role, or a `project.member_added`
-  onto a project full of project-mode tickets. Every ticket those newly reveal carries the identical
-  pre-cursor gap. They are ROSTER events, and P37 scopes closure 5 to "the visibility event itself", so
-  this is disclosed rather than fixed. It is named in `GRANT_BACKFILL_TRIGGERS`' own docblock so a reader
-  cannot infer from the module's existence that it is covered. *Owner: the WS catch-up/purge protocol,
-  unassigned to any task.*
-
-### Closure 5 — the narrow half (ruling P37, 2026-09-06)
-
-`apps/server/test/sync/reconcile-route.test.ts`, `packages/sync-client/test/sync-engine.test.ts` and the
-client-half case on the dual-client rig (see 12.289 on what that does and does not reach).
-
+  `newParentId`; `parentId` is the plan text's spelling and leaves `parent_id` unchanged for ever. The
+  notice-before-trigger ordering is asserted here specifically, because `ticket.reparented` is the folded
+  event: a client handed the trigger first would replay a transition with no `ticket.created`.
+- 12.282 ✅ **Once per widening, per drain** *(the "bounded to PRE-cursor rows" half DIED with the push
+  shape — a notice carries no rows, so that clause has no subject; the exact-envelope-list assertions in
+  12.278, 12.281 and 12.291 are what replaced it)*. Two triggers on one ticket in one drain — deliberately
+  one `visibility.set` and one `ticket.reparented`, so nothing rests on a same-value short-circuit — name
+  it once; a LATER drain that sees a NEW widening is owed the notice again, because the ledger is scoped
+  to the drain and not to the subscription.
+- 12.283 ✅ **The THIRD shape of grant — CLOSED by closure 5b(a).** *(Was 🚫, recorded and not built;
+  P37 scoped closure 5 to "the visibility event itself".)* Visibility also widens when the READER's reach
+  grew rather than the ticket's — `membership.granted`, `project.member_added` — and every ticket such an
+  event reveals carries the identical pre-cursor gap. **It could not be another entry in
+  `GRANT_BACKFILL_TRIGGERS`, for a structural reason rather than a scoping choice:** those are roster
+  events filed against the roster entity, so there is no ticket to start a subtree walk from, and the
+  question inverts with the widening — not who can now see this ticket, but which tickets can this viewer
+  now see. `readerReachNoticeFor` answers it with `listVisibleTickets`, the same predicate every read
+  endpoint uses, rather than a second definition of visibility. It answers what the reader can see NOW,
+  not what they gained, because there is no before-image to subtract; it therefore OVER-NAMES, which is
+  affordable only because the client drops ids it already holds without asking the server anything.
+  Two cases in `apps/server/test/visibility/reader-reach.test.ts`, each with its excluding half in the
+  same run against the same ledger. The project case asserts the notice EXACTLY — a workspace-wide
+  listing would satisfy "contains the joined project's ticket" while disclosing one in a project the
+  member still cannot see — and the membership case plants an owner-only ticket in the same project for
+  the same reason, plus a bystander who CAN see the named ticket and would be a plausible recipient for
+  an implementation keyed on the ticket rather than on the event's subject. *The file's own docblock
+  records the trap that would have made both pass for the wrong reason: `seedMember` writes the
+  projections and NOT the ledger, so in most fixtures no roster row exists to be drained at all.*
 - 12.284 ✅ **`POST /v1/sync/reconcile` answers `{kind:'restricted', id}` for the narrowed ticket and says
   nothing about the one still held** — asserted as an EXACT response, because `toContainEqual` alone would
   pass on an answer that restricted both, and that answer wipes a replica. A caller with no role gets
@@ -2003,12 +2047,49 @@ client-half case on the dual-client rig (see 12.289 on what that does and does n
   unpresented id — its reply is built by walking the request — but a purge is destructive and LOCAL, and
   this device does not need to trust a remote party in order to be safe from it. Vacuity excluded: the
   replica is asserted to hold both tickets before the reconcile.
-- 12.288 🚫 **Nothing calls `reconcile` on a schedule, and that is recorded rather than implied.** When a
-  device should reconcile — every reconnect, on a timer, on pull-to-refresh — is a product decision with a
-  cost attached (one request per 100 tickets held) and no plan states it. The primitive is built,
-  correct and unscheduled. *Owner: unassigned.* **Its sibling, same owner:** the engine presents
-  `replica.listTickets`, so a ticket held only as unfolded events with no local `tickets` row is not
-  presented and therefore not reconciled.
+- 12.288 ✅ **The reconcile SCHEDULE — CLOSED by closure 5b(b).** *(Was 🚫: "nothing calls `reconcile` on
+  a schedule; when a device should is a product decision with a cost and no plan states it".)* The engine
+  calls it on catch-up completion — **which is once per SUBSCRIPTION, not once per catch-up**, because
+  `hub.ts` gates the frame on `caughtUpSent`; an earlier version of this entry said "every catch-up
+  completion" and overstated it until the branch review measured the latch — with **no
+  `engine.reconcile()` call anywhere in the test** — the
+  moment a device's cursor is current is the moment its HOLDINGS may be stale, because a narrowing sends
+  the losing device nothing at all (6.104). **The tempting cheaper trigger is unsound and is refused in
+  the source:** gating on "the catch-up delivered something" would skip the zero-frame catch-up, which is
+  precisely the case reconcile exists for. So the bound is TIME, not activity — `reconnectDelayMs` is a
+  fixed 2000 with no growth or jitter and the hub sends one `caught-up` per subscription
+  unconditionally, so a flapping socket would otherwise reconcile every two seconds for ever at
+  `ceil(held / 100)` requests each. Asserts the restricted ticket is purged and the OTHER one still
+  folds, so this is a targeted purge and not an emptied store. *Its scheduling mutation reddens 12.288
+  AND 12.307 — a case bounding the interval must observe the interval's first firing, so no honest 12.307
+  leaves it alone; a second discriminating mutation (skip the purge) reddens 12.288 and 12.287 instead.
+  Both recorded as measurements rather than as an "alone" nobody saw.*
+- 12.305 ✅ **A notice pulls exactly the ids the device does NOT hold.** The held ticket is asserted
+  readable first — the non-vacuity control — then the pull list is asserted EXACTLY, so an id already held
+  costing a pull would redden. This is ruling P37.1's "a repeated no-op `visibility.set` costs a holding
+  client nothing" measured on the client side. The cursor is asserted unmoved: the pull door writes none.
+  *Dropping the holdings filter in `replica.ts`'s `reach-granted` arm reddens this case ALONE.*
+- 12.306 ✅ **A failing pull does not stall the engine, stays owed, and the next catch-up retries it.**
+  The most important case in the set: `stalled` is a one-way latch cleared only by `start()`, which
+  mobile never calls again, so a transient network failure that reached `stall()` would brick the device
+  until the process restarts. Asserts `lastApplyFailure()` null, the chain still alive (a later
+  transition folds), the id still owed — then a working transport on the next catch-up converges.
+  *Rethrowing inside the drain's catch reddens 12.306 and 12.308.*
+- 12.307 ✅ **Two catch-ups in quick succession produce ONE reconcile.** Time is controlled honestly:
+  `vi.useFakeTimers({ toFake: ['Date'] })` — `Date` only, `setTimeout` left real — and the base instant
+  is captured from the REAL clock first, because sinon's default epoch is 0 and would compute a negative
+  age, passing for the opposite reason. The second half advances 61 s and requires a second reconcile, so
+  the case pins the interval in both directions. Cursor 10 is the control that the second catch-up ran
+  at all. *Both `true ||`-ing the guard and reducing it to once-per-process redden this case ALONE, in
+  opposite directions.*
+- 12.308 ✅ **A pull that never settles is abandoned rather than parking the apply chain for ever.**
+  Written rather than skipped. `net/http-transport.ts` calls bare `fetch` with no `AbortSignal` anywhere
+  in the file and `applyChain` is strictly serial, so without a timeout the chain simply stops: status
+  stuck at `live`, `stalled` false, `settled()` never resolving, nothing surfaced — a SILENT brick traded
+  for the loud one. Asserts not-drained at `PULL_TIMEOUT_MS - 1` and drained at `+1`, the id still owed,
+  and no apply failure. *Dropping `withTimeout` reddens this case ALONE — as a 7 ms assertion, not a
+  runner timeout, so the case DETECTS the hang rather than surviving it. The author's own prediction said
+  "vitest timeout" and is corrected here against the measurement.*
 - 12.289 ✅ **6.104's residual actually closes, by the CLIENT-PRESENTED path.** *(Not "end to end" — that word was here until the branch review measured it. The rig's transport RESTATES the route's rule in-process rather than calling it, the same way it restates `bootstrapTicket`; the ROUTE is covered by 12.284-12.286 through `app.inject`. **No single case runs the client and the real route together**, so a drift between them is caught by nothing until closure 5b points the rig at `inject()`.)* The residual is
   witnessed first — after a narrowing B still holds the ticket, its history and its searchable title, and
   no tombstone ever arrived — then `engine.reconcile` removes it: `getTicket` null, `listEntityEvents`
@@ -2024,32 +2105,39 @@ client-half case on the dual-client rig (see 12.289 on what that does and does n
 Raised by the branch review, survived adversarial refutation, ruled the same hour. **This lane's block
 12.290–12.319, controller-allocated after 12.260–12.289 was exhausted.**
 
-- 12.290 ❌ **A BACKFILL LARGER THAN THE SLOW-CONSUMER BUDGET WEDGES THE SUBSCRIBER PERMANENTLY.**
-  *Recorded with the mechanism spelled out, because the obvious repair is unsafe and someone will reach
-  for it.* Every backfilled envelope is at or below `afterSeq`, so **none of them moves a cursor**, and
-  the only envelope that does — the trigger — is yielded AFTER the whole subtree's history. `hub.ts`'s
-  `send` closes a socket `1013 slow-consumer` above `maxBufferedBytes` and detaches; no `caught-up` is
-  sent; `createSyncEngine` persists its cursor ONLY in `onCaughtUp`; `app-core`'s
-  `lastSeq = Math.max(…)` cannot move on envelopes below its own `afterSeq`; and `needsBootstrap`
-  refuses to re-bootstrap over a local baseline. **So the client reconnects at the same cursor, is
-  handed the identical burst, and is cut short again — silently, and for as long as the ledger stands.**
-  A second, independent half: `readEntityEvents` runs with the default `afterSeq = 0` and
-  `check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so
-  one authorised member can re-issue it and make the server re-walk and re-stream a subtree to every
-  subscriber, per commit.
-  **⚠️ DO NOT CLOSE THIS BY YIELDING THE TRIGGER FIRST.** The cursor would advance before the burst, and
-  it is UNSAFE: `ticket.reparented` IS folded, so a client that never held the ticket replays a
-  transition with no `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, a
-  worse failure than the one it fixes. Measured before the option was proposed.
-  *Not asserted, on 6.104's own reason: a test pinning the wedge hardens the half this branch wants
-  closed.* **Owner: closure 5b item (d)** — make the grant side PULL-shaped and client-presented, the
-  same principle as the narrow side: the hub pushes a bounded NOTICE (the trigger plus the ids it newly
-  admits), and the client pulls each ticket it does not hold through the per-ticket bootstrap door
-  before applying the trigger. A cut-short session then resumes by pulling what it still lacks — no
-  wedge and no per-subscriber server state — and the refold hazard above closes as
-  "bootstrap-before-apply on any event for an entity not held", which is the rule a replica needs for
-  `ReplicaGapError` anyway. **This case flips ❌ → ✅ only when a slow-consumer close MID-PULL is
-  followed by convergence on reconnect** — never on an assertion about the notice alone.
+- 12.290 🟡 **THE MECHANISM IS GONE; THE CONVERGENCE IT ASKED FOR IS STILL NOT MEASURED.**
+  *(Was ❌, owner closure 5b(d). Closure 5b removed the wedge and DELIBERATELY DOES NOT FLIP THIS TO ✅.)*
+  **What changed:** the grant side no longer streams history at all — `grantNoticeFor` returns ids and
+  `visible-events-for.ts` yields ONE bounded `reach-granted` frame — so the atomic non-progressing burst
+  the wedge was made of does not exist. A list of ids is a list of ids however long the histories behind
+  it are.
+  **Why this is 🟡 and not ✅, which is the honest half.** The ruling's own flip condition was *"a
+  slow-consumer close MID-PULL followed by convergence on reconnect"*, and **nothing on this branch can
+  cut a socket**: the dual-client rig has no socket by construction (`openStream` throws, deliberately,
+  so a scenario cannot believe a subscription exists), and the engine's socket tests use a fake transport
+  with no buffer bound. So the re-delivery chain — notice carries no cursor → `onCaughtUp` never fires →
+  reconnect at the same cursor → `visibleEventsFor` re-yields the trigger and regenerates the notice —
+  is argued from the code and **measured only link by link**, never end to end. *Flipping this on the
+  strength of "the burst is gone" would be exactly the move 12.274's own history warns about: the mirror
+  half was once called "partly discharged" on a reading, and that claim had to be withdrawn.*
+  **What IS measured instead**, and it is the property that makes the wedge unreachable rather than
+  merely smaller: a failed or timed-out pull leaves its id in a DURABLE pending set and the next
+  catch-up retries it (12.306), and an unsettling pull is abandoned rather than parking the apply chain
+  (12.308). Convergence after an interruption therefore does not depend on the notice arriving twice —
+  which matters, because `net/http-transport.ts`'s frame dispatch is an if/return ladder with no
+  trailing branch and an unrecognised frame is dropped in silence.
+  **The residual kept from the old entry, because it is unchanged:** `check-permission.ts` still does not
+  refuse a `visibility.set` that sets the mode a ticket already has. What changed is the cost of one — a
+  client that already holds the subtree now does no work for it (12.276), so the amplifier is bounded by
+  HOLDINGS rather than by trust in the permission check.
+  **⚠️ THE OLD WARNING STILL APPLIES to anyone restoring a push shape:** do not yield the trigger first.
+  `ticket.reparented` IS folded, so a client that never held the ticket replays a transition with no
+  `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, worse than the failure it
+  fixes. **OWNER of the remaining measurement: Lane F (test infrastructure), ruled by the controller
+  2026-09-06 — a socket-cutting fixture for the dual-client rig. 12.290 flips to ✅ only when that fixture
+  exists; the reason it cannot flip before is recorded verbatim above: nothing in this repo can cut a
+  socket, so the ruling's own flip condition is unmeasurable here.**
+
 - 12.291 ✅ **The walk is capped at `GRANT_BACKFILL_MAX_TICKETS` (200) — P37.1's interim guard, and not
   its fix.** Fixture is OVER the cap by two, all direct children of one parent so the whole excess sits
   in a single breadth-first frontier. Asserts the touched-ticket count is **EXACTLY** the cap — not
@@ -2106,3 +2194,134 @@ before mutating, not to remember.*
 - **12.320** ✅ **THE EXACT-CAP BOUNDARY — a project of exactly `LIST_ROW_CAP` ASSEMBLES**, and refusal starts one page later. Found by the opus reviewer as a **surviving mutant**, which is the finding class this repo cares most about: moving the refusal to `page >= LIST_PAGE_CAP - 1`, thrown after the fetch and before the `nextCursor` check, left 12.257, 12.259 AND 12.258 all green — 12.258 asserts `urls.length` and the absences and still could not see it — while a legitimate largest-allowed project refused. **Nothing exercised `pages.length === LIST_PAGE_CAP`, so the cap was asserted on ONE SIDE only.** A cap is a claim about both sides of a line; this is the other side. (Mutation: the off-by-one above → **1 failed, 23 passed — 12.320 ALONE**, with 12.257/12.258/12.259 all still green, exactly as predicted.) — `packages/app-core/test/online/online-data-source.test.ts`
 - **12.321** 🚫 **REFETCH AMPLIFICATION is carried, not fixed here.** `getTickets` went from one request to N under `use-live-query.ts`, which reloads on every stream event on a 200 ms debounce with no cancellation (last-one-wins). Partially MITIGATED in this change set rather than ignored: the client now SENDS `limit=200` (the route's validated `MAX_LIMIT`), so a 2000-row project is **10 round trips instead of 40** — a four-fold cut, each request otherwise re-running the recursive `epicAncestors` CTE. What is NOT done is cancellation, or any measurement: whether a busy workspace's event rate actually outruns the walk is unmeasured, and the reviewer flagged its own "pile up" wording as the claim it was least sure of. *Owner: whoever measures walk duration against observed stream event rate — the fix is cancellation in `use-live-query.ts`, not in the loop.* Out of scope for C2, which was a correctness closure.
 - **12.322** 🚫 **THE CAP IS A CLIFF, and no user-side escape exists.** `ticket-list.tsx` hardcodes the filter as `{}`, so a user cannot narrow the query to get under the bound, and the project page routes `list.error` to `ShellRefusal` on the **List, Calendar and Timeline** arms — only Board survives on a separate read. So a project crossing the bound loses three of four tabs, with a message whose `owner` names a SOURCE change as the remedy. **Throwing remains right** (a truncated set is the C2 defect, and the reviewer agreed); what is missing is a graceful path — a filter affordance, or a degradation that is not a blank tab. 2000 tickets in one project is ordinary for a mature team, so this is a cliff a real customer reaches, not a hostile-input guard. *Owner: the list surface's product design.* Recorded rather than built: it is a product decision, not a closure.
+
+## Closure 5b — ruling P37.1's real fix: the grant side becomes PULL-shaped (cases 12.292–12.308)
+
+**Closure 5 pushed the history and that WEDGED.** Every backfilled envelope sat at or below the
+client's cursor, so none of them advanced it, and the only one that did — the trigger — was yielded
+last; a slow-consumer close mid-burst left the client reconnecting into the identical burst for ever
+(case 12.290). The one-line repair of yielding the trigger first is unsafe and the code says so.
+So the direction inverted into the narrow half's own shape: **the server names ids, the client pulls
+what it lacks.** `grantBackfillFor` became `grantNoticeFor`, a `reach-granted` frame joined the wire,
+and `GET /v1/sync/bootstrap/ticket` is the door the client pulls through.
+
+*Every case below carries a positive control from the same run, because most of them assert an
+absence and this branch has already shipped one control that could not fail (12.277's, recorded above).*
+
+### The client's per-ticket door and its durable pending set — `packages/sync-client/test/ticket-bootstrap.test.ts`
+
+- 12.292 ✅ **`loadTicketBootstrap` applies a ticket the device did not hold, snapshot-less, so it becomes readable.** Its positive control is the TITLE, which comes only from `ticket.created`'s payload — so "the ticket is there" cannot be satisfied by a row some other door wrote.
+- 12.293 ✅ **It does NOT move the workspace cursor, though the events it applies sit far above it.** `loadBootstrap` writes `cursor:<workspaceId>` to the server's head unconditionally; a device at cursor 40 pulling from a server at 900 would skip everything between for every OTHER ticket, silently and permanently, and look exactly like convergence in a quiet fixture. **So this fixture is deliberately not quiet** — the pulled ticket's own events are at `workspaceSeq` 900/901, giving the plausible wrong implementation ("advance to the highest seq I just applied") something to advance to. Paired with a readability assertion so "the cursor did not move" cannot be satisfied by a door that did nothing.
+- 12.294 ✅ **A pull that cannot fold rolls back ITSELF and leaves the session intact.** `loadBootstrap` wraps every ticket in one transaction — correct there, because a partial cut is not a cut. Here the opposite is correct: wedging a pull the way the burst wedged the stream is the failure closure 5b exists to remove. Asserts the failed ticket left NOTHING (no row, no events) and that an earlier ticket and the cursor both stand.
+- 12.295 ✅ **The pending-pull set survives a process restart**, measured by reopening a REAL FILE with a fresh replica rather than by arguing from a shared in-memory handle.
+- 12.296 ✅ **A re-recorded id does not duplicate, and an unknown workspace owes nothing** — the set is workspace-scoped exactly as `cursor:` is.
+- 12.297 ✅ **A workspace-wide revocation forgets what the device was owed; a project-scoped one does not.** Left behind, the ids would have a removed device asking for tickets in a workspace it is not in, on every catch-up, answered 403 each time. The project-scoped half is the control proving this is about the workspace arm and not about revocation generally.
+- 12.298 ✅ **A ticket on a workflow the device has NEVER SEEN folds with its definition shipped beside it and throws without it**, with the exact refusal text asserted (`vanished — replay integrity is broken`) rather than "some error". **This case's first draft was WRONG and the correction is the interesting half:** a device on v1 pulling a ticket whose snapshot names v2 does *not* throw — `foldSnapshotForward` finds no latest, returns the state untouched, and the tail folds against v1 perfectly happily, leaving a state that records v2 and was folded under v1's rules. *That silent version-down fold is reachable through `loadBootstrap` too, is a property of `foldSnapshotForward`'s `latest === undefined` guard rather than of this door, and is RECORDED, not fixed. Owner: unassigned.*
+- 12.302 ✅ **A pulled ticket keeps the provenance closure 4 ships it.** Found by rebasing rather than by reading: the argument is optional and defaults to null, so the omission compiled and every other case stayed green. It is the worst place to drop it — a ticket arriving through this door is by definition one the device never held, so it is snapshot-bounded on arrival by construction, which is exactly the refusal ruling P36 exists to have closed. The block is passed THROUGH, never constructed: an absent block means "nothing new to say", so a door supplying its own helpful `null` would erase a good one on a re-pull.
+
+### The route — `apps/server/test/sync/ticket-bootstrap-route.test.ts`
+
+- 12.299 ✅ **`GET /v1/sync/bootstrap/ticket` serves one ticket the caller may see: a real tail, the definitions, and NO stream cursor.** The key set is asserted EXACTLY rather than `streamSeq` being `undefined` — the latter would also pass on a response that grew some other cursor-shaped field under a different name.
+- 12.300 ✅ **A ticket the caller may not see and a ticket that never existed answer IDENTICALLY**, byte for byte, not merely "both 4xx". A fetch-one-thing route naturally wants to say "no such thing", and that split is the existence oracle `reconcile-route.ts` refuses in its own words and `can-see.ts` refuses one layer down. A successful pull sits in the same case so the 404s are about those ids rather than about the caller.
+- 12.301 ✅ **A stranger is refused for being a stranger, before any ticket is consulted** — asserted with the SAME id the member just pulled, and with a phantom too, so the 403/404 split cannot itself become the probe.
+- 12.303 ✅ **Only the asked-for ticket travels.** The hidden ticket is in the same workspace and project, so a handler reaching for `listVisibleTickets` — the workspace route's own helper, one import away — would have every opportunity to include it, and for an owner it *would* be visible, so the mistake would not even look like a leak in a single-user fixture.
+
+### The narrow half's guest side — `apps/server/test/sync/reconcile-route.test.ts`
+
+- 12.304 ✅ **The reconcile door answers a GUEST correctly, which is case 6.102 and closes it.** 6.102 was never a missing rule: `reconcileHeldIds` asks `canSee` and nothing else, and `canSee` resolves a guest through the explicit share list exactly as it resolves a member through a project. Nothing about the door was role-aware — what was missing was the measurement, which is what 6.102's own text says. **An APPLICATION of the shipped rule, so no escalation under P25.** Both ids in ONE request with an exact `toEqual`: a guest presenting only the lost id could be answered "restricted" by a door that restricted everything a guest named, which is the shape that wipes a guest's whole device. Two controls in the same run — the MEMBER's answer restricts both, proving the guest's asymmetric answer is about the explicit list rather than about leniency; and the status is asserted not to be 403, or the case would also pass against a door that refused guests outright, failing for the wrong reason.
+
+### The hub's own arm — `apps/server/test/stream/hub.test.ts`
+
+- 12.314 ✅ **The notice is framed with the HUB's `workspaceId`, and the subscription runs on behind it.** Two properties in one case because one fixture measures both. **The workspace-id half was UNFALSIFIABLE until the fixture changed**: in production `sub.workspaceId` and `item.workspaceId` coincide, which is exactly why the wrong one would ship green — so the scripted seam gained a `claimsWorkspaceId`, letting the routing key and the claimed key differ, and the case asserts the frame carries the ROUTING one. The liveness half exists because this arm sits directly beside `scope-revoked`, which detaches and returns; before closure 5b the code was an `if/else` reading *"purge, otherwise scope-revoked"*, so a new instruction WOULD have been handled as a revocation — which empties the replica — and an accident of field names is all that caught it. Its control is the identical fixture with a `scope-revoked` in the notice's slot, which DOES stop the stream, so the liveness assertions are known to be able to see a detach at that exact position.
+- 12.315 ✅ **A drain ending on a notice resumes exactly where it would without one.** The property the whole pull-shaped design rests on: a notice must be RE-DELIVERED if the socket dies before the client finishes pulling, and only its trigger — which IS above the cursor — regenerates it. Measured differentially against the same script with the notice removed, so any cursor value the arm might write shows up as a divergence between two runs rather than as disagreement with a number this file chose. **The fixture puts the notice LAST in the drain deliberately, which is not the production order**: a `sub.cursor += 1` mutant is MASKED in the production shape, because the trigger behind it re-advances past the drift. That asymmetry is why the fixture is shaped this way and is written into the case.
+
+**Mutations run against the hub arm — measured, and the two "alone" results are the point.**
+
+| mutation | result |
+|---|---|
+| delete the `send` | 12.314 + 12.315 |
+| `sub.workspaceId` → `item.workspaceId` | **12.314 ALONE**, `1 failed \| 18 passed` |
+| the arm `detach`es like `scope-revoked` | 12.314 + 12.315 |
+| the arm advances `sub.cursor` | **12.315 ALONE**, `1 failed \| 18 passed` — and 12.314 survives it, exactly as the case's own masking analysis predicts |
+
+*Baseline `19 passed (19)` before and after every restore. One label in the sweep script was wrong and the run corrected it: it expected one `detach(sub);` in `hub.ts` and there are two, so the injected third read as "3" and the restore as "2" — the restore is verified by the baseline going green again, not by that count.*
+
+### 12.316 — closure 5c's first form could not work, DERIVED (and the measurement that said so was contaminated)
+
+- 12.316 ✅ **A device on a live socket, narrowed then re-widened with no reconnect and no manual reconcile, converges.** Closed by ruling **P37.2**: the notice carries each named ticket's `headSeq` and the client pulls iff its own local maximum for that ticket is lower.
+  **Why the FIRST attempt (reconcile the notice's named ids) could not work — and this is a DERIVATION, not a measurement.** `grant-backfill.ts:301` admits a candidate to the notice only `if (canSee(...))` is TRUE. `reconcile-route.ts:140` marks an id restricted only `if (!canSee(...))`. Same function, same db, same user, same instant — complementary predicates over one primitive, so **the intersection is empty by construction**: a notice cannot name an id reconcile will say anything about. The stale copy is stale in its CONTENT and `canSee` answers about its AUDIENCE, so reconcile was the wrong instrument rather than a mistimed one.
+  **⚠️ THE RUN THAT FIRST REPORTED THIS WAS CONTAMINATED, and the record says so rather than quietly resting on the proof.** A subagent was mutation-testing `sync-engine.ts` in the same worktree; commit `75657f2` swept its MUTANT-4 in (blob check: `9135059` 0 occurrences, `75657f2` 1, `1533e00` 1), so the dual-client run behind `1533e00` executed with `reconcileNamed` NEVER CALLED. `b.pulls` was empty because the reconcile was disabled, not because it was useless. The subagent found this and reported it unprompted. **The conclusion survives on the derivation above and on nothing else**, and it cannot now be re-measured because P37.2(c) deleted the function — which is the right outcome and is why this stays a proof.
+  *The transferable lesson, because the obvious fix was already in place and did not help:* this lane had already replaced `git add -A` with explicit-path staging after an earlier incident. It staged `sync-engine.ts` by name, legitimately, for a docblock fix — and that made no difference, because the contamination was in a file it had every reason to stage. **The rule is not about the staging verb: do not commit a shared source file while another party is mutating it.** Mutations now run in a quiet window with nothing else touching the tree.
+
+### The Critical's own fixtures — `packages/sync-client/test/sync-engine.test.ts`
+
+*Bootstrap-before-apply was a CLAIM in `grant-backfill.ts` and not a rule; the branch review found it. These five measure the rule that replaced it.*
+
+- 12.309 ✅ **A failed pull followed by the ticket's own folded TRIGGER converges instead of stalling.** The Critical's sequence (a): the pull fails, the id stays owed, and the `ticket.transitioned` for that same ticket arrives one link later — `applyServerItem` throws *never created*, which used to reach the one-way `stall()` latch. Asserts `lastApplyFailure()` null, the chain still alive, the exact pull list across both attempts, and — after the network returns — that the ticket reaches the state the ROLLED-BACK trigger described, delivered by the pull payload rather than by the streamed event. `reconcileCalls` empty, which also pins P37.2(c)'s deletion.
+- 12.310 ✅ **A fold failure on a ticket the device DOES hold still stalls, loudly.** The case that stops the swallow becoming a blanket: a held ticket transitioned into a state its workflow lacks stalls with the message naming the state, the cursor frozen and a later item NOT applied. Second half, fresh fixture: a malformed non-ticket definition stalls too, with a well-formed one as the in-run control. *`recoverByPull`'s INSTRUCTION refusal is honestly unmeasured — every statement in the two instruction arms is a DELETE, and nothing makes one throw without stubbing the replica, which would measure the stub. Disclosed at the case rather than faked.*
+- 12.311 ✅ **A definition arriving in a PULL payload folds the tickets already held, and the stream's later copy of it is inert.** The gap: `loadTicketBootstrap` stored definitions without `foldTicketsOntoVersion`, and `applyServerItem`'s duplicate-event-id early return then made the stream's copy a permanent no-op — so a client that pulled across a publish kept stale categories until the NEXT publish. A v3 over the same door is the control proving the door still works.
+- 12.312 ✅ **A notice naming a ticket the device holds STALE pulls it, and the missing tail lands.** The case ruling P37.2 exists for: `headSeq` above the local head is what makes the staleness visible, where "do I hold it" could not. An unnamed sibling is the exactness control.
+- 12.313 ✅ **A current ticket costs no pull; a behind one in the same notice is fetched.** One notice carrying both, so the boundary (`headSeq` EQUAL to the local head) and the miss are measured against each other in one run. This is the amplifier bound at the id level, and its mutation — flipping the comparison to always-pull — reddens exactly the two cases carrying an equal-boundary id.
+
+**Mutations for this set were measured at the PRE-P37.2 tree and are labelled so wherever they appear**, because the wire shape changed under them mid-task: `recoverByPull` → always false reddens **12.309 alone**; → always true reddens four (12.163, 12.164, 12.309, 12.310); dropping its holdings check reddens three; dropping its ticket-kind check reddens **12.310 alone**; dropping `foldTicketsOntoVersion` reddens **12.311 alone**. *Two further mutations on the `headSeq` comparison were derived and handed over rather than run, for the reason recorded at 12.316: mutations no longer run while another party may commit.*
+
+**⚠️ THE CRITICAL'S FIX CHANGED TWO EXISTING CASES, and they were re-witnessed rather than deleted.** 12.163 and 12.164 drove their stall with an event for a ticket the device does NOT hold — exactly what `recoverByPull` now swallows — so they were red on arrival (`2 failed | 20 passed`). Proof rather than reasoning: the always-false mutation on the un-repaired file left both GREEN and reddened 12.309, which is the two behaviours separating. They now witness the same property against a HELD ticket, and the retired witness is recorded in 12.163's docblock.
+
+### Ruling P37.3 (2026-09-06) — the 404 drop, keyed to the notice that issued the pull
+
+The Critical's fix turned the revoked-project sequence from a loud stall into a **quiet permanent leak**: a
+pull that 404s and an id owed on every catch-up, for ever. The bound could not be keyed to the status code,
+because `bootstrapTicket` answers *"you may not see it"* and *"it never existed"* with the **same 404** —
+deliberately, so presence-versus-absence is not an oracle — so the device cannot tell a phantom from a race
+in which visibility narrowed again between the notice and the pull. It is keyed to the **notice** instead:
+each pending entry carries the `workspaceSeq` of the notice that named it, and a 404 drops the entry only if
+that seq is still the one the pull was issued for. **A 404 is never the last word; the next notice is.**
+
+- 12.317 ✅ **One 404 forgets the owed id for good, while a wobbling id beside it is retried on every catch-up.** The revoked-project sequence. Two ids ride the same notice, the same drain and the same catch-ups, failing in the two different ways the arm distinguishes — `TicketPullNotFound` and an ordinary transport error — so the assertion is a **contrast measured in one run** rather than an absence measured against nothing: a drain that stopped running shows the wobbling id missing too and fails loudly instead of passing. **TWO later catch-ups, not one**, because "no request on ANY later catch-up" is a claim about the steady state and one catch-up cannot distinguish it from one-shot suppression.
+- 12.318 ✅ **A notice arriving during the pull keeps the id owed through its 404, and the next catch-up fetches it.** The race the ruling refused to lose: an unconditional drop discards a re-widening that landed a millisecond early, silently, with no error and nothing to retry. `headSeq: 9` is asserted rather than presence — the number is what says the racing notice REPLACED the recorded seq and that the guard compared against the new value, which is the whole mechanism in one integer.
+
+**⚠️ The race in 12.318 is NOT reachable through the socket today, and the case says so.** `applyChain` is
+strictly serial and every `drainPendingPulls` call site is on it, so a socket-delivered notice queues
+*behind* the link holding the in-flight pull; `withTimeout`'s abandonment cannot deliver a late 404 to the
+`catch` either, because `Promise.race` has already settled. **Through the socket path alone the keyed drop
+and an unconditional drop are behaviourally identical** — the second notice has not written at drop time and
+re-adds the id afterwards either way — so a fixture driven purely through `onItem` would let the
+unconditional mutant survive and report a green case for a guard that does nothing. 12.318 therefore applies
+the racing notice through `replica.applyServerItem` from inside `pullImpl`: off-chain, as the public-API
+writer `replica.ts`'s own docblock names (*"the set is public API and a shell may add to it too"*), and
+through the real `reach-granted` filter rather than around it. The keying becomes socket-load-bearing the
+moment the drain runs off the apply chain. *Derived before the cases were written, not discovered after.*
+
+**The pair discriminates, which is why there are two of them.** Neither means anything alone: 12.317 says the
+drop HAPPENS, 12.318 says it is not UNCONDITIONAL. 12.318 deliberately does **not** re-assert 12.317's
+property — that omission is the design, because a case that reddened under both mutations would be measuring
+12.317 twice and its racing write would be doing no work.
+
+**Recorded with an owner, not fixed (outside these fixtures' scope):** a pull abandoned by `withTimeout` that
+later rejects with `TicketPullNotFound` produces an **unhandled rejection** nobody catches — `Promise.race`
+has settled, and `net/http-transport.ts` calls bare `fetch` with no `AbortSignal`. Owner: Plan 6 / sync-client.
+
+**Mutations run for P37.3 — measured 2026-09-06 12:49 IST at `bc45bba`, in ONE locked quiet window (lock
+free on entry, zero live vitest pools, nothing else touching the tree).** The denominator is the WHOLE
+`sync-client` package, 8 files / 87 tests, so "alone" is a claim about the package and not about one file.
+Baseline `87 passed (87)` **before and after** every mutation; each restore left `dirty-src-files=0`; each
+edit was confirmed PRESENT by grep before its run, because a mutation that fails nothing is an
+unconstrained path only if it actually fired.
+
+| mutation | site | predicted | MEASURED |
+|---|---|---|---|
+| **never drop** — the `TicketPullNotFound` arm's drop deleted | `sync-engine.ts` | 12.317 alone | **12.317 ALONE**, `1 failed \| 86 passed` |
+| **always drop** — the `headSeq` guard deleted, drop unconditional | `replica.ts` | 12.318 alone | **12.318 ALONE**, `1 failed \| 86 passed` |
+| **never below** — `localHeadSeq(...) < headSeq` neutered to `false` | `replica.ts` | **7 at derivation, 9 at this tree** | **9**: 12.305, 12.306, 12.308, 12.309, 12.311, 12.312, 12.313, **12.317, 12.318** — and **12.310 SURVIVES**, as predicted |
+| **always pull** — the off-by-one, `<` becomes `<=` | `replica.ts` | 12.305 + 12.313 | **12.305 + 12.313**, `2 failed \| 85 passed` |
+
+**The pair discriminates, which is the result worth having:** never-drop reddens 12.317 and 12.318 passes;
+always-drop reddens 12.318 and 12.317 passes. Each fixture kills its own mutant and is blind to the other's,
+so neither is measuring the other twice.
+
+*The two `headSeq` mutations were derived by a previous session and handed over unrun, and their prediction
+of **7** was made BEFORE 12.317/12.318 existed. Both new fixtures route their initial entry through that same
+comparison, so the honest prediction at this tree is **9** — reported here as three numbers
+(predicted-at-derivation, predicted-at-this-tree, measured) rather than one, because otherwise a correct
+measurement reads as a finding. The `<=` prediction is unchanged at either tree: an unheld id satisfies
+`0 < h` and `0 <= h` alike, so neither new case can see that mutant.*

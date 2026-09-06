@@ -1,9 +1,9 @@
-import type { EntityKind, LedgerEvent } from '@gisik-nokma/domain';
+import type { EntityKind, LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canSee } from './can-see.js';
-import { grantBackfillFor, isGrantBackfillTrigger } from './grant-backfill.js';
+import { grantNoticeFor, isGrantBackfillTrigger, readerReachNoticeFor } from './grant-backfill.js';
 
 /**
  * "This ticket is gone — delete whatever you hold for it."
@@ -175,7 +175,26 @@ export interface ScopeRevokedInstruction {
  * Recorded as a cross-plan finding, owner Plan 10 — that plan codes against
  * this contract without reading this file.
  */
-export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
+/**
+ * "Your reach grew; here are the ids it now admits." Ruling P37.1, closure
+ * 5b(d) — the pull-shaped replacement for the grant-side history burst that
+ * closure 5 emitted here.
+ *
+ * See `stream-frames.ts`'s wire declaration for the full argument, including
+ * why this is not case 6.101's purge walk arriving from the other direction.
+ * The short form: a purge names an entity to a device that may never have held
+ * it, which is news; a notice names ids the recipient may at that moment read
+ * in full, which is not.
+ *
+ * The list is what the reader's `canSee` admits, NOT what the reader lacks —
+ * the server does not model a device's holdings and must not start. Each entry
+ * carries the ticket's HEAD SEQ (ruling P37.2) so the client can tell a complete
+ * local copy from a stale partial one, which is the one thing `canSee` can never
+ * answer: it is about audience, and staleness here is about content.
+ */
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /**
  * Who an event about this entity kind is for, before any per-ticket question is
@@ -206,7 +225,9 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
     case 'membership':
     case 'project':
       // The roster: who is in the workspace, who is on which project. Both
-      // kinds carry a LOSS branch naming a user, and both go to non-guests.
+      // kinds carry a LOSS branch naming a user AND, since closure 5b, a GAIN
+      // branch naming one — the loss branches purge, the gain branches yield a
+      // `reach-granted` notice (case 12.283). Both go to non-guests.
       return 'roster';
     case 'workspace':
       return 'workspace';
@@ -420,13 +441,27 @@ export async function* visibleEventsFor(
           // never reach this line and therefore needs no before-image to
           // exclude, is `grant-backfill.ts`'s docblock.
           //
-          // Before the event, not after: the backfill is earlier history, and
-          // `seq` order is the order a consumer that is not a full-replay folder
-          // would need. Neither this nor any backfilled envelope can move a
-          // cursor — both consumers advance only on `workspaceSeq > cursor` and
-          // every backfilled envelope is at or below `afterSeq`.
+          // Ruling P37.1: a bounded NOTICE, yielded BEFORE its trigger, never
+          // the history it used to carry.
+          //
+          // Before-and-not-after is the load-bearing half. The client must have
+          // pulled a ticket before a folded `ticket.reparented` for it arrives,
+          // or `applyTicketEvent` replays a transition with no `ticket.created`
+          // and stalls the engine terminally. Under the OLD push shape this
+          // ordering was the unsafe repair — putting the trigger first to
+          // advance the cursor ahead of the burst — and it is safe here for the
+          // reason that stopped being true of it: a notice carries no history
+          // to sit behind, so there is no burst to advance the cursor past.
+          //
+          // The notice cannot move a cursor either. Both consumers advance only
+          // on `workspaceSeq > cursor` (`stream/hub.ts`'s `drain`, and the
+          // dual-client rig's `syncDown`), and an instruction has no
+          // `workspaceSeq` at all — which here is a requirement rather than an
+          // accident, because the notice must be RE-DELIVERED if the socket
+          // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
-            yield* grantBackfillFor(db, userId, env.entity.id, afterSeq, backfilled);
+            const tickets = await grantNoticeFor(db, userId, env.entity.id, afterSeq, backfilled);
+            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           }
           yield env;
         }
@@ -479,6 +514,29 @@ export async function* visibleEventsFor(
                 await nowInvisibleTicketsInScope(db, userId, workspaceId, 'workspace'),
               );
             }
+          } else if (env.type === 'membership.granted' || env.type === 'project.member_added') {
+            // THE WIDENING HALF of this arm, and it was missing until closure
+            // 5b (case 12.283). Its two siblings above answer the narrowings —
+            // `membership.revoked` and `project.member_removed` — and a reader
+            // finding only those could reasonably conclude that a grant needed
+            // nothing. It does: every ticket this event reveals sits below the
+            // client's cursor, because the client's cursor advanced past that
+            // history while the tickets were invisible to it. Identical gap to
+            // the one `grant-backfill.ts` closes on the ticket's side, so it
+            // gets the identical repair — a bounded notice, and the client
+            // pulls what it lacks.
+            //
+            // `membership.granted` cannot scope; `project.member_added` names
+            // its project in `entity.id`, exactly as `project.member_removed`
+            // one branch down reads it.
+            const tickets = await readerReachNoticeFor(
+              db,
+              userId,
+              workspaceId,
+              env.type === 'project.member_added' ? { projectId: env.entity.id } : 'workspace',
+              afterSeq,
+            );
+            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           } else if (env.type === 'project.member_removed') {
             // A guest holds no project (the 2026-08-27 collapse, stated in
             // `can-see.ts`), so this site is reached by members only and the
