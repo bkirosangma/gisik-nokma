@@ -25,7 +25,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | §09 | **98 cited / 121 uncited / 219** (was 0/219). Baseline set to **121** |
 | §05 | tightened **68 → 67**, deliberately — see below; it is the ratchet working, not a stray |
 | `check:citations` | **0** — 1529 checked, **879 cited / 650 uncited**, ratchet holds exactly on every file |
-| gate | RUNNING at `97d7451` when this was written. **If no gate line was ever added below, IT DID NOT FINISH — re-run it; do not assume green** |
+| **gate at `97d7451`** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m31.9s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed \| 5 skipped (3671) / 285 files** — identical again, the prediction a comments-only change owes. `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (1614) · `check:runbook` 0. Zero orphans |
 
 ## 🔴 THE BROKEN INSTRUMENT — the most important thing on this page
 
@@ -75,8 +75,14 @@ not EMPTY* is worth 98 citations here. Read the tree before re-dispatching anyth
    to one commit). If the gate did not finish, re-run it before opening.
 2. **§09 batch 2** — the **113 rows naming `apps/server/`**, same method, one subagent. Then set the §09 baseline
    to the new real count.
-3. **Mutation-test §09 before calling any zero evidence** — use **`9.11`**, a real prefix of the live
-   `9.115`–`9.118`; removing its sole citation must redden naming `9.11` and only `9.11`.
+3. **Mutation-test §09 before calling any zero evidence.** ⚠ **CORRECTION to what this line first said:** it
+   named `9.11` as "a real prefix of the live `9.115`–`9.118`". **`9.11` is NOT a live row** — §09's live ids run
+   **9.35–9.256** (9.1–9.34 are permanently unused, per `test-cases/README.md`), and **measured: §09 contains NO
+   prefix pairs at all**, so the substring hazard that made §10's `10.1` the right probe *does not arise here*.
+   **Already done for batch 1 and it passed:** removing the sole `9.36` citation gave `EXIT=1` and
+   §09 `97 cited / 122 uncited` — the count moving by exactly one, with `9.36` named. Note the reporting
+   difference from §10: §09 still has 122 uncited ids, so the checker lists many rather than one; **the delta of
+   exactly 1 is the evidence, not the length of the list.** Re-run the same shape when batch 2 closes.
 4. **Then (A)**, the approved semble hunt: ranked candidates as rows with **named owners, not fixes**. First row
    already evidenced: `packages/app-core/src/precheck.ts:375` ↔ `rule-engine`, 0.61–0.67, no import, no call.
 
