@@ -680,3 +680,83 @@ re-run by anything since, automated or otherwise.)*
 *(`scripts/check-env-example.mjs` was reused by Task 6, not created by it — it already existed from an
 earlier lane's work (`git log` shows it first at `b641a28`, unchanged in the Task 4–6 diffs inspected). No
 case above credits Task 6 with authoring it; flagging this so a future edit doesn't misattribute it.)*
+
+## The scheduler generalisation and the notification-sweep registration (Plan 11's two deferred "ops errands")
+
+**NO ID MINTED — Lane C's `13.1–13.40` block is fully exhausted (13.40 above already spends the last one on
+the restore-drill guard pair). The cases below are written out in full, exactly as this file's own Task 12
+precedent does two sections up, and await one id in the next block the controller allocates (`13.201` or
+whatever is current when that happens) — never borrowed from Lane D's `13.41–13.100` or Lane E's
+`13.101–13.200`, and never sub-numbered onto `13.40` (`check-case-ids.mjs`'s `ID_LINE` would extract a
+`13.40.1` as a duplicate `13.40` and miss a `13.40a` entirely).** This contradicts the brief this task was
+given ("13.40 is your LAST free id") — 13.40 was already spent before this task started, so the block held
+exactly zero, not one. **The ASK, precisely: three PENDING BLOCK entries below, covering TEN new real
+vitest tests (four `startScheduler` cases and six `requirePositiveIntervalMs` cases, all in
+`apps/server/test/ops/schedule.test.ts`, all passing) plus the `backup-daemon-main.ts` wiring claim, need
+one id each from Lane C's next allocated block.** Flagged in this task's own report as a block-exhaustion
+ask, per the rule at the head of this file.
+
+**PENDING BLOCK — `startScheduler` generalises the daemon's private `loop`/`onFailure` primitive from a
+fixed two-job shape to an arbitrary list of `{name, run, delayMs}` jobs, and `startBackupDaemon` becomes a
+thin wrapper over it with an UNCHANGED external signature.** Every existing `startBackupDaemon` case in
+`test/ops/schedule.test.ts` (the stderr shape, the `` `backup:${name}` `` alerter key, two timers armed
+synchronously at construction, independent re-arm, `stop()` clearing both) passes byte-for-byte against the
+new implementation with no edits to those cases — proof the wrapper is genuinely thin rather than a
+same-behavior rewrite that happens to pass. Four NEW cases prove the generalisation itself, none of them
+reachable through the two-job wrapper alone: N independent jobs are armed with N timers **synchronously at
+construction** (not on a microtask — the existing `stop()` case's `toBe(2)` immediately after construction
+already pins this for two jobs; the new case pins it for three); one job's failure and re-arm leaves a
+sibling job's own call count and schedule untouched; each job re-arms strictly on its OWN `delayMs()`, so a
+fast job firing three times causes zero calls to a slow job on a much longer interval; and `stop()` clears
+EVERY job's timer (five, not two) with nothing firing across a fortnight of advanced time afterward.
+**Review-round addition (2026-09-06): construction is all-or-nothing, not first-come-first-armed.** Every
+job's initial `delayMs()` is now called BEFORE any of them is armed, so a LATER job's `delayMs()` throwing
+(the shape `requirePositiveIntervalMs` and `msUntilNextUtc` both produce on a malformed schedule value)
+leaves ZERO timers live, rather than orphaning the earlier jobs' timers with no `stop()` ever returned to
+cancel them. Two new cases pin this: a three-job list where the third throws leaves `vi.getTimerCount() === 0`
+(mutation-verified — reverting the fix to the original one-job-at-a-time loop reddens exactly this
+assertion, at exactly the pre-fix value 2, with every other case in the file still green); and a two-job
+list where the first throws proves the second job's `delayMs()` is never even called.
+`apps/server/src/ops/schedule.ts`, `apps/server/test/ops/schedule.test.ts`
+
+**PENDING BLOCK — `requirePositiveIntervalMs` refuses rather than clamps a millisecond interval, the same
+"refuse, don't clamp" bargain `msUntilNextUtc`'s HH:MM and day-of-week checks already make for the two
+existing backup jobs, applied to the notification sweep's configurable interval.** Six cases: a legitimate
+positive integer (and the boundary value `1`) pass through unchanged; `0` is refused, naming `0` in the
+thrown message; a negative value is refused, naming it; `NaN` (what a non-numeric
+`NOTIFICATION_SWEEP_INTERVAL_MS` produces through `Number()`, mirroring how `LEDGER_EXPORT_DOW_UTC`'s own
+`NaN` case is asserted above at 13.9–13.12's neighbourhood) is refused; a fractional value is refused,
+because "positive integer" means the integers, not the range; and `Infinity` is refused, because "positive"
+alone would pass it and only a `setTimeout` scheduled for the heat death of the universe would ever reveal
+the mistake. Every refusal is a SYNCHRONOUS throw, asserted the same way the day-of-week cases above are:
+the failure mode this guards against is not a wrong value but a call that never returns (`0`/negative spin
+the daemon in a tight re-arm loop; the pre-fix code had no guard against either).
+`apps/server/test/ops/schedule.test.ts`
+
+**PENDING BLOCK — `backup-daemon-main.ts` registers two more jobs on the SAME scheduler as the existing
+pg-dump and ledger-export jobs, and neither reaches the `--once` path.** The entry point now calls
+`startScheduler` DIRECTLY with all four jobs, not `startBackupDaemon` — one scheduler, one `stop()`, one
+`'backup daemon scheduled'` log line, for all four. `startBackupDaemon`'s only remaining caller is its own
+test file above (13.9, 13.25–13.29), kept because it is what pins `startScheduler`'s stderr/alerter contract
+in one place; that pinning is what makes it true, by construction rather than by a fifth case, that a
+`sweep-orphans` failure in production alerts as `` `backup:sweep-orphans` `` with `msg: 'backup job failed'`
+— the exact shape 13.25/13.27 assert against `startBackupDaemon`. `sweep-orphans` runs
+`sweepOrphanObjects` against the worker's own `createObjectStoreFromEnv` store on a fixed 30-day interval
+(first run 30 days after boot — the same `delayMs`-called-once-to-arm, called-again-after-completion
+semantics `startScheduler` already gives the two backup jobs) and logs COUNTS only (`examined`, `named`,
+`unrecognizedShape`, `withinWindow`, `swept`, `deleted`), never the swept key list itself, at `info` level.
+`sweep-notifications` runs `runNotificationSweep` with `createInAppTransport(pool)` on
+`NOTIFICATION_SWEEP_INTERVAL_MS` (optional, default one hour; unset OR empty both mean "use the default",
+the same equivalence `requireDatabaseUrl` and the `ALERT_WEBHOOK_URL || null` mapping already draw
+elsewhere in this file, because an unset App Platform binding resolves to `''` and `Number('')` is `0`,
+which the validator above would then — correctly — refuse for a value the operator never actually set).
+Both new jobs are absent from the `process.argv.includes('--once')` branch, with a comment at that branch
+saying so explicitly: that flag's own docstring, and the `pnpm ops:backup-once` script that calls it, are
+"run the two BACKUP jobs right now," and folding a sweep whose delete has no undo into that silently would
+surprise whoever reaches for it expecting only a backup. `console.log(JSON.stringify({msg: 'backup daemon
+scheduled'}))` still fires exactly once, after all FOUR jobs are armed — no competing log line was added.
+**No automated test exercises `backup-daemon-main.ts` itself** — this is the same gap 13.39 already records
+for the two original jobs, now also true of the two new ones; the claim above is proven at the unit level
+(`startScheduler`'s and `requirePositiveIntervalMs`'s own cases, immediately above) and by reading the
+wiring, not by an integration test of the entry point. `apps/server/src/ops/backup-daemon-main.ts`,
+`apps/server/src/ops/schedule.ts`

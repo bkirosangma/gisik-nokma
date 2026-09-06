@@ -12,8 +12,15 @@ resolving it by extending the fine convention rather than forcing new cases into
 **9.1–9.34 therefore stay permanently UNUSED, not filled**: filling them now with the plan's coarse
 descriptions would put two ids on several of the same test files at two different granularities, which
 is the exact defect Task 15's fix round closed. New cases from Task 16 on continue past the highest live
-id (9.87 at the time Task 16 ran), currently ending at **9.241**. **Never renumber; 9.1–9.34 will never
-be filled.**
+id (9.87 at the time Task 16 ran); Task 16 itself left off at 9.239. Another lane shipped 9.240–9.241
+to `origin/main` first (the `attachments-wired.test.ts` composition-root cases) while this Plan 11 errand
+(`ObjectStore.list` and `sweep-orphans`) was in flight on its own branch still assuming 9.239 was the
+true highest — a review round caught the resulting collision (both lanes had claimed 9.240–9.241 for
+unrelated cases) before merge, and this errand's block was renumbered to continue from the real
+`origin/main` highest instead, now ending at **9.256**. **Never renumber; 9.1–9.34 will never be
+filled.** (The 9.240–9.256 renumbering above is the one exception on record, and only because the
+original numbers had not yet reached `origin/main` under this lane's name — once a case id ships to
+`origin/main`, it is permanent the same way 9.1–9.34 is.)
 
 **Scope of this file, as of Task 16 (the closing task of Plan 7).** Every task in the plan has landed on
 this branch: schema v1 and the one extension set (Task 1), the embeddable-image walker (Task 2), the
@@ -227,6 +234,34 @@ Case 9.57 above cites this file for the `attachment.added` kind-discriminated-un
 - 9.165 ✅ Planted defect: the refusal happens DURING the stream, not after the whole body is buffered — an oversize upload cannot exhaust memory on the way to being refused. (`apps/server/test/attachments/read-limited.test.ts`)
 - 9.166 ✅ The refusal states the limit in the units a person uses (MB), not raw bytes. (`apps/server/test/attachments/read-limited.test.ts`)
 - 9.167 ✅ A sub-mebibyte ceiling changes units in its message rather than reporting a misleading "0 MB". (`apps/server/test/attachments/read-limited.test.ts`)
+
+## Server — ops:sweep-orphans (filed here, not §13: these are ObjectStore-level behaviors, matching where the store's own cases already live)
+
+`ObjectStore` gained a fourth verb, `list`, and `apps/server/src/tools/sweep-orphans.ts` is its first
+consumer — Plan 11's deferred orphan-object errand: bytes `routes/attachments.ts` can leave behind with
+no `attachments` row naming them (the crash window between `store.put()` succeeding and
+`insertAttachment()` committing, named in that file's own comment). Deliberately NOT filed under §13
+(`test-cases/13-deployment-dogfooding.md`) alongside the backup daemon that will eventually schedule it:
+`list()` and `sweepOrphanObjects` are ObjectStore/attachment-layer behaviors, proven against the real
+`LocalDiskStore` and a mocked `S3ObjectStore` exactly like every other case in this section, not
+deployment-shaped ones. The scheduler wiring that RUNS this sweep periodically is §13's concern and is
+catalogued there instead.
+
+- 9.242 ✅ `LocalDiskStore.list` round-trips every key it was given, each with a `Date` `lastModified`. (`apps/server/test/attachments/local-disk-store.test.ts`)
+- 9.243 ✅ `LocalDiskStore.list` with a prefix returns only keys starting with it. (`apps/server/test/attachments/local-disk-store.test.ts`)
+- 9.244 ✅ `LocalDiskStore.list` on an empty store returns an empty array — including a store directory that does not exist yet. (`apps/server/test/attachments/local-disk-store.test.ts`)
+- 9.255 ✅ `LocalDiskStore.list` skips a symlink planted inside `rootDir`, even one pointing outside `root` — structural: a symlink's `Dirent` is neither `isDirectory()` nor `isFile()`, so the walk's two branches both miss it without a dedicated check; the target lives outside `root` on purpose, so a regression that started following symlinks would surface as a leaked out-of-root key rather than merely a differently-named in-root one. (`apps/server/test/attachments/local-disk-store.test.ts`)
+- 9.245 ✅ `S3ObjectStore.list` maps `Contents[].Key`/`.LastModified` and passes `Prefix` through when given. (`apps/server/test/attachments/s3-store.test.ts`)
+- 9.246 ✅ `S3ObjectStore.list` PAGINATES via `ContinuationToken` rather than stopping at one page — two mocked pages are joined into one result, asserted against exactly two `ListObjectsV2Command` calls. (`apps/server/test/attachments/s3-store.test.ts`)
+- 9.247 ✅ `sweepOrphanObjects`: an object named ONLY by an `attachments` table row survives, however old — planted-mutation witness: dropping the `attachments` lookup alone reddens this case and leaves 9.248 green. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.248 ✅ `sweepOrphanObjects`: an object named ONLY by an `attachment.added` ledger event (`kind: 'upload'`) survives, however old — the union's OTHER half, load-bearing because the web client does not currently post this event at all (see the file's own docblock); planted-mutation witness: dropping the `events` lookup alone reddens this case and leaves 9.247 green. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.249 ✅ `sweepOrphanObjects`: an unnamed object 10 days old survives, inside the 30-day retention window. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.250 ✅ `sweepOrphanObjects`: an unnamed object 40 days old is swept on the first run, and a second run at the same clock finds nothing left to sweep — the idempotence property. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.256 ✅ `sweepOrphanObjects`: the retention boundary is "sweep at or past 30 days," not "sweep only when older" — an object aged to EXACTLY `ORPHAN_OBJECT_RETENTION_MS` (measured to the millisecond off one fixed `now`, not a re-read clock) is swept, and one 1 second inside the window survives. Pins the `<` in the comparison directly, where the 10-day/40-day fixtures above (9.249/9.250) sit comfortably on either side and would stay green even under a `<=` off-by-one. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.251 ✅ `sweepOrphanObjects`: a key that does not match the `w/<workspaceId>/a/<id>` shape (`w/ws1/other-thing`) is left alone whatever its age or naming — recorded in `unrecognizedShape`, never in `swept`, and still on disk afterward. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.252 ✅ `sweepOrphanObjects`: a torn-write `.tmp-<pid>-<ms>` leftover — four `/`-segments shaped exactly like a real attachment key — is refused as unrecognized shape rather than accepted and later crashing `store.delete` on its own dotted suffix. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.253 ✅ `sweepOrphanObjects`: a dry run makes no `store.delete` calls and reports the identical `swept` list a live run at the same clock would actually delete. (`apps/server/test/tools/sweep-orphans.test.ts`)
+- 9.254 ✅ `ORPHAN_OBJECT_RETENTION_MS` is exactly 30 days — the boundary constant every fixture above is measured against. (`apps/server/test/tools/sweep-orphans.test.ts`)
 
 ## Server — attachment metadata: repo, hash, filename, sniffing
 

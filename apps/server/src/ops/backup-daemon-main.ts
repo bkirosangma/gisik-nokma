@@ -1,14 +1,23 @@
-import { ConfigError } from '../config.js';
-import { createPool } from '../db.js';
 // Task 3 has merged and the shim is deleted. `alerterFromConfig` treats ONLY a
 // strict `null` as "no alerter", so the `|| null` at the call site below stays
 // load-bearing: `.env.example` ships ALERT_WEBHOOK_URL empty and `??` would
 // hand that empty string to WebhookErrorAlerter.
 import { alerterFromConfig } from '../alerts/error-alerter.js';
+import { createObjectStoreFromEnv } from '../attachments/store-config.js';
+import { ConfigError } from '../config.js';
+import { createPool } from '../db.js';
+import { runNotificationSweep } from '../notifications/sweep.js';
+import { createInAppTransport } from '../notifications/transport.js';
+import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
 import { exportLedger } from './export-ledger.js';
 import { s3SinkFromEnv } from './object-sink.js';
 import { dumpDatabaseToSink } from './pg-dump.js';
-import { startBackupDaemon } from './schedule.js';
+import {
+  msUntilNextUtc,
+  requirePositiveIntervalMs,
+  startScheduler,
+  type ScheduledJob,
+} from './schedule.js';
 
 /**
  * THIS DAEMON DOES NOT CALL `loadConfig`, ON PURPOSE.
@@ -87,6 +96,13 @@ async function main(): Promise<void> {
     // the worst moment to let the convenient job veto the fundamental one. So
     // both are settled, both outcomes are reported, and the exit code is
     // non-zero if EITHER failed.
+    //
+    // NEITHER of the two errand sweeps below (orphan objects, notifications)
+    // runs on this path, ON PURPOSE: this docstring, and the
+    // `pnpm ops:backup-once` script that calls it, are specifically "run the
+    // two BACKUP jobs right now" — silently folding a destructive sweep (an
+    // orphan delete has no undo) into that would surprise whoever reaches for
+    // it expecting only a backup.
     const outcomes = await Promise.allSettled([jobs.runLedgerExport(), jobs.runPgDump()]);
     await pool.end();
     const failures = outcomes.filter((outcome) => outcome.status === 'rejected');
@@ -98,24 +114,99 @@ async function main(): Promise<void> {
     return;
   }
 
-  // The three schedule values are NOT validated here, and that is the choice
-  // rather than an omission: `msUntilNextUtc` refuses a malformed `HH:MM` and,
-  // since the same review that found this, a `dayOfWeek` outside the integers
-  // 0-6 — including the `NaN` a non-numeric `LEDGER_EXPORT_DOW_UTC` produces
-  // through `Number()` below. Both refusals fire on the FIRST `delayMs()`
-  // call, which `startBackupDaemon` makes synchronously while arming the
-  // initial timers, so a mistyped variable rejects `main()` and exits the
-  // worker 1 with the bad value named. Duplicating the range check here would
-  // put the same rule in two places for no earlier a failure.
-  const daemon = startBackupDaemon(
-    jobs,
-    {
-      pgDumpTimeUtc: process.env.BACKUP_TIME_UTC ?? '21:00',
-      ledgerExportTimeUtc: process.env.LEDGER_EXPORT_TIME_UTC ?? '22:00',
-      ledgerExportDowUtc: Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0'),
-    },
-    alerter,
+  // Built HERE, after the `--once` early return, and not above alongside
+  // `sink`/`pool`: neither the attachment object store nor the notification
+  // transport is needed by `--once`, and constructing the store eagerly would
+  // give an operator with a partial `OBJECT_STORE=s3` environment a new
+  // `ConfigError` from `pnpm ops:backup-once`, which works today without
+  // either variable set.
+  const store = createObjectStoreFromEnv(process.env);
+  const notificationTransport = createInAppTransport(pool);
+
+  // Read once, validated on every `delayMs()` call below (the same "read
+  // once, validate on every call" shape `LEDGER_EXPORT_DOW_UTC` already has
+  // via `msUntilNextUtc`). An unset OR EMPTY binding means "use the default":
+  // App Platform resolves an unset variable to `''`, and `requireDatabaseUrl`
+  // and `ALERT_WEBHOOK_URL || null` above both already treat that spelling of
+  // "unset" the same way, for the same reason — `Number('')` is `0`, which
+  // `requirePositiveIntervalMs` would then (correctly) refuse for a value the
+  // operator never actually set.
+  const rawSweepInterval = process.env.NOTIFICATION_SWEEP_INTERVAL_MS;
+  const notificationSweepIntervalMs = Number(
+    rawSweepInterval === undefined || rawSweepInterval.trim() === '' ? '3600000' : rawSweepInterval,
   );
+
+  const scheduledJobs: ScheduledJob[] = [
+    // The three schedule values below are NOT validated here, and that is the
+    // choice rather than an omission: `msUntilNextUtc` refuses a malformed
+    // `HH:MM` and a `dayOfWeek` outside the integers 0-6 — including the `NaN`
+    // a non-numeric `LEDGER_EXPORT_DOW_UTC` produces through `Number()`.
+    // These refusals fire on the FIRST `delayMs()` call, which `startScheduler`
+    // makes synchronously for every job — BEFORE arming any of their timers —
+    // so a mistyped variable rejects `main()` with no scheduler timer left
+    // running (not even the other, correctly-configured jobs') and exits the
+    // worker 1 with the bad value named. Duplicating the range check here
+    // would put the same rule in two places for no earlier a failure.
+    {
+      name: 'pg-dump',
+      run: jobs.runPgDump,
+      delayMs: () => msUntilNextUtc(process.env.BACKUP_TIME_UTC ?? '21:00', new Date()),
+    },
+    {
+      name: 'ledger-export',
+      run: jobs.runLedgerExport,
+      delayMs: () =>
+        msUntilNextUtc(
+          process.env.LEDGER_EXPORT_TIME_UTC ?? '22:00',
+          new Date(),
+          Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0'),
+        ),
+    },
+    {
+      name: 'sweep-orphans',
+      run: async (): Promise<void> => {
+        const report = await sweepOrphanObjects(store, pool, { now: new Date(), dryRun: false });
+        // Counts only — NOT the swept key list, which could be long. A
+        // failure here still reaches stderr and the alerter as usual, via
+        // `startScheduler`'s own `onFailure`.
+        console.log(
+          JSON.stringify({
+            msg: 'orphan sweep complete',
+            examined: report.examined,
+            named: report.named,
+            unrecognizedShape: report.unrecognizedShape.length,
+            withinWindow: report.withinWindow.length,
+            swept: report.swept.length,
+            deleted: report.deleted,
+          }),
+        );
+      },
+      // Every 30 days, first run 30 days after boot. "Monthly" in the plan
+      // sense would mean calendar month-of-day scheduling (`msUntilNextUtc`'s
+      // day-of-week machinery generalised to a day-of-month, with February's
+      // short month and DST-free UTC arithmetic to get right) — real new
+      // logic this maintenance sweep does not need enough to justify.
+      delayMs: () => 30 * 24 * 60 * 60 * 1000,
+    },
+    {
+      name: 'sweep-notifications',
+      run: async (): Promise<void> => {
+        const report = await runNotificationSweep({ pool, transports: [notificationTransport] });
+        console.log(
+          JSON.stringify({
+            msg: 'notification sweep complete',
+            dueCandidates: report.dueCandidates,
+            staleCandidates: report.staleCandidates,
+            delivered: report.delivered,
+          }),
+        );
+      },
+      delayMs: () =>
+        requirePositiveIntervalMs(notificationSweepIntervalMs, 'NOTIFICATION_SWEEP_INTERVAL_MS'),
+    },
+  ];
+
+  const daemon = startScheduler(scheduledJobs, alerter);
   console.log(JSON.stringify({ msg: 'backup daemon scheduled' }));
 
   // App Platform stops a worker with SIGTERM, then SIGKILLs it. Without this
