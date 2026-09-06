@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`fdd3bad`** — fourteen merges this context, in order: #127 · #121 (T17, `dca435d`) · #125 (closure 2, `7bb93cc`) · #129 · #130 · #128 (closure 3, `e407bf5`) · #131 · #126 (T14+T15, `c7c2b8e`) · #132 · #133 · #135 · **#137** (Lane A closure 2b, `c25d7fe`, CI green at `973ed0b`; gate at `a173cd6`, one docs line after) · **#136** (Lane D Plan 11 T7+T8, `a1252bc`, CI green at `1d4f6b5`) · **#138** (11/7 + 11/8 promoted, `fdd3bad`). Every `gh pr merge` exit read from `$?` on its own line |
-| ledger | **`CHECK_EXIT=0` · 162/177 (91.5%)** · claimed 0 · in-flight 0 · todo 15 · Plan 10 **17/18** (T18 open, held on §12 stability) · Plan 11 **3/16** (T5 landed on Lane E's branch, unmerged; T7, T8 done; T14 in PR) — every promotion independently re-run at the PR's exact tree, node 22 |
-| last forced gate | **`a1252bc`** (code-identical to `fdd3bad`) — ONE backgrounded invocation under the lock (queued 3 min behind a lane, acquired 03:28:29, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m29.5s · node v22.22.2** · zero `Unsupported engine` · **3319 tests / 253 files** — domain 464 · rule-engine 282 · **server 1042** (+46 = D's six seed suites) · **app-core 1092** (+6 = closure 2b) · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. Matches Lane D's 1042 and reconciles Lane A's 3273 (pre-#136) + 46. *(`c25d7fe` itself was not gated locally — CI at `973ed0b` plus Lane A's own 30/30 covered it, and this gate followed within minutes; previous: `c7c2b8e` 3267, `e407bf5` 3254, `7bb93cc` 3254.)* |
-| open PRs | **three, all HELD on their lanes' reviews, none on the controller:** **#134** (Lane C T14, rebased at `dcdd310` — its own eight-job workflow fully green there; amendment pending: 13.7/13.8 flipped to ❌ because T15's artefacts are not in the PR, the root-scripts statement, the §13 header, and the new **`scripts/check-case-ids.mjs`** gate) · **#139** (Lane B closure 5, rebased at `f13264e`, Fable branch review in flight) · **#141** (Lane A closure 4 under P36, gate green at `badfce9`, Fable branch review in flight). Merge order = arrival of the verdicts; whichever of #139/#141 lands second rebases (file lists exchanged). Then: promote 11/14, restart C → T15 and B → closure 5b + T18 (overrides staged). Expected next: Lane D T9+T10 (`exec/27-plan11-seed-runners`, workflow running); Lane E seam 1 (21 commits, T2 mid-implementation: `src/http/`, `@fastify/cors`, HTTP-Origin). |
+| `main` | **`cc42d01`** — nineteen merges this context; since `fdd3bad`: #140 · #142 (P37.1, P38) · **#143** (Lane A case 7.213, the mapper round trip, `5abb71e`) · **#134** (Lane C Plan 11 T14, the eight-job `ci.yml` with the blocking `check-case-ids` gate, `3571d38`, merged after reading every job's steps on run 33995268917) · **#144** (11/14 promoted, `cc42d01`). Every `gh pr merge` exit read from `$?` on its own line |
+| ledger | **`CHECK_EXIT=0` · 163/177 (92.1%)** · claimed 0 · in-flight 0 · todo 14 · Plan 10 **17/18** (T18 held) · Plan 11 **4/16** (T7, T8, T14 done; T5 landed on Lane E's branch, unmerged) |
+| last forced gate | **`3571d38`** (code-identical to `cc42d01`) — ONE backgrounded invocation under the lock (acquired 07:30:55, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m34.5s · node v22.22.2** · zero `Unsupported engine` · **3320 tests / 253 files** — server **1043** (+1 = 7.213), app-core 1092, the rest unchanged. *(Previous: `a1252bc` 3319.)* **CI itself changed at `3571d38`:** every PR now runs the eleven-job workflow (scope · check-env with `check-skipif-coverage` and `check-case-ids` · check-tasks · build → typecheck / server-tests ×4 / other-tests · e2e detect-only · gate fan-in); a docs-only PR shows every substantive job `skipped` and `check-tasks` RUN — read job steps, never the fan-in alone. |
+| open PRs | **#139** (Lane B closure 5 + P37.1's cap and cases, head `c2d0c52` = `9762cda` + one docs file (+6/−6, verified); gate at `9762cda` 30/30 · 0 cached · **3333 tests · server 1055**; running the new workflow at the head; **merges on its gate, then B restarts onto closure 5b with (d) — override staged**) · **#141** (Lane A closure 4, `badfce9` gate green; **the Fable review DIED on Fable's own session limit at ~03:5x with zero findings; an opus replacement reviewer was dispatched and its verdict is ACCEPTED as the verdict** — proportionality: opus is the standard tier, Fable the preference; HELD until A reports it applied and rebases past `cc42d01`). Expected next: Lane C T15 (`exec/28-plan11-do-spec`, restarted 07:31 with its WIP checkpoint `2df7cf5` to cherry-pick); Lane D T9+T10 (workflow relaunched after the reset); Lane E seam 1 (T2's fix round died on the limit; the lane is finishing it by hand — trustProxy attacker-chosen rate-limit key confirmed Critical, fix in design); Lane A the HELD pair under P38 (`exec/27-held-pair`, building). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -198,6 +198,30 @@ omission and what runs the dual-client suite instead (the sharded `server-tests`
 time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.skipIf(`-coverage
 trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
 version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
+
+### ⛔ THE 06:40 SESSION-LIMIT WINDOW TOOK EVERY LANE AND THIS CONTROLLER DOWN FOR ~3.5 HOURS (03:5x → ~07:20 IST)
+
+Every lane's five-hour session meter read 80% at 03:25; by ~03:50 subagents were dying with `You've hit
+your session limit · resets 6:40am (Asia/Calcutta)` (HTTP 429): **Lane A's Fable review of #141** (8
+minutes, zero findings — replaced by an opus reviewer, accepted as the verdict); **Lane D's whole T9/T10
+workflow** (four agents, ~13 min, 212K subagent tokens, zero output — relaunched via `resumeFromRunId`
+after the reset, nothing cached to reuse); **Lane E's T2 fix round** (the lane finished it by hand). This
+controller's last event was at 03:55 and its next at 07:29; the lanes' meters then read **6%, resets
+12:20pm**. **What held:** every ruling was on `main` before the window (P35–P38, P37.1 — #142 merged 03:48),
+every lane's handoff was on its branch, and the monitor and gate lock came back with the sessions. **What
+it cost:** #134 sat fully green for three hours; C idled from 03:44. **Rule:** when the meters pass ~80%,
+merge what is green and write the restart surface BEFORE dispatching anything Fable-tier; a Fable review
+that dies on a limit returns nothing and looks like a review that found nothing.
+
+**Closure 5b(d) — measured before the restart (Lane B):** the ruling assumed one missing artefact; there
+are three, and the third would have cost a round. (i) **`Replica.loadBootstrap` is the replica's only
+bootstrap door and it unconditionally sets `cursor:<workspace>` to the server's head** — pulling one ticket
+through it would SKIP every intervening event for every other ticket and present as convergence in a
+quiet fixture; a per-ticket door that does not touch the cursor comes FIRST, with the no-cursor-movement
+excluding fixture and per-ticket rollback (`loadBootstrap` rolls the whole response back on a fold
+failure). (ii) `bootstrapTicket` is PRIVATE to `sync-routes.ts` — the reason the rig restates it. (iii) no
+per-ticket route exists (`/v1/sync`, `/v1/sync/bootstrap`, `/v1/sync/reconcile` is the whole surface).
+Shape of the ruling unchanged.
 
 ### RULING P37.1 (2026-09-06 03:50, controller as ruling tier) — the push-shaped grant backfill WEDGES; disclosed and capped now, made pull-shaped and client-presented under closure 5b(d)
 
