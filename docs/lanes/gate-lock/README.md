@@ -1,4 +1,4 @@
-# Gate lock v3.1 — the reference implementation
+# Gate lock v3.3 — the reference implementation
 
 Controller ruling 2026-09-06. Lane E maintains this; the other four lanes and the
 controller copy it. **These files are a REFERENCE COPY, not repo tooling** —
@@ -46,57 +46,91 @@ them were invisible to inspection:
 Controls for (4), run together: with a real gate process **and** a shell that
 merely mentions both names, `peers = 1`; with nothing running, `peers = 0`.
 
-## MEASURED DEFECT IN THIS VERSION, found 2026-09-06 — `peer_gates` counts its own subshell
+## v3.3 — `peer_gates` counted its own subshell. FIXED, and the prescribed fix was wrong
 
-**Reproduced, bounded, and NOT fixed here, because the fix is unverified. Read the
-whole entry before acting on it.**
+**The defect (v3.2 and earlier).** `peer_gates()` is invoked as `pg=$(peer_gates)`.
+The `$( )` forks a subshell that inherits the script's argv, and the script's own
+path — `.../locked-test.sh` — is a token in that argv, so the subshell matches the
+very pattern the matcher uses. `$$` excludes the script and `$PPID` excludes its
+launcher; the subshell is neither. **On an idle machine the matcher returned 1,
+never 0.**
 
-`peer_gates()` is invoked as `pg=$(peer_gates)`. The `$( )` forks a subshell that
-inherits the script's argv, and the script's own path — `.../locked-test.sh` — is a
-token in that argv, so the subshell matches the very pattern the matcher uses.
-`$$` excludes the script and `$PPID` excludes its launcher, but the subshell is
-neither. **On a completely idle machine the matcher therefore returns 1, never 0.**
+**Blast radius, small but exactly the wrong place.** `pg` is read only on the
+empty-lock RECLAIM path: reclaim an abandoned lock only if the machine is
+observably idle. With `pg >= 1` always, **that path can never fire, so an
+abandoned empty lock wedges every lane forever** — the failure v3's reclaim exists
+to prevent. The normal acquire path never consults it, so a gate taken against a
+free lock (the common case) was unaffected.
 
-Measured, not reasoned about. A script invoked as `.../locked-test-probe.sh`,
-containing nothing but this function and an echo, printed `peer_gates via $( ) = 1`
-on an idle box. The same awk run WITHOUT a command substitution — piped straight
-in the caller's own shell — enumerated **zero** matching processes at the same
-instant. That difference is the whole bug.
+**The prescribed fix does not work, and looks like it does.** The instruction
+issued to the lanes was `-v fork=$BASHPID` inline in the awk argument list, with
+`$1 != fork` in the predicate. Bash expands that argument **in the child it forks
+for `awk`**, so `fork` receives AWK's pid — and awk is already excluded, by `comm`.
+The subshell stays counted. Written inline it is a no-op that reads as a fix.
 
-**Blast radius is small but it is exactly the wrong place.** `pg` is read only at
-lines 119-125, the empty-lock RECLAIM path: reclaim an abandoned lock only if the
-machine is observably idle. Since `pg >= 1` always, **that path can never fire, so
-an abandoned empty lock wedges every lane forever** — which is the failure v3's
-reclaim was written to prevent. The normal acquire path does not consult it, so a
-gate taken against a free lock (the common case) is unaffected. Lane E ran its
-seam-1 gate under v3.1 with the lock free, knowingly.
+**What works: capture `$BASHPID` with a plain assignment first**, executed by the
+substitution subshell before any pipeline fork:
 
-**Candidate fix, NEGATIVE CONTROL PASSES, POSITIVE CONTROL NEVER FIRED — do not
-adopt on this note's say-so.** Exclude our own process GROUP rather than our pid,
-since a `$( )` subshell shares the script's pgid while a peer lane's gate has its
-own:
-
-```
-ps -eo pid=,pgid=,comm=,args= | awk -v mypgid=$(ps -o pgid= -p $$ | tr -d ' ') '
-  { c = $3; sub(/.*\//, "", c); hit = 0
-    for (i = 4; i <= NF; i++)
-      if ($i ~ /(^|\/)(gate[^\/]*|locked-test[^\/]*)\.sh$/) hit = 1 }
-  (c == "bash" || c == "sh" || c == "zsh") && hit && $2 != mypgid { n++ }
-  END { print n + 0 }'
+```bash
+peer_gates() {
+  local fork=$BASHPID
+  ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID -v fork="$fork" '
+    ...  $1 != self && $1 != parent && $1 != fork { n++ }
 ```
 
-It returns 0 on an idle machine, which is the improvement. **It also returned 0
-against a peer this session tried to stage**, because a `&` background job in a
-non-interactive shell stays in its parent's process group and was excluded along
-with the subshell. A real peer lane runs in a different session and would not be,
-but that was not demonstrated. So the fix is a hypothesis with half a control, and
-this file's own rule applies to it: *a zero from a matcher never watched to fire is
-not a measurement.* Whoever adopts it must first stage a peer in a genuinely
-separate process group and watch the count reach 1.
+**Control record, measured on this machine 2026-09-06** with Lane D's live
+gate-shaped peer (pid 87594) present throughout, so the true peer count is 1 —
+never 0 — and the positive control is a **gate-shaped SLEEPER**, deliberately not a
+copy of these scripts, since an instrument that counts copies of itself proves only
+that it counts instruments:
 
-**The recurring shape, for whoever writes v3.3:** this is correction #4 again — "a
-shell whose command line merely mentions a gate" — reappearing one level down, in
-the subshell rather than the caller. Every fix so far has narrowed WHICH processes
-match; none has addressed the fact that the matcher runs inside a process that
-matches. Owner: Lane E (maintains this reference), escalated to the controller
-because all five lanes and the controller copy these files.
+| condition | inline `-v fork=$BASHPID` | captured first |
+|---|---|---|
+| baseline: one live peer gate | 2 | **1** |
+| + one gate-shaped sleeper | 3 | **2** |
+| sleeper reaped | 2 | **1** |
+
+The inline form is the captured form **plus one, always** — it never excludes
+anything real. The captured form tracks the true peer count, and the sleeper moves
+it in both directions, which is what makes this a measurement rather than a zero
+from a matcher never watched to fire.
+
+*(The v3.2 note here proposed excluding our own process GROUP instead. That
+candidate is WITHDRAWN: it returned 0 on an idle machine, but its positive control
+never fired — a `&` background job in a non-interactive shell stays in its parent's
+process group and was excluded along with the subshell. Superseded by the above,
+which is controlled in both directions.)*
+
+**The recurring shape:** this is correction #4 — "a shell whose command line merely
+mentions a gate" — one level down. Every earlier fix narrowed WHICH processes match;
+none addressed the fact that **the matcher runs inside a process that matches.**
+
+## v3.3 — `REPO` is no longer hard-coded, and a wrong tree now fails loudly
+
+`gate.sh` and `locked-test.sh` both carried
+`REPO=/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` — Lane E's worktree.
+**These files are copied between lanes**, so a peer that copied the FILE gated Lane
+E's tree and read Lane E's `check:env` exit while believing it had measured its own
+(Lane B, 2026-09-06). A wrong tree does not error; it returns a well-formed green
+about somebody else's work.
+
+Now `REPO="${GATE_REPO:-$PWD}"`, guarded:
+
+```bash
+if [ ! -e "$REPO/.git" ]; then
+  echo "FATAL: '$REPO' is not the root of a git worktree." >&2
+  ...
+  exit 3
+fi
+```
+
+`-e`, not `-d`: in a git **worktree** `.git` is a FILE (`gitdir: …`), not a
+directory — verified here (`file -b .git` → `ASCII text`). Controls: from `/tmp`
+it prints the FATAL lines and exits 3; with `GATE_REPO` set to a real worktree the
+guard passes. A relative form (`$(dirname "$0")/../..`) was rejected — from
+`docs/lanes/gate-lock/` it resolves to `docs/`, and it breaks entirely for the
+scratchpad copies every lane actually runs.
+
+**Copying these files still requires one decision per lane**: run them from your
+worktree root, or export `GATE_REPO`. That is now a loud failure instead of a
+silent misattribution.
