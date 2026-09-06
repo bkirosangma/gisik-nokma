@@ -749,6 +749,16 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await tx.run('DELETE FROM events WHERE entity_id = ?', [entityId]);
         await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [entityId]);
         await tx.run('DELETE FROM snapshots WHERE entity_id = ?', [entityId]);
+      // The provenance block goes with the snapshot it belongs to. It was
+      // MISSED when the table was added, and the omission is the shape this
+      // file's own invariant warns about — "a replica for a workspace you are
+      // not in should hold nothing of it beyond your own authored stubs". A
+      // block left behind is an actorId and two instants for a ticket the
+      // server told this device to forget. Nothing serves an orphaned row
+      // today, but `writeSnapshot` deliberately does not overwrite with an
+      // absent block, so a future re-delivery would resurface it rather than
+      // replace it — retention now, a wrong answer later.
+      await tx.run('DELETE FROM snapshot_provenance WHERE entity_id = ?', [entityId]);
         // Contests OTHERS raised vanish with the ticket. The local user's OWN
         // contested claims survive as content-light stubs: their `originalEvent`
         // is what this user typed on this device, purging it would silently
@@ -783,6 +793,8 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
           await tx.run('DELETE FROM events WHERE entity_id = ?', [ticketId]);
           await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [ticketId]);
           await tx.run('DELETE FROM snapshots WHERE entity_id = ?', [ticketId]);
+        // Same reason as `purgeEntity`: the block follows the snapshot.
+        await tx.run('DELETE FROM snapshot_provenance WHERE entity_id = ?', [ticketId]);
           if (me === null) await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
           else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [ticketId, me.userId]);
         }

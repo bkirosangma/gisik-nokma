@@ -385,6 +385,15 @@ describe('runSnapshotPass', () => {
  */
 describe('12.244 the snapshot copies the state claim’s recorded instant, not a neighbour’s', () => {
   it('12.244 stateProvenance.serverTime equals the ledger row at that seq — asserted against the ROW', async () => {
+    // A SECOND state-claiming event, and the case could not test its own title
+    // without it. `TICKET` was created and then only ever `field_set`, so
+    // `ticket.created` was the ONLY candidate — "the LAST such event wins" was
+    // unconstrained, and a capture-first-only writer passed. It still would
+    // have caught option 3 (a non-state neighbour's instant), which is why the
+    // gap was easy to miss: the case DID kill the mutation it was written for,
+    // while its stated property went untested.
+    await seed([ticketEvent('ticket.transitioned', { to: 'doing' }, TICKET)]);
+
     await runSnapshotPass(db.pool, { minEvents: 0 });
 
     const client = await db.pool.connect();

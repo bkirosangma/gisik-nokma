@@ -528,6 +528,90 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
   });
 });
 
+/**
+ * 12.249 — THE STALE ATTRIBUTION, found by review and reproduced.
+ *
+ * `claimsFor` branched ONCE on the state event and, finding none, took the
+ * snapshot block for BOTH claims — never looking at the local `ticket.assigned`
+ * events it had been handed. On the ordinary fresh-device path that is a wrong
+ * answer on screen: a snapshot-bounded bootstrap ships neither
+ * `ticket.created`/`.transitioned` NOR `ticket.assigned` below the line, then a
+ * streamed `ticket.assigned` arrives, and the door served the snapshot's OLD
+ * assignment claim beside the NEW assignee — a stale actor and a stale instant,
+ * rendered as the claim that produced the current assignment.
+ *
+ * The guard that was supposed to prevent it checked only NULLNESS, while its
+ * comment claimed to catch drift "if a local fold has moved the assignment on".
+ * **A guard that checks whether a value exists is not checking whether it is
+ * the right value** — and the comment saying otherwise made the gap read as
+ * covered.
+ */
+describe('12.249 a newer local assignment beats the shipped block', () => {
+  const TICKET = 'tkt-stale';
+  const USER_C = newUlid();
+  const USER_D = newUlid();
+  // Deliberately NOT `SERVER_TIME`, which is what `envelope` stamps on the
+  // local event. The two must differ or the instant assertion below cannot
+  // tell the block's value from the event's — the first draft used a string
+  // that happened to equal `SERVER_TIME`, and the case failed for that reason
+  // rather than for a defect.
+  const OLD = { actorId: USER_A, clientTime: '2026-01-01T00:00:00.000Z', serverTime: '2026-01-01T00:00:00.000Z' };
+
+  it('12.249 assignedProvenance names the actor of the LOCAL assignment, not the snapshot’s', async () => {
+    const storage = createBetterSqliteStorage();
+    const replica = await createReplica({ storage });
+    // A ticket that exists ONLY as a snapshot — no events below the line, which
+    // is the fresh-device shape, not an exotic one.
+    await replica.loadBootstrap({
+      ...bootstrapOf(),
+      tickets: [
+        {
+          ticketId: TICKET,
+          snapshot: {
+            seq: 1,
+            state: {
+              kind: 'ticket', id: TICKET, workspaceId: WS, projectId: PROJECT,
+              typeId: TYPE_TASK, parentId: null, workflowId: WF, workflowVersion: 1,
+              stateId: wfV1.initialStateId, stateCategory: 'open',
+              assigneeId: USER_B, collaboratorIds: [], fields: {}, transitions: [],
+            },
+            provenance: { state: OLD, assigned: OLD },
+          },
+          events: [],
+        } as never,
+      ],
+    });
+
+    // THE PRE-STATE, so the case cannot pass by the block never arriving.
+    expect((await replica.getSnapshotProvenance(TICKET))?.assigned?.actorId).toBe(USER_A);
+
+    // Now the assignment MOVES, locally, by a different actor at a later time.
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: TICKET }, 'ticket.assigned', { assigneeId: USER_D }, { actorId: USER_C }),
+    );
+
+    const outbox = createOutbox({ storage, replica });
+    const engine = createSyncEngine({ replica, outbox, transport: idleTransport });
+    const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
+    const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === TICKET);
+
+    expect(row?.assignee?.id, 'the state moved').toBe(USER_D);
+    // THE DEFECT: this read USER_A — the snapshot's actor — beside USER_D.
+    expect(row?.assignedProvenance?.actorId).toBe(USER_C);
+    // Asserted POSITIVELY against the local event's own stamp, not merely as
+    // "not the old one": a build that invented a third instant would satisfy a
+    // negative and name a moment nothing recorded.
+    expect(row?.assignedProvenance?.serverTime).toBe(SERVER_TIME);
+
+    // AND THE CONTROL: the STATE claim still comes from the block, because
+    // there is no local state event. Without this the case would also pass
+    // against a build that abandoned the block entirely — which would reopen
+    // the very refusal ruling P36 exists to close.
+    expect(row?.stateProvenance.actorId).toBe(USER_A);
+    expect(row?.stateProvenance.serverTime).toBe(OLD.serverTime);
+  });
+});
+
 describe('12.187 the three doors an offline-born ticket reaches', () => {
   it('12.187 a ticket that exists only as a queued claim is in the summaries and in NEITHER settled listing', async () => {
     const { ds } = await fixture();

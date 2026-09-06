@@ -516,15 +516,28 @@ async function claimsFor(
   getBlock: (id: string) => Promise<SnapshotProvenanceBlock | null>,
 ): Promise<{ state: ClaimProvenance; assigned: ClaimProvenance | null } | null> {
   const stateEvent = stateClaimOf(events);
-  if (stateEvent !== null) {
-    const assignedEvent = assignedClaimOf(events);
-    return {
-      state: provenanceOf(stateEvent),
-      assigned: assignedEvent === null ? null : provenanceOf(assignedEvent),
-    };
-  }
-  const block = await getBlock(ticketId);
-  if (block === null) return null;
+  const assignedEvent = assignedClaimOf(events);
+
+  // THE TWO CLAIMS ARE RESOLVED INDEPENDENTLY, and the first draft did not do
+  // this. It branched once on the STATE event and took the block for BOTH
+  // claims when there was none — so on the ordinary fresh-device path (a
+  // snapshot-bounded bootstrap ships neither `ticket.created`/`.transitioned`
+  // NOR `ticket.assigned` below the line, then one streamed `ticket.assigned`
+  // arrives) the door served the snapshot's OLD assignment claim beside the
+  // NEW assignee. A stale actor and a stale instant, rendered as the claim that
+  // produced the current assignment, and used as the My Work sort key.
+  //
+  // The old code re-checked only NULLNESS — `assigneeId === null ||
+  // block.assigned === null` — and its comment claimed to catch drift "if a
+  // local fold has moved the assignment on". Move-to-null it caught;
+  // move-to-a-different-assignee, the drift it named, it did not. **A guard
+  // that checks whether a value exists is not checking whether it is the right
+  // value**, and a comment saying otherwise made the gap read as covered.
+  //
+  // Each claim now prefers its OWN local event and falls back to the block
+  // independently, so a newer local claim always wins over an older shipped one
+  // — which is the only ordering that cannot serve a stale attribution.
+  let block: SnapshotProvenanceBlock | null | undefined;
   const fromBlock = (c: { actorId: string; clientTime: string; serverTime: string }): ClaimProvenance => ({
     actorId: c.actorId,
     // `null` for the same reason `provenanceOf` gives: this client resolves
@@ -533,13 +546,36 @@ async function claimsFor(
     clientTime: c.clientTime,
     serverTime: c.serverTime,
   });
-  return {
-    state: fromBlock(block.state),
-    // The server derived this from `state.assigneeId`, so it already agrees with
-    // the state. Re-checking here keeps the two from drifting if a local fold
-    // has moved the assignment on since the snapshot was taken.
-    assigned: assigneeId === null || block.assigned === null ? null : fromBlock(block.assigned),
+  const loadBlock = async (): Promise<SnapshotProvenanceBlock | null> => {
+    // Read at most once even though both claims may want it.
+    if (block === undefined) block = await getBlock(ticketId);
+    return block;
   };
+
+  let state: ClaimProvenance;
+  if (stateEvent !== null) {
+    state = provenanceOf(stateEvent);
+  } else {
+    const carried = (await loadBlock())?.state ?? null;
+    // Neither the events nor a delivered block: the device genuinely cannot
+    // name who put this ticket in its state. The caller refuses, which is the
+    // answer it gave before this fallback existed.
+    if (carried === null) return null;
+    state = fromBlock(carried);
+  }
+
+  let assigned: ClaimProvenance | null = null;
+  if (assigneeId !== null) {
+    if (assignedEvent !== null) {
+      assigned = provenanceOf(assignedEvent);
+    } else {
+      const carried = (await loadBlock())?.assigned ?? null;
+      assigned = carried === null ? null : fromBlock(carried);
+    }
+  }
+  // `assigneeId === null` short-circuits to `null` above: nobody is assigned, so
+  // there is no claim to name, and that is a FACT rather than a lost value.
+  return { state, assigned };
 }
 
 function stateClaimOf(events: readonly LedgerEvent[]): LedgerEvent | null {
