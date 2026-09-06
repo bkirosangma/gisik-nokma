@@ -29,7 +29,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | branch | `exec/31-mywork-residuals`, cut from `origin/main` `b4e2f14` (the HELD pair, #150) |
 | merge-base | `b4e2f14` — verified with `git merge-base origin/main HEAD` |
 | HEAD | `1b441ae` |
-| ahead | **3** commits: `eb2e056` (serving) → `724e51f` (client tests) → `1b441ae` (server tests + catalogue) |
+| ahead | **4** commits: `eb2e056` (serving) → `724e51f` (client tests) → `1b441ae` (server tests + catalogue) → `62cd517` (the three fixtures the GATE caught) |
 | tree | clean |
 | node | **v22.22.2** — every figure below was measured under it |
 
@@ -101,6 +101,29 @@ fixtures. **The same shape was found TWICE more on the client** — `attention-s
 back to `[]`; the error still carries the asserted message prefix, so both went on PASSING while
 measuring a refusal about nothing. Both now construct their own absence (the T13.4h-control
 precedent), and both siblings invert to pin the fact that licenses it.
+
+## THREE FIXTURES THE GATE CAUGHT THAT THE TOUCHED FILES COULD NOT
+
+Running only the four files I had edited showed 49/49 green. **The full gate found eighty-eight more
+failures in three fixtures.** None was a defect in the change; all three are worth knowing.
+
+1. **`seedTicket` writes `proj_tickets` rows naming `wf-seed@1` and never publishes that definition**
+   — its own comment says so. Invisible while nothing read a state NAME off those rows. Serving
+   `stateNames` made `readMyWork` throw, exactly as `assembleListCards` always has. **The throw is
+   right and the fixture is the incoherent thing**: the door refuses a `ticket.created` whose type
+   names an unpublished workflow, so such a row is not a state the product can reach. Added
+   `seedWorkflowDef()` — **opt-in**, because 23 files use `seedTicket` and 10 read `proj_workflows`,
+   and any general fix must go through an EVENT (never a direct insert) or `verify-projections`,
+   which diffs projections against a ledger replay, breaks. Owner recorded at the helper.
+2. **`real-door-round-trip` pins the my-work body with an exact `toEqual`** and reddened when the body
+   grew two keys — the assertion working. Both added INSIDE the `toEqual`.
+3. **Eighty-six web tests died on ONE line.** `stub-services.ts` builds refusing reads with
+   `refuse(method)`, which THROWS when the gap it names leaves the register — so both served methods
+   took every file importing that helper down at module load. Same mechanism that fired when P32/P38
+   served `getMyWorkspaces`, and both get the same treatment (`unstubbed(...)`, never `[]`).
+
+**The lesson for the next task: running the files you edited is not the gate.** The three fixtures
+were reachable only from files I had no reason to open.
 
 ## TWO CORRECTIONS TO THE OVERRIDE — measured, accepted by the controller
 
