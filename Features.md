@@ -1004,38 +1004,44 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 and 15 — the LIFTED §11 closer, the contested-claims read path, the
-snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with its
-local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, app-core's offline/sync UX surfaces, the dual-client harness rig, and the six scripted divergence scenarios. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
-scope note; what follows is what those ELEVEN tasks added — 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 and 15, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
-stays absent**, because the coordination doc assigns `Features.md` sections one per implementation plan
-and numbering is claimed from that table, never taken next-free. That clause used to read "§8/§10/§11
-stay absent" and was still saying it here after Plan 8 wrote §10 and Plan 9 wrote §11: both are in this
-file, BELOW this section (`grep -n '^## ' Features.md` — §10 at the workflow builder, §11 at calendar
-and notifications, both after §12). The reservation table governs a section's NUMBER, not the order
-sections appear in the file, and §12 landing above §10 and §11 is that rule working rather than
-failing. Still absent rather than missing from this section:
-both app shells — Plan 10 Tasks 16–17. **Task 15's scenarios came off that list in the change set that
-landed them**, and the range moved from 15–17 to 16–17 in the same edit. **Task 14's harness came off that list in the change set that landed it**,
-and the range moved from 14–17 to 15–17 in the same edit — the enumeration above, this clause and the
-`test-cases/12` header were rewritten together, which is what the closing paragraph of this banner
-exists to enforce and what this PR was HELD for not doing the first time. **Task 13's offline/sync UX came out of that list in the change set that
-landed it**, and the range moved from 13–17 to 14–17 in the same edit, which is the discipline this
-banner's closing paragraph exists to enforce. **Task 11's sync engine came out of that list in the change set that
-landed it, and Task 12's replica `DataSource` came out of it the same way** — which is the discipline
-the closing paragraph of this banner exists to enforce; the
-enumeration above and this one were rewritten together, not one and then the other, and the range that
-names what is left moved from 12–17 to 13–17 in the same edit rather than being left to say "12"
-above bullets that describe Task 12. **Task 9's replica and Task 10's outbox are now here, at the end of this
-section, while Task 8's storage substrate sits in §3** — that split is real and is left standing rather
-than tidied: Task 8 catalogued itself beside the ledger and its persistence, Tasks 9 and 10 placed the
-replica and the outbox in §12, and Task 18 owns the reconciliation with its own measurement, exactly as
-the §3 notes say. **This banner was itself the drift it warns about**: written for Task 7 (commit
-`ae712d0`), it still read "Tasks 4, 5, 6 and 7 … and nothing else" and listed Task 10's outbox as
-absent while Task 10's own two ✅ bullets sat below it in this same section. Whoever adds a task's
-bullets here rewrites this enumeration in the SAME change set — an appended "Task 9's replica is now
-here" clause patched the tail and left the head saying four tasks, which is how the contradiction
-survived a whole task.)*
+*(**Plan 10, Tasks 4–7 and 9–17, plus closures 1–5b** — the LIFTED §11 closer, the contested-claims read
+path, the snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with
+its local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, app-core's
+offline/sync UX surfaces, the dual-client harness rig, the six scripted divergence scenarios, the
+`apps/desktop` Tauri shell and the `apps/mobile` Expo shell — and the rulings applied to this bucket's
+surface afterwards. **Task 18 is this banner and `test-cases/12`'s header**; it owns §12's final shape
+and the reconciliation the notes below record.*
+
+***Where the rest of Plan 10 is catalogued, measured rather than assumed.** Tasks 1–2's shared
+vocabulary is NOT here and should not be moved here: `formatIstInstant`, `IST_CLOCK_NOTE`,
+`istDayOf`/`istDayBounds` and the clock-skew derivation live in **§3**, and the contest *evaluators*
+(`contest.server-only`, `contest.unknown`, `contest.already-resolved`, `contest.wrong-ticket`) in
+**§4** — the sections that own the domain and the rule engine. **Task 8's** `sync-client` scaffold and
+storage seam sit in **§3** beside the ledger and its persistence. Measured at this commit: those four
+tokens return **0** occurrences inside §12 and **7 / 2 / 4 / 2** elsewhere in this file, with
+`proj_contested` at **9** inside §12 as the positive control that the same method can find a §12 string
+at all — a zero with no positive control beside it is indistinguishable from a search that cannot fire.
+The split is real and is left standing rather than tidied, exactly as the §3 notes say.*
+
+***Still absent from `Features.md`, and genuinely so: §8 alone.** The coordination doc's reservation
+table gives Plans 5–11 "§7+ in order, one bucket each", which makes §8 Plan 6's — but **that row was
+superseded on 2026-09-02 (Plan 6 Task 16)**: every Plan 6 web-client feature had already landed in §3
+and been catalogued in `test-cases/03` under 3.x ids, and renumbering 112+ cross-referenced ids for a
+cosmetic relocation would violate the never-renumber rule. **§3 is Plan 6's permanent home; §8 and
+`test-cases/08-web-client.md` are deliberately never created.** Absent by ruling, not by omission — and
+`ls test-cases/` confirms no `08-` bucket. The reservation table governs a section's NUMBER, not the
+order sections appear in this file, which is why §12 sits above §10 and §11 here and that is the rule
+working rather than failing.*
+
+***Nothing is on the "still absent" list any more, and that is the point of this task.** The clause used
+to read "both app shells — Plan 10 Tasks 16–17" while `apps/desktop`'s and `apps/mobile`'s own bullets
+sat inside this same section, and `test-cases/12`'s header simultaneously called Tasks 14–15 "absent
+rather than missing" with both of their sections in that file. **Three such contradictions were live
+when Task 18 measured, and two were Lane B's own drift from its own #126.** Whoever adds a task's
+bullets here rewrites this enumeration in the SAME change set — this banner has twice been the drift it
+warns about, once written for Task 7 and still saying "Tasks 4, 5, 6 and 7 … and nothing else" while
+Task 10's two bullets sat below it. An appended "Task 9's replica is now here" clause patches the tail
+and leaves the head lying, which is how a contradiction survives a whole task.)*
 
 - ✅ **A contest cannot lie about which claim it is contesting** — `claim.contested` embeds the
   refused claim whole, and the embedded claim must name the **same workspace, the same entity kind

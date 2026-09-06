@@ -81,6 +81,77 @@ origin/main...` = **one file, `docs/lanes/executor-state.md`, docs-only**; it ha
 the 12.320–12.322 already on `main`. Lane D has **pushed no branch** (`git ls-remote --heads origin
 'exec/40*'` empty). **12.290 stays 🟡, owner Lane D.**
 
+
+### T18's measurements — what §12 actually needed, and three live falsehoods
+
+**`Features.md` §12 needs the BANNER rewritten, not new bullets.** All 15 probed features from the plan's
+22-bullet §12 block are already present (`outbox` 16 hits, `proj_contested` 9, `reopen` 12, `dual-client`
+5, …). Exactly two are absent from §12 and **both are absent on purpose**: Tasks 1–2's shared vocabulary
+(`formatIstInstant`, `IST_CLOCK_NOTE`, `istDayOf`/`istDayBounds`) is catalogued in **§3**, and the contest
+*evaluators* (`contest.server-only` and kin) in **§4** — the sections that own the domain and the rule
+engine, exactly as the §3 notes and the coordination doc's reservation table say. Measured with a positive
+control: those four tokens read **0** inside §12 and **7 / 2 / 4 / 2** elsewhere in `Features.md`, while
+`proj_contested` reads **9** inside §12, so the zeros are measurements rather than a search that cannot
+fire.
+
+**Three contradictions were LIVE when T18 measured, and two are Lane B's own:**
+1. `test-cases/12` header: *"HIGHEST ID IN USE ON THIS BRANCH IS `12.318`"* — **`12.322`** has been on
+   `main` since #176 (`2d2bc5c`). Not Lane B's.
+2. `test-cases/12` header: *"Tasks 14–15 … are absent rather than missing"* — **both have sections**, at
+   L1755 and L1827, landed by **Lane B's own #126**.
+3. `Features.md` §12: *"Still absent … both app shells — Plan 10 Tasks 16–17"* — **both exist**, bulleted
+   inside that same section, with catalogue sections at L1624 and L1686.
+
+**§8 is the only thing genuinely absent from `Features.md`, and it is absent BY RULING** — the
+coordination doc's table makes §8 Plan 6's, but that row was superseded 2026-09-02 (Plan 6 Task 16): every
+Plan 6 feature had already landed in §3 under 3.x ids, and renumbering 112+ cross-referenced ids for a
+cosmetic relocation would violate never-renumber. `ls test-cases/` confirms no `08-` bucket.
+
+**The staleness count is TWENTY, not fourteen** — and `grep -c` says **1**, because it counts matching
+LINES and the whole running parenthesis is one line. The real enumeration comes from `uniq -c`. A
+measurement instrument answering a question nobody asked, in the middle of the paragraph about
+measurement instruments.
+
+### Style normalisation — safe, and it touches only Lane A's lines
+
+§12 was **bare 244 / bold 23 / marker-first 0**. Canonical is **bare**. All 23 bold heads convert with the
+strict `- **ID** rest` form and **zero** lines need a manual look. Verified the conversion renumbers
+nothing by two independent instruments **with a positive control that the comparator can detect a
+difference**: id sets identical at 267 before and after, same md5, and deliberately dropping one id makes
+the comparator report a difference. ⚠️ **All 23 bold lines are Lane A's** (12.240–12.259, 12.320–12.322),
+so this is the one part of T18 that can conflict with a live lane — the controller is asked to broadcast
+that **bare is canonical in §12** so A and D do not land new bold heads and drift the census back.
+
+⚠️ **marker-first = 0 is a MEASUREMENT** — the same pattern returns **40** on `test-cases/13`, watched
+firing before the zero was believed.
+
+### A standing brief claim is now FALSE — recorded, not acted on
+
+The executor brief's *"TWO KNOWN GAPS"* §2 says *"Zero of 48 test files vary `TZ`"*. **Measured at
+`2f18f3f`: 17 of 272 test files vary it.** The counterexample is inside T18's own range —
+`packages/app-core/test/contests.test.tsx:97` is case **12.194**, *"renders the IST day under a non-IST
+TZ, and the TZ actually took effect"*, and it carries its own control that the TZ took effect plus a
+docblock on the `process.env.TZ = original` restore bug that assigns the STRING `"undefined"` when TZ was
+unset. The gap was real when written and has been closed by work since; the brief was not updated. **The
+rule it states — vary `TZ` explicitly on any clock-sensitive assertion — still stands and is now
+followed in 17 files.**
+
+### Uncatalogued surfaces T18 owns, measured
+
+- `packages/sync-client/test/barrel.test.ts` (**4** tests) and `test/storage.test.ts` (**4**: three from
+  `storageConformanceTests` plus `migrateLocal`) are catalogued in **no** `test-cases/` file — only named
+  in §12's prose as an owed item. Control: `outbox` returns 47 hits in `test-cases/`, so the search fires.
+  The header's *"the storage conformance suite's four"* mis-attributes: the suite has **three**, and the
+  fourth is `migrateLocal`. Two of barrel's four are self-controls (*"actually walked the graph — the
+  guard is not passing by reading nothing"*, *"the walker finds the forbidden imports where they really
+  live"*) — the antidote to this series' signature defect, and uncatalogued.
+- `apps/server/test/sync/stream-seq.test.ts` holds **four** green assertions with **no case id anywhere**.
+  **`12.15` is the reserved id for exactly this**, and the header already names *"Owner: Plan 10 Task 18."*
+- **Found by a verifier, recorded with an owner, NOT fixed here:** `attachment.added` is a live member of
+  `BOOTSTRAP_BACKFILL_TYPES` (`apps/server/src/sync/sync-routes.ts:59`) **with no server-side test
+  witness — deleting it from that constant leaves the whole server suite green.** Owner: Plan 10 Task 6 /
+  bootstrap.
+
 ---
 
 ## ✅ (HISTORY) POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
