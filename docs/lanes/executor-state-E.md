@@ -20,7 +20,7 @@ off `main`.
 | ahead of `origin/main` | **21**, 0 behind |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | GREEN pre-rebase at `805b39c`: `EXIT=0`, `Tasks: 30/30`, `0 cached`, **250 files / 3341 tests**, `CHECK_ENV_EXIT=0`. Re-gating at `f342c87` now — main gained 11 commits incl. C's 8-job `ci.yml`, so the number WILL move and must be recounted, not carried |
+| gate composition | **GREEN at `f342c87`** (rebased onto `1b72900`): `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **259 files / 3408 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers. This branch's own contribution is **+74** (A0 2, T1 16, T2 56), so `main` alone measures 3334 |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -1080,3 +1080,16 @@ Source `it(` count is 33 and reconciles because three `it.each(PROTECTED)` lines
 The `it.each` table injects a forged `Origin` at all seven routes and each returns **403** — which is what
 confirms the pattern strings actually match Fastify's `routeOptions.url`. A pattern that did not match
 would make the check **silently not fire**, and no test asserting only "the route works" would notice.
+
+## The empty-lock guard fired for real, and it was right
+
+At 07:38 the gate lock directory existed with **no pid file** for ~58 seconds, and both this lane's gate
+and the controller's were waiting on it. **It was genuinely orphaned** — a previous holder's `rmdir` had
+not completed — so the 60-second empty-pid reclaim added earlier did exactly what it was for, and the
+controller's gate then queued behind this one correctly (verified: its only child was `sleep 15`, so it
+was in the acquire loop, not running turbo).
+
+**The residual risk, stated so nobody assumes it away:** "empty pid ⇒ dead holder" is an inference, not a
+measurement. It is false for the milliseconds between a holder's `mkdir` and its `echo $$ > pid`. The 60s
+threshold is what makes a false reclaim implausible rather than impossible — **if two gates are ever seen
+running at once, this is the first place to look.**
