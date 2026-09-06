@@ -128,11 +128,45 @@ gate 7.230–7.237 witnessed; the client half IS un-literalled to `CONTEST_RULES
 family name · 7.247 `'state-machine'`, filed one severity lower on purpose · 7.248 Lane B's
 `sync-client` `rule: 'restrict-to'` literals, deliberately not taken.
 
-## MUTATIONS — nine kills, one deliberate survivor, one contaminated run
+## THE REVIEW ROUND — seven Important findings, all valid, all taken
 
-Every prediction written before its run; **all nine matched**, blast radius 1 each, every red an
+One opus reviewer over the whole branch, two axes only: does every witness drive the REAL producer,
+and is there any assertion that cannot fail. **Four of its seven Important findings are one shape —
+prose claiming more than the assertions pin — which is worth naming, because it is the failure this
+cluster was built to catch in other people's fixtures and it turned up in mine.**
+
+| # | finding | taken as |
+|---|---|---|
+| 1 | **7.238 asserted no `reason` at all**, so the corrected constant in both `app-core` files was still a transcription verified only by a human reading `refusals.ts` | 7.238 now asserts the whole ADD-arm sentence and excludes the MOVE clause |
+| 2 | both corrected docblocks claimed the value was "read off the wire by 7.238/7.239" — neither case read it | closed by (1); the docblocks now also point at the producer-owned fixture JSON |
+| 3 | **7.241 executed no shipped client module** — a hand parse — filed ✅ under exactly the constraint row 7.243 files ❌ | it now runs the shipped `refusalText` over the real bytes, second branch, with `message`'s absence asserted; the row says which witness it is |
+| 4 | `expect(body.rule).not.toBe('ticket.unknown-state')` **cannot fail** — the equality above entails it or aborts first | deleted; the finding stays in the comment where it was doing the work |
+| 5 | "a rename reddens here and nowhere else in the repo" is false — six other sites redden | narrowed to the true claim: the only place the two spellings are compared WITH EACH OTHER |
+| 6 | **7.248 said five `sync-client` sites are mirrors. One is.** `precheck.test.ts:284` takes its value from the REAL engine — un-literalling it would have CREATED a self-comparison; `outbox.test.ts:206,357` are inputs, never asserted | row corrected to one site, and the count error recorded as the pass's third |
+| 7 | 7.245's consequence was wrong: `@gisik-nokma/rule-engine/fixtures` exports `loadFixtures()`, and `created-under-terminal-parent.json` carries the ADD-arm sentence **verbatim** | row corrected — the bytes are reachable today; only the function is not |
+
+Minor findings 8, 9, 12, 13, 14 also taken (7.242's `toContain('admin')` → the whole sentence; "the
+SAME ticket" → the accurate control description; two `Features.md` overclaims; 7.244's wrong witness
+citation). Findings 10 and 11 need no change and are noted in the catalogue as such.
+
+**THE ONE THE BATTERY HAD ALREADY SAID.** Finding 1 was in my own mutation table before the reviewer
+read it: *"M4 kills 7.239 alone"*, where M4 mutates the return template **both** arms build from. I
+recorded that as a clean blast radius of 1. **A blast radius smaller than the mutation's reach is a
+fact about the CASES, not about the code** — it was naming a hole and I read it as tidiness. After the
+fix, M4 re-run kills **7.238 and 7.239**, and that delta is the fix's own evidence.
+
+## MUTATIONS — twelve kills, one deliberate survivor, one contaminated run
+
+Every prediction written before its run; **all twelve matched** — nine before the review round, three
+after — every red an
 `AssertionError` from the case's own `expect` — none at a `MappingError` shape gate, none grey.
-Full table with messages at the catalogue's mutation block. The three worth carrying:
+Full table with messages at the catalogue's mutation block. **M10 and M11 are new and exist because of
+the review:** M10 strips the actor clause from the `restrict-to` sentence and kills 7.242 at the
+strengthened equality — *the `toContain('admin')` it replaced would have SURVIVED it*; M11 gives the
+migrate route's refusal a `message` beside its `reason` and kills 7.241 at the guard keeping
+`refusalText` on its second branch. **Every mutation from the fix round on rebuilds `rule-engine`
+UNCONDITIONALLY after each apply and each restore** — the conditional rebuild is what produced the
+contaminated run below. The four worth carrying:
 
 - **M6** (`rankRefusal`'s arguments swapped) is the one 7.240 was redesigned for. It **survives**
   task-under-task. A check that could not fail, caught by asking what would kill it *before* writing it.
@@ -151,11 +185,13 @@ Full table with messages at the catalogue's mutation block. The three worth carr
 
 ## THE CLAIM I AM LEAST SURE OF
 
-**7.242's reason assertion is the weakest line on the branch.** It asserts only
-`expect(result.reason).toContain('admin')`, because the sentence `Only ${allowed.join(', or ')} may
-make this move, and ${env.actorId} is not among them.` embeds a generated actor id. The RULE is pinned
-hard and the control is tight, so the case's title holds; the reason half is closer to non-vacuity than
-to a property. A reviewer aiming limited budget should aim it there.
+**It is no longer 7.242** — I named that one before the review, the reviewer agreed, and it is fixed
+and measured (M10). **It is now 7.241, and the reviewer named it too.** It is the narrowest witness on
+the branch: its typed consumer (`apps/web/src/authoring/data-source-gateway.ts`) is unreachable from a
+server test, so the client half is `refusalText` — a nine-line function reading one of two keys —
+rather than a mapper that transforms anything. The route half and the refutation behind it are solid;
+the *witness* is thin, and the row now says so instead of presenting it as 7.238's equal. A reader with
+limited budget should aim it at 7.241's claim to be a witness at all.
 
 ## COLLISIONS — re-measured from origin at the rebase, not adopted
 
