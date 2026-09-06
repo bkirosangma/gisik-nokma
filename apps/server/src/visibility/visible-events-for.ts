@@ -1,4 +1,4 @@
-import type { EntityKind, LedgerEvent } from '@gisik-nokma/domain';
+import type { EntityKind, LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
@@ -187,11 +187,12 @@ export interface ScopeRevokedInstruction {
  * in full, which is not.
  *
  * The list is what the reader's `canSee` admits, NOT what the reader lacks —
- * the server does not model a device's holdings and must not start. The client
- * drops the ids it already has, which is also what makes a repeated no-op
- * `visibility.set` cost a holding client nothing.
+ * the server does not model a device's holdings and must not start. Each entry
+ * carries the ticket's HEAD SEQ (ruling P37.2) so the client can tell a complete
+ * local copy from a stale partial one, which is the one thing `canSee` can never
+ * answer: it is about audience, and staleness here is about content.
  */
-export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; ticketIds: string[] };
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
 
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
@@ -459,8 +460,8 @@ export async function* visibleEventsFor(
           // accident, because the notice must be RE-DELIVERED if the socket
           // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
-            const ticketIds = await grantNoticeFor(db, userId, env.entity.id, backfilled);
-            if (ticketIds.length > 0) yield { kind: 'reach-granted', workspaceId, ticketIds };
+            const tickets = await grantNoticeFor(db, userId, env.entity.id, backfilled);
+            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           }
           yield env;
         }
@@ -528,13 +529,13 @@ export async function* visibleEventsFor(
             // `membership.granted` cannot scope; `project.member_added` names
             // its project in `entity.id`, exactly as `project.member_removed`
             // one branch down reads it.
-            const ticketIds = await readerReachNoticeFor(
+            const tickets = await readerReachNoticeFor(
               db,
               userId,
               workspaceId,
               env.type === 'project.member_added' ? { projectId: env.entity.id } : 'workspace',
             );
-            if (ticketIds.length > 0) yield { kind: 'reach-granted', workspaceId, ticketIds };
+            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           } else if (env.type === 'project.member_removed') {
             // A guest holds no project (the 2026-08-27 collapse, stated in
             // `can-see.ts`), so this site is reached by members only and the

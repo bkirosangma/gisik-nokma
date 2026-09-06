@@ -499,42 +499,6 @@ export function createSyncEngine(deps: {
   }
 
   /**
-   * Ask the server about exactly the ids a notice named, purge the ones it says
-   * are restricted, and hand back what went.
-   *
-   * The same door and the same rule as `engine.reconcile`, over a caller-chosen
-   * id list instead of the whole holding set. The client's own half of "the
-   * answer contains only ids I presented" is kept — `chunk.includes` — because
-   * a purge is destructive and local and this device does not need to trust the
-   * server to be safe from it.
-   */
-  async function reconcileNamed(ws: string, ids: readonly string[]): Promise<string[]> {
-    // Only ids we actually hold can be stale, and only they can be purged.
-    // Presenting one we do not hold would ask the server a question whose
-    // answer we could not act on.
-    //
-    // Asked PER NAMED ID rather than by listing the workspace: `listTickets`
-    // runs a `getTicket` per row, so it is O(every ticket held) with a query
-    // each, while a notice names at most `GRANT_BACKFILL_MAX_TICKETS`. The
-    // whole point of this call is that it costs a notice, not a catch-up.
-    const present: string[] = [];
-    for (const id of ids) {
-      if ((await replica.getTicket(id)) !== null) present.push(id);
-    }
-    const purged: string[] = [];
-    for (let i = 0; i < present.length; i += RECONCILE_CHUNK_SIZE) {
-      const chunk = present.slice(i, i + RECONCILE_CHUNK_SIZE);
-      const answer = await transport.reconcile(ws, chunk);
-      for (const restricted of answer.restricted) {
-        if (!chunk.includes(restricted.id)) continue;
-        await replica.purgeEntity(restricted.id);
-        purged.push(restricted.id);
-      }
-    }
-    return purged;
-  }
-
-  /**
    * `true` when a fold failure was answered by owing a pull instead of stalling.
    *
    * Deliberately narrow. It answers `false` — so the caller rethrows and the
@@ -615,28 +579,15 @@ export function createSyncEngine(deps: {
     // ticket that is already held. That ordering is the whole reason the
     // notice is yielded before its trigger on the server side.
     if (isSyncInstruction(item) && item.kind === 'reach-granted') {
-      // CLOSURE 5c, minimal form (controller ruling 2026-09-06). Reconcile the
-      // ids the notice NAMED before pulling, and re-owe anything that purged.
-      //
-      // Without this, the grant half does not close case 12.274 at all on a
-      // live socket. The holdings filter cannot tell a complete local copy from
-      // a STALE PARTIAL one — a narrowing purges nothing (6.101 struck the
-      // walk; 6.104 is the disclosed residual) — so a re-widening's notice
-      // names a ticket the device "holds", nothing is fetched, and the
-      // divergence survives. The scheduled reconcile does not save it either:
-      // `hub.ts` sends `caught-up` ONCE PER SUBSCRIPTION (`caughtUpSent`), so
-      // the automatic reconcile is once per RECONNECT, and a narrow-and-
-      // re-widen with no reconnect between them never reconciles at all.
-      // *An earlier version of this branch said that residual was "bounded in
-      // time" by `RECONCILE_MIN_INTERVAL_MS`. It was not: on a stable socket it
-      // was the full defect.*
-      //
-      // Reconciling only the NAMED ids — not the whole holding set — is what
-      // keeps this cheap: it is one request per 100 ids a notice already
-      // carries, on an event that is already rare, and it makes the interval
-      // and the reconnect latch irrelevant for exactly the tickets in question.
-      const purged: string[] = []; // MUTANT-4 dropped the reconcileNamed call
-      if (purged.length > 0) await replica.addPendingPulls(item.workspaceId, purged);
+      // The notice's own `headSeq` per ticket decides what is pulled — see
+      // `replica.ts`'s `reach-granted` arm. An earlier round tried reconciling
+      // the NAMED ids here instead (closure 5c's first form) and it was a
+      // structural no-op: a notice only names ids the viewer can see NOW, and
+      // reconcile only answers about ids they CANNOT, so the intersection is
+      // empty by construction. Deleted rather than left with a docblock —
+      // ruling P37.2(c), because dead code with an explanation is a false
+      // sentence waiting to be reasoned from. Case 12.316 holds the
+      // measurement.
       await drainPendingPulls(item.workspaceId);
     }
     // A workspace-wide revocation is TERMINAL for the subscription

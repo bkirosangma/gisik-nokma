@@ -77,7 +77,7 @@ async function collect(userId: string, workspaceId: string, afterSeq = 0): Promi
 const noticesIn = (items: SyncItem[]): string[][] =>
   items
     .filter((i): i is Extract<SyncItem, { kind: 'reach-granted' }> => 'kind' in i && i.kind === 'reach-granted')
-    .map((i) => [...i.ticketIds].sort());
+    .map((i) => i.tickets.map((t) => t.id).sort());
 
 describe('12.283 a widening on the READER’s side of canSee is owed the same notice', () => {
   it('12.283 project.member_added names the project’s tickets to the person added, and to nobody else', async () => {

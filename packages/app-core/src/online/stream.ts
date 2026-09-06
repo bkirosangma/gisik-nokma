@@ -126,10 +126,20 @@ export function parseFrame(data: unknown): ServerStreamFrame | PingFrame | null 
   // transport's handling and for its reason: a dropped id costs one un-pulled
   // ticket that the next widening names again, where refusing the frame would
   // discard the good ids with the bad one.
-  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string' && Array.isArray(frame.ticketIds)) {
-    const ticketIds = frame.ticketIds.filter((id): id is string => typeof id === 'string' && id !== '');
-    if (ticketIds.length === 0) return null;
-    return { type: 'reach-granted', workspaceId: frame.workspaceId, ticketIds };
+  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string' && Array.isArray(frame.tickets)) {
+    const tickets = frame.tickets.filter(
+      (t): t is { id: string; headSeq: number } =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof (t as { id?: unknown }).id === 'string' &&
+        (t as { id: string }).id !== '' &&
+        // `headSeq` decides whether a ticket is fetched at all, and `NaN < n` is
+        // false — so a junk value would SILENTLY skip the pull this notice
+        // exists to cause, rather than failing loudly. Checked, not trusted.
+        Number.isInteger((t as { headSeq?: unknown }).headSeq),
+    );
+    if (tickets.length === 0) return null;
+    return { type: 'reach-granted', workspaceId: frame.workspaceId, tickets };
   }
   if (frame.type === 'caught-up' && typeof frame.seq === 'number' && typeof frame.workspaceId === 'string') {
     return { type: 'caught-up', workspaceId: frame.workspaceId, seq: frame.seq };

@@ -161,7 +161,7 @@ export const frameIds = (socket: FakeSocket): string[] =>
         // The IDS, not a count. A `reach-granted:3` spelling would make two
         // notices naming different tickets compare equal, which is the whole
         // property closure 5b(d)'s excluding fixtures assert.
-        return `reach-granted:${frame.ticketIds.join(',')}`;
+        return `reach-granted:${frame.tickets.map((t) => t.id).join(',')}`;
       case 'caught-up':
         return `caught-up:${frame.seq}`;
       case 'error':

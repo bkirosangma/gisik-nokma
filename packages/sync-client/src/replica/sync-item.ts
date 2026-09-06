@@ -1,4 +1,4 @@
-import type { LedgerEvent } from '@gisik-nokma/domain';
+import type { LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
 
 /**
  * What sync-down hands a replica — the CLIENT-SIDE MIRROR of
@@ -85,11 +85,13 @@ export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: stri
  * fetching is the sync engine's job, and keeping the split means the replica
  * stays a store rather than becoming a second client.
  *
- * `ticketIds` may name tickets this device already holds. The server does not
- * model a device's holdings and must not start; the client is the only party
- * that knows, which is the same inversion `reconcile` uses.
+ * `tickets` may name tickets this device already holds — the server does not
+ * model a device's holdings and must not start. Each entry carries the ticket's
+ * HEAD SEQ (ruling P37.2), which is what lets the client tell a copy it holds
+ * COMPLETELY from a stale partial one. An id-only notice could not: holding a
+ * ticket says nothing about holding all of it.
  */
-export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; ticketIds: string[] };
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
 
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 

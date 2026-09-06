@@ -179,7 +179,7 @@ function idsOf(items: readonly SyncItem[]): string[] {
       ? item.kind === 'purge'
         ? `purge:${item.entityId}`
         : item.kind === 'reach-granted'
-          ? `reach-granted:${item.ticketIds.join(',')}`
+          ? `reach-granted:${item.tickets.map((t) => t.id).join(',')}`
           : `scope-revoked:${item.projectId ?? item.workspaceId}`
       : item.id,
   );
@@ -340,7 +340,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     expect(idsOf(items)).toEqual([`reach-granted:${parent},${child},${grandchild}`, widen.id]);
     // The per-drain ledger holds even though the walk reaches the parent as the
     // trigger and could reach it again as its own dependent.
-    const named = soleNotice(items).ticketIds;
+    const named = soleNotice(items).tickets.map((t) => t.id);
     expect(new Set(named).size).toBe(named.length);
     // Pinned by id rather than by count: `hiddenOnParent` is the pre-cursor row
     // the push shape handed back, and the one a reader is most likely to expect
@@ -377,7 +377,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     // the authored child was pruned). `toContain(parent)` plus
     // `not.toContain(authored)` would be the weaker pair — it passes against a
     // walk that named the whole workspace minus one ticket.
-    expect(soleNotice(items).ticketIds).toEqual([parent]);
+    expect(soleNotice(items).tickets.map((t) => t.id)).toEqual([parent]);
     // Subordinate: the pruned child's id appears in no field of no item, which
     // covers the envelope half as well as the notice.
     expect(JSON.stringify(items)).not.toContain(authored);
@@ -418,7 +418,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     // becomes `[parent, crossProject]`, handing the viewer the id of a ticket in
     // a project they are not on. The parent in the same list is the positive
     // control — an empty notice fails this assertion too.
-    expect(soleNotice(items).ticketIds).toEqual([parent]);
+    expect(soleNotice(items).tickets.map((t) => t.id)).toEqual([parent]);
     // Subordinate: and the id is in no other field of no other item either.
     expect(JSON.stringify(items)).not.toContain(crossProject);
   });
@@ -488,7 +488,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     const widen = await record(setVisibilityEnv(ws, parent, 'workspace', undefined, author));
 
     const items = await collect(viewer, ws, cursor);
-    const named = soleNotice(items).ticketIds;
+    const named = soleNotice(items).tickets.map((t) => t.id);
     // EXACTLY the cap, not merely "at most" — a `toBeLessThanOrEqual` would also
     // pass against a notice that named nothing at all, and the whole family of
     // defects here is a check that passes for the wrong reason. Every one of the
@@ -574,7 +574,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     const first = await collect(viewer, ws, cursor);
     // The count stated HERE rather than inherited from `soleNotice`, because in
     // this case the count IS the property: two triggers, one notice.
-    expect(noticesOf(first).map((n) => n.ticketIds)).toEqual([[ticket]]);
+    expect(noticesOf(first).map((n) => n.tickets.map((t) => t.id))).toEqual([[ticket]]);
     // And it sits before the FIRST of the two triggers, with both triggers
     // delivered — the positive control that the drain is not simply empty.
     expect(idsOf(first)).toEqual([`reach-granted:${ticket}`, widen.id, reparent.id]);

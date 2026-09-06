@@ -653,6 +653,27 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
  * the other's owed ids deleted with it. `revokeScope` clears this key for the
  * workspace it names, for that reason.
  */
+/**
+ * This device's highest `workspaceSeq` for one ticket, or 0 when it holds none.
+ *
+ * ZERO for an unheld ticket is what makes the notice's comparison degrade to
+ * the old holdings test in the case where the old test was right: a ticket the
+ * device has never seen has local head 0, which is below any real `headSeq`,
+ * so it is pulled. The new rule is a strict widening of the old one.
+ *
+ * Reads `events` rather than the `tickets` row, because a ticket held only as
+ * unfolded events still has a real position — and because the snapshot row's
+ * `seq` is a per-entity counter, not the workspace one the notice speaks in.
+ */
+async function localHeadSeq(tx: SyncStorage, ticketId: string): Promise<number> {
+  const rows = await tx.all(
+    "SELECT MAX(workspace_seq) AS head FROM events WHERE entity_kind = 'ticket' AND entity_id = ?",
+    [ticketId],
+  );
+  const head = rows[0]?.['head'];
+  return typeof head === 'number' ? head : Number(head ?? 0);
+}
+
 function pendingPullsKey(workspaceId: string): string {
   return `pending-pulls:${workspaceId}`;
 }
@@ -1208,8 +1229,23 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         // over-delivery, and over-delivery is the side this door is allowed to
         // err on: `loadTicketBootstrap` is idempotent by event id.
         const missing: string[] = [];
-        for (const ticketId of instruction.ticketIds) {
-          if ((await replica.getTicket(ticketId)) === null) missing.push(ticketId);
+        for (const { id, headSeq } of instruction.tickets) {
+          // THE COMPARISON RULING P37.2 ADDED, and the reason the obvious test
+          // is not enough. "Do I hold this ticket" cannot distinguish a
+          // COMPLETE local copy from a stale partial one, and a device that
+          // was narrowed and re-widened holds exactly the latter — so an
+          // id-only notice skipped precisely the tickets it existed to repair
+          // (measured, case 12.316). What settles it is one integer: the
+          // server's head for that ticket against this device's own highest
+          // local position for it.
+          //
+          // `>=` rather than `===` on purpose: a local head ABOVE the server's
+          // means this device holds something the notice's snapshot of the
+          // ledger did not, which is an ordinary race with a concurrent commit
+          // and not a reason to re-fetch. Pulling on `<` alone is also what
+          // keeps the amplifier bound — a client already current on the subtree
+          // fetches nothing, which is case 12.276.
+          if ((await localHeadSeq(storage, id)) < headSeq) missing.push(id);
         }
         await replica.addPendingPulls(instruction.workspaceId, missing);
         return { applied: true };

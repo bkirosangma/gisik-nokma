@@ -129,6 +129,27 @@ export type ClientStreamFrame = SubscribeFrame;
 export const STREAM_ERROR_CODES = ['bad-message', 'not-a-member', 'already-subscribed'] as const;
 export type StreamErrorCode = (typeof STREAM_ERROR_CODES)[number];
 
+/**
+ * One ticket a reach notice names, and the server's head position for it.
+ *
+ * **`headSeq` is what makes the notice usable, and ruling P37.2 added it after
+ * an id-only notice was MEASURED not to work.** The client cannot tell a
+ * complete local copy from a STALE PARTIAL one by asking whether it holds the
+ * ticket, and it cannot ask the server either: a notice only ever names ids the
+ * viewer can see NOW, and `reconcile` only ever answers about ids they CANNOT —
+ * complementary predicates over the same `canSee`, so their intersection is
+ * empty by construction. Staleness here is about CONTENT; `canSee` answers
+ * about AUDIENCE. One integer settles it: the client pulls iff its own highest
+ * `workspaceSeq` for that ticket is below this one.
+ *
+ * It discloses nothing a moment's patience would not: the viewer may already
+ * read this ticket in full, and the pull that follows delivers its whole
+ * history. And it keeps the amplifier bound — a client already current on the
+ * subtree compares equal and fetches nothing, which is the property case 12.276
+ * measures.
+ */
+export type ReachGrantedTicket = { id: string; headSeq: number };
+
 export type ServerStreamFrame =
   | { type: 'event'; envelope: LedgerEvent }
   | { type: 'purge'; workspaceId: string; entityId: string }
@@ -198,10 +219,12 @@ export type ServerStreamFrame =
    * the cursor, so a subscription that dies here resumes at the same place and
    * regenerates both.
    *
-   * `ticketIds` may name a ticket the client already holds — the server does not
-   * know a device's holdings and must not model them. The client drops those.
+   * `tickets` may name a ticket the client already holds — the server does not
+   * know a device's holdings and must not model them. Each entry carries that
+   * ticket's head position so the client can tell a copy it holds COMPLETELY
+   * from a stale partial one; see `ReachGrantedTicket`.
    */
-  | { type: 'reach-granted'; workspaceId: string; ticketIds: string[] }
+  | { type: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] }
   | { type: 'caught-up'; workspaceId: string; seq: number }
   | { type: 'error'; workspaceId: string | null; code: StreamErrorCode; message: string };
 
@@ -254,7 +277,13 @@ export const serverStreamFrameSchema = z.discriminatedUnion('type', [
       // here fails at this schema rather than at the client's pull.
       type: z.literal('reach-granted'),
       workspaceId: ulidString,
-      ticketIds: z.array(ulidString).min(1),
+      // `headSeq` is a WORKSPACE sequence and therefore `>= 1`: it is assigned
+      // inside the appending transaction under `lockWorkspace`, so a mock that
+      // has not spoken to a ledger has nothing true to put here — the same
+      // property that makes `envelope.workspaceSeq` hard to fake.
+      tickets: z
+        .array(z.object({ id: ulidString, headSeq: z.number().int().min(1) }).strict())
+        .min(1),
     })
     .strict(),
   z

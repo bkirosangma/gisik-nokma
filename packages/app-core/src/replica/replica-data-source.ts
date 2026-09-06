@@ -1223,7 +1223,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // outcome by a different mechanism, and a consumer waiting for a
           // per-pull frame would wait for one that never comes.
           if (item.workspaceId === workspaceId) {
-            cb({ type: 'reach-granted', workspaceId, ticketIds: item.ticketIds });
+            cb({ type: 'reach-granted', workspaceId, tickets: item.tickets });
           }
           return;
         }

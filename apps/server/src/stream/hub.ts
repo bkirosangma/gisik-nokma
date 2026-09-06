@@ -244,7 +244,7 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
             // former and vouches for it; the latter is whatever the injectable
             // filter seam yielded, and this module holds no second opinion
             // about anything the filter says.
-            send(sub, { type: 'reach-granted', workspaceId: sub.workspaceId, ticketIds: item.ticketIds });
+            send(sub, { type: 'reach-granted', workspaceId: sub.workspaceId, tickets: item.tickets });
             break;
           case 'scope-revoked': {
             if (item.projectId !== undefined) {

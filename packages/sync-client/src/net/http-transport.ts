@@ -235,10 +235,10 @@ export function createHttpTransport(opts: {
         if (frame.type === 'reach-granted') {
           // Ruling P37.1, closure 5b(d): the reader's reach grew and these are
           // the ids it now admits. Validated the way every other id-bearing
-          // frame here is — an array of strings, non-empty — because the ids go
-          // straight into a durable pending set and then into request URLs; a
-          // frame carrying `[null]` would persist a `"null"` this device asks
-          // for on every catch-up forever.
+          // frame here is — a non-empty array of `{id, headSeq}` — because the
+          // ids go straight into a durable pending set and then into request
+          // URLs, and `headSeq` goes straight into the comparison that decides
+          // whether a ticket is fetched at all.
           //
           // Filtered rather than refused WHOLE on a bad element, unlike
           // `caught-up` above. The asymmetry is the consequence, not a
@@ -246,10 +246,22 @@ export function createHttpTransport(opts: {
           // a dropped id costs one un-pulled ticket that the NEXT widening
           // names again. Refusing the whole frame over one bad element would
           // discard the good ids with it.
-          if (!Array.isArray(frame.ticketIds)) return;
-          const ticketIds = frame.ticketIds.filter((id: unknown): id is string => typeof id === 'string' && id !== '');
-          if (ticketIds.length === 0) return;
-          handlers.onItem({ kind: 'reach-granted', workspaceId, ticketIds });
+          if (!Array.isArray(frame.tickets)) return;
+          const tickets = frame.tickets.filter(
+            (t: unknown): t is { id: string; headSeq: number } =>
+              typeof t === 'object' &&
+              t !== null &&
+              typeof (t as { id?: unknown }).id === 'string' &&
+              (t as { id: string }).id !== '' &&
+              // `headSeq` decides whether a ticket is FETCHED, so a junk value
+              // must not reach the comparison: `NaN < n` is false, which would
+              // silently SKIP the pull this notice exists to cause. Integer and
+              // finite, checked here rather than trusted — the same reason
+              // `caught-up.seq` is checked one branch down.
+              Number.isInteger((t as { headSeq?: unknown }).headSeq),
+          );
+          if (tickets.length === 0) return;
+          handlers.onItem({ kind: 'reach-granted', workspaceId, tickets });
           return;
         }
         if (frame.type === 'caught-up') {

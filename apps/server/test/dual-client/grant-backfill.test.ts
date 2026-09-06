@@ -258,7 +258,7 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     // it. Under the push shape this drain carried four envelopes and the wedge
     // at 12.290 with them.
     expect(instructionsOf(delivered)).toEqual([
-      { kind: 'reach-granted', workspaceId: h.workspaceId, ticketIds: [ticketId] },
+      { kind: 'reach-granted', workspaceId: h.workspaceId, tickets: [ticketId].map((id) => ({ id, headSeq: expect.any(Number) as unknown as number })) },
     ]);
     expect(envelopeIdsOf(delivered)).toEqual([widen.id]);
     // THE PULL, exactly: one request, for this ticket, and nothing left owed.
@@ -395,7 +395,7 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     // THE NOTICE ARRIVED, and it named this very ticket. Without this line the
     // zero below would be satisfied by a product that fired no notice at all.
     expect(instructionsOf(delivered)).toEqual([
-      { kind: 'reach-granted', workspaceId: h.workspaceId, ticketIds: [ticketId] },
+      { kind: 'reach-granted', workspaceId: h.workspaceId, tickets: [ticketId].map((id) => ({ id, headSeq: expect.any(Number) as unknown as number })) },
     ]);
     // AND IT COST NOTHING. The id was named, the replica found it held, and no
     // request left the device — `applyInstruction`'s `getTicket(id) === null`
@@ -423,7 +423,7 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     await commit(USER_A, widenUnheld);
     const deliveredControl = await b.syncDown();
     expect(instructionsOf(deliveredControl)).toEqual([
-      { kind: 'reach-granted', workspaceId: h.workspaceId, ticketIds: [unheld] },
+      { kind: 'reach-granted', workspaceId: h.workspaceId, tickets: [unheld].map((id) => ({ id, headSeq: expect.any(Number) as unknown as number })) },
     ]);
     expect(b.pulls).toEqual([unheld]);
     // The wire carried the trigger and NOTHING ELSE — the two earlier rows on
@@ -447,7 +447,7 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     const repeatUnheld = ticketEvent(USER_A, unheld, 'visibility.set', { ticketId: unheld, mode: 'project' });
     await commit(USER_A, repeatUnheld);
     expect(instructionsOf(await b.syncDown())).toEqual([
-      { kind: 'reach-granted', workspaceId: h.workspaceId, ticketIds: [unheld] },
+      { kind: 'reach-granted', workspaceId: h.workspaceId, tickets: [unheld].map((id) => ({ id, headSeq: expect.any(Number) as unknown as number })) },
     ]);
     expect(b.pulls).toEqual([unheld]);
     expect(await b.replica.listPendingPulls(h.workspaceId)).toEqual([]);

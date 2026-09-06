@@ -1,3 +1,4 @@
+import type { ReachGrantedTicket } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from './can-see.js';
 import { listVisibleTickets } from './visible-tickets.js';
@@ -289,7 +290,7 @@ export async function grantNoticeFor(
   userId: string,
   ticketId: string,
   backfilled: Set<string>,
-): Promise<string[]> {
+): Promise<ReachGrantedTicket[]> {
   const admitted: string[] = [];
   for (const candidate of await audienceDependents(db, ticketId)) {
     if (backfilled.has(candidate)) continue;
@@ -300,7 +301,46 @@ export async function grantNoticeFor(
     if (!(await canSee(db, userId, candidate))) continue;
     admitted.push(candidate);
   }
-  return admitted;
+  return withHeadSeq(db, admitted);
+}
+
+/**
+ * Attach each ticket's head position — ruling P37.2.
+ *
+ * **An ID-ONLY notice was MEASURED not to work**, which is why this exists. The
+ * client cannot tell a complete local copy from a STALE PARTIAL one by asking
+ * whether it holds the ticket, and it cannot ask the server either: a notice
+ * only ever names ids the viewer can see NOW, and `reconcile` only ever answers
+ * about ids they CANNOT — complementary predicates over the same `canSee`, so
+ * their intersection is empty by construction. Staleness here is about CONTENT
+ * and `canSee` answers about AUDIENCE, so reconcile was the wrong instrument
+ * rather than a mistimed one. Case 12.316 carries the measurement.
+ *
+ * **READ, never computed, and never a neighbour's.** `MAX(workspace_seq)` over
+ * the ticket's own events is the ledger's own number for "the last thing that
+ * happened to this ticket". Ruling P36 refused a synthesised instant one surface
+ * over for exactly this reason: a number the server derives rather than reads is
+ * one that can disagree with the ledger, and it would pass a gate.
+ *
+ * ONE query for the whole notice, not one per candidate — the walk above already
+ * costs a query each, and doubling that for something a single `GROUP BY`
+ * answers would be real cost for no property.
+ *
+ * A ticket with no rows cannot reach here (`canSee` refuses a ticket with no
+ * `proj_visibility` row, and every candidate has passed it), but `?? 0` is kept
+ * rather than asserted away: zero makes the client PULL, which is the safe
+ * direction, where a throw would take down the whole drain.
+ */
+async function withHeadSeq(db: Queryable, ticketIds: readonly string[]): Promise<ReachGrantedTicket[]> {
+  if (ticketIds.length === 0) return [];
+  const { rows } = await db.query<{ entity_id: string; head: string }>(
+    `SELECT entity_id, MAX(workspace_seq) AS head FROM events
+      WHERE entity_kind = 'ticket' AND entity_id = ANY($1::text[])
+      GROUP BY entity_id`,
+    [[...ticketIds]],
+  );
+  const heads = new Map(rows.map((r) => [r.entity_id, Number(r.head)]));
+  return ticketIds.map((id) => ({ id, headSeq: heads.get(id) ?? 0 }));
 }
 
 /**
@@ -366,12 +406,15 @@ export async function readerReachNoticeFor(
   userId: string,
   workspaceId: string,
   scope: 'workspace' | { projectId: string },
-): Promise<string[]> {
+): Promise<ReachGrantedTicket[]> {
   const rows = await listVisibleTickets(db, userId, workspaceId);
   const inScope =
     scope === 'workspace' ? rows : rows.filter((row) => row['project_id'] === scope.projectId);
-  return inScope
-    .map((row) => row['ticket_id'])
-    .filter((id): id is string => typeof id === 'string')
-    .slice(0, GRANT_BACKFILL_MAX_TICKETS);
+  return withHeadSeq(
+    db,
+    inScope
+      .map((row) => row['ticket_id'])
+      .filter((id): id is string => typeof id === 'string')
+      .slice(0, GRANT_BACKFILL_MAX_TICKETS),
+  );
 }
