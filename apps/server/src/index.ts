@@ -107,6 +107,12 @@ async function main(): Promise<void> {
     // the repository is worse than a server that will not start.
     baseUrl: config.betterAuthUrl,
     secret: config.betterAuthSecret,
+    // The origin the browser is served from, so better-auth trusts the product's
+    // own client. Without it `trustedOrigins` holds only this server's origin,
+    // which is not what any browser sends, and every cookie-carrying POST from
+    // the web app is refused with INVALID_ORIGIN. Measured against the shipped
+    // compose stack, not inferred.
+    webOrigin: config.webOrigin,
   });
   const app = buildApp(
     {

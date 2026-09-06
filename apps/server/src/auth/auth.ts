@@ -12,6 +12,12 @@ export interface AuthDeps {
   magicLinkSender: MagicLinkSender;
   baseUrl: string; // e.g. http://localhost:3000
   secret: string; // BETTER_AUTH_SECRET
+  /**
+   * `WEB_ORIGIN` — where the browser that talks to this server is served from.
+   * Required, not optional: a server that does not know its web origin cannot
+   * trust it, and the failure is a 403 on every sign-in rather than a warning.
+   */
+  webOrigin: string;
 }
 
 /**
@@ -40,6 +46,7 @@ export function createAuth(deps: AuthDeps) {
     database: deps.pool,
     baseURL: deps.baseUrl,
     secret: deps.secret,
+    trustedOrigins: [deps.webOrigin],
     emailAndPassword: { enabled: false }, // the spec forbids passwords
     advanced: {
       /**
@@ -63,9 +70,43 @@ export function createAuth(deps: AuthDeps) {
        * `Origin` or `Referer`; a bearer-only request sends no cookie and is
        * exempt, which is why `signInWithPhone` hands later tasks a bearer token.
        *
-       * `trustedOrigins` is left at its default — the origin of `baseUrl`. When
-       * the web app is served from a different origin than this server, that
-       * origin must be added here or the browser's own cookie POSTs will 403.
+       * `trustedOrigins` NO LONGER relies on its default alone. The default is
+       * the origin of `baseUrl` — this server's own origin — and that is not
+       * the origin a browser sends. The browser is served from `WEB_ORIGIN`,
+       * so it is `WEB_ORIGIN` that appears in `Origin`, and leaving the default
+       * to stand meant the product refused its own client.
+       *
+       * MEASURED IN THE SHIPPED COMPOSE STACK before this line existed: a real
+       * browser at `http://localhost:3001` submitting the shipped sign-in form
+       * got `403 {"code":"INVALID_ORIGIN"}` and the words "Invalid origin"
+       * rendered on the page. `BETTER_AUTH_URL` was `http://localhost:3000` and
+       * `WEB_ORIGIN` `http://localhost:3001`, which is exactly the condition the
+       * paragraph this replaces described in the abstract.
+       *
+       * WHY THE SUITE COULD NOT SEE IT. `sign-in-flows.test.ts` asserts the
+       * accepted origin as `BASE_URL` — the SERVER's origin — in both places it
+       * asserts acceptance. So the suite pinned "an origin equal to baseUrl is
+       * trusted", which the default already guarantees and no browser ever
+       * sends. The one test that uses `http://localhost:3001` is the mounted-
+       * methods gap, not an acceptance. A bound asserted on only one side of
+       * its line.
+       *
+       * ADDED, NOT SUBSTITUTED: `getTrustedOrigins`
+       * (`better-auth/dist/context/helpers.mjs:74,77`) pushes the `baseURL`
+       * origin first and only then appends `options.trustedOrigins`, so passing
+       * an array extends the default rather than replacing it. A same-origin
+       * deployment, where `WEB_ORIGIN` and `baseUrl` share an origin, simply
+       * lists it twice and behaves as before. Never a wildcard, and never read
+       * from the request — the value comes from config, which is the whole
+       * point of the guard below it.
+       *
+       * NOT SUFFICIENT FOR A CROSS-ORIGIN DEPLOYMENT, and that is a separate
+       * recorded gap: `sign-in-flows.test.ts`'s "known gap: OPTIONS and HEAD are
+       * not mounted" pins that a CORS preflight 404s before better-auth is
+       * reached. It does not bite the compose stack, where the browser talks to
+       * Next same-origin and Next proxies server-side, so no preflight is
+       * issued. It would bite a deployment whose web app called this server
+       * cross-origin directly.
        */
       disableOriginCheck: false,
       /**

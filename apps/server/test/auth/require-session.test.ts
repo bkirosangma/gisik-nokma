@@ -34,6 +34,8 @@ beforeAll(async () => {
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: BASE_URL,
     secret: TEST_SECRET,
+    // The browser's origin, so better-auth trusts the product's own client.
+    webOrigin: 'http://localhost:3001',
   });
   app = Fastify();
   registerAuthRoutes(app, auth);
