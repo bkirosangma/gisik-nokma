@@ -102,12 +102,20 @@ function injectFetch(headers: { authorization: string }, calls: string[] = []): 
   return (async (input: string, init?: RequestInit) => {
     calls.push(input);
     const method = (init?.method ?? 'GET') as 'GET' | 'POST' | 'PUT';
-    const res = await app.inject({
-      method,
-      url: input,
-      headers: { ...headers, ...(init?.body === undefined ? {} : { 'content-type': 'application/json' }) },
-      ...(init?.body === undefined ? {} : { payload: JSON.parse(String(init.body)) as unknown }),
-    });
+    const rawBody = init?.body;
+    // The client's OWN serialised bytes are handed to the route verbatim, not
+    // parsed here and re-serialised by the harness. A round trip that re-encodes
+    // the payload in the middle is measuring the harness's encoder as much as the
+    // client's, and `createHttpClient` does its own `JSON.stringify`.
+    const res =
+      typeof rawBody === 'string'
+        ? await app.inject({
+            method,
+            url: input,
+            headers: { ...headers, 'content-type': 'application/json' },
+            payload: rawBody,
+          })
+        : await app.inject({ method, url: input, headers });
     return {
       ok: res.statusCode >= 200 && res.statusCode < 300,
       status: res.statusCode,
