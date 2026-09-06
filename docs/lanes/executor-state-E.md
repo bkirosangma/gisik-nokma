@@ -1448,3 +1448,25 @@ the tree a lane holds is not the tree that ships.**
 
 **Also on main:** GATE LOCK **v3.2** (#157) — the token matcher, citing this lane's reference copy at
 `e814f49`. The three corrections this lane measured are in the shared protocol.
+
+## …and the note above aged in TEN MINUTES. Count at `aa17046`: **ONE**.
+
+The entry immediately above says three refusals remain, verified on main at the time. **#169 landed
+`getMyWork` and `getAttention`, and `SERVING_GAPS` now carries `search` alone.** Measured at `aa17046`:
+
+    ): never  →  4  (my seam-3 map)  →  3  (an hour later)  →  1  (ten minutes after that)
+    remaining →  mapSearchHits, and nothing else
+
+**This is not a correction to that note — it is the note's own claim demonstrating itself.** The lesson
+stands untouched and is now evidenced twice inside one file: **do not act on a map entry without
+re-measuring it against `origin/main`.** Any T13 scenario touching **search** still meets a serving gap;
+My Work and the attention strip no longer do.
+
+**Unchanged and still binding: `applyAll` still applies exactly four projections** (`projProjects`,
+`memberships`, `projInvites`, `projVisibility`) at `aa17046` — **`projTickets` is still not among them**,
+so Lane A's silent-no-op hazard is live. A0 remains safe for the recorded reason: the attachment gate
+fails **closed**, so an unapplied projection reddens that test rather than passing it.
+
+**Rebase target: `aa17046`** (or later), `pnpm install` after. **Deferred deliberately** — the shutdown
+workflow is mutating `index.ts` right now, and the standing rule is that nothing touching a file under
+mutation moves until its completion notification lands.
