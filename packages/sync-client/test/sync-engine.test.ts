@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newSubmittedEvent, newUlid, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newSubmittedEvent, newUlid, parseEvent, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
 import { createReplica, type BootstrapResponse, type Replica, type TicketBootstrap } from '../src/replica/replica.js';
 import type { SyncItem } from '../src/replica/sync-item.js';
@@ -14,6 +14,49 @@ import {
   TicketPullNotFound,
 } from '../src/engine/sync-engine.js';
 import { createHttpTransport, type WebSocketLike } from '../src/net/http-transport.js';
+
+/**
+ * The `invalid` code every fixture in this file carries, taken FROM THE REAL
+ * PARSER rather than written down — case 12.327.
+ *
+ * It used to be the literal `'bad-envelope'`, and no server has ever emitted
+ * that code. The envelope arm is `'malformed-envelope'` (`parse-event.ts`), and
+ * the union the sync door narrows to is `IngestErrorCode | 'actor-mismatch' |
+ * 'reserved-type'`. The fixture had drifted from the vocabulary it was
+ * imitating, and nothing could see it: `SyncEventResult.code` is deliberately
+ * `string` on this side (a client's job with an invalid answer is to SHOW it,
+ * not to classify it — see `outbox.ts`), so no type refused the invention and
+ * no assertion read it.
+ *
+ * Replacing one literal with a better literal would fix today and drift again.
+ * So there is no literal: `parseEvent` is `@gisik-nokma/domain`'s and is the
+ * SAME function the server's ingest door calls, and the code below is whatever
+ * it actually answers for a malformed envelope. The drift class is removed
+ * structurally rather than corrected.
+ *
+ * The `if (answer.ok) throw` is not defensive noise — it is the non-vacuity
+ * guard. Without it a `parseEvent` that started ACCEPTING this input would
+ * leave `code` undefined and the fixtures would carry `undefined` silently,
+ * which is exactly the shape of the defect being closed.
+ *
+ * **It is deliberately NOT annotated `: string`.** Left to infer, it is
+ * `EnvelopeErrorCode` — a member of `IngestErrorCode`, and therefore it
+ * survives the narrowing `outbox.ts`'s `SyncEventResult` docblock prices. An
+ * explicit `: string` would widen it back and re-create the cost this fixture
+ * edit just paid off. The absence of the annotation is load-bearing, so it is
+ * named rather than left looking like an oversight.
+ *
+ * What this canNOT witness, said plainly: that the SERVER SENDS this code over
+ * the wire. `parseEvent` is pure and shared, and agreeing with a shared
+ * function is not agreeing with a running door. Case 12.362 is that half,
+ * against `POST /v1/sync` through `inject()`, and it lives in the server
+ * package because this one may not depend on `apps/server`.
+ */
+const MALFORMED_ENVELOPE_CODE = (() => {
+  const answer = parseEvent({ not: 'an envelope' });
+  if (answer.ok) throw new Error('12.327 precondition: parseEvent accepted a malformed envelope');
+  return answer.code;
+})();
 
 /**
  * Plan 10 Task 11 — the sync engine and its HTTP/WS transport. Cases
@@ -622,7 +665,7 @@ describe('12.156-12.164 + 12.169-12.170 sync engine lifecycle and flush', () => 
     // that would disagree is the one carrying no id to disagree with.
     const shifted = await runOne([
       { status: 'committed', eventId: 'SECOND', seq: 1, workspaceSeq: 201, serverTime: '2026-08-20T02:00:00.000Z' },
-      { status: 'invalid', eventId: null, code: 'bad-envelope', message: 'unreadable' },
+      { status: 'invalid', eventId: null, code: MALFORMED_ENVELOPE_CODE, message: 'unreadable' },
     ]);
     expect(shifted.sent).toBe(1);
     expect(shifted.queued).toEqual([
@@ -899,8 +942,21 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
    *
    * The assertion pins the frame TYPE STRINGS, not that the handling is right —
    * which is what this case is for.
+   *
+   * **The `ping` half was deleted, and its absence is now the assertion (12.328).**
+   * This case used to send a TEXT `{type:'ping'}` and expect `pong` back — a
+   * protocol nothing on the other side implements. The server's heartbeat is
+   * `socket.ping()`, a control frame the platform socket answers below
+   * JavaScript, and `stream/routes.ts:342` answers `bad-message` to any text
+   * frame that is not a `subscribe`. So the ping is still SENT here and the
+   * sent-list is asserted EXACTLY as `['subscribe']`: the frame goes in, nothing
+   * comes back, and `subscribe` is that absence's own positive control that
+   * sends are observable at all.
+   *
+   * *Mutation: restore the `pong` arm in `http-transport.ts`'s `onmessage` →
+   * red HERE alone (`['subscribe','pong']` against `['subscribe']`).*
    */
-  it('12.167 delivers all five server frames and answers ping with pong', async () => {
+  it('12.167 delivers all five server frames and answers a text ping with nothing', async () => {
     const { transport, urls, socketOf } = transportFixture();
     const seen: string[] = [];
     const items: SyncItem[] = [];
@@ -929,7 +985,7 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
 
     expect(seen).toEqual(['item', 'item', 'item', 'caught-up:12', 'error:bad-message']);
     expect(items).toEqual([env, { kind: 'purge', entityId: 'ticket_x' }, { kind: 'scope-revoked', workspaceId: WS }]);
-    expect(socket.sent.map((s) => JSON.parse(s).type)).toEqual(['subscribe', 'pong']);
+    expect(socket.sent.map((s) => JSON.parse(s).type)).toEqual(['subscribe']);
 
     socket.onclose!({});
     expect(seen.at(-1)).toBe('close');

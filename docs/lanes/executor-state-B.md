@@ -1,4 +1,4 @@
-# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · **T18**)
+# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · T18 · **the sync-surface fixes**)
 
 **This file is Lane B's restart surface, and nobody else's.** `executor-state.md` is Lane A's — never
 edit it. A Lane B session relaunched from `dispatch-executor-serial.md` + the Lane B override recovers
@@ -11,7 +11,255 @@ only what is written here.
 
 ---
 
-## ▶ LIVE — Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
+## ▶ LIVE — the SYNC-SURFACE SOURCE PR (12.328 · 12.327 · 12.13 · 12.16), started 14:2x IST 2026-09-06
+
+**T18 IS DONE AND MERGED. Plan 10 is 18/18, COMPLETE.** Everything under the next heading is history.
+This lane is now on a small source PR turning four ❌/🟡 cases from the T18 round into fixes with
+excluding fixtures.
+
+| anchor | value | how verified |
+|---|---|---|
+| branch | `exec/43-sync-surface-fixes`, cut from `origin/main` | `git checkout -b … origin/main` |
+| base at cut (SUPERSEDED — rebased onto `c5dfdcd`, #196) | **`8d6b756`** (#193, lock v3.3 + `REPO=`) — NOT `8373ae5`: `origin/main` moved twice between the fetch and the cut (#194 `f2ab4b2` promoting T18, then #193), and the branch was reset onto the newer tip **before** any commit rather than rebased after | `git rev-parse origin/main` twice, the second after a re-fetch; `git merge-base --is-ancestor 8373ae5 origin/main` → YES |
+| T18's final head | **`c2d2e3b`** — **squash-merged as `8373ae5` (#188)**, then promoted by **`f2ab4b2` (#194)**. `git branch -a --contains c2d2e3b` names only the stale local `exec/33-plan10-t18`; **it is NOT reachable from `main` or from `origin/*`** — a squash merge orphans its inputs, so every sha in the T18 narrative below is unreliable exactly as the banner warns. Positive control for the same command: `--contains 8373ae5` names `main`, four branches and `origin/main` | `git branch -a --contains`, both directions |
+| toolchain | node **v22.22.2**; `pnpm install --frozen-lockfile` **`INSTALL_EXIT=0`** · `pnpm rebuild better-sqlite3` **`REBUILD_EXIT=0`** · `pnpm turbo run build --force --concurrency=1` **`BUILD_EXIT=0`** | one shell invocation, each `$?` on its own line |
+| `check-case-ids` (repo-wide) | **`CHECK_CASE_IDS_EXIT=0`** — bare 1010 + bold 469 + marker-first 40 = **sum 1519 == union 1519**, highest `13.168`, 10 files. **A SEPARATE CI step, NOT part of `pnpm check:env`; its own line in every report** | `node scripts/check-case-ids.mjs` |
+| **§12 max, recounted** | **`12.328`** — line-head shape only. **`12.360` is in the file and is NOT a case**: it is the header's next-free-block pointer, and so are `12.329/12.339/12.340/12.359`. A whole-file `grep -oE '12\.[0-9]+'` returns `12.360` as the max and is wrong | line-head extraction, with a positive control that the same shape still finds `12.1` |
+| **my new §12 block** | **`12.360–12.379`**, allocated with this override; next free block `12.380` **on request**. Verified free as CASE ids (`^- \*{0,2}12\.3[67][0-9]` → empty). D holds `12.340–12.359`; A holds `12.320–12.339`, used through `12.328`. **My old block `12.290–12.319` is EXHAUSTED** | grep, stated either way |
+| §12 style | **bare is canonical** (ruled 13:43 on my request; T18 normalised all 19 bold heads, zero renumbered). Census at this HEAD: **bare 318 · bold 0 · marker-first 0; sum 318 == union 318** | §12-scoped, three styles, per-style counts printed as the control |
+| `Features.md` §12 bullets | **87** | see the extractor note below — the obvious range is wrong |
+| position | override item 1 of 4 not yet started; the docs refresh is this commit | — |
+
+### ▶ POSITION AT 14:47 — all four items COMMITTED and MUTATION-MEASURED; gate in flight; PR not yet opened
+
+| anchor | value | how verified |
+|---|---|---|
+| branch · HEAD | `exec/43-sync-surface-fixes` — **SEE THE REVIEW-ROUND BLOCK BELOW for the live head; the sha in this row was true at 14:47 and the branch has been rebased and extended twice since.** A restart reads the LAST block in this file, not this table | `git rev-parse HEAD` |
+| base | **`8d6b756`** (#193) — REACHABLE, `git branch --contains` names `main` | not `git cat-file` |
+| tree | clean; every mutation restored and verified BY READING plus an empty `git diff` | stated either way |
+| dist | `app-core`, `sync-client` and `domain` REBUILT after their mutations — no mutated `dist` left for Lane D's rebase | `grep` for the mutant marker in `dist/` after each restore |
+| `check-case-ids` | **`EXIT=0`**, 1524 unique, union == sum, +5 (12.360–12.364). **Its own step, NOT part of `check:env`** | `node scripts/check-case-ids.mjs` |
+| §12 | max **`12.364`**; Lane B's block `12.360–12.379` used through `12.364`; header's next-free bumped to `12.380` | recounted at this sha, line-head shape |
+| full gate | **IN FLIGHT** — lock acquired 14:40:36 pid 62853, after waiting out Lane C's holder. **Do not read `/tmp/laneB-gate.log` until the wrapper prints `GATE_EXIT=`** (see the trap below) | — |
+| PR | **NOT OPENED YET.** Head is therefore NOT frozen | — |
+
+**What landed, one commit each, each with its mutation measured after the commit:**
+
+| item | case | mutation | measured |
+|---|---|---|---|
+| 1 | **12.328 ✅** (was ❌) — four production ping/pong sites deleted; owner-rule docblocks at both `webSocketFactory` defaults; **12.360 ✅** and **12.361 🚫** minted | restore the pong arm in `stream.ts` (BOTH halves — a send arm alone is unreachable once `parseFrame` answers null) | **1 failed / 26 passed, 12.360 alone**, `expected […(2)] to deeply equal [Array(1)]` |
+| 1 | same, sync-client half | restore the pong arm in `http-transport.ts` | **1 failed / 28 passed, 12.167 alone**, `expected ['subscribe','pong'] to deeply equal ['subscribe']` |
+| 2 | **12.327 ✅** (was ❌) — the literal replaced by `parseEvent`'s own answer; `outbox.ts`'s standing measurement repriced; **12.362 ✅** minted | change all five `'malformed-envelope'` sites in `parse-event.ts` | **12.362 alone within `sync-route.test.ts` (1/16)**; repo-wide over every file that mentions the code: domain **6 failed / 28**, other four server files **0 / 40**, sync-client **0 / 29** |
+| 3 | **12.13 ✅** (was 🟡) — **12.363 ✅** minted | delete `'attachment.added'` from `BOOTSTRAP_BACKFILL_TYPES` | **1 failed / 103 passed over `test/sync/` + `test/dual-client/` (15 files) — 12.363 alone** |
+| 4 | **12.16 ✅** (was 🟡) — **12.364 ✅** minted | `env.workspaceSeq` → `0` in `insertEnvelope` | **3 failed / 85 passed across sync-client (8 files, 88 tests)** — 12.364 plus 12.305/12.313 through `ticketHeadSeq`'s aggregate |
+
+### THREE THINGS THIS BRANCH PAID FOR — all three are method, not content
+
+1. **`git checkout HEAD -- <path>` restored two files that carried UNCOMMITTED work, and destroyed it.**
+   Item 2's whole source change vanished mid-measurement. Commit-then-mutate is not a style rule: the
+   restore *is* `git checkout HEAD`, so **a file holding uncommitted work cannot be a mutation site.**
+2. **A STALE LOG AT A PATH I CHOSE READ AS MY OWN RESULT.** `/tmp/laneB-gate.log` still held a complete,
+   green run from an earlier Lane B session — `GATE_EXIT=0`, 30/30 — and it was read and nearly reported
+   while my gate was still waiting on Lane C's lock. It was caught only because the per-package numbers
+   were LOWER than main's last gate on a branch that only adds tests (sync-client 7 files/64 tests, where
+   a direct run of the same package gives 8/88). **The log path is not the run.** Read `GATE_EXIT=` from
+   the WRAPPER's own stdout, and check the log carries this run's `LOCK ACQUIRED` timestamp.
+3. **A carried finding aged out of true inside the catalogue that quoted it forward.** 12.16 said the
+   constant-0 mutation "leaves the whole suite green". True when Plan 10 Task 9 recorded it; false since
+   closure 5b landed the pull door — *my own change*, and I did not notice then either. Re-measured
+   rather than repeated.
+
+### CARRIED, WITH OWNERS — not fixed here
+
+- **12.361 🚫** — the owner rule at both `webSocketFactory` defaults is a docblock and no test can hold it:
+  the failing case needs a `ws` dependency no client package has. *Owner if a client shell ever adopts
+  `ws`: whoever adds that dependency.* The 12.328(b) grep is the tripwire, and it is a human one.
+- **`outbox.ts`'s `SyncEventResult` move** — still open, eight files, and **now zero fixture cost**.
+- **Lane D** (`exec/40-socket-cut-fixture`) holds `apps/server/test/dual-client/socket-cut.test.ts` only;
+  file lists exchanged in both directions, no import of mine changes signature except `parseFrame`'s
+  return type (app-core, which D does not import). Whoever lands second rebases.
+
+
+### CORRECTION TO THE 14:47 BLOCK ABOVE — the freshness check I prescribed does not work
+
+I wrote *"check the log carries this run's `LOCK ACQUIRED` timestamp"*. **It does not.** `LOCK ACQUIRED`
+is printed by the wrapper to ITS OWN STDOUT and never reaches the logfile — `grep -c "LOCK ACQUIRED
+pid=62853" /tmp/laneB-gate.log` returns **0** on a run that genuinely acquired that lock. A freshness
+check that cannot fire is the same defect as the stale log it was written to catch, committed in the
+paragraph describing that defect. **The check that works: read `GATE_EXIT=` from the WRAPPER's stdout
+(the background task's output file), never from a logfile path you chose** — and if you must judge a
+logfile, compare its per-package composition against a number you can re-derive right now.
+
+### THE REBASE PAST #196, and the re-gate it owed
+
+Lane D's socket-cutting fixture landed as `c5dfdcd`. **Three conflicts, all in `test-cases/12`'s header**
+(the block table and the MAXIMUM line), none in source — resolved keeping BOTH lanes: Lane D's
+`12.340–12.359` *used through 12.343*, and Lane B's `12.360–12.379` *used through 12.364*. The header's
+counters were resolved to their FINAL values once rather than replayed per intermediate commit, then
+**recounted at the rebased sha**: max `12.364`, Lane D's four ids all present, `check-case-ids`
+**`EXIT=0`, 1536 unique, union == sum**.
+
+**The re-gate was genuinely owed and is not a formality**: the branch-vs-base diff carries SOURCE
+(`stream.ts`, `http-transport.ts`, `outbox.ts`), and D's new fixture drives the very transport whose
+ping/pong arm this branch deleted. **⚠️ THE INTERACTION CHECK I RAN HERE WAS THE WRONG GREP, and the review caught it.** I grepped
+`socket-cut.test.ts` for `ping|pong` — which finds nothing and **could not have found anything** — and
+wrote "measured, not assumed". The grep that mattered was 12.328's own clause (a), `webSocketFactory`
+over `packages` AND `apps`, and re-running it at the rebased head returns **FOUR** test files, not
+three: `socket-cut.test.ts:379` injects a **real `ws` socket** into `createHttpTransport`. That
+falsified four shipped sentences at once — 12.328(a)'s enumeration, `stream.ts`'s "three sites … are
+test fakes", both OWNER-RULE docblocks' absolute *never inject a raw `ws` socket* (which the repo now
+violates, so a maintainer obeying it would delete Lane D's day-old fixture), and 12.361's "no test can
+hold this". **A check aimed at the wrong term is not a weaker check; it is no check** — and the term I
+aimed at was the one I had just been thinking about, which is how it happened. All four corrected in
+the review round below.
+
+**A worktree trap, paid for here:** `[ -d .git/rebase-merge ]` is ALWAYS false in a git worktree, because
+`.git` is a FILE pointing at the real gitdir. A resolve-and-continue loop guarded on it reported
+"REBASE DONE" immediately, with conflict markers still on disk and a rebase still in progress. Use
+`git rev-parse --git-path rebase-merge`.
+
+### FULL GATE AT THE REBASED HEAD — GREEN
+
+`GATE_EXIT=0` · **`Tasks: 30 successful, 30 total`** · **`0 cached, 30 total`** · 2m11.689s ·
+**node `v22.22.2`** · `PNPM=9.15.0` · **`CHECK_ENV_EXIT=0`** · `Unsupported engine` **0** ·
+**no orphaned vitest workers**. Lock acquired pid 88476, released clean.
+**`check-case-ids` is a SEPARATE step and is not in that run: `CHECK_CASE_IDS_EXIT=0`, 1536 unique,
+union == sum.**
+
+**3612 passed / 283 files** (+5 skipped, server): domain 464/27 · ui 37/4 · editor 178/15 ·
+rule-engine 282/12 · **sync-client 88/8** · app-core 1102/68 · web 138/18 · mobile 20/3 · desktop 5/2 ·
+**server 1298/126**.
+
+**The branch's own test delta is +3, and it decomposes** — stated because a delta that does not
+decompose is a number nobody can check: **sync-client +1** (12.364), **server +2** (12.362, 12.363),
+**app-core +0** — 12.360 REPLACED the deleted `answers ping with pong` test one-for-one, which is why
+app-core's 1102 is unchanged rather than +1. 12.361 is 🚫 and has no test by construction.
+**The gate log names files, not tests**: each of the four new cases was confirmed to EXECUTE by name
+under `--reporter=verbose` in a targeted run, never inferred from a green total. That distinction was
+paid for on this branch — a first run of 12.363 reported `11 skipped` behind a failed suite.
+
+### THE FOUR ITEMS, and the shape each has to have
+
+One PR, each item its own commit, **commit then mutate**, mutation confirmed present before the run,
+predicted vs measured, restore with `git checkout HEAD -- <path>` **verified by READING the file, never
+by shell `diff`** (which has returned a false "identical" on this machine).
+
+1. **12.328 — delete the dead TEXT ping/pong protocol.** Ruled 13:44: **no runtime measurement; the four
+   production sites are deletable on SOURCE evidence.** Lane A's three grep shapes **re-run at
+   `8d6b756`, not adopted**, all three reproducing: (a) `webSocketFactory` is injected by **three test
+   files only** (`sync-engine.test.ts:879`, `online-data-source.test.ts:556`, `stream.test.ts:80` and
+   `:426`); the production hits are the two default-application lines (`app-core/src/online/stream.ts:235`,
+   `sync-client/src/net/http-transport.ts:126`) plus **one pass-through** at
+   `online-data-source.ts:403`, which forwards a caller's option and injects nothing — that reading is the
+   load-bearing half of "no production site injects one"; (b) **only `apps/server` depends on `ws`**
+   (`ws@^8.18.0`, `@types/ws@^8.5.0`); no client package does, enumerated package.json by package.json
+   with the name printed beside each; (c) the four production ping/pong sites are `stream.ts:35` (the
+   `PingFrame` type), `:93` (the parse arm), `:282-283` (the send) and `http-transport.ts:201-202` (the
+   send), with two test arms agreeing (`stream.test.ts:354-355`, `sync-engine.test.ts:928-932`). The
+   server's `socket.ping()` at `stream/routes.ts:319` and `socket.on('pong')` at `:290` are **`ws`
+   protocol control frames**, a different mechanism the platform WebSocket answers below JavaScript.
+   **Deleting `PingFrame` narrows an EXPORTED signature**: `parseFrame` returns
+   `ServerStreamFrame | PingFrame | null` (`stream.ts:83`) and becomes `ServerStreamFrame | null`. Lane D
+   was told this in writing before I started. **The residual is an OWNER-RULE docblock at BOTH
+   default-application lines** — never inject a raw `ws` socket into `webSocketFactory`, because the seam
+   is injected and a Node shell that did would reopen this — citing 12.328. The case flips ❌ → ✅ **only**
+   for "no production site speaks the protocol"; **the owner-rule half is 🚫 with its reason**, because a
+   docblock is not a check.
+2. **12.327 — `'bad-envelope'`, a code no server emits.** The fixture is at
+   `packages/sync-client/test/sync-engine.test.ts:**625**` — **NOT `:547`**, which the ❌ text and the
+   controller record both name; `:547` today is inside 12.169's docblock. The file is the durable half of
+   that reference and `outbox.ts` says so in its own words, having watched the number move twice while it
+   was being written. The real union is `SyncInvalidCode = IngestErrorCode | 'actor-mismatch' |
+   'reserved-type'` (`sync-service.ts:29`) over `IngestErrorCode = EnvelopeErrorCode |
+   'duplicate-event-id'` (`ingest-result.ts:3`); the envelope arm is `'malformed-envelope'`
+   (`parse-event.ts:7`).
+   **⚠️ THE PART THAT IS NOT IN THE OVERRIDE, AND IT CHANGES THE CHANGE SET.**
+   `packages/sync-client/src/outbox/outbox.ts:36-62` uses this exact fixture as a **standing
+   measurement**: *"ONE sync-client test constructs an `invalid` result, and narrowing `code` would redden
+   it"*, priced at *"one fixture edit (pick a real code)"* and evidenced with `tsc` exit 2 and the literal
+   `TS2322: Type '"bad-envelope"' is not assignable to type 'IngestErrorCode'`. **Correcting the fixture
+   PAYS that cost**, so the bullet becomes false the moment I touch the test, and the docblock is part of
+   this commit rather than a follow-up. The docblock's conclusion — *the blocker is scope, not difficulty*
+   — survives; only the price changes. It never says "keep this string"; it prices changing it. This is
+   the same pointer-defect class the #188 review round charged me for three times.
+   **Which direction the witness constrains, stated because "reddens alone" has two readings:** the
+   property that actually broke is **fixture drift**, not server drift. Mutating the server's
+   `'malformed-envelope'` reddens siblings, so "alone" is unavailable in that direction and I will not
+   loosen an assertion to buy it — if I run it, I report the measured sibling count. The witness reads the
+   server's real answer at runtime and compares the client's literal to it, so that **mutating the
+   client's literal** reddens the new case alone, which is the direction that catches the next drift.
+3. **12.13 — `attachment.added` is a live member of `BOOTSTRAP_BACKFILL_TYPES`** (`sync-routes.ts:59`) and
+   deleting it leaves the whole server suite green. A bootstrap that must carry an `attachment.added` for
+   a held ticket, asserting it arrived. Server src + server test, so the dist trap below does not apply.
+4. **12.16 — a constant 0 written into `workspace_seq` leaves the suite green.** The mutation site is
+   `packages/sync-client/src/replica/replica.ts:269` (`env.workspaceSeq` in the INSERT parameter list);
+   the read-back is `:216` (`workspaceSeq: Number(row.workspace_seq)`). **The witness must assert on the
+   `:216` read path against the envelope's own value — copied, never computed (P36/P37.2) — and NOT
+   through `ticketHeadSeq`,** because `:689` is `SELECT MAX(workspace_seq)` and a constant 0 collapses it
+   too: a red arriving through headSeq cannot tell "the row stored the wrong seq" from "headSeq
+   collapsed", which is a mutation that does not identify its own site.
+   **IMPORT STYLE DECIDES WHETHER THIS MUTATION IS VISIBLE AT ALL — the highest silent-failure risk of the
+   four.** A case in `packages/sync-client/test/` importing `../src/*.js` sees the mutation; a case in
+   `apps/server/test/dual-client/` importing `@gisik-nokma/sync-client` **by package name resolves through
+   `./dist`** and shows a green run over unmutated code. It goes in the sync-client package. Rebuild after
+   restoring, or the next agent inherits a mutated `dist` — Lane D rebases onto this branch.
+
+### CARRIED FROM THE #188 REVIEW ROUND — the lesson, not the diff
+
+**The reviewer's headline was a clean negative: ZERO downgrades.** No ✅ whose stated property was
+unasserted anywhere, all seven 🟡s confirmed. What it found instead was the one costume that block was
+uniquely exposed to: **36 of T18's 44 lines carry no assertion of their own, so the POINTER is the
+deliverable**, and a `→ landed 12.NNN` naming an id that proves less than the line claims is a defect
+even when the line is true. **Eleven pointer defects. Three were flatly mine:**
+
+- **12.319 cited `12.228`** for the storage-conformance run. `12.228` is the `vi.fn()` fixture and imports
+  the suite zero times — a reader following that pointer would have concluded the one-storage-interface
+  claim rests on a mock. It is **`12.229`**.
+- **12.319 said "the header said"** of an arithmetic correction **it never made**: the count line still
+  read "the storage conformance suite's four" at the moment the prose claimed it had been fixed. Narrated,
+  not done — the same species as the three live falsehoods that branch removed, committed *inside* the
+  change set that removed them.
+- **12.31 cited a blank line** (`:275` for an assertion at `:274`).
+
+**Eight were under-cited. The worst is 12.23**, which pointed five clauses at "12.156+" where the range is
+`12.156` alone: reconnect, flush-order and transport-failure are `12.161`, `12.159`, `12.160`, so **four of
+five clauses would have survived broken with the cited range green**. `12.21`'s middle clause named no id
+at all; `12.8` pointed "exactly one contest" at the retried COMMITTED case, which contains no contest
+assertion (it is `12.105`). All eight were verified as they were applied; every one held.
+
+**Two (A) unfreezes were granted and both were spent**: one docs-only fix commit for the review round
+(head `3090c8b`), then a second when §12 gained an 87th bullet under Lane B — #187's fixture-mirror
+inventory — that the banner's enumeration did not admit.
+
+**The banner reshape, and the sentence that makes it safe.** §12's banner enumerating what is "still
+absent" had been one short **three times**: the app shells, Task 3's stream cursor, and then A's
+fixture-mirror inventory, which went stale **under** me — #187 landed the bullet while the banner sat on
+an unmerged branch, so the banner's own same-change-set rule had nothing to bite on. Naming the inventory
+would have fixed today and failed tomorrow (D's socket-cut fixture and this very PR both add §12 bullets).
+So the enumeration now names **CATEGORIES**, carrying the rule that makes that safe: *every bullet added
+under a category rather than a Plan 10 task names itself and its PR in its own text, and a reader
+reconciles the section by reading its bullets rather than trusting a list at the top to have kept pace.*
+Same move `test-cases/12`'s header made for ids: **the fix for a value that goes stale is not a better
+value, it is removing the reader's need to trust it.**
+
+### THE TWO MEASUREMENT NOTES THAT WILL BITE THE NEXT SESSION — both re-fired TODAY, in this file's own prep
+
+- **A broken extractor's zero reads exactly like a clean result.** T18's dangling-reference matcher
+  `landed \*\*?12\.` **requires** the literal asterisk and so could not match `**landed 12.156**`; it
+  reported zero references and was nearly believed. Only the count going *down* after adding references
+  exposed it. **A control downstream of a broken extractor validates the comparator, not the extraction.**
+  It fired again forty minutes later: `grep -oE '12\.[0-9]+'` over the whole `test-cases/12` returns
+  `12.360` as the maximum id, which is not a case at all — it is the header's next-free-block pointer.
+- **A denominator carried from a sha becomes a false property of the file.** "86 bullets" measured at
+  `2f18f3f` read as data loss at `e33c429` until it was re-measured at four shas. **And the obvious
+  extractor for it is wrong here:** `Features.md`'s sections are NOT in numeric order — §12 is at line
+  1005 and **§10 is at 1627**, so `awk '/^## 12\./,/^## 13\./'` swallows §10 and §11 and returns **115**.
+  The correct shape stops at the next `^## ` *whatever its number* and returns **87**, with §13 as the
+  positive control that the shape still finds bullets at all.
+
+---
+
+## ✅ (HISTORY — squash-merged as `8373ae5`, #188; promoted by `f2ab4b2`, #194) Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
 
 Closure 5b merged as **`2f18f3f`** (#161). T13 (#117), T14+T15 (#126), closure 5 (#139) and closure 5b are
 **all on `main`** — none of them is re-implemented here.
@@ -1355,3 +1603,51 @@ Read the list before killing anything; expect it empty. Checked after every run 
   it — whoever lands second rebases) · `apps/server/package.json` at T14 (Lane E) · `Features.md` /
   `test-cases/12` (append only in Plan 10's section).
 - Never edit `docs/lanes/task-ledger.tsv`. Never merge this lane's own PR. Never commit to `main`.
+
+
+## ▶ REVIEW ROUND — opus reviewer, three CRITICAL, five IMPORTANT, five MINOR; all verified and all fixed
+
+The reviewer also caught that **`rtk`-proxied `git` handed it a stale log and diff** (pre-rebase shas)
+and re-read everything through `/usr/bin/git`. Worth carrying: the proxy's staleness is a known
+silent-wrong-answer mode on this machine and it reached a *reviewer*, the party least able to notice.
+
+**Three Critical, every one confirmed by me directly with `/usr/bin/grep` before acting on it:**
+
+1. **`Features.md:1384` still ended `` `ping` is answered with `pong`. ``** — the transport bullet, 1,351
+   lines below the app-core bullet I did correct. My own check read the first 1,500 characters of that
+   bullet and stopped short of the sentence. **A one-line diff to a file this size is not evidence the
+   file is consistent.**
+2. **`test-cases/03-foundation-ledger.md:39`, case 3.33 ✅**, still claimed *"answers `ping` with `pong`
+   without delivering it"* — and its cited witness is `stream.test.ts`, the very arm 12.360 replaced with
+   the OPPOSITE assertion. A ✅ naming behaviour its own witness contradicts. `test-cases/12` was updated
+   in the change set; `test-cases/03` was never looked at.
+3. **12.328's ✅ rested on 12.361's 🚫, whose stated reason was refuted by a file the rebase pulled in.**
+   See the corrected interaction-check note above. The deletion itself survives — `ws` surfaces protocol
+   pings on `socket.on('ping')`, which `WebSocketLike` does not expose — but the enumeration, the
+   absolute prohibition and 12.361's "no test can hold this" were all false, and 12.361's reason is now
+   SCOPE with the buildable assertion named.
+
+**Five Important, all fixed:** `outbox.ts`'s `apps/server` count was 2 by the bullet and **3** by the
+bullet's own stated command (`rig.ts` — a type import and a return-type annotation, both code uses), so
+the total is **9 files, not 8** — and my change set **re-signed the wrong number in the very bullet that
+congratulates itself for catching that class**. `replica.test.ts`'s recount excluded 12.127 and summed
+to 22 against its own measured 23: the extractor required a SINGLE quote after `it(`, and 12.127's title
+carries an apostrophe. **12.360's shipped mutation text said "restore the pong arm"; it takes BOTH arms**
+— the parse arm too, since `parseFrame` now answers `null` and the send arm alone is unreachable and does
+not typecheck. I measured it with both and then wrote the docblock as one, so the docblock would have
+sent the next maintainer to a mutation that never runs. **12.167's title re-affirmed "all five server
+frames" over a SIX-member union** (`reach-granted` since closure 5b), and the transport's `reach-granted`
+wire branch has no witness — a pre-existing gap, but re-signing "five" in a line I rewrote is the same
+defect as `outbox.ts`'s count. And this file's own position table was stale on the commit that shipped it.
+
+**The through-line, and it is one thing:** every Critical and three of the five Importants are a NUMBER
+OR SENTENCE I RE-SIGNED WITHOUT RE-DERIVING — an enumeration measured before a rebase, a count carried
+into a bullet I was editing, a title I rewrote and left, a mutation I ran one way and described another.
+The branch's own commit messages argue this exact point four times. **Editing a line does not verify it;
+it re-signs it.**
+
+**Two the reviewer flagged its own uncertainty on, and my resolution:** its `ws` `on('ping')` reading is
+reasoned rather than measured — I have not run the recorder it proposed, so 12.361 keeps the residual and
+the docblocks now state the mechanism as the reason rather than asserting a prohibition. And it asked
+whether I3 was a mis-run or a mis-description: it is a **mis-description** — the handoff at 14:47 already
+said "BOTH halves", so the measurement was sound and only the shipped wording understated it.

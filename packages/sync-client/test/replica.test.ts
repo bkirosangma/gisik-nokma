@@ -15,7 +15,8 @@ import { createReplica, type BootstrapResponse, type Replica } from '../src/repl
 import { workflowVersionsOf } from '../src/replica/local-deps.js';
 
 /**
- * Plan 10 Task 9 — the replica. Cases 12.119–12.137.
+ * Plan 10 Task 9 — the replica. Cases 12.119–12.137, plus 12.246–12.248 and
+ * 12.364, which later rounds added here.
  *
  * Task 9 also owns 12.154–12.155, and they are deliberately NOT here: they pin
  * RECORDED hazards (behaviour nobody wants, deleted when their owner fixes it)
@@ -25,11 +26,30 @@ import { workflowVersionsOf } from '../src/replica/local-deps.js';
  *
  * This line said `12.119–12.132` from the task's first commit through the round
  * that added 12.133–12.135 and the one that added 12.136–12.137: a range in a
- * docblock is a fact about a moment, and nothing recomputes it. Enumerated, not
- * counted — `grep -nE "^[[:space:]]*it\(" test/replica.test.ts` prints NINETEEN
- * declarations, one per id 12.119–12.137, and the runner's own line reads
- * `Tests 20 passed (20)` because 12.132's `it` sits inside a two-zone loop and
- * executes twice.
+ * docblock is a fact about a moment, and nothing recomputes it. **And it went
+ * stale twice more while saying so** — first when 12.246–12.248 landed in this
+ * file (the P36 client half), which the sentence below never admitted, and then
+ * when 12.364 closed 12.16's `workspace_seq` half. The lesson is the one the
+ * paragraph already taught and did not survive: a number in prose needs a
+ * reader who recounts, not a better number.
+ *
+ * Recounted at the commit that added 12.364, with the command this docblock
+ * has always stated: `grep -cE "^[[:space:]]*it\(" test/replica.test.ts`
+ * prints **23** declarations, and the runner's own line reads
+ * `Tests 24 passed (24)` — one more than the declarations, because 12.132's
+ * `it` sits inside a two-zone loop and executes twice. The ids declared at an
+ * `it(` head are 12.119–12.131, 12.133–12.137, 12.246–12.248 and 12.364 —
+ * twenty-two ids across twenty-three heads, the twenty-third being 12.132's
+ * two-zone loop, which carries its id inside the loop rather than in the head
+ * and is why the runner's 24 exceeds the 23 declarations.
+ *
+ * A first draft of THIS paragraph also excluded 12.127, and summed to 22
+ * against its own measured 23. The cause outlives the correction: the
+ * enumeration came from a grep requiring a SINGLE quote after `it(`, and
+ * 12.127's title contains an apostrophe, so it is written `it("12.127 …")`.
+ * **A recount that does not reconcile with its own total is not a recount** —
+ * and this one was caught by a reviewer, in a paragraph whose entire thesis is
+ * that a number in prose needs a reader who recounts.
  *
  * ## `to` versus `toStateId`, and please do not "reconcile" them
  *
@@ -1121,6 +1141,71 @@ describe('12.136–12.137 the bootstrap door carries the same two rules the stre
     // ticket's state.
     expect(ticket?.confirmed?.transitions).toEqual([
       { toStateId: 'doing', actorId: USER_A, seq: 3, workflowId: WF, workflowVersion: 1 },
+    ]);
+    await storage.close();
+  });
+});
+
+describe('12.364 the local ledger stores both sequences it was handed', () => {
+  /**
+   * 12.364 — THE LOCAL LEDGER STORES THE `workspaceSeq` IT WAS HANDED, and the
+   * half of 12.16 that had no assertion.
+   *
+   * 12.119/12.121/12.137 cover the fold, the beside-not-inside property and the
+   * per-entity `seq` round-trip. The stream position did not: **a mutation
+   * writing a constant 0 into the `workspace_seq` column left the whole suite
+   * green.** `insertEnvelope`'s own docblock states the property — *a replica
+   * stores exactly what arrived; inventing a stream position for a row that was
+   * handed one would be the quietest possible lie about ordering* — and until
+   * now nothing held it to that.
+   *
+   * ## Why this reads `listEntityEvents` and NOT `ticketHeadSeq`
+   *
+   * `ticketHeadSeq` is `SELECT MAX(workspace_seq)`, so a constant 0 collapses it
+   * too and a red arriving that way could not distinguish *the row stored the
+   * wrong position* from *the aggregate collapsed*. A mutation that does not
+   * identify its own site is the failure mode this file has paid for before.
+   * So the assertion is on the read path that maps the column straight back
+   * (`rowToEnvelope`), one row at a time.
+   *
+   * ## The two premises, asserted rather than assumed
+   *
+   * The expected values are the ENVELOPES' OWN — copied off the objects handed
+   * to `applyServerItem`, never recomputed here (P36/P37.2's discipline: the
+   * value under test may not be re-derived by the test). That alone is not
+   * enough, because `workspaceSeq` and `seq` could coincide and then a mutation
+   * writing `seq` into the column would pass. So:
+   *
+   * 1. `workspaceSeq !== seq` on both events — the helper's `streamCounter` is
+   *    shared across the whole file and never reset, so the two genuinely
+   *    diverge, but that is a property of today's fixture and is therefore
+   *    checked, not trusted.
+   * 2. `workspaceSeq > 0` — without it the constant-0 mutation could pass on a
+   *    fixture that happened to hand in 0.
+   *
+   * *Mutation: `env.workspaceSeq` → `0` in `insertEnvelope` → red here. The
+   * measured count is at the case in `test-cases/12`.*
+   */
+  it('12.364 the local ledger stores the workspaceSeq it was handed, not one it computed', async () => {
+    const storage = createBetterSqliteStorage();
+    const replica = await seededReplica(storage);
+    const first = created(TICKET, 'Positioned on the stream', PROJECT, 1);
+    const second = transitioned(TICKET, 'doing', 2);
+    await replica.applyServerItem(first);
+    await replica.applyServerItem(second);
+
+    // Premise 1: the stream position is not the per-entity seq, so a mutation
+    // writing `seq` into the column cannot pass this case.
+    expect(first.workspaceSeq).not.toBe(first.seq);
+    expect(second.workspaceSeq).not.toBe(second.seq);
+    // Premise 2: it is not 0 either, so the constant-0 mutation cannot pass.
+    expect(first.workspaceSeq).toBeGreaterThan(0);
+    expect(second.workspaceSeq).toBeGreaterThan(first.workspaceSeq);
+
+    const stored = await replica.listEntityEvents(TICKET);
+    expect(stored.map((e) => ({ id: e.id, seq: e.seq, workspaceSeq: e.workspaceSeq }))).toEqual([
+      { id: first.id, seq: first.seq, workspaceSeq: first.workspaceSeq },
+      { id: second.id, seq: second.seq, workspaceSeq: second.workspaceSeq },
     ]);
     await storage.close();
   });

@@ -114,6 +114,25 @@ type _FramesHandled = AssertTrue<ServerStreamFrame['type'] extends HandledFrameT
  * ruling defers replacing, and moving it would BE that replacement. The
  * duplication is one lenient switch, and it is bounded by the compile-time link
  * above rather than by anyone remembering.
+ *
+ * ## OWNER RULE — case 12.328. A shell that injects `ws` must not answer a
+ * ## protocol ping with a TEXT frame.
+ *
+ * Same rule and same reason as `app-core/src/online/stream.ts`'s default
+ * application, and stated there at length. The platform socket answers protocol
+ * pings below JavaScript, so this transport's TEXT `{type:'ping'}` /
+ * `{type:'pong'}` arms were dead on both sides and were deleted with it.
+ *
+ * **This function is the one the repository already hands a raw `ws` socket to**
+ * — `apps/server/test/dual-client/socket-cut.test.ts:398`, via a
+ * `webSocketFactory` building `new WsWebSocket(url, …)` at `:384`. That is safe,
+ * and the reason is the whole rule: `ws` surfaces protocol pings on
+ * `socket.on('ping')`, which `WebSocketLike` does not expose, so one cannot
+ * reach this `onmessage`. What would be a live defect is a shell wiring
+ * `on('ping')` to a TEXT `{type:'pong'}` reply — `stream/routes.ts:342` answers
+ * that `bad-message`. An earlier draft of this block forbade the injection
+ * outright and would have condemned that fixture. A docblock, not a check —
+ * 12.361 records that.
  */
 export function createHttpTransport(opts: {
   /** e.g. `https://api.gisik-nokma.example` — no trailing slash. */
@@ -197,11 +216,6 @@ export function createHttpTransport(opts: {
         }
         if (raw === null || typeof raw !== 'object') return;
         const frame = raw as Record<string, unknown>;
-
-        if (frame.type === 'ping') {
-          socket.send(JSON.stringify({ type: 'pong' }));
-          return;
-        }
 
         if (frame.type === 'event') {
           if (frame.envelope === null || typeof frame.envelope !== 'object') return;

@@ -22,8 +22,13 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  * counted rather than guessed (`grep -rln 'SyncEventResult\|SyncInvalidCode'
  * --include='*.ts' packages apps`, `dist/` and `node_modules` excluded):
  *
- * - **`apps/server`: 2 files** — `sync/sync-service.ts` (the declaration and
- *   its docblock) and `sync/sync-routes.ts`.
+ * - **`apps/server`: 3 files** — `sync/sync-service.ts` (the declaration and
+ *   its docblock), `sync/sync-routes.ts`, and `test/dual-client/rig.ts` (`:36` a
+ *   type import, `:229` a return-type annotation — both CODE uses). **This
+ *   bullet said 2, and was re-signed at 2 by the change set that repriced the
+ *   fixture below** — the exact defect the next bullet congratulates itself for
+ *   catching, committed inside the paragraph that celebrates it. Re-run the
+ *   stated command before trusting either number.
  * - **`packages/sync-client`: 6 files** — this one, `engine/sync-engine.ts`,
  *   `net/http-transport.ts`, `index.ts`, `test/sync-engine.test.ts`, and
  *   `replica/sync-item.ts`. **This bullet said 5 and enumerated 5, and the
@@ -38,30 +43,44 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  *   `ingest-result.ts` already declares an `{status:'invalid'; eventId: string
  *   | null; code; message}` member of the same shape. The type has a home
  *   waiting for it.
- * - **ONE sync-client test constructs an `invalid` result, and narrowing `code`
- *   would redden it.** This bullet used to read *"No sync-client test
- *   constructs an `invalid` result at all — measured, `grep -rn "'invalid'"
- *   packages/sync-client/test` returns nothing"*, and **the commit that wrote
- *   that sentence falsified it in the same change set**: 12.169's shifted-array
- *   half constructs `{status: 'invalid', eventId: null, code: 'bad-envelope',
- *   message: 'unreadable'}`, and the stated command now returns one line, in
- *   `test/sync-engine.test.ts` (at :529 on this tree — the FILE is the durable
- *   half of that reference; the line number moves whenever the docblocks above
- *   it do, and it moved twice while this correction was being written). The conclusion goes with the premise:
- *   `'bad-envelope'` is not a member of `IngestErrorCode`
- *   (`'malformed-envelope' | 'unknown-event-type' | 'unknown-event-version' |
- *   'entity-kind-mismatch' | 'invalid-payload' | 'duplicate-event-id'`), so the
- *   narrowing is red — measured by mutation, `tsc -p tsconfig.typecheck.json`
- *   exit 2, `test/sync-engine.test.ts(529,43): error TS2322: Type
- *   '"bad-envelope"' is not assignable to type 'IngestErrorCode'` — re-run at
- *   this tree rather than carried. **The cost
- *   is one fixture edit** (pick a real code), which is still not the blocker —
- *   but it is a cost, where this bullet claimed none.
+ * - **ONE sync-client test constructs an `invalid` result, and the narrowing
+ *   NO LONGER costs it anything — the fixture edit this bullet used to price
+ *   has been PAID (case 12.327).** The history stays because this bullet has
+ *   been wrong twice, both times in the direction of understating the cost. It
+ *   first read *"No sync-client test constructs an `invalid` result at all —
+ *   measured, `grep -rn "'invalid'" packages/sync-client/test` returns
+ *   nothing"*, and **the commit that wrote that sentence falsified it in the
+ *   same change set**: 12.169's shifted-array half constructs one, in
+ *   `test/sync-engine.test.ts` (the FILE is the durable half of that reference;
+ *   the line number moved twice while that correction was being written and
+ *   twice more since — it is deliberately not repeated here). It then priced
+ *   the narrowing at **one fixture edit**, because the fixture carried the
+ *   literal `'bad-envelope'` — a code NO SERVER EMITS, which is exactly why it
+ *   was not a member of `IngestErrorCode` (`'malformed-envelope' |
+ *   'unknown-event-type' | 'unknown-event-version' | 'entity-kind-mismatch' |
+ *   'invalid-payload' | 'duplicate-event-id'`).
+ *   **That literal is gone.** The fixture takes its code from `parseEvent` —
+ *   `@gisik-nokma/domain`'s, the same function the server's ingest door calls —
+ *   so the value is whatever the real parser answers and the INFERRED type is
+ *   `EnvelopeErrorCode`, a member of `IngestErrorCode`. The narrowing therefore
+ *   compiles. **Measured, with its own positive control, not reasoned:**
+ *   replacing `code: string` below with
+ *   `code: import('@gisik-nokma/domain').IngestErrorCode` and running
+ *   `pnpm --filter @gisik-nokma/sync-client exec tsc -p tsconfig.typecheck.json`
+ *   exits **0**; the SAME narrowing with the old `'bad-envelope'` literal put
+ *   back exits **1** with `test/sync-engine.test.ts: error TS2322: Type
+ *   '"bad-envelope"' is not assignable to type 'IngestErrorCode'`. Without that
+ *   second run the exit 0 would have been indistinguishable from a typecheck
+ *   that never looked at the file. *(The old bullet said exit 2; measured here
+ *   it is exit 1. A carried exit code is a carried number like any other.)*
+ *   The lesson the bullet's own history teaches: **a cost quoted for a fixture
+ *   is a fact about that fixture's spelling, and it expires the moment someone
+ *   spells it better.**
  *
  * The blocker that remains is scope, not difficulty: the move edits a shipped
  * server module and a shipped server route from inside a client task, on a
- * branch carrying two more tasks behind it. *Owner: still open — and now with
- * an eight-file cost plus one fixture line instead of a shrug.*
+ * branch carrying two more tasks behind it. *Owner: still open — with a NINE-
+ * file cost by the stated command and, since 12.327, no fixture cost at all.*
  *
  * TWO DELIBERATE DIFFERENCES FROM THE SERVER'S DECLARATION, both widenings:
  *
