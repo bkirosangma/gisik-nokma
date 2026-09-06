@@ -4,6 +4,46 @@
 finish is here. Verify anchors with `git branch -r --contains` — empty means orphaned; `git cat-file`
 passes on orphaned commits and will lie to you.
 
+# ▶ T16 IS WRITTEN AND GATED at content commit `07ab5fa`. Review IN FLIGHT. **Plan 11 is otherwise done.**
+
+**If the session halted here, T16's work is COMMITTED AND PUSHED — do not rewrite it.** What remains is:
+read the opus reviewer's verdict, fix what it finds, re-gate, push, open the PR. If the reviewer's output
+was lost with the session, re-dispatch one over `git diff origin/main...HEAD` rather than trusting this
+file's "gate green" as a substitute — **no independent party has checked T16 yet.**
+
+| fact | value |
+|---|---|
+| branch | `exec/46-plan11-t16` from `origin/main` `fcd39e7` |
+| content commit | **`07ab5fa`** (the handoff commit sits on top; read the head with `git rev-parse HEAD`) |
+| gate | **30/30 · 0 cached · 1m57.32s · node v22.22.2 · 285 files / 3655 passed / 5 skipped · Unsupported engine 0 · no orphans** |
+| `check:env` | **`CHECK_ENV_EXIT=0`** |
+| `check-case-ids` | **ok**, 1590 ids, highest 13.203 |
+| `check:runbook` | **ok**, all 12 resolve *(NEW in T16, its own CI step)* |
+| §13 | used through **13.195. Next free: 13.196.** |
+| PR | **NOT OPENED YET** |
+
+## What T16 landed
+
+1. **`docs/runbook.md`** — deploy, the three Asia/Kolkata settings, rotation, backups, orphan sweep,
+   restore drill, seeding, incidents.
+2. **`scripts/check-runbook-commands.mjs`** + root `check:runbook` + a step in `ci.yml`'s `check-env`
+   job — **the only falsifiable thing about a runbook**: every command it names must resolve. Self-tests
+   against 4 planted defects and 3 known-good before it will report clean; proven against the REAL
+   runbook by restoring the `ops:sweep-orphans` ghost, which reddens it naming the site.
+3. **`verify-projections.ts` now reads `DATABASE_URL` directly.** It used to call `loadConfig`, demanding
+   `BETTER_AUTH_URL` + `BETTER_AUTH_SECRET` + `WEB_ORIGIN` — none of which it reads — so the runbook's
+   own restore-drill step 4 answered `ConfigError`. **A drill nobody can run is not a recovery procedure.**
+4. **THE DDL DECISION IS DISCHARGED** (carried since seam 1) in `docs/runbook.md` AND
+   `deploy/do/README.md`: the verifier runs only against restore scratch databases, never production, and
+   no DDL credential is added — it detects drift by rebuilding and diffing, so against production it would
+   rewrite the rows it judges. **Cost recorded with it:** production drift surfaces only at the next
+   monthly drill, so the exposure window is up to a month.
+5. `Features.md` §13 intro reconciled (it claimed the runbook's gate was "NOT cleared") + two bullets;
+   cases **13.190–13.195**.
+
+**Two ghosts the first draft carried, both now fixed and both the reason (2) exists:** `ops:sweep-orphans`
+has never existed (the script is `sweep:orphans`), and the restore drill's step 4 could not run at all.
+
 # ▶ WHERE THIS LANE IS: T13 IS MERGED. **T16 IS THE ONLY THING LEFT IN PLAN 11.**
 
 | fact | value |
