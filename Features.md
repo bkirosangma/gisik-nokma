@@ -780,6 +780,15 @@ reason on record, not an oversight:*
   `error.code` stays the one open stream divergence (client `string`, server `StreamErrorCode`); it is
   named rather than pinned, because no case here ever asserted it.
   `apps/server/test/integration/client-contract.test.ts`
+- ⚙️ **Fixture witnesses — the real client stack against the real routes.** A second integration file
+  beside the contract suite, for fixtures whose protocol was authored alongside their consumer. Each
+  case runs the SHIPPED client module (imported through the `@gisik-nokma/app-core/online` subpath and
+  executed, never restated as a literal) against the SHIPPED route via an `inject()`-backed
+  `FetchLike`, carrying the server's own values between calls. Covers the founding refusal's sentence
+  (7.221), the list route's treatment of an unrecognised cursor and the shipped paging loop
+  (12.323–12.324), and the notifications keyset cursor's value (12.325). Reading a server constant
+  into a client-side assertion is deliberately NOT counted as a witness — that agrees with source
+  text, not with a running producer. `apps/server/test/integration/fixture-witnesses.test.ts`
 
 
 ## 9. Editor, documents & attachments
@@ -1570,6 +1579,13 @@ survived a whole task.)*
   record of it is the outbox stub. *What is permanent is the non-delivery, not any cursor lag — an
   earlier version of this bullet said the cursors stay one behind the head for good, and the next
   visible event moves them past.*
+- ⚙️ **The fixture-mirror inventory.** 157 fixtures across `app-core`, `sync-client`, `apps/web`,
+  `apps/server` and the periphery, each classified against the producer it models: 80 MIRROR (a
+  protocol owned elsewhere, with no round trip pinning it), 24 WITNESSED, 53 N.A. (the fixture
+  implements an interface its own package owns). The discriminator is whether some OTHER process
+  authoritatively defines the shape the fixture encodes. Recorded in `docs/lanes/executor-state.md`
+  with owners; the buildable subset is witnessed by the file above, and the rest carry ❌ cases
+  (12.326–12.328) naming what remains unwitnessed and why.
 
 ## 10. Workflow builder & ticket types
 
