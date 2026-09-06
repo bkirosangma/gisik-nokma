@@ -471,9 +471,9 @@ restored; `git diff -- packages/app-core/src/online/mappers.ts` clean afterwards
 - 7.247 ❌ **`packages/app-core/test/online/mappers.test.ts:958,1116` USE `'state-machine'` AS A CONTEST'S RULE, AND NO PRODUCER EMITS IT.** Swept across all four `src` trees with a fabricated control in the same run: zero files. **Deliberately filed one severity BELOW 7.246 and below `'bad-envelope'` (12.327), and the difference is not cosmetic:** `mapMyWork` and `mapAttention` carry a contest's `rule` through opaquely and nothing branches on it, so this pins no discriminant — it is a fixture-REALISM defect, a body modelling a value production cannot produce. The real values in that slot are the rule the original claim was refused under (`restrict-to`, `hierarchy.rank`, …). Smoothing it together with 7.246 would overstate it; leaving it out would repeat the mistake that made this whole cluster necessary. *Owner: whoever owns `mappers.test.ts`'s contest fixtures.*
 - 7.248 ❌ **THE `rule: 'restrict-to'` LITERALS IN `packages/sync-client/test` ARE THE SAME MIRROR, IN ANOTHER LANE'S PACKAGE.** **AND THE COUNT IS ONE, NOT FIVE — this row said five and review reduced it to one, which is the correction worth more than the row.** Re-read individually: `precheck.test.ts:284` asserts `{queued:false, rule:'restrict-to'}` where the value comes from the **REAL engine** (`buildLocalEngineContext` → `evaluateEvent` → `evaluateRestrictTo` → `REFUSAL_RULES.restrictTo`) — that is comparison form (1) against a running producer, the GOOD form, and "un-literalling" it would convert a valid check into exactly the self-comparison this block's standing rule forbids. `outbox.test.ts:206` and `:357` are `applyResult(...)` **inputs**: the rule value is stimulus, never asserted, and importing a constant there changes nothing measurable. Only `replica.test.ts:307` (planted in `contestOf`) read back at `:353` is the mirror this row describes. **A grep count is not an addressable count, and this row made the same mistake it flags in `'restrict-to'`'s and `'require-different-user'`'s headline numbers — recorded rather than quietly corrected, because it is the third instance in one pass.** Deliberately NOT taken either way: another lane's package, and the instinct to fix what you find is the one that hides compounds. The producer behind all four is witnessed at 7.242. *Owner: Lane B, for `replica.test.ts:307` alone.*
 
-> **MUTATION STATUS FOR 7.238–7.242 — NINE KILLS, EVERY BLAST RADIUS 1, EVERY RED AN
-> `AssertionError` FROM THE CASE'S OWN `expect`.** None died at a `MappingError` shape gate and none
-> was grey. Each was written down with its prediction BEFORE it ran; all nine matched. Run serially
+> **MUTATION STATUS FOR 7.238–7.242 — TWELVE KILLS, EVERY RED AN
+> `AssertionError` FROM THE CASE'S OWN `expect`.** Nine before the review fix round, three after it.
+> None died at a `MappingError` shape gate and none was grey. Each was written down with its prediction BEFORE it ran; all nine matched. Run serially
 > inside one lock acquisition against `apps/server/test/integration/fixture-witnesses.test.ts`
 > (25 tests), `packages/rule-engine` rebuilt after every apply **and after every restore** — see the
 > contaminated run below for why the second half of that sentence is not optional. Restores verified by
@@ -520,6 +520,28 @@ restored; `git diff -- packages/app-core/src/online/mappers.ts` clean afterwards
 > code.** Re-run with a rebuild first: 7.241 alone. *The repo's own rule — "rebuild again after
 > restoring or you leave a mutated dist for the next agent" — was written down before this battery and
 > still cost a run; a conditional rebuild is the shape that defeats it.*
+>
+> **THREE MORE AFTER THE REVIEW FIX ROUND, and the first of them is the fix's own evidence.**
+>
+> - **M4 RE-RUN, and its blast radius moved from 1 to 2 — 7.238 AND 7.239.** The mutation is unchanged;
+>   the cases are not. Before the fix round 7.238 asserted no `reason` at all, so a mutation to the
+>   template BOTH arms build from could only reach the reparent case. **The battery said review finding
+>   1 out loud and nobody read it that way** — "M4 kills 7.239 alone" was recorded as a clean blast
+>   radius rather than as the absence it actually was. *A blast radius smaller than the mutation's
+>   reach is a fact about the CASES, not about the code, and this one named a hole.*
+> - **M10** (NEW) `rules/restrict-to.ts` — the refusal sentence loses its `and ${env.actorId} is not
+>   among them` clause → **7.242 alone**, at the full-sentence `toBe`. **The old `toContain('admin')`
+>   would have SURVIVED this**, because `admin` stays in the allowed clause. That line was the one the
+>   implementer named as least certain and the reviewer confirmed; this is the mutation that shows the
+>   replacement earns its place, and nothing in the first battery touched 7.242's reason at all.
+> - **M11** (NEW) `builder-reads.ts`'s `refuse()` gains a `message` key beside `reason` → **7.241
+>   alone**: `expected { status: 'refused', …(3) } to not have property "message"`. That guard is what
+>   keeps `refusalText` on its SECOND branch; without it the case stays green while silently becoming a
+>   duplicate of the first-branch cases 7.221/7.235 — the disguise 7.236 records one cluster earlier.
+>
+> **Every mutation from M4-again onward rebuilds `rule-engine` UNCONDITIONALLY after each apply and
+> each restore.** The conditional rebuild is what produced the contaminated run above; removing the
+> condition is cheaper than reasoning about which package a mutation travels through.
 
 
 ### Mutation results for 7.163–7.198 — the CASES each kills, never the count
