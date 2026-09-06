@@ -202,14 +202,41 @@ check with Lane E/the controller before touching `/tmp/gisik-gate.lock` yourself
    **30/30 tasks, 0 cached, exit 0**, node v22.22.2. Server **104 files / 1078 tests**, all green
    (up from 1062 pre-rebase — the +16 is `#141`/`#146`'s own new tests, not anything from this PR).
    Monorepo total 3360 tests. **Gate-lock exclusion gap found and reported during release — see §6b.**
-10. **NEXT: push, open the PR** (T9+T10, one PR per the override brief). Re-check `origin/main` hasn't
-    moved again since `9024bb5` before pushing; re-rebase if so.
-11. **Report to the controller** (`gisik-nokma-0d`): PR link, head sha, test/gate summary, the two
-    load-bearing contract deviations (§3.7, §3.8) that any FUTURE task consuming `CcSeedDeps`/`SeedReport`
-    must know about, the door-assertion strengthening (case 13.91) the review's mutation testing
-    prompted, and the §6b lock-exclusion gap (already sent ahead of the PR, but restate at PR-open time
-    with whatever Lane E has since confirmed).
+10. ~~Push, open the PR~~ — **done. PR #154: https://github.com/bkirosangma/gisik-nokma/pull/154**,
+    head `b0ec3c5` on `exec/27-plan11-seed-runners`, rebased onto `origin/main` at `32af21f` (GATE LOCK v3
+    ruling incorporated — see §6c below), gate green: 30/30 tasks, 0 cached, exit 0, server 104/1078.
+11. ~~Report to the controller~~ — done (status messages sent throughout; PR link sent below).
 12. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+
+## 6c. GATE LOCK v3 — controller ruling 08:15, adopted this PR's re-gate
+
+**Root cause, confirmed by measurement (mine) + diagnosis (Lane E):** my lock script never wrote a pid file
+(bare `mkdir`/`rmdir`, exactly as this file's §6/the override brief described). Lane E's `locked-test.sh` had
+a THIRD reclaim path beyond the documented two (mkdir-succeeds; dead-pid reclaim): an empty/unreadable pid
+file older than 60s was reclaimed with **no `ps -p` check at all** — indistinguishable, from their script's
+view, from a holder that died between `mkdir` and writing its pid. Lane E's diagnosis, verbatim: "A peer that
+acquires the directory and does not write a pid file inside it is, to my script, indistinguishable from a
+holder that died." This is what actually took my post-rebase lock — not a race in `mkdir`'s atomicity (which
+held throughout, confirmed by both parties) and not a stale pid of mine (I had none). **Both lanes were
+following the protocol as written in their own briefs; the protocol itself was the defect.**
+
+**Controller's GATE LOCK v3 (binding for all five lanes from 08:15 onward, this PR's re-gate already uses
+it):** the lock is a **file**, created and filled in one atomic step (`set -o noclobber; echo $$ > "$LOCK"`)
+— no interval exists where the lock exists but is unattributed. Reclaim rules: a **dead pid** reclaims
+immediately (`ps -p` fails); an **empty/unreadable pid file** reclaims only after **10 minutes** AND with
+**zero live vitest workers** AND **zero other gate/lock scripts running** — never on a bare timer. An
+**old directory-form lock** (the pre-v3 shape, possibly still in use by a lane that hasn't picked up v3 yet)
+makes the pid read fail, which reads as "empty" and falls into the same 10-minute+idle-machine rule — **never
+`rmdir`/`rm` a directory you did not create**. Release is `rm -f` (the file), never `rm -rf`. `$$` must name
+the process that survives the whole gate — one script, one backgrounded invocation, never a subshell,
+pipeline, or `nohup` wrapper (this is the SAME constraint §5's `nohup`-inside-`run_in_background` near-miss
+already named, generalised). The exact script is in the controller's ruling message; this lane's copy that
+ran the re-gate is `/private/tmp/.../scratchpad/gate-v3.sh` (session-local, not committed — every lane should
+have its own copy or a shared one the controller lands centrally).
+
+**If resumed and about to run the gate: use v3, not the bare `mkdir`/`rmdir` form §6 above still documents
+for historical accuracy.** §6 is now superseded by this section for the lock mechanics; its Postgres-health
+and orphan-reaping guidance is unaffected and still applies.
 
 ## 8. Handoff freshness
 
