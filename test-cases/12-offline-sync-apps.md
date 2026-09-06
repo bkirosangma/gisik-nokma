@@ -2092,32 +2092,37 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
 Raised by the branch review, survived adversarial refutation, ruled the same hour. **This lane's block
 12.290–12.319, controller-allocated after 12.260–12.289 was exhausted.**
 
-- 12.290 ❌ **A BACKFILL LARGER THAN THE SLOW-CONSUMER BUDGET WEDGES THE SUBSCRIBER PERMANENTLY.**
-  *Recorded with the mechanism spelled out, because the obvious repair is unsafe and someone will reach
-  for it.* Every backfilled envelope is at or below `afterSeq`, so **none of them moves a cursor**, and
-  the only envelope that does — the trigger — is yielded AFTER the whole subtree's history. `hub.ts`'s
-  `send` closes a socket `1013 slow-consumer` above `maxBufferedBytes` and detaches; no `caught-up` is
-  sent; `createSyncEngine` persists its cursor ONLY in `onCaughtUp`; `app-core`'s
-  `lastSeq = Math.max(…)` cannot move on envelopes below its own `afterSeq`; and `needsBootstrap`
-  refuses to re-bootstrap over a local baseline. **So the client reconnects at the same cursor, is
-  handed the identical burst, and is cut short again — silently, and for as long as the ledger stands.**
-  A second, independent half: `readEntityEvents` runs with the default `afterSeq = 0` and
-  `check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so
-  one authorised member can re-issue it and make the server re-walk and re-stream a subtree to every
-  subscriber, per commit.
-  **⚠️ DO NOT CLOSE THIS BY YIELDING THE TRIGGER FIRST.** The cursor would advance before the burst, and
-  it is UNSAFE: `ticket.reparented` IS folded, so a client that never held the ticket replays a
-  transition with no `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, a
-  worse failure than the one it fixes. Measured before the option was proposed.
-  *Not asserted, on 6.104's own reason: a test pinning the wedge hardens the half this branch wants
-  closed.* **Owner: closure 5b item (d)** — make the grant side PULL-shaped and client-presented, the
-  same principle as the narrow side: the hub pushes a bounded NOTICE (the trigger plus the ids it newly
-  admits), and the client pulls each ticket it does not hold through the per-ticket bootstrap door
-  before applying the trigger. A cut-short session then resumes by pulling what it still lacks — no
-  wedge and no per-subscriber server state — and the refold hazard above closes as
-  "bootstrap-before-apply on any event for an entity not held", which is the rule a replica needs for
-  `ReplicaGapError` anyway. **This case flips ❌ → ✅ only when a slow-consumer close MID-PULL is
-  followed by convergence on reconnect** — never on an assertion about the notice alone.
+- 12.290 🟡 **THE MECHANISM IS GONE; THE CONVERGENCE IT ASKED FOR IS STILL NOT MEASURED.**
+  *(Was ❌, owner closure 5b(d). Closure 5b removed the wedge and DELIBERATELY DOES NOT FLIP THIS TO ✅.)*
+  **What changed:** the grant side no longer streams history at all — `grantNoticeFor` returns ids and
+  `visible-events-for.ts` yields ONE bounded `reach-granted` frame — so the atomic non-progressing burst
+  the wedge was made of does not exist. A list of ids is a list of ids however long the histories behind
+  it are.
+  **Why this is 🟡 and not ✅, which is the honest half.** The ruling's own flip condition was *"a
+  slow-consumer close MID-PULL followed by convergence on reconnect"*, and **nothing on this branch can
+  cut a socket**: the dual-client rig has no socket by construction (`openStream` throws, deliberately,
+  so a scenario cannot believe a subscription exists), and the engine's socket tests use a fake transport
+  with no buffer bound. So the re-delivery chain — notice carries no cursor → `onCaughtUp` never fires →
+  reconnect at the same cursor → `visibleEventsFor` re-yields the trigger and regenerates the notice —
+  is argued from the code and **measured only link by link**, never end to end. *Flipping this on the
+  strength of "the burst is gone" would be exactly the move 12.274's own history warns about: the mirror
+  half was once called "partly discharged" on a reading, and that claim had to be withdrawn.*
+  **What IS measured instead**, and it is the property that makes the wedge unreachable rather than
+  merely smaller: a failed or timed-out pull leaves its id in a DURABLE pending set and the next
+  catch-up retries it (12.306), and an unsettling pull is abandoned rather than parking the apply chain
+  (12.308). Convergence after an interruption therefore does not depend on the notice arriving twice —
+  which matters, because `net/http-transport.ts`'s frame dispatch is an if/return ladder with no
+  trailing branch and an unrecognised frame is dropped in silence.
+  **The residual kept from the old entry, because it is unchanged:** `check-permission.ts` still does not
+  refuse a `visibility.set` that sets the mode a ticket already has. What changed is the cost of one — a
+  client that already holds the subtree now does no work for it (12.276), so the amplifier is bounded by
+  HOLDINGS rather than by trust in the permission check.
+  **⚠️ THE OLD WARNING STILL APPLIES to anyone restoring a push shape:** do not yield the trigger first.
+  `ticket.reparented` IS folded, so a client that never held the ticket replays a transition with no
+  `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, worse than the failure it
+  fixes. *Owner of the remaining measurement: unassigned — it needs a harness that can cut a socket
+  mid-drain, which no lane has built.*
+
 - 12.291 ✅ **The walk is capped at `GRANT_BACKFILL_MAX_TICKETS` (200) — P37.1's interim guard, and not
   its fix.** Fixture is OVER the cap by two, all direct children of one parent so the whole excess sits
   in a single breadth-first frontier. Asserts the touched-ticket count is **EXACTLY** the cap — not
