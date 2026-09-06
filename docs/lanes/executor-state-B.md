@@ -191,6 +191,35 @@ a slow-consumer close mid-pull is followed by measured convergence.
 
 ---
 
+## ⚠️ THE FINDING A REVIEWER SHOULD AIM AT FIRST — the grant half does not close 12.274 alone
+
+**Found by the agent rewriting 12.275, and it would otherwise have shipped as a green test.**
+
+The client's notice filter is *"do I hold this ticket"* (`applyInstruction`'s `reach-granted` arm asks
+`getTicket(id) === null`). **A device can hold a STALE PARTIAL copy** — a narrowing purges nothing,
+because the per-event walk was struck on 6.101 and 6.104 is the disclosed residual, both deliberate. So
+in 12.274's own script the re-widening's notice names a ticket the client "holds", nothing is fetched,
+and the divergence survives wearing closure 5's clothes. **A straight port of the old case would have
+been green and false.**
+
+**What actually closes it is BOTH halves of closure 5, in the order `onCaughtUp` runs them:** `reconcile`
+purges the stale copy first, and only then does a notice find a ticket the device does not hold. The
+narrow half is not an independent feature shipping alongside the grant half — it is a PRECONDITION of the
+grant half converging. Now written into `grant-backfill.ts` rather than left to be rediscovered.
+
+**The residual, disclosed rather than escalated** (it is the same family as 6.104, and P37.1 already
+accepted "what a truncated client loses is history it did not have a moment ago"): `reconcile` is bounded
+by `RECONCILE_MIN_INTERVAL_MS`, so a narrow-and-re-widen inside that window of the last automatic
+reconcile leaves the stale partial copy with no repair — the notice is spent, and the next reconcile will
+not purge a ticket the device may now legitimately see. **12.274's defect at reduced width: bounded in
+time where it used to be permanent and unconditional.** *Owner: unassigned.*
+
+**Both obvious repairs are worse and are named in the source so nobody spends the round.** Dropping the
+holdings filter closes this and reopens the amplifier the filter exists to bound (`check-permission.ts`
+does not refuse a no-op `visibility.set`). Moving the filter from record-time to drain-time does not help
+either: the drain that matters runs inside `applyOne`, ahead of the trigger, which is where the refold
+hazard requires it — and that is before any reconcile in the same catch-up.
+
 ## FOUR THINGS CLOSURE 5b LEARNED THE HARD WAY — all four will recur
 
 1. **`git add -A` WITH SUBAGENTS RUNNING COMMITS THEIR WORK-IN-PROGRESS UNDER YOUR MESSAGE.** Two
