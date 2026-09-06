@@ -897,13 +897,20 @@ describe('GET /v1/me/work vs MyWorkView', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { groups: Record<string, unknown> };
 
-    // `view-types.ts:157` — `MyWorkView = {assigned, inTransit, contested}`.
+    // `view-types.ts` — `MyWorkView = {assigned, inTransit, contested}`.
     // This is not a rename: the server groups by STATE CATEGORY and the client
-    // groups by CLAIM STATUS. `inTransit` is the replica's outbox, which a
-    // server by definition has not received; `contested` comes from a DIFFERENT
-    // shipped route — `GET /v1/contests` — which is why the two absences about
-    // it are cross-checked against that body in 7.208 and not against this one.
-    // So one axis cannot be computed from the other at all.
+    // groups by CLAIM STATUS, so one axis cannot be computed from the other.
+    //
+    // **The sentence that used to follow was retired by ruling P40** and is
+    // restated rather than dropped, because it is the sort a maintainer
+    // reasons from: it said `contested` "comes from a DIFFERENT shipped route —
+    // `GET /v1/contests`". It comes from THIS one now, as a top-level key
+    // beside `groups`, because "my contested claims" is viewer-scoped and only
+    // the server knows the viewer. `/v1/contests` still serves the contests a
+    // viewer may SEE — a different question, still measured in 7.208.
+    //
+    // `inTransit` remains on neither: it is the replica's outbox, which a
+    // server by definition has not received.
     expect(Object.keys(body.groups).sort()).toEqual(['active', 'open', 'terminal']);
     for (const clientKey of ['assigned', 'inTransit', 'contested']) {
       expect(body.groups).not.toHaveProperty(clientKey);
@@ -926,14 +933,46 @@ describe('GET /v1/me/work vs MyWorkView', () => {
     expect(card).toHaveProperty('projectId'); // control
     expect(card).toHaveProperty('stateId'); // control
 
-    // 7.205 — the refusal, cross-checked, for the two absences this body can
-    // speak to: `projectName` and `stateName`. `getMyWork`'s other two —
-    // `ContestedClaim.title` and `ContestedClaim.claim.serverTime` — name
-    // `/v1/contests` and are measured there, in 7.208. `inTransit` is
-    // deliberately in neither list: the web client is online-only and has no
-    // outbox, so an empty `inTransit` is the true answer rather than a degraded
-    // one, and the absence list says so by leaving it out.
-    expectStillUnserved('MAP_MY_WORK_ABSENCES', body, 'groups', '/v1/me/work');
+    // 7.205 — INVERTED. This asserted `MAP_MY_WORK_ABSENCES` was still unserved
+    // against this body. `getMyWork` refuses over nothing now (rulings P39 and
+    // P40), so the cross-check has no absence list to measure and the case
+    // pins what replaced it — the same duty pointed at the serving.
+    //
+    // The two NAMES the client needs are here, in sibling maps rather than on
+    // the card: `TicketCard` is shared by the board, search and the attention
+    // strip, and putting a name on it would move a visibility decision onto
+    // three routes that never asked the question. That is why the assertions
+    // above — no `projectName`, no `stateName` ON THE CARD — are still correct
+    // and are NOT a refusal any more.
+    const full = res.json() as Record<string, unknown>;
+    expect(Object.keys(full).sort()).toEqual([
+      'contested',
+      'groups',
+      'projectNames',
+      'stateNames',
+      'workspaceId',
+    ]);
+    // `stateNames` is documented TOTAL over the cards in `groups`, and totality
+    // is the property a client depends on — `WorkItem.stateName` is required,
+    // so a single missing key is a mapping failure. Asserted by enumeration
+    // rather than by a count, and with the value pinned: a map that answered
+    // the state ID would satisfy a presence check.
+    const cards = Object.values(full['groups'] as Record<string, Array<Record<string, unknown>>>)
+      .flat();
+    const stateNames = full['stateNames'] as Record<string, string>;
+    expect(cards.length).toBeGreaterThan(0);
+    for (const each of cards) {
+      expect(stateNames, `no stateNames entry for ${String(each['ticketId'])}`).toHaveProperty(
+        String(each['ticketId']),
+      );
+      expect(stateNames[String(each['ticketId'])]).not.toBe(each['stateId']);
+    }
+    // And `contested` is a key on this body now, which is the half of ruling
+    // P40 this route owns. Its CONTENT — the claimant filter and the canSee
+    // gate on the title — is measured in the my-work route's own tests, where
+    // a second user and a narrowed audience can be seeded.
+    expect(full).toHaveProperty('contested');
+    expect(Array.isArray(full['contested'])).toBe(true);
   });
 });
 
@@ -1336,24 +1375,50 @@ describe('GET /v1/workspaces/:ws/attention vs AttentionItem', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { items: Array<{ kind: string }> };
 
-    // `AttentionKind` (`view-types.ts`) has FOUR members and this strip can
-    // emit three. That is not a shape a mapper can adapt: it is the difference
-    // between "nothing is contested" and "nobody looked".
-    expect(body.items.every((item) => item.kind !== 'contested')).toBe(true);
+    // **THIS BODY IS EMPTY, and the assertion that used to stand here could not
+    // fail.** It read `body.items.every((item) => item.kind !== 'contested')`,
+    // which is vacuously TRUE for `[]` — this fixture seeds nothing blocked,
+    // nothing stale and nothing due soon, so the strip has always answered
+    // `{items: []}` here and the case has always passed without observing a
+    // single item. Found by adding a non-vacuity line to it, which failed.
+    //
+    // It is REPLACED rather than propped up with a seeded item: the population
+    // claim is already made non-vacuously in `test/routes/attention.test.ts`,
+    // which asserts the exact id sets for all three kinds against real blocked,
+    // stale and due-soon fixtures (its 7.114-7.116 group). Seeding a fourth
+    // copy here would be a second fixture for a property that file already
+    // owns, and this file's job is the CLIENT CONTRACT — the shape a mapper
+    // reads — not the sweep's arithmetic.
+    //
+    // So what is pinned here is the envelope the mapper destructures, which
+    // this body really does carry.
+    const shape = res.json() as Record<string, unknown>;
+    expect(Object.keys(shape).sort()).toEqual([
+      'generatedAt',
+      'items',
+      'settings',
+      'workspaceId',
+    ]);
+    expect(Array.isArray(shape['items'])).toBe(true);
 
-    // **CORRECTED 2026-09-02.** This case used to pin `routes/attention.ts`'s
-    // SOURCE — "it never mentions proj_contested" — with the refusal's `wireKey`
-    // at `null`. Both were true and both aimed at the wrong file: `GET
-    // /v1/contests` shipped (`src/sync/contests-route.ts`, registered in
-    // `app.ts`), gated per row by `canSee` and queryable by workspace, so the
-    // fourth kind is a client-side JOIN away and this route owes nothing. The
-    // strip staying three-kinded is a fact about THIS route and is still pinned
-    // above; what the refusal is about now lives in 7.208, against the body that
-    // would close it.
-    const absences = mapperAbsences('MAP_ATTENTION_ABSENCES');
-    expect(absences.map((absence) => absence.wireRoute)).toEqual(['/v1/contests']);
-    expect(absences.map((absence) => absence.wireKey)).toEqual(['title']);
-    expect(absences[0]?.field).toContain('contested');
+    // **CORRECTED TWICE, and the second correction is this one.** It first
+    // pinned `routes/attention.ts`'s SOURCE — "it never mentions
+    // proj_contested" — which aimed at a file that owed nothing. It then pinned
+    // `MAP_ATTENTION_ABSENCES`, which ruling P40 DELETED when `/v1/contests`
+    // grew the title. So the source-text read is gone and what remains is the
+    // fact about THIS route, which has not changed through either correction:
+    // the sweep emits three kinds and the fourth is somebody else's to supply.
+    //
+    // The client joins it now (`mapAttention`), so "three kinds here" is no
+    // longer a gap — it is the division of labour, and it is still worth
+    // pinning because a strip that silently grew a fourth kind HERE would mean
+    // two sources for one item type.
+    // Whatever this route ever emits, it is one of the three it sweeps for —
+    // stated as a loop so it stays true if the fixture is ever populated, and
+    // explicitly NOT relied on while `items` is empty.
+    for (const item of body.items) {
+      expect(['blocked', 'stale', 'due-soon']).toContain(item.kind);
+    }
   });
 });
 
@@ -1369,20 +1434,25 @@ describe('GET /v1/contests vs the two contested refusals', () => {
    * and out through the whole projection registry — `{contests: []}` would make
    * every "absent" assertion below trivially true.
    *
-   * Two absences, two different kinds:
+   * **Both absences this case was built on are gone, and they went different
+   * ways** — which is the reason it is inverted rather than deleted:
    *
-   * - `title` is a key the route COULD grow: `proj_contested` stores
-   *   `ticket_id`, so one join names the ticket. Whoever does that closes both
-   *   the My Work banner and the attention strip's fourth kind, and this case
-   *   goes red so they notice.
-   * - `serverTime` is not. `originalEvent` is a `SubmittedEvent` — the envelope
-   *   MINUS `serverTime` and `seq` — because the claim was refused at the door
-   *   and never committed, so the instant `ClaimProvenance` requires was never
-   *   recorded by anything. Pinned here anyway: the day a body under this route
-   *   carries one, somebody has changed what a contest is and the client's
-   *   refusal has to be re-argued rather than quietly kept.
+   * - `title` was a key the route COULD grow, and it grew it. `proj_contested`
+   *   stores `ticket_id`, so one join names the ticket; the route now serves
+   *   `title` AND `projectId` off that join, closing the My Work banner's copy
+   *   and the attention strip's fourth kind at once. This case said "whoever
+   *   does that, this goes red so they notice" — it went red, and this is the
+   *   noticing.
+   * - `serverTime` did NOT arrive and never will. `originalEvent` is a
+   *   `SubmittedEvent` — the envelope MINUS `serverTime` and `seq` — because
+   *   the claim was refused at the door and never committed. Ruling P39 closed
+   *   that absence by deleting the FIELD rather than finding the instant, so
+   *   the pin below is kept exactly as it was: the day a body under this route
+   *   carries a `serverTime` for a refused claim, somebody has changed what a
+   *   contest is, and `ContestedClaimProvenance` has to be re-argued rather
+   *   than quietly widened.
    */
-  it('7.208 carries the contest whole and still carries neither a title nor the claim’s serverTime', async () => {
+  it('7.208 carries the contest whole, now WITH a title, and still with no serverTime on the claim', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/v1/contests?workspaceId=${workspaceId}&ticketId=${ticketId}`,
@@ -1412,8 +1482,25 @@ describe('GET /v1/contests vs the two contested refusals', () => {
     // received the claim.
     expect(contest['contestedAt']).toEqual(expect.any(String));
 
-    expectStillUnserved('MAP_MY_WORK_ABSENCES', body, 'contests', '/v1/contests');
-    expectStillUnserved('MAP_ATTENTION_ABSENCES', body, 'contests', '/v1/contests');
+    // The two keys the join added, which is what un-blocked both client
+    // refusals. Values, not presence: a `title` echoing the ticket id would
+    // satisfy `toHaveProperty` and is exactly the shape the absence warned
+    // about ("a contest labelled with a title this client made up").
+    expect(contest['title']).toBe('Sweep the aisle');
+    expect(contest['title']).not.toBe(contest['ticketId']);
+    expect(contest['projectId']).toBe(projectId);
+
+    // THE EXCLUSION, same body, same run: no `serverTime` anywhere on or under
+    // the claim. This is ruling P39's own stated fixture — the mapper and the
+    // route alike must never populate one for a refused claim — and it is
+    // asserted on the ORIGINAL EVENT rather than on a client shape, because
+    // this is the only place a real wire body exists.
+    expect(original).not.toHaveProperty('serverTime');
+    expect(original).not.toHaveProperty('seq');
+    // `contestedAt` is present (asserted above) and is NOT equal to anything
+    // the claim carries, so "the contest has an instant" cannot be mistaken for
+    // "the claim has one".
+    expect(contest['contestedAt']).not.toBe(original['clientTime']);
   });
 
   /**
@@ -1437,13 +1524,15 @@ describe('GET /v1/contests vs the two contested refusals', () => {
     // two ticket routes left it with P25 clause 1: the file still FETCHES it
     // (above), and a route dropping out of the refusal set is not the same
     // claim as a route dropping out of the file.
-    const EXERCISED = ['/v1/contests', '/v1/me/work', '/v1/search'];
+    // ONE route, and it was four, and six before that. `/v1/contests` and
+    // `/v1/me/work` left this set with rulings P39 and P40 when
+    // `MAP_MY_WORK_ABSENCES` and `MAP_ATTENTION_ABSENCES` were DELETED. This
+    // file still fetches both — the cases above assert what they now serve — so
+    // a route dropping out of this set is not the same claim as a route
+    // dropping out of the file, and the two are kept apart on purpose.
+    const EXERCISED = ['/v1/search'];
     const named = new Set<string>();
-    for (const constName of [
-      'MAP_SEARCH_HITS_ABSENCES',
-      'MAP_MY_WORK_ABSENCES',
-      'MAP_ATTENTION_ABSENCES',
-    ]) {
+    for (const constName of ['MAP_SEARCH_HITS_ABSENCES']) {
       for (const absence of mapperAbsences(constName)) {
         // A `wireKey` with no `wireRoute` is a key nothing can ever measure.
         expect(

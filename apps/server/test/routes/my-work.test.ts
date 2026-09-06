@@ -786,6 +786,144 @@ describe('GET /v1/me/work — what is mine', () => {
   });
 });
 
+describe('GET /v1/me/work — my contested claims (ruling P40)', () => {
+  /**
+   * The `contested` key is the viewer's OWN refused claims, and both halves of
+   * that sentence are gated here: whose claims (7.216) and how much of the
+   * ticket they may still be told (7.217).
+   *
+   * Contests are appended in this describe rather than in the shared seed
+   * because they add no ticket rows and move no group's arithmetic — the cases
+   * above assert card counts and `ticket_id` order per viewer, and a contest
+   * touches neither.
+   */
+  const contestOn = (ticketId: string, claimantId: string, rule: string, reason: string): LedgerEvent =>
+    makeCommitted({
+      workspaceId: read.world.workspaceId,
+      actorId: read.world.owner,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'claim.contested',
+      payload: {
+        // The REFUSED envelope, whole. `claimant_id` is projected from
+        // `originalEvent.actorId` and deliberately NOT from the contest's own
+        // actor: the server files the contest, the claimant made the claim.
+        originalEvent: {
+          id: newUlid(),
+          workspaceId: read.world.workspaceId,
+          entity: { kind: 'ticket', id: ticketId },
+          type: 'ticket.transitioned',
+          version: 1,
+          payload: { toStateId: 'done' },
+          actorId: claimantId,
+          origin: 'web',
+          clientTime: '2026-08-20T09:00:00.000Z',
+        },
+        rule,
+        reason,
+      },
+    });
+
+  beforeAll(async () => {
+    await applyCommitted(db.pool, [
+      // The OWNER's own claim, on a ticket the owner can see.
+      contestOn(fx.ownerOrderIds[0] as string, read.world.owner, 'require-field', 'A due date is required before this move.'),
+      // The MEMBER's claim, on the ticket the member is ASSIGNED but may NOT
+      // SEE — the shared world's planted hidden task, explicit to the owner
+      // alone. This is 7.217's whole fixture: a contest that outlives the
+      // claimant's sight of its ticket.
+      contestOn(read.world.hiddenTaskId, read.userIds.member, 'restrict-to', 'Only the assignee may perform this transition.'),
+    ]);
+  }, 60_000);
+
+  it('7.216 THE EXCLUSION — a viewer gets their OWN contested claims and never another person’s', async () => {
+    const asOwner = await read.app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+      headers: read.authOf('owner'),
+    });
+    const asMember = await read.app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+      headers: read.authOf('member'),
+    });
+    expect(asOwner.statusCode).toBe(200);
+    expect(asMember.statusCode).toBe(200);
+    const owner = (asOwner.json() as MyWorkResponse).contested;
+    const member = (asMember.json() as MyWorkResponse).contested;
+
+    // Each sees exactly one — their own. Both halves in one run, so "the member
+    // does not see the owner's" is a distinction this filter really draws
+    // rather than an answer that is empty for both.
+    expect(owner.map((each) => each.ticketId)).toEqual([fx.ownerOrderIds[0]]);
+    expect(member.map((each) => each.ticketId)).toEqual([read.world.hiddenTaskId]);
+    // Stated as the exclusion too, because that is the sentence the mutation
+    // has to break: dropping `c.claimant_id = $2` puts BOTH rows in BOTH
+    // answers, and these two lines are what say so.
+    expect(owner.map((each) => each.ticketId)).not.toContain(read.world.hiddenTaskId);
+    expect(member.map((each) => each.ticketId)).not.toContain(fx.ownerOrderIds[0]);
+    // The claimant on the row is the CLAIMANT, not the contest's actor (the
+    // owner filed both through `makeCommitted`).
+    expect(member[0]?.claim.actorId).toBe(read.userIds.member);
+  });
+
+  it('7.217 the contested title is gated by canSee AT READ TIME — the row survives, the title does not', async () => {
+    const res = await read.app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+      headers: read.authOf('member'),
+    });
+    expect(res.statusCode).toBe(200);
+    const contested = (res.json() as MyWorkResponse).contested;
+    expect(contested).toHaveLength(1);
+
+    // The member made this claim, so the REFUSAL is theirs to see...
+    expect(contested[0]?.ticketId).toBe(read.world.hiddenTaskId);
+    expect(contested[0]?.rule).toBe('restrict-to');
+    expect(contested[0]?.reason).toBe('Only the assignee may perform this transition.');
+    // ...and the TICKET is not: it is explicit to the owner alone. Losing the
+    // row would lose the record of their own refused claim; carrying the title
+    // would disclose a ticket they may not read. So the title is null and the
+    // id is kept — the existence-without-title register.
+    expect(contested[0]?.title).toBeNull();
+
+    // Positive control, same run, different viewer: the gate really can serve a
+    // title, so `null` above is `canSee` answering rather than a route that
+    // never joins one.
+    const asOwner = await read.app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+      headers: read.authOf('owner'),
+    });
+    const ownerRows = (asOwner.json() as MyWorkResponse).contested;
+    // The seeder titles the owner's queue `Owner queue XX`. Asserted by VALUE
+    // and against the id, so a route echoing the ticket id into `title` — the
+    // exact shape the old refusal warned about ("a title this client made up")
+    // — fails here rather than satisfying a non-null check.
+    expect(ownerRows[0]?.title).toMatch(/^Owner queue /);
+    expect(ownerRows[0]?.title).not.toBe(ownerRows[0]?.ticketId);
+  });
+
+  it('7.218 the refused claim carries no serverTime, and contestedAt is the CONTEST’s own instant (P39)', async () => {
+    const res = await read.app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+      headers: read.authOf('member'),
+    });
+    const claim = (res.json() as MyWorkResponse).contested[0]?.claim;
+    // The three members the type has, and no fourth. `toEqual` on the key list
+    // rather than a `toHaveProperty` chain, so a `serverTime` smuggled in is a
+    // failure and not an unobserved extra.
+    expect(Object.keys(claim ?? {}).sort()).toEqual(['actorId', 'clientTime', 'contestedAt']);
+    // `clientTime` is the claimant's DEVICE instant, off the refused envelope,
+    // pinned to the literal the fixture sent so a substituted clock is visible.
+    expect(claim?.clientTime).toBe('2026-08-20T09:00:00.000Z');
+    // `contestedAt` is a real instant and is NOT the claim's — spending one for
+    // the other is ruling P36's option 3, refused in writing.
+    expect(claim?.contestedAt).toEqual(expect.any(String));
+    expect(claim?.contestedAt).not.toBe(claim?.clientTime);
+  });
+});
+
 describe('GET /v1/me/work — the door', () => {
   it('7.110 no session is 401, and so is a forged bearer — the session is resolved, not merely present', async () => {
     const url = myWorkUrl({ workspaceId: read.world.workspaceId });
