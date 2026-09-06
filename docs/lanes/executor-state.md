@@ -25,8 +25,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | what | value |
 |---|---|
-| branch | `exec/41-mapper-witnesses`, cut from `origin/main` **`e33c429`** (#187, Lane A's own Lane F pass) |
-| merge-base | `e33c429` — `git branch -a --contains` lists `main`, so REACHABLE, not orphaned |
+| branch | `exec/41-mapper-witnesses`, cut from `e33c429`, **now rebased onto `8373ae5`** (#190 seam 1 · #188 T18 · the ledger promotion) |
+| merge-base | **`8373ae5`** — verified with `git merge-base` after the rebase, not adopted from the cut |
+| §12 | **Freeze lifted (T18 merged), and NO §12 line is minted.** The mapper cluster is the `/v1` API contract — §7's subject — and all eight cases live there; nothing in this pass is about offline sync or the apps. Block 12.320–12.339 stays at next-free **12.329**. Declined deliberately rather than minting one to fill the offer; controller told and free to disagree. |
+| gate lock | v3.3 **corrected** form (`fork=$BASHPID` captured as its own command BEFORE the pipeline, not inline). Measured against a LIVE peer, not an idle box: it read 1, and printing the ROWS showed the match was Lane D's genuinely-running gate holding the lock with ten workers. **A matcher that reads 0 on a quiet machine has not been shown to fire at all.** |
 | node | **v22.22.2** |
 | install / rebuild / build | `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · `BUILD_EXIT=0`, **`0 cached, 10 total`** |
 | §7 ids | **7.222–7.229 minted** (eight). Next free **7.230**. Recounted at cut with both styles agreeing on 7.221 as the prior maximum. |
