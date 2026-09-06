@@ -789,6 +789,14 @@ reason on record, not an oversight:*
   (12.323–12.324), and the notifications keyset cursor's value (12.325). Reading a server constant
   into a client-side assertion is deliberately NOT counted as a witness — that agrees with source
   text, not with a running producer. `apps/server/test/integration/fixture-witnesses.test.ts`
+- ⚙️ **The mapper cluster, witnessed (7.222–7.229).** Eight further `app-core` mapper entry points now
+  execute against real `/v1` bodies over a real database: `mapActors`/`rosterByActorId`, `mapBoardView`,
+  `mapHistory`, `mapWorkflowDef`, `mapIngestResults`, `mapPreferences`, `mapMyWork`, `mapAttention`.
+  Before these, `mappers.test.ts` exercised twenty entry points entirely against hand-authored literals
+  and only two had ever seen a real body. Each case carries a producer-breaking mutation on the route
+  whose failure message names the mapper's own path, and each records what it does NOT reach — 7.227
+  witnesses the empty-preferences document only, 7.229's correct answer is an empty list.
+  `apps/server/test/integration/fixture-witnesses.test.ts`
 
 
 ## 9. Editor, documents & attachments

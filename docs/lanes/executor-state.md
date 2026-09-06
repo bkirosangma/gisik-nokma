@@ -16,7 +16,92 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR #187 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.** `exec/39-fixture-witnesses` @ `137d48a`
+# LANE A — **MAPPER-WITNESS PASS IN PROGRESS** on `exec/41-mapper-witnesses`
+
+> Re-tasked by the controller after #187 merged (`e33c429`). Closes the carried item *"no test
+> executes a mapper against a real `/v1` body — 18 of 20 entry points"* **by name**.
+
+## ANCHORS — measured on this branch
+
+| what | value |
+|---|---|
+| branch | `exec/41-mapper-witnesses`, cut from `origin/main` **`e33c429`** (#187, Lane A's own Lane F pass) |
+| merge-base | `e33c429` — `git branch -a --contains` lists `main`, so REACHABLE, not orphaned |
+| node | **v22.22.2** |
+| install / rebuild / build | `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · `BUILD_EXIT=0`, **`0 cached, 10 total`** |
+| §7 ids | **7.222–7.229 minted** (eight). Next free **7.230**. Recounted at cut with both styles agreeing on 7.221 as the prior maximum. |
+| §12 / Features.md §12 | **NOT TOUCHED, by instruction** — closed to this lane until Lane B's #188 (T18) merges. Anything §12 wants is held here and added bare afterwards. **Nothing is currently held.** |
+| open PRs at cut | **#188** only (Lane B, T18, `exec/33-plan10-t18`) — three DOCS files, no overlap with this branch |
+
+## THE EIGHT WITNESSES
+
+All appended to `apps/server/test/integration/fixture-witnesses.test.ts` (the file #187 created), in the
+7.220 shape: the REAL route through `app.inject()` over the real DB, the REAL mapper imported from
+`@gisik-nokma/app-core/online` and EXECUTED, non-vacuity asserted first.
+
+| case | mapper | route |
+|---|---|---|
+| 7.222 | `mapActors` + `rosterByActorId` | members |
+| 7.223 | `mapBoardView` | board |
+| 7.224 | `mapHistory` | ticket history |
+| 7.225 | `mapWorkflowDef` | single workflow |
+| 7.226 | `mapIngestResults` | `POST /v1/events` |
+| 7.227 | `mapPreferences` | preferences |
+| 7.228 | `mapMyWork` | `/v1/me/work` |
+| 7.229 | `mapAttention` | attention + contests |
+
+**Citations in this file name SYMBOLS, not line numbers.** Lane B re-measured a catalogue citation of
+mine ONE DAY after it merged (`sync-engine.test.ts:547` → `:625`) and it had already moved. A stale
+line number sends a reader to the wrong place and looks authoritative doing it; a symbol survives every
+edit above it. **Rule for this lane from here: cite `file` + symbol, let the reader grep.**
+
+### What the world needed, and one trap it set
+
+`beforeAll` gained an assignment (so `/v1/me/work` has a card) and DISCOVERS the founding workflow id
+through the real workflows route rather than typing one in. **The discovery was wrong on the first
+run and failed in the misleading direction:** I read the id as `workflows[0].workflowId`, but the
+domain's `workflowDefSchema` spells it `id`, so the value was `undefined`, the URL became
+`/workflows/undefined`, and the route answered **404 — which reads as "no workflow exists" rather than
+"your key is wrong."** The length assertion above it passed the whole time, because one workflow DID
+exist. Now the id is asserted to match a ULID shape before it is used, so a bad key fails as a bad key.
+
+`mapWorkflowDef` returns the DOMAIN type unreshaped (it validates and casts), so the client-side field
+is `id`, not `workflowId` — a second place the same wrong guess would have landed.
+
+## THE MUTATIONS — eight, all restored, every message naming the mapper's own path
+
+| case | mutation on the ROUTE | result |
+|---|---|---|
+| 7.222 | `members:` → `people:` | **3 failed, 9 passed** — 7.222 + 7.228 + 7.229, all `at members.members: expected an array` |
+| 7.223 | `columns` → `cols` | 1 failed, 11 passed — `at board.columns` |
+| 7.224 | `events` → `entries` | 1 failed, 11 passed — `at history.events` |
+| 7.225 | `workflow` → `definition` | 1 failed, 11 passed — `at workflow.workflow: expected an object` |
+| 7.226 | `[...results, ...results]` | 1 failed, 11 passed — `at ingest.results: expected 1 index-aligned results (got 2)` |
+| 7.227 | strip `savedFilters` | 1 failed, 11 passed — `at preferences.savedFilters` |
+| 7.228 | `projectNames` → `projects` | 1 failed, 11 passed — `at myWork.projectNames` |
+| 7.229 | `items` → `entries` | 1 failed, 11 passed — `at attention.items` |
+
+**7.222's blast radius is 3 and is recorded, not trimmed.** 7.228 and 7.229 build their roster from the
+members route before mapping their own body, so breaking it takes all three. What makes the run evidence
+about 7.222 is that every message names `members.members` — the route's own key — rather than the count.
+
+### THE MUTATION THAT WAS NOT A MEASUREMENT, and it is the more useful half
+
+7.226's first mutation renamed `results` → `outcomes`. `beforeAll`'s own `post()` helper reads that same
+key to confirm each seeded event committed, so the seed threw and vitest reported **`Tests 12 skipped
+(12)`** — no failures, no evidence, and a naive reading of "not green" as "the mutation worked" would
+have banked it. **A mutation whose blast radius is the fixture's own setup measures nothing about the
+case it was aimed at** — the same shape this repo recorded when a claimant-filter mutation left `$2`
+unbound and reddened twenty cases while identifying none. The replacement duplicates the results array:
+the seed still reads `results[0].status === 'committed'` and passes, and only the mapper's
+count check fires. **Third time in two passes that a mutation reddened or greyed without measuring its
+property.** The rule now has three instances behind it: *read WHICH assertion produced the colour before
+banking the mutation.*
+
+---
+
+# ↓ LANE A — #187 (Lane F pass) RECORD. **MERGED as `e33c429`; its position line is superseded.**
+
 
 **https://github.com/bkirosangma/gisik-nokma/pull/187** · MERGEABLE / UNSTABLE (CI in flight).
 
