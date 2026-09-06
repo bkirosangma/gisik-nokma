@@ -1118,7 +1118,7 @@ describe('the onboarding gateways and the refusal vocabulary, against real route
    * `refusalText` → `InviteAdminError.serverMessage` — over a refusal the role
    * gate really produced.
    */
-  it('7.236 a member’s mint is refused as an IngestResult and the engine’s `reason` reaches the caller', async () => {
+  it('7.236 a member’s mint is refused as an IngestResult and the ROLE GATE’s `reason` reaches the caller', async () => {
     const request = { address: 'lender@example.com', channel: 'email', role: 'member' };
 
     // NON-VACUITY FIRST, and it is what pins WHICH branch of `refusalText`
@@ -1149,7 +1149,7 @@ describe('the onboarding gateways and the refusal vocabulary, against real route
     expect(error.status).toBe(422);
     // THE SERVER'S OWN VALUE, carried between two calls to the same door.
     expect(error.serverMessage).toBe(body['reason']);
-    // And it is the engine's sentence rather than a paraphrase of it, compared
+    // And it is the ROLE GATE's sentence rather than a paraphrase of it, compared
     // against the server module's own function.
     expect(error.serverMessage).toBe(adminOnlyReason('member'));
   });
