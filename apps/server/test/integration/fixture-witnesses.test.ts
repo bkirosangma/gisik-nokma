@@ -18,6 +18,15 @@ import {
   createHttpFoundingGateway,
   createOnlineDataSource,
   FoundingError,
+  mapActors,
+  mapAttention,
+  mapBoardView,
+  mapHistory,
+  mapIngestResults,
+  mapMyWork,
+  mapPreferences,
+  mapWorkflowDef,
+  rosterByActorId,
   type FetchLike,
 } from '@gisik-nokma/app-core/online';
 import { buildTestApp } from '../helpers/app.js';
@@ -63,6 +72,7 @@ let owner: { userId: string; headers: { authorization: string } };
 let workspaceId: string;
 let projectId: string;
 const ticketIds: string[] = [];
+let workflowId: string;
 
 let phoneCounter = 0;
 async function signedIn(): Promise<{ userId: string; headers: { authorization: string } }> {
@@ -174,6 +184,35 @@ beforeAll(async () => {
     });
   }
   ticketIds.sort();
+
+  // ASSIGNED, so `/v1/me/work` has a card to serve and 7.228 is not asserting
+  // over an empty world. Assigning the LOWEST id keeps 12.324's ordering
+  // assertion (which compares against the sorted list) untouched.
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'ticket', id: ticketIds[0] as string },
+    type: 'ticket.assigned',
+    payload: { assigneeId: owner.userId },
+    actorId: owner.userId,
+  });
+
+  // The workflow id is DISCOVERED through the real route, not typed in. Founding
+  // appends a `workflow.defined` (`bootstrap-workspace.ts`'s founding sequence),
+  // so exactly one exists — asserted below, because "the first of a list" is a
+  // claim about the list's length as much as its contents.
+  const wfList = await app.inject({
+    method: 'GET',
+    url: `/v1/workspaces/${workspaceId}/workflows`,
+    headers: owner.headers,
+  });
+  expect(wfList.statusCode).toBe(200);
+  const wfBody = wfList.json() as { workflows: { id: string }[] };
+  expect(wfBody.workflows.length, 'founding must leave exactly one workflow').toBe(1);
+  workflowId = wfBody.workflows[0]?.id as string;
+  // The id is a real ULID, not `undefined` stringified into the URL — which is
+  // how this first went wrong: a bad key made the path `/workflows/undefined`
+  // and the route answered 404, a failure that looks like a missing workflow.
+  expect(workflowId, 'the founding workflow must have an id').toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 });
 
 afterAll(async () => {
@@ -389,5 +428,232 @@ describe('the notifications cursor, against the real route', () => {
     // And it is the route's DESC ordering, so "last" is the smallest id here —
     // which is what makes `id < $cursor` the right next query rather than `>`.
     expect(body.notifications[0]?.id.localeCompare(body.notifications[1]?.id ?? '')).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **THE MAPPER CLUSTER — eight entry points that had never seen a real body.**
+ *
+ * `packages/app-core/test/online/mappers.test.ts` is ~1,400 lines and exercises
+ * twenty mapper entry points **entirely against hand-authored literals**: it
+ * injects no route and builds no app. Before this file, exactly two of the
+ * twenty had ever been run over bytes a real `/v1` route emitted — `mapListPage`
+ * (7.220) and `mapTicketRead` (7.213). The other eighteen agreed with fixtures
+ * their own author wrote, which is the `pagingFetch` shape at eighteen-fold
+ * scale rather than a new problem.
+ *
+ * Each case below fetches a REAL route over the REAL database and hands the
+ * bytes to the REAL mapper. Non-vacuity is asserted first, so an empty world
+ * fails loudly instead of passing over nothing.
+ *
+ * **Citations here name SYMBOLS, not line numbers.** Lane B re-measured a
+ * catalogue citation of mine one day after it merged and found the line had
+ * already moved. A stale line number sends a reader to the wrong place and looks
+ * authoritative doing it; a symbol survives every edit above it.
+ */
+describe('the mapper cluster, against real routes', () => {
+  it('7.222 mapActors + rosterByActorId over the REAL members route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/members`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const actors = mapActors(res.json());
+
+    // NON-VACUITY FIRST: an empty roster would satisfy every `toContain` below.
+    expect(actors.length).toBeGreaterThan(0);
+    const roster = rosterByActorId(actors);
+    expect(roster.size).toBe(actors.length);
+    // The founder is IN it, by the id the server minted — not by a name this
+    // case invented.
+    expect(roster.has(owner.userId)).toBe(true);
+    expect(actors.map((a) => a.id)).toContain(owner.userId);
+  });
+
+  it('7.223 mapBoardView over the REAL board route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/projects/${projectId}/board`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const board = mapBoardView(res.json());
+
+    // NON-VACUITY: a board with no groups, or groups with no columns, would let
+    // the identity assertions below pass over nothing.
+    expect(board.groups.length).toBeGreaterThan(0);
+    const columns = board.groups.flatMap((g) => g.columns);
+    expect(columns.length).toBeGreaterThan(0);
+    // THE ROUND TRIP: the project the mapper reports is the project asked for.
+    expect(board.projectId).toBe(projectId);
+    // Every seeded ticket is on the board exactly once — the mapper's own
+    // regrouping of the route's flat `columns` must not drop or duplicate.
+    const carded = columns.flatMap((c) => c.cards.map((card) => card.ticketId)).sort();
+    expect(carded).toEqual(ticketIds);
+  });
+
+  it('7.224 mapHistory over the REAL ticket-history route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/tickets/${ticketIds[0]}/history`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const history = mapHistory(res.json());
+
+    // NON-VACUITY: this ticket was created AND assigned in `beforeAll`, so a
+    // real ledger must answer at least two events. `> 0` would be satisfied by
+    // a route that served only the creation.
+    expect(history.length).toBeGreaterThanOrEqual(2);
+    // The types are the ones the product appended, spelled as the server spells
+    // them — not a vocabulary this case chose.
+    expect(history.map((e) => e.type)).toContain('ticket.created');
+  });
+
+  it('7.225 mapWorkflowDef over the REAL workflow route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/workflows/${workflowId}`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const def = mapWorkflowDef(res.json());
+
+    // NON-VACUITY: a definition with no states is not a workflow, and every
+    // assertion about states below would pass over an empty list.
+    expect(def.states.length).toBeGreaterThan(0);
+    // The id round-trips: the definition the mapper reports is the one asked
+    // for, by the id the SERVER minted during founding. The field is `id` — the
+    // DOMAIN's spelling, since `mapWorkflowDef` validates the body and returns
+    // it unreshaped rather than renaming anything.
+    expect(def.id).toBe(workflowId);
+    // A published definition carries a version the client can compare.
+    expect(def.version).toBeGreaterThanOrEqual(1);
+  });
+
+  it('7.226 mapIngestResults over the REAL /v1/events response', async () => {
+    const id = newUlid();
+    const submitted: SubmittedEvent = {
+      id: newUlid(),
+      version: 1,
+      origin: 'web',
+      clientTime: new Date().toISOString(),
+      workspaceId,
+      entity: { kind: 'ticket', id },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: null, title: 'Count the till' },
+      actorId: owner.userId,
+    };
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: owner.headers,
+      payload: { events: [submitted] },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // The SECOND argument is the count the client submitted. `mapIngestResults`
+    // uses it to refuse a response that answers a different number of events
+    // than were sent, so passing the real 1 here is what makes that check live.
+    const results = mapIngestResults(res.json(), 1);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.status).toBe('committed');
+    // The result names the event the client sent, by the client's own id.
+    expect(results[0]?.eventId).toBe(submitted.id);
+  });
+
+  it('7.227 mapPreferences over the REAL preferences route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/me/preferences?workspaceId=${workspaceId}`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const prefs = mapPreferences(res.json());
+
+    // NON-VACUITY of a different kind, and it is the honest one here: a fresh
+    // user's document is legitimately EMPTY, so there is no non-empty value to
+    // demand. What must hold is that the mapper produced the document's SHAPE
+    // from real bytes rather than throwing — `savedFilters` is an array and the
+    // version is the document's own.
+    expect(Array.isArray(prefs.savedFilters)).toBe(true);
+    expect(prefs.version).toBeGreaterThanOrEqual(1);
+    // RECORDED, not asserted: this world never writes a preferences document, so
+    // this case witnesses the EMPTY-document path only. A witness for a populated
+    // document needs a PUT first and belongs with whoever owns preferences.
+  });
+
+  it('7.228 mapMyWork over the REAL /v1/me/work route', async () => {
+    const members = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/members`,
+      headers: owner.headers,
+    });
+    const roster = rosterByActorId(mapActors(members.json()));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/me/work?workspaceId=${workspaceId}`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const view = mapMyWork(res.json(), roster);
+
+    // NON-VACUITY: `beforeAll` assigned exactly one ticket to this viewer, so an
+    // empty `assigned` means the route or the mapper dropped it — and a bare
+    // "is an array" check would not notice.
+    expect(view.assigned.length).toBeGreaterThan(0);
+    expect(view.assigned.map((w) => w.ticketId)).toContain(ticketIds[0]);
+    // The project NAME came through the route's `projectNames` side table, which
+    // is the part a fixture most easily gets wrong: the mapper joins two halves
+    // of the body and this proves the real route sends both.
+    const card = view.assigned.find((w) => w.ticketId === ticketIds[0]);
+    expect(card?.projectName).toBe('The aisle');
+  });
+
+  it('7.229 mapAttention over the REAL attention and contests routes', async () => {
+    const members = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/members`,
+      headers: owner.headers,
+    });
+    const roster = rosterByActorId(mapActors(members.json()));
+
+    const attention = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/attention`,
+      headers: owner.headers,
+    });
+    expect(attention.statusCode).toBe(200);
+    const contests = await app.inject({
+      method: 'GET',
+      url: `/v1/contests?workspaceId=${workspaceId}&open=true`,
+      headers: owner.headers,
+    });
+    expect(contests.statusCode).toBe(200);
+
+    // BOTH arguments are real bodies from real routes. `mapAttention` folds the
+    // contests list into the attention items, and a fixture supplying either
+    // half by hand is agreeing with itself about how the two join.
+    const items = mapAttention(attention.json(), contests.json(), roster);
+
+    // THE HONEST NON-VACUITY, and it is not `length > 0`: this world has no
+    // stale ticket, no approaching date and no contested claim, so the correct
+    // answer IS an empty list. What is asserted is that the mapper accepted the
+    // real bodies and produced a list — the shape agreement neither fixture
+    // could prove alone. **A populated attention sweep needs a world with a
+    // stale ticket or an open contest; that is a separate fixture and it is NOT
+    // built here.** Recorded rather than faked, because seeding a contest to
+    // make a number non-zero would be this case asserting its own setup.
+    expect(Array.isArray(items)).toBe(true);
+    expect(items).toHaveLength(0);
   });
 });
