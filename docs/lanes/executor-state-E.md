@@ -15,12 +15,12 @@ off `main`.
 |---|---|
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
-| merge-base with `origin/main` | `1b72900` — rebased twice (was `1e372e3`, then `1394396`) |
-| HEAD at last refresh | `f342c87` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | **21**, 0 behind |
+| merge-base with `origin/main` | `de88248` — rebased 3× (`1e372e3` → `1394396` → `1b72900` → `de88248`) |
+| HEAD at last refresh | `5744489` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | **29**, 0 behind |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | **GREEN at `f342c87`** (rebased onto `1b72900`): `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **259 files / 3408 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers. This branch's own contribution is **+74** (A0 2, T1 16, T2 56), so `main` alone measures 3334 |
+| gate composition | last green at `f342c87`: 30/30, 0 cached, 259 files / 3408 tests. **Re-gating at `5744489` through GATE LOCK v3.1 now** — main gained Lane C's T15 and Lane D's T7–T10, so the number WILL move and must be recounted |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -98,8 +98,8 @@ main as part of P33.
 | — | 25 MiB ceiling test timeout (controller-assigned) | **DONE — `bb174fe`** |
 | T1 | config surface + `/healthz` **deploy SHA** (P33) + strict URL validation | **DONE** — CA-discard Critical fixed |
 | T2 | CORS + 3 rate-limit buckets + **HTTP-Origin** + invite-mint bucket | **DONE — `805b39c`** (rebased). Critical fixed: `trustProxy` made the limiter key attacker-chosen |
-| T3 | error alerting hook | **NEXT** |
-| T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | not started |
+| T3 | error alerting hook | **DONE — `b5ec53a`.** 2 Criticals, both guards that could not fire |
+| T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | **NEXT** — dispatch staged at `scratchpad/t4-workflow.js` |
 | T5b | SIGTERM / shutdown path (inherited errand #2) | not started |
 | T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
 
@@ -1262,3 +1262,40 @@ The pid written is the process that survives the whole gate: **13 locked runs th
 `LOCK ACQUIRED pid=N` and its `EXIT=` line in the same backgrounded invocation
 (`bp05hmtdf`: acquired 00:58:32, finished 00:59:57 — 85s, one bash). So `ps -p` on this lane's pid
 mid-gate always succeeds, and **path B was never the problem.**
+
+---
+
+# GATE LOCK v3.1 — this lane owns the reference implementation (`e814f49`)
+
+Published at **`docs/lanes/gate-lock/`** (`locked-test.sh`, `gate.sh`, `sweep-test-dbs.sh`, `README.md`).
+**Reference copy only — nothing invokes it**; each lane runs its own copy because the paths inside are
+per-worktree.
+
+v3 creates and fills the lock in ONE `set -o noclobber` redirect, so the held-but-unattributed window that
+v2's reclaim had to guess about **does not exist**.
+
+## Four corrections, three of them invisible to inspection
+
+| # | the broadcast form | why it fails | fix |
+|---|---|---|---|
+| 1 | `pgrep -fl … \| grep -vc` | **counts LINES.** A Claude session's argv carries its whole brief, so ONE process emits hundreds. Measured: 371 lines vs **1** process for the same query. The idle check could never reach 0 → an orphaned lock wedges every lane **forever** | count processes |
+| 2 | exclude `self` only | the tool shell that launched `bash gate.sh` carries that string in its own argv | also exclude `$PPID` (controller's addition) |
+| 3 | `/gate\.sh/` | **cannot match `gate19.sh`** — as a regex it wants exactly ONE char between "gate" and "sh". Measured with the controller's gate live: broadened **2**, narrow **0**, `pgrep -f` **0** | `gate[^/]*\.sh` |
+| 4 | match `$0` | **the matcher matches its own caller**, because the awk program contains both script names. And the script path is field **4** (`bash /path/gate19.sh`), not 3 | match a path TOKEN in fields 3..NF |
+
+**How 3 and 4 were caught, and it is the lesson:** my first strict form reported **`count = 0` against TWO
+live gate-shaped processes**. It only surfaced because I refused a *vacuous* positive control — the real
+gate had finished between measurements, so the 0 proved nothing, and I started real gate-shaped processes
+rather than accept it. **A zero from a matcher nobody has watched fire is not a measurement.** Same rule
+that caught `pgrep -f vitest`, the pool matcher I nearly deleted as broken, and T3's two tautological guards.
+
+**Controls, both green in ONE instant:** a real gate process **plus** a shell that merely mentions both
+names → `peers = 1`; nothing running → `peers = 0`.
+
+## Live interoperation, not simulated
+
+While testing, the **controller's** v3 gate held the lock as a regular file containing pid 80157, and this
+lane's independently written v3 script **waited** rather than reclaiming. Two implementations, one
+protocol, correct exclusion — the property v2 lacked.
+
+**Still owed when this was written:** a FULL gate through v3.1. Everything above is unit-level.
