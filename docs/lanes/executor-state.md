@@ -16,6 +16,45 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 SUNDAY 2026-09-06 ~23:45 IST — **§09 IS CLOSED AT ZERO UNCITED. Clause A rows 7.256/7.257 written. Both method findings promoted into the COORDINATION DOC. Gate green, PR open, NOTHING IN FLIGHT, no subagent running, no ruling outstanding.**
+
+| what | value |
+|---|---|
+| `main` | **`e673ecb`** (#235 merged) |
+| branch | **`exec/57-s09-tail-and-clauseA`**, head `129c4b5` + this handoff commit, pushed. **PR open — head FROZEN until the controller says merged** |
+| **§09** | **219 cited / 0 uncited / 219 — CLOSED** (was 0/219 this morning). Baseline **0** |
+| sections at zero | **§09, §10, §11** |
+| repo-wide ratchet | **815 → 529 uncited** across today's four PRs (1000 cited) |
+| §7 | **7.254–7.257** minted. **Next free: 7.258** |
+| **gate at `129c4b5`** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m27.7s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285 files** — identical for the FIFTH time. `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (**1618**) · `check:runbook` 0 · `check:tasks` 0 (ledger 177/177 untouched). Zero orphans |
+
+## What landed today, in one line each
+
+§10 backfill (#230) · §09 batch 1, 98 citations recovered from a killed subagent (#232) · stale-handoff fix (#233) · §09 batch 2, all 113 server rows (#235) · **this PR: §09's last 8 by hand, clause A rows 7.256/7.257, and the two method findings into the coordination doc.**
+
+## Ruling P44 is DISCHARGED as far as it can be tonight — do not re-ask
+
+- **(C)** the backfill: §09 closed. **(A)** the semble substitution: two candidate rows written from live `find_related` evidence.
+- **7.256** — three engine-context builders (`rule-engine/memory-context.ts` 180 lines, `sync-client/precheck/local-context.ts` 297, `app-core/precheck.ts` 386), ~860 lines, no shared symbol. **Caveat recorded in the row:** the top hits between those files are IMPORT HEADERS, so part of that similarity is shared imports, not shared logic.
+- **7.257** — the current-workflow-version rule in three spellings; the client's `local-deps.ts:50` is a bare `MAX(version)` with **no as-of bound and no workspace predicate**, against the server projection's `published_workspace_seq <= $2` (*"greatest published at or before this position"*). They agree only while the replica holds nothing newer than its applied events. **May be true by construction — which is why it is a candidate.** The owner line names the falsifiable question, not a remedy.
+
+## NEXT — nothing blocked, no ruling needed, no dispatch required
+
+1. **The §09 remainder is gone; the next backfill targets are the big ones:** §13 (153 uncited), §07 (78), §12 (78), §06 (63), §03 (45), §04 (45), §05 (67). **§12 mints from CONTROLLER-ALLOCATED BLOCKS — ask before minting there.** §07 and §13 are sequential.
+2. **Continue clause A** from **7.258**: more `find_related` over `packages/{app-core,ui,editor,sync-client}`, zero token cost.
+3. Override §1(f) carried items.
+
+## Measured cost data — use it to plan, it was expensive to learn
+
+| dispatch | tokens |
+|---|---|
+| trivial one-word subagent | **45,877** — the FLOOR for any dispatch |
+| §09 batch 1 (98 citations, 17 files) | 171,618 |
+| §09 batch 2 (113 citations, 15 files) | 245,189 |
+
+**Both method findings now live in `docs/superpowers/plans/2026-08-20-00-series-coordination.md` as verification-method rules 5 and 6** (§ "Verification-method rules (2026-09-06, serial executor)"), which is where they bind. Summary: `git diff | grep "^+"` is always empty under the proxy and **a control must traverse the same path as the measurement**; and **commit first, then mutate**, because `git checkout --` restores from HEAD — plus *reading evidence is not checking it*, since the restoration read showed the damage and only the count, which carried a prediction, caught it.
+
+
 # 🟢 SUNDAY 2026-09-06 ~23:20 IST — **§09 BATCH 2 DONE (121 uncited → 8) AND RULING P44 CLAUSE A's FIRST ROWS COMMITTED. GATE GREEN. PR OPEN. NOTHING IN FLIGHT, NO SUBAGENT RUNNING.**
 
 | what | value |
