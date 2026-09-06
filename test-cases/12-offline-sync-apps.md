@@ -35,15 +35,17 @@ never carried forward from the previous one.
 
 **Style: BARE is canonical here** (`- 12.45 ✅ …`). Task 18 normalised this file's 23 bold-style line
 heads to bare — **marker and bold placement only; no id was renumbered, and never may be.** Census at
-this commit: **bare 328, bold 0, marker-first 0; sum 328 == union 328, zero duplicates** — the 267 that
+this commit: **bare 329, bold 0, marker-first 0; sum 329 == union 329, zero duplicates** — the 267 that
 were here (bare 244 + bold 23), plus Task 18's 44 and `12.319`, plus Lane A's `12.323–12.328` from #187,
 plus Lane D's `12.340–12.343` (the socket-cutting fixture), which were authored BOLD against the header
 this branch forked from and are written bare here because Task 18's rule above is the one that now
 holds, plus Lane B's `12.360–12.364` from the sync-surface override, plus Lane D's `12.344` (the ping
-hazard built inside that same fixture). *Recounted at this sha rather than carried: it read `318` until
-this branch rebased past Task 18 — the twenty-third instance of exactly what this section is about — and
-`322` until the sync surface landed on `main`, which is the twenty-fourth, and was found the same way,
-by recounting instead of reading.*
+hazard built inside that same fixture), plus Lane B's `12.365` (#215, the reach-granted wire witness,
+which landed on `main` and was rebased past while this catalogue commit was in flight). *Recounted at
+this sha rather than carried: it read `318` until this branch rebased past Task 18 — the twenty-third
+instance of exactly what this section is about — `322` until the sync surface landed on `main`, the
+twenty-fourth, and `328` until #215 landed and this branch rebased past it, the twenty-fifth — each found
+the same way, by recounting instead of reading.*
 **Those six were authored bold and normalised to bare by Task 18 in its rebase, with Lane A informed** —
 by the controller's ruling of 2026-09-06, since Task 18 owns §12's final shape and a marker/bold change
 is not a renumber. That ownership ends when this task merges. New cases in any block are written bare.
