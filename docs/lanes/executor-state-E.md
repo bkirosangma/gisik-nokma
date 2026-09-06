@@ -20,7 +20,7 @@ off `main`.
 | ahead of `origin/main` | **29**, 0 behind |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | last green at `f342c87`: 30/30, 0 cached, 259 files / 3408 tests. **Re-gating at `5744489` through GATE LOCK v3.1 now** — main gained Lane C's T15 and Lane D's T7–T10, so the number WILL move and must be recounted |
+| gate composition | **GREEN at `5744489` THROUGH GATE LOCK v3.1**: `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **263 files / 3450 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers. Server 108 files. Lock acquired as a regular file (pid 8070) and released by the EXIT trap |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -1298,4 +1298,10 @@ While testing, the **controller's** v3 gate held the lock as a regular file cont
 lane's independently written v3 script **waited** rather than reclaiming. Two implementations, one
 protocol, correct exclusion — the property v2 lacked.
 
-**Still owed when this was written:** a FULL gate through v3.1. Everything above is unit-level.
+**DISCHARGED:** a full gate ran through v3.1 at `5744489` — `EXIT=0`, 30/30 tasks, 0 cached, 263 files /
+3450 tests, `CHECK_ENV_EXIT=0`, no orphaned workers. The lock was taken as a **regular file** holding pid
+8070 and released by the EXIT trap; a peer's `gate77.sh` acquired 113 seconds later.
+
+**That peer is itself the confirmation for correction #3:** the broadened matcher sees `gate77.sh`
+(`gate: 8994 bash`), and the broadcast `gate\.sh` pattern would not — a third differently-named gate,
+after `gate19.sh`, in the space of one session.
