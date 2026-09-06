@@ -313,6 +313,17 @@ export type SearchResponse = { workspaceId: string; query: string; hits: SearchH
 export type MyWorkResponse = {
   workspaceId: string;
   groups: { open: TicketCard[]; active: TicketCard[]; terminal: TicketCard[] };
+  /**
+   * `projectId` → name, for the projects in THESE cards that this viewer may be
+   * told the name of (rulings P32/P38). A card always carries its `projectId`;
+   * an id absent from this map is one whose NAME is withheld, and the item
+   * renders id-only rather than blank — the existence-without-title register.
+   *
+   * A map beside the groups, not a field on `TicketCard`: that type is shared
+   * by the board, the list, search and attention, and a name there would put
+   * this visibility decision on four routes that never asked the question.
+   */
+  projectNames: Record<string, string>;
 };
 
 export type AttentionItem =

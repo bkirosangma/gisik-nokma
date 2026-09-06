@@ -795,11 +795,6 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     fields: readonly string[];
   }> = [
     {
-      method: 'getMyWorkspaces',
-      call: () => mapWorkspaceRefs({ workspaces: [{ workspaceId: 'w', name: 'n', role: 'owner' }] }),
-      fields: ['WorkspaceRef.projects'],
-    },
-    {
       method: 'search',
       call: () => {
         const body: SearchResponse = { workspaceId: 'w', query: 'q', hits: [] };
@@ -813,11 +808,20 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
         const body: MyWorkResponse = {
           workspaceId: 'w',
           groups: { open: [serverCard()], active: [], terminal: [] },
+          // REQUIRED since rulings P32/P38, and empty here on purpose: this
+          // fixture exists to observe the REFUSAL, and an empty map is the
+          // honest shape for a viewer told no project names. Filling it would
+          // make the case about the names rather than about the three absences
+          // that still refuse.
+          projectNames: {},
         };
         return mapMyWork(body);
       },
       fields: [
-        'WorkItem.projectName',
+        // `WorkItem.projectName` was here until rulings P32/P38 served it —
+        // the my-work route now carries a `projectNames` map for the projects
+        // this viewer may be told the name of. The method still refuses, for
+        // the three below.
         'WorkItem.stateName',
         'ContestedClaim.title',
         'ContestedClaim.claim.serverTime',
@@ -907,7 +911,7 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
       (SERVING_GAPS['getMyWork'] ?? [])
         .filter((absence) => absence.wireRoute === '/v1/me/work')
         .map((absence) => absence.field),
-    ).toEqual(['WorkItem.projectName', 'WorkItem.stateName']);
+    ).toEqual(['WorkItem.stateName']);
     // And no refusal still says the shipped read does not exist.
     for (const absence of contested) {
       expect(absence.because, absence.field).not.toMatch(/never reads it|never reads proj_contested/);
@@ -921,13 +925,12 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     expect(contested[1]?.because).toContain('never committed');
   });
 
-  it('3.39 the register covers exactly the four blocked methods', () => {
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual([
-      'getAttention',
-      'getMyWork',
-      'getMyWorkspaces',
-      'search',
-    ]);
+  it('3.39 the register covers exactly the THREE blocked methods', () => {
+    // Four until rulings P32/P38 served `getMyWorkspaces`, six until P25
+    // clause 1 served `getTickets` and `getTicket`. The number in this title
+    // has now been wrong twice by being right when written, which is why the
+    // absences below are asserted INDIVIDUALLY rather than trusted to a count.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['getAttention', 'getMyWork', 'search']);
     // Positive control on the sort above: the methods NOT here are the ones this
     // source answers. `getBoard` is the one P25 clause 1 unblocked first;
     // `getTickets` and `getTicket` are the two it unblocked in this change set,
@@ -937,6 +940,10 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     expect(SERVING_GAPS['getMembers']).toBeUndefined();
     expect(SERVING_GAPS['getTickets']).toBeUndefined();
     expect(SERVING_GAPS['getTicket']).toBeUndefined();
+    // `getMyWorkspaces` pinned as SERVED for the same reason: a refusal that
+    // stops refusing must leave a trace, or the only record it ever refused is
+    // a shorter array.
+    expect(SERVING_GAPS['getMyWorkspaces']).toBeUndefined();
   });
 });
 /**

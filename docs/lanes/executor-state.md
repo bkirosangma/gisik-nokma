@@ -3246,3 +3246,40 @@ Mine: the bootstrap payload type (~36), `writeSnapshot` (~247), the local schema
 caller and its purge loop. **`SyncTransport`'s fourth method does not touch me** — closure 4 adds,
 wraps and constructs no transport. `sync-routes.ts` is shared too: they add a registration line inside
 `registerSyncRoutes`, I widen `bootstrapTicket`'s payload. Whoever lands second rebases.
+
+---
+
+# LANE A — BOTH PRs OPEN AND GREEN. RESTART POINT, 2026-09-06.
+
+| PR | branch | head | state |
+|---|---|---|---|
+| **#141** closure 4 | `exec/26-provenance-block` (worktree `gisik-nokma-lanes/laneA-closure4`) | `09c03d3` | opus verdict APPLIED, 30/30, 3,340 tests |
+| **#150** HELD pair | `exec/27-held-pair` (primary worktree) | `7cb3344` | 30/30 lane gate, app-core 1091/1091 |
+
+Merged this session: #109, #125, #128, #137, #143. **Do not restart C2 in this session** (controller's instruction).
+
+## THE QUEUE AFTER BOTH MERGE — controller-ordered
+1. **`WorkItem.stateName`** — buildable, same shape as `ListRow.stateName`; the version is on `proj_tickets` via `PROJ_TICKET_COLUMNS`. Front of the queue.
+2. **`ContestedClaim.title`** — buildable if `getAttention` already serves it (one join in `GET /v1/contests`).
+3. **`ContestedClaim.claim.serverTime` — RULED. See P39 in `controller-state.md` on main (landed as #151);
+   the ruling is NOT copied here, only pointed at, because a copy drifts.** In short: neither
+   `contested_at` (that is P36's refused option 3 — another event's instant) nor a bare optional (which
+   would make every consumer of a REAL claim's provenance handle an absence that cannot occur there).
+   **`ContestedClaim.claim` gets its OWN shape** — `actorId`, `clientTime`, `contestedAt` — with **no
+   `serverTime` member at all**, because a refused claim never took effect and has no instant of taking
+   effect. Extend `renderContestedClaimText` (verified present in `@gisik-nokma/domain`, consumed by
+   `contests/contest-banner.tsx` and `contests/contest-view-model.ts`) rather than replacing it.
+   Excluding fixture: mutate the mapper to copy `contested_at` into anything named `serverTime` → red.
+   *Original measurement, kept because it is why the ruling went this way:* The measurement is in #150's body and is the load-bearing part: `SubmittedEvent = Omit<EventEnvelope,'serverTime'|'seq'>` so the stored `original_event` has the claimant's `clientTime` and NO server instant by construction; `proj_contested.contested_at` IS a recorded instant but it is the CONTEST event's — when the server filed the refusal, not when it received the claim. **No row records a server instant for the refused claim itself.** Opposite of P36, where the row DID record it and the writer dropped it. Spending `contested_at` is P36's refused option 3.
+
+## THE FOUR SENTENCES THIS SESSION EARNED — carry them, they generalise
+- **A guard that checks whether a value exists is not checking whether it is the right value.** My `assigneeId === null || block.assigned === null` caught move-to-null and missed move-to-a-different-assignee — the drift its own comment named. **The comment is the aggravating factor**: it made the gap read as covered.
+- **An empty filter is not a neutral default — it is the one input under which a filter bug cannot show.** A door that takes a filter needs a case with a filter. Mirror of closure 2's `rollup: null` fixture default.
+- **Nullable describes the VALUE; additive describes the CONSTRUCTOR.** A required nullable field still forces every existing caller to change.
+- **A case can kill the mutation it was written for and leave its stated property untested.** 12.244 killed option 3 while "the LAST state-claiming event wins" was unconstrained, because its fixture had only one.
+
+## METHOD NOTES THAT COST TIME TO LEARN
+- **Id recounts must be STYLE-AWARE and range-aware.** Four styles exist (`- 12.1`, `- **12.1**`, `- 🧪 **13.1`, and comma-lists like `**7.1, 7.2 — …**`). My §3 ceiling grep read past `**3.149–3.151**` and I minted a duplicate an hour after making range-collisions a project rule. Print PER-STYLE counts as the positive control. Lane C's `scripts/check-case-ids.mjs` is the real answer.
+- **Turbo prints pnpm's LAUNCHER path, not the interpreter.** A gate log naming node v24 is not drift — probe the spawn (`pnpm exec node -e 'process.version'`).
+- **After any rebase past a merge: `pnpm install` AND rebuild dists.** Imports by package name resolve through `./dist`; a stale one gives `X is not a function` and looks like a regression.
+- **`pgrep -f vitest` matches every lane session.** Only ppid=1 is an orphan.

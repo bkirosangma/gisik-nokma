@@ -1,4 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { visibleProjects } from '../read/visible-projects.js';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
@@ -155,10 +157,19 @@ export function registerWorkspaceRoutes(
     );
     const workspaces = [];
     for (const row of rows) {
+      // Resolved PER WORKSPACE, never once for the caller: `eff.projects` is a
+      // set within one workspace, and reusing another workspace's resolution
+      // here would be a cross-tenancy answer wearing the right shape.
+      const eff = await resolveEffectiveRole(deps.pool, request.currentUserId, row.workspace_id);
       workspaces.push({
         workspaceId: row.workspace_id,
         name: await workspaceNameFromLedger(deps.pool, row.workspace_id),
         role: row.role,
+        // Rulings P32/P38. A viewer outside a project is not told its NAME —
+        // and this list being partial is the CORRECT answer, not a defect. See
+        // `read/visible-projects.ts` for why that is an application of
+        // `resolveEffectiveRole` rather than a new rule.
+        projects: await visibleProjects(deps.pool, eff, row.workspace_id),
       });
     }
     return { workspaces };

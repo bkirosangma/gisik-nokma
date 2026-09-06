@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { visibleProjects } from '../read/visible-projects.js';
 import type { MyWorkResponse, StateCategory, TicketCard } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
@@ -124,7 +125,31 @@ export async function readMyWork(
   for (const card of await assembleTicketCards(db, viewerId, rows)) {
     bucketFor(groups, card).push(card);
   }
-  return { workspaceId, groups };
+
+  // NAMES ONLY, and only for projects this viewer may be told the name of
+  // (rulings P32/P38). A card the viewer can see always carries its
+  // `projectId`; what is withheld is the NAME, so an item whose project is not
+  // in this map renders as id-only — the existence-without-title register
+  // `routes/tickets.ts` already uses for a restricted parent, one level up.
+  //
+  // A separate MAP rather than a `projectName` on the card, because
+  // `TicketCard` is shared by the board, the list, search and attention: adding
+  // a field there would put this decision on four other routes that never asked
+  // the question. Additive here, so a client that ignores it is unaffected.
+  const names = new Map(
+    (await visibleProjects(db, eff, workspaceId)).map((project) => [project.projectId, project.name]),
+  );
+  const projectNames: Record<string, string> = {};
+  for (const bucket of [groups.open, groups.active, groups.terminal]) {
+    for (const card of bucket) {
+      const name = names.get(card.projectId);
+      // Only the projects these cards are actually in. Emitting the viewer's
+      // whole visible set here would disclose project names through a door
+      // nobody asked that question of.
+      if (name !== undefined) projectNames[card.projectId] = name;
+    }
+  }
+  return { workspaceId, groups, projectNames };
 }
 
 /**
