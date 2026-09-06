@@ -1174,3 +1174,35 @@ exactly the files intended, not merely a superset that looks plausible.**
 returns 503 **without throwing**, so `setErrorHandler` never runs and **the one 5xx an operator most needs
 paged — the database being unreachable — alerts nobody**, while the module's own prose says "5xx failures
 phone somewhere" three times without stating the boundary.
+
+---
+
+# THE SHUTDOWN ERRAND IS NOT THEORETICAL — measured against the built image
+
+Inherited errand #2 (`index.ts:124-131` defers it here by name; **Plan 11's text contains ZERO occurrences
+of sigterm/shutdown/app.close**). Measured against `gisik-server:t5c`, the image T5 actually built:
+
+**node is PID 1.** The entrypoint is `sh -c '… exec "$@"'` with `CMD ["node","dist/index.js"]`, and
+`exec` makes sh **replace itself** with node — verified two ways: `/proc/1/comm` reads `sh` for a plain
+`sh -c`, and under the real exec form node reports `process.pid === 1`.
+
+**PID 1 has no default signal dispositions** — the kernel delivers a signal to PID 1 only if that process
+installed a handler. So today SIGTERM is simply ignored. Timed, `docker stop -t 3`:
+
+| container | elapsed |
+|---|---|
+| **no SIGTERM handler — TODAY** | **3197 ms** — signal ignored, docker fell through to SIGKILL |
+| with a SIGTERM handler | **172 ms** — handler ran, process exited on its own |
+
+**So every deploy is currently a hard kill after the full grace period.** In-flight requests are severed
+mid-response, `startSnapshotWriter`'s interval is never stopped, the stream hub's sockets and the
+notification fan-out's subscription are never released, and `pool.end()` never runs.
+
+**The fix is a handler, NOT `tini`/`--init`.** Because `exec` already gives node PID 1, an explicit
+`process.on('SIGTERM')` is sufficient and the 172 ms row proves it. Adding an init shim would be solving a
+problem this image does not have.
+
+**What the handler must do, and why the pieces already exist:** `await app.close()` fires the two
+`onClose` hooks `app.ts` already registers (stop the snapshot writer, close the stream hub, unsubscribe
+the notification fan-out) — `index.ts`'s snapshot-writer docblock says in terms that it hung its stop on
+that hook *"on the day Plan 11 adds a real shutdown"*. Then `await pool.end()`. **That day is this task.**
