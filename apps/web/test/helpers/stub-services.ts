@@ -81,7 +81,13 @@ export function stubServices(
   const unstubbed = (name: string) => () =>
     Promise.reject(new Error(`this case did not stub ${name}`));
   const query: DataSourceQuery = {
-    getMyWorkspaces: refuse('getMyWorkspaces'),
+    // UNSTUBBED since rulings P32/P38 served it, and NOT `[]`. This read
+    // refused for the whole of this helper's life, and `refuse()` throws when
+    // the gap it names disappears — which is how a served method announced
+    // itself here rather than degrading quietly. `[]` would be this helper
+    // asserting the user belongs to no workspace, which is a claim about the
+    // world; the same argument `getTicketTypes` below makes for itself.
+    getMyWorkspaces: unstubbed('getMyWorkspaces'),
     getMembers: unstubbed('getMembers'),
     getBoard: unstubbed('getBoard'),
     getTickets: unstubbed('getTickets'),

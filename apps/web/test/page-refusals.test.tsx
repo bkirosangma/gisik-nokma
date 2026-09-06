@@ -73,7 +73,13 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       expect.stringContaining('My Work cannot be shown yet.'),
     ]);
     expect(texts[0]).toContain("AttentionItem kind 'contested' — its title");
-    expect(texts[1]).toContain('WorkItem.projectName');
+    // `WorkItem.stateName`, and it named `WorkItem.projectName` until rulings
+    // P32/P38 served that field. `getMyWork` still refuses — on three absences
+    // now rather than four — so this case's PROPERTY is unchanged: the refusal
+    // reaches the page as a refusal, naming a real unserved field. The field it
+    // names had to move because the old one is no longer unserved, which is the
+    // register staying honest rather than the case being weakened.
+    expect(texts[1]).toContain('WorkItem.stateName');
 
     // The half that makes the two above a test: neither falsehood is also here.
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
