@@ -1399,3 +1399,26 @@ mid-mutation (Lane B's failure). Neither subsumes the other.
 
 **Restore-and-verify form:** `git checkout HEAD -- <path>`, then **read the file for the marker**.
 Never a shell `diff`, which has returned a false "identical" on this machine.
+
+---
+
+# Helper hazard (Lane A): `applyAll` is a hand-written subset — checked against this lane
+
+`apps/server/test/helpers/seed.ts`'s `applyAll` applies **four** projections in registry order —
+`projProjects`, `memberships`, `projInvites`, `projVisibility` — and **`projTickets` is NOT among them**.
+An event type outside that set is a **silent no-op**, indistinguishable from a successful apply. The
+helper's own docblock says the list is hand-written and that a new projection *"is silently absent here
+until somebody notices a seeded event producing no row — it cost this task one debugging round."*
+
+**Only one file in this lane seeds through it: `test/routes/attachments-wired.test.ts` (A0).**
+Checked, and it is unaffected **for a reason worth naming rather than by luck:**
+
+- The attachment route's gate reads **`proj_visibility`**, which IS in the applied set. It never reads
+  `proj_tickets`, so `projTickets`' absence cannot touch it.
+- **And the failure direction is safe.** `getResolvedVisibility` returns `null` when no row exists and the
+  route short-circuits to a **refusal**. So had visibility been unapplied, A0's test would have gone
+  **RED (404 where it asserts 201)** — not silently green. **A fail-closed gate converts a silent-no-op
+  helper into a loud test failure**, which is the property that makes seeding through it survivable here.
+
+**T13 seeds through the real `seed:dev` CLI** (Lane D's, now on main), which is the right door and outside
+this hazard entirely. **The hazard binds unit fixtures only.**
