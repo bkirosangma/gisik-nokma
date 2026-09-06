@@ -412,6 +412,38 @@ the form at 08:15 and adopt it at their next gate; Lane E's `locked-test.sh` is 
 *Earlier "RECLAIMING stale empty-pid lock after 60s" lines in this file's gate rows (07:43) were this
 mechanism firing benignly — the holder was still in its acquire loop.*
 
+### RULING P40 (2026-09-06 08:45, controller as ruling tier) — `/v1/me/work` serves the viewer's OWN contested claims (Door B); mappers.ts's "never will" was wrong and is corrected in place
+
+**Lane A found two landed docblocks contradicting each other** on which door serves `MyWorkView.contested`
+(the viewer's own contested claims): `mappers.ts` (~86) — *"`/v1/me/work` does not serve contests and NEVER
+WILL, because `GET /v1/contests` already does"*; `routes/my-work.ts` (~100) — *"Plan 10 extends
+`MyWorkResponse` with an ADDITIVE `contested` key … nested under `groups` PRECISELY SO THAT KEY CAN ARRIVE
+BESIDE IT"*. **Measured, not argued:** the online client cannot form the query — `getMyWork(workspaceId)`
+carries no viewer id and P30 forbids widening `data-source.ts`; `OnlineDataSourceDeps` could take one, but
+`apps/web/src/providers.tsx:96` builds the source in a `useMemo` keyed on services only while the session
+loads asynchronously, and keying it on the session rebuilds the source AND the cache against that file's
+one-cache invariant; `/v1/contests?claimantId=` is caller-supplied, so an unfiltered read serves EVERY
+visible contest as "mine" — strictly wrong, worse than the refusal. For Door B: the server holds
+`request.currentUserId`; `proj_contested_claimant_idx (workspace_id, claimant_id)` exists with a migration
+comment naming "My Work / attention strip"; the route nests cards under `groups` for exactly this key.
+**RULING: Door B.** "My contested claims" is a viewer-scoped read and the server is the only party that
+knows the viewer. mappers.ts's sentence was about where the cross-check should look for a wireKey, and it
+was wrong — corrected in place, the cross-check re-aimed. **Constraints:** claimant = the session, never a
+query parameter (excluding fixture: user X's contested claims never appear in user Y's `/v1/me/work`;
+mutate the claimant filter away → red, alone); the contested ticket's title on that key iff the viewer
+`canSee` it NOW (id and no title otherwise — P32/P38's register; visibility may have narrowed since the
+claim); provenance is P39's shape. `getAttention` needs no viewer id (`routes/attention.ts` scopes by
+`visibleTicketsWhere` only) and closes on `/v1/contests` serving `title` + `projectId` through one
+tenancy-scoped LEFT JOIN (LEFT so a missing ticket row throws loudly; inside the tenancy because
+`proj_contested` has no FK). **Also measured by Lane A and corrected in the same change set:**
+`read-models.ts:250`'s reason for `WorkItem.stateName`'s absence was FALSE — the version is on the ROW and
+`readMyWork` had selected `workflow_id, workflow_version` all along; served via `foldedWorkflowDefs` by
+version, NOT `attention.ts`'s latest-def `stateNameOf` (the workflowVersion lie). P39's compiler found a
+live consumer the ruling did not name (`views/my-work.tsx:124` rendered `actorName` and `serverTime`,
+neither of which the row can say) → `renderContestedClaimAttribution`, a sibling in `@gisik-nokma/domain`.
+Two override corrections accepted: the replica's `MY_WORK_ABSENCES` never listed `serverTime` (its two
+entries stay valid locally; no replica file changes); `getAttention` did not already serve `title`.
+
 ### RULING P39 (2026-09-06 08:05, controller as ruling tier) — `ContestedClaim.claim` is NOT a `ClaimProvenance`; it gets its own shape, with no `serverTime` member and no synthesis
 
 **Measured by Lane A on #150 before asking, after it had inherited "unservable by anyone" from the
