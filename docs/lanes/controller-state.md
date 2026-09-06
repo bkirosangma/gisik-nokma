@@ -1,5 +1,46 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 00:2x IST (weekly reset still ~6h out at 06:30) — `main` is `749cc46`, gate green (tenth identical run tonight). CLAUSE A DECLARED COMPLETE. §07 at 177/57. §13 (153 rows) DISPATCHED as one subagent, owner's explicit "one more batch" call — in flight now.
+
+**Two more PRs landed since the §09-closed anchor: #239 (clause A closure-pattern rows 7.258a/b) and #240
+(§07 backfill 78→57 by hand across three per-file batches, plus clause A's closing row 7.259).** Both merged,
+gate re-verified green each time (`GATE_EXIT=0` · 30/30 · 3666 passed | 5 skipped (3671) — ninth and tenth
+identical runs). `main` **`749cc46`**. `check:citations`: **§07 177 cited / 57 uncited** (was 155/78);
+repo-wide **1022 cited / 508 uncited**, down from 815 uncited at Sunday-morning start. `check:tasks`: 177/177
+unchanged throughout.
+
+**Clause A (Ruling P44's semble hunt) is COMPLETE at 7.259** — eight probes total: 3 candidate rows (7.256,
+7.257, one minor), 2 closed exemplars showing the hazard already guarded (`isEmbeddableImageMime` single
+source; `sniff.ts`'s deliberately-unspread allow-list, kept as two independent spellings so a differential
+check stays observable), 1 already-owned finding (`sync-item.ts`, self-declared mirror, catalogued at 6.96,
+no new row needed), 2 clean surfaces (`sync-engine.ts`, `packages/ui`). Diminishing returns were visible by
+round 3 and the executor stopped rather than manufacture a row. **Do not re-run clause A** — only
+`app-core/src/{cache,cache-feed}.ts` went unprobed and was judged too small to justify a round.
+
+**§07's three by-hand batches surfaced three non-mechanical citation calls worth keeping as the standard for
+whoever continues backfilling:** a row naming a file that doesn't actually assert it must stay uncited rather
+than satisfy the checker on a technicality (`7.72`, refused); a row that's a *mutation record* (six mutations,
+not one test assertion) gets cited on the null control it actually names, with the docblock saying so
+(`7.66`); a row whose two clauses live in two different tests is cited on the `describe`, never on one `it`
+alone (`7.75`, and the two-file rows `7.49`/`7.53` the same way). **A citation must never imply one test proves
+more than it does.**
+
+**§12 block allocated earlier (`12.380–12.399`) still stands, still NOT cleared to start** — §13 was the one
+backfill batch the owner authorized tonight ("keep going, one more batch"), and it is the only one in flight.
+
+**§13 (153 uncited, the largest remaining file) DISPATCHED as ONE subagent** — same method as batch 2: verify
+comments-only with the controlled instrument, confirm the real count before setting the baseline, mutation-
+check with commit-before-mutate (rule 6), gate, then PR. Cost data point so far tonight, for planning the next
+one: trivial-probe floor 45,877 · batch 1 (98, §09) 171,618 · batch 2 (113, §09) 245,189 — §13 at 153 rows
+should be budgeted **above** batch 2's figure.
+
+**Remaining backfill after §13, sizes as of `749cc46`:** §07 57 (named clusters left: `filter-spec` 5,
+`projections/search` 5, `workspace-settings` 4, `doc-text` 3; a separate 36-row tail in §07 names no test file
+at all and needs a reader, not a transcriber — explicitly NOT hand-batch or subagent work as currently
+understood) · §12 78 (block allocated, not cleared) · §05 67 · §06 63 · §03/§04 45 each. None of these are
+authorized to start beyond §13 without another explicit go from the owner, per the same reasoning as the first
+scope check tonight.
+
 ## ⏸ 23:3x IST — §09, §10, §11 ALL AT ZERO UNCITED. `main` is `e6e16c6`, gate green (5th identical run tonight). §12 BLOCK ALLOCATED (12.380–12.399). Controller HOLDS the remaining large backfills (~529 uncited across 7 files) pending an owner scope check — clause A continues at zero cost.
 
 **PR #237 merged**: the last 8 §09 rows by hand (219/219 — §09 CLOSED), clause A rows 7.256/7.257, and the two
