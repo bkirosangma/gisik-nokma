@@ -112,6 +112,56 @@ never on the body), so nothing discriminates on it. It becomes load-bearing the 
 does. **Owner: the server's route surface — Lane C or E, whoever next touches `attachments.ts`.**
 Not mine to fix: it is in `apps/server/src/`, which this lane may not touch at all.
 
+### 6. The client's PATHS all exist on the server — a negative, and it narrows the search
+
+Enumerated both sides and compared. All eighteen `/v1` paths `online-data-source.ts` builds are
+present among the **thirty-three** the server registers. **This took two sweeps and the first one was
+wrong in the silent way:** `grep -oE "(get|post)\(\s*'/v1/[^']*'"` returned FOUR routes and looked
+like an answer. It requires the method and the path on ONE line, and `routes/my-work.ts:459` puts the
+path on its own line inside a multi-line call. Had I reported the first sweep, "the client calls
+routes the server does not serve" would have been a fabricated Critical. The second sweep keys on any
+quoted `/v1/…` string in `apps/server/src` regardless of line position.
+
+**Why the negative is worth having:** routing agrees, so a client/server divergence cannot hide in the
+URL. It can only hide in the BODY or the QUERY PARAMS — which is exactly where `pagingFetch` hid, and
+it means a witness should assert on parsed body values rather than on the request line.
+
+### 7. `applyAll` re-verified, and the RECORD about it has drifted from the code
+
+The known landmine is real and the code handles it well: `test/helpers/seed.ts:80` applies **FOUR**
+projections (projects, memberships, invites, visibility), and its own docblock says so in bold, names
+the trap (*"hand this a `workflow.defined` and it goes NOWHERE and reports nothing"*) and records the
+MEASUREMENT for why it was not widened — widening broke case 6.91 in
+`test/visibility/visible-events-for.ts`, which passes a `workflow.defined` with a STUB payload the
+real projection parses and throws on. `seedWorkflowDef` at `:459` applies the one projection to its
+own event instead.
+
+**The drift:** the coordination doc records this as *"Now five (workflow defs), ENUMERATED rather than
+widened to the whole registry."* On `main` at `3e6d606`, `applyAll` is still **four**; the fifth is
+applied by a separate seeder to its own event. The code is correct and the sentence about it is not,
+in the direction that would let a lane assume `applyAll` handles workflow events. **A documentation
+correction, not a code change — owner: whoever next amends that section.**
+
+This helper is also the pass's best COUNTER-EXAMPLE, and it belongs in the report as one: a fixture
+that diverges from the real registry deliberately, with the divergence measured, named in bold, and
+its non-widening justified by a case that would break. That is what a well-handled mirror looks like,
+and it is the standard the inventory should hold others to rather than a defect.
+
+### 8. Phase 2 is unblocked on the harness — measured against BOTH open PRs
+
+A sibling witness file needs `test/helpers/{app,db,session}.ts` (140/60/79 lines) plus `seed.ts`.
+**None of the four is on #161's diff, and none is on #183's.** `apps/server/test/integration/` is
+touched by exactly one file across both open PRs — `client-contract.test.ts`, in #161. So
+`apps/server/test/integration/fixture-witnesses.test.ts` collides with nothing and can reuse
+`buildTestApp`, `createTestDatabase` and `signInWithPhone` as they stand.
+
+**One constraint from `client-contract.test.ts`'s own docblock, which is a measurement and binds any
+witness I write:** a client half encoded as a LITERAL typed into the server test file is a pin on
+nothing — they measured it, applying both reconciliations to `app-core` at once left that file
+15 passed / 0 failed with the divergences it exists to pin GONE. A witness must IMPORT the real
+client code through the `@gisik-nokma/app-core/online` subpath. That import resolves through `dist`,
+so any mutation run must rebuild rather than use bare `vitest`.
+
 ## WHAT I FOUND BY LOOKING, THAT CHANGES THE SHAPE OF PHASE 2
 
 The override anticipated a sibling file "until #161 merges". Finding 1 says that is not a
