@@ -16,16 +16,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# 🔴 SERIAL EXECUTOR — SUNDAY 2026-09-06 ~22:35 IST. §09 BATCH 1 DONE (98 cited, gate green, PR open). **A VERIFICATION METHOD USED THROUGHOUT THIS SESSION WAS BROKEN — IT PRODUCED THREE FALSE GREENS, ONE OF THEM IN THE MERGED #230. READ THE NEXT SECTION BEFORE YOU VERIFY ANYTHING.**
+# 🔴 SERIAL EXECUTOR — SUNDAY 2026-09-06, closed ~22:50 IST. §09 BATCH 1 **MERGED** (#232, `1bf5e92`). **NOTHING IS IN FLIGHT. NO PR IS OPEN. THE EXECUTOR IS HOLDING ON THE WEEKLY METER — see the STOP box below before dispatching anything.** **A VERIFICATION METHOD USED THROUGHOUT THIS SESSION WAS BROKEN — IT PRODUCED THREE FALSE GREENS, ONE OF THEM IN THE MERGED #230. READ THE NEXT SECTION BEFORE YOU VERIFY ANYTHING.**
 
 | anchor | value |
 |---|---|
-| `main` | **`fcf39ab`** (#230 merged at `1bc6e01`, + the controller's anchor commit) |
-| my branch | **`exec/54-cite-section-09`** off `fcf39ab`, **ONE commit**, head **`04082b2`**, worktree clean, PR open |
+| `main` | **`1bf5e92`** — #232 merged (§09 batch 1). Verified on `main`: `9.36` cited, baseline `05:67 / 09:121 / 10:0` |
+| my branch | **`exec/54-cite-section-09` IS MERGED AND DEAD** (as are `exec/50`, `exec/52`, `exec/53`). **Do not resume any of them — branch fresh off `main`.** This session opened onto the already-merged `exec/50` and lost time proving it dead; that is why this row exists |
 | why a new branch | `exec/53` could not rebase: #230 was **squash**-merged, so `exec/53` still carried §10's original commits and its rebase conflicted on this very file. Rebuilt clean off `main` by cherry-picking the §09 commit alone. **`exec/52` and `exec/53` are DEAD — do not resume either** |
 | §09 | **98 cited / 121 uncited / 219** (was 0/219). Baseline **121** |
 | §05 | **68 → 67**, deliberate and correct — see below |
 | **gate** | **`GATE_EXIT=0` at `97d7451`** · 30/30 · 0 cached · 1m31.9s · node v22.22.2 · **3666 passed \| 5 skipped (3671) / 285 files** — identical to `bf1c517`, the prediction a comments-only change owes. **The non-docs content of `04082b2` is byte-identical to that gated tree** (`git diff 97d7451 HEAD -- . ':(exclude)docs'` empty), so the gate carries. `check:env` 0 · `check:citations` 0 (879 cited / 650 uncited, ratchet holds everywhere) · `check-case-ids` 0 (1614) · `check:runbook` 0 |
+
+## ⛔ STOP — DO NOT DISPATCH. Controller ruling, 2026-09-06 ~22:50.
+
+**"HOLD — do not dispatch batch 2."** The binding signal is **the status line's `Weekly reset used — available
+again Sep 7 at 6:30am` banner**, NOT the 93% number and NOT the session meter (which reset at 22:20 and does not
+touch the weekly one). Starting a subagent against it risks losing it to a hard rejection mid-run for nothing —
+which is exactly how batch 1's implementer died. **Both the executor and the controller stopped here.**
+
+Resume when the weekly banner clears — tonight if it turns out to have headroom, otherwise after the **real**
+Monday 2026-09-07 06:30 reset. **Ruling A+C is already given; do not re-ask for it.**
 
 ## 🔴 THE BROKEN INSTRUMENT — three false greens, and the merged #230 is one of them
 
