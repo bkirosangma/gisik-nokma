@@ -1,12 +1,20 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { visibleProjects } from '../read/visible-projects.js';
-import type { MyWorkResponse, StateCategory, TicketCard } from '@gisik-nokma/domain';
+import type {
+  ContestedClaimView,
+  FieldClaim,
+  MyWorkResponse,
+  StateCategory,
+  TicketCard,
+} from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
+import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
 import { visibleTicketsWhere } from '../read/visible-where.js';
+import { canSee } from '../visibility/can-see.js';
 
 /**
  * Assigned-to-me across every project in ONE workspace, grouped by state
@@ -149,7 +157,207 @@ export async function readMyWork(
       if (name !== undefined) projectNames[card.projectId] = name;
     }
   }
-  return { workspaceId, groups, projectNames };
+  return {
+    workspaceId,
+    groups,
+    projectNames,
+    stateNames: await stateNamesFor(db, workspaceId, rows),
+    contested: await contestedFor(db, viewerId, workspaceId),
+  };
+}
+
+/**
+ * This viewer's own OPEN contested claims, with the contested ticket's title
+ * when they may still see that ticket (ruling P40).
+ *
+ * ## The claimant is the SESSION, and there is no version of this that takes one
+ *
+ * `viewerId` is `request.currentUserId`, threaded from the route exactly as the
+ * assignee filter above is. It is never a query parameter, and the reason is the
+ * one this file's own docblock gives about `t.assignee_id`: a route that let a
+ * caller name whose contested claims to read would be a read of another person's
+ * refusals behind a 200. `GET /v1/contests` DOES take a `claimantId`, which is
+ * correct there — that route answers "contests on tickets I may see", gated per
+ * row by `canSee`, and the filter only narrows an answer whose subject is
+ * something else. Here the subject IS the caller, so the filter is also the
+ * boundary and may have exactly one source.
+ *
+ * ## The workspace clause is the tenancy, and `claimant_id` is not a substitute
+ *
+ * Both clauses are present. `claimant_id` alone would return this person's
+ * contested claims in EVERY workspace they have ever claimed in, flattened into
+ * an answer that names one `workspaceId` — the same shape case 7.106 falsifies
+ * for the assigned half.
+ *
+ * ## Why the title is joined here and gated again, rather than taken from the row
+ *
+ * A contest OUTLIVES the visibility of its ticket: the claim is the viewer's, so
+ * the contest is theirs to see, but whether they may still read the ticket is a
+ * separate question whose answer can have changed since the refusal. So the join
+ * is LEFT (a contest whose ticket has no row is a contest, not an error, and the
+ * title is simply unknown) and every title passes `canSee` for THIS viewer
+ * before it is served. A viewer who may no longer see the ticket gets the row
+ * with `title: null` — the existence-without-title register — rather than
+ * losing the record of their own refused claim.
+ *
+ * `canSee` is called per row rather than compiled into the query for the reason
+ * `sync/contests-route.ts` gives about its own loop: it is the product's ONE
+ * visibility decision, and a second SQL spelling of it here would be the
+ * two-sources-of-truth shape this series keeps catching. The row count is this
+ * viewer's own open contests in one workspace.
+ */
+async function contestedFor(
+  db: Queryable,
+  viewerId: string,
+  workspaceId: string,
+): Promise<ContestedClaimView[]> {
+  const { rows } = await db.query<{
+    ticket_id: string;
+    rule: string;
+    reason: string;
+    original_event: unknown;
+    contested_at: Date;
+    ticket_fields: Record<string, FieldClaim> | null;
+  }>(
+    `SELECT c.ticket_id, c.rule, c.reason, c.original_event, c.contested_at,
+            t.fields AS ticket_fields
+       FROM proj_contested c
+       LEFT JOIN proj_tickets t
+         ON t.ticket_id = c.ticket_id AND t.workspace_id = c.workspace_id
+      WHERE c.workspace_id = $1 AND c.claimant_id = $2 AND NOT c.resolved
+      ORDER BY c.contested_at, c.contested_event_id`,
+    [workspaceId, viewerId],
+  );
+
+  const contested: ContestedClaimView[] = [];
+  for (const row of rows) {
+    // The refused envelope, verbatim. `original_event` is a `SubmittedEvent` —
+    // `EventEnvelope` minus `serverTime` and `seq`, because the claim never
+    // committed — so `clientTime` is the only instant it carries and there is
+    // no server instant to look for. `contested_at` is the CONTEST event's own
+    // stamp and is served under that name, never as the claim's (ruling P39).
+    const envelope = row.original_event as { actorId?: unknown; clientTime?: unknown };
+    if (typeof envelope.actorId !== 'string' || typeof envelope.clientTime !== 'string') {
+      throw new Error(
+        `readMyWork: the contested claim on ticket ${row.ticket_id} carries an original_event with no string actorId/clientTime — submittedEventSchema requires both at the door, so this row did not come through it`,
+      );
+    }
+    contested.push({
+      ticketId: row.ticket_id,
+      title: (await canSee(db, viewerId, row.ticket_id)) ? titleOf(row.ticket_fields, row.ticket_id) : null,
+      rule: row.rule,
+      reason: row.reason,
+      claim: {
+        actorId: envelope.actorId,
+        clientTime: envelope.clientTime,
+        contestedAt: row.contested_at.toISOString(),
+      },
+    });
+  }
+  return contested;
+}
+
+/**
+ * The contested ticket's current title out of the joined `proj_tickets.fields`.
+ *
+ * Reached only when `canSee` has said this viewer may read the ticket, so a
+ * missing row or a missing claim here is a projection/ledger disagreement and
+ * not the ordinary withheld case — which is why both are throws and neither is
+ * a `null`. `null` is reserved for "you may not see this ticket", and a second
+ * meaning on the same value would make the two indistinguishable to the client.
+ */
+function titleOf(fields: Record<string, FieldClaim> | null, ticketId: string): string {
+  if (fields === null) {
+    throw new Error(
+      `readMyWork: contested ticket ${ticketId} is visible to this viewer but has no proj_tickets row — proj_contested and proj_tickets disagree`,
+    );
+  }
+  const claim = fields['title'];
+  if (claim === undefined) {
+    throw new Error(
+      `readMyWork: no title claim on ticket ${ticketId} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
+    );
+  }
+  if (typeof claim.value !== 'string') {
+    throw new Error(
+      `readMyWork: the title claim on ticket ${ticketId} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+    );
+  }
+  return claim.value;
+}
+
+/**
+ * `ticketId` → the name of the state that ticket is in, read from the
+ * definition the ticket is FOLDED TO.
+ *
+ * ## The version is the whole point, and it was here all along
+ *
+ * `PROJ_TICKET_COLUMNS` has always selected `t.workflow_id, t.workflow_version`,
+ * so this route has held the folded pair since it was written; what was missing
+ * was the by-version definition read. `read-models.ts` carried the opposite
+ * claim in the `ListCard` docblock — that a My Work card "names no workflow
+ * version to read a name from" — which is true of the CARD and false of the
+ * ROW, and that sentence is corrected there in this change set rather than left
+ * to be re-derived.
+ *
+ * `foldedWorkflowDefs`, never `latestWorkflowDefs`. A card's state name is a
+ * name for the state that card is IN, and the card is in a state of the
+ * definition its own row names. `routes/attention.ts` has a `stateNameOf` that
+ * reads the LATEST definition and falls back to the state id, and it is
+ * deliberately NOT reused here: that helper feeds a `reason` SENTENCE, where a
+ * heading a reader can see is a slug is acceptable, and this feeds a field
+ * called `stateName` that a client renders as a name. Reusing it would be the
+ * `workflowVersion` lie in miniature — a name from a vocabulary this ticket was
+ * never folded into — which is the same reason `ListRow.stateName` was recorded
+ * as a gap rather than closed with a one-line lookup.
+ *
+ * ## Both absences throw, and neither falls back
+ *
+ * The discipline is `assembleListCards`', restated for the same fields rather
+ * than softened:
+ *
+ * - **No published definition at the ticket's own `(workflow_id,
+ *   workflow_version)`** → throw. The ticket names a definition
+ *   `proj_workflows` does not hold, so the projection and the ledger disagree.
+ * - **A definition with no such state** → throw. `applyTicketEvent` refuses a
+ *   transition to a state its workflow does not carry, so a row in one did not
+ *   come through the door.
+ *
+ * Falling back to the state id would put a slug where a name goes, and omitting
+ * the entry would be worse still: `WorkItem.stateName` is REQUIRED on the
+ * client, so an absent key becomes a mapping failure one layer away from the
+ * two facts that would name what is actually wrong.
+ */
+async function stateNamesFor(
+  db: Queryable,
+  workspaceId: string,
+  rows: readonly ProjTicketRow[],
+): Promise<Record<string, string>> {
+  if (rows.length === 0) {
+    return {};
+  }
+  const defs = await foldedWorkflowDefs(
+    db,
+    workspaceId,
+    rows.map((row) => ({ workflowId: row.workflow_id, version: row.workflow_version })),
+  );
+  const stateNames: Record<string, string> = {};
+  for (const row of rows) {
+    const def = defs.get(foldedDefKey(row.workflow_id, row.workflow_version));
+    if (def === undefined) {
+      throw new Error(
+        `readMyWork: no published definition of workflow ${row.workflow_id} at version ${row.workflow_version}, which ticket ${row.ticket_id} is folded to — the ticket names a definition proj_workflows does not hold`,
+      );
+    }
+    const state = def.states.find((candidate) => candidate.id === row.state_id);
+    if (state === undefined) {
+      throw new Error(
+        `readMyWork: workflow ${row.workflow_id}@${row.workflow_version} has no state ${row.state_id}, which ticket ${row.ticket_id} is in — applyTicketEvent refuses a transition to a state its workflow does not carry, so this row did not come through it`,
+      );
+    }
+    stateNames[row.ticket_id] = state.name;
+  }
+  return stateNames;
 }
 
 /**

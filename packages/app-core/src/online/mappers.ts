@@ -8,15 +8,18 @@ import type {
 } from '@gisik-nokma/domain';
 import type {
   Actor,
+  AttentionItem,
   BoardCard,
   BoardColumn,
   BoardGroup,
   BoardView,
   ClaimProvenance,
+  ContestedClaim,
   FilterSpec,
   Grouping,
   ListColumnId,
   ListRow,
+  MyWorkView,
   ParentRef,
   ProjectViewPrefs,
   RollupToViewer,
@@ -26,6 +29,7 @@ import type {
   TicketRead,
   TransitionCause,
   UserPreferences,
+  WorkItem,
   WorkspaceRef,
 } from '../view-types.js';
 
@@ -83,14 +87,33 @@ export class MappingError extends Error {
  *
  * `wireRoute` is the `/v1` path whose real body that check is made AGAINST, and
  * it exists because an absence is not always missing from the route the client
- * method calls. `MyWorkView.contested` is the case that forced it: `/v1/me/work`
- * does not serve contests and never will, because `GET /v1/contests` already
- * does — so the key that would close the gap has to be looked for THERE, and a
- * cross-check pointed at the my-work body would have measured the wrong route
- * and called it evidence. `null` on either field means no route can close this:
- * the client TYPE is the owner (`FilterSpec` has no key for the server's
- * `blocked` term; `ClaimProvenance` requires an instant the system never
- * recorded).
+ * method calls.
+ *
+ * **The example this paragraph used to give was WRONG, and it is corrected in
+ * place rather than swapped out** (ruling P40), because a false sentence a
+ * maintainer reasons from is worse than a missing one. It said `/v1/me/work`
+ * "does not serve contests and never will, because `GET /v1/contests` already
+ * does". It does serve them now, and the reason it had to is the one that
+ * sentence could not see: `MyWorkView.contested` is the viewer's OWN claims,
+ * "the viewer" is a fact only the server holds, and `/v1/contests`' `claimantId`
+ * is caller-supplied. `routes/my-work.ts` had reserved the additive key for
+ * exactly this all along, and `proj_contested`'s `(workspace_id, claimant_id)`
+ * index names this access path in its own migration comment.
+ *
+ * The FIELD the paragraph exists for is still real and is better illustrated by
+ * the attention strip, which keeps its cross-route shape: its `'contested'`
+ * items are joined from `/v1/contests`, so an absence on that surface is
+ * measured against the contests body and not against the attention route's.
+ *
+ * `null` on either field means NO route can close it, because the client TYPE
+ * is the owner. `FilterSpec` has no key for the server's `blocked` term, and
+ * that is still the shape. The other example this sentence used to give —
+ * `ClaimProvenance` requiring an instant the system never recorded — was
+ * retired by ruling P39, which did not find the instant but removed the field:
+ * a contested claim carries a `ContestedClaimProvenance` now, with no
+ * `serverTime` member at all. It is worth keeping as the WORKED example of the
+ * `null` case even so, since a type-owned absence is closed by changing the
+ * type and not by finding the data.
  */
 export type Absence = {
   field: string;
@@ -1299,132 +1322,303 @@ export function mapSearchHits(_raw: unknown): never {
   throw new ServingGapError('search', MAP_SEARCH_HITS_ABSENCES);
 }
 
-const MAP_MY_WORK_ABSENCES: readonly Absence[] = [
-  {
-    field: 'WorkItem.stateName',
-    wireKey: 'stateName',
-    wireRoute: '/v1/me/work',
-    because:
-      'cards carry stateId only, and the card names no workflow version to read the name from',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'ContestedClaim.title',
-    wireKey: 'title',
-    wireRoute: '/v1/contests',
-    because:
-      'GET /v1/contests IS shipped and gated per row by canSee (sync/contests-route.ts, registered in app.ts), so the contested rows are one client-side join away — the move getBoard already makes for the roster. What the join cannot produce is the TITLE: ContestView carries ticketId, claimantId, rule, reason and the embedded claim and no title, and no /v1 route answers a ticket’s CURRENT title given only a ticket id. The workspace ticket read answers a proj_visibility row, which has none; every route that does carry a title serves TicketCards selected some other way (a project’s board or list, a search query, this viewer’s own assigned work, or the three computed attention kinds), and none of those is guaranteed to contain an arbitrary contested ticket. The history route carries the ledger, so a title could only be REPLAYED from create and rename events — this client reimplementing a server projection, which is a different thing from the two-route join getBoard makes',
-    owner:
-      'whoever extends GET /v1/contests — proj_contested already stores ticket_id, so joining the ticket the row names closes this and the attention strip’s copy of it at once',
-  },
-  {
-    field: 'ContestedClaim.claim.serverTime',
-    wireKey: 'serverTime',
-    wireRoute: '/v1/contests',
-    because:
-      'ClaimProvenance requires serverTime and the contested claim has none anywhere in this system: originalEvent is a SubmittedEvent, which IS EventEnvelope minus serverTime and seq (envelope.ts), because the claim was refused at the door and never committed. contestedAt is the CONTEST event’s serverTime — when the server filed the refusal, not when it received the claim — so spending it here would attribute one event’s instant to another',
-    owner:
-      'Plan 6 — the client ClaimProvenance type (view-types.ts), not a route: no route can serve an instant the system never recorded',
-  },
-];
-
 /**
- * `GET /v1/me/work?workspaceId=` → `MyWorkView`. REFUSED.
+ * `GET /v1/me/work?workspaceId=` → `MyWorkView`. **This mapper used to REFUSE,
+ * and all three facts it refused over are served now** (rulings P39 and P40,
+ * this change set).
  *
- * ## `inTransit` is NOT one of the absences, and the difference is the point
+ * The absence list is DELETED rather than emptied, for the reason this module
+ * gives at `SERVING_GAPS`: an `Absence[]` with no entries is a refusal nobody
+ * can read, and `client-contract.test.ts` throws on a list it cannot parse
+ * precisely so that closing a gap forces the record to be removed instead of
+ * hollowed out.
+ *
+ * ## What each of the three was, and what closed it
+ *
+ * - **`WorkItem.stateName`** said "cards carry `stateId` only, and the card
+ *   names no workflow version to read the name from". True of the CARD and
+ *   false of the ROUTE: `readMyWork` has selected `t.workflow_id,
+ *   t.workflow_version` through `PROJ_TICKET_COLUMNS` all along, so only the
+ *   by-version definition read was missing. It arrives as `stateNames`, a map
+ *   beside the groups, keyed by `ticketId` because a state id is unique only
+ *   within one workflow AND one version.
+ * - **`ContestedClaim.title`** was on no contest row and derivable from no
+ *   other route for a bare ticket id. `GET /v1/me/work` now joins it (ruling
+ *   P40) and `GET /v1/contests` serves it too, both from `proj_tickets` and
+ *   both gated by `canSee`.
+ * - **`ContestedClaim.claim.serverTime`** did not exist and still does not.
+ *   Ruling P39 did not find it — it removed the field: `ContestedClaim.claim`
+ *   is a `ContestedClaimProvenance`, not a `ClaimProvenance`, and carries no
+ *   `serverTime` member at all, because a refused claim never took effect.
+ *
+ * ## `inTransit` is `[]`, and it was never one of the absences
  *
  * `inTransit` is the replica's outbox. The web client is online-only (spec §5,
- * line 104 — Plan 6 carries the constraint at its own line 23, and cites it as
- * "spec §5" there too), so it HAS no outbox and `inTransit: []` would be the true answer, not a
- * degradation — a structural emptiness. `contested` is the opposite: the rows
- * exist in `proj_contested`, so `[]` there would be a claim about the world
- * rather than a fact about this client. That distinction is why the two are
- * treated differently and it is written here rather than left for a reader to
- * infer from an absence list.
+ * line 104), so it HAS no outbox and `[]` is the true answer — a structural
+ * emptiness, not a degradation. `contested` was the opposite while it refused:
+ * the rows exist in `proj_contested`, so `[]` there would have been a claim
+ * about the world rather than a fact about this client. That distinction is why
+ * the two were treated differently, and it is written here rather than left to
+ * be inferred from an absence list that no longer exists.
  *
- * ## `contested` no longer blames `/v1/me/work`, because the read SHIPPED
+ * ## The GROUPS are flattened, and no information is lost
  *
- * This absence used to read "/v1/me/work never reads it" and name Plan 10 and
- * `routes/my-work.ts`. Both sentences were true and both sent a fixer to the
- * wrong file: `GET /v1/contests` is registered in `app.ts` today, takes
- * `?workspaceId=&ticketId=&claimantId=&open=true`, filters every row through
- * `canSee`, and its own docblock says "The ticket banner, My Work and the
- * attention strip all read this". So a client-side join IS available — the same
- * move `getBoard` makes for the roster — and the question is only whether the
- * join can fill a `ContestedClaim`.
- *
- * It cannot, and the two entries below are the field-by-field reason. `ticketId`,
- * `rule` and `reason` come straight off the row. `title` is required and is on no
- * contest row and derivable from no other route for a bare ticket id. `claim` is
- * `ClaimProvenance`, non-nullable, and its `serverTime` does not exist: the
- * claim was refused, so it was never committed and never stamped. Fill either
- * one and the banner shows a contest labelled with a title this client made up,
- * or timed by an instant belonging to a different event.
- *
- * The grouping model also differs — the server groups by state category
- * `{open, active, terminal}` and the client by claim status — but that is
- * adaptable (all three groups are this viewer's assigned work) and is not why
- * this refuses.
+ * The server groups by state CATEGORY (`{open, active, terminal}`) and
+ * `MyWorkView` groups by claim STATUS (`assigned` / `inTransit` / `contested`).
+ * All three server groups are this viewer's assigned work, so they concatenate
+ * into `assigned` in the order the server emitted them, cards in `ticket_id`
+ * order within each. Every card the server sent becomes exactly one item; the
+ * category survives on `WorkItem.stateCategory`, so a client that wants the
+ * server's buckets back can rebuild them without a second read.
  */
-export function mapMyWork(_raw: unknown): never {
-  throw new ServingGapError('getMyWork', MAP_MY_WORK_ABSENCES);
+export function mapMyWork(raw: unknown, roster: ReadonlyMap<string, string>): MyWorkView {
+  const record = asRecord(raw, 'myWork');
+  const groups = asRecord(record['groups'], 'myWork.groups');
+  const projectNames = asRecord(record['projectNames'], 'myWork.projectNames');
+  const stateNames = asRecord(record['stateNames'], 'myWork.stateNames');
+
+  const assigned: WorkItem[] = [];
+  for (const key of ['open', 'active', 'terminal'] as const) {
+    const cards = asArray(groups[key], `myWork.groups.${key}`);
+    cards.forEach((card, index) => {
+      assigned.push(
+        mapWorkItem(card, `myWork.groups.${key}[${index}]`, roster, projectNames, stateNames),
+      );
+    });
+  }
+
+  const contested = asArray(record['contested'], 'myWork.contested').map((row, index) =>
+    mapContestedClaim(row, `myWork.contested[${index}]`),
+  );
+
+  // NOT read off the wire. An online-only shell has no outbox, and a `pending`
+  // or an `inTransit` on the body would be the server asserting something only
+  // the client can know.
+  return { assigned, inTransit: [], contested };
 }
 
-const MAP_ATTENTION_ABSENCES: readonly Absence[] = [
-  {
-    field: "AttentionItem kind 'contested' — its title",
-    wireKey: 'title',
-    wireRoute: '/v1/contests',
-    because:
-      'the fourth kind is a client-side join away and not a serving gap in routes/attention.ts: GET /v1/contests is shipped, per-row canSee-gated, and queryable by workspace. The join stops at AttentionItem.title, which is REQUIRED and is on no contest row. It is the title, and the other two candidates are named so a fixer does not re-derive them: AttentionItem.claim is `ClaimProvenance | null`, so the contested claim’s missing serverTime costs the item its provenance rather than making the item unformable, which is not what it does to the non-nullable ContestedClaim.claim; and AttentionItem.projectId is servable — GET /v1/workspaces/:workspaceId/tickets carries project_id — though that read resolves its set through listVisibleTickets while /v1/contests filters through canSee, and the two are not asserted anywhere to answer the same set, so it is a second join with a caveat rather than a free one. Neither is why this refuses. The title is on no route at all',
-    owner:
-      'whoever extends GET /v1/contests — the same missing title as ContestedClaim.title; one join to the ticket proj_contested already names closes both',
-  },
-];
+/**
+ * One card of `MyWorkResponse.groups` → `WorkItem`.
+ *
+ * The two sibling MAPS are looked up here rather than merged into the card by
+ * the caller, so the absence of an entry keeps its own meaning at the point it
+ * is read:
+ *
+ * - **`projectNames`** — a MISS is the rule applying (rulings P32/P38: this
+ *   viewer may not be told that project's name), so it becomes `null` and the
+ *   item renders id-only. That is why `WorkItem.projectName` is nullable.
+ * - **`stateNames`** — a miss is NOT a rule. The route documents the map as
+ *   TOTAL over the cards in `groups` and throws rather than omitting an entry,
+ *   and `WorkItem.stateName` is required, so a missing key here is a malformed
+ *   body and `asString` refuses it. Falling back to the `stateId` would put a
+ *   slug where a name goes, which is the exact substitution `assembleListCards`
+ *   throws to avoid one layer down.
+ */
+function mapWorkItem(
+  raw: unknown,
+  path: string,
+  roster: ReadonlyMap<string, string>,
+  projectNames: Record<string, unknown>,
+  stateNames: Record<string, unknown>,
+): WorkItem {
+  const record = asRecord(raw, path);
+  const ticketId = asString(record['ticketId'], `${path}.ticketId`);
+  const projectId = asString(record['projectId'], `${path}.projectId`);
+  const name = projectNames[projectId];
+  return {
+    ticketId,
+    workspaceId: asString(record['workspaceId'], `${path}.workspaceId`),
+    projectId,
+    projectName: name === undefined ? null : asString(name, `myWork.projectNames.${projectId}`),
+    title: asString(record['title'], `${path}.title`),
+    stateId: asString(record['stateId'], `${path}.stateId`),
+    stateName: asString(stateNames[ticketId], `myWork.stateNames.${ticketId}`),
+    stateCategory: asStateCategory(record['stateCategory'], `${path}.stateCategory`),
+    stateProvenance: mapProvenance(record['stateProvenance'], `${path}.stateProvenance`, roster),
+    dueDate: mapDueDate(record['dueDate'], `${path}.dueDate`, roster),
+  };
+}
 
 /**
- * `GET /v1/workspaces/:ws/attention` → `AttentionItem[]`. REFUSED.
+ * One row of `MyWorkResponse.contested` → `ContestedClaim`.
  *
- * Every one of the three shipped kinds maps cleanly (`card.ticketId`,
- * `card.projectId`, `card.title`, the route's own `reason`, and
- * `card.stateProvenance` or the due claim for `claim`). The refusal is about the
- * FOURTH: `AttentionKind` includes `'contested'`, the strip's whole contract is
- * "what needs attention now", and a strip that silently cannot contain a
- * contested claim is worse than no strip, because the user reads its emptiness
- * as an answer.
+ * **No roster, and no `actorName`.** `ContestedClaimProvenance` is not a
+ * `ClaimProvenance` (ruling P39): nothing resolves a refused claim's actor
+ * through the member roster, and the type carries no `actorName` member to fill.
  *
- * ## The reason NAMED THE WRONG FILE, and the correction narrows the gap
+ * **No `serverTime`, and there is nothing to look for.** The claim was refused
+ * at the door, so it was never committed and never stamped. `contestedAt` is the
+ * CONTEST event's own instant, read from the key of that name and served under
+ * it — copying it into a `serverTime` would attribute one event's instant to
+ * another, which is the move ruling P36 refused as its option 3.
  *
- * This used to refuse because "routes/attention.ts … never reads proj_contested".
- * True, and beside the point: `GET /v1/contests` is shipped
- * (`apps/server/src/sync/contests-route.ts`, registered at `apps/server/src/app.ts`),
- * gated per row by `canSee`, and takes a `workspaceId` — so this client may join
- * it exactly as `getBoard` joins the member roster, and the attention ROUTE owes
- * nothing. `wireKey` therefore no longer says "not a key at all"; it names the
- * key `/v1/contests` would have to grow, so the server-side cross-check watches
- * the route that would actually close this instead of a route that never will.
- *
- * What remains is one field. `AttentionItem.title` is required and no contest row
- * carries a title; `projectId` is joinable and `claim` is nullable, so neither of
- * those is a reason to refuse. The join is one server-side `JOIN` away from being
- * possible, which is why the owner is the contests route rather than "Plan 10".
+ * `title` is `string | null` on both sides and the null is passed through
+ * unchanged: it means "this viewer may no longer see the ticket" (P40's
+ * constraint b), and an absent key means a malformed body, which `asString`
+ * refuses.
  */
-export function mapAttention(_raw: unknown): never {
-  throw new ServingGapError('getAttention', MAP_ATTENTION_ABSENCES);
+function mapContestedClaim(raw: unknown, path: string): ContestedClaim {
+  const record = asRecord(raw, path);
+  const claim = asRecord(record['claim'], `${path}.claim`);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    title: record['title'] === null ? null : asString(record['title'], `${path}.title`),
+    rule: asString(record['rule'], `${path}.rule`),
+    reason: asString(record['reason'], `${path}.reason`),
+    claim: {
+      actorId: asString(claim['actorId'], `${path}.claim.actorId`),
+      clientTime: asString(claim['clientTime'], `${path}.claim.clientTime`),
+      contestedAt: asString(claim['contestedAt'], `${path}.claim.contestedAt`),
+    },
+  };
+}
+
+/**
+ * `GET /v1/workspaces/:ws/attention` + `GET /v1/contests` → `AttentionItem[]`.
+ * **This mapper used to REFUSE over one field and that field is served now.**
+ *
+ * ## What it refused over, and why the answer was a JOIN rather than a route
+ *
+ * `AttentionKind` includes `'contested'`, the strip's contract is "what needs
+ * attention now", and a strip that silently cannot contain a contested claim is
+ * worse than no strip because the user reads its emptiness as an answer. The
+ * three shipped kinds always mapped cleanly; the fourth stopped at
+ * `AttentionItem.title`, which is required and was on no contest row.
+ *
+ * `GET /v1/contests` now serves both the ticket's `title` and its `projectId`
+ * from one tenancy-scoped join, so the fourth kind is a client-side join — the
+ * same move `getBoard` makes for the roster — and the attention ROUTE still owes
+ * nothing.
+ *
+ * ## The two reads answer the SAME SET, which is what makes the join sound
+ *
+ * This was the caveat that used to make `projectId` "a second join with a
+ * caveat": `GET /v1/workspaces/:ws/tickets` resolves its set through
+ * `listVisibleTickets` while `/v1/contests` filters through `canSee`, and
+ * nothing asserted the two answer the same set. That second route is no longer
+ * involved — `projectId` comes off the contest row itself — so the only set
+ * question left is whether the contests belong on THIS strip.
+ *
+ * They do, measured rather than assumed. `routes/attention.ts` scopes its sweep
+ * by `visibleTicketsWhere` and NOTHING else — never by assignment — so the strip
+ * is "everything in this workspace this viewer can see that needs attention".
+ * `/v1/contests?workspaceId=&open=true` is `canSee`-gated per row and answers
+ * exactly that population. **This is the one place the strip and My Work
+ * deliberately differ**: `MyWorkView.contested` is the viewer's OWN claims and
+ * is served by `/v1/me/work` (ruling P40) because only the server knows who the
+ * viewer is; the strip's contested items are every visible contest, because
+ * that is what the other three kinds already are.
+ *
+ * ## `claim` is `null` for the fourth kind, and that is the type working
+ *
+ * `AttentionItem.claim` is `ClaimProvenance | null`. A contested claim has no
+ * `ClaimProvenance` — no server instant was ever recorded for it (ruling P39) —
+ * so the item carries `null` and loses its provenance line rather than becoming
+ * unformable. That is exactly the difference from `ContestedClaim.claim`, which
+ * is non-nullable and therefore needed a type of its own.
+ */
+export function mapAttention(
+  raw: unknown,
+  contests: unknown,
+  roster: ReadonlyMap<string, string>,
+): AttentionItem[] {
+  const record = asRecord(raw, 'attention');
+  const items = asArray(record['items'], 'attention.items').map((item, index) =>
+    mapAttentionItem(item, `attention.items[${index}]`, roster),
+  );
+
+  const rows = asArray(asRecord(contests, 'contests')['contests'], 'contests.contests');
+  rows.forEach((row, index) => {
+    const path = `contests.contests[${index}]`;
+    const contest = asRecord(row, path);
+    items.push({
+      kind: 'contested',
+      ticketId: asString(contest['ticketId'], `${path}.ticketId`),
+      projectId: asString(contest['projectId'], `${path}.projectId`),
+      title: asString(contest['title'], `${path}.title`),
+      // The rule that refused it and why, which is what the strip is for. The
+      // contest row's own `reason`, never a sentence composed here: the server
+      // writes the reason and this client does not paraphrase it.
+      reason: asString(contest['reason'], `${path}.reason`),
+      claim: null,
+    });
+  });
+  return items;
+}
+
+/**
+ * One of the three SHIPPED attention kinds → `AttentionItem`.
+ *
+ * Each server arm nests the whole `TicketCard` and adds its own evidence
+ * fields; the client item is flat and carries the four facts the strip renders.
+ * `reason` is the route's own sentence in every arm — it is composed server-side
+ * from the workspace's thresholds (`staleDays`, `dueSoonDays`), which this
+ * client does not hold, so re-composing it here would drift the moment a
+ * setting changed.
+ *
+ * `claim` is where the arms differ, and the choice is the CLAIM THE ITEM IS
+ * ABOUT rather than whichever provenance is nearest:
+ *
+ * - `blocked` and `stale` are both about the state the ticket is IN, so the
+ *   claim is `card.stateProvenance` — who moved it there and when.
+ * - `due-soon` is about the DUE DATE, so the claim is the due claim, not the
+ *   state's. Using `stateProvenance` there would attribute a deadline to
+ *   whoever last transitioned the ticket.
+ *
+ * A fourth `kind` on the wire is refused rather than dropped: the client union
+ * has four members and the server three, so an unknown arm is a server this
+ * client does not understand, and silently skipping it would shorten a strip
+ * whose emptiness the user reads as an answer.
+ */
+function mapAttentionItem(
+  raw: unknown,
+  path: string,
+  roster: ReadonlyMap<string, string>,
+): AttentionItem {
+  const record = asRecord(raw, path);
+  const kind = asString(record['kind'], `${path}.kind`);
+  const card = asRecord(record['card'], `${path}.card`);
+  const base = {
+    ticketId: asString(card['ticketId'], `${path}.card.ticketId`),
+    projectId: asString(card['projectId'], `${path}.card.projectId`),
+    title: asString(card['title'], `${path}.card.title`),
+    reason: asString(record['reason'], `${path}.reason`),
+  };
+  if (kind === 'blocked' || kind === 'stale') {
+    return {
+      ...base,
+      kind,
+      claim: mapProvenance(card['stateProvenance'], `${path}.card.stateProvenance`, roster),
+    };
+  }
+  if (kind === 'due-soon') {
+    return {
+      ...base,
+      kind,
+      claim: mapProvenance(record['due'], `${path}.due`, roster),
+    };
+  }
+  throw new MappingError(`${path}.kind`, "one of blocked/stale/due-soon");
 }
 
 /**
  * Every refusal in this module, so a caller can enumerate the register.
  *
- * **`getTickets` and `getTicket` were here and are not any more** (ruling P25
- * clause 1). Their entries are DELETED rather than mapped to `[]`: an empty
- * absence list is a refusal nobody can read, `client-contract.test.ts` throws on
- * a `const` it cannot parse rather than passing over one it can parse as empty,
- * and `mappers.test.ts`'s register case asserts the exact key set — so hollowing
- * an entry out would have left two methods claiming to refuse over nothing.
+ * **Four methods have left this register and none was hollowed out.**
+ * `getTickets` and `getTicket` went under ruling P25 clause 1; `getMyWorkspaces`
+ * went with the HELD pair under P32/P38; `getMyWork` and `getAttention` go in
+ * this change set under P39 and P40. Every entry is DELETED rather than mapped
+ * to `[]`: an empty absence list is a refusal nobody can read,
+ * `client-contract.test.ts` throws on a `const` it cannot parse rather than
+ * passing over one it can parse as empty, and `mappers.test.ts`'s register case
+ * asserts the exact key set — so hollowing an entry out would leave a method
+ * claiming to refuse over nothing.
+ *
+ * **`search` is the last one, and it is the only DATA gap of the six.** Every
+ * other refusal was a field some route could serve once somebody looked; this
+ * one is `routes/search.ts` destroying which column matched inside the query, so
+ * no join closes it and no ruling can. `SearchHit.matchedIn` is the field.
  */
 export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
   search: MAP_SEARCH_HITS_ABSENCES,
-  getMyWork: MAP_MY_WORK_ABSENCES,
-  getAttention: MAP_ATTENTION_ABSENCES,
 };
