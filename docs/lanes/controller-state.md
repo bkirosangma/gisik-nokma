@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`b4e2f14`** — thirty-three merges this context; since `e0c8294`: #157 (lock v3.2) · **#150** (Lane A, the HELD pair under P38, `b4e2f14`, eleven jobs green at `063f6af` — **P25 clause 1 is DISCHARGED: every `owner: 'P25 clause 1 — HELD'` absence in `mappers.ts` is served or catalogued**; `getMyWorkspaces` closes completely, `getMyWork` still refuses on three fields, all now assigned under P39). Every `gh pr merge` exit read from `$?` on its own line |
-| ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (T7–T10, T14, T15 done; T1–T5/A0 on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E) |
-| last forced gate | **`b4e2f14`** — ONE backgrounded invocation under **lock v3.2** (acquired 08:33:28 fifteen seconds after Lane B's gate released, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m35.0s · node v22.22.2** · zero `Unsupported engine` · **3364 tests / 260 files** — server **1083** (+25: T9/T10's seed runners and the HELD pair's route cases), app-core 1092, sync-client 67, the rest unchanged. Covers #154 and #150 together. *(Previous: `c8268e1` 3340.)* |
-| open PRs | **#161** (Lane B closure 5b — HELD twice: first for its Fable verdict, then on the Critical that verdict found (the claimed bootstrap-before-apply rule did not exist); fix round under way with **P37.2's headSeq notice** folded in; intermediate head `75657f2` red on `other-tests` as expected; **merge only on B's re-report at a fresh green head, then restart B onto T18 — override staged**). In flight: Lane A `getMyWork`'s residuals under P39/P40 (`exec/31-mywork-residuals`, ctx 42%); Lane C T11+T12 (opus workflow running, ctx 29%); Lane D the two retention sweeps (reviewing its diff, minting §6 from 6.143, ctx 30%); Lane E seam 1 (T4 running, **ctx 82%** — instructed to push its handoff at every task commit and STOP at a task boundary if ctx passes ~90%, for a mid-step restart per the documented procedure). **Session meters at 09:20: A, B, D at 76%, E 43%, C 41% — reset 12:20. At the overnight burn rate A/B/D reach 100% around 11:00; expect a second limit window 11:00–12:20.** The rule from the first window binds: as meters pass ~80%, merge what is green and keep the restart surface current BEFORE dispatching anything Fable-tier; a Fable review that dies on the limit returns zero findings and looks clean. |
+| `main` | **`2d90a03`** — forty-plus merges this context; since `b4e2f14`: docs #158/#159/#160 (P40)/#162/#163/#164 (P37.2)/#165/#166/#168/#170 (P37.3) · **#167** (Lane D, the two P33 retention errands — `invite_tokens` sweep 6.131 ✅, `user_preferences` retention for revoked members, cases 6.143–6.149, `5ca3be1`, re-gated 30/30 at `ac7a185`) · **#169** (Lane A, `getMyWork`'s three residuals + `getAttention` under P39/P40, `aa17046`, twelve checks green at `7138217`; **`SERVING_GAPS` now carries `search` alone**). Every `gh pr merge` exit read from `$?` on its own line |
+| ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (+ T1–T4, A0, T5, the shutdown path on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E). The P33 errands and the closures have no ledger rows by design — closed by name here: retention sweeps ✅ (#167); scheduler errands with C; the DDL decision with T16 |
+| last forced gate | **`b4e2f14`** 3364 (above); **a gate at `aa17046` is QUEUED behind Lane B's lock as this is written (09:45)** — its row lands when it does. Lane A's own gate at `4aecf26` (#169's code sha): 30/30 · 0 cached · **3371** (server 1088, app-core 1094); Lane D's at `ac7a185`: 30/30 · 0 cached · server 1094. |
+| open PRs | **#161 only** (Lane B closure 5b — held through two review rounds; the Critical fixed as bootstrap-before-apply made real; P37.2's `headSeq` notice with the corrected definition (MAX at or below `afterSeq`); **P37.3's keyed drop-on-404 landing now**; two handed-over `headSeq` mutations to run under the lock; gate running at `f814db3`+; **merge only on B's re-report at a green head, then restart B onto T18 — override staged as `override-laneB-next.md`**). **Restarted this hour:** A (09:37, `gisik-nokma-exec-43`, onto **C2's proper close** then `BoardCard.cause` and 7.211 — 7.210 discharged by measurement; `exec/37-c2-cursor`), D (09:37, `lane4-periphery-22`, onto **four entity-keyed `data-testid` hooks** for T13 per Lane E's list — `workspace-card-*`, `project-card-*`, `board-column-*`, `ticket-card-*`; NOT the seven that work by accessible name, NOT the four scenario-shaped ones that stay with T13; `exec/36-e2e-testids`). In flight: C T11+T12 (workflow, `exec/30-plan11-backups`, then the two scheduler errands — `override-laneC-next.md` staged); E seam 1 (T4 landed at `c7aad93`, shutdown path in flight, T6 last; ctx 82%; `override-laneE-next.md` staged for T13 → T16). **⛔ SESSION METERS: 87% on EVERY pane at 09:40 — the meter is account-wide.** From 76% at 09:20 that is ~0.55%/min: **every session, this controller included, halts around 10:05 until the 12:20 reset.** Every lane was told at 09:42 to commit + push what has landed with its handoff position in the same push, and not to start a phase that cannot finish by ~10:00; running workflow agents die with the halt (03:50's shape); the limit-resumer resumes sessions at the reset. **Rule for the resumed controller:** read this file, re-measure every anchor, `gh pr list`, and each lane's branch head before acting — the panes will show `/limit-reset` or the resumer's paste. |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -575,6 +575,33 @@ SERIALLY inside one lock acquisition, from a written list, nothing else touching
 `git checkout HEAD -- <path>` and verified by READING the region plus an empty `git status --porcelain`.
 Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
 3,285 lines of lessons and stopped.
+
+### #169 (Lane A) and #167 (Lane D) landed — what each changed on `main`, 09:37
+
+**#169:** `/v1/me/work` serves `stateNames` (a sibling map by `workflowVersion` via `foldedWorkflowDefs`,
+NOT `attention.ts`'s latest-def `stateNameOf`) and the additive `contested` key with claimant = session
+(P40); `/v1/contests` serves `title` + `projectId` through one tenancy-scoped LEFT JOIN, `canSee`-gated;
+`ContestedClaimProvenance {actorId, clientTime, contestedAt}` with no `serverTime` (P39) and
+`renderContestedClaimAttribution` as a domain sibling; `read-models.ts:250`'s false reason corrected;
+`mappers.ts`'s "never will" corrected. **Rulings on its report:** `stateNames` THROWS on an unpublished
+definition (as `assembleListCards` always has; a fallback puts a slug where a name goes; the only producer
+of such a row is a fixture) — kept, the case says why; **7.210 DISCHARGED by measurement** —
+`projections/tickets.ts` forward-folds on `workflow.defined` (a monotone max-join), so `folded` and
+`latest` agree on the product path by construction; 7.214 writes the row back by hand and SAYS the product
+path cannot produce it, 7.215 pins the fold. The `applyAll` widening was REVERTED to "one projection for
+its own event" after the next gate falsified "a no-op for every existing caller" (6.91 passes a
+`workflow.defined` with a STUB payload) — *"a prediction wearing the clothes of a measurement"*, Lane A's
+own words for its own sentence. A `gate.log` rode into two commits via `git add -A` before the ignore;
+absent from HEAD. **#167:** `sweep-invite-tokens.ts` and `sweep-user-preferences.ts` under `src/tools/`
+with dry-run flags, membership through `resolveEffectiveRole` (P22); the review found two Importants
+(P22-compliant but untested against the one state where a project-scope roster row survives revocation;
+the preferences DELETE had no membership guard of its own, so a mid-sweep re-grant could destroy a
+now-current member's unrecoverable row) — fixed, re-verified by planting the surviving mutant, restored by
+sha256 because the files were untracked at review time. Neither CLI's `main()` is exercised by any test
+(pre-existing gap, owner named at 6.145); nothing scheduled — scheduling is Lane C's. **Lane D's "two
+pre-existing typecheck errors on main" was FALSE** (the stale-dist trap plus an ad-hoc `tsc -p`); D
+verified with `pnpm turbo run typecheck --force` (16/16 clean), struck the claim from its handoff and the
+PR body. *Never record a red as `main`'s without a `--force` build first.*
 
 ### RULING P37.3 (2026-09-06 09:40, controller as ruling tier) — a pending pull is DROPPED on 404, keyed by the notice that issued it; a newer notice re-arms it. Plus two fixture findings and `headSeq`'s correct definition
 
