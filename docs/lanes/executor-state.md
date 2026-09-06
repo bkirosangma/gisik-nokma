@@ -16,7 +16,105 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **LANE F FIXTURE-WITNESS PASS, PHASE 1 (INVENTORY) IN PROGRESS** on `exec/39-fixture-witnesses`
+# LANE A — **PHASE 2 BUILT. Gate running. PR next.** on `exec/39-fixture-witnesses`
+
+> Rebased onto `origin/main` **`2f18f3f`** (#161 merged, my freeze lifted). Merge-base verified
+> REACHABLE with `git branch --contains` — `main` is in the output, so it is not orphaned.
+
+## CORRECTION TO MY OWN PHASE 1 REPORT — the counts were labelled post-audit and were pre-audit
+
+I wrote *"counts below are AFTER those moves are applied by hand"* and then generated them from the
+RAW scanner rows without ever applying the auditor's challenges. **A check asserted about a pass that
+did not run — inside the artifact built to hunt exactly that.** Found by an advisor, not by me, and
+not by the fact that 76+29+52 = 157 was sitting there unchanged.
+
+| | pre-audit (what I published) | **post-audit (the record)** |
+|---|---|---|
+| MIRROR | 76 | **80** |
+| WITNESSED | 29 | **24** |
+| N.A. | 52 | **53** |
+
+Five verdicts moved (not the "five of twelve challenges" my prose implied — the other seven were
+refinements that KEPT their verdict). **One challenge matched no row by file:line** — the auditor
+cited `packages/sync-client/test/replica-data-source.test.ts:56` and no such row exists; it is named
+here rather than silently dropped. Three rows were self-reported `frozen_by_161` that are NOT on
+#161's diff (`sync-client/test/replica.test.ts:118/:216/:510`) — over-cautious, so it would have
+excluded work rather than let me edit a frozen file; every freeze flag was revalidated against the
+re-measured 31-file list instead of the agents' booleans.
+
+**And "two live divergences" was wrong: there are SIXTEEN non-empty divergence rows.** My filter
+matched the literal prefix `LIVE` on a free-text field. Fourteen were invisible to it, including the
+`bad-envelope` code and the ping/pong protocol. Another well-formed wrong answer from a query that
+never errored.
+
+## THE THREE WITNESSES, AND WHAT EACH ACTUALLY REACHES
+
+All in `apps/server/test/integration/fixture-witnesses.test.ts` — a NEW file, because the two files
+that execute client code against a real server were frozen when this began. Each runs the SHIPPED
+client module (imported through the `/online` subpath and EXECUTED) against the SHIPPED route through
+an `inject()`-backed `FetchLike`, carrying the server's own values between calls. **Reading a server
+constant into a client-side assertion is deliberately not counted as a witness — that agrees with
+source text, not with a running producer** (the controller's sharpening, and it was the right one).
+
+| case | property | mutation | result |
+|---|---|---|---|
+| **12.323** | an unrecognised cursor yields 200 + empty page, never 404 | route refuses when the cursor matched nothing | **1 failed, 3 passed** — 12.323 alone, `expected 500 to be 200` |
+| **12.324** | the shipped `getTickets` loop returns the complete row set | route drops the last card of the page | **2 failed** — 12.324 on `length of 3 but got 2`, and 12.323's own non-vacuity precondition, which is the guard working |
+| **7.221** | the door's sentence reaches `FoundingError.serverMessage` | route sends `{error, detail}`, constant keeps `message` | **1 failed, 3 passed** — 7.221 alone, `expected null to be 'A workspace needs a name.'` |
+| **12.325** | `nextCursor` is the LAST id of the page | `store.ts:96` emits the FIRST row instead | **one run over BOTH files: 1 failed, 13 passed** — 12.325 red, `notifications.test.ts`'s ten green beside it |
+
+**All four re-verified AFTER the typecheck fix, not carried over.** The first gate came back
+`EXIT=2` on `@gisik-nokma/server#typecheck` — a conditional `payload` spread produced a union
+fastify's `inject` overloads refuse — while **every test in that run passed**. Reading the `EXIT=`
+line rather than the background wrapper's own status is what caught it; a gate whose tests are all
+green is not a green gate. The fix rebuilt `injectFetch` as two concrete branches, which also made the
+witness stronger: the client's own `JSON.stringify` output now reaches the route verbatim instead of
+being parsed and re-serialised by the harness, so the server parses the client's bytes.
+
+Because that fix changed the harness `7.221` and `12.324` run through, **their mutation results were
+stale and were re-measured rather than argued about.** 3b still kills 7.221 alone with the same
+message. 12.325 does not use `injectFetch` at all, and it was re-run anyway — in ONE invocation
+covering both files, which is the cleanest form of the claim: same run, same mutation, the existing
+suite green and the new case red.
+
+**12.325's mutation is the measurement this whole pass exists to produce:** the existing suite cannot
+see a broken keyset cursor and the new case can. It works because the case uses `limit=2`, where the
+last row differs from the first; the existing test uses `limit=1`, where they coincide.
+
+### A mutation that was WORSE than it looked, kept because the lesson is the point
+
+7.221's FIRST mutation deleted `message` from `INVALID_NAME_BODY`. The case went red — and red **at
+its own non-vacuity guard** (`TypeError: Cannot read properties of undefined`), never reaching the
+carry it exists to test. A mutation that reddens the right case for the wrong reason is not evidence
+about that case. Replaced with one that breaks only what the route SENDS, keeping the constant intact,
+which fails at the property with the client's own null.
+
+### And a defect I found in my OWN case before the mutations
+
+12.324 was written as *"walks the real route to exhaustion"*. It does not: `LIST_PAGE_SIZE` is 200 and
+the loop hard-codes `limit=200`, so a three-ticket world is answered in ONE page and the multi-page
+threading is never reached. **That title was the same defect this pass catches at 7.221** — a name
+claiming more than the body keeps. The case now asserts its own reach (`calls` length 1, `limit=200`
+present, no `cursor=`), so the limitation is falsifiable rather than narrated: seed 201 tickets or
+drop the page size and that line goes red and says the reach changed. *Owner for closing the
+client-loop multi-page gap: whoever can afford a 201-ticket fixture, or a page-size seam.*
+
+## BOTH FIXTURE LIES CORRECTED AT SOURCE
+
+- `pagingFetch`'s 404 arm now narrows to an empty page. **The helper had TWO invented rules** — the
+  cursor as a page index (fixed in #176) and the unrecognised cursor as a 404 (found here).
+- `founding.test.ts:64` keeps its assertion and loses its overclaim: the literal is the door's real
+  `INVALID_NAME_BODY` and the title says what the case keeps.
+
+## IDS — recounted on this branch
+
+§12 block **12.320–12.339 used through 12.328** (12.323–12.325 witnesses, 12.326–12.328 ❌); next free
+**12.329**. §7: **7.221 minted**, next free **7.222**. `check-case-ids` **1,404 unique, union == sum**
+— run SEPARATELY from `check:env`, which is `check-env-example.mjs` alone.
+
+---
+
+# ↓ LANE A — PHASE 1 (INVENTORY) RECORD. **Its position line is superseded by the block above;** its anchors, ids and eight measured findings remain live.
 
 > **Position, 2026-09-06 ~12:50 IST.** Branch cut from `origin/main` `3e6d606`. Tree clean at cut.
 > Phase 1 is READ-ONLY by the override: inventory → report to controller → **wait for a scope answer**
@@ -161,104 +259,6 @@ nothing — they measured it, applying both reconciliations to `app-core` at onc
 15 passed / 0 failed with the divergences it exists to pin GONE. A witness must IMPORT the real
 client code through the `@gisik-nokma/app-core/online` subpath. That import resolves through `dist`,
 so any mutation run must rebuild rather than use bare `vitest`.
-
-# LANE A — **PHASE 2 BUILT. Gate running. PR next.** on `exec/39-fixture-witnesses`
-
-> Rebased onto `origin/main` **`2f18f3f`** (#161 merged, my freeze lifted). Merge-base verified
-> REACHABLE with `git branch --contains` — `main` is in the output, so it is not orphaned.
-
-## CORRECTION TO MY OWN PHASE 1 REPORT — the counts were labelled post-audit and were pre-audit
-
-I wrote *"counts below are AFTER those moves are applied by hand"* and then generated them from the
-RAW scanner rows without ever applying the auditor's challenges. **A check asserted about a pass that
-did not run — inside the artifact built to hunt exactly that.** Found by an advisor, not by me, and
-not by the fact that 76+29+52 = 157 was sitting there unchanged.
-
-| | pre-audit (what I published) | **post-audit (the record)** |
-|---|---|---|
-| MIRROR | 76 | **80** |
-| WITNESSED | 29 | **24** |
-| N.A. | 52 | **53** |
-
-Five verdicts moved (not the "five of twelve challenges" my prose implied — the other seven were
-refinements that KEPT their verdict). **One challenge matched no row by file:line** — the auditor
-cited `packages/sync-client/test/replica-data-source.test.ts:56` and no such row exists; it is named
-here rather than silently dropped. Three rows were self-reported `frozen_by_161` that are NOT on
-#161's diff (`sync-client/test/replica.test.ts:118/:216/:510`) — over-cautious, so it would have
-excluded work rather than let me edit a frozen file; every freeze flag was revalidated against the
-re-measured 31-file list instead of the agents' booleans.
-
-**And "two live divergences" was wrong: there are SIXTEEN non-empty divergence rows.** My filter
-matched the literal prefix `LIVE` on a free-text field. Fourteen were invisible to it, including the
-`bad-envelope` code and the ping/pong protocol. Another well-formed wrong answer from a query that
-never errored.
-
-## THE THREE WITNESSES, AND WHAT EACH ACTUALLY REACHES
-
-All in `apps/server/test/integration/fixture-witnesses.test.ts` — a NEW file, because the two files
-that execute client code against a real server were frozen when this began. Each runs the SHIPPED
-client module (imported through the `/online` subpath and EXECUTED) against the SHIPPED route through
-an `inject()`-backed `FetchLike`, carrying the server's own values between calls. **Reading a server
-constant into a client-side assertion is deliberately not counted as a witness — that agrees with
-source text, not with a running producer** (the controller's sharpening, and it was the right one).
-
-| case | property | mutation | result |
-|---|---|---|---|
-| **12.323** | an unrecognised cursor yields 200 + empty page, never 404 | route refuses when the cursor matched nothing | **1 failed, 3 passed** — 12.323 alone, `expected 500 to be 200` |
-| **12.324** | the shipped `getTickets` loop returns the complete row set | route drops the last card of the page | **2 failed** — 12.324 on `length of 3 but got 2`, and 12.323's own non-vacuity precondition, which is the guard working |
-| **7.221** | the door's sentence reaches `FoundingError.serverMessage` | route sends `{error, detail}`, constant keeps `message` | **1 failed, 3 passed** — 7.221 alone, `expected null to be 'A workspace needs a name.'` |
-| **12.325** | `nextCursor` is the LAST id of the page | `store.ts:96` emits the FIRST row instead | **one run over BOTH files: 1 failed, 13 passed** — 12.325 red, `notifications.test.ts`'s ten green beside it |
-
-**All four re-verified AFTER the typecheck fix, not carried over.** The first gate came back
-`EXIT=2` on `@gisik-nokma/server#typecheck` — a conditional `payload` spread produced a union
-fastify's `inject` overloads refuse — while **every test in that run passed**. Reading the `EXIT=`
-line rather than the background wrapper's own status is what caught it; a gate whose tests are all
-green is not a green gate. The fix rebuilt `injectFetch` as two concrete branches, which also made the
-witness stronger: the client's own `JSON.stringify` output now reaches the route verbatim instead of
-being parsed and re-serialised by the harness, so the server parses the client's bytes.
-
-Because that fix changed the harness `7.221` and `12.324` run through, **their mutation results were
-stale and were re-measured rather than argued about.** 3b still kills 7.221 alone with the same
-message. 12.325 does not use `injectFetch` at all, and it was re-run anyway — in ONE invocation
-covering both files, which is the cleanest form of the claim: same run, same mutation, the existing
-suite green and the new case red.
-
-**12.325's mutation is the measurement this whole pass exists to produce:** the existing suite cannot
-see a broken keyset cursor and the new case can. It works because the case uses `limit=2`, where the
-last row differs from the first; the existing test uses `limit=1`, where they coincide.
-
-### A mutation that was WORSE than it looked, kept because the lesson is the point
-
-7.221's FIRST mutation deleted `message` from `INVALID_NAME_BODY`. The case went red — and red **at
-its own non-vacuity guard** (`TypeError: Cannot read properties of undefined`), never reaching the
-carry it exists to test. A mutation that reddens the right case for the wrong reason is not evidence
-about that case. Replaced with one that breaks only what the route SENDS, keeping the constant intact,
-which fails at the property with the client's own null.
-
-### And a defect I found in my OWN case before the mutations
-
-12.324 was written as *"walks the real route to exhaustion"*. It does not: `LIST_PAGE_SIZE` is 200 and
-the loop hard-codes `limit=200`, so a three-ticket world is answered in ONE page and the multi-page
-threading is never reached. **That title was the same defect this pass catches at 7.221** — a name
-claiming more than the body keeps. The case now asserts its own reach (`calls` length 1, `limit=200`
-present, no `cursor=`), so the limitation is falsifiable rather than narrated: seed 201 tickets or
-drop the page size and that line goes red and says the reach changed. *Owner for closing the
-client-loop multi-page gap: whoever can afford a 201-ticket fixture, or a page-size seam.*
-
-## BOTH FIXTURE LIES CORRECTED AT SOURCE
-
-- `pagingFetch`'s 404 arm now narrows to an empty page. **The helper had TWO invented rules** — the
-  cursor as a page index (fixed in #176) and the unrecognised cursor as a 404 (found here).
-- `founding.test.ts:64` keeps its assertion and loses its overclaim: the literal is the door's real
-  `INVALID_NAME_BODY` and the title says what the case keeps.
-
-## IDS — recounted on this branch
-
-§12 block **12.320–12.339 used through 12.328** (12.323–12.325 witnesses, 12.326–12.328 ❌); next free
-**12.329**. §7: **7.221 minted**, next free **7.222**. `check-case-ids` **1,404 unique, union == sum**
-— run SEPARATELY from `check:env`, which is `check-env-example.mjs` alone.
-
----
 
 ## PHASE 1 COMPLETE — THE INVENTORY, AND THE FOUR THINGS IN IT THAT ARE NOT BOOKKEEPING
 
