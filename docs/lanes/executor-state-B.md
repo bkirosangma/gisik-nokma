@@ -12,37 +12,69 @@ only what is written here.
 
 ---
 
-## ⏸ POSITION AT THE 10:05 SESSION HALT — READ THIS FIRST
+## ⏸ POSITION AT THE 12:35 RELAUNCH — READ THIS FIRST
 
-**PR #161 is OPEN and HELD at `21ba6f4`.** It is NOT clear to merge. The fix round
-following the Fable branch review is nearly complete; what remains is enumerated at the bottom of this
-block. A resumed session finishes those, re-gates, and reports the head to the controller.
+**PR #161 is OPEN, CONFLICTING, and HELD at `632ad04`.** It is NOT clear to merge. `CONFLICTING` is the
+owed rebase, **not** a new defect. The previous session halted at the 10:32 limit with a full fix round
+ahead of it; nothing was lost — its tree was clean and its head is on `origin/exec/29-closure5b-reach`.
 
-| anchor | value |
-|---|---|
-| branch | `exec/29-closure5b-reach`, pushed at every commit |
-| HEAD | **`21ba6f4`** — P37.3 landed, `TicketPullNotFound` exported. Pushed; `git status` clean |
-| rebase owed | onto **`aa17046`** (#169 Lane A getMyWork residuals) — also #167 (`5ca3be1`, Lane D sweeps). Expect `test-cases/12` and `Features.md` hunks, KEEP BOTH, and re-run `pnpm install` |
-| node | v22.22.2 (`source ~/.nvm/nvm.sh && nvm use 22`) — the machine default is v24 and gives a FALSE RED of ~14 better-sqlite3 failures |
-| last full gate | **RED at `f814db3`** on one app-core fixture, since FIXED (`ticketIds` → `tickets`); **no green full gate exists after P37.2/P37.3** |
-| sync-client | **85/85 green** at `e52673e` |
-| server subset | 72/72 green across the six affected files, at the pre-P37.3 tree |
+| anchor | value | how verified |
+|---|---|---|
+| branch | `exec/29-closure5b-reach` | `git status --porcelain --branch` |
+| HEAD | **`632ad04`** — equals `origin/exec/29-closure5b-reach`; tree clean except an **untracked `gate.log`** (never `git add -A`; it rode into two of Lane A's commits that way) | `git rev-parse HEAD origin/…` |
+| merge-base | **`b4e2f14`** | `git merge-base HEAD origin/main` |
+| rebase owed | onto **`origin/main` = `3e6d606`** (supersedes the override's `5fca89e`, which is code-identical to `2d2bc5c`; `3e6d606` is one docs commit on Lane A's `executor-state.md` and does **not** touch this lane's files). Since `b4e2f14`: #154, #167, #169, #173, **#176**, docs | `git rev-parse origin/main`, `git show --name-only 3e6d606` |
+| conflicts expected | four files, all also changed by **#176**: `apps/server/test/integration/client-contract.test.ts`, `packages/app-core/src/online/stream.ts`, `Features.md`, `test-cases/12-offline-sync-apps.md`. **KEEP BOTH SIDES** — #176 added `LIST_PAGE_CAP`/`mapListPage`/`ListPage` and ids 12.256–12.259, 12.320–12.322, 7.220. Never drop a landed id | controller's measurement, 12:31 |
+| node | v22.22.2 (`source ~/.nvm/nvm.sh && nvm use 22`) — the machine default is v24 and gives a FALSE RED of ~14 better-sqlite3 failures | `node -v` |
+| last full gate | **still RED at `f814db3`** on one app-core fixture, since FIXED (`ticketIds` → `tickets`); **no green full gate exists after P37.2/P37.3.** The gate owed below is the first one that will | — |
+| §12 ids | this lane holds **12.290–12.319**; used through **12.316**, so **12.317 and 12.318 are the P37.3 pair** and 12.319 is the last. Next block if needed: **12.340–12.359, allocated 12:35** — add it to `test-cases/12`'s header in the same PR. Never mint above 12.359 without asking | `grep -o '12\.[0-9]\{3\}'`, sorted |
+| case-id control | at `632ad04`: `CHECK_EXIT=0` · bare 856 + bold 468 + marker-first 8 = **sum 1332 == union 1332**, zero duplicates, highest `13.100`, 10 files | `node scripts/check-case-ids.mjs` |
+| import style | `sync-engine.test.ts` imports `../src/replica/replica.js` and `../src/engine/sync-engine.js` — **relative, so a `src` mutation IS visible under bare vitest** (a by-package-name import would have resolved through a stale `dist` and returned a well-formed zero) | `sed -n '1,15p'` of the test file |
 
 ### WHAT IS OUTSTANDING, in order
 
-1. **P37.3 has NO excluding fixtures yet.** The controller required two, both directions, each alone:
-   **(i)** the revoked-project sequence — after ONE 404 the id is gone and no request is issued on any
-   later catch-up (mutate the drop away → red: a request per catch-up, for ever); **(ii)** the RACE — a
-   second notice for the same id arriving between the pull's issue and its 404 → the id stays pending and
-   the next catch-up pulls it (mutate the drop to UNCONDITIONAL → red). Ids: mint from **12.317**.
+1. **P37.3's two excluding fixtures, ids 12.317 and 12.318** — both directions, each alone.
+   **(i)** the revoked-project sequence: after ONE 404 the id is gone and **no request is issued on any
+   later catch-up** (mutate the drop away → red: a request per catch-up, for ever). Drive **two** later
+   catch-ups, not one — "no request on any later catch-up" is a claim about the steady state, and a single
+   catch-up cannot distinguish it from one-shot suppression.
+   **(ii)** the RACE: a second notice for the same id arriving between the pull's issue and its 404 → the
+   id stays pending and the next catch-up pulls it (mutate the drop to UNCONDITIONAL → red).
    Say at the case that "may not see" and "never existed" stay indistinguishable to the device, and that
-   this is why the drop is keyed to the notice rather than to the status code.
+   this is why the drop is keyed to the notice's `workspaceSeq` rather than to the status code.
+   **Discrimination is FOUR runs, not two** — each fixture must redden under its own mutation *and survive
+   the other*, or (ii) is measuring (i) twice.
 2. **Two handed-over `headSeq` mutations, derived but NOT run**, on `replica.ts`'s
-   `if ((await localHeadSeq(storage, id)) < headSeq)`: **never below** → predicted 7 red (12.305, 12.306,
-   12.308, 12.309, 12.311, 12.312, 12.313; only 12.310 survives); **always pull** (the `<=` off-by-one) →
-   predicted **12.305 and 12.313**, the only two notices carrying an equal-boundary id. **Run them in a
-   QUIET WINDOW under the lock with nothing else touching the tree** — see the contamination record.
-3. Rebase onto `aa17046`, `pnpm install`, rebuild, **full gate**, report the head to the controller.
+   `if ((await localHeadSeq(storage, id)) < headSeq)`. **The predictions were derived BEFORE 12.317/12.318
+   existed and both new fixtures route their initial entry through that same filter**, so report three
+   numbers — predicted-at-derivation, predicted-at-this-tree, measured — or a correct measurement reads as
+   a finding: **never below** → predicted 7 at derivation (12.305, 12.306, 12.308, 12.309, 12.311, 12.312,
+   12.313; only 12.310 survives), **9 at this tree** once the new pair lands; **always pull** (the `<=`
+   off-by-one) → **12.305 and 12.313**, unchanged at either tree, because an unheld id is `0 < h` and
+   `0 <= h` alike. **Run them in a QUIET WINDOW under the lock with nothing else touching the tree** — see
+   the contamination record. Restore with `git checkout HEAD -- <path>`, verify by READING the region.
+3. Rebase onto `3e6d606`, `pnpm install --frozen-lockfile`, `pnpm rebuild better-sqlite3`, rebuild,
+   recount §12, **full gate under lock v3.2**, push, re-report the head to the controller and HOLD.
+
+### ⚠️ THE RACE IN (ii) IS NOT REACHABLE THROUGH THE SOCKET, AND THE FIXTURE MUST SAY SO
+
+Derived at this tree, before writing: `applyChain` is **strictly serial**, and every `drainPendingPulls`
+call site — `applyOne`'s `reach-granted` arm, `recoverByPull`, `onCaughtUp` — is on that chain. A second
+notice arriving over the socket is queued *behind* the link that is holding the in-flight pull, so it
+cannot write between the pull's issue and its 404. `withTimeout`'s abandonment cannot deliver a late 404
+to the `catch` either: `Promise.race` has already settled, so that rejection is unhandled and never
+reaches `dropPendingPullIfUnchanged`. **Through the socket path, keyed and unconditional drop are
+behaviourally identical** — N2 has not written at drop time and re-adds the id afterwards either way — so
+the unconditional mutation SURVIVES any fixture driven purely through `onItem`.
+The honest second writer is the one `replica.ts`'s own docblock names: *"the set is public API and a shell
+may add to it too."* Fixture (ii) therefore writes through `replica.addPendingPulls` from inside
+`pullImpl`, and the case states that the interleaving is not socket-reachable today, that this models the
+documented public-API writer, and that the keying becomes socket-load-bearing only if the drain ever runs
+off-chain. Without that sentence a reader concludes the socket path is what is being pinned.
+
+**Recorded, not fixed, owner Plan 6/sync-client:** a pull abandoned by `withTimeout` that later rejects
+with `TicketPullNotFound` produces an **unhandled rejection** nobody catches — `Promise.race` has settled
+and `net/http-transport.ts` calls bare `fetch` with no `AbortSignal`. Outside these two fixtures' scope.
 
 ## LIVE ANCHORS — measured 2026-09-06 after the #139 merge and the closure-5b relaunch. RE-VERIFY BEFORE TRUSTING.
 
