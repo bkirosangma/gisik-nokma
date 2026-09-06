@@ -16,6 +16,55 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~01:20 IST — **§07 HAND-BACKFILL EXHAUSTED at 39 uncited (was 78). §13 SUBAGENT IS IN FLIGHT.** Branch `exec/62-s13-backfill`, pushed. Weekly reset ~5h away.
+
+| what | value |
+|---|---|
+| `main` | **`749cc46`** (#240 merged) |
+| branch | **`exec/62-s13-backfill`** off `749cc46`, head **`8a06ce4`**, pushed. **No PR yet** |
+| **§07** | **195 cited / 39 uncited / 234** (was 155/78 this session). Baseline **39** |
+| repo-wide | **1040 cited / 490 uncited** (was 815 uncited Sunday morning) |
+| **IN FLIGHT** | **§13 subagent**, ONE dispatch, all in-scope rows — cleared by the controller. **It was told NOT to touch `scripts/fixtures/check-case-citations-baseline.json`, so `check:citations` failing with "baseline is STALE — committed 153, reality is N" is its SUCCESS signal, not a regression.** It was also told to skip `packages/domain/test/doc-text.test.ts` (I hold it) |
+| gate | **NOT run since `4fb18fc`.** My §07 commits here are ungated — **gate before opening the PR** |
+
+## §07 is DONE as far as hand-work reaches — and the remainder is NOT more of the same
+
+Six per-file batches today: `compile-filter` 8 · `ticket-cards` 7 · `visible-where` 6 · `filter-spec` 3 ·
+`projections/search` 5 · `workspace-settings` (two files) 7 · three singletons. **78 → 39.**
+
+**Of the 39 left: 36 name NO test file at all, and 3 are in `doc-text.test.ts` (blocked only while §13 runs).**
+The 36 are a **reading job** — someone must decide what covers them. **Do not hand them to a transcriber and do
+not expect a per-file batch to fit them.** Controller has agreed they stay.
+
+## Two method facts earned today — both cost a wrong number first
+
+1. **A catalogue-id regex written for one style silently misses the other.** `- 7.x ✅` and `- ✅ **7.x —**`
+   both occur. Mine matched only the first and read **§13 as 133 ids where the checker read 160** — a 27-id gap I
+   caught only by comparing against `pnpm check:citations`. **Make a private instrument agree with the checker
+   before believing it**, and treat the checker as authoritative.
+2. **`7.72` vindicated the refusal.** I declined to cite it in `compile-filter.test.ts` this morning because the
+   row is about `tsvector` under `verify-projections` and nothing there asserts it — even though the row names
+   that file. Its real home turned out to be `apps/server/test/projections/search.test.ts:305`, which matches the
+   row almost sentence for sentence. **The refusal cost one uncited row for a few hours and bought a citation
+   that points at the test that actually proves the case.**
+
+## Citation shapes used, so the convention stays honest
+
+Cited on a **block** where the row's clauses are asserted by several tests (7.3, 7.55, 7.58, 7.69), on the
+**primary clause** with the docblock naming where the rest live (7.8, 7.11, 7.56), on **one half** of a two-file
+claim (7.49, 7.53), and on the **named control** where the row is a mutation RECORD rather than an assertion
+(7.66). **Never let a docblock imply one test proves a whole row.**
+
+## NEXT
+
+1. **When §13 lands:** verify comments-only with the controlled instrument, set its baseline to the measured
+   count, mutation-test, **gate** (my §07 commits are ungated), then open ONE PR covering §13 + §07 batches 4–6.
+2. **If §13's subagent died:** treat as **UNVERIFIED, not EMPTY** — read the tree first; a previous batch died
+   mid-run and all 98 of its citations were recovered.
+3. Then the 3 `doc-text.test.ts` rows, which unblock once §13 releases the file.
+4. **§12 block `12.380–12.399` is ALLOCATED but NOT CLEARED to start** — controller: "one thing at a time."
+
+
 # 🟣 MONDAY 2026-09-07 ~00:55 IST — **PR OPEN: clause A's last row + §07 backfill 78 → 57. Clause A is COMPLETE. Nothing in flight, no subagent, weekly reset ~5.5h away.**
 
 | what | value |
