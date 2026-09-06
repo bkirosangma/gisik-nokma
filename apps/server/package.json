@@ -12,6 +12,8 @@
     "verify:projections": "tsx src/tools/verify-projections.ts",
     "auth:schema": "tsx src/tools/auth-schema.ts",
     "sweep:notifications": "tsx src/tools/sweep-notifications.ts",
+    "sweep:invite-tokens": "tsx src/tools/sweep-invite-tokens.ts",
+    "sweep:user-preferences": "tsx src/tools/sweep-user-preferences.ts",
     "seed:cc": "tsx src/seed/cli-seed-convenience-corner.ts",
     "seed:dev": "tsx src/seed/cli-seed-dev-workspace.ts"
   },
