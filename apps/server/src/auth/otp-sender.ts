@@ -1,3 +1,5 @@
+import { APIError } from 'better-auth/api';
+
 /**
  * Delivery of one-time codes, abstracted so the transport is swappable.
  *
@@ -9,18 +11,79 @@ export interface OtpSender {
 }
 
 /**
- * Development implementation: logs the code and records it for tests.
- * Production delivery runs through a DLT-registered SMS provider behind this
- * same interface — a deployment concern, deliberately NOT implemented in this
- * plan (spec §6 names the errand).
+ * The machine-readable code a client switches on to hide phone sign-in.
  *
- * `sent` is what a test reads to learn the code that was issued.
+ * Shaped like better-auth's own `PHONE_NUMBER_ERROR_CODES` entries (the vendor
+ * answers `SEND_OTP_NOT_IMPLEMENTED` when no `sendOTP` is configured at all), so
+ * a client that already reads `body.code` off this plugin's refusals reads this
+ * one with no new branch.
+ */
+export const PHONE_SIGN_IN_UNAVAILABLE = 'PHONE_SIGN_IN_UNAVAILABLE';
+
+/**
+ * What a person is told. Not "something went wrong": the sentence names the
+ * door that IS open, because a refusal a user cannot act on is an outage with
+ * better manners.
+ */
+export const PHONE_SIGN_IN_UNAVAILABLE_MESSAGE =
+  'Phone sign-in is unavailable: this deployment has no SMS delivery channel. Sign in with your email address instead.';
+
+/**
+ * THE PRODUCTION OTP SENDER, and it refuses.
  *
- * **This class is not safe to run in production, for TWO reasons, and until the
- * real sender exists `src/index.ts` wires it anyway.** An earlier version of
- * this comment said "there is no production implementation that keeps a
- * transcript of every OTP the system has ever sent"; Plan 4 Task 2's assembly
- * made that sentence false, and it is corrected here rather than left standing.
+ * Sending an SMS to an Indian number requires a DLT-registered sender and
+ * template. This deployment has neither, so there is no SMS channel — and the
+ * honest implementation of "deliver this code by SMS" when no such channel
+ * exists is a refusal, not a pretence. What the alternative bought is worth
+ * naming, because it is what shipped until now: `LogOtpSender` on the
+ * production path answered `200 {"message":"code sent"}` to a person who would
+ * never receive anything, wrote the code where the operators could read it, and
+ * kept every code it ever issued in memory. All three are the same mistake —
+ * behaving as though a channel exists.
+ *
+ * **What the caller sees.** `501` with a JSON body carrying
+ * `code: "PHONE_SIGN_IN_UNAVAILABLE"` and a sentence pointing at email sign-in.
+ * The `APIError` is thrown from inside better-auth's `sendOTP` callback, which
+ * the `phone-number` plugin AWAITS (`routes.mjs`: `else await sendOTPResult`,
+ * taken because this server configures no `advanced.backgroundTasks.handler`),
+ * so it propagates out of `auth.handler` and the vendor's own router renders
+ * it. That is measured in `test/auth/null-otp-sender.test.ts` over the real
+ * mount, not inferred from the throw: a plain `Error` here would be a 500 with
+ * nothing a client could render, and the difference between the two is the
+ * whole point of this class.
+ *
+ * **One thing it does not undo.** The plugin writes its verification row BEFORE
+ * calling `sendOTP`, so a refused request still leaves an expiring row keyed by
+ * the phone number. It discloses nothing (the code is not in the response and
+ * not in the log) and it expires on its own; removing it would mean reaching
+ * into the vendor's storage from a sender, which is a worse trade.
+ *
+ * It holds no state, so there is nothing here to grow and nothing to dump.
+ */
+export class NullOtpSender implements OtpSender {
+  async send(_phoneE164: string, _code: string): Promise<void> {
+    throw new APIError('NOT_IMPLEMENTED', {
+      code: PHONE_SIGN_IN_UNAVAILABLE,
+      message: PHONE_SIGN_IN_UNAVAILABLE_MESSAGE,
+    });
+  }
+}
+
+/**
+ * DEVELOPMENT AND TEST ONLY: logs the code and records it for tests.
+ *
+ * `sent` is what a test reads to learn the code that was issued — it is the
+ * seam `test/helpers/session.ts`'s `signInWithPhone` signs users in through,
+ * which is how a route test gets a real bearer token without stubbing the
+ * sign-in path.
+ *
+ * **This class is not safe to run in production, for TWO reasons — and as of
+ * Plan 11 Task 4 nothing wires it there.** The errand recorded in `index.ts`
+ * (and in the coordination doc) was to remove both from the production path;
+ * `NullOtpSender` above is what that removal shipped as, and `selectOtpSender()`
+ * is the seam a test can hold it to. The faults are described rather than
+ * deleted, because the class still exists and a future contributor reaching for
+ * it in `src/` needs to know why they must not.
  *
  * 1. `log` writes every one-time code to the process log, where anyone with log
  *    access can sign in as anyone.
@@ -29,8 +92,8 @@ export interface OtpSender {
  *    and a heap dump or debugger attach that discloses the lot. A test file
  *    lives for seconds; a server does not.
  *
- * The real sender must do neither. Both faults live in this class rather than in
- * the interface, so replacing the implementation removes them together.
+ * Both live in this class rather than in the interface, which is why swapping
+ * the implementation removes them together and touches nothing else.
  */
 export class LogOtpSender implements OtpSender {
   public readonly sent: Array<{ phoneE164: string; code: string }> = [];

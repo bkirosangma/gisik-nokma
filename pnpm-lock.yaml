@@ -169,6 +169,9 @@ importers:
       node-pg-migrate:
         specifier: ^7.9.0
         version: 7.9.1(@types/pg@8.23.1)(pg@8.23.0)
+      nodemailer:
+        specifier: ^10.0.0
+        version: 10.0.0
       pg:
         specifier: ^8.13.0
         version: 8.23.0
@@ -4535,6 +4538,10 @@ packages:
   node-releases@2.0.54:
     resolution: {integrity: sha512-YHs7BmmcsdAI5Ozuf8JZo6PT0mv2GIWC9vMfvUC3dp65M8hn7Ux8CPL+2oBI7juNuj9d0ndhTcznq2ODBps9cQ==}
     engines: {node: '>=18'}
+
+  nodemailer@10.0.0:
+    resolution: {integrity: sha512-wdv+hXBg0iIPIOf108FaZyTxqjQpCvQeAJt9pHHTooPy/y3vQtI9eiImM9AIVKR3e/0FeMA1oueNfBjFJcaK+Q==}
+    engines: {node: '>=20.0.0'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -10468,6 +10475,8 @@ snapshots:
       '@types/pg': 8.23.1
 
   node-releases@2.0.54: {}
+
+  nodemailer@10.0.0: {}
 
   normalize-path@3.0.0: {}
 

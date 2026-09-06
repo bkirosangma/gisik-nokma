@@ -99,8 +99,8 @@ main as part of P33.
 | T1 | config surface + `/healthz` **deploy SHA** (P33) + strict URL validation | **DONE** — CA-discard Critical fixed |
 | T2 | CORS + 3 rate-limit buckets + **HTTP-Origin** + invite-mint bucket | **DONE — `805b39c`** (rebased). Critical fixed: `trustProxy` made the limiter key attacker-chosen |
 | T3 | error alerting hook | **DONE — `b5ec53a`.** 2 Criticals, both guards that could not fire |
-| T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | **NEXT** — dispatch staged at `scratchpad/t4-workflow.js` |
-| T5b | SIGTERM / shutdown path (inherited errand #2) | not started |
+| T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | **DONE.** 3 Importants, incl. a 2-minute sign-in hang |
+| T5b | SIGTERM / shutdown path (inherited errand #2) | **NEXT** — plan has no text for it; the 3197ms/172ms measurement is the spec |
 | T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
 
 **Seam 2 (PR 2) — T7 seed plumbing · T8 Convenience Corner mapping · T9 seed runner · T10 dev seed ·
@@ -1305,3 +1305,62 @@ protocol, correct exclusion — the property v2 lacked.
 **That peer is itself the confirmation for correction #3:** the broadened matcher sees `gate77.sh`
 (`gate: 8994 bash`), and the broadcast `gate\.sh` pattern would not — a third differently-named gate,
 after `gate19.sh`, in the space of one session.
+
+---
+
+# T4 — landed. Three Importants, and the OTP errand closed by swapping the wiring
+
+## The sign-in that hangs for two minutes
+
+`createTransport(smtpUrl)` takes nodemailer's defaults — **connectionTimeout 2 min, greetingTimeout 30 s,
+socketTimeout 10 min** (read from the installed `dist/esm/smtp-connection/index.js:11-13`). `sendMagicLink`
+is awaited inside better-auth, so **an unreachable mail host holds the sign-in request open**. Measured
+against a blackholed address: the promise was **still pending at 20 000 ms**.
+
+Fixed with `SMTP_TIMEOUTS_MS = { connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 }`
+passed as `createTransport({ url: smtpUrl, ...SMTP_TIMEOUTS_MS })` — the obvious second-argument form is
+**inert**, which the docblock records as measured rather than assumed. Pinned by a test against a local
+listener that **accepts the socket and never sends an SMTP banner**, which exercises the greeting bound
+rather than only the connect bound. Mutation reverting to defaults produces **30 005 ms** where the guard
+expects seconds.
+
+## A test whose reach stopped before the wire
+
+`jsonTransport` hands back the text **BEFORE transfer-encoding**, so the "URL alone on its own line"
+assertion was true of the composed object and **false of the transmitted message**. Swapped to
+`streamTransport: true, buffer: true`, which applies the real encoding with still no network.
+
+**The test was content-dependent and that is how it was caught:** the first wire-shape version asserted
+`quoted-printable` against a short toy URL and FAILED, because nodemailer picks `7bit` when no line
+exceeds 76 columns. The fixture is now a realistic >76-column better-auth link, so the encoding step has
+work to do.
+
+## `@types/nodemailer` was added on a wrong measurement — and REMOVED
+
+The justification was "nodemailer 10 ships no `types` field, so the types package is load-bearing".
+**Under `moduleResolution: NodeNext`, absence of a `types` field is not absence of types**: nodemailer 10
+ships **76 `.d.ts` files** and a `typesVersions` block, and TypeScript resolves the sibling `.d.ts` beside
+the `exports`-resolved ESM entry. Proven with `--traceResolution`. **Removed; `tsc -p
+tsconfig.typecheck.json` exits 0 without it** (re-verified independently here).
+
+## The OTP errand: `NullOtpSender`, not a stripped array
+
+The choice turned on one constraint: **stripping `sent` fixes fault #2 and leaves fault #1 standing** —
+`index.ts` would still wire a sender whose `log` writes every one-time code to the process log. Only
+swapping the wiring clears both. It also costs **zero churn** against ~20 test files that annotate
+`let otp: LogOtpSender` and the two readers of `.sent`. `LogOtpSender` keeps both faults **by design as a
+dev double**, and its docblock now says so.
+
+A refusal is a product decision, so it says what a user sees: `APIError('NOT_IMPLEMENTED')` → **501** with
+`{code: 'PHONE_SIGN_IN_UNAVAILABLE', message}` and nothing else, shaped like the vendor's own error codes.
+Verified through the **real route** on a real database, with a **positive control** — an identical second
+server differing only in the `OtpSender` answers 200 — without which the 501 would be consistent with a
+merely broken route.
+
+**Not undone, and stated at the docblock:** the plugin calls `createVerificationValue` BEFORE `sendOTP`,
+so a refused request still leaves an expiring verification row. It discloses nothing and expires itself.
+
+## The Nit deliberately NOT applied
+
+`requireTLS: true` would break an `smtp://` Mailpit dev deployment — **the exact configuration
+`selectMagicLinkSender` exists to serve**. Recorded, not silently dropped.

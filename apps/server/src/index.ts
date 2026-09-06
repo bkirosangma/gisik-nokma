@@ -3,8 +3,7 @@ import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
 import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
-import { LogMagicLinkSender } from './auth/magic-link-sender.js';
-import { LogOtpSender } from './auth/otp-sender.js';
+import { selectMagicLinkSender, selectOtpSender } from './auth/select-senders.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
@@ -81,23 +80,27 @@ async function main(): Promise<void> {
   });
   const auth = createAuth({
     pool,
-    // The senders that exist, and neither is deployable.
+    // The senders, chosen by `select-senders.ts` and by nothing here.
     //
-    // `LogOtpSender` does two things a production process must not. It writes
-    // every one-time code to the process log, so anyone with log access can sign
-    // in as anyone. And it accumulates every code it has ever issued in an
-    // unbounded in-process array (`otp-sender.ts`'s `sent`) — memory that grows
-    // for the life of the process, and a heap dump that discloses the lot. The
-    // array exists so a test can read the code that was issued; nothing on this
-    // path ever reads it.
+    // Both decisions used to be inline at this spot, which made them decisions
+    // no test could reach: `main()` opens a pool on its first line, so nothing
+    // in the suite could observe that the production OTP sender had quietly
+    // become the one that logs codes again. They are pure functions of config
+    // now, and `test/auth/select-senders.test.ts` fails if either flips.
     //
-    // Real delivery through a DLT-registered SMS provider and an email transport
-    // is the deployment errand Plan 4 names and does not do. Both are behind an
-    // interface, so the swap is one line each and touches nothing else — and
-    // both faults leave with the implementation, because neither is in the
-    // interface.
-    otpSender: new LogOtpSender(),
-    magicLinkSender: new LogMagicLinkSender(),
+    // What changed here, and it is the errand Plan 4 recorded and left open:
+    // this line used to read `new LogOtpSender()`. That sender wrote every
+    // one-time code to the process log AND kept every code it ever issued in an
+    // unbounded in-process array, on the path a real deployment runs. Both are
+    // gone from production because the class is gone from production —
+    // `selectOtpSender()` returns a `NullOtpSender`, which holds no state and
+    // refuses with a 501 a client can render, because there is no
+    // DLT-registered SMS channel for it to be honest about.
+    otpSender: selectOtpSender(),
+    // `SMTP_URL` set means real mail (Mailpit in dev-compose, any SMTP provider
+    // in production — the vendor stays out of this repository); unset keeps the
+    // log sender, which is the dev path and not a degraded server.
+    magicLinkSender: selectMagicLinkSender(config),
     // Both come from validated configuration, not from `process.env` with a
     // fallback: a server that silently signs sessions with a secret checked into
     // the repository is worse than a server that will not start.
