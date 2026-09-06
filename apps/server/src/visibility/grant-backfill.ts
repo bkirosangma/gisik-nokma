@@ -191,6 +191,21 @@ export function isGrantBackfillTrigger(type: string): boolean {
  * nothing else. That is the line 6.82 and 6.94 draw, and this stays the legal
  * side of it.
  *
+ * **Neither this walk nor `reResolveSubtree`'s carries a WORKSPACE predicate**, and that is inherited
+ * rather than introduced — `proj-visibility.ts`'s own children query is
+ * `WHERE parent_id = $1` with no workspace clause either. Adding one HERE would
+ * be the drift this function exists to avoid: two answers to "whose row did that
+ * event change", from two queries that no longer match. It is not a disclosure
+ * in any case, because the audience question is still asked once per candidate
+ * of `canSee`, which resolves each ticket's OWN workspace
+ * (`can-see.ts`: `getResolvedVisibility` then `resolveEffectiveRole(v.workspaceId)`)
+ * — so a foreign-workspace candidate is admitted only to someone who may see it
+ * there. What it could do, IF a cross-workspace `parent_id` is reachable at all
+ * (not established here), is put a foreign ticket's id in a notice tagged with
+ * THIS workspace. *Recorded, not fixed, and not closure 5b's to fix: the fix
+ * belongs wherever a cross-workspace parent is either refused or declared legal.
+ * Owner: unassigned.*
+ *
  * `visited` guards a `parent_id` cycle, exactly as `reResolveSubtree`'s does and
  * for the reason case 6.58 records: nothing on this branch refuses a
  * cycle-creating reparent, so a walk that assumed acyclicity would hang the
