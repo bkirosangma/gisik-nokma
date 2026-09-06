@@ -1206,3 +1206,59 @@ problem this image does not have.
 `onClose` hooks `app.ts` already registers (stop the snapshot writer, close the stream hub, unsubscribe
 the notification fan-out) — `index.ts`'s snapshot-writer docblock says in terms that it hung its stop on
 that hook *"on the day Plan 11 adds a real shutdown"*. Then `await pool.end()`. **That day is this task.**
+
+---
+
+# THE LOCK HOLE I PREDICTED AND DID NOT CLOSE — path C
+
+Two hours before it happened, this file said: *"empty pid ⇒ dead holder is an inference, not a
+measurement… if two gates are ever seen running at once, this is the first place to look."*
+**Lane D then saw it.** Its bare `mkdir` won the directory, and this lane's pid appeared inside it
+afterwards.
+
+**D's mechanism was wrong; D's conclusion was right.** This script has always used bare
+`mkdir "$LOCK"` (line 48), never `mkdir -p` — the exclusion is atomic. The hole was a SECOND
+acquisition path. Three routes existed, not one:
+
+| path | how the lock was taken | sound? |
+|---|---|---|
+| **A** | `mkdir` succeeds outright | yes — atomic |
+| **B** | `ps -p <pid>` FAILS → release → `mkdir` | yes — a real corpse |
+| **C** | **pid file EMPTY 60s → release → `mkdir`** | **NO — no `ps -p` anywhere in it** |
+
+**Path C cannot tell a holder that writes no pid file from a holder that died between `mkdir` and its
+pid write.** After 60s it deleted a LIVE peer's lock. The controller offered an explanation that would
+have exonerated this script (D's pid naming an already-exited shell, or a release-then-acquire inside
+one poll); **it was declined, because path C exists and is exactly the "rm + mkdir without a `ps -p`
+failure in between" the controller asked me to rule out.**
+
+**Fixed:** path C now requires the machine to be **observably idle** as well as the timer to expire —
+zero peer gate scripts besides itself, zero live vitest workers — and prints which condition it failed
+when it declines. Orphaned directories still clear, because *nothing running* is what orphaned means.
+Inference replaced by measurement.
+
+**Path C fired benignly once before, at 07:38**, while the controller's gate waited (verified harmless at
+the time: its only child was a `sleep`, so it was in its acquire loop, not running turbo). **That was the
+warning, and I filed it instead of closing it.**
+
+## The lesson that generalises — it is NOT "write a pid file"
+
+That is true but small. The real one: **a lock protocol shared by scripts that DIFFER is not one
+protocol.** This reclaim was safe against *this* script's invariants and unsafe against a peer's, and
+nothing in either script could see the other's assumptions. **Predicting a failure is not preventing it.**
+
+**The form that removes the window entirely** — put to the controller as a five-lane protocol change
+rather than made unilaterally, since a mixed protocol is worse than either:
+
+```
+set -o noclobber; echo $$ > /tmp/gisik-gate.lock   # create AND fill, one atomic operation
+```
+
+No interval exists in which the lock is held but unattributed, so path C has nothing to misread.
+
+## Evidence on the half that WAS sound
+
+The pid written is the process that survives the whole gate: **13 locked runs this session**, each with
+`LOCK ACQUIRED pid=N` and its `EXIT=` line in the same backgrounded invocation
+(`bp05hmtdf`: acquired 00:58:32, finished 00:59:57 — 85s, one bash). So `ps -p` on this lane's pid
+mid-gate always succeeds, and **path B was never the problem.**
