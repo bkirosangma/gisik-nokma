@@ -15,7 +15,9 @@
     "sweep:invite-tokens": "tsx src/tools/sweep-invite-tokens.ts",
     "sweep:user-preferences": "tsx src/tools/sweep-user-preferences.ts",
     "seed:cc": "tsx src/seed/cli-seed-convenience-corner.ts",
-    "seed:dev": "tsx src/seed/cli-seed-dev-workspace.ts"
+    "seed:dev": "tsx src/seed/cli-seed-dev-workspace.ts",
+    "ops:backup-once": "tsx src/ops/backup-daemon-main.ts --once",
+    "ops:fetch-backup": "tsx src/ops/fetch-backup.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.700.0",
