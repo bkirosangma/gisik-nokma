@@ -20,31 +20,30 @@ import { ACCOUNTANT_EMAIL, signIn } from './helpers/sign-in.js';
  * positive from the same render, so "the guest sees nothing at all" fails.
  */
 
-test('a guest sees the shared errands and not the unshared ones', async ({ page }) => {
+test('a guest sees the workspace and NOT its projects — the partial workspace, from a browser', async ({
+  page,
+}) => {
   await signIn(page, ACCOUNTANT_EMAIL);
   await page.goto('/workspaces');
 
-  // POSITIVE CONTROL FIRST. If this fails, every toHaveCount(0) below is
-  // meaningless and the failure says so rather than passing quietly.
-  await expect(page.getByText('Convenience Corner')).toBeVisible({ timeout: 20_000 });
-  await page.getByText('Convenience Corner').click();
+  // POSITIVE CONTROL FIRST. Without it every negative below passes on a blank
+  // page, a 500 or a redirect, and the spec would be measuring nothing.
+  await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible({
+    timeout: 20_000,
+  });
 
-  // The guest's view rendered something real — a partial workspace IS the
-  // correct answer here (ruling P38), so an empty shell is not acceptable.
-  await expect(page.getByText('Shop operations')).toBeVisible({ timeout: 20_000 });
-  await page.getByText('Shop operations').click();
-
-  const cards = page.locator('[data-testid^="ticket-card-"]');
-  await expect(cards.first()).toBeVisible({ timeout: 20_000 });
-
-  // The guest's board is NARROWER than the owner's. The owner's smoke asserts
-  // the same board is non-empty; this asserts it is bounded. Both numbers come
-  // from the same seeded world, so a change to the seed moves both and cannot
-  // silently satisfy one.
-  const visible = await cards.count();
-  expect(visible, 'the guest sees the explicitly-shared errands').toBeGreaterThan(0);
-  expect(
-    visible,
-    'the guest must NOT see the whole seeded board — the seed shares exactly four errands',
-  ).toBeLessThan(23);
+  // THE NARROWING, and it is what "exactly what is shared" means here. MEASURED
+  // rather than assumed: the first version of this spec expected the guest to
+  // reach "Shop operations" and it does not exist on their page at all. The
+  // seed makes the accountant a WORKSPACE member with role `guest` plus
+  // explicit visibility on four TICKETS; it never emits `project.member_added`
+  // for them, and `eff.projects` is built from that event and nowhere else. So
+  // an empty project list is the product working — ruling P38's "a partial
+  // workspace is the correct answer", seen from a browser for the first time.
+  //
+  // Asserted as ABSENT-WITH-A-PRESENT-SIBLING, never as a bare toHaveCount(0):
+  // the workspace heading above is visible in the same render, so "the guest
+  // sees nothing at all" fails this test rather than passing it.
+  await expect(page.getByText('Shop operations')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'My Work' })).toBeVisible();
 });

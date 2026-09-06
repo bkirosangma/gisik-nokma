@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { fetchMagicLink, purgeInbox } from './helpers/mailpit.js';
 import { ACCOUNTANT_EMAIL, OWNER_EMAIL } from './helpers/sign-in.js';
-import { assertStackIsTheStack, SERVER } from './helpers/stack.js';
+import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
 
 /**
  * People first, then the seed — people are never invented.
@@ -24,13 +24,28 @@ const REPO_ROOT = new URL('../../../', import.meta.url).pathname;
 
 async function createUser(email: string): Promise<void> {
   await purgeInbox();
+  // `Origin` is sent DELIBERATELY, and the reason is a measured one rather than
+  // a cargo-culted header. Node's fetch presents `Sec-Fetch-*` headers, which
+  // is browser provenance, so better-auth's `validateFormCsrf`
+  // (`origin-check.mjs:141`) force-validates the origin — and with no `Origin`
+  // present that is `403 MISSING_OR_NULL_ORIGIN`. curl, which sends no
+  // `Sec-Fetch-*` at all, falls through the same code unchecked and answers
+  // 200, which is why a curl probe and this helper disagreed. Sending WEB, the
+  // origin a browser really presents, is both the fix and the faithful thing.
   const requested = await fetch(`${SERVER}/api/auth/sign-in/magic-link`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin: WEB },
     body: JSON.stringify({ email, callbackURL: '/' }),
   });
   if (!requested.ok) {
-    throw new Error(`magic-link request for ${email} answered ${requested.status}`);
+    // The BODY, not only the status. An earlier version of this line printed
+    // `answered 403` alone, and that hid which of two different refusals it was
+    // — INVALID_ORIGIN (the product defect) or MISSING_OR_NULL_ORIGIN (this
+    // helper's own missing header). A failure message that cannot tell two
+    // causes apart costs exactly one debugging round every time it fires.
+    throw new Error(
+      `magic-link request for ${email} answered ${requested.status}: ${await requested.text()}`,
+    );
   }
   const link = await fetchMagicLink(email);
   const verified = await fetch(link, { redirect: 'manual' });
