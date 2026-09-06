@@ -1206,6 +1206,22 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           cb({ type: 'purge', workspaceId, entityId: item.entityId });
           return;
         }
+        if (item.kind === 'reach-granted') {
+          // Ruling P37.1, closure 5b(d). Re-emitted rather than swallowed: a
+          // view subscribed here is entitled to know that tickets are on their
+          // way, and a DataSource that quietly dropped a frame the engine acted
+          // on would be a second, disagreeing account of the stream.
+          //
+          // It is a NOTIFICATION and nothing more — the pull itself is the
+          // engine's, and the ids named here are not held yet. A consumer that
+          // treats this as "these tickets are now readable" will read too
+          // early; the arrival that matters is the ordinary `event` frame that
+          // follows once each pull lands.
+          if (item.workspaceId === workspaceId) {
+            cb({ type: 'reach-granted', workspaceId, ticketIds: item.ticketIds });
+          }
+          return;
+        }
         if (item.workspaceId === workspaceId && item.projectId === undefined) {
           cb({ type: 'scope-revoked', workspaceId });
         }

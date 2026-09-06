@@ -51,7 +51,7 @@ export function streamUrl(baseUrl: string): string {
  * copy and its five members omit `scope-revoked`, so a revoked device would be
  * told nothing and keep showing work it was removed from.
  */
-type HandledFrameType = 'event' | 'purge' | 'scope-revoked' | 'caught-up' | 'error';
+type HandledFrameType = 'event' | 'purge' | 'scope-revoked' | 'reach-granted' | 'caught-up' | 'error';
 
 type AssertTrue<T extends true> = T;
 
@@ -214,6 +214,26 @@ export function createHttpTransport(opts: {
           // instruction carrying one, so a `projectId` on the wire is not a
           // narrowing this client may honour — nothing here reads one.
           handlers.onItem({ kind: 'scope-revoked', workspaceId });
+          return;
+        }
+        if (frame.type === 'reach-granted') {
+          // Ruling P37.1, closure 5b(d): the reader's reach grew and these are
+          // the ids it now admits. Validated the way every other id-bearing
+          // frame here is — an array of strings, non-empty — because the ids go
+          // straight into a durable pending set and then into request URLs; a
+          // frame carrying `[null]` would persist a `"null"` this device asks
+          // for on every catch-up forever.
+          //
+          // Filtered rather than refused WHOLE on a bad element, unlike
+          // `caught-up` above. The asymmetry is the consequence, not a
+          // preference: a bad cursor is terminal and survives restarts, whereas
+          // a dropped id costs one un-pulled ticket that the NEXT widening
+          // names again. Refusing the whole frame over one bad element would
+          // discard the good ids with it.
+          if (!Array.isArray(frame.ticketIds)) return;
+          const ticketIds = frame.ticketIds.filter((id: unknown): id is string => typeof id === 'string' && id !== '');
+          if (ticketIds.length === 0) return;
+          handlers.onItem({ kind: 'reach-granted', workspaceId, ticketIds });
           return;
         }
         if (frame.type === 'caught-up') {

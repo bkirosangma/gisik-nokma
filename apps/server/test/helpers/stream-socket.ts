@@ -157,6 +157,11 @@ export const frameIds = (socket: FakeSocket): string[] =>
         return `purge:${frame.entityId}`;
       case 'scope-revoked':
         return `scope-revoked:${frame.workspaceId}`;
+      case 'reach-granted':
+        // The IDS, not a count. A `reach-granted:3` spelling would make two
+        // notices naming different tickets compare equal, which is the whole
+        // property closure 5b(d)'s excluding fixtures assert.
+        return `reach-granted:${frame.ticketIds.join(',')}`;
       case 'caught-up':
         return `caught-up:${frame.seq}`;
       case 'error':

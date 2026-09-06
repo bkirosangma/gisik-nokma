@@ -3,7 +3,7 @@ import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canSee } from './can-see.js';
-import { grantBackfillFor, isGrantBackfillTrigger } from './grant-backfill.js';
+import { grantNoticeFor, isGrantBackfillTrigger } from './grant-backfill.js';
 
 /**
  * "This ticket is gone — delete whatever you hold for it."
@@ -175,7 +175,25 @@ export interface ScopeRevokedInstruction {
  * Recorded as a cross-plan finding, owner Plan 10 — that plan codes against
  * this contract without reading this file.
  */
-export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
+/**
+ * "Your reach grew; here are the ids it now admits." Ruling P37.1, closure
+ * 5b(d) — the pull-shaped replacement for the grant-side history burst that
+ * closure 5 emitted here.
+ *
+ * See `stream-frames.ts`'s wire declaration for the full argument, including
+ * why this is not case 6.101's purge walk arriving from the other direction.
+ * The short form: a purge names an entity to a device that may never have held
+ * it, which is news; a notice names ids the recipient may at that moment read
+ * in full, which is not.
+ *
+ * The list is what the reader's `canSee` admits, NOT what the reader lacks —
+ * the server does not model a device's holdings and must not start. The client
+ * drops the ids it already has, which is also what makes a repeated no-op
+ * `visibility.set` cost a holding client nothing.
+ */
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; ticketIds: string[] };
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /**
  * Who an event about this entity kind is for, before any per-ticket question is
@@ -420,13 +438,27 @@ export async function* visibleEventsFor(
           // never reach this line and therefore needs no before-image to
           // exclude, is `grant-backfill.ts`'s docblock.
           //
-          // Before the event, not after: the backfill is earlier history, and
-          // `seq` order is the order a consumer that is not a full-replay folder
-          // would need. Neither this nor any backfilled envelope can move a
-          // cursor — both consumers advance only on `workspaceSeq > cursor` and
-          // every backfilled envelope is at or below `afterSeq`.
+          // Ruling P37.1: a bounded NOTICE, yielded BEFORE its trigger, never
+          // the history it used to carry.
+          //
+          // Before-and-not-after is the load-bearing half. The client must have
+          // pulled a ticket before a folded `ticket.reparented` for it arrives,
+          // or `applyTicketEvent` replays a transition with no `ticket.created`
+          // and stalls the engine terminally. Under the OLD push shape this
+          // ordering was the unsafe repair — putting the trigger first to
+          // advance the cursor ahead of the burst — and it is safe here for the
+          // reason that stopped being true of it: a notice carries no history
+          // to sit behind, so there is no burst to advance the cursor past.
+          //
+          // The notice cannot move a cursor either. Both consumers advance only
+          // on `workspaceSeq > cursor` (`stream/hub.ts`'s `drain`, and the
+          // dual-client rig's `syncDown`), and an instruction has no
+          // `workspaceSeq` at all — which here is a requirement rather than an
+          // accident, because the notice must be RE-DELIVERED if the socket
+          // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
-            yield* grantBackfillFor(db, userId, env.entity.id, afterSeq, backfilled);
+            const ticketIds = await grantNoticeFor(db, userId, env.entity.id, backfilled);
+            if (ticketIds.length > 0) yield { kind: 'reach-granted', workspaceId, ticketIds };
           }
           yield env;
         }

@@ -70,10 +70,25 @@ export type PurgeInstruction = { kind: 'purge'; entityId: string };
  */
 export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: string; projectId?: string };
 
-export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
+/**
+ * "Your reach grew; here are the ids it now admits." Ruling P37.1, closure
+ * 5b(d) — the pull-shaped replacement for the grant-side history burst.
+ *
+ * The replica's handling is deliberately small: record the ids it does NOT
+ * already hold as owed, and stop. It cannot pull — it has no transport — so
+ * fetching is the sync engine's job, and keeping the split means the replica
+ * stays a store rather than becoming a second client.
+ *
+ * `ticketIds` may name tickets this device already holds. The server does not
+ * model a device's holdings and must not start; the client is the only party
+ * that knows, which is the same inversion `reconcile` uses.
+ */
+export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; ticketIds: string[] };
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /** The two members that carry a top-level `kind`. */
-export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction;
+export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /**
  * `true` when `item` is an instruction rather than an event envelope.

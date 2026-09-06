@@ -1180,6 +1180,29 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       case 'scope-revoked':
         await replica.revokeScope(instruction);
         return { applied: true };
+      case 'reach-granted': {
+        // Record what this device does not already hold, and STOP. The replica
+        // has no transport and must not grow one — fetching is the engine's
+        // job, and keeping the split is what stops this store becoming a second
+        // client.
+        //
+        // The holdings filter lives HERE rather than on the server because the
+        // server does not model a device's holdings and must not start; the
+        // client is the only party that knows. It is also what makes a repeated
+        // no-op `visibility.set` — which `check-permission.ts` does not refuse
+        // — cost a client that already holds the subtree nothing at all.
+        //
+        // A ticket held only as unfolded events has no `tickets` row and is
+        // therefore treated as NOT held, so it is pulled again. That is
+        // over-delivery, and over-delivery is the side this door is allowed to
+        // err on: `loadTicketBootstrap` is idempotent by event id.
+        const missing: string[] = [];
+        for (const ticketId of instruction.ticketIds) {
+          if ((await replica.getTicket(ticketId)) === null) missing.push(ticketId);
+        }
+        await replica.addPendingPulls(instruction.workspaceId, missing);
+        return { applied: true };
+      }
     }
   }
 

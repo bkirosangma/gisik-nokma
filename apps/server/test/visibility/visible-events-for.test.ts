@@ -86,7 +86,11 @@ function idsOf(items: readonly SyncItem[]): string[] {
     'kind' in item
       ? item.kind === 'purge'
         ? `purge:${item.entityId}`
-        : `scope-revoked:${item.projectId ?? item.workspaceId}`
+        : item.kind === 'reach-granted'
+          ? // The ids, not a count: two notices naming different tickets must
+            // not compare equal — see the same spelling in `stream-socket.ts`.
+            `reach-granted:${item.ticketIds.join(',')}`
+          : `scope-revoked:${item.projectId ?? item.workspaceId}`
       : item.id,
   );
 }
