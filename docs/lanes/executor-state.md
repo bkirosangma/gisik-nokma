@@ -3261,7 +3261,16 @@ Merged this session: #109, #125, #128, #137, #143. **Do not restart C2 in this s
 ## THE QUEUE AFTER BOTH MERGE — controller-ordered
 1. **`WorkItem.stateName`** — buildable, same shape as `ListRow.stateName`; the version is on `proj_tickets` via `PROJ_TICKET_COLUMNS`. Front of the queue.
 2. **`ContestedClaim.title`** — buildable if `getAttention` already serves it (one join in `GET /v1/contests`).
-3. **`ContestedClaim.claim.serverTime` — DO NOT BUILD. Awaiting a ruling.** The measurement is in #150's body and is the load-bearing part: `SubmittedEvent = Omit<EventEnvelope,'serverTime'|'seq'>` so the stored `original_event` has the claimant's `clientTime` and NO server instant by construction; `proj_contested.contested_at` IS a recorded instant but it is the CONTEST event's — when the server filed the refusal, not when it received the claim. **No row records a server instant for the refused claim itself.** Opposite of P36, where the row DID record it and the writer dropped it. Spending `contested_at` is P36's refused option 3.
+3. **`ContestedClaim.claim.serverTime` — RULED. See P39 in `controller-state.md` on main (landed as #151);
+   the ruling is NOT copied here, only pointed at, because a copy drifts.** In short: neither
+   `contested_at` (that is P36's refused option 3 — another event's instant) nor a bare optional (which
+   would make every consumer of a REAL claim's provenance handle an absence that cannot occur there).
+   **`ContestedClaim.claim` gets its OWN shape** — `actorId`, `clientTime`, `contestedAt` — with **no
+   `serverTime` member at all**, because a refused claim never took effect and has no instant of taking
+   effect. Extend `renderContestedClaimText` (verified present in `@gisik-nokma/domain`, consumed by
+   `contests/contest-banner.tsx` and `contests/contest-view-model.ts`) rather than replacing it.
+   Excluding fixture: mutate the mapper to copy `contested_at` into anything named `serverTime` → red.
+   *Original measurement, kept because it is why the ruling went this way:* The measurement is in #150's body and is the load-bearing part: `SubmittedEvent = Omit<EventEnvelope,'serverTime'|'seq'>` so the stored `original_event` has the claimant's `clientTime` and NO server instant by construction; `proj_contested.contested_at` IS a recorded instant but it is the CONTEST event's — when the server filed the refusal, not when it received the claim. **No row records a server instant for the refused claim itself.** Opposite of P36, where the row DID record it and the writer dropped it. Spending `contested_at` is P36's refused option 3.
 
 ## THE FOUR SENTENCES THIS SESSION EARNED — carry them, they generalise
 - **A guard that checks whether a value exists is not checking whether it is the right value.** My `assigneeId === null || block.assigned === null` caught move-to-null and missed move-to-a-different-assignee — the drift its own comment named. **The comment is the aggravating factor**: it made the gap read as covered.
