@@ -11,6 +11,8 @@ older sections kept below as history, not deleted.
 
 ---
 
+> **CONTROLLER, 2026-09-06 20:50 — LANE C IS DONE FOR THE WEEKEND. Lane F pass 1, the citation-check ratchet, MERGED as #227 (`ba6f9e6`); its first catch (the #225 + #227 combination, §07 uncited 78 → 79 for 7.251) repaired by the controller in #228. Nothing is in flight for Lane C; the blocks below are history. From Monday 2026-09-07 execution is SERIAL — the queue and the procedure are the top block of `docs/lanes/controller-state.md`.**
+
 ## ⏩ LANE F PASS 1 — the test-cases <-> test citation check, 2026-09-06 ~20:20 IST
 
 **PR #227 OPEN at head `afa8945`** (`exec/51-case-citation-check` → `main`). Includes the review
