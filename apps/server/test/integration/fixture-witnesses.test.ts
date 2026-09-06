@@ -33,9 +33,22 @@ import {
   mapPreferences,
   mapWorkflowDef,
   mapWorkspaceRefs,
+  refusalText,
   rosterByActorId,
   type FetchLike,
 } from '@gisik-nokma/app-core/online';
+// The client's OWN spelling of the reopenable refusal, from the package ROOT
+// rather than `./online` — it is the constant `submitChildEvent` branches on,
+// and 7.238 exists to compare it against what the engine really refuses under.
+// Importing it is what makes that comparison a claim about two packages rather
+// than about one string used twice.
+import { PARENT_TERMINAL_RULE } from '@gisik-nokma/app-core';
+// The engine's exported rule vocabulary, and the migrate route's own. Both are
+// carried ALONGSIDE a literal at every case that uses them, never instead of
+// one — see the refusal-vocabulary describe's header for why an assertion
+// against a producer's own constant, on its own, cannot fail.
+import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
+import { MIGRATION_RULES } from '../../src/routes/builder-reads.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
@@ -1200,5 +1213,649 @@ describe('the onboarding gateways and the refusal vocabulary, against real route
     expect(ref?.projects).toHaveLength(1);
     expect(ref?.projects[0]?.id).toBe(projectId);
     expect(ref?.projects[0]?.name).toBe('The aisle');
+  });
+});
+
+/**
+ * **THE REFUSAL VOCABULARY — client fixtures that hard-code what the engine and
+ * the server refuse under, measured against the running producers.**
+ *
+ * ## The rule this cluster had to work out first, because it decides every case
+ *
+ * **Where a producer BUILDS its refusal from an exported constant, asserting the
+ * wire value against that same constant is a self-comparison through one module
+ * and cannot fail.** `contests.ts` refuses with `CONTEST_RULES.alreadyResolved`;
+ * a witness that then asserts `rule === CONTEST_RULES.alreadyResolved` compares
+ * the constant to itself over a longer path. It reddens for a broken route and a
+ * broken mapper — which is worth something — but it is blind to the rename it
+ * looks like it is watching.
+ *
+ * Two assertions are not blind, and every case below says which one it is using:
+ *
+ * 1. **The wire value against a LITERAL.** The literal is not a transcription
+ *    here, because the producer RAN: it is the observed byte sequence, and it
+ *    reddens on any rename at the producer. This is the only form available for
+ *    `hierarchy.parent-terminal` and `hierarchy.rank`, which are bare literals at
+ *    their `refuse()` call sites (`checks/hierarchy.ts:150, 298, 134, 282`) and
+ *    belong to no exported constant at all.
+ * 2. **The wire value against a SECOND, INDEPENDENTLY-OWNED constant.** This is
+ *    the strongest form in the file, and 7.238 is the one case that has it:
+ *    `PARENT_TERMINAL_RULE` (`packages/app-core/src/precheck.ts:15`) is the
+ *    client's own spelling, owned by a different package from the engine's
+ *    literal, and the client BRANCHES on it. Nothing before this case compared
+ *    the two.
+ *
+ * ## And the doctrine it has to be reconciled with, or a reviewer will read this
+ * ## file as violating it
+ *
+ * `checks/refusals.ts`'s header says: *"Tests and fixtures assert the LITERAL
+ * strings, never these constants, so a typo here cannot certify itself."* That is
+ * right, and it is about the ENGINE'S OWN unit tests, whose job is to pin the
+ * wording a human approved. A witness's job is different and complementary: it
+ * asks whether the value the CONSUMER sees is still the value the PRODUCER
+ * emitted, after a real round trip. Neither replaces the other, and this cluster
+ * adds no literal to `packages/rule-engine/test`.
+ *
+ * ## What was found by running it
+ *
+ * `packages/app-core/test/flows/guarded-child-event.test.ts:15` declares its
+ * `PARENT_TERMINAL_REASON` to be *"the engine's own words, copied from
+ * `checks/hierarchy.ts`'s refusal shape"*, and
+ * `packages/app-core/test/views/reopen-flow.test.tsx:16` carries the same string
+ * under the name `SERVER_PARENT_TERMINAL_REASON`. **The engine has never said
+ * it.** It says the sentence 7.239 reads off the wire, which shares with the
+ * fixture only the parent's title and the word "Done". Two files, both naming
+ * the producer in their own identifier or comment, both wrong, and neither
+ * detectable from inside `app-core`: the fixture was compared only with itself.
+ */
+describe('the refusal vocabulary, against the real engine over the real door', () => {
+  let vocOwner: { userId: string; headers: { authorization: string } };
+  let vocWorkspace: string;
+  let vocProject: string;
+  /** A `story` (rank 2) driven all the way to `done` — `stateCategory: 'terminal'`. */
+  let terminalParent: string;
+  /** The same type, same project, left in `todo`. The control for 7.238 and 7.239. */
+  let openParent: string;
+  /** A `task` (rank 3), so a second `task` under it is a rank violation and nothing else. */
+  let taskParent: string;
+  /** An `epic` (rank 1) — the only parent a `story` may legally sit under. */
+  let epicParent: string;
+  /** Created under `openParent` in 7.238's control, then reparented by 7.239. */
+  let liveChild: string;
+  let vocWorkflowId: string;
+
+  const TERMINAL_PARENT_TITLE = 'Quarterly filings';
+
+  /**
+   * A FRESH FOUNDER and a FRESH WORKSPACE, not the file's.
+   *
+   * This is not tidiness. `7.237` asserts the file's founder belongs to exactly
+   * one workspace holding exactly one project; `7.223` asserts `toEqual(ticketIds)`
+   * over the shared project and `12.324` asserts `toHaveLength(3)`. A second
+   * project, a second workspace on the same founder, or three more tickets in the
+   * shared project each breaks one of those three by arithmetic. 7.233 founds under
+   * a fresh founder for the same reason and says so; this follows it.
+   */
+  beforeAll(async () => {
+    vocOwner = await signedIn();
+    const founded = await app.inject({
+      method: 'POST',
+      url: '/v1/workspaces',
+      headers: vocOwner.headers,
+      payload: { name: 'Refusal Corner' },
+    });
+    expect(founded.statusCode).toBe(201);
+    vocWorkspace = (founded.json() as { workspaceId: string }).workspaceId;
+
+    vocProject = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'project', id: vocProject },
+      type: 'project.created',
+      payload: { name: 'The back office' },
+      actorId: vocOwner.userId,
+    });
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'project', id: vocProject },
+      type: 'project.member_added',
+      payload: { userId: vocOwner.userId, projectAdmin: true },
+      actorId: vocOwner.userId,
+    });
+
+    const wfList = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${vocWorkspace}/workflows`,
+      headers: vocOwner.headers,
+    });
+    expect(wfList.statusCode).toBe(200);
+    const wfBody = wfList.json() as { workflows: { id: string }[] };
+    expect(wfBody.workflows.length, 'founding must leave exactly one workflow').toBe(1);
+    vocWorkflowId = wfBody.workflows[0]?.id as string;
+
+    async function story(title: string): Promise<string> {
+      const id = newUlid();
+      await post(vocOwner.headers, {
+        workspaceId: vocWorkspace,
+        entity: { kind: 'ticket', id },
+        type: 'ticket.created',
+        // `story` is rank 2 and `task` is rank 3 (`domain/src/ticket-types.ts:73-76`).
+        // A parent of a HIGHER rank number would trip `hierarchy.rank`, which is
+        // checked BEFORE `hierarchy.parent-terminal` — 7.238 would then be green on
+        // the wrong refusal. The ranks are what keep these two cases apart.
+        payload: { typeId: 'story', projectId: vocProject, parentId: null, title },
+        actorId: vocOwner.userId,
+      });
+      return id;
+    }
+
+    terminalParent = await story(TERMINAL_PARENT_TITLE);
+    openParent = await story('Open ledger');
+
+    // The simple-kanban clone every workspace is founded on has no edge
+    // `todo -> done` (`domain/src/simple-kanban.ts`), so terminality is reached in
+    // TWO moves. Both go through `post`, which asserts `committed`, so a workflow
+    // that stopped offering either edge fails here rather than leaving 7.238
+    // asserting over a parent that is still open.
+    for (const to of ['doing', 'done']) {
+      await post(vocOwner.headers, {
+        workspaceId: vocWorkspace,
+        entity: { kind: 'ticket', id: terminalParent },
+        type: 'ticket.transitioned',
+        payload: { to },
+        actorId: vocOwner.userId,
+      });
+    }
+
+    taskParent = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket', id: taskParent },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId: vocProject, parentId: null, title: 'Reconcile the till' },
+      actorId: vocOwner.userId,
+    });
+
+    // An `epic` (rank 1), so a `story` (rank 2) under it is legal and 7.240's
+    // control commits. The rank case uses a story-under-task rather than the
+    // obvious task-under-task precisely so the two TYPE NAMES in the refusal
+    // differ: with both sides named "Task", a mutation that swapped
+    // `rankRefusal`'s two arguments would produce a byte-identical sentence and
+    // the case would measure nothing about which type is which.
+    epicParent = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket', id: epicParent },
+      type: 'ticket.created',
+      payload: { typeId: 'epic', projectId: vocProject, parentId: null, title: 'Close the quarter' },
+      actorId: vocOwner.userId,
+    });
+  });
+
+  /**
+   * Submit ONE event through the real door and hand back the raw `/v1/events`
+   * body, unasserted. The caller decides what the answer should be — a helper
+   * that asserted `refused` here would make every non-vacuity control below
+   * impossible to write in the same shape as the case it controls.
+   */
+  async function submitOne(
+    headers: { authorization: string },
+    event: Omit<SubmittedEvent, 'id' | 'version' | 'origin' | 'clientTime'>,
+  ): Promise<unknown> {
+    const submitted: SubmittedEvent = {
+      id: newUlid(),
+      version: 1,
+      origin: 'web',
+      clientTime: new Date().toISOString(),
+      ...event,
+    };
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers,
+      payload: { events: [submitted] },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    return res.json();
+  }
+
+  function createChildUnder(parentId: string, title: string, typeId = 'task') {
+    return {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket' as const, id: newUlid() },
+      type: 'ticket.created',
+      payload: { typeId, projectId: vocProject, parentId, title },
+      actorId: vocOwner.userId,
+    };
+  }
+
+  /**
+   * 7.238 — **THE CLIENT'S REOPEN BRANCH CONSTANT, MEASURED AGAINST WHAT THE
+   * ENGINE ACTUALLY REFUSES UNDER.**
+   *
+   * `packages/app-core/src/flows/guarded-child-event.ts`'s docblock claims, in
+   * prose: *"`PARENT_TERMINAL_RULE` … is the same string
+   * `packages/rule-engine/src/checks/hierarchy.ts` refuses under at both its call
+   * sites, so the client's branch and the server's verdict cannot drift into
+   * disagreeing about which refusal is the reopenable one."* **Nothing checked
+   * it.** The two spellings live in different packages — an exported constant in
+   * `app-core`, a bare literal in `rule-engine` — and the entire reopen affordance
+   * hangs on their being equal: if the engine's literal were renamed, every
+   * parent-terminal refusal would fall through to `submitChildEvent`'s ordinary
+   * `refused` arm, no reopen would ever be offered, and every test in `app-core`
+   * would stay green because they all feed the client its own constant back.
+   *
+   * This is the file's ONE case of comparison form (2) — a second,
+   * independently-owned constant — and it is the reason this cluster exists.
+   *
+   * **A NARROWER CLAIM THAN AN EARLIER DRAFT MADE, corrected by review.** That draft
+   * said "a rename on either side reddens here and nowhere else in the repo",
+   * which is false: an engine-side rename also reddens
+   * `rule-engine/test/hierarchy.test.ts:138`, `reparent.test.ts:371`,
+   * `sync-client/test/precheck.test.ts:169` and three sites in
+   * `dual-client/scenarios.test.ts`; a client-side rename reddens
+   * `app-core/test/views/reopen-flow.test.tsx:85`. What is unique to this case is
+   * that it is **the only place the two spellings are compared with each other** —
+   * every one of those sites pins one side against a literal of its own, so they
+   * all stay green while the two packages disagree.
+   */
+  it('7.238 a live child under a FINISHED parent is refused under the client’s own PARENT_TERMINAL_RULE', async () => {
+    // NON-VACUITY FIRST, and it is the tightest control available: the same
+    // create, the same type, the same project, the same actor, under a parent of
+    // the SAME TYPE that differs only in `stateCategory`. Without it, a refusal
+    // below is satisfied by a broken project, a bad type id or a door that
+    // refuses everything.
+    const control = createChildUnder(openParent, 'Chase the licence renewal');
+    const controlBody = (await submitOne(vocOwner.headers, control)) as {
+      results: { status: string; reason?: string }[];
+    };
+    expect(controlBody.results[0]?.status, JSON.stringify(controlBody.results[0])).toBe('committed');
+    liveChild = control.entity.id;
+
+    const body = await submitOne(
+      vocOwner.headers,
+      createChildUnder(terminalParent, 'File the GST return'),
+    );
+
+    // THE CLIENT HALF, EXECUTED — the shipped mapper, over the real response.
+    const [result] = mapIngestResults(body, 1);
+    expect(result?.status, JSON.stringify(result)).toBe('refused');
+    if (result?.status !== 'refused') throw new Error('unreachable — narrowed by the assertion above');
+
+    // THE PROPERTY. Left side: the engine's bare literal, carried over HTTP and
+    // through the shipped mapper. Right side: the client's exported constant,
+    // owned by another package, and the one `submitChildEvent` branches on. This
+    // is the only place in the repo the two spellings meet.
+    expect(result.rule).toBe(PARENT_TERMINAL_RULE);
+
+    // THE ADD-ARM SENTENCE, READ OFF THE WIRE — and this assertion is here
+    // because review caught its absence. Without it the corrected constant in
+    // `app-core/test/flows/guarded-child-event.test.ts` and
+    // `views/reopen-flow.test.tsx` would still be a transcription verified only by
+    // a human reading `refusals.ts`, which is the failure this cluster exists to
+    // close, at one remove. The battery said so before the reviewer did: M4 mutates
+    // the SHARED return template both arms build from, and it killed 7.239 alone —
+    // there was nothing here for it to redden.
+    //
+    // Comparison form (1): the observed bytes. The title is the one `beforeAll`
+    // gave the parent and `Done` is the workflow definition's NAME for the state
+    // id `done`, resolved by the server through `ctx.getWorkflowDef`; a reason
+    // reading `(done)` would mean that lookup failed and the refusal degraded.
+    // The same bytes are carried by the producer package's own fixture
+    // `packages/rule-engine/fixtures/created-under-terminal-parent.json`, whose
+    // `expected.reason` the engine's suite asserts against `evaluateEvent` — so
+    // this literal and that fixture redden together and neither certifies itself.
+    expect(result.reason).toBe(
+      `"${TERMINAL_PARENT_TITLE}" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`,
+    );
+    // THE VERB PAIR from this side, so a producer that collapsed the two arms into
+    // one sentence reddens at BOTH 7.238 and 7.239 rather than at neither.
+    expect(result.reason).not.toContain('Moving live work');
+  });
+
+  /**
+   * 7.239 — **THE SECOND CALL SITE, AND THE SENTENCE THE CLIENT FIXTURES CLAIM TO
+   * HAVE COPIED.**
+   *
+   * `guarded-child-event.ts` says the rule holds "at both its call sites"; the
+   * create arm is 7.238 and this is `checkTicketReparented`
+   * (`checks/hierarchy.ts:298`). A mutation at one site only reddens one of these
+   * two cases, which is the point of having both.
+   *
+   * **The reason is asserted STRUCTURALLY, and the limit is stated rather than
+   * hidden.** `parentTerminalRefusal` lives in `checks/refusals.ts`, which
+   * `packages/rule-engine/src/index.ts` does not re-export and which no subpath
+   * reaches (`package.json` exposes `.` and `./fixtures`), so no consumer of the
+   * package can compare against the producer's own words — every downstream test
+   * must transcribe them, which is exactly how the two fabrications below
+   * survived. *Recorded, not fixed: owner is whoever next touches
+   * `rule-engine/src/index.ts`.*
+   *
+   * What CAN be asserted without that export is worth more than a transcription
+   * anyway: the sentence carries the parent's real title and the state's real
+   * NAME — both values this test never typed, resolved by the server out of the
+   * ticket's fields and the workflow definition — and the two call sites say
+   * DIFFERENT things ('add' vs 'move'). A single transcribed constant in
+   * `app-core` cannot see that difference at all; it is one string standing in
+   * for two sentences.
+   */
+  it('7.239 reparenting under the same finished parent refuses under the same rule with the MOVE sentence', async () => {
+    expect(liveChild, '7.238 must have committed its control child first').toBeDefined();
+
+    const body = await submitOne(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket', id: liveChild },
+      type: 'ticket.reparented',
+      payload: { newParentId: terminalParent },
+      actorId: vocOwner.userId,
+    });
+    const [result] = mapIngestResults(body, 1);
+    expect(result?.status, JSON.stringify(result)).toBe('refused');
+    if (result?.status !== 'refused') throw new Error('unreachable — narrowed by the assertion above');
+
+    expect(result.rule).toBe(PARENT_TERMINAL_RULE);
+
+    // The title is the one `beforeAll` gave the parent, and the state name is
+    // `Done` — the workflow definition's `name` for the id `done`, which the check
+    // resolves through `ctx.getWorkflowDef` and falls back to the raw id for. A
+    // reason reading "(done)" would mean that lookup failed and the refusal
+    // degraded, which is a real regression this asserts against.
+    expect(result.reason).toContain(`"${TERMINAL_PARENT_TITLE}"`);
+    expect(result.reason).toContain('(Done)');
+
+    // THE VERB PAIR — the half no fixture in `app-core` can express, because both
+    // client files hold ONE constant for both call sites.
+    expect(result.reason).toContain('Moving live work under it reopens it');
+    expect(result.reason).not.toContain('Adding live work');
+
+    // AND THE FABRICATION, MADE FALSIFIABLE. Both `app-core` fixtures declare this
+    // string to be the engine's own words. It is not a sentence the engine can
+    // produce: `parentTerminalRefusal` builds `"<title>" is finished (<state>). …`
+    // and nothing anywhere emits the clause below.
+    expect(result.reason).not.toContain('it must reopen because it is acquiring live work');
+  });
+
+  /**
+   * 7.240 — **`hierarchy.rank`, THE MOST-ASSERTED ENGINE REFUSAL IN THE CLIENT
+   * SUITE, DRIVEN FOR REAL.**
+   *
+   * `guarded-child-event.test.ts` asserts it three times through `refusedWith`,
+   * and `reopen-flow.test.tsx` once, all against fixtures those files wrote.
+   * Comparison form (1): the wire value against a literal, because
+   * `'hierarchy.rank'` belongs to no exported constant — it is written out at
+   * `checks/hierarchy.ts:134` and `:282` and nowhere else. A reviewer should read
+   * that literal as the observed bytes of a running producer, not as a
+   * transcription: the producer ran, and a rename at either call site reddens it.
+   */
+  it('7.240 a story under a task is refused hierarchy.rank, naming both types the right way round', async () => {
+    // NON-VACUITY: the identical `story` create under an `epic` commits. The two
+    // requests differ in the PARENT'S TYPE and in nothing else — same child type,
+    // same project, same actor, same door — so the refusal below is the rank
+    // comparison and cannot be a project, permission or type-resolution failure.
+    const control = createChildUnder(epicParent, 'Post the day book', 'story');
+    const controlBody = (await submitOne(vocOwner.headers, control)) as {
+      results: { status: string; reason?: string }[];
+    };
+    expect(controlBody.results[0]?.status, JSON.stringify(controlBody.results[0])).toBe('committed');
+
+    const body = await submitOne(
+      vocOwner.headers,
+      createChildUnder(taskParent, 'Count the float', 'story'),
+    );
+    const [result] = mapIngestResults(body, 1);
+    expect(result?.status, JSON.stringify(result)).toBe('refused');
+    if (result?.status !== 'refused') throw new Error('unreachable — narrowed by the assertion above');
+
+    expect(result.rule).toBe('hierarchy.rank');
+    // `rankRefusal(childTypeName, parentTypeName)` names both TYPE names, resolved
+    // by the server out of `proj_ticket_types` — neither is a string this test
+    // typed. The two names DIFFER here, which is what makes the sentence able to
+    // fail on an argument swap: with "Task" on both sides it could not.
+    expect(result.reason).toBe(
+      '"Story" cannot go under "Task": a ticket\'s parent must be a bigger kind of work.',
+    );
+  });
+
+  /**
+   * 7.241 — **THE MIGRATION REFUSAL VOCABULARY, AND THE FINDING THAT WAS HANDED
+   * TO THIS LANE AS "NO PRODUCER EXISTS".**
+   *
+   * `packages/app-core/test/workflow-builder/events.test.ts:160,172` configures a
+   * fake gateway to refuse a migration under the rule `'ticket.unknown-state'`
+   * and then asserts the client returns it. A sweep for that string across
+   * `packages/rule-engine/src`, `apps/server/src`, `packages/domain/src` and
+   * `packages/app-core/src` finds it in NO producer, and a fabricated control in
+   * the same run finds nothing either — so the scoping concluded it was a dead
+   * sentence of the `'bad-envelope'` class.
+   *
+   * **That conclusion is wrong, and the way it was wrong is the finding.** The
+   * slot has a real vocabulary: `MIGRATION_RULES`
+   * (`apps/server/src/routes/builder-reads.ts:444`) served by a real route,
+   * `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate` (`:693`), and
+   * it spells its three refusals `migration.same-workflow`,
+   * `migration.unknown-target-state` and `migration.unmapped-state`. The fixture
+   * is not pinning a discriminant nobody emits; it is pinning **the wrong
+   * family's name in a slot that has a real one**, and a sweep for the fixture's
+   * OWN string can never find that — a well-formed search, a valid control, and a
+   * conclusion undetectable from inside its own run.
+   *
+   * The fixture site is NOT corrected here: `MIGRATION_RULES` lives in
+   * `apps/server`, `app-core` does not and must not depend on it, so there is no
+   * import that would fix it and the right answer is a product decision about
+   * where that vocabulary belongs. *Recorded with an owner; see the catalogue.*
+   *
+   * The assertion below is comparison form (1) — the wire value against a
+   * literal — with the imported constant carried alongside so the two cannot
+   * drift apart silently. The `not.toBe` line is the finding itself, made
+   * falsifiable: it goes red the day someone makes the fixture's string real.
+   */
+  it('7.241 the real migrate route refuses an unknown target state under migration.unknown-target-state', async () => {
+    const otherWorkflow = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'workflow', id: otherWorkflow },
+      type: 'workflow.defined',
+      payload: {
+        id: otherWorkflow,
+        version: 1,
+        name: 'Back-office flow',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'shipped', name: 'Shipped', category: 'terminal' },
+        ],
+        transitions: [{ from: '*', to: 'shipped', rules: [] }],
+      },
+      actorId: vocOwner.userId,
+    });
+
+    // NON-VACUITY, and it is a control over the ROUTE rather than over the world:
+    // the same request with a target the destination DOES define gets past this
+    // refusal. Without it, a 422 below is satisfied by a route that refuses every
+    // migration — including one that never resolved either workflow.
+    const reachable = await app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${vocWorkspace}/ticket-types/task/migrate`,
+      headers: vocOwner.headers,
+      payload: { fromWorkflowId: vocWorkflowId, toWorkflowId: otherWorkflow, stateMap: { todo: 'shipped' } },
+    });
+    expect(reachable.statusCode, reachable.body).toBe(200);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${vocWorkspace}/ticket-types/task/migrate`,
+      headers: vocOwner.headers,
+      // `never-a-state` is not among the destination's two state ids.
+      payload: {
+        fromWorkflowId: vocWorkflowId,
+        toWorkflowId: otherWorkflow,
+        stateMap: { todo: 'never-a-state' },
+      },
+    });
+    expect(res.statusCode, res.body).toBe(422);
+    const body = res.json() as { status: string; rule: string; reason: string };
+
+    expect(body.status).toBe('refused');
+    // Form (1): the observed bytes. A rename at `builder-reads.ts:448` reddens here.
+    expect(body.rule).toBe('migration.unknown-target-state');
+    // And the producer's own constant, so the literal above cannot drift from it
+    // unnoticed. This pair is weaker than it looks on its own — see the header —
+    // and is why the literal is written out rather than replaced by the import.
+    expect(body.rule).toBe(MIGRATION_RULES.unknownTargetState);
+    // The reason names the DESTINATION workflow and the offending state, both
+    // resolved by the server; a client reading it learns which map entry to fix.
+    expect(body.reason).toContain('"Back-office flow"');
+    expect(body.reason).toContain('"never-a-state"');
+
+    // A SHIPPED CLIENT MODULE OVER THESE REAL BYTES, and it is what keeps this
+    // case a witness rather than a route test. `refusalText`
+    // (`app-core/src/online/http.ts:69`) is the one narrowing this package ships
+    // for a refusal body: it reads `message` first and falls back to `reason`.
+    // The migrate route's 422 carries `reason` and no `message`, so this exercises
+    // the SECOND branch over bytes a server really sent — asserted below rather
+    // than assumed, because if a `message` ever appears this case has silently
+    // moved to the first branch and stopped measuring what its title says.
+    expect(body).not.toHaveProperty('message');
+    expect(refusalText(body)).toBe(body.reason);
+  });
+
+  /**
+   * 7.242 — **`restrict-to`, THE ENGINE RULE THE CLIENT SUITE ASSERTS MOST, OVER
+   * A REAL ROLE-GATED TRANSITION.**
+   *
+   * `'restrict-to'` appears at many sites across the client packages, but the
+   * count is a grep count and not an addressable one: most of them are
+   * `{ kind: 'restrict-to' }` — a member of the domain's `Rule` discriminated
+   * union, already pinned by the type system and never a mirror. The sites that
+   * ARE mirrors are the ones asserting it as a REFUSAL rule, and this case is the
+   * running producer behind them.
+   *
+   * Comparison form (1) plus the producer's own constant, exactly as 7.241, and
+   * for the same reason: `rules/restrict-to.ts` builds its refusal FROM
+   * `REFUSAL_RULES.restrictTo`, so an assertion against that constant alone would
+   * be a self-comparison through one module.
+   *
+   * **What makes this a role measurement rather than a permission one:** the
+   * member is granted workspace membership AND project membership first, and the
+   * control is the SAME actor moving a ticket of the SAME TYPE out of the SAME
+   * state along the UNGATED edge. *A different ticket instance* — `approvalTicket()`
+   * mints a fresh ULID per call, and an earlier version of this sentence said "the
+   * same ticket", which was wrong. The instance difference is inert (both created
+   * identically by the owner, both sitting in `todo`); what the control excludes is
+   * everything the committed move had to satisfy — session, workspace membership,
+   * project membership, submit permission, and type/workflow resolution.
+   */
+  it('7.242 a non-admin on a role-gated edge is refused restrict-to, not by permission', async () => {
+    const vocMember = await signedIn();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'membership', id: `${vocWorkspace}:${vocMember.userId}` },
+      type: 'membership.granted',
+      payload: { userId: vocMember.userId, role: 'member' },
+      actorId: vocOwner.userId,
+    });
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'project', id: vocProject },
+      type: 'project.member_added',
+      payload: { userId: vocMember.userId, projectAdmin: false },
+      actorId: vocOwner.userId,
+    });
+
+    // A workflow whose `todo -> approved` edge is admin-only and whose
+    // `todo -> noted` edge is open to anyone. Two edges out of one state is what
+    // lets the control differ from the case in the RULE and in nothing else.
+    const guardedWorkflow = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'workflow', id: guardedWorkflow },
+      type: 'workflow.defined',
+      payload: {
+        id: guardedWorkflow,
+        version: 1,
+        name: 'Approvals',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'noted', name: 'Noted', category: 'active' },
+          { id: 'approved', name: 'Approved', category: 'terminal' },
+        ],
+        transitions: [
+          { from: 'todo', to: 'noted', rules: [] },
+          { from: 'todo', to: 'approved', rules: [{ kind: 'restrict-to', roles: ['admin'] }] },
+        ],
+      },
+      actorId: vocOwner.userId,
+    });
+    // A ULID, not the readable `'approval'` a projection-level fixture would use.
+    // `eventEnvelopeSchema` requires `entity.id` to be a ULID and the real door
+    // enforces it — the first draft here used the readable id and was answered
+    // `invalid / malformed-envelope`, which is the door refusing a shape several
+    // projection-level fixtures in this repo write directly. Recorded because it
+    // is the same class this file exists for: a fixture that never met the door.
+    const approvalTypeId = newUlid();
+    await post(vocOwner.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket-type', id: approvalTypeId },
+      type: 'ticket-type.defined',
+      payload: {
+        id: approvalTypeId,
+        name: 'Approval',
+        icon: 'check',
+        rank: 3,
+        workflowId: guardedWorkflow,
+        fields: [],
+      },
+      actorId: vocOwner.userId,
+    });
+
+    async function approvalTicket(title: string): Promise<string> {
+      const id = newUlid();
+      await post(vocOwner.headers, {
+        workspaceId: vocWorkspace,
+        entity: { kind: 'ticket', id },
+        type: 'ticket.created',
+        payload: { typeId: approvalTypeId, projectId: vocProject, parentId: null, title },
+        actorId: vocOwner.userId,
+      });
+      return id;
+    }
+
+    // NON-VACUITY: the same member, the same ticket type, the same source state,
+    // moving along the UNGATED edge. This is what separates "the rule refused
+    // them" from "they could never submit here at all".
+    const openMove = await submitOne(vocMember.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket', id: await approvalTicket('Note the delivery') },
+      type: 'ticket.transitioned',
+      payload: { to: 'noted' },
+      actorId: vocMember.userId,
+    });
+    const [allowed] = mapIngestResults(openMove, 1);
+    expect(allowed?.status, JSON.stringify(allowed)).toBe('committed');
+
+    const body = await submitOne(vocMember.headers, {
+      workspaceId: vocWorkspace,
+      entity: { kind: 'ticket', id: await approvalTicket('Approve the delivery') },
+      type: 'ticket.transitioned',
+      payload: { to: 'approved' },
+      actorId: vocMember.userId,
+    });
+    const [result] = mapIngestResults(body, 1);
+    expect(result?.status, JSON.stringify(result)).toBe('refused');
+    if (result?.status !== 'refused') throw new Error('unreachable — narrowed by the assertion above');
+
+    expect(result.rule).toBe('restrict-to');
+    expect(result.rule).toBe(REFUSAL_RULES.restrictTo);
+    // THE WHOLE SENTENCE, and it replaces a `toContain('admin')` that review
+    // correctly called dressed-up non-vacuity: `'admin'` is a value THIS TEST typed
+    // into the workflow definition above, so a producer that hard-coded it would
+    // have satisfied that line. The equality below pins the frame, the `', or '`
+    // join implied by the single-criterion phrasing, and — the half no fixture can
+    // fake — that the refusal names the ACTOR, whose id the server resolved from
+    // the session and which nothing in the workflow definition carries.
+    expect(result.reason).toBe(
+      `Only anyone with the role admin may make this move, and ${vocMember.userId} is not among them.`,
+    );
   });
 });
