@@ -2072,3 +2072,39 @@ task's own change set — see the note at the top of `test-cases/13-deployment-d
   travelling through the web container's proxy and being answered by the server, live — nothing
   automated brings the stack up and makes that round trip; it is a hand-run case. `docker-compose.dev.yml`,
   `apps/server/test/deploy/compose-dev-contract.test.ts`
+- ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
+  found** — three specs drive the REAL stack (a Next container proxying to a real API server, real
+  Postgres, real Mailpit, real MinIO): sign-in through the shipped form with the magic link fetched out of
+  the test inbox, the seeded Convenience Corner board rendered from real projections, `POST /v1/events`
+  through the web container's proxy carrying the session cookie the browser earned, and a guest seeing the
+  workspace but NOT its projects — ruling P38's partial workspace, seen from a browser for the first time.
+  Run with `pnpm run test:e2e:stack` against a stack that is already up. It lives under a **second**
+  Playwright config (`apps/web/playwright.stack.config.ts`, `apps/web/e2e-stack/`) with **no `webServer`**,
+  because the existing mock-only smoke's config starts `pnpm dev` on 3001 with `reuseExistingServer` — so
+  real-stack specs under it would either collide with the compose web container or silently adopt a stray
+  dev server and report deployment coverage of a deployment they never touched. It is off the gate
+  **structurally**: `test:e2e:stack` is a script name turbo defines no task for (measured before and
+  after: 16 tasks, 10 `#test`, zero e2e), which matters because playwright declares no install script, so
+  the browser binary is an explicit CI step and nowhere else. `global-setup.ts` REFUSES the run unless what
+  is listening is really the stack — a proxied `/v1` request must be answered by the API server, with the
+  server's own error body, inside a time bound — and that assertion has a measured negative control rather
+  than an argued one: an image built without `SERVER_ORIGIN` (what `up -d` reuses without `--build`)
+  proxies `/v1/*` at itself and answers **500 after 30 s**, while `docker compose ps` reports every
+  container healthy in both states. The Mailpit helper purges the inbox immediately before each send and
+  then requires **exactly one** message, because `messages[0]` under an unknown sort order can return an
+  already-spent link and following one does not fail loudly — the earlier session cookie is still in the
+  context. `apps/web/e2e-stack/*`, `apps/web/playwright.stack.config.ts`, the `e2e` job in
+  `.github/workflows/ci.yml`
+- ⚙️ **`WEB_ORIGIN` is a trusted auth origin — the product no longer refuses its own client** —
+  better-auth's `trustedOrigins` was left at its default, the origin of `BETTER_AUTH_URL`, which is the
+  SERVER's origin and not what any browser sends; a real browser at the web origin submitting the shipped
+  sign-in form was answered `403 INVALID_ORIGIN` with "Invalid origin" rendered on the page. The
+  configured `WEB_ORIGIN` is now appended to `trustedOrigins` — **appended, never substituted**
+  (`getTrustedOrigins` pushes the `baseURL` origin first and only then appends), never a wildcard, and
+  never read from the request — so a same-origin deployment is unaffected and a cross-origin one works.
+  `webOrigin` is a **required** field on `AuthDeps` rather than an optional one, so the typecheck names
+  every caller instead of a default hiding one. The condition was not hypothetical: `deploy/do/app.yaml`
+  serves the web app and the API from different hosts, so the production deploy would have met it too.
+  Trusting the origin is necessary and **not sufficient** for a genuinely cross-origin deployment — the
+  CORS preflight is still unmounted on the auth catch-all, which `sign-in-flows.test.ts` pins as a known
+  gap. `apps/server/src/auth/auth.ts`, `apps/server/src/index.ts`, `apps/server/src/auth/auth-dev.ts`

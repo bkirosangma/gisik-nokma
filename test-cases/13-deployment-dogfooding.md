@@ -758,3 +758,106 @@ for the two original jobs, now also true of the two new ones; the claim above is
 (`startScheduler`'s and `requirePositiveIntervalMs`'s own cases, immediately above) and by reading the
 wiring, not by an integration test of the entry point. `apps/server/src/ops/backup-daemon-main.ts`,
 `apps/server/src/ops/schedule.ts`
+
+### Deployed-stack E2E, and the sign-in defect it found (Task 13)
+
+Playwright against the **running compose stack** — real Next container proxying to a real API server,
+real Postgres, real Mailpit — under `apps/web/playwright.stack.config.ts`, a SECOND config with no
+`webServer`. Run: `pnpm run test:e2e:stack` with the stack up. **Three specs, all passing at the head
+that carries this file.** The auth cases below are ordinary `vitest` server cases
+(`apps/server/test/auth/trusted-origins.test.ts`), not E2E.
+
+- 13.169 ✅ the run REFUSES to start unless what is listening is the stack: `/healthz` answers `ok` with a
+  non-empty deploy sha, AND `GET :3001/v1/me/workspaces` is answered by the API SERVER — status 401 with
+  the server's own `{"error":"unauthenticated"}` body, inside a 10 s bound (`e2e-stack/helpers/stack.ts`)
+- 13.170 ✅ the negative control that makes 13.169 falsifiable, MEASURED both ways on one stack: an image
+  built without `SERVER_ORIGIN` (what `up -d` reuses WITHOUT `--build`) proxies `/v1/*` at itself and
+  answers **500 after 30.014 s**; rebuilt, the same request answers **401 in 0.059 s** — and
+  `docker compose ps` reported **every container healthy in BOTH states**, so "the containers are up" is
+  not evidence about the hop
+- 13.171 ✅ the test inbox is purged immediately before each send and EXACTLY ONE message is then required;
+  two after a purge raises rather than picking a winner. `messages[0]` under an unknown sort order can
+  return an already-SPENT link, and following one does not fail loudly — the earlier session cookie is
+  still in the context, so the suite would go green having proved nothing (`e2e-stack/helpers/mailpit.ts`)
+- 13.172 ✅ sign-in through the SHIPPED UI: the email goes into the real form (`getByLabel('Email')`,
+  `getByRole('button', {name:'Send magic link'})` — role/label addressing, no test id added to suit a
+  test), the link comes out of Mailpit, the browser follows it and lands authenticated
+- 13.173 ✅ the seeded board renders from REAL projections: `Convenience Corner` → `Shop operations` →
+  at least one `board-column-*`, and `ticket-card-*` COUNTED greater than zero (an empty board would
+  satisfy "no error appeared")
+- 13.174 ✅ `POST /v1/events` through the WEB container's proxy carries the session cookie the browser
+  actually earned — not 401, and under 500 — with the ticket and workspace ids read off the real page. A
+  probe against an invented workspace is refused for an UNRELATED reason while reading as though the
+  transition rule had fired
+- 13.175 ✅ a guest sees the workspace and NOT its projects — ruling **P38**'s partial workspace, seen from
+  a browser for the first time. The seed makes the accountant a WORKSPACE member with role `guest` plus
+  explicit visibility on four TICKETS and never emits `project.member_added`, and `eff.projects` is built
+  from that event and nowhere else, so an empty project list is the product working. Asserted as
+  absent-with-a-present-sibling (the workspace heading is visible in the same render), never a bare
+  `toHaveCount(0)`, which passes on a blank, 500'd or redirected page
+- 13.176 ❌ **a guest has NO NAVIGATION to the four errands explicitly shared with them** — the only path
+  to a ticket is through a project they cannot see (13.175). Explicit per-ticket visibility exists and is
+  unreachable from the UI. **13.175 passing does NOT mean the shared tickets were verified reachable —
+  none was ever reached.** Owner: Plan 6 / visibility
+- 13.177 ✅ the suite is off the gate STRUCTURALLY, not by request: it is reached by `test:e2e:stack`, a
+  script name turbo defines no task for. Measured before and after the change — `turbo run test
+  --dry=json` = 16 tasks, 10 `#test`, **0** matching e2e. (An earlier pre-flight recorded "8 tasks": true
+  when written, stale by the time it was used. Recount, never carry.)
+- 13.178 🧪 `ci.yml`'s `e2e` job supplies the real invocation (bring the stack up, install the browser
+  explicitly since playwright declares no install script, run, tear down) and keeps a visibly-skipped
+  path with a printed reason. It had become **green-by-presence**: once Task 6 landed
+  `docker-compose.dev.yml` the old job took its file-present branch and reported green while running
+  nothing. `🧪` and not `✅` because **no CI run has ever executed it** — GitHub Actions has been failing
+  account-wide before the first step on a billing block — so it is verified only by a local YAML parse
+  (9 jobs, `e2e` 11 steps, `gate`'s `needs` unchanged) and by Lane C's review of the hunk
+- 13.179 ❌ what the web shell RENDERS when `getTickets` throws past the 2000-row cap (case 12.258) —
+  **Task 13 does not cover it**; the E2E never reaches that path. Owner: Plan 6 / web render tests
+- 13.180 ✅ `seed:cc` runs INSIDE the server container exactly as the plan wrote — `reference/convenience-
+  corner-tracker` is present at `/app` in the image (measured) — and it is the seed T13 needs, because the
+  visibility spec requires a guest and only this seed produces one
+- 13.181 ❌ `seed:dev` has no runtime coverage and CANNOT be run the plan's way: it reads
+  `docs/superpowers/plans`, which is **absent** from the image (measured, against `reference/` present as
+  the positive control), so `docker compose exec server node dist/seed/cli-seed-dev-workspace.js` cannot
+  work. Host-side only, `DATABASE_URL` → `localhost:54330`. Owner: Lane D. (Case 13.90 is `seed:cc`'s CLI
+  smoke and stays Lane D's to flip; Task 13 produces evidence for it but does not claim it)
+
+### `WEB_ORIGIN` is a trusted origin — the defect the E2E found (Task 13, ruling P42)
+
+`apps/server/test/auth/trusted-origins.test.ts`. **The product refused its own client**: a real browser at
+`http://localhost:3001` submitting the shipped sign-in form got
+`403 {"message":"Invalid origin","code":"INVALID_ORIGIN"}`, with "Invalid origin" rendered on the page.
+`trustedOrigins` was left at better-auth's default — the origin of `baseURL`, i.e. THIS SERVER's origin,
+which no browser ever sends. **`deploy/do/app.yaml` had the same condition waiting**
+(`WEB_ORIGIN=https://pm.artsourced.in` vs `BETTER_AUTH_URL=https://pm-api.artsourced.in`).
+
+**Why the existing suite was green through it:** `sign-in-flows.test.ts` asserts acceptance with
+`origin: BASE_URL` in both places it asserts acceptance at all — pinning what the default already
+guarantees and no client exercises — while pinning refusals against `evil.example`. A bound asserted on
+only one side of its line.
+
+- 13.182 ✅ the WEB_ORIGIN a browser actually sends is ACCEPTED on `/sign-in/magic-link` (200). **Mutation:
+  delete `trustedOrigins` from `createAuth` → this case reddens ALONE, 4 pass / 1 fail, `expected 403 to
+  be 200` — the production defect reproduced, and the only assertion in the suite that distinguishes the
+  default from the fix**
+- 13.183 ✅ an origin in neither the default nor `WEB_ORIGIN` (`http://evil.test:9`) is still refused 403
+  `INVALID_ORIGIN`
+- 13.184 ✅ the `baseUrl` origin the default provides is STILL trusted — the fix ADDS, never substitutes:
+  `getTrustedOrigins` (`better-auth@1.7.2`, `dist/context/helpers.mjs:74,77`) pushes the `baseURL` origin
+  and only then appends `options.trustedOrigins`
+- 13.185 ✅ a same-origin deployment (`WEB_ORIGIN` == `baseUrl`) behaves exactly as before AND does not
+  become permissive — `:3001` is refused by that deployment. **Mutation: trust every origin (`'*'`) → 3
+  pass / 2 fail; both this case and 13.183 redden, because both are permissiveness bounds. The ruling
+  predicted one; two is more constraint than predicted, not less**
+- 13.186 🚫 a request with NO cookie, NO `Sec-Fetch-*` and NO `Origin`/`Referer` is not origin-checked at
+  all and answers 200 — read from outside that looks inverted, since the browser's own origin was refused.
+  **Deliberate library policy, cited to the vendor's source rather than inferred from response codes**:
+  in `better-auth@1.7.2`, `validateFormCsrf` (`dist/api/middlewares/origin-check.mjs:131`) returns
+  unvalidated at `:137` (no cookie), `:141` (no `Sec-Fetch-*`) and `:152` (no `Origin`/`Referer`), and
+  `validateOrigin` (`:96`) gates on `const useCookies = headers.has("cookie")` (`:101`) at `:108`. CSRF
+  needs an AMBIENT CREDENTIAL the browser attaches automatically; a caller sending none gains nothing from
+  forgery. Pinned as behaviour so a version bump that changes it is visible. *(Line numbers are `dist`
+  line numbers and are only valid for 1.7.2 — re-read them when the lockfile moves.)*
+- 13.187 ✅ node's `fetch` is not `curl`, and a probe cannot stand in for the client here: the SAME request
+  answers 200 under curl and **403 `MISSING_OR_NULL_ORIGIN`** under node, because node presents
+  `Sec-Fetch-*` headers and so takes `validateFormCsrf`'s force-validate branch while curl falls through
+  unchecked. Pinned by the E2E's own setup, which sends the web origin as a browser does
