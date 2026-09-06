@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
+import { canSee } from '../visibility/can-see.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { readStreamSeq } from './stream-seq.js';
@@ -110,8 +111,17 @@ export type BootstrapResponse = {
  * seq, PLUS every `BOOTSTRAP_BACKFILL_TYPES` event regardless of position,
  * because those are the ticket-entity types the reducer never folds and a
  * snapshot therefore never carries.
+ *
+ * **EXPORTED for closure 5b(d)(ii), and exported rather than moved or copied.**
+ * Three callers now build this shape: the workspace bootstrap below, the
+ * per-ticket route below that, and `test/dual-client/rig.ts`'s `bootstrapFor` —
+ * which used to restate it, and whose restatement is exactly how a harness ends
+ * up proving replicas against a payload the server never sends. It is also why
+ * exporting beats reimplementing for a second reason that is not obvious:
+ * closure 4 populates the snapshot's provenance block INSIDE this function, so
+ * a caller that reimplements the body would silently serve tickets without it.
  */
-async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<BootstrapTicket> {
+export async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
   const all = await readEntityEvents(client, 'ticket', ticketId);
   const snapSeq = snapshot?.seq ?? 0;
@@ -166,6 +176,24 @@ async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<Bo
  * for the consequence: this route is not compatible with a `BuildTestAppOverrides.pool`
  * wrapper that lacks `.connect()`.
  */
+/**
+ * `GET /v1/sync/bootstrap/ticket`'s body — the SERVER's declaration of the
+ * shape `@gisik-nokma/sync-client`'s `TicketBootstrap` mirrors.
+ *
+ * Mirrored rather than shared for the reason `sync-item.ts` already records at
+ * length: the client package cannot depend on `apps/server`, and there is no
+ * common home for these types today. Same drift risk, same missing owner, and
+ * named here so this is not the second reader who has to rediscover it.
+ *
+ * It is `BootstrapResponse` minus `me` and minus `streamSeq`. Both omissions
+ * are deliberate and the second is load-bearing — see the route.
+ */
+export type TicketBootstrapResponse = {
+  workspaceId: string;
+  definitions: LedgerEvent[];
+  ticket: BootstrapTicket;
+};
+
 export type SyncRouteDeps = {
   pool: Pool;
   /**
@@ -196,6 +224,127 @@ export function registerSyncRoutes(
   // two above (no ingest, no serverAppend, only the pool) and its whole argument
   // is about disclosure rather than about ingest.
   registerReconcileRoute(app, { pool: deps.pool }, requireSession);
+
+  /**
+   * `GET /v1/sync/bootstrap/ticket?workspaceId=<id>&ticketId=<id>` — ONE
+   * ticket's replica-build payload. Closure 5b(d)(iii), ruling P37.1.
+   *
+   * ## Why this door exists at all
+   *
+   * The grant side used to PUSH: a widening streamed the ticket's whole
+   * pre-cursor history, and every such envelope sits at or below the client's
+   * cursor by construction, so none of them moved it. A slow-consumer close
+   * mid-burst therefore left the client at the same cursor to be handed the
+   * identical burst forever (case 12.290). P37.1 inverts it into the narrow
+   * half's own shape: **the server names ids, the client pulls what it lacks.**
+   * This is the door it pulls through.
+   *
+   * ## Invisible and non-existent answer identically, and that is the point
+   *
+   * A 404 here means exactly "nothing travels" and covers BOTH a ticket the
+   * caller may not see and a ticket that was never minted. Distinguishing them
+   * — 404 for one, 403 for the other — would make presence-versus-absence an
+   * oracle, which is the disclosure `reconcile-route.ts` refuses in its own
+   * words and `can-see.ts` refuses one layer down (*"unknown and invisible are
+   * the same answer"*). This route is the third reader depending on that
+   * sentence, and the first that could have quietly broken it, because a
+   * fetch-one-thing route naturally wants to say "no such thing".
+   *
+   * The membership 403 stays, and is not an exception: `resolveEffectiveRole`
+   * answers about the CALLER, not about the ticket, so a stranger learns only
+   * that they are a stranger — the same answer `/v1/sync/bootstrap` and
+   * `/v1/sync/reconcile` give, and they give it before `canSee` is ever asked.
+   *
+   * ## Definitions are shipped WHOLE, deliberately, and it is not laziness
+   *
+   * The tempting version scopes them to the workflows this ticket references.
+   * Refused, because that is precisely where the silent failure lives: a
+   * scoped list missing one intermediate version does not fail at the fold —
+   * `foldSnapshotForward` returns the state untouched when it has no latest —
+   * and the throw arrives one step later out of `refoldTicket`, or worse, does
+   * not arrive at all and the ticket is folded under the wrong vocabulary. The
+   * version walk needs the whole chain, and *"which versions does this ticket's
+   * snapshot and tail actually reach"* is a question with a subtle answer and a
+   * silent wrong one.
+   *
+   * It also discloses nothing extra, measured rather than assumed: over the
+   * live stream a definition is class `'definition'` and is yielded to EVERY
+   * subscriber unconditionally, guests included (`visible-events-for.ts`), and
+   * `/v1/sync/bootstrap` already serves the identical unfiltered list to anyone
+   * who is a member. So the whole list is what this caller can already have.
+   *
+   * *The cost is real and is RECORDED rather than hidden:* N pulls re-send the
+   * workspace's definitions N times. Definitions are configuration — a handful
+   * of workflows and types per workspace, not data — so this is small today and
+   * would stop being small in a workspace with a long publish history.
+   * *Owner: unassigned; a client that cached definitions by event id, or a
+   * conditional request, closes it without changing this route's contract.*
+   *
+   * ## No `streamSeq`, and the omission is load-bearing
+   *
+   * `BootstrapResponse` carries one and `Replica.loadBootstrap` writes it
+   * straight to `cursor:<workspaceId>`. A per-ticket response must not, and the
+   * cheapest way to guarantee it is to have nothing to write: `TicketBootstrap`
+   * has no such field. A device at cursor 40 pulling from a server at 900 that
+   * moved its cursor would skip everything between for every other ticket, and
+   * look exactly like convergence. Client-side case 12.293 pins the door;
+   * this is the wire half of the same property.
+   */
+  app.get<{ Querystring: { workspaceId: string; ticketId: string } }>(
+    '/v1/sync/bootstrap/ticket',
+    {
+      preHandler: requireSession,
+      schema: {
+        querystring: {
+          type: 'object',
+          required: ['workspaceId', 'ticketId'],
+          additionalProperties: false,
+          properties: { workspaceId: { type: 'string' }, ticketId: { type: 'string' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { workspaceId, ticketId } = request.query;
+      const userId = request.currentUserId;
+      const client = await deps.pool.connect();
+      try {
+        // One consistent cut for the snapshot, the tail and the definitions —
+        // the same discipline `/v1/sync/bootstrap` uses, minus the stream-seq
+        // read it exists to make consistent, which this route deliberately does
+        // not serve.
+        await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+        const eff = await resolveEffectiveRole(client, userId, workspaceId);
+        if (eff.workspaceRole === null) {
+          await client.query('ROLLBACK');
+          return await reply.code(403).send({ error: 'not_a_member' });
+        }
+        if (!(await canSee(client, userId, ticketId))) {
+          await client.query('ROLLBACK');
+          // See the docblock: this is the answer for "never existed" too.
+          return await reply.code(404).send({ error: 'not_found' });
+        }
+        const { rows: defRows } = await client.query<EventRow>(
+          `SELECT * FROM events
+            WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
+            ORDER BY workspace_seq`,
+          [workspaceId],
+        );
+        const ticket = await bootstrapTicket(client, ticketId);
+        await client.query('COMMIT');
+        const body: TicketBootstrapResponse = {
+          workspaceId,
+          definitions: defRows.map(rowToEnvelope),
+          ticket,
+        };
+        return body;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+  );
 
   app.get<{ Querystring: { workspaceId: string } }>(
     '/v1/sync/bootstrap',
