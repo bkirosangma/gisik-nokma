@@ -25,19 +25,31 @@ const S3_ENV = {
 };
 
 describe('createObjectStoreFromEnv', () => {
+  /**
+   * 9.156 — `createObjectStoreFromEnv` defaults to the local disk store when no `OBJECT_STORE` is configured.
+   */
   it('defaults to the local store', () => {
     expect(createObjectStoreFromEnv({})).toBeInstanceOf(LocalDiskStore);
   });
 
+  /**
+   * 9.157 — it builds the S3 store when fully configured.
+   */
   it('builds the S3 store when fully configured', () => {
     expect(createObjectStoreFromEnv(S3_ENV)).toBeInstanceOf(S3ObjectStore);
   });
 
+  /**
+   * 9.158 — path-style addressing defaults to `true` when `OBJECT_STORE_S3_FORCE_PATH_STYLE` is unset.
+   */
   it('defaults path-style addressing to true when OBJECT_STORE_S3_FORCE_PATH_STYLE is unset', () => {
     const store = createObjectStoreFromEnv(S3_ENV) as S3ObjectStore;
     expect(forcePathStyleOf(store)).toBe(true);
   });
 
+  /**
+   * 9.159 — an explicit `OBJECT_STORE_S3_FORCE_PATH_STYLE=false` is honoured.
+   */
   it('honours an explicit OBJECT_STORE_S3_FORCE_PATH_STYLE=false', () => {
     const store = createObjectStoreFromEnv({
       ...S3_ENV,
@@ -46,6 +58,9 @@ describe('createObjectStoreFromEnv', () => {
     expect(forcePathStyleOf(store)).toBe(false);
   });
 
+  /**
+   * 9.160 — planted defect: missing S3 environment variables are named, ALL of them, in one refusal.
+   */
   it('planted defect: missing s3 variables are named, all of them, in one refusal', () => {
     const env = { OBJECT_STORE: 's3', OBJECT_STORE_S3_REGION: 'ap-south-1' };
     try {
@@ -61,6 +76,9 @@ describe('createObjectStoreFromEnv', () => {
     }
   });
 
+  /**
+   * 9.161 — planted defect: an invented `OBJECT_STORE` value is refused by name.
+   */
   it('planted defect: an invented OBJECT_STORE value is refused by name', () => {
     expect(() => createObjectStoreFromEnv({ OBJECT_STORE: 'ftp' })).toThrow(/OBJECT_STORE.*ftp/);
   });

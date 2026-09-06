@@ -98,6 +98,9 @@ async function ledgerCount(eventId: string): Promise<number> {
 }
 
 describe('image-embed gate (layer 3)', () => {
+  /**
+   * 9.214 — Layer 3: a comment embedding the ticket's own PNG commits.
+   */
   it("a comment embedding the ticket's own png commits", async () => {
     const event = submitted('comment.added', { body: docEmbedding(PNG_ID) });
     const [result] = await ingest.ingestBatch([event]);
@@ -105,6 +108,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(await ledgerCount(event.id)).toBe(1);
   });
 
+  /**
+   * 9.215 — a comment embedding a PDF is refused `attachment.embed-not-image` and leaves no ledger trace.
+   */
   it('a comment embedding a pdf is refused attachment.embed-not-image and leaves no trace', async () => {
     const event = submitted('comment.added', { body: docEmbedding(PDF_ID) });
     const [result] = await ingest.ingestBatch([event]);
@@ -116,6 +122,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.216 — a fabricated embed id is refused `attachment.embed-unknown` and leaves no trace.
+   */
   it('a fabricated embed id is refused attachment.embed-unknown and leaves no trace', async () => {
     const event = submitted('comment.added', { body: docEmbedding(newUlid()) });
     const [result] = await ingest.ingestBatch([event]);
@@ -123,6 +132,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.217 — another ticket's real image is refused with the SAME rule and reason shape as a fabricated id — no existence leak across tickets.
+   */
   it("another ticket's image is refused with the SAME rule and reason shape — no existence leak", async () => {
     const [foreignResult] = await ingest.ingestBatch([
       submitted('comment.added', { body: docEmbedding(FOREIGN_PNG_ID) }),
@@ -139,6 +151,9 @@ describe('image-embed gate (layer 3)', () => {
     }
   });
 
+  /**
+   * 9.218 — a foreign image is refused even though it genuinely IS an image — the TICKET predicate refuses it, not the mime check, proving the two refusals are independently reachable.
+   */
   it("a foreign image is refused even though it IS an image — the ticket predicate, not the mime, is what refuses it", async () => {
     // FOREIGN_PNG_ID is image/png. The only thing wrong with it is whose it is,
     // so this reddens for a gate that resolves an actor-supplied attachment id
@@ -149,6 +164,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.219 — every embedded image in a document is judged, not just the first one found.
+   */
   it('every embed in the document is judged, not just the first', async () => {
     // The ticket's own png FIRST, the pdf SECOND. A gate that inspected only
     // ids[0] commits this and passes every other test in the file.
@@ -159,6 +177,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.220 — a `ticket.field_set` on the description field embedding a PDF is refused; other fields are not inspected by this gate at all.
+   */
   it('a description field_set embedding a pdf is refused; other fields are not inspected', async () => {
     const [descResult] = await ingest.ingestBatch([
       submitted('ticket.field_set', { fieldId: 'description', value: docEmbedding(PDF_ID) }),
@@ -171,6 +192,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(otherResult).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 9.221 — a document with no images passes through untouched.
+   */
   it('a doc with no images passes through untouched', async () => {
     const [result] = await ingest.ingestBatch([
       submitted('comment.added', { body: { type: 'doc', content: [{ type: 'paragraph' }] } }),
@@ -178,6 +202,9 @@ describe('image-embed gate (layer 3)', () => {
     expect(result).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 9.222 — planted defect: a document embedding a Drive image reference is refused — a reference has no bytes to embed, whatever mime it claims.
+   */
   it('planted defect: a document embedding a Drive image reference is refused — a reference has no bytes to show, whatever it claims to be', async () => {
     // mimeType: 'image/png' is deliberate and DEVIATES from the plan's
     // literal `seedDriveReference(db.pool, { workspaceId, ticketId,

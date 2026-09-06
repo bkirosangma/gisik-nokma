@@ -16,6 +16,64 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 SUNDAY 2026-09-06 ~23:20 IST — **§09 BATCH 2 DONE (121 uncited → 8) AND RULING P44 CLAUSE A's FIRST ROWS COMMITTED. GATE GREEN. PR OPEN. NOTHING IN FLIGHT, NO SUBAGENT RUNNING.**
+
+| what | value |
+|---|---|
+| `main` | `68f0859` |
+| branch | **`exec/56-semble-duplicate-hunt`**, head **`4babe26`** + this handoff commit, pushed. **PR open — head FROZEN until the controller says merged** |
+| §09 | **211 cited / 8 uncited / 219** (was 0/219 at the start of the day). Baseline **8**. The 8 left are `9.60` and `9.137`–`9.143`, batch 1's editor territory, pre-existing and named |
+| §7 | **7.254 / 7.255** committed — clause A's first rows, ❌ with named owners, no fixes. `check-case-ids` 0, **1616** unique |
+| **gate at `4babe26`** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m30s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed \| 5 skipped (3671) / 285 files** — identical for the FOURTH time; that identity is the prediction a comments-only change owes. `check:env` 0 · `check:citations` 0 (**992 cited / 537 uncited**, ratchet holds everywhere) · `check-case-ids` 0 (1616) · `check:runbook` 0. Zero orphans |
+| repo-wide ratchet | **815 → 537 uncited** across the three backfill PRs today |
+
+## ⚠ THE PROCEDURE THAT CHANGED TODAY — COMMIT FIRST, THEN MUTATE
+
+I mutation-tested a citation on **uncommitted** work and restored with `git checkout -- <file>`. **That restores
+from HEAD**, so it reverted the file wholesale and **destroyed all sixteen of batch 2's citations in it** — §09
+fell `211/8 → 195/24`. It had been safe twice earlier the same session because those mutations ran against
+**committed** work, so HEAD was the right restore point. **Same command, different precondition, nothing visible
+to tell them apart.**
+
+**Rule: commit the work, THEN mutate.** If you must mutate uncommitted work, copy the file aside and restore from
+the copy — never from HEAD.
+
+**And the sharper half:** my restoration check **showed the damage and I did not act on it.** I read the line back
+and saw `expect(ghost.statusCode).toBe(404);` where a docblock belonged. What caught the loss was the **count**
+returning 195/24 against an expected 211/8. **Reading evidence is not checking it — a verification only works when
+you know what the output MUST say before you look.** The line read had no prediction attached; the count did.
+
+Recovery was exact: damage was bounded to **9.192–9.207**, sixteen contiguous ids the catalogue assigns to that one
+file, mapping 1:1 in order onto its sixteen tests. **A catalogue naming which test covers which case is also a
+backup of work derived from it.**
+
+## NEXT — nothing is blocked, and no ruling is outstanding
+
+1. **The §09 remainder: 8 rows** (`9.60`, `9.137`–`9.143`) in `packages/editor/test/{attachment-list-item,drive-never-inline}.test.ts`. Small enough to do by hand — **no subagent needed.**
+2. **Continue ruling P44 clause A**: more `find_related` passes over `packages/{app-core,ui,editor,sync-client}`, candidates as ❌ rows with owners from **7.256**. Zero token cost; the searches are local.
+3. The other carried items in the override's §1(f).
+
+**Cost data measured today, for whoever plans the next run:** a trivial one-word subagent costs **45,877 tokens** —
+that is the FLOOR for any dispatch. Batch 1 (98 citations, 17 files) cost 171,618; batch 2 (113 citations, 15
+files) cost 245,189.
+
+# ⛔ SUPERSEDED — LIVE block, SUNDAY 2026-09-06 ~22:55 IST, branch `exec/56-semble-duplicate-hunt` off `68f0859`. Ruling P44 A+C CLEARED TO RUN by the controller. **§7 ROWS COMMITTED (`8261001`). §09 BATCH 2 IS IN FLIGHT RIGHT NOW — if you are reading this after a restart, ITS EDITS ARE IN THE TREE, UNCOMMITTED AND UNVERIFIED. Read the tree; do not re-dispatch blind.**
+
+| what | value |
+|---|---|
+| `main` | **`68f0859`** |
+| branch | **`exec/56-semble-duplicate-hunt`**, head **`8261001`**, pushed. No PR open yet |
+| committed | **7.254 / 7.255** in `test-cases/07-api-realtime-search.md` — ruling P44 clause A's first rows, ❌ with named owners, no fixes. `check-case-ids` **0**, 1616 unique (was 1614, +2, sum == union) |
+| **IN FLIGHT** | **§09 batch 2** — one sonnet subagent, all **113 `apps/server/` rows**, owner's explicit choice over splitting. It was told **NOT to touch `scripts/fixtures/check-case-citations-baseline.json`** — I set the baseline myself after confirming the real count. **So `pnpm check:citations` FAILING with `baseline is STALE -- committed 121, reality is N` is the EXPECTED success signal, not a regression** |
+| §09 before batch 2 | 98 cited / 121 uncited / 219 |
+
+**IF BATCH 2 DIED:** treat it as **UNVERIFIED, not EMPTY** — batch 1 died mid-run and all 98 of its citations were recovered from the tree. Read `git status --porcelain`, verify comments-only **with the controlled instrument below (NOT `git diff | grep`)**, run `pnpm check:citations` to learn the real count, set the baseline to it, gate, commit.
+
+**THE INSTRUMENT — `git diff | grep "^+"` IS ALWAYS EMPTY UNDER THE PROXY** (added lines arrive indented `␣␣+␣␣`); measured `grep -c "^+"` → 0 on a 31 KB diff with 294 additions. Use `git show <sha>:<file>` vs the working file through Python `difflib`, **asserting the added-line count equals `git diff --numstat`** before believing anything. That count-match is the control that binds; a control that does not run the same path certifies nothing.
+
+**Probe result, for the record (22:50):** a trivial sonnet subagent returned `PROBE_OK` in 6.9s with no rejection — the dispatch path was open — **but it cost 45,877 tokens for one word.** That is the floor cost of ANY dispatch. Batch 1 (98 citations) cost 171,618.
+
+
 # 🔴 SERIAL EXECUTOR — SUNDAY 2026-09-06, closed ~22:50 IST. §09 BATCH 1 **MERGED** (#232, `1bf5e92`). **NOTHING IS IN FLIGHT. NO PR IS OPEN. THE EXECUTOR IS HOLDING ON THE WEEKLY METER — see the STOP box below before dispatching anything.** **A VERIFICATION METHOD USED THROUGHOUT THIS SESSION WAS BROKEN — IT PRODUCED THREE FALSE GREENS, ONE OF THEM IN THE MERGED #230. READ THE NEXT SECTION BEFORE YOU VERIFY ANYTHING.**
 
 | anchor | value |

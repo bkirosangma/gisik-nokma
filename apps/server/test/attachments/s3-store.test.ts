@@ -25,6 +25,9 @@ beforeEach(() => {
 });
 
 describe('S3ObjectStore', () => {
+  /**
+   * 9.149 — `S3ObjectStore.put` uploads with bucket, key, content-type and length set.
+   */
   it('put uploads with bucket, key, content type and length', async () => {
     s3Mock.on(PutObjectCommand).resolves({});
     const bytes = Buffer.from('pdf bytes here');
@@ -38,6 +41,9 @@ describe('S3ObjectStore', () => {
     expect(input.ContentLength).toBe(bytes.length);
   });
 
+  /**
+   * 9.150 — `getStream` returns the body stream.
+   */
   it('getStream returns the body stream', async () => {
     const bytes = Buffer.from('image bytes');
     s3Mock.on(GetObjectCommand).resolves({ Body: Readable.from(bytes) as never });
@@ -48,16 +54,25 @@ describe('S3ObjectStore', () => {
     expect(s3Mock.commandCalls(GetObjectCommand)[0]!.args[0].input.Key).toBe('w/ws1/a/att1');
   });
 
+  /**
+   * 9.151 — a `NoSuchKey` S3 answer becomes `ObjectNotFoundError`.
+   */
   it('a NoSuchKey answer becomes ObjectNotFoundError', async () => {
     s3Mock.on(GetObjectCommand).rejects(Object.assign(new Error('The specified key does not exist.'), { name: 'NoSuchKey' }));
     await expect(makeStore().getStream('w/ws1/a/gone')).rejects.toBeInstanceOf(ObjectNotFoundError);
   });
 
+  /**
+   * 9.152 — other S3 failures propagate untranslated rather than being folded into `ObjectNotFoundError`.
+   */
   it('other S3 failures propagate untranslated', async () => {
     s3Mock.on(GetObjectCommand).rejects(Object.assign(new Error('denied'), { name: 'AccessDenied' }));
     await expect(makeStore().getStream('w/ws1/a/x')).rejects.toThrow('denied');
   });
 
+  /**
+   * 9.245 — `S3ObjectStore.list` maps `Contents[].Key`/`.LastModified` and passes `Prefix` through when given.
+   */
   it('list maps Contents Key/LastModified, and applies Prefix when given', async () => {
     const lastModified = new Date('2026-08-01T00:00:00.000Z');
     s3Mock.on(ListObjectsV2Command).resolves({
@@ -75,6 +90,9 @@ describe('S3ObjectStore', () => {
     expect(s3Mock.commandCalls(ListObjectsV2Command)[0]!.args[0].input.Prefix).toBe('w/ws1/a/');
   });
 
+  /**
+   * 9.246 — `S3ObjectStore.list` PAGINATES via `ContinuationToken` rather than stopping at one page — two mocked pages joined into one result.
+   */
   it('list paginates via ContinuationToken rather than stopping at one page', async () => {
     const t = new Date('2026-08-01T00:00:00.000Z');
     s3Mock
@@ -96,12 +114,18 @@ describe('S3ObjectStore', () => {
     expect(calls[1]!.args[0].input.ContinuationToken).toBe('token-2');
   });
 
+  /**
+   * 9.153 — `delete` sends `DeleteObject`.
+   */
   it('delete sends DeleteObject', async () => {
     s3Mock.on(DeleteObjectCommand).resolves({});
     await makeStore().delete('w/ws1/a/att1');
     expect(s3Mock.commandCalls(DeleteObjectCommand)[0]!.args[0].input.Key).toBe('w/ws1/a/att1');
   });
 
+  /**
+   * 9.154 — path-style addressing defaults to `true` when the config omits it (MinIO/R2-ready by default).
+   */
   it('defaults path-style addressing to true when the config omits it', () => {
     // No client override and no forcePathStyle key: the only shape that
     // reaches the constructor's `config.forcePathStyle ?? true`. The SDK's
@@ -117,6 +141,9 @@ describe('S3ObjectStore', () => {
     expect((store as unknown as { client: S3Client }).client.config.forcePathStyle).toBe(true);
   });
 
+  /**
+   * 9.155 — planted defect: malformed keys are refused before any network call is made.
+   */
   it('planted defect: malformed keys are refused before any network call', async () => {
     // All three verbs share the same `assertValidObjectKey` call (object-store.ts) —
     // each is asserted independently so a mutation dropping the check from any

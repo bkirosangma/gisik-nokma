@@ -244,6 +244,9 @@ afterAll(async () => {
 });
 
 describe('POST /v1/attachments', () => {
+  /**
+   * 9.192 — a member uploading a PNG gets 201 with the server-sniffed truth (mime, size, filename), and the bytes land in the store.
+   */
   it('a member uploads a png: 201 with the server-sniffed truth, and the bytes land', async () => {
     const ticketId = await freshTicket();
     const res = await upload(memberToken, ticketId, {
@@ -286,6 +289,9 @@ describe('POST /v1/attachments', () => {
     expect(Buffer.concat(chunks).equals(PNG)).toBe(true);
   });
 
+  /**
+   * 9.193 — planted defect: a renamed `.exe` (image name, image content-type, MZ bytes) is refused 415 by its bytes, and nothing is stored.
+   */
   it('planted defect: a renamed .exe is refused 415 by its bytes, and nothing is stored', async () => {
     const ticketId = await freshTicket();
     const before = await countStoredObjects(storeRoot);
@@ -307,6 +313,9 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
+  /**
+   * 9.194 — planted defect: a lying client-supplied content-type cannot make a real PNG answer as anything but a PNG.
+   */
   it('planted defect: the client-supplied content-type cannot make a png anything else', async () => {
     // The converse direction, and the one that proves the header is UNUSED
     // rather than merely overridden when it disagrees pessimistically: honest
@@ -327,6 +336,9 @@ describe('POST /v1/attachments', () => {
     expect(body.filename).toBe('setup.exe');
   });
 
+  /**
+   * 9.195 — planted defect: unidentifiable bytes are refused 415, and nothing is stored.
+   */
   it('planted defect: unidentifiable bytes are refused 415, and nothing is stored', async () => {
     const ticketId = await freshTicket();
     const before = await countStoredObjects(storeRoot);
@@ -343,6 +355,9 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
+  /**
+   * 9.196 — planted defect: an oversize upload is refused 413, and nothing is stored.
+   */
   it('planted defect: an oversize upload is refused 413, and nothing is stored', async () => {
     const ticketId = await freshTicket();
     const before = await countStoredObjects(storeRoot);
@@ -378,6 +393,9 @@ describe('POST /v1/attachments', () => {
   // test replaced an earlier one-sided version that a `?? 1_048_576` fallback
   // passed green. The cost of the raise is that a genuine hang here takes 120s to
   // report instead of 30s; the cost of the alternatives is a claim nothing checks.
+  /**
+   * 9.197 — the shipped ceiling is exactly 26_214_400 bytes (25 MiB), and a route built with no explicit maxBytes uses that number.
+   */
   it('the shipped ceiling is 25 MiB, and a route with no maxBytes uses exactly that number', async () => {
     // Two separate claims, because pinning only the first leaves
     // `deps.maxBytes ?? SOMETHING_ELSE` free to ship. The constant is a Global
@@ -439,6 +457,9 @@ describe('POST /v1/attachments', () => {
     }
   }, 120_000);
 
+  /**
+   * 9.198 — planted defect: a `ticketId` truncated by multipart’s field-size cap is refused rather than acted on against the shortened value.
+   */
   it('planted defect: a ticketId truncated by the field-size cap is refused, not acted on', async () => {
     // `fieldSize: 256` does not error when a field value is too long — busboy
     // sets `valueTruncated` and hands the SHORTENED string through. A handler
@@ -472,6 +493,9 @@ describe('POST /v1/attachments', () => {
     expect(ok.statusCode).toBe(201);
   });
 
+  /**
+   * 9.199 — planted defect: too many multipart parts is refused 413 inside this route’s own body handling, not by relying on the parser default.
+   */
   it('planted defect: too many parts is refused 413 in THIS route’s body, not the parser’s', async () => {
     // The parser's own `FST_PARTS_LIMIT` is `createError(..., 413)`, so left
     // uncaught Fastify answers 413 with `{statusCode, code, error, message}` —
@@ -514,6 +538,9 @@ describe('POST /v1/attachments', () => {
     expect(ok.statusCode).toBe(201);
   });
 
+  /**
+   * 9.200 — planted defect: a guest without ticket visibility gets a 404 indistinguishable from a ticket that never existed.
+   */
   it('planted defect: a guest gets a 404 indistinguishable from a ticket that never existed', async () => {
     const ticketId = await freshTicket();
 
@@ -549,6 +576,9 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toHaveLength(1);
   });
 
+  /**
+   * 9.201 — a member cannot upload to a ticket in a project they are not on.
+   */
   it('a member cannot upload to a ticket in a project they are not on', async () => {
     // The same 404, reached through the OTHER half of the visibility table:
     // a real ticket, a real member, a project they were never added to.
@@ -564,6 +594,9 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
+  /**
+   * 9.202 — the visibility refusal happens BEFORE the uploaded file is even looked at.
+   */
   it('the visibility refusal comes before the file is even looked at', async () => {
     // Refusal ORDER, pinned. An invisible ticket carrying bytes that would
     // ALSO fail the sniff must still answer 404 — if the sniff ran first the
@@ -604,6 +637,9 @@ describe('POST /v1/attachments', () => {
     expect(seen.statusCode).toBe(413);
   });
 
+  /**
+   * 9.203 — no session → 401, with the route’s one unauthenticated body.
+   */
   it('no session → 401 with the one unauthenticated body', async () => {
     const ticketId = await freshTicket();
     const anon = await post([
@@ -616,6 +652,9 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
+  /**
+   * 9.204 — a missing `ticketId` field → 400.
+   */
   it('a missing ticketId field → 400', async () => {
     const res = await post(
       [{ name: 'file', filename: 'p.png', contentType: 'image/png', data: PNG }],
@@ -626,6 +665,9 @@ describe('POST /v1/attachments', () => {
     expect((res.json() as { error: string }).error).toBe('bad-request');
   });
 
+  /**
+   * 9.205 — a filename that could break a `Content-Disposition` header is stored sanitized.
+   */
   it('a filename that could break a Content-Disposition header is stored sanitized', async () => {
     // MEASURED, not assumed: busboy already reduces a path-shaped filename to
     // its basename, so `../../etc/passwd` arrives here as `passwd` and no
@@ -655,6 +697,9 @@ describe('POST /v1/attachments', () => {
     expect(row?.objectKey).toBe(`w/${WS}/a/${body.attachmentId}`);
   });
 
+  /**
+   * 9.206 — the 201 response body and the stored row carry the SAME SHA-256 of the stored bytes.
+   */
   it('the 201 body and the stored row carry the same SHA-256 of the stored bytes', async () => {
     const ticketId = await freshTicket();
     const res = await upload(memberToken, ticketId, {
@@ -692,6 +737,9 @@ describe('POST /v1/attachments', () => {
     expect(row?.sha256).toBe(body.sha256);
   });
 
+  /**
+   * 9.207 — planted defect: two uploads differing by one byte get different hashes, and a lying content-type changes neither.
+   */
   it('planted defect: two uploads differing by one byte get different hashes, and a lying content-type changes nothing', async () => {
     const ticketId = await freshTicket();
     const other = Buffer.concat([PNG, Buffer.from([0x01])]);

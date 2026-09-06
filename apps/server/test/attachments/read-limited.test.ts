@@ -64,6 +64,9 @@ function countingSource(
 const MIB = 1024 * 1024;
 
 describe('readAtMost', () => {
+  /**
+   * 9.162 — `readAtMost` returns the whole body when it fits under the limit.
+   */
   it('returns the whole body when it fits', async () => {
     const { stream, state } = countingSource(3000, 512);
     const result = await readAtMost(stream, 4096);
@@ -76,6 +79,9 @@ describe('readAtMost', () => {
     expect(state.produced).toBe(3000);
   });
 
+  /**
+   * 9.163 — a body of exactly `maxBytes` is accepted — the limit is inclusive.
+   */
   it('accepts a body of exactly maxBytes — the limit is inclusive', async () => {
     const { stream } = countingSource(4096, 1024);
     const result = await readAtMost(stream, 4096);
@@ -83,12 +89,18 @@ describe('readAtMost', () => {
     if (result.ok) expect(result.bytes).toHaveLength(4096);
   });
 
+  /**
+   * 9.164 — one byte over the limit is refused.
+   */
   it('refuses one byte over the limit', async () => {
     const { stream } = countingSource(4097, 4097);
     const result = await readAtMost(stream, 4096);
     expect(result.ok).toBe(false);
   });
 
+  /**
+   * 9.165 — planted defect: the refusal happens DURING the stream, not after — an oversize upload cannot exhaust memory on the way to being refused.
+   */
   it('planted defect: the refusal happens DURING the stream, not after buffering it', async () => {
     const total = 8 * MIB;
     const { stream, state } = countingSource(total, 64 * 1024);
@@ -108,6 +120,9 @@ describe('readAtMost', () => {
     expect(stream.destroyed).toBe(true);
   });
 
+  /**
+   * 9.166 — the refusal states the limit in the units a person uses (MB), not raw bytes.
+   */
   it('states the limit in the refusal, in the units a person uses', async () => {
     const { stream } = countingSource(200, 200);
     const result = await readAtMost(stream, 25 * MIB);
@@ -119,6 +134,9 @@ describe('readAtMost', () => {
     if (!refused.ok) expect(refused.reason).toBe('This file is larger than the 25 MB limit.');
   });
 
+  /**
+   * 9.167 — a sub-mebibyte ceiling changes units in its message rather than reporting a misleading "0 MB".
+   */
   it('a sub-mebibyte ceiling changes units rather than reporting "0 MB"', async () => {
     // `maxBytes / 1048576` floors to zero for every ceiling a test uses, and
     // the refusal is shipped copy. Asserted on the whole sentence, because
