@@ -30,6 +30,9 @@ const UPLOADED = {
 };
 
 describe('composeEditorSubmission', () => {
+  /**
+   * 9.65 — `composeEditorSubmission` maps the two composer modes onto Plan 3's ledger events and nothing else: comment → `comment.added {body}`.
+   */
   it('comment mode → comment.added {body}', () => {
     expect(composeEditorSubmission('comment', DOC)).toEqual({
       type: 'comment.added',
@@ -107,6 +110,9 @@ const OWN_SOURCE = resolve(process.cwd(), 'test/ticket-editor-slot.test.tsx');
 const THIS_HALF_SOURCE = resolve(process.cwd(), 'src/components/TicketEditorSlot.tsx');
 
 describe('the <EditorSlot> contract, written twice', () => {
+  /**
+   * 9.71 — the `<EditorSlot>` contract written twice does not drift unnoticed: this runtime case reads `packages/app-core/src/views/editor-slot.tsx` and fails if its `doc` stops saying `unknown`. Neither this nor the type-level assignment above is the end-to-end mount, which is still 9.61.
+   */
   it("app-core's half still spells `doc` as unknown, which is why this half widened", () => {
     // POSITIVE CONTROL 1: a missing file must fail here, not silently read as
     // an empty string somewhere downstream.
@@ -124,6 +130,9 @@ describe('the <EditorSlot> contract, written twice', () => {
     expect(declaration).toMatch(/^\s*doc: unknown;$/m);
   });
 
+  /**
+   * 9.75 — neither half of the twice-written contract carries a field the other lacks: THREE sets are compared for equality, not two, because assignability alone never rejects extra properties on a type.
+   */
   it('neither half of the contract has a field the other lacks', () => {
     const source = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
     const appCoreFields = fieldNamesOf(source, 'export type EditorSlotProps = {');
@@ -232,6 +241,9 @@ describe('TicketEditorSlot', () => {
    * This is NOT the end-to-end mount (case 9.61, Plan 6a Task 12): nothing here
    * passes `TicketEditorSlot` to `TicketSheet`'s `editorSlot` prop.
    */
+  /**
+   * 9.76 — the slot mounted the way app-core mounts it, with NO `editorRef`, populates its own `ownRef`, submits `comment.added`, fires `onDone` and clears. Every other runtime case in this file injects `editorRef`, so this is the only case that exercises the production branch. Not the end-to-end mount, which is still 9.61.
+   */
   it('mounted the way app-core mounts it — no editorRef — the slot uses its OWN ref, submits, and clears', async () => {
     const submit = vi.fn(async (_submission: EditorSubmission) => {});
     const onDone = vi.fn();
@@ -253,6 +265,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.66 — a successful comment submit clears the composer.
+   */
   it('comment mode: submit sends comment.added and clears the composer on success', async () => {
     const submit = vi.fn(async (_submission: EditorSubmission) => {});
     const onDone = vi.fn();
@@ -288,6 +303,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.67 — a REFUSED submit reports through `onError`, never fires `onDone`, and never clears the words — the clear lives inside the `try` after the `await`, so a rejection skips it.
+   */
   it('a refused submit reports the error and never clears the words', async () => {
     const submit = vi.fn(async (_submission: EditorSubmission) => {
       throw new Error('This move must carry a comment explaining it, and none was provided.');
@@ -308,6 +326,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.74 — two clicks in one React batch append ONE `comment.added`, not two: `disabled` is not committed yet at the second click, so the guard is a ref set synchronously before the first await.
+   */
   it('two clicks in one tick append ONE comment, not two — the ledger cannot take it back', async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => {
@@ -336,6 +357,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.68 — the slot takes `doc` as `unknown` and narrows with `isDocJson` at the mount, so `null`, `undefined`, a string, a number and `{}` all open an EMPTY composer.
+   */
   it('the doc prop arrives as unknown: a value that is not a document opens an empty composer', async () => {
     for (const notADoc of [null, undefined, 'the words', 42, {}, [{ type: 'doc' }]]) {
       const { view } = await mountSlot(makeProps({ doc: notADoc }));
@@ -350,6 +374,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.69 — a slot mounted without `submit` disables the submit button and says WHICH of the two reasons applies in its title, rather than offering a control that discards what is typed.
+   */
   it('mounted without submit: the button is disabled and says why, instead of pretending', async () => {
     const props = makeProps();
     delete props.submit;
@@ -369,6 +396,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.70 — a pasted file routes through `emitAttachmentAdded` — the host owns the ledger.
+   */
   it('uploads route through emitAttachmentAdded — the host owns the event', async () => {
     const emitAttachmentAdded = vi.fn(async (_uploaded: EditorSlotUpload) => {});
     const uploadAttachment = vi.fn(async (_file: File) => UPLOADED);
@@ -410,6 +440,9 @@ describe('TicketEditorSlot', () => {
    * the extensions memo. Task 14 depends on that stability and does not own it;
    * the extensions memo's own justification is Task 12's to defend.
    */
+  /**
+   * 9.72 — a parent re-render does not re-initialise the editor. Mutation testing showed the mechanism is `useEditor`'s empty deps inside `TicketEditor`, NOT the extensions `useMemo`.
+   */
   it('a parent re-render does not re-initialise the editor', async () => {
     const editorRef: React.MutableRefObject<Editor | null> = { current: null };
     const view = render(<TicketEditorSlot {...makeProps({ doc: DOC })} editorRef={editorRef} />);
@@ -431,6 +464,9 @@ describe('TicketEditorSlot', () => {
     view.unmount();
   });
 
+  /**
+   * 9.73 — `autoFocus` actually focuses the composer, and its absence leaves the composer unfocused.
+   */
   it('autoFocus focuses the composer; without it the composer is left alone', async () => {
     const focused = await mountSlot(makeProps({ autoFocus: true }));
     await vi.waitFor(() => {

@@ -107,6 +107,9 @@ describe('ticket event vocabulary', () => {
     ).toBe('invalid-payload');
   });
 
+  /**
+   * 9.57 — an `attachment.added` claim states which of the two kinds it is or is refused at the door; a Drive reference and an upload are two shapes, not one shape with optional fields. (Also catalogued as case 5.26.)
+   */
   it('refuses an attachment claim that does not say which kind it is — an unstated kind is the ambiguity these rules exist to remove', () => {
     expect(
       refuses('attachment.added', 'ticket', {

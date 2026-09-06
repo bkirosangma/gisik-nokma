@@ -11,6 +11,9 @@ import { typeText } from './helpers/type-text.js';
  * coverage, and the contrast case below is half the point.
  */
 describe('typeText', () => {
+  /**
+   * 9.95 — the `typeText` test helper drives Tiptap's input rules the way a real keystroke does, unlike `insertContent`, which leaves typed markdown as literal text with no autoformat firing.
+   */
   it('drives input rules the way a real keystroke does', () => {
     const editor = createTestEditor();
     typeText(editor, '# GST filing');

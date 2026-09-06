@@ -43,6 +43,9 @@ async function mount(props: TicketEditorProps) {
 }
 
 describe('TicketEditor', () => {
+  /**
+   * 9.102 — `TicketEditor` mounts SSR-safe (`immediatelyRender: false`, so `ready` fires only post-hydration) and renders the `initialDoc` it was given.
+   */
   it('mounts (immediatelyRender: false ⇒ ready fires post-hydration) and renders initialDoc', async () => {
     const doc: DocJson = {
       type: 'doc',
@@ -54,6 +57,9 @@ describe('TicketEditor', () => {
     view.unmount();
   });
 
+  /**
+   * 9.103 — `onDocChange` fires with the serialized current doc on every edit.
+   */
   it('onDocChange fires with the serialized doc on edits', async () => {
     const onDocChange = vi.fn();
     const { view, editor } = await mount(makeProps({ onDocChange }));
@@ -66,6 +72,9 @@ describe('TicketEditor', () => {
     view.unmount();
   });
 
+  /**
+   * 9.104 — Mod-Enter submits the current doc.
+   */
   it('Mod-Enter submits the current doc', async () => {
     const onSubmit = vi.fn();
     const { view, editor } = await mount(makeProps({ onSubmit }));
@@ -76,6 +85,9 @@ describe('TicketEditor', () => {
     view.unmount();
   });
 
+  /**
+   * 9.105 — selecting an image surfaces the wrap menu, and choosing an option rewrites the selected image's `wrap` attribute.
+   */
   it('the wrap menu appears on image selection and rewrites the wrap attr', async () => {
     const { view, editor } = await mount(makeProps());
     editor.commands.insertTicketImage({ attachmentId: IMG, mime: 'image/png', alt: 'shelf' });
@@ -99,6 +111,9 @@ describe('TicketEditor', () => {
     view.unmount();
   });
 
+  /**
+   * 9.106 — upload chips appear while an upload is in flight and clear once it resolves.
+   */
   it('upload chips appear while an upload is in flight and clear after', async () => {
     let releaseUpload: () => void = () => {};
     const gate = new Promise<void>((resolve) => {

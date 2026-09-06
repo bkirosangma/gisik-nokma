@@ -52,6 +52,9 @@ afterEach(() => {
 });
 
 describe('mention picker', () => {
+  /**
+   * 9.52 — typing `@an` opens the picker on matching candidates.
+   */
   it('typing @ plus a query surfaces matching candidates', async () => {
     const queryUsers = vi.fn(async (query: string) =>
       USERS.filter((user) => user.name.toLowerCase().startsWith(query.toLowerCase())),
@@ -118,6 +121,9 @@ describe('mention picker', () => {
    * half is ours to break: the typed `@an` survives as literal text and no node
    * was created. `@…` never silently becomes markup.
    */
+  /**
+   * 9.53 — Escape dismisses the picker, the typed text stays literal, and no mention node was created.
+   */
   it('Escape dismisses the picker and the typed text stays literal', async () => {
     editor = createTestEditor({ queryUsers: async () => USERS });
     typeText(editor, '@an');
@@ -171,6 +177,9 @@ describe('mention picker', () => {
    * `@` then Enter is an ordinary thing to do ("email me @ 5pm", newline).
    * Returning true unconditionally for Enter, ArrowUp and ArrowDown swallows
    * every one of those keystrokes and the editor appears frozen.
+   */
+  /**
+   * 9.54 — navigation keys are declined when there is nothing to navigate, so the picker does not swallow arrows on an empty result.
    */
   it('declines navigation keys while it has nothing to navigate', async () => {
     editor = createTestEditor({ queryUsers: async () => [] });
@@ -246,6 +255,9 @@ describe('the label a mention is stored with', () => {
     expect(docToPlainText(doc)).toBe(`@${USERS[0]!.userId}`);
   });
 
+  /**
+   * 9.48 — one trim-and-refuse rule covers both fields on insert: a blank, whitespace-only or missing `userId` or label is refused rather than substituted.
+   */
   it('mentionAttrsOf trims both fields, and refuses what trims to nothing', () => {
     expect(mentionAttrsOf({ userId: ' x ', name: '  Anselma  ' })).toEqual({
       userId: 'x',
@@ -354,6 +366,9 @@ describe('the label a mention is stored with', () => {
     ]);
   });
 
+  /**
+   * 9.50 — a present id with a missing NAME is still admitted through both the JSON and parse doors, deliberately: refusing it would discard the one fact the markup carried.
+   */
   it('leaves the JSON and parse doors open, exactly as the image node does', () => {
     editor = createTestEditor(undefined, {
       type: 'doc',
@@ -377,6 +392,9 @@ describe('the label a mention is stored with', () => {
   // away the only fact the markup carried, refusing the second throws away
   // nothing — the name survives as text — while admitting it stores a mention
   // that renders perfectly and addresses nobody, with no downstream gate.
+  /**
+   * 9.49 — a blank or whitespace-only id is refused at the PARSE door too, and the name survives as literal text, so the refusal discards nothing.
+   */
   it('PLANTED DEFECT: a blank mention id is refused at the parse door, and the name survives as text', () => {
     for (const id of ['', '   ']) {
       editor = createTestEditor();
@@ -414,6 +432,9 @@ describe('the label a mention is stored with', () => {
  * which only one is read back through a guard.
  */
 describe('mention HTML, in both directions', () => {
+  /**
+   * 9.46 — both mention attributes carry their own `parseHTML`; a crafted span naming a second userId and label cannot store a different person than the one displayed.
+   */
   it('planted defect: bare `userId` / `label` attributes cannot outrank the canonical ones', () => {
     editor = createTestEditor();
     editor.commands.setContent(
@@ -442,6 +463,9 @@ describe('mention HTML, in both directions', () => {
     expect(html).not.toMatch(/\slabel=/i);
   });
 
+  /**
+   * 9.47 — the outward direction carries no second spelling: parse → render → parse is stable for both mention attributes.
+   */
   it('survives a full HTML round trip with both attrs intact', () => {
     editor = createTestEditor(undefined, {
       type: 'doc',
@@ -460,6 +484,9 @@ describe('mention HTML, in both directions', () => {
     expect(mentionNodes(editor.getJSON())).toEqual(mentionNodes(json));
   });
 
+  /**
+   * 9.51 — `<span>` without `data-mention-user-id` is not claimed as a mention; the attribute is the discriminator, not the tag.
+   */
   it('does not claim a span that carries no mention id', () => {
     // A `<span>` pasted from any web page is not one of this product's
     // mentions; `data-mention-user-id` is the discriminator, not the tag.
@@ -496,6 +523,9 @@ const BEM_CONTRACT = [
 ];
 
 describe('the BEM classes the contract names', () => {
+  /**
+   * 9.56 — the stylesheet declares exactly the BEM classes the code emits, set equality against one shared contract list.
+   */
   it('the stylesheet declares exactly the mention classes the code emits', () => {
     const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css');
     const css = readFileSync(cssPath, 'utf8');
@@ -609,6 +639,9 @@ describe('the picker as a screen reader meets it', () => {
     }
   });
 
+  /**
+   * 9.55 — the picker announces its result count politely.
+   */
   it('announces the result count politely, and says so when there are none', async () => {
     expect(mentionResultAnnouncement(0)).toBe('No people match');
     expect(mentionResultAnnouncement(1)).toBe('1 person matches');
