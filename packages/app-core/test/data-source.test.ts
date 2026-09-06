@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { parentTerminalRefusal } from '@gisik-nokma/rule-engine';
+
+/**
+ * The engine's real ADD-arm sentence, a LITERAL and pinned to the producer at the
+ * bottom of this file — ruling P43's shape. It was `'Parent is Done; it must reopen
+ * because it is acquiring live work.'`, a third wording of a sentence no producer
+ * emits; the two other files carried a fourth. This one claimed no source, so it is
+ * a fake's stimulus rather than a false claim, and the pin is what stops it drifting
+ * back into one.
+ */
+const PARENT_TERMINAL_REASON =
+  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, ServerStreamFrame } from '../src/data-source.js';
 import { DEFAULT_GROUPING, DEFAULT_LIST_COLUMNS, DEFAULT_VIEW_PREFS } from '../src/view-types.js';
@@ -36,7 +47,7 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
         // comment claiming a source, so it is the mildest of the three — a fake's
         // stimulus rather than a false claim — but it modelled an answer no producer
         // gives, and the imported builder costs nothing. See case 7.250.
-        reason: parentTerminalRefusal('Registrations', 'Done', 'add'),
+        reason: PARENT_TERMINAL_REASON,
       })),
     );
     const [result] = await source.ingest([submittedTicketCreated()]);
@@ -71,5 +82,11 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
       grouping: { origin: 'default' },
     });
     expect(DEFAULT_VIEW_PREFS.grouping).not.toHaveProperty('value');
+  });
+});
+
+describe('7.249 the fixture sentence is pinned to the producer it models', () => {
+  it('7.249c PARENT_TERMINAL_REASON is byte-identical to the engine\'s ADD arm', () => {
+    expect(PARENT_TERMINAL_REASON).toBe(parentTerminalRefusal('Registrations', 'Done', 'add'));
   });
 });

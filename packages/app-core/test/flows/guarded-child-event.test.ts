@@ -34,7 +34,12 @@ const make = makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
  * while being a fabrication: it now carries a value production really produces.
  * Removing a class of lie, not adding a check.
  */
-const PARENT_TERMINAL_REASON = parentTerminalRefusal('Registrations', 'Done', 'add');
+const PARENT_TERMINAL_REASON =
+  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
+
+/** `rankRefusal('Task', 'Sub-task')`'s real output, pinned below for the same reason. */
+const RANK_REASON =
+  `"Task" cannot go under "Sub-task": a ticket's parent must be a bigger kind of work.`;
 
 /**
  * Renamed from `parentTerminalRefusal` when the engine's real builder of that
@@ -173,12 +178,12 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
     // now the imported builder called with the two type names this scenario means.
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
-        refusedWith(event.id, 'hierarchy.rank', rankRefusal('Task', 'Sub-task')),
+        refusedWith(event.id, 'hierarchy.rank', RANK_REASON),
       ),
     );
     expect(await submitChildEvent(source, submittedTicketCreated())).toEqual({
       kind: 'refused',
-      refusal: { rule: 'hierarchy.rank', reason: rankRefusal('Task', 'Sub-task') },
+      refusal: { rule: 'hierarchy.rank', reason: RANK_REASON },
     });
   });
 
@@ -315,7 +320,7 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
       call += 1;
       if (call === 1) return events.map((event) => committed(event.id));
       return events.map((event) =>
-        refusedWith(event.id, 'hierarchy.rank', rankRefusal('Task', 'Sub-task')),
+        refusedWith(event.id, 'hierarchy.rank', RANK_REASON),
       );
     });
     const outcome = await reopenAndProceed(source, plan, make);
@@ -325,10 +330,36 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
       expect(outcome.parentResult.status).toBe('committed');
       expect(outcome.refusal).toEqual({
         rule: 'hierarchy.rank',
-        reason: rankRefusal('Task', 'Sub-task'),
+        reason: RANK_REASON,
       });
     }
     // Two claims went out and NO third: nothing compensates the reopen away.
     expect(source.ingested).toHaveLength(2);
+  });
+});
+
+/**
+ * **RULING P43: a literal ALONGSIDE the import, never instead.** The literals above
+ * are the pins; the case below is what makes them pins rather than decoration.
+ *
+ * The shape matters and this branch got it wrong once. Replacing a literal WITH the
+ * builder call reads as an improvement and is not: the fixture then feeds the
+ * builder's output to a fake and reads it back, so a reword moves both sides
+ * together and every test here stays green. Measured, not argued — the first draft
+ * of this change did exactly that and its excluding mutation came back SERVER RED /
+ * CLIENT GREEN, which is the condition P43 named as the failure.
+ *
+ * With the literal kept and pinned, the same mutation reddens BOTH halves, each at
+ * its own sentence: the witness (7.238/7.240, over a real round trip) and this case.
+ * That is the acceptance test the ruling wrote, and it is the only reason the
+ * import is worth having here at all.
+ */
+describe('7.249 the fixture sentences are pinned to the producer they claim', () => {
+  it('7.249a PARENT_TERMINAL_REASON is byte-identical to the engine\'s ADD arm', () => {
+    expect(PARENT_TERMINAL_REASON).toBe(parentTerminalRefusal('Registrations', 'Done', 'add'));
+  });
+
+  it('7.249b the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
+    expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
   });
 });

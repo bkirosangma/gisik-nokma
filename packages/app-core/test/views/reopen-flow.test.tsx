@@ -29,7 +29,12 @@ import { PARENT, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.j
  * literal over a real round trip. What it buys is that this constant can never
  * again say SERVER while being a fabrication.
  */
-const SERVER_PARENT_TERMINAL_REASON = parentTerminalRefusal('Registrations', 'Done', 'add');
+const SERVER_PARENT_TERMINAL_REASON =
+  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
+
+/** `rankRefusal('Task', 'Sub-task')`'s real output, pinned below. */
+const RANK_REASON =
+  `"Task" cannot go under "Sub-task": a ticket's parent must be a bigger kind of work.`;
 
 /**
  * What the LOCAL pre-check writes when it refuses off cached state — and this one
@@ -213,7 +218,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
       if (call === 1) return events.map((event) => parentTerminal(event.id));
       if (call === 2) return events.map((event) => committed(event.id));
       return events.map((event) =>
-        refused(event.id, 'hierarchy.rank', rankRefusal('Task', 'Sub-task')),
+        refused(event.id, 'hierarchy.rank', RANK_REASON),
       );
     });
     const onCreated = renderFlow(source);
@@ -225,7 +230,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const alertBox = await screen.findByRole('alert');
     expect(alertBox).toHaveTextContent('Registrations was reopened — that is now recorded history.');
     expect(alertBox).toHaveTextContent(
-      `Refused by the server — hierarchy.rank: ${rankRefusal('Task', 'Sub-task')}`,
+      `Refused by the server — hierarchy.rank: ${RANK_REASON}`,
     );
     expect(onCreated).not.toHaveBeenCalled();
     // Three claims and no fourth: nothing was sent to compensate the reopen away.
@@ -441,5 +446,31 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
       'Refused by the server — invalid-payload: title: must not be blank — a title of only spaces names nothing',
     );
     expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **RULING P43: a literal ALONGSIDE the import, never instead.** The literals above
+ * are the pins; the case below is what makes them pins rather than decoration.
+ *
+ * The shape matters and this branch got it wrong once. Replacing a literal WITH the
+ * builder call reads as an improvement and is not: the fixture then feeds the
+ * builder's output to a fake and reads it back, so a reword moves both sides
+ * together and every test here stays green. Measured, not argued — the first draft
+ * of this change did exactly that and its excluding mutation came back SERVER RED /
+ * CLIENT GREEN, which is the condition P43 named as the failure.
+ *
+ * With the literal kept and pinned, the same mutation reddens BOTH halves, each at
+ * its own sentence: the witness (7.238/7.240, over a real round trip) and this case.
+ * That is the acceptance test the ruling wrote, and it is the only reason the
+ * import is worth having here at all.
+ */
+describe('7.249 the fixture sentences are pinned to the producer they claim', () => {
+  it('7.249d SERVER_PARENT_TERMINAL_REASON is byte-identical to the engine\'s ADD arm', () => {
+    expect(SERVER_PARENT_TERMINAL_REASON).toBe(parentTerminalRefusal('Registrations', 'Done', 'add'));
+  });
+
+  it('7.249e the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
+    expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
   });
 });

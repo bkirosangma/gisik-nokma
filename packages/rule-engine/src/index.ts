@@ -9,17 +9,19 @@ export { REFUSAL_RULES } from './refusal-rules.js';
  * **The refusal VOCABULARY — the exact plain-language words this engine refuses
  * with.** Added because its absence was a measured defect, not a tidiness item.
  *
- * `checks/refusals.ts` was reachable from nowhere: this index re-exported
- * `engine.js`, `evaluate.js`, `refusal-rules.js` and five more, and never it, and
+ * `checks/refusals.ts` was reachable from nowhere: this index re-exported ten
+ * modules and never it, and
  * `package.json` exposes only `.` and `./fixtures`. So every consumer that wanted
- * a refusal's SENTENCE had to retype it — and three of them did, in three
- * different wordings, each under a comment or an identifier naming this package
- * as the source:
+ * a refusal's SENTENCE had to retype it — and three files did, carrying TWO
+ * wordings between them (the first two are byte-identical; the count was stated
+ * as three until review compared them):
  *
  *   - `app-core/test/flows/guarded-child-event.test.ts` — *"the engine's own
  *     words, copied from `checks/hierarchy.ts`"*
  *   - `app-core/test/views/reopen-flow.test.tsx` — `SERVER_PARENT_TERMINAL_REASON`
- *   - `app-core/test/data-source.test.ts` — a third variant again
+ *   - `app-core/test/data-source.test.ts` — `'Parent is Done; …'`, the second
+ *     wording, and the only one of the three claiming NO source: a bare `reason:`
+ *     key, so a fake's stimulus rather than a false claim
  *
  * None was a sentence this engine can produce, and nothing could see it: each
  * file fed its own constant to a fake and read it back, so the fixture was only
