@@ -359,6 +359,7 @@ describe('7.249 the fixture sentences are pinned to the producer they claim', ()
     expect(PARENT_TERMINAL_REASON).toBe(parentTerminalRefusal('Registrations', 'Done', 'add'));
   });
 
+  // 7.251 — the rank reason in this file was a fabrication (test-cases/07); the pin below is that case's citation.
   it('7.249b the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
     expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
   });
