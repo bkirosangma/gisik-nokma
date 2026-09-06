@@ -145,11 +145,21 @@ prose rather than silently corrected).
   Named in case 6.145 with an owner: whoever gives these tools a scheduling surface.
 - **The scheduling surface itself.** Out of scope by the P33 split with Lane C; these are the
   DELETE, safe at any moment and safe twice, per case 6.131's own original text.
-- **Two pre-existing typecheck errors inherited from `main`** (`src/routes/my-work.ts(152,33)`,
-  `test/read/visible-projects.test.ts(123,17)`, both "`projectNames` does not exist on
-  `MyWorkResponse`" — PR #150's visibleProjects/P32/P38 contract drift). Confirmed pre-existing
-  and unrelated to this PR by moving this PR's five new/changed files aside and reproducing the
-  identical two errors on the resulting tree; not this lane's files, not fixed here.
+- **CORRECTION, struck rather than left standing:** an earlier version of this section reported
+  two `projectNames`-on-`MyWorkResponse` typecheck errors (`src/routes/my-work.ts(152,33)`,
+  `test/read/visible-projects.test.ts(123,17)`) as pre-existing on `main` from PR #150. **That was
+  wrong, and the controller caught it.** `main`'s forced gate at `b4e2f14` (which includes #150)
+  ran all ten typecheck tasks green with 0 cached, and #150's own CI run was green. What actually
+  happened: the workflow's review/fix rounds ran `pnpm --filter @gisik-nokma/server run
+  typecheck` directly (the ad-hoc-tsc trap Lane A recorded the same morning — invoking the
+  package script in isolation rather than through `pnpm turbo run typecheck`, which is what keeps
+  a workspace dependency's `dist/` in step with the source it was typechecked against) against a
+  tree whose `dist/` for at least one workspace dependency predated the rebase past #150, so the
+  two-error reproduction "proved" nothing about `main` — it reproduced a stale-build artifact of
+  this lane's own working tree. Verified by this session: `pnpm turbo run typecheck --force`
+  (16/16 tasks, 0 cached) is clean, `@gisik-nokma/server:typecheck` included. **Never record a
+  build/typecheck red as a fact about `main` without a `--force` rebuild first** — the same
+  discipline this branch's own tests already apply to a stale `dist/` under bare `vitest`.
 
 ## 6. The gate lock — GATE LOCK v3.2, and the mutation-contamination rule from PR #166
 
