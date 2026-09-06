@@ -26,6 +26,83 @@ the 177 plan tasks; it closes by name.
 
 **§7 next free: 7.238. No §12 line** — the surface is §7's; block 12.320–12.339 remains at **12.329**.
 
+## THE NEXT CLUSTER I WOULD TAKE — **THE TRANSCRIBED REFUSAL VOCABULARY** (scoped on paper; nothing built)
+
+**Written for a reader with none of my context.** Background in three sentences: a *witness* runs the
+SHIPPED client code against the SHIPPED server route in one process (`app.inject()` + the real mapper
+or gateway imported from `@gisik-nokma/app-core/online`), so a rename on either side reddens. A
+*mirror* is a fixture that models a producer's output but was written by the same hand as its consumer,
+so the two agree by construction and nothing can catch a drift. All witnesses live in
+`apps/server/test/integration/fixture-witnesses.test.ts`; §7 ids, next free **7.238**.
+
+**The cluster: client tests that hard-code the rule engine's and the server's refusal vocabulary.**
+Two of them say in their own comments that the values are *copied* — which is the same defect this lane
+has now closed twice (`founding.test.ts` retyped `INVALID_NAME_BODY`; `invites.test.ts` retyped
+`INVITE_NOT_OPENABLE_BODY`). **Every producer below was verified to exist, with a positive control** (a
+fabricated rule name returns zero files).
+
+| # | fixture SYMBOL | models | real producer (verified) | witness shape |
+|---|---|---|---|---|
+| 1 | `PARENT_TERMINAL_REASON` in `test/flows/guarded-child-event.test.ts` — its own comment says *"the engine's own words, copied from `checks/hierarchy.ts`"* | the refusal sentence for `hierarchy.parent-terminal` | `packages/rule-engine/src/checks/hierarchy.ts` | real `POST /v1/events` creating a child under a TERMINAL parent → real refusal → compare `rule` and `reason` against the engine module's own export, **imported never retyped** |
+| 2 | `parentTerminalRefusal()` in the same file | the `IngestResult` refused arm for that rule | `apps/server/src/ingest/ingest-service.ts` | same round trip; assert through the real `mapIngestResults` |
+| 3 | `refusedWith(rule, reason)` in the same file | the generic refusal builder every flow case uses | `rule-engine/src/refusal-rules.ts` | one real refusal per rule the flows assert |
+| 4 | the `'hierarchy.rank'` literals in app-core tests | a rank-violation refusal | `rule-engine/src/checks/hierarchy.ts` | real event violating rank depth |
+| 5 | the `'restrict-to'` literals (7 sites) | the most-asserted engine rule in the client suite | `rule-engine/src/refusal-rules.ts` | real event refused by a restrict-to rule |
+| 6 | the `'require-different-user'` literals | a two-actor rule | `rule-engine/src/refusal-rules.ts` | real event with the same actor twice |
+| 7 | the `'contest.already-resolved'` literals | a contest refusal | `rule-engine/src/contests.ts` | real contest resolved twice |
+| 8 | the scripted bodies in `apps/web/test/notifications-gateway.test.ts` — its own comment says *"the SERVER'S, copied from the routes that serve"* | the notifications route bodies | `apps/server/src/routes/notifications.ts` | **CAVEAT: `apps/server` has no dependency on `apps/web`, so the web gateway CANNOT be driven from a server test.** The producer end is already pinned by 12.325. This row is a *catalogue* item unless someone builds a web-side harness. |
+
+### A LIVE FINDING that fell out of the scoping, and it is not mine to fix
+
+**Two rule names asserted in app-core tests are emitted by NO producer:** `'ticket.unknown-state'` (2
+sites) and `'state-machine'` (2 sites). Swept across `packages/rule-engine/src`, `apps/server/src` and
+`packages/domain/src`: **zero files each**, with the six verified names above and a fabricated control
+in the same run. **This is the same class as the non-existent `'bad-envelope'` code (case 12.327) that
+this lane handed Lane B** — a client test pinning a discriminant no server produces. *Owner: whoever
+owns the client pre-check vocabulary; worth a ❌ case in §12 or §7 when someone picks it up.*
+
+### Why this cluster and not another
+
+(a) **It is the defect this lane has already found twice and fixed twice** — a transcribed constant,
+where the test asserts the fixture's own copy and passes forever. Two of the eight rows *document
+themselves* as copies, so there is no inference involved. (b) Every producer is a real module and the
+refusals are reachable through `POST /v1/events`, which the merged harness already drives. (c) It needs
+no new machinery: `fixture-witnesses.test.ts` and its `injectFetch` seam already exist. (d) The mutation
+shape is known and safe — **keep the KEY, corrupt the VALUE**, which is what made all eight of
+7.230–7.237 fail at their own assertion instead of at a parse.
+
+### What I would NOT take next, so the choice is legible
+
+The `editor/` group (Google Picker/Drive), `desktop`/`mobile` storage (a real device runtime), and
+`s3-store` (a real bucket) — **not cheaper later, simply not buildable here**, and taking them would
+mean softening assertions to fit, which is the one thing this pass refuses.
+
+### THE 23-vs-29 NUMBER, NOW FIRM: it is **21**
+
+The controller's re-task said 23 addressable; my filter said 29; the gap was seven borderline rows I
+had not read. **Read individually, they classify as:**
+
+| row (symbol) | classification |
+|---|---|
+| `apps/server/test/helpers/seed.ts` — `applyAll` | **NOT a witness item.** Applies 4 of the registry's 12 projections. Fixing it is a structural change to a helper ~20 files share, not a round trip. Owner: a dedicated cleanup. |
+| `apps/server/test/helpers/seed.ts` — `insertTicketHead` | **Addressable, but the producer is the ticket REDUCER, not a route** — it writes `transitions`/`fields` the real fold computes. Different witness shape; high blast radius. |
+| `app-core/test/helpers/seed.ts` — `WF_ERRAND` | **NOT addressable.** It builds a DOMAIN `WorkflowDef`; the domain owns the type, so there is no external producer to disagree with. Its real problem is that `id: 'wf-errand'` is a non-ULID production cannot mint — a fixture-realism item, not a mirror. |
+| `app-core/test/helpers/seed.ts` — `ticketStateSeed` | **NOT addressable as a route witness** — same reason; domain type, domain-owned. |
+| `app-core/test/helpers/fake-data-source.ts` — `ingest()` default | **DISCHARGED** by 7.226/7.234, which run `mapIngestResults` over real committed and refused arms. |
+| `app-core/test/helpers/fake-data-source.ts` — `pushStreamItem` | **NOT addressable here.** Needs a real hub and a real socket peer — Lane B/D's surface. |
+| `app-core/test/flows/guarded-child-event.test.ts` — the three builders | **ADDRESSABLE — and promoted to rows 1–3 of the cluster above.** |
+
+**So: 29 minus the 8 just landed = 21, and of those, four are not addressable at all (WF_ERRAND,
+ticketStateSeed, pushStreamItem, applyAll-as-a-witness) and one is discharged.** Neither 23 nor 29 was
+right. **The firm number is 21 addressable rows remaining, of which this cluster takes 7 buildable
+plus 1 catalogue-only.**
+
+### Collisions — MEASURED, both lanes, at 17:35
+
+- **Lane B `exec/46-reach-granted-wire`** — measured directly from origin: `packages/sync-client/test/sync-engine.test.ts`, `Features.md`, `test-cases/12-offline-sync-apps.md`, `docs/lanes/executor-state-B.md`. **Disjoint.**
+- **Lane D `exec/45-ping-hazard`** — **not on origin, so I asked D by message rather than assume.** D replied: no to all four files I named, and its live diff is `apps/server/test/dual-client/socket-cut.test.ts` alone, landing later with `test-cases/12` (its own block 12.340–12.359) and a Features.md bullet. **Disjoint.** *This is a REPORTED list, not one I measured from a branch — re-measure when it reaches origin.*
+
+
 > **This header is the first commit after the merge, by the rule this lane wrote and has now needed
 > three times:** *a frozen head makes the handoff stale, so correcting it is the FIRST commit after
 > the merge.* It previously said "#204 COMPLETE … GATE GREEN", which was true of a branch that no
