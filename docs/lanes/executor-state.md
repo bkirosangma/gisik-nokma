@@ -16,7 +16,183 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR #187 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.** `exec/39-fixture-witnesses` @ `137d48a`
+# LANE A — **MAPPER-WITNESS PASS BUILT AND REVIEWED. NO FULL GATE YET — TWO OOM KILLS.** `exec/41-mapper-witnesses` @ `ea97f90`
+
+> **READ THIS BEFORE TRUSTING ANY GATE CLAIM BELOW.** The full gate has been **killed by the system
+> for low memory TWICE** at this head. Per the controller's 14:22 advisory (and my own rule, now
+> everyone's) **a gate killed twice is a fact about the machine — it is reported, not retried.**
+> **There is NO green full gate at `ea97f90`.** What exists instead, each measured and each labelled:
+>
+> | evidence | result |
+> |---|---|
+> | **`pnpm turbo run typecheck --force --concurrency=1`** | **`TYPECHECK_EXIT=0` · 16/16 tasks · 0 cached · 0 `error TS`** — the class that failed #187's first gate |
+> | partial gate (killed mid-run) | **16 of 30 tasks successful, ZERO failures**: domain 464, ui 37, rule-engine 282, editor 178, sync-client 87 = **1,048 tests passed**. `app-core`, `server` and `web` **never ran** — which is exactly where this branch's change lives, so the partial run is NOT evidence for it |
+> | the witness file itself, post-rebase | **12/12 passed** at the rebased tree |
+>
+> **After BOTH kills, checked before anything else and clean each time:** no lock file (the `trap` in
+> `locked-test.sh` released it), **zero** orphaned workers by the `ppid=1` criterion, zero pools, tree
+> clean. Nothing needed reaping — which matters, because the wrong reap takes out a peer's live pool
+> or a Claude session.
+>
+> **The machine, measured:** ~66 MB free pages and swap 69% at the first kill; ~90 MB and **89%** at the
+> second — worse after, not better. Both at `--concurrency=1`, which is already the mitigation. **The
+> lock serialises gates; it does not serialise seven Claude sessions and their subagents.**
+>
+> **OWED BEFORE MERGE: one full gate at this head in a quiet window.** Do not merge on the partial.
+
+> Re-tasked by the controller after #187 merged (`e33c429`). Closes the carried item *"no test
+> executes a mapper against a real `/v1` body — 18 of 20 entry points"* **by name**.
+
+## ANCHORS — measured on this branch
+
+| what | value |
+|---|---|
+| branch | `exec/41-mapper-witnesses`, cut from `e33c429`, **now rebased onto `8373ae5`** (#190 seam 1 · #188 T18 · the ledger promotion) |
+| merge-base | **`8373ae5`** — verified with `git merge-base` after the rebase, not adopted from the cut |
+| §12 | **Freeze lifted (T18 merged), and NO §12 line is minted.** The mapper cluster is the `/v1` API contract — §7's subject — and all eight cases live there; nothing in this pass is about offline sync or the apps. Block 12.320–12.339 stays at next-free **12.329**. Declined deliberately rather than minting one to fill the offer; controller told and free to disagree. |
+| gate lock | v3.3 **corrected** form (`fork=$BASHPID` captured as its own command BEFORE the pipeline, not inline). Measured against a LIVE peer, not an idle box: it read 1, and printing the ROWS showed the match was Lane D's genuinely-running gate holding the lock with ten workers. **A matcher that reads 0 on a quiet machine has not been shown to fire at all.** |
+| node | **v22.22.2** |
+| install / rebuild / build | `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · `BUILD_EXIT=0`, **`0 cached, 10 total`** |
+| §7 ids | **7.222–7.229 minted** (eight). Next free **7.230**. Recounted at cut with both styles agreeing on 7.221 as the prior maximum. |
+| §12 / Features.md §12 | **NOT TOUCHED, by instruction** — closed to this lane until Lane B's #188 (T18) merges. Anything §12 wants is held here and added bare afterwards. **Nothing is currently held.** |
+| open PRs at cut | **#188** only (Lane B, T18, `exec/33-plan10-t18`) — three DOCS files, no overlap with this branch |
+
+## THE EIGHT WITNESSES
+
+All appended to `apps/server/test/integration/fixture-witnesses.test.ts` (the file #187 created), in the
+7.220 shape: the REAL route through `app.inject()` over the real DB, the REAL mapper imported from
+`@gisik-nokma/app-core/online` and EXECUTED, non-vacuity asserted first.
+
+| case | mapper | route |
+|---|---|---|
+| 7.222 | `mapActors` + `rosterByActorId` | members |
+| 7.223 | `mapBoardView` | board |
+| 7.224 | `mapHistory` | ticket history |
+| 7.225 | `mapWorkflowDef` | single workflow |
+| 7.226 | `mapIngestResults` | `POST /v1/events` |
+| 7.227 | `mapPreferences` | preferences |
+| 7.228 | `mapMyWork` | `/v1/me/work` |
+| 7.229 | `mapAttention` | attention + contests |
+
+**Citations in this file name SYMBOLS, not line numbers.** Lane B re-measured a catalogue citation of
+mine ONE DAY after it merged (`sync-engine.test.ts:547` → `:625`) and it had already moved. A stale
+line number sends a reader to the wrong place and looks authoritative doing it; a symbol survives every
+edit above it. **Rule for this lane from here: cite `file` + symbol, let the reader grep.**
+
+### What the world needed, and one trap it set
+
+`beforeAll` gained an assignment (so `/v1/me/work` has a card) and DISCOVERS the founding workflow id
+through the real workflows route rather than typing one in. **The discovery was wrong on the first
+run and failed in the misleading direction:** I read the id as `workflows[0].workflowId`, but the
+domain's `workflowDefSchema` spells it `id`, so the value was `undefined`, the URL became
+`/workflows/undefined`, and the route answered **404 — which reads as "no workflow exists" rather than
+"your key is wrong."** The length assertion above it passed the whole time, because one workflow DID
+exist. Now the id is asserted to match a ULID shape before it is used, so a bad key fails as a bad key.
+
+`mapWorkflowDef` returns the DOMAIN type unreshaped (it validates and casts), so the client-side field
+is `id`, not `workflowId` — a second place the same wrong guess would have landed.
+
+## THE REVIEW FOUND MORE THAN THE BUILD DID — one opus reviewer, and it earned the dispatch
+
+**Two checks that could not fail, two overclaiming titles, and one systemic finding.** I verified every
+one against primary source before acting; the reviewer's own least-confident claim resolved in my
+favour and I am recording that too, because a reviewer that flags its uncertainty accurately is worth
+more than one that is merely right.
+
+### The real defect: 7.227 shipped a check that could not fail
+
+`mapPreferences` ends `return { version: 1, projects, savedFilters }` — **the version is a CLIENT-SIDE
+LITERAL.** There is nothing on the wire to read: the server's `preferencesDocSchema` is `.strict()`
+over exactly `savedFilters`, `listColumns`, `grouping`, and the GET handler returns that document
+unwrapped. My `expect(prefs.version).toBeGreaterThanOrEqual(1)` compared a constant to itself, and my
+comment calling it *"the document's own"* was false. `Array.isArray(prefs.savedFilters)` was unfailable
+for a structural reason — the mapper builds it with `.map()`. **Both removed**, replaced with
+`toEqual([])`, which is what the wire carried. **A product finding falls out and is recorded with an
+owner rather than fixed: `UserPreferences.version` is fabricated and no producer emits it.**
+
+### The systemic one, which is the most useful thing the review produced
+
+**Seven of the eight mutations kill at a SHAPE GATE upstream of the property the case names.** Every
+quoted failure is `MappingError: response mapping failed at <path>`, thrown inside the mapper call
+*before any `expect` about the claim runs* — each would still redden with every assertion below the
+mapper call deleted. So the set measures *"the route's top-level key names agree with the mapper's"*
+seven times and measures no transformation logic. Not worthless — a renamed wire key is exactly how
+client and server drift silently, and nothing measured it before — but **not what the per-case
+sentences implied.** Disclosed once for the cluster in `test-cases/07`.
+
+**This is the FOURTH instance in two passes of a mutation changing colour without measuring its
+property** (7.221's non-vacuity guard · 12.323's 500-instead-of-404 · 7.226's `12 skipped` · now seven
+shape-gate kills). Three were incidents. Four is a class, and the rule is written with the evidence
+behind it: **a red on the case you aimed at is not evidence until you have read WHICH assertion
+produced it.**
+
+### Two titles that claimed more than their bodies kept — the defect this pass exists to catch
+
+- **7.223** sold itself on the regrouping. The fixture **cannot constrain it**: one founding workflow
+  and an unreachable straggler path mean exactly one group is possible, so a mapper keying by
+  `workflowId` alone passes identically. Title and entry corrected to what it keeps.
+- **7.229** claimed the contests fold. **The fold never executes** — with `items` empty,
+  `mapAttention` could be `() => []` and every assertion would pass. Corrected to the two top-level key
+  names, which are real.
+
+Recorded, not fixed: 7.222's roster is one element so `rosterByActorId`'s collapse is untested; 7.226
+is the only case that WRITES (a fourth ticket into the shared project) and 7.223/12.324 depend on
+running first — latent under declaration order, live under `--sequence.shuffle`.
+
+### The reviewer's uncertainty, resolved
+
+It flagged 7.225's `def.id === workflowId` as possibly circular and said so explicitly. **It is not:**
+`getWorkflowDefFromProjection` selects the `definition` JSON blob, so the id comes from inside the
+blob, not reconstructed from the row key. Weak but real.
+
+## SEAM 1 REBASE — measured, not assumed
+
+Rebased onto `592b34c` (E's #190 plus the ledger promotion). **The suite passes 12/12 unchanged.**
+Predicted beforehand from source — `buildTestApp` passes no `security` block so no limiter registers,
+and `httpOriginRefused` is POST-only and *cookie*-gated (`a bearer client lands here` returns false),
+while every witness is Bearer-authenticated — but re-run rather than banked, per the controller.
+
+**The rebase DID break the build first, and the cause is worth carrying:** seam 1 added `@fastify/cors`
+and `nodemailer`, so `BUILD_EXIT=2` with `Cannot find module` until `pnpm install` ran again. **A rebase
+that crosses a dependency change needs a reinstall, and the failure names a missing module rather than
+anything about the branch.** The error line also showed pnpm resolving under `node/v24.11.1`; checked
+rather than assumed — `pnpm exec node -v` reports **v22.22.2**, so the binary is a shim running the
+active node and the toolchain is correct.
+
+## THE MUTATIONS — eight, all restored, every message naming the mapper's own path
+
+| case | mutation on the ROUTE | result |
+|---|---|---|
+| 7.222 | `members:` → `people:` | **3 failed, 9 passed** — 7.222 + 7.228 + 7.229, all `at members.members: expected an array` |
+| 7.223 | `columns` → `cols` | 1 failed, 11 passed — `at board.columns` |
+| 7.224 | `events` → `entries` | 1 failed, 11 passed — `at history.events` |
+| 7.225 | `workflow` → `definition` | 1 failed, 11 passed — `at workflow.workflow: expected an object` |
+| 7.226 | `[...results, ...results]` | 1 failed, 11 passed — `at ingest.results: expected 1 index-aligned results (got 2)` |
+| 7.227 | strip `savedFilters` | 1 failed, 11 passed — `at preferences.savedFilters` |
+| 7.228 | `projectNames` → `projects` | 1 failed, 11 passed — `at myWork.projectNames` |
+| 7.229 | `items` → `entries` | 1 failed, 11 passed — `at attention.items` |
+
+**7.222's blast radius is 3 and is recorded, not trimmed.** 7.228 and 7.229 build their roster from the
+members route before mapping their own body, so breaking it takes all three. What makes the run evidence
+about 7.222 is that every message names `members.members` — the route's own key — rather than the count.
+
+### THE MUTATION THAT WAS NOT A MEASUREMENT, and it is the more useful half
+
+7.226's first mutation renamed `results` → `outcomes`. `beforeAll`'s own `post()` helper reads that same
+key to confirm each seeded event committed, so the seed threw and vitest reported **`Tests 12 skipped
+(12)`** — no failures, no evidence, and a naive reading of "not green" as "the mutation worked" would
+have banked it. **A mutation whose blast radius is the fixture's own setup measures nothing about the
+case it was aimed at** — the same shape this repo recorded when a claimant-filter mutation left `$2`
+unbound and reddened twenty cases while identifying none. The replacement duplicates the results array:
+the seed still reads `results[0].status === 'committed'` and passes, and only the mapper's
+count check fires. **Third time in two passes that a mutation reddened or greyed without measuring its
+property.** The rule now has three instances behind it: *read WHICH assertion produced the colour before
+banking the mutation.*
+
+---
+
+# ↓ LANE A — #187 (Lane F pass) RECORD. **MERGED as `e33c429`; its position line is superseded.**
+
 
 **https://github.com/bkirosangma/gisik-nokma/pull/187** · MERGEABLE / UNSTABLE (CI in flight).
 
