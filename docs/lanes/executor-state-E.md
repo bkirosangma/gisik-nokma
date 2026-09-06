@@ -9,25 +9,94 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
-## Anchors — re-measured 2026-09-06 ~12:35 IST by the RELAUNCHED session, at `c0bba56`
+## Anchors — re-measured 2026-09-06 by the RELAUNCHED session, AFTER the 4th rebase, at `4d16c2f`
 
-*The previous table said HEAD `5744489` / 29 ahead / 0 behind. All three were stale: two commits landed
-after it was written and thirty-nine merges landed on `main`. The stale row is not preserved here — an
-anchors table is the one place in this file where history is a hazard, because a restart reads it as
-position. The narrative sections below keep their own shas, and those remain facts about when they were
-written.*
+> **The previous version of this table had `ahead` and `behind` SWAPPED, and the commit message that
+> landed it repeats the error.** It said "25 ahead, 39 behind"; the truth at `c0bba56` was **39 ahead,
+> 25 behind**. Cause, recorded because it will recur: `git rev-list --left-right --count A...B` puts
+> **A-only on the LEFT** — so with `A = origin/main` the left column is *behind*, not *ahead*. The
+> output `25\t39` was read left-to-right as "ahead, behind". It is a well-formed wrong answer: both
+> numbers were real, in the wrong slots, and nothing in the output says which is which. **Use the
+> unambiguous two-dot forms instead** — `git rev-list --count origin/main..HEAD` is *ahead*,
+> `git rev-list --count HEAD..origin/main` is *behind* — which is how the numbers below were taken.
+> Caught by the arithmetic failing to reconcile: the rebase announced 40 commits to replay against a
+> branch the table called 25 ahead, and the 15-commit gap was the inversion, not a lost commit.
 
 | anchor | value |
 |---|---|
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
-| merge-base with `origin/main` | `de88248` — rebased 3× (`1e372e3` → `1394396` → `1b72900` → `de88248`); **a 4th rebase onto `5fca89e` is the next action** |
-| HEAD | **`c0bba56`** ("The shutdown path, reviewed — and my own rationale for it was false"). Reachable: `git branch -r --contains c0bba56` → `origin/exec/23-plan11`. Not orphaned |
-| `origin/main` | **`5fca89e`** at the measurement |
-| ahead / behind `origin/main` | **25 ahead, 39 behind** (`git rev-list --left-right --count origin/main...HEAD` → `39	25`) |
-| tree state | clean (`git status --porcelain --branch` → branch line only) |
-| node | `v22.22.2` (`source ~/.nvm/nvm.sh && nvm use 22`), pnpm **9.15.0** — measured in this session |
-| gate composition | **30/30 · 267 files / 3467 tests · `check:env` 0**, reported by the shutdown-path review round at the sha that became `c0bba56`. **NOT re-measured by this session** — it is the previous session's reading, carried because the tree has not changed since, and it will be superseded by the post-rebase gate before the PR. The last figure this lane measured end-to-end itself was `5744489`: 30/30 · 0 cached · 263 files / 3450 tests · `CHECK_ENV_EXIT=0` under lock v3.1 |
+| HEAD | **`4d16c2f9c9d117a31a8467b41dfe2fbc715c8cd0`** |
+| reachable | `git branch -r --contains HEAD` → ``. Not orphaned. (`git cat-file` is NOT evidence — it passes on reflog-only commits) |
+| `origin/main` | **`d92dd41`** |
+| merge-base | **`d92dd41`** — equal to `origin/main`, i.e. the rebase is complete and nothing is behind |
+| ahead (`origin/main..HEAD`) | **42** |
+| behind (`HEAD..origin/main`) | **0** |
+| tree state | clean |
+| node | `v22.22.2`, pnpm `9.15.0` — measured in this session |
+| post-rebase build | `pnpm install --frozen-lockfile` **0** · `pnpm rebuild better-sqlite3` **0** · `pnpm turbo run build --concurrency=1` **0**, `Tasks: 10 successful, 10 total` |
+| `check:env` baseline | **0** at the rebased head, BEFORE any T6 edit — so a later non-zero is attributable to this lane's change |
+| gate composition | **NOT YET MEASURED at this head.** The last full gate this lane ran end-to-end was at `5744489`: 30/30 · 0 cached · 263 files / 3450 tests · `CHECK_ENV_EXIT=0` under lock v3.1. The shutdown review round reported 30/30 · 267 files / 3467 tests at the sha that became `c0bba56`, which this session did **not** re-measure. Both are pre-rebase and neither describes the current tree; the seam-1 PR gate supersedes them |
+
+### Re-measurements taken after the rebase, before any writing
+
+| what | reading | how |
+|---|---|---|
+| `SERVING_GAPS` | **`['search']` alone** — the seam-3 map's claim still holds | pinned by `packages/app-core/test/online/mappers.test.ts:1148` (`Object.keys(SERVING_GAPS).sort()`), which is on the rebased tree |
+| `applyAll`'s projections | **four, in §8 order**: `projProjects` → `memberships` → `projInvites` → `projVisibility` | `apps/server/test/helpers/seed.ts:80-92`. Its own docblock records the deliberate absence: it should read `buildProjectionRegistry().all()`, owner "whoever next adds a projection" |
+| `deploy/do/app.yaml` · `.env.example` | last moved on `main` at `56cd091` (Plan 11 T15), which is BELOW the merge-base — no post-rebase surprise | `git log origin/main -- deploy/do/app.yaml .env.example` |
+| port sweep for T6 | **54330, 3000, 3001, 1025, 8025, 9000, 9001 all free**; 54329 and 5432 BUSY (Docker) | `lsof -nP -iTCP:<p> -sTCP:LISTEN` per port, with a positive control listing the 12 lowest live listeners |
+| `BACKUP_S3_BUCKET` | **read by NOTHING on this branch** (0 hits) — it is Lane C's, on `exec/30-plan11-backups` | `grep -rn BACKUP apps/server/src packages/*/src scripts`, positive control 22 hits for `OBJECT_STORE` in `store-config.ts` |
+| bare `S3_*` names | **read by NOTHING** — the plan's compose block would strand attachments on container-local disk | same sweep, same positive control |
+| Docker | **available**: server 24.0.6, Compose v2.21.0-desktop.1 — so "could not verify the stack starts" is NOT available as an excuse | `docker version` / `docker compose version` |
+| §13 catalogue debt | **T1, T2, T3, T4, T5 AND T6 all have NO `Features.md` bullet and NO test case.** The override says "T1 and T5"; it is six tasks | `grep` for each task's symbols across `Features.md` and `test-cases/`, positive control: `installShutdownHandlers` returns 2 |
+
+### What this session did, in order — and the three corrections it produced
+
+1. **Anchors refreshed** (`17bf362`) — and that commit's own arithmetic was WRONG; see the inversion note
+   above. Corrected here rather than left to be re-read as position.
+2. **Rebase #1 onto `5fca89e`**: 40 commits replayed, **zero conflicts** against the four the override
+   predicted. Verified nothing was dropped by enumerating all 40 rather than trusting the clean exit.
+3. **T6 implemented** (sonnet) and **reviewed** (opus, mutation-executing). Committed at the sha the
+   review ran against, BEFORE fixes, so the review stays evidence about a tree that exists.
+4. **Rebase #2 onto `81a7e44`** (Lane C's #183): one conflict, `test-cases/13`, resolved keeping BOTH
+   blocks — Lane C's 13.9–13.40 and this lane's 13.101–13.104. No id renumbered.
+5. **Lane C's `error-alerter-shim.ts` retired**, per its own header, since Task 3 rides in this PR.
+6. **Fix round**: the review's Critical + 3 Importants + 1 Minor + 1 Nit, plus the web-env defect this
+   lane found itself. Eleven mutations, zero survivors.
+
+#### Correction 1 — `git rev-list --left-right` reads BACKWARDS from the natural guess
+Left column is **behind**, right is **ahead**. Cost: one committed handoff with inverted figures. Use the
+two-dot forms; they cannot be misread. Detected only because the rebase announced 40 commits against a
+branch the table called 25 ahead and the gap would not reconcile — *arithmetic that fails to close is the
+cheapest detector this lane has.*
+
+#### Correction 2 — `check-case-ids.mjs` is NOT part of `pnpm check:env`
+The lane override says it is "BLOCKING in `check:env`". False, measured: `package.json`'s `check:env` is
+`node scripts/check-env-example.mjs` **alone**; `check-case-ids.mjs` is a separate CI step at
+`.github/workflows/ci.yml:169`, in the same JOB. **A lane reporting "check:env 0" has verified nothing
+about case ids.** Run it on its own line. The controller has corrected this in Lanes A and B's overrides.
+
+#### Correction 3 — the retroactive catalogue is SIX tasks, not two
+The override says "T1 and T5". Measured: **T1, T2, T3, T4, T5 and T6** all have no `Features.md` §13
+bullet and no test case (positive control: `installShutdownHandlers` returns 2 in `Features.md`).
+
+### The T6 findings worth carrying past this PR
+
+- **A compose file's project name is derived from its DIRECTORY.** Two compose files in one directory are
+  ONE project; if they share a service name, `up` on either RECREATES the other's container. Different
+  host ports do not separate two stacks — different `name:` values do. The header claimed co-runnability
+  before it was true, and no assertion could see it. *A claim in a comment is not a check.*
+- **`SERVER_ORIGIN` binds at BUILD time.** `next.config.ts`'s `rewrites()` runs during `next build` and
+  the result is serialised into `.next/routes-manifest.json`. Proven free, from this repo's existing build
+  output, without a rebuild. A runtime `environment:` entry changes nothing; it must be a build ARG.
+- **Task 6's stated acceptance cannot see the defect Task 6 is most likely to have.** "The stack comes up
+  and `/healthz` is green" is the SERVER's healthcheck; it passes over a web tier whose proxy points at
+  itself. The acceptance is now a request through the web proxy answered by the server. **The plan wrote a
+  check that cannot fail for the property it names, into its own success condition** — the eleventh entry
+  in this lane's catalogue of that shape, and the first found in an acceptance criterion rather than a test.
+- **`check:env` is structurally blind to compose files.** It validates code → `.env.example`. A compose
+  variable nothing reads is invisible to it; a required variable compose omits surfaces only at runtime.
 
 ### Position, in one line
 Seam 1 is complete **through the reviewed shutdown path**. Remaining, in order: **rebase onto `5fca89e`**

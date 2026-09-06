@@ -215,9 +215,13 @@ describe('docker-compose.dev.yml env contract', () => {
     });
 
     it('points SERVER_ORIGIN at the server service, not at localhost', () => {
-      // Inside the web container `localhost:3000` is the WEB container, so a
-      // localhost value makes Next proxy /v1/* back into itself and answer its
-      // own 404. This is the assertion that fails against the pre-fix tree.
+      // Inside the web container `localhost:3000` is the WEB container. What
+      // that costs was measured against a live stack, not predicted: Next logs
+      // `Failed to proxy http://localhost:3000/v1/me/work` with
+      // `EADDRNOTAVAIL 127.0.0.1:3000`, then a socket hang up, and answers
+      // HTTP 500 after a 30-second stall. (The predicted symptom was a fast
+      // self-served 404; that was wrong, and the measured one is worse.)
+      // This is the assertion that fails against the pre-fix tree.
       const origin = buildArgsOf('web').SERVER_ORIGIN;
       expect(origin).toBeTruthy();
       expect(

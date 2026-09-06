@@ -219,13 +219,23 @@ services:
         # literally into that manifest.
         #
         # SERVER_ORIGIN is server-side: the Next process inside THIS container
-        # dials it, so it must be the compose service name. `localhost:3000`
-        # here is the web container itself, which makes Next proxy /v1/* back
-        # into Next and answer its own 404 — the whole same-origin proxying
-        # arrangement silently broken, while the server's own /healthz stays
-        # green. NEXT_PUBLIC_SERVER_URL is the opposite: baked into the browser
-        # bundle for the /v1/stream socket (rewrites deliberately do not cover
-        # protocol upgrades), so it names the host-published port.
+        # dials it, so it must be the compose service name. What `localhost:3000`
+        # actually does here was MEASURED against a live stack rather than
+        # predicted, and the prediction was wrong in a way worth recording — the
+        # first guess (and the wording this comment carried until the control was
+        # run) was that Next would proxy back into itself and answer its own 404.
+        # It does not. It attempts the hop and cannot make it:
+        #     Failed to proxy http://localhost:3000/v1/me/work
+        #     [Error: connect EADDRNOTAVAIL 127.0.0.1:3000 - Local (0.0.0.0:0)]
+        #   then [Error: socket hang up] { code: 'ECONNRESET' }
+        # and the caller gets **HTTP 500 after a 30-second hang**, not a fast
+        # 404. The real symptom is worse than the predicted one, and nothing
+        # else looks wrong while it happens: the server is healthy, the web
+        # container is Up, and `GET :3001/` still serves its own pages (307).
+        # Only the proxied path fails. NEXT_PUBLIC_SERVER_URL is the opposite
+        # kind of variable: baked into the browser bundle for the /v1/stream
+        # socket (rewrites deliberately do not cover protocol upgrades), so it
+        # names the host-published port, not the service.
         SERVER_ORIGIN: http://server:3000
         NEXT_PUBLIC_SERVER_URL: http://localhost:3000
     depends_on:
