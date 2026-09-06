@@ -214,6 +214,23 @@ those names and swaps on rebase — never a second `src/alerts/`), scratch datab
 lines: C announces to E and D before pushing; keep both. Lane sessions after the 07:3x restarts:
 C `lane3-plan7-8-13`, B (restarted 07:38, name per `ListAgents`).
 
+### Re-task 08:25 — Lane D takes the two RETENTION errands after #154; Lane C takes the two SCHEDULER errands after T11/T12; the verifier's DDL decision is NOT discharged by T15
+
+Lane E's split of P33's four seam-2/3 errands is by whether the errand needs the SCHEDULER Lane C is
+building in `src/ops/schedule.ts` for T11: **C** — `ops:sweep-orphans` (monthly, 30-day, only objects no
+ledger event ever named; coordination:310/:1115; reads the object store C already touches) and scheduling
+the notification-sweep CLI (`tools/sweep-notifications.ts:8`); both fold into the SAME scheduler, as a
+follow-up PR after T11/T12 to keep that review's scope honest. **D** — the `invite_tokens` sweep (6.131)
+and `user_preferences` retention for revoked members (coordination:5495-5502): data-retention sweeps in
+`apps/server/src/tools/`, invoked by whatever scheduler exists, cases in **§6** (D's §13 block is exhausted
+at 13.100 by #154), membership read through `resolveEffectiveRole` (P22), dry-run flag, never
+`object-store.ts` (C's). D's override is staged for its restart at #154's merge. **Still open, with T16 as
+a written decision (Lane E measured `deploy/do/` on `main`: every "verif" hit is `sslmode=verify-full`;
+`DDL`/`DROP SCHEMA`/`scratch` appear zero times, positive control `DATABASE_URL` ×4):** coordination:1607-1611's
+requirement that `deploy/do/` carry either a DDL-capable credential for the projection verifier or an
+explicit recorded decision that it runs only against restore scratch DBs. **Lane E's T3 committed at
+`b5ec53a`** (two more guards-that-could-not-fire found by its reviewer, repaired with positive controls).
+
 ### ⛔ THE 06:40 SESSION-LIMIT WINDOW TOOK EVERY LANE AND THIS CONTROLLER DOWN FOR ~3.5 HOURS (03:5x → ~07:20 IST)
 
 Every lane's five-hour session meter read 80% at 03:25; by ~03:50 subagents were dying with `You've hit
@@ -304,6 +321,21 @@ done
 trap 'rm -f "$LOCK"' EXIT
 # then the drain-wait on live vitest pools (unchanged), then the run — ONE backgrounded invocation.
 ```
+**v3.1 (08:25) — the idle check's `pgrep -fl … | grep -vc` line in v3 was DEFECTIVE and is replaced.**
+Lane E measured it before adopting: `pgrep -fl` emits one line per argv LINE, and a claude session's argv is
+its whole multi-line brief — **371 lines for 1 process** — so once any brief or relayed message quotes a
+script name (v3's own text did), the count never reaches 0, the empty-file reclaim can never fire, and a
+genuinely orphaned lock wedges all five lanes forever. `pgrep -f vitest`'s class, one turn later. The
+peers term is now a PROCESS count requiring the executable to be a shell, excluding self AND the parent
+shell (the tool's own shell carries the command text in its argv; measured here: idle reads 0 only with
+both excluded):
+```
+peers=$(ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID '{ c=$2; sub(/.*\//,"",c) } (c=="bash"||c=="sh"||c=="zsh") && ($0 ~ /gate\.sh/ || $0 ~ /locked-test\.sh/) && $1!=self && $1!=parent { n++ } END { print n+0 }')
+… && [ "$peers" -eq 0 ] …
+```
+Positive-controlled by E: a real `locked-test.sh` run reports `peers=3`. Sent to all five lanes 08:25; the
+controller's `gate.sh` is on v3.1.
+
 **Rules:** (1) `$$` is the process that survives the whole gate — one script, one `run_in_background`
 invocation, never a subshell, pipeline or `nohup … &` (Lane D's earlier near-miss); (2) the ONLY stale
 reclaim is a dead pid; an EMPTY file (a crash between open and write — microseconds) is reclaimed only
