@@ -11,7 +11,56 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 12:25 IST AT THE OWNER'S INSTRUCTION (ctx 95%) — RESUME FROM HERE
+## ⏩ CONTROLLER RESUMED 2026-09-06 12:26 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `3e6d606`
+
+**The 12:25 `/clear` worked as designed.** The fresh context read this file top-down (the 12:25 block, then
+the 02:10 block in full — the standing rules and Rulings P35–P41 live there), then every lane's handoff from
+its OWN branch, then measured before touching anything. **Session model is Fable (owner-set); the brief's
+Sonnet gating does not apply; rulings are taken in-session.** The 12:25 block below and everything under it
+remain true history; **this block is the live state.**
+
+### Anchors — re-measured 12:38 IST
+
+| what | value |
+|---|---|
+| `main` | **`3e6d606`** — since `5fca89e`: **#181** (Lane A's post-#176 handoff, docs-only, 62 lines of `executor-state.md`). Lane A had pushed it to `exec/38-handoff-post-176` and stopped per its override without a PR; the controller opened and merged it, because an unmerged handoff branch is exactly this file's header hazard. **Code-identical to `2d2bc5c`** (`git diff --stat 2d2bc5c origin/main -- . ':!docs'` is empty) |
+| ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** re-run at `3e6d606` (and at `5fca89e`) — unchanged; Plan 10 **17/18** (T18 held), Plan 11 **6/16** (T7–T10, T14, T15) |
+| last forced gate | **`2d2bc5c`** (code-identical to `3e6d606`) — `GATE_EXIT=0` · 30/30 · 0 cached · node v22.22.2 · 3393 tests / 264 files. No gate was re-run for the two docs-only merges (#180, #181): the written rule for docs/ledger PRs is an independent `check:tasks`, and it ran |
+| open PRs | **#161 only** — Lane B closure 5b at `632ad04`, `CONFLICTING` = the owed rebase (four files collide with #176: `apps/server/test/integration/client-contract.test.ts`, `packages/app-core/src/online/stream.ts`, `Features.md`, `test-cases/12`) |
+| watch | the `Monitor` task from 02:14 (`bw9fyoz9c`) **SURVIVED the `/clear`** — its first event landed in this context at 12:25:50 (`MAIN MOVED dfd9485 -> 5fca89e`); not re-armed. It dies with the session PROCESS, not the context; re-arm `ctl-watch.sh` (copied with `gate.sh` v3.2 into this session's scratchpad `75988d28-…`) only at a relaunch |
+| lock · machine | lock free at 12:27; 0 vitest pools; swap **4.0 of 5 GB used** (3.6 at 02:26) — five lanes plus fan-outs, not a blocker, watch it |
+| session meters | fresh after the 12:20 reset — lanes read 8–12% at 12:38, **next reset 17:20 IST**; weekly 58% |
+
+### The five lanes NOW — 12:38; verify each with `git log origin/<branch>` and `ListAgents`, do not adopt
+
+| lane | session (per `ListAgents`) · model | branch · head | state | controller's next action |
+|---|---|---|---|---|
+| **A** | `gisik-nokma-exec-f3` · opus · **RELAUNCHED 12:38** (`start-lanes.sh A`; old override → `override-laneA-c2-done.md.bak`) | `exec/39-fixture-witnesses`, cut from `3e6d606` | **RE-TASKED onto Lane F's pass "any fixture whose protocol was authored alongside its consumer"** (A's own #176 finding, generalised). **Phase 1 is a read-only INVENTORY** — file:line · protocol modelled · real producer · witness exists? · verdict MIRROR / WITNESSED / N.A. — **reported to the controller as a SCOPE report before anything is built.** Phase 2: witnesses in the 7.220 shape (real producer, real consumer, producer-breaking mutation → red, blast radius recorded), new server test files only, nothing on #161's diff, server `src/` untouched. §12 12.320–12.339 (used through 12.322); §7 from 7.221 | **answer the scope report** (which mirrors get witnesses now, which get ❌/🧪 cases with owners, which wait for #161); merge its PR on arrival; no ledger row (Lane F) |
+| **B** | `lane2-plan4-b3` · opus · **RELAUNCHED 12:36 mid-step** (previous at 79%, halted by the 10:32 limit with an unsent nudge in its input box; tree clean = origin, so nothing was lost; old override → `override-laneB-closure5b-pre-halt.md.bak`) | `exec/29-closure5b-reach` · `632ad04` | finishing **#161**: anchors refresh → P37.3's two fixtures (**12.317, 12.318**; 12.319 last) → the two `headSeq` mutations under the lock in a quiet window (predicted 7 red / 2 red — measured set recorded against prediction) → rebase onto `3e6d606`+ (the four #176 collisions above, keep both) → `pnpm install`, rebuild, full gate v3.2 → **re-report the head and HOLD**. **§12 block 12.340–12.359 is ALLOCATED to B conditionally** — used only if 12.317–12.319 run out, header updated in the same PR, said in the report. The whole-branch Fable round already ran; a second is not owed unless production code changes beyond the fixtures | merge at the re-reported head on twelve jobs green at that exact sha; **then restart B onto T18** — swap `override-laneB-next.md` into `override-laneB.md` first |
+| **C** | `lane3-plan7-8-3d` · sonnet · ctx 38% · **NOT restarted, NUDGED 12:33** by `SendMessage` (acted on it within a minute) | `exec/30-plan11-backups` · `0a1182a` **+ SIX uncommitted files** (`src/ops/{backup-daemon-main,error-alerter-shim,pg-dump,schedule}.ts`, `test/ops/{pg-dump,schedule}.test.ts`) | its fix workflow (`wf_06c65784-7e3`, gated on the LAST verdict) **COMPLETED at 10:32**; the session hit the limit before reading the result, so the fix round's files sit uncommitted and the conditional commit never ran. Told: read the LAST verdict, verify the Critical itself under `env -i` with the worker's literal `app.yaml` env block, commit by explicit path, then its NEXT STEPS list (four WIP claims, check-case-ids + check-env-example, restore-drill's first run, T12 review, split the WIP, rebase, gate v3.2, PR). Kept its context because the workflow result lives only there | merge on its report + twelve jobs (read JOB STEPS); **promote 11/11, 11/12**; then restart C with `override-laneC-next.md` (scheduler errands) |
+| **D** | `lane4-periphery-22` · sonnet · 31% · idle | `exec/36-e2e-testids` → MERGED #173 | **HOLDING by instruction (told 12:33, with its next task NAMED):** the socket-cutting fixture for the dual-client rig — Lane F item 5, the only thing that flips 12.290 (the wedge) from 🟡 — touches Lane B's rig files, so it starts only after #161 merges | **at #161's merge:** write `override-laneD.md` for the socket-cutting fixture (`override-laneD.md` is SPENT — it was the hooks), `start-lanes.sh D` |
+| **E** | `lane5-plan11-7e` · opus · **RELAUNCHED 12:30 mid-step** (previous at 91%; its worktree was clean and equal to `origin/exec/23-plan11`, so "push any last handoff refresh" was discharged by measurement — nothing to push; old override → `override-laneE-seam1-pre-halt.md.bak`) | `exec/23-plan11` · `c0bba56` | finishing **seam 1**: refresh its state file's anchors (the table said `5744489`; truth `c0bba56`) → rebase onto `3e6d606`+ → **T6** (compose on **54330**, `OBJECT_STORE_S3_*` split, `.env.example`; `docker compose up` reaching `/healthz` is the acceptance) → retroactive §13 catalogue **from 13.105** → the seam-1 PR (body owes the same-change-set sentence and the two recorded deviations) → **HOLD**. The DDL/scratch-DB written decision is **T16's**, carried | merge the seam-1 PR on arrival (`check:env` on its own line; `engine-strict` lands for every lane — under node 24 pnpm exits 1 SILENTLY); **promote 11/1–11/6**; then restart E onto seam 3 (`override-laneE-next.md`) |
+
+**Staged overrides, unchanged:** `override-laneB-next.md` (T18) · `override-laneC-next.md` (scheduler errands)
+· `override-laneE-next.md` (T13 → T16). **§ id blocks:** §12 — A 12.320–12.339 (through 12.322), B
+12.290–12.319 (12.317+ for P37.3) **+ 12.340–12.359 conditional**, next 12.360; §13 — C 1–40, D 41–100
+(exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159 (through 149), B 160–179, A 180+.
+
+### Three notes for the next restart, each paid for in this context
+- **`gh pr merge --squash --delete-branch` exits 1 when the LOCAL branch cannot be deleted** (checked out
+  in a lane's worktree) **even though the merge SUCCEEDED** — #181 did exactly this (`MERGE181_EXIT=1`,
+  `origin/main` moved, `gh pr view 181 --json state` → `MERGED`). Reading `$?` on its own line stays the
+  rule; this note is about what a 1 can mean: confirm with `gh pr view N --json state,mergeCommit` and
+  `git log origin/main` before treating it as a failed merge, and delete the remote branch by hand.
+- **`git show <ref>:<path> | head -N` panics rtk's git proxy** ("failed printing to stdout: Broken pipe")
+  — harmless for git, but write to a scratchpad file and Read it instead. The `| head` rule for test and
+  build runs stays absolute.
+- **`SendMessage` controller → lane WORKS** (C and D both acted on 12:33 messages inside a minute); the
+  `/clear` brief's "SendMessage does not work" describes the dead serial topology. The proof is still
+  watching the pane. A lane pane holding a stale unsent nudge in its input box is either relaunched (B, E —
+  both idle with pushed trees) or told in the message to ignore the line (C — kept for its context).
+
+## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 12:25 IST AT THE OWNER'S INSTRUCTION (ctx 95%) — SUPERSEDED BY THE BLOCK ABOVE, kept for the record
 
 **Deliberate, not a crash.** The owner said *"limit has been reset now. and its already 95% ctx. prepare and
 restart yourself."* This controller landed this block, then typed `/clear` into its own pane (`gisik:0`)
