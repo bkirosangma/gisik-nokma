@@ -162,6 +162,257 @@ nothing — they measured it, applying both reconciliations to `app-core` at onc
 client code through the `@gisik-nokma/app-core/online` subpath. That import resolves through `dist`,
 so any mutation run must rebuild rather than use bare `vitest`.
 
+## PHASE 1 COMPLETE — THE INVENTORY, AND THE FOUR THINGS IN IT THAT ARE NOT BOOKKEEPING
+
+**157 fixtures inventoried: 76 MIRROR · 29 WITNESSED · 52 N.A.** Nineteen are frozen by #161.
+Twenty are MIRRORs that are buildable here and frozen by nothing. Five read-only scanners plus one
+witness auditor whose only job was to attack the WITNESSED verdicts; it moved five of them and refined
+six more. **1.05M subagent tokens, six agents, zero errors — at the 6-agent cap, no fan-out deferred.**
+
+**Everything below that I report as fact, I reopened and verified myself against source.** The
+scanners' claims are cited, not adopted; two of the four findings are against my OWN work.
+
+### FINDING A (verified) — my own "fixed" fake still models a branch the real route cannot produce
+
+`pagingFetch` was the defect that motivated this pass, and I fixed its cursor semantics in #176. **It
+has a SECOND invented rule I did not see, in the same helper.**
+`online-data-source.test.ts:67` answers **`{ok:false, status:404}` for any cursor it does not
+recognise.** The real route cannot do that: `routes/list.ts:143` binds `t.ticket_id > $n` as a
+**VALUE**, so an unknown cursor is a text comparison that NARROWS — 200 with zero rows, never a 404.
+The route's own docblock (`list.ts:103-112`) says so and goes further:
+
+> *"a cursor naming another tenancy's ticket or a ticket the caller may not see is just a text
+> comparison that narrows. **The tests hand back all three (foreign, invisible, hostile) and pin
+> that.**"*
+
+**So the server has tests pinning the exact rule my client fake contradicts, and neither could see the
+other.** That is the whole thesis of this pass in one row, and it is mine: **fixing one lie in a
+fixture does not convert the fixture into a witness.** I closed the cursor semantics and left the
+error semantics, and 30/30 tasks and 3,388 tests stayed green across both.
+
+### FINDING B (verified) — a case whose NAME claims the door's sentence, and which asserts its own
+
+`packages/app-core/test/online/founding.test.ts:64`, titled *"carries the 400 whitespace-name refusal
+out with **the door's sentence**"*, builds `{error:'invalid_name', message:'A workspace needs a name.
+Whitespace alone is not one.'}`. The door's actual sentence — `INVALID_NAME_BODY`,
+`apps/server/src/routes/workspaces.ts:10-13`, sent at `:99` — is
+`{error:'invalid', message:'A workspace needs a name.'}`. **Both the discriminant and the sentence
+differ**, and the case passes because it asserts `serverMessage: body.message`, reading back the
+literal it just wrote. Its docblock cites `routes/workspaces.ts` as its authority while contradicting
+it. No runtime defect today — nothing in app-core narrows on `error` — but the case's own title is the
+claim it fails to keep, and a fixture asserting a discriminant no server emits is how a client comes to
+depend on one.
+
+### FINDING C (verified) — 7.220 witnesses less than I said it did, and the gap is four keys wide
+
+This one is against my own case. `mapListRow` (`mappers.ts:1125-1176`) reads sixteen keys and
+**never reads `workspaceId`, `projectId`, `workflowId` or `collaboratorIds`** — all four of which the
+fixtures assert the wire carries. I enumerated every `record[...]` read in the function to confirm it.
+**So 7.220 running the real `mapListPage` over real route bytes cannot redden if the route dropped any
+of those four**: the consumer ignores them, so the round trip is blind to them. My state file's earlier
+sentence — that 7.220 pins "the accepted key set" — is **too strong, and I am correcting it here rather
+than letting it stand**: 7.220 pins the cursor's VALUE and its ADVANCE, and nothing about four of the
+keys the fixture spells out.
+
+### FINDING D (verified) — the largest weight-bearing citation in the inventory is circular
+
+Four `sync-client` fixtures were reported WITNESSED against `apps/server/test/dual-client/rig.ts:366`.
+**The same inventory files `rig.ts:219` and `:249` as MIRRORs of the real bootstrap route.** A second
+restatement written by the same authors is not a witness, and these two have already parted: the route
+emits `snapshot.provenance` (ruling P36's whole subject) and the rig does not. The auditor downgraded
+all four to MIRROR. **I accept the downgrade and flag its one honest weakness, which the auditor
+itself raised:** every VALUE in the rig's payload does come from real server modules over real
+Postgres, and a compile-time chain would break on a rename of any REQUIRED key. The field that escaped
+that chain is exactly the field that diverged. A reviewer could defensibly split these as
+envelope-MIRROR / values-WITNESSED. **I am not deciding it — it is a scope question for the
+controller**, and it changes whether four rows need witnesses or four docblocks need a named gap.
+
+### THE ONE I WOULD BUILD FIRST, AND THE CORRECTION I MADE TO IT
+
+`packages/app-core/test/inbox/fake-gateway.ts:20` — `FakeNotificationsGateway` — is `pagingFetch` with
+the serial numbers filed off. Its own docblock says it is *"MIRRORING the server's paging semantics"*
+and that *"the interface has no consumer in this package"*, and lines 37-44 record a drift it has
+ALREADY had once (the empty-string cursor). It is the only measurement of `NotificationsGateway`.
+
+The proposed witness is one assertion inside a test that already has both halves in scope —
+`apps/server/test/routes/notifications.test.ts:100`, which today asserts `nextCursor` is
+`not.toBeNull()`, re-sends it, and asserts a different row: it witnesses ADVANCE and TERMINATION and
+**never the cursor's VALUE**, which is the keyset claim.
+
+**The correction, and it matters:** the assertion proposed to me was
+`expect(body1.nextCursor).toBe(body1.notifications[0]?.id)`. `nextCursor` is the **LAST** row of the
+page (`store.ts:96`, `rows.slice(0, limit)` then `lastRow.id`), and `notifications[0]` is the FIRST.
+It is correct here **only because that case uses `limit=1`**, which makes first and last the same row.
+**A witness that is accidentally right at one page size is not one I will write.** It goes in as
+`body1.notifications.at(-1)?.id`, which stays true if anyone changes the limit.
+
+| # | fixture | models | real producer | verdict | build | owner |
+|---|---|---|---|---|---|---|
+| | **— app-core / online — 45 rows, 36 MIRROR —** | | | | | |
+| 1 | `packages/app-core/test/online/founding.test.ts:27` | The body `POST /v1/workspaces` returns at 201. | apps/server/src/routes/workspaces.ts:128 — `return reply.… | **MIRROR** | NO | apps/server integration lan… |
+| 2 | `packages/app-core/test/online/founding.test.ts:64` | `INVALID_NAME_BODY` — what `POST /v1/workspaces` sends at 400 for a blank nam… | apps/server/src/routes/workspaces.ts:10-13 — `{ error: 'i… | **MIRROR** | NO | Lane A can correct the lite… |
+| 3 | `packages/app-core/test/online/founding.test.ts:77` | The ingest layer's `IngestResult` refused arm, forwarded verbatim by the foun… | apps/server/src/routes/workspaces.ts:126 (`reply.code(422… | **MIRROR** | NO | apps/server integration lan… |
+| 4 | `packages/app-core/test/online/http.test.ts:4` | The WHATWG `Response` interface consumed by `FetchLike` (src/online/http.ts:1… | The runtime `fetch` / undici `Response` (WHATWG spec); no… | **MIRROR** | NO | Lane A (documentation only;… |
+| 5 | `packages/app-core/test/online/http.test.ts:114` | The three-key admin-only refusal body `{error, rule, message}` that `GET /v1/… | apps/server/src/routes/invites.ts:118 (`INVITE_ADMIN_ONLY… | **MIRROR** | NO | apps/server integration lan… |
+| 6 | `packages/app-core/test/online/http.test.ts:128` | A reverse proxy answering an HTML error page where JSON was expected — i.e. a… | NONE — no proxy exists in this repo; the modeled producer… | **MIRROR** | NO | Lane A (documentation only) |
+| 7 | `packages/app-core/test/online/http.test.ts:152` | Two server refusal vocabularies: `{error, message}` (frozen refusal bodies) a… | apps/server/src/routes/workspaces.ts:10 and apps/server/s… | **MIRROR** | NO | apps/server integration lan… |
+| 8 | `packages/app-core/test/online/invites-admin.test.ts:33` | `{inviteId, url, expiresAt}` — the one and only copy of a raw invite token, p… | apps/server/src/routes/invites.ts:359-362. | **MIRROR** | NO | apps/server integration lan… |
+| 9 | `packages/app-core/test/online/invites-admin.test.ts:121` | `{invites:[{inviteId, address, channel, role, projectIds, invitedBy, invitedA… | apps/server/src/routes/invites.ts:572-581 (the `rows.map`… | **MIRROR** | NO | apps/server integration lan… |
+| 10 | `packages/app-core/test/online/invites-admin.test.ts:265` | The frozen 403 a plain member meets on the admin invite doors. | apps/server/src/routes/invites.ts:118-122, sent at :552. | **MIRROR** | NO | apps/server integration lan… |
+| 11 | `packages/app-core/test/online/invites.test.ts:37` | The body `GET /v1/invites/:token` serves for an openable link. | apps/server/src/routes/invites.ts:383-387 — `{ workspaceI… | **MIRROR** | NO | apps/server integration lan… |
+| 12 | `packages/app-core/test/online/invites.test.ts:86` | The 200 body of `POST /v1/invites/:token/accept`. | apps/server/src/routes/invites.ts:518 — `return { workspa… | **MIRROR** | NO | apps/server integration lan… |
+| 13 | `packages/app-core/test/online/invites.test.ts:102` | The frozen 404 body a used/withdrawn/lapsed invite link draws on both invite … | apps/server/src/routes/invites.ts:110-115, sent at :380 a… | **MIRROR** | NO | apps/server integration lan… |
+| 14 | `packages/app-core/test/online/mappers.test.ts:52` | `TicketCard` as emitted on the board, my-work and attention wires: `dueDate: … | apps/server/src/read/ticket-cards.ts (`assembleTicketCard… | **MIRROR** | NO | apps/server integration lan… |
+| 15 | `packages/app-core/test/online/mappers.test.ts:121` | `{workspaceId, members:[{userId, displayName, role}]}`. | apps/server/src/routes/builder-reads.ts:569 (`const body:… | **MIRROR** | NO | apps/server integration lan… |
+| 16 | `packages/app-core/test/online/mappers.test.ts:144` | `{projectId, workspaceId, columns:[{workflowId, workflowName, workflowVersion… | apps/server/src/routes/board.ts:86 (`Promise<BoardRespons… | **MIRROR** | NO | apps/server integration lan… |
+| 17 | `packages/app-core/test/online/mappers.test.ts:367` | `{ticketId, events:[{id, type, version, payload, actorId, origin, clientTime,… | apps/server/src/routes/ticket-history.ts:309 — `return { … | **MIRROR** | NO | apps/server integration lan… |
+| 18 | `packages/app-core/test/online/mappers.test.ts:394` | `{workspaceId, workflow:{id, version, name, initialStateId, states[], transit… | apps/server/src/routes/builder-reads.ts:525 — `const body… | **MIRROR** | NO | apps/server integration lan… |
+| 19 | `packages/app-core/test/online/mappers.test.ts:466` | `POST /v1/events`'s answer: `{results: IngestResult[]}`, index-aligned with t… | apps/server/src/routes/events.ts:98 — `return { results }… | **MIRROR** | NO | apps/server integration lan… |
+| 20 | `packages/app-core/test/online/mappers.test.ts:506` | `{savedFilters, listColumns, grouping}` — the strict preferences document, ke… | apps/server/src/routes/preferences.ts:110 (`return getPre… | **MIRROR** | NO | apps/server integration lan… |
+| 21 | `packages/app-core/test/online/mappers.test.ts:632` | The INBOUND direction of the same document: `{assigneeId, due:{before}, field… | packages/domain/src/filter-spec.ts:119 (`filterSpecSchema… | **MIRROR** | YES | Lane A — a schema-driven sw… |
+| 22 | `packages/app-core/test/online/mappers.test.ts:650` | Runs the OTHER direction: app-core is the producer, the server route is the c… | apps/server/src/routes/preferences.ts:126 — `preferencesD… | **MIRROR** | YES | Lane A — this is the one wi… |
+| 23 | `packages/app-core/test/online/mappers.test.ts:720` | Also the other direction: `{text, assigneeId, stateCategory, due:{before,afte… | packages/domain/src/filter-spec.ts:119-158 (`filterSpecSc… | **MIRROR** | YES | Lane A — `filterSpecSchema.… |
+| 24 | `packages/app-core/test/online/mappers.test.ts:825` | `{workspaceId, groups:{open,active,terminal}, projectNames, stateNames, conte… | apps/server/src/routes/my-work.ts:116 (`Promise<MyWorkRes… | **MIRROR** | NO | apps/server integration lan… |
+| 25 | `packages/app-core/test/online/mappers.test.ts:1015` | `{workspaceId, generatedAt, settings:{staleDays, dueSoonDays, provenance}, it… | apps/server/src/routes/attention.ts:163 (`Promise<Attenti… | **MIRROR** | NO | apps/server integration lan… |
+| 26 | `packages/app-core/test/online/mappers.test.ts:1092` | A five-key contest row `{ticketId, title, projectId, rule, reason}` under a `… | apps/server/src/sync/contests-route.ts:213 (`GET /v1/cont… | **MIRROR** | NO | apps/server integration lan… |
+| 27 | `packages/app-core/test/online/online-data-source.test…:29` | The `Response` interface again, PLUS a server convention: 'every /v1 read rou… | apps/server/src/read/membership.ts:15 (`READ_NOT_FOUND_BO… | **MIRROR** | NO | apps/server integration lan… |
+| 28 | `packages/app-core/test/online/online-data-source.test…:114` | `MemberListResponse` and `BoardResponse` served together on the roster-join p… | apps/server/src/routes/builder-reads.ts:569 and apps/serv… | **MIRROR** | NO | apps/server integration lan… |
+| 29 | `packages/app-core/test/online/online-data-source.test…:238` | `/v1/tickets/:id/history?afterSeq=&limit=` and `/v1/workspaces/:id/workflows/… | apps/server/src/routes/ticket-history.ts:271 with `parseP… | **MIRROR** | NO | apps/server integration lan… |
+| 30 | `packages/app-core/test/online/online-data-source.test…:423` | Both directions of `/v1/me/preferences`: the served document, and the bytes t… | apps/server/src/routes/preferences.ts:110 / :126 (`prefer… | **MIRROR** | YES | Lane A — the PUT body can b… |
+| 31 | `packages/app-core/test/online/online-data-source.test…:535` | The directory body `{workspaces:[{workspaceId, name, role, projects:[{project… | apps/server/src/routes/workspaces.ts:151-175 — the `works… | **MIRROR** | YES | Lane A can add a non-empty … |
+| 32 | `packages/app-core/test/online/online-data-source.test…:578` | `{workspaceId, ticketTypes:[{id, name, icon, rank, workflowId, fields}]}` ord… | apps/server/src/routes/builder-reads.ts:538 (`const body:… | **MIRROR** | NO | apps/server integration lan… |
+| 33 | `packages/app-core/test/online/stream.test.ts:119` 🔒 | `{type:'event', envelope:{…, seq, workspaceSeq}}` plus `purge` / `scope-revok… | apps/server/src/stream/hub.ts → apps/server/src/stream/ro… | **MIRROR** | NO | Lane B (PR #161) — inventor… |
+| 34 | `packages/app-core/test/online/stream.test.ts:163` 🔒 | Runs the other direction: `{type:'subscribe', workspaceId, afterSeq}` — the O… | apps/server/src/stream/routes.ts:342 — `subscribeFrameSch… | **MIRROR** | YES | Lane B (PR #161) — inventor… |
+| 35 | `packages/app-core/test/online/stream.test.ts:354` 🔒 | An application-level JSON heartbeat: server sends `{"type":"ping"}` as a TEXT… | NONE. The shipped heartbeat is the WebSocket PROTOCOL con… | **MIRROR** | NO | Lane B (PR #161) — inventor… |
+| 36 | `packages/app-core/test/online/stream.test.ts:487` 🔒 | All five members of the published `ServerStreamFrame` union, at the schema's … | packages/domain/src/stream-frames.ts:194 (`serverStreamFr… | **MIRROR** | NO | Lane B (PR #161) — inventor… |
+| 37 | `packages/app-core/test/online/founding.test.ts:11` | `HttpClient` — get/post/put returning `unknown`. | packages/app-core/src/online/http.ts:3 — app-core's OWN t… | **N.A.** | YES | Lane A |
+| 38 | `packages/app-core/test/online/invites.test.ts:14` | `HttpClient`, plus the transport's 404-as-null affordance (an unknown path an… | packages/app-core/src/online/http.ts:3 and :110 — app-cor… | **N.A.** | YES | Lane A |
+| 39 | `packages/app-core/test/online/mappers.test.ts:799` | `{workspaceId, query, hits}` — but nothing reads it. | apps/server/src/routes/search.ts:124 (`Promise<SearchResp… | **N.A.** | YES | Lane A |
+| 40 | `packages/app-core/test/online/stream.test.ts:15` 🔒 | `WebSocketLike` — the injected socket seam. | packages/app-core/src/online/stream.ts (`WebSocketLike`) … | **N.A.** | YES | Lane B (PR #161) — inventor… |
+| 41 | `packages/app-core/test/online/mappers.test.ts:80` | `{totalChildren, terminalChildren, uncategorizedChildren, restrictedCount}` —… | apps/server/src/read/ticket-cards.ts (the `TicketRollup` … | **WITNESSED** | NO | Lane A for the app-core hal… |
+| 42 | `packages/app-core/test/online/mappers.test.ts:1218` | `ListCard` = `TicketCard` + `{typeRank, epicId, stateName, assignedProvenance… | apps/server/src/routes/list.ts:128 (`Promise<ListResponse… | **WITNESSED** | NO | Lane A owns the app-core ha… |
+| 43 | `packages/app-core/test/online/mappers.test.ts:1385` | The inline body of `GET /v1/workspaces/:id/tickets/:id`: `{ticket (a proj_vis… | apps/server/src/routes/tickets.ts — the route composes th… | **WITNESSED** | NO | apps/server integration lan… |
+| 44 | `packages/app-core/test/online/online-data-source.test…:52` | The list route's cursor protocol: `cursor` in the query string, `nextCursor` … | apps/server/src/routes/list.ts:142-143 (`t.ticket_id > ${… | **WITNESSED** | NO | Lane A owns the helper; the… |
+| 45 | `packages/app-core/test/online/online-data-source.test…:89` | The 20-key `ListCard` shape `mapListPage` accepts. | apps/server/src/read/list-cards.ts (`assembleListCards`) … | **WITNESSED** | NO | Lane A owns the helper; wit… |
+| | **— app-core / rest — 16 rows, 8 MIRROR —** | | | | | |
+| 46 | `packages/app-core/test/cache.test.ts:22` | A ledger envelope as the stream delivers it: entity kind/id, type, `seq` (per… | packages/domain/src/ledger-event.ts (declaration); apps/s… | **MIRROR** | NO | Lane A |
+| 47 | `packages/app-core/test/flows/guarded-child-event.test…:19` | A server refusal for a child event under a terminal parent, keyed by the RULE… | packages/rule-engine/src/checks/hierarchy.ts:150 and :298… | **MIRROR** | YES | Lane A |
+| 48 | `packages/app-core/test/helpers/fake-data-source.ts:62` | `POST /v1/events`'s per-event answer: the `IngestResult` array, index-aligned… | packages/domain/src/ingest-result.ts:14-17 declares `Inge… | **MIRROR** | NO | Lane A |
+| 49 | `packages/app-core/test/helpers/fake-data-source.ts:73` | The server→client WS frame union on /v1/stream (`ServerStreamFrame`, re-expor… | apps/server/src/stream/hub.ts:205-274 — `send(sub, frame)… | **MIRROR** | NO | Lane A |
+| 50 | `packages/app-core/test/helpers/seed.ts:17` | A `WorkflowDef` as it reaches a client: the value `getWorkflowDef` returns ve… | packages/domain/src/workflow.ts:41 (`workflowDefSchema`) … | **MIRROR** | YES | Lane A |
+| 51 | `packages/app-core/test/helpers/seed.ts:106` | The folded ticket state a server snapshot carries and the reducer produces, i… | packages/domain/src/entity-state.ts (the declaration) and… | **MIRROR** | YES | Lane A |
+| 52 | `packages/app-core/test/inbox/fake-gateway.ts:20` | `GET /v1/me/notifications`'s page contract: rows ordered id DESC, keyset curs… | apps/server/src/notifications/store.ts:66-97 (`listNotifi… | **MIRROR** | NO | Lane A |
+| 53 | `packages/app-core/test/inbox/fixtures.ts:88` | A notification ROW as delivered by `GET /v1/me/notifications`: id, userId, wo… | apps/server/src/notifications/fanout.ts and sweep.ts writ… | **MIRROR** | NO | Lane A |
+| 54 | `packages/app-core/src/workflow-builder/fake-gateway.ts:36` | `WorkflowAuthoringGateway` — app-core's own interface — but its `submit` also… | packages/domain/src/envelope.ts's `submittedEventSchema` … | **N.A.** | YES | Lane A |
+| 55 | `packages/app-core/test/helpers/fake-data-source.ts:31` | None external. `DataSourceQuery` is declared in packages/app-core/src/data-so… | NONE — app-core owns both the interface and every type it… | **N.A.** | YES | Lane A |
+| 56 | `packages/app-core/test/helpers/seed.ts:34` | None external — `ClaimProvenance`, `ContestedClaimProvenance`, `BoardCard` an… | NONE. These are app-core's own view models; the server's … | **N.A.** | YES | Lane A |
+| 57 | `packages/app-core/test/no-http-in-views.test.ts:13` | None. These are structural guards over app-core's OWN source tree: amendment … | NONE — the thing scanned is this package's own source tex… | **N.A.** | YES | Lane A |
+| 58 | `packages/app-core/test/preferences/fake-gateway.ts:12` | None external — `PreferencesGateway` is declared in packages/app-core/src/pre… | NONE for the interface. The DOCUMENT it carries is witnes… | **N.A.** | YES | Lane A |
+| 59 | `packages/app-core/test/views:1` | None external. These suites drive React components and view models over app-c… | NONE. The wire→view-model adaptation that DOES face the s… | **N.A.** | YES | Lane A |
+| 60 | `packages/app-core/test/preferences/fake-gateway.ts:49` | The body of `GET`/`PUT /v1/me/preferences`: `{savedFilters:[{id,name,filterSp… | apps/server/src/routes/preferences.ts over the domain's `… | **WITNESSED** | NO | Lane A |
+| 61 | `packages/app-core/test/replica/replica-data-source.te…:56` 🔒 | `BootstrapResponse` (the `GET /v1/sync/bootstrap` body) plus sync-client's ow… | apps/server/src/sync/sync-routes.ts:95-113 declares `Boot… | **WITNESSED** | NO | Lane B / PR #161 |
+| | **— sync-client — 12 rows, 4 MIRROR —** | | | | | |
+| 62 | `packages/sync-client/test/replica.test.ts:216` 🔒 | Ruling P36's additive snapshot-provenance block on the bootstrap wire: `{stat… | apps/server/src/sync/sync-routes.ts:132-137 — `{seq, stat… | **MIRROR** | NO | Lane B / PR #161 |
+| 63 | `packages/sync-client/test/sync-engine.test.ts:547` 🔒 | One member of `POST /v1/sync`'s per-event answer array — the `invalid` arm of… | apps/server/src/sync/sync-service.ts:53-58 declares `Sync… | **MIRROR** | NO | Lane B / PR #161 (frozen). … |
+| 64 | `packages/sync-client/test/sync-engine.test.ts:772` 🔒 | The WS `/v1/stream` wire: the exact JSON bytes the hub writes, and the subscr… | apps/server/src/stream/hub.ts:205-274 (`sub.socket.send(J… | **MIRROR** | NO | Lane B / PR #161; transport… |
+| 65 | `packages/sync-client/test/sync-engine.test.ts:843` 🔒 | A server→client JSON TEXT frame `{"type":"ping"}` on WS /v1/stream, answered … | apps/server/src/stream/routes.ts:319 — the heartbeat call… | **MIRROR** | NO | Lane B / PR #161 (frozen). … |
+| 66 | `packages/sync-client/test/barrel.test.ts:70` | None. A structural guard over this package's own source graph: no native modu… | NONE — the thing walked is this package's own source text. | **N.A.** | YES | Lane A |
+| 67 | `packages/sync-client/test/storage.test.ts:6` | `SyncStorage` — sync-client's own adapter interface (src/storage/storage.ts) … | NONE external. The suite is run against the REAL better-s… | **N.A.** | YES | Lane A |
+| 68 | `packages/sync-client/test/outbox.test.ts:26` | `BootstrapResponse` and the ledger envelope, per this package's stated conven… | apps/server/src/sync/sync-routes.ts (bootstrap) and visib… | **WITNESSED** | NO | Lane A |
+| 69 | `packages/sync-client/test/precheck.test.ts:24` | `BootstrapResponse` including `me.workspaceRole`, and the ledger envelope. | apps/server/src/sync/sync-routes.ts:250-254 builds `me: {… | **WITNESSED** | NO | Lane A |
+| 70 | `packages/sync-client/test/recorded-hazards.test.ts:141` | `BootstrapResponse` and one `BootstrapTicket` whose snapshot deliberately sit… | apps/server/src/sync/sync-routes.ts:95-113 and the route … | **WITNESSED** | NO | Lane A (file not in the #16… |
+| 71 | `packages/sync-client/test/replica.test.ts:118` 🔒 | A ledger envelope as sync-down delivers it, carrying both the per-entity `seq… | apps/server/src/visibility/visible-events-for.ts (the gen… | **WITNESSED** | NO | Lane B / PR #161 |
+| 72 | `packages/sync-client/test/replica.test.ts:510` 🔒 | The two instruction members of `SyncItem` — sync-client's declared MIRROR of … | apps/server/src/visibility/visible-events-for.ts:104/:405… | **WITNESSED** | NO | Lane B / PR #161 |
+| 73 | `packages/sync-client/test/sync-engine.test.ts:180` 🔒 | `SyncTransport`, `StreamHandlers`, `ReconcileAnswer` and `SyncEventResult` — … | For the interface: NONE, it is sync-client's own. For the… | **WITNESSED** | NO | Lane B / PR #161 |
+| | **— apps/web — 39 rows, 5 MIRROR —** | | | | | |
+| 74 | `apps/web/test/app-nav.test.tsx:34` | better-auth's `useSession()` return contract: `{data: {user:{id,name}} \| nul… | better-auth/react's `useSession`, via apps/web/src/auth-c… | **MIRROR** | NO | the E2E/integration lane |
+| 75 | `apps/web/test/inbox-page.test.tsx:18` | Next.js 15's App Router client hook surface, and the `push(path)` string ever… | next/navigation (Next.js). External authority; the real r… | **MIRROR** | NO | the E2E lane |
+| 76 | `apps/web/test/invite-page.test.tsx:122` | The 404 refusal text `POST /v1/invites/:token/accept` sends for a used, withd… | apps/server/src/routes/invites.ts:111-115 — `INVITE_NOT_O… | **MIRROR** | NO | the server-integration lane |
+| 77 | `apps/web/test/members-page.test.tsx:54` | The server's 403 refusal TEXT for both admin-only invite doors, reaching the … | apps/server/src/routes/invites.ts:118-123 — `INVITE_ADMIN… | **MIRROR** | NO | the server-integration lane… |
+| 78 | `apps/web/test/sign-in.test.tsx:13` | better-auth 1.7.2's REACT CLIENT surface: the member names, their argument sh… | better-auth/react + better-auth/client/plugins + @better-… | **MIRROR** | NO | the E2E/integration lane (a… |
+| 79 | `apps/web/test/data-source-gateway.test.ts:20` | HTTP itself: status codes, JSON bodies, and the `FetchLike` contract. The tra… | packages/app-core/src/online/http.ts:69+ (`createHttpClie… | **N.A.** | YES | Lane A |
+| 80 | `apps/web/test/data-source-gateway.test.ts:48` | `DataSource` — `ingest`, `query` (13 members), `subscribe`. | NONE — packages/app-core/src/data-source.ts owns the inte… | **N.A.** | YES | Lane A |
+| 81 | `apps/web/test/founding.test.tsx:32` | `FoundingGateway` (app-core/online's own) plus `getMyWorkspaces` left at the … | NONE for the interface. apps/server/src/routes/workspaces… | **N.A.** | YES | Lane A |
+| 82 | `apps/web/test/helpers/stub-services.ts:18` | `UserPreferences` = `{version: 1, projects: {}, savedFilters: []}`. | packages/app-core/src/online/mappers.ts:935 `mapPreferenc… | **N.A.** | YES | Lane A |
+| 83 | `apps/web/test/helpers/stub-services.ts:29` | A client-side serving refusal: `new ServingGapError(method, SERVING_GAPS[meth… | packages/app-core/src/online/mappers.ts:1729 (SERVING_GAP… | **N.A.** | YES | Lane A |
+| 84 | `apps/web/test/helpers/stub-services.ts:77` | `DataSourceQuery` (13 members) and the five gateways `InviteGateway`, `Invite… | NONE — packages/app-core/src/data-source.ts:143 owns `Dat… | **N.A.** | YES | Lane A |
+| 85 | `apps/web/test/inbox-page.test.tsx:41` | A parsed `Notification` handed straight to the page, bypassing `parseNotifica… | packages/domain/src/notifications.ts:151 `parseNotificati… | **N.A.** | YES | Lane A |
+| 86 | `apps/web/test/inbox-page.test.tsx:187` | Notification paging as the PAGE sees it: `{notifications, nextCursor}` per ca… | apps/web/src/notifications-gateway.ts:120-146 (`list(curs… | **N.A.** | YES | Lane A |
+| 87 | `apps/web/test/invite-page.test.tsx:36` | `InviteSummary` as the real `createHttpInviteGateway` produces it from `GET /… | packages/app-core/src/online/invites.ts (the mapper) over… | **N.A.** | YES | Lane A |
+| 88 | `apps/web/test/ist-today.test.ts:5` | Nothing external — instants handed to a pure function. | NONE. | **N.A.** | YES | Lane A |
+| 89 | `apps/web/test/list-prefs-wiring.test.tsx:24` | `TicketListView`, and the load window in which `canSetPrefs` is false. | packages/app-core/src/online/mappers.ts (mapListPage / ma… | **N.A.** | YES | Lane A |
+| 90 | `apps/web/test/members-page.test.tsx:41` | `{inviteId, address, channel, role, projectIds, invitedBy, invitedAt, expires… | packages/app-core/src/online/invites-admin.ts (mapper) ov… | **N.A.** | YES | Lane A |
+| 91 | `apps/web/test/members-page.test.tsx:65` | What `DataSource.ingest` answers per submitted event. | packages/domain owns `IngestResult`; the wire producer is… | **N.A.** | YES | Lane A |
+| 92 | `apps/web/test/next-config.test.ts:58` | Which `/v1` and `/api/auth` prefixes the server actually registers, for the d… | apps/server/src/** — READ DIRECTLY from source at test ti… | **N.A.** | YES | Lane A |
+| 93 | `apps/web/test/notifications-gateway.test.ts:199` | A refusal envelope (`{error:'upstream_unavailable'}`) or a renamed field (`{c… | NONE, deliberately. The file says so at lines 183-196: bo… | **N.A.** | YES | Lane A |
+| 94 | `apps/web/test/page-refusals.test.tsx:9` | The size and membership of the serving-gap register. | packages/app-core/src/online/mappers.ts:1729 — SERVING_GA… | **N.A.** | YES | Lane A |
+| 95 | `apps/web/test/page-refusals.test.tsx:72` | A serving refusal for `getMyWork` and `getAttention` — two methods the real r… | packages/app-core/src/online/mappers.ts:1729 SERVING_GAPS… | **N.A.** | YES | Lane A |
+| 96 | `apps/web/test/project-calendar-timeline.test.tsx:73` | `ListRow` as `view-types.ts` declares it, and — the load-bearing part — a due… | apps/server/src/read/ticket-cards.ts:148 (`fields: row.fi… | **N.A.** | YES | Lane A for the fixture; the… |
+| 97 | `apps/web/test/project-create-gate.test.tsx:78` | The board and list view models the project page renders, and a workspace's ti… | packages/app-core/src/online/mappers.ts (mapBoard / mapLi… | **N.A.** | YES | Lane A |
+| 98 | `apps/web/test/theme-toggle.test.tsx:7` | The browser's own storage and the `data-theme` attribute the app writes. | jsdom's real localStorage — used, not faked. | **N.A.** | YES | Lane A |
+| 99 | `apps/web/test/workspaces-cards.test.tsx:32` | `{id, name, projects:[{id, name}]}` — the mapped view of `GET /v1/me/workspac… | apps/server/src/routes/workspaces.ts:151-176 (`{workspace… | **N.A.** | YES | Lane A |
+| 100 | `apps/web/test/authoring-routes.test.tsx:53` | `WorkspaceMember[]` and the four-value `WorkspaceRole` vocabulary (`owner \| … | apps/server/src/routes/builder-reads.ts:547-577 (`members… | **WITNESSED** | NO | the server-integration lane |
+| 101 | `apps/web/test/data-source-gateway.test.ts:39` | `WorkflowDef` on the wire: `{id, version, name, initialStateId, states:[{id,n… | apps/server/src/routes/builder-reads.ts:482-496 (`GET /v1… | **WITNESSED** | NO | the server-integration lane… |
+| 102 | `apps/web/test/data-source-gateway.test.ts:106` | The roster wire shape and its ROLE vocabulary — the one field `DataSourceQuer… | apps/server/src/routes/builder-reads.ts:547-577 — `const … | **WITNESSED** | NO | the server-integration lane |
+| 103 | `apps/web/test/data-source-gateway.test.ts:141` | The list envelope key `workflows` (not `defs`), under `GET /v1/workspaces/ws/… | apps/server/src/routes/builder-reads.ts:494 — `const body… | **WITNESSED** | NO | the server-integration lane |
+| 104 | `apps/web/test/data-source-gateway.test.ts:155` | The occupancy envelope: counts keyed by state id, zeroes included. | apps/server/src/routes/builder-reads.ts:580-599 — `const … | **WITNESSED** | NO | the server-integration lane |
+| 105 | `apps/web/test/data-source-gateway.test.ts:166` | `{workspaceId, typeId, workflowId, count}`, and the fact that the workflow tr… | apps/server/src/routes/builder-reads.ts:602-660 — the rou… | **WITNESSED** | NO | the server-integration lane |
+| 106 | `apps/web/test/data-source-gateway.test.ts:212` | The POST answer's migrated arm, and the `.strict()` request body carrying exa… | apps/server/src/routes/builder-reads.ts:693+ — `migrateBo… | **WITNESSED** | NO | the server-integration lane |
+| 107 | `apps/web/test/data-source-gateway.test.ts:240` | A refusal carried as a VALUE on a 422, with the door's own rule id and senten… | apps/server/src/routes/builder-reads.ts:681-691 (`refuse(… | **WITNESSED** | NO | the server-integration lane |
+| 108 | `apps/web/test/notifications-gateway.test.ts:41` | The wire row: `{id, userId, workspaceId, kind, dedupeKey, read, createdAt, pa… | apps/server/src/notifications/store.ts:30-43 `rowToNotifi… | **WITNESSED** | NO | the server-integration lane… |
+| 109 | `apps/web/test/notifications-gateway.test.ts:64` | The inbox page envelope AND the cursor's semantics — `nextCursor: 'n_9'` for … | apps/server/src/notifications/store.ts:66-98 `listNotific… | **WITNESSED** | NO | the server-integration lane |
+| 110 | `apps/web/test/notifications-gateway.test.ts:126` | The one-field envelope key `unread` — not `count`. | apps/server/src/routes/notifications.ts:83 — `return { un… | **WITNESSED** | NO | the server-integration lane |
+| 111 | `apps/web/test/notifications-gateway.test.ts:147` | `POST /v1/me/notifications/:id/read` answers an empty 204 and reads nothing f… | apps/server/src/routes/notifications.ts:87-97 — `markNoti… | **WITNESSED** | NO | the server-integration lane |
+| 112 | `apps/web/test/notifications-gateway.test.ts:226` | The snake_case `proj_visibility` row the ticket route serves, and specificall… | apps/server/src/routes/tickets.ts:131-141 `toTicketView` … | **WITNESSED** | NO | the server-integration lane… |
+| | **— apps/server — 26 rows, 9 MIRROR —** | | | | | |
+| 113 | `apps/server/test/attachments/s3-store.test.ts:8` | AWS S3's response and error semantics as consumed by S3ObjectStore: that a Ge… | NONE reachable in this repo — the authority is Amazon S3 … | **MIRROR** | NO | Lane A (a MinIO-backed roun… |
+| 114 | `apps/server/test/dual-client/rig.ts:219` 🔒 | The GET /v1/sync/bootstrap response body: BootstrapResponse{workspaceId, me{u… | apps/server/src/sync/sync-routes.ts:114-119 (private boot… | **MIRROR** | NO | Lane B (PR #161) |
+| 115 | `apps/server/test/dual-client/rig.ts:346` 🔒 | The POST /v1/sync/reconcile answer: {workspaceId, restricted:[{kind:'restrict… | apps/server/src/sync/reconcile-route.ts (registerReconcil… | **MIRROR** | NO | Lane B (PR #161) |
+| 116 | `apps/server/test/helpers/drive-reference.ts:40` | Two things at once: (a) the ledger's 13-column `INSERT INTO events` statement… | (a) apps/server/src/ledger/event-store.ts:insertEvent — t… | **MIRROR** | YES | Lane A |
+| 117 | `apps/server/test/helpers/seed.ts:80` | The projection registry's application set and order — it hand-lists FOUR proj… | apps/server/src/projections/index.ts:buildProjectionRegis… | **MIRROR** | YES | Lane A |
+| 118 | `apps/server/test/helpers/seed.ts:364` | The proj_tickets head row: the 13-column INSERT, the workflow_id/workflow_ver… | apps/server/src/projections/tickets.ts:184 (INSERT INTO p… | **MIRROR** | YES | Lane A |
+| 119 | `apps/server/test/notifications/fanout.test.ts:49` | The server's visibility RULE: who may see a ticket. Modelled as membership in… | apps/server/src/visibility/can-see.ts:canSee — the author… | **MIRROR** | YES | Lane A |
+| 120 | `apps/server/test/routes/attachments-download.test.ts:1` | The server's own route-registration surface — which plugins, decorators, erro… | apps/server/src/app.ts:buildApp, wrapped by apps/server/t… | **MIRROR** | YES | Lane A |
+| 121 | `apps/server/test/visibility/visible-events-for.test.ts:1` 🔒 | A workflow.defined event payload, written as a stub because the case only ask… | apps/server/src/projections/workflows.ts (workflowsProjec… | **MIRROR** | NO | Lane B (PR #161) |
+| 122 | `apps/server/test/app.test.ts:16` | IngestService (three no-op methods) and the minimal `{query}` shape /healthz … | apps/server/src/ingest/ingest-service.ts:createIngestServ… | **N.A.** | YES | Lane A |
+| 123 | `apps/server/test/dual-client/rig.ts:331` 🔒 | The sync-client's SyncTransport seam: bootstrap / sync / reconcile / openStre… | packages/sync-client/src/net/http-transport.ts is the shi… | **N.A.** | NO | Lane B (PR #161) |
+| 124 | `apps/server/test/fixtures/ledger-fixture.ts:51` | Eleven LedgerEvent values with hand-written deterministic ULIDs, three worksp… | packages/domain (LedgerEvent, ULID_REGEX) | **N.A.** | YES | Lane A |
+| 125 | `apps/server/test/helpers/apply.test.ts:1` | n/a — these are tests OF the helpers. | n/a | **N.A.** | YES | Lane A |
+| 126 | `apps/server/test/helpers/apply.ts:150` | Ingest's ledger-and-projection half: it inserts the event and applies every r… | apps/server/src/ingest/ingest-service.ts (the real ingest… | **N.A.** | YES | Lane A |
+| 127 | `apps/server/test/helpers/envelope.ts:56` | A LedgerEvent value with the two sequence counters and both clocks filled in. | packages/domain (LedgerEvent); the numbering authority is… | **N.A.** | YES | Lane A |
+| 128 | `apps/server/test/helpers/events.ts:4` | SubmittedEvent values for the three founding event types, and the ingest comp… | packages/domain (SubmittedEvent, the payload schemas); in… | **N.A.** | YES | Lane A |
+| 129 | `apps/server/test/helpers/read-scenario.ts:112` | A whole seeded workspace as a list of LedgerEvent values — memberships, proje… | packages/domain payload schemas, parsed by the REAL proje… | **N.A.** | YES | Lane A |
+| 130 | `apps/server/test/helpers/session.ts:40` | Nothing. It drives the real sign-in over the wire. | apps/server/src/auth/auth.ts:createAuth (better-auth phon… | **N.A.** | YES | Lane A |
+| 131 | `apps/server/test/helpers/stream-socket.ts:76` 🔒 | The `StreamSocket` sink the hub writes frames to — send/close/terminate/buffe… | apps/server/src/stream/hub.ts declares StreamSocket; the … | **N.A.** | NO | Lane B (PR #161) |
+| 132 | `apps/server/test/ingest.test.ts:56` | pg's Pool/PoolClient — but only as a Proxy over a REAL borrowed client. | the pg driver against real Postgres | **N.A.** | YES | Lane A |
+| 133 | `apps/server/test/notifications/fanout.test.ts:80` | NotificationTransport — the deliver seam the fanout writes through. | apps/server/src/notifications/transport.ts:createInAppTra… | **N.A.** | YES | Lane A |
+| 134 | `apps/server/test/seed/cc-map.test.ts:8` | Nothing invented — the upstream tracker board's own data shape. | reference/convenience-corner-tracker/board.data.js, read … | **N.A.** | YES | Lane A |
+| 135 | `apps/server/test/stream/hub.test.ts:59` 🔒 | Queryable (a throwing stand-in, deliberately) and LedgerEvent values with seq… | apps/server/src/db/queryable.ts declares Queryable; packa… | **N.A.** | NO | Lane B (PR #161) |
+| 136 | `apps/server/test/visibility/can-see.test.ts:44` | EffectiveRole — workspaceRole plus a Map of projectId → {projectAdmin}. | apps/server/src/permissions/effective-role.ts:resolveEffe… | **N.A.** | YES | Lane A |
+| 137 | `apps/server/test/gates/gate-seam.test.ts:91` | The object-store key format the upload route mints for attachment bytes. | apps/server/src/routes/attachments.ts:374 — `const object… | **WITNESSED** | YES | Lane A |
+| 138 | `apps/server/test/helpers/stream.ts:110` | The CLIENT-side wire frame `{type:'subscribe', workspaceId, afterSeq}` sent u… | packages/app-core/src/online/stream.ts:244 — `socket?.sen… | **WITNESSED** | YES | Lane A (helpers/stream.ts i… |
+| | **— domain — 2 rows, 0 MIRROR —** | | | | | |
+| 139 | `packages/domain/src/testing.ts:18` | `EventEnvelope` / `SubmittedEvent` and the per-event payloads — the ledger en… | No external producer. Every one of the 26 files imports o… | **N.A.** | YES | Lane A. |
+| 140 | `packages/domain/test/stream-frames.test.ts:37` | The WS /v1/stream server→client frame union and the LedgerEvent envelope carr… | WHICH SIDE OWNS THE FRAME SHAPE: the DOMAIN owns it, and … | **N.A.** | YES | Lane A for the test file; n… |
+| | **— desktop / mobile / editor — 17 rows, 14 MIRROR —** | | | | | |
+| 141 | `apps/desktop/src/storage/tauri-sql-storage.conformanc…:18` | `@tauri-apps/plugin-sql`'s JS surface — `execute(sql, params) → Promise<Query… | @tauri-apps/plugin-sql (installed: node_modules/.pnpm/…/p… | **MIRROR** | NO | Not Lane A — needs a real T… |
+| 142 | `apps/desktop/src/storage/tauri-sql-storage.test.ts:6` | The same tauri-plugin-sql surface, plus the pinned statement sequence `['BEGI… | @tauri-apps/plugin-sql's `Database` (typings cited above). | **MIRROR** | NO | Not Lane A — needs a real T… |
+| 143 | `apps/mobile/src/editor/editor-web-view.test.ts:27` | The editor→host half of the webview bridge: `{bridge:1, kind, …}` frames that… | packages/editor/src/webview/create-editor-bridge.ts — `po… | **MIRROR** | YES | Lane A. Buildable in apps/m… |
+| 144 | `apps/mobile/src/push/register-push.test.ts:8` | The push-registration HTTP contract: path `/v1/push/registrations`, method PO… | NONE. Verified by two greps from the repo root with quote… | **MIRROR** | NO | Lane A can inventory it, bu… |
+| 145 | `apps/mobile/src/storage/op-sqlite-storage.test.ts:23` | op-sqlite's `execute(sql, params) → Promise<{rows}>` plus `close(): void`, an… | @op-engineering/op-sqlite@15.2.14 (installed): `execute: … | **MIRROR** | NO | Not Lane A — needs a device… |
+| 146 | `apps/mobile/src/storage/op-sqlite-storage.test.ts:59` | op-sqlite's `execute` again, with a canned `rows: sql.startsWith('SELECT') ? … | @op-engineering/op-sqlite@15.2.14 (src/types.ts, cited ab… | **MIRROR** | NO | Not Lane A — needs a device… |
+| 147 | `packages/editor/test/attachment-paste.test.ts:8` | The upload endpoint's 201 response body: exactly the six keys `attachmentId, … | apps/server/src/routes/attachments.ts:401 — `return reply… | **MIRROR** | YES | Lane A. NOTE: the natural h… |
+| 148 | `packages/editor/test/attachment-paste.test.ts:69` | The DOM's clipboard/drag producer: `ClipboardEvent.clipboardData` / `DragEven… | The browser / the DOM specification. jsdom does not popul… | **MIRROR** | NO | Whoever owns browser-level … |
+| 149 | `packages/editor/test/evidence-picker.test.tsx:88` | The /v1/attachments 201 body: `{attachmentId, url:'/v1/attachments/01J9GATC…'… | apps/server/src/routes/attachments.ts:401. | **MIRROR** | YES | Lane A (new test file). |
+| 150 | `packages/editor/test/google-picker.test.ts:30` | Google's own two SDK surfaces: the GSI token client (`initTokenClient({client… | Google's hosted scripts — https://accounts.google.com/gsi… | **MIRROR** | NO | Not Lane A. This is the cla… |
+| 151 | `packages/editor/test/google-picker.test.ts:238` | The /v1/attachments 201 body as the INPUT to an event claim — the case name l… | apps/server/src/routes/attachments.ts:401 for the input; … | **MIRROR** | YES | Lane A (same new round-trip… |
+| 152 | `packages/editor/test/ticket-editor-slot.test.tsx:23` | The /v1/attachments 201 body again, here flowing through `TicketEditorSlot`'s… | apps/server/src/routes/attachments.ts:401. | **MIRROR** | YES | Lane A (new test file). |
+| 153 | `packages/editor/test/ticket-editor-slot.test.tsx:83` | packages/app-core's `<EditorSlot>` props contract — the shape app-core's Tick… | packages/app-core/src/views/editor-slot.tsx — `export typ… | **MIRROR** | YES | Plan 6a Task 12 / case 9.61… |
+| 154 | `packages/editor/test/ticket-editor.test.tsx:13` | The same /v1/attachments 201 body, spelled inline rather than through the `Up… | apps/server/src/routes/attachments.ts:401 (the 201 send). | **MIRROR** | YES | Lane A (new test file; clie… |
+| 155 | `packages/editor/test/attachment-list-item.test.tsx:12` | The attachment-list row union: the upload arm `{kind:'upload', attachmentId, … | No external producer. The type is declared by the package… | **N.A.** | YES | Lane A. |
+| 156 | `packages/editor/test/evidence-picker.test.tsx:7` | A workflow definition with require-evidence/require-comment rules, and the pi… | No external producer. `WorkflowDef` is declared in packag… | **N.A.** | YES | Lane A. |
+| 157 | `apps/mobile/src/editor/editor-web-view.test.ts:13` | The host→editor half of the webview bridge — all five kinds (loadDoc with doc… | packages/editor/src/webview/bridge.ts:97 — `parseHostMess… | **WITNESSED** | YES | Already closed; Lane A owns… |
+
 ## CONTROLLER CORRECTION RECEIVED 2026-09-06 ~12:53 — ADOPTED, AND ONE COVERAGE GAP IT OPENS
 
 **`pnpm check:env` is `scripts/check-env-example.mjs` ALONE** — verified at `package.json:12`.
