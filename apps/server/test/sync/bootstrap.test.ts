@@ -70,6 +70,8 @@ const WS2_TYPE = newUlid();
 const WS3 = newUlid();
 const WS3_PROJECT = newUlid();
 const AUDIT = newUlid();
+/** The attachment 12.363 follows from the ledger into the bootstrap payload. */
+const AUDIT_ATTACHMENT = newUlid();
 const WS3_WF_OLD = newUlid();
 const WS3_WF_NEW = newUlid();
 /**
@@ -269,6 +271,19 @@ beforeAll(async () => {
       mode: 'workspace',
     }),
     ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.added', { body: { type: 'doc', content: [] } }),
+    // For 12.363. Seeded here with the comment and the `visibility.set`, so it
+    // lands BELOW the snapshot cut the 22 field_sets push up — the only
+    // position from which the backfill clause is what carries it. The reducer
+    // does not fold `attachment.added` into `TicketState`, so a snapshot never
+    // holds it and "it arrived" can only mean the backfill list named it.
+    ws3Submit({ kind: 'ticket', id: AUDIT }, 'attachment.added', {
+      kind: 'upload',
+      attachmentId: AUDIT_ATTACHMENT,
+      filename: 'audit-trail.pdf',
+      mime: 'application/pdf',
+      size: 4096,
+      sha256: 'b'.repeat(64),
+    }),
   ]);
   for (const result of ws3Ticket) expect(result.status).toBe('committed');
 
@@ -334,14 +349,22 @@ beforeAll(async () => {
   // Sorted by entity id rather than compared in pass order: `runSnapshotPass`
   // sweeps every workspace, so WS3's AUDIT is due in the same pass and the due
   // query's ordering is not this test's business. The seqs stay exact —
-  // AUDIT's 27 is what places its `visibility.set` (seq 2), comment (3),
-  // contest (4) and resolution (5) BELOW the snapshot, which is the whole
-  // premise of 12.115 and 12.116.
+  // AUDIT's 28 is what places its `visibility.set` (seq 2), comment (3),
+  // attachment (4), contest (5) and resolution (6) BELOW the snapshot, which
+  // is the whole premise of 12.115, 12.116 and 12.363.
+  //
+  // It was 27 until 12.363 seeded the attachment, and this line is why that
+  // edit could not land silently: an exact premise is what turns "one more
+  // event in the fixture" into a failure HERE, naming the seed, instead of a
+  // vacuous pass three cases below where the attachment would have sat above
+  // the cut and travelled for a reason that has nothing to do with the
+  // backfill list. The number is not the property; being forced to restate it
+  // deliberately is.
   const { written } = await runSnapshotPass(db.pool, { minEvents: 20 });
   expect([...written].sort((a, b) => a.entityId.localeCompare(b.entityId))).toEqual(
     [
       { entityId: VISIBLE, seq: 24 },
-      { entityId: AUDIT, seq: 27 },
+      { entityId: AUDIT, seq: 28 },
     ].sort((a, b) => a.entityId.localeCompare(b.entityId)),
   );
 
@@ -597,6 +620,53 @@ describe('GET /v1/sync/bootstrap', () => {
     // it is not a record of anything.
     expect((contest?.payload.originalEvent as { entity: { id: string } }).entity.id).toBe(AUDIT);
     expect(contest?.payload.rule).toBe('require-field');
+  });
+
+  /**
+   * 12.363 — THE ATTACHMENTS CLAUSE OF 12.13, WHICH HAD NO WITNESS.
+   *
+   * `attachment.added` is a live member of `BOOTSTRAP_BACKFILL_TYPES`
+   * (`sync-routes.ts:59`) and **deleting it from that constant left the WHOLE
+   * server suite green.** 12.94's loop hardcodes the five names rather than
+   * importing them, deliberately — so shrinking the constant shrinks only one
+   * side — but that loop is a boundary check driven by `comment.added` alone,
+   * and 12.115/12.116 cover `visibility.set` and the two contest entries. The
+   * attachment was the one member of the five that nothing made travel.
+   *
+   * Same shape as 12.115, for the same reasons: the premise (a snapshot exists,
+   * and this event really is below it) is asserted rather than assumed, so the
+   * case cannot pass vacuously the day the seed order shifts and the attachment
+   * lands above the cut, where it would travel for a reason unrelated to the
+   * backfill list. And it is stated RELATIVE to the seq the response carries,
+   * never against a literal, because the numbers are a fact about today's seed
+   * order and this file has one shared `beforeAll` that later rounds add to.
+   *
+   * `toHaveLength(1)` rather than `some()`: a filter that returned the whole
+   * tail would satisfy a `some()` here for no reason at all.
+   *
+   * *Mutation: delete `'attachment.added'` from `BOOTSTRAP_BACKFILL_TYPES` →
+   * red here. The sibling count is measured and reported at the case in
+   * `test-cases/12`, not asserted to be one.*
+   */
+  it('12.363 an `attachment.added` filed BELOW the snapshot seq reaches the replica — the attachments clause of 12.13', async () => {
+    const body = await bootstrapWs3();
+    const audit = body.tickets.find((t) => t.ticketId === AUDIT);
+    expect(audit).toBeDefined();
+    const snapSeq = audit?.snapshot?.seq;
+    expect(typeof snapSeq).toBe('number');
+    expect(snapSeq).toBeGreaterThan(0);
+    const attachments = audit?.events.filter((e) => e.type === 'attachment.added') ?? [];
+    expect(attachments).toHaveLength(1);
+    const [attachment] = attachments;
+    expect(attachment?.seq).toBeLessThan(snapSeq ?? 0);
+    // Whole, not merely present: a replica that has to render or re-fetch the
+    // file needs the id and the digest, not the fact that a row existed.
+    expect(attachment?.payload).toMatchObject({
+      kind: 'upload',
+      attachmentId: AUDIT_ATTACHMENT,
+      filename: 'audit-trail.pdf',
+      sha256: 'b'.repeat(64),
+    });
   });
 
   it('12.117 `definitions` arrives in workspace-stream order, so a replica folding it in the order received resolves the same definition the server does', async () => {
