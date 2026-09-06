@@ -2229,3 +2229,19 @@ absence and this branch has already shipped one control that could not fail (12.
 ### The narrow half's guest side — `apps/server/test/sync/reconcile-route.test.ts`
 
 - 12.304 ✅ **The reconcile door answers a GUEST correctly, which is case 6.102 and closes it.** 6.102 was never a missing rule: `reconcileHeldIds` asks `canSee` and nothing else, and `canSee` resolves a guest through the explicit share list exactly as it resolves a member through a project. Nothing about the door was role-aware — what was missing was the measurement, which is what 6.102's own text says. **An APPLICATION of the shipped rule, so no escalation under P25.** Both ids in ONE request with an exact `toEqual`: a guest presenting only the lost id could be answered "restricted" by a door that restricted everything a guest named, which is the shape that wipes a guest's whole device. Two controls in the same run — the MEMBER's answer restricts both, proving the guest's asymmetric answer is about the explicit list rather than about leniency; and the status is asserted not to be 403, or the case would also pass against a door that refused guests outright, failing for the wrong reason.
+
+### The hub's own arm — `apps/server/test/stream/hub.test.ts`
+
+- 12.314 ✅ **The notice is framed with the HUB's `workspaceId`, and the subscription runs on behind it.** Two properties in one case because one fixture measures both. **The workspace-id half was UNFALSIFIABLE until the fixture changed**: in production `sub.workspaceId` and `item.workspaceId` coincide, which is exactly why the wrong one would ship green — so the scripted seam gained a `claimsWorkspaceId`, letting the routing key and the claimed key differ, and the case asserts the frame carries the ROUTING one. The liveness half exists because this arm sits directly beside `scope-revoked`, which detaches and returns; before closure 5b the code was an `if/else` reading *"purge, otherwise scope-revoked"*, so a new instruction WOULD have been handled as a revocation — which empties the replica — and an accident of field names is all that caught it. Its control is the identical fixture with a `scope-revoked` in the notice's slot, which DOES stop the stream, so the liveness assertions are known to be able to see a detach at that exact position.
+- 12.315 ✅ **A drain ending on a notice resumes exactly where it would without one.** The property the whole pull-shaped design rests on: a notice must be RE-DELIVERED if the socket dies before the client finishes pulling, and only its trigger — which IS above the cursor — regenerates it. Measured differentially against the same script with the notice removed, so any cursor value the arm might write shows up as a divergence between two runs rather than as disagreement with a number this file chose. **The fixture puts the notice LAST in the drain deliberately, which is not the production order**: a `sub.cursor += 1` mutant is MASKED in the production shape, because the trigger behind it re-advances past the drift. That asymmetry is why the fixture is shaped this way and is written into the case.
+
+**Mutations run against the hub arm — measured, and the two "alone" results are the point.**
+
+| mutation | result |
+|---|---|
+| delete the `send` | 12.314 + 12.315 |
+| `sub.workspaceId` → `item.workspaceId` | **12.314 ALONE**, `1 failed \| 18 passed` |
+| the arm `detach`es like `scope-revoked` | 12.314 + 12.315 |
+| the arm advances `sub.cursor` | **12.315 ALONE**, `1 failed \| 18 passed` — and 12.314 survives it, exactly as the case's own masking analysis predicts |
+
+*Baseline `19 passed (19)` before and after every restore. One label in the sweep script was wrong and the run corrected it: it expected one `detach(sub);` in `hub.ts` and there are two, so the injected third read as "3" and the restore as "2" — the restore is verified by the baseline going green again, not by that count.*
