@@ -162,6 +162,20 @@ Lock: atomic `mkdir /tmp/gisik-gate.lock`, released with `rmdir`. ONE background
 `ppid=1` only, never `pkill -f vitest`. `test/seed/` files that don't import `createTestDatabase`
 (`plan-series.test.ts`, the pure half of `cc-map.test.ts` etc.) don't need the lock.
 
+## 6b. Gate-lock exclusion gap found while releasing — reported, not resolved by this lane
+
+After the post-rebase gate run, `rmdir /tmp/gisik-gate.lock` failed with "Directory not empty": it held a
+`pid` file (`21361`, a bash process in Lane E's worktree, alive ~2 min, **no vitest/Postgres children** —
+no active test run). My own `mkdir /tmp/gisik-gate.lock` immediately before that gate run had **succeeded**
+(only possible when the directory is absent), so Lane E's pid write landing inside it afterward implies
+their lock script is not using `mkdir`'s atomicity as the actual exclusion check (a `mkdir -p` +
+unconditional `echo $$ > pid` would explain it — it never fails even when someone else already holds the
+directory). **No corruption evidence this time** — my gate had already finished cleanly, no concurrent
+vitest activity was observed — but the next overlap could genuinely run two test pools against the shared
+Postgres at once. Reported to Lane E and the controller; **deliberately left the lock directory untouched**
+(did not `rmdir` over their pid) rather than guessing at resolution. If resumed and this is still open,
+check with Lane E/the controller before touching `/tmp/gisik-gate.lock` yourself.
+
 ## 7. Remaining steps, in order (mid-execution at time of writing)
 
 1. ~~Dispatch T9+T10 implement/review/fix~~ — done, both landed clean after one fix round each.
@@ -172,19 +186,29 @@ Lock: atomic `mkdir /tmp/gisik-gate.lock`, released with `rmdir`. ONE background
 4. ~~Add the two `package.json` script lines~~ — done (`tsx src/...` form, see §3.6).
 5. ~~Message Lane E with the exact script lines before pushing~~ — done, 2026-09-06.
 6. ~~Rewrite this handoff~~ — in progress (this write).
-7. **Commit** everything on this branch (T9/T10 files, package.json, catalogue, this handoff).
-8. **Rebase onto latest `origin/main`** (past `#139`/`#146`) — expect a conflict in
-   `test-cases/13-deployment-dogfooding.md`'s header/allocation prose (content-shape conflict, not a
-   line-number one; resolve by keeping both lanes' sections and reconciling the header once) and a
-   `pnpm-lock.yaml` change from `#146`'s new `pg` devDependency (re-run `pnpm install`, never hand-merge
-   the lockfile).
-9. **Re-run the full gate** at the rebased head; **re-run the §13 recount** against the rebased file.
-10. Push, open the PR (T9+T10, one PR per the override brief), rebase-and-report if `#139`/`#146` moved
-    again in the interim.
+7. ~~Commit everything on this branch~~ — done (`ac8f234`, pre-rebase).
+8. ~~Rebase onto latest `origin/main`~~ — done, onto `9024bb5` (past `#139` closure 5, `#141` closure 4,
+   `#146` T15, ruling P39). Conflict was in `Features.md` (Task 9/10 bullets vs Lane C's Task 14/15
+   bullets in the same §13 section — resolved by keeping both, Task 9/10 ordered before 14/15 to match
+   the existing 7/8 numeric order) and the intro paragraph (merged to name all six tasks: 7,8,9,10,14,15).
+   `test-cases/13-deployment-dogfooding.md` **auto-merged cleanly** (purely additive on both sides) — one
+   stale prose fix applied by hand ("Tasks 7/8 section" → "Tasks 7–10 sections"). Final rebased head:
+   `79fb739`. **Re-ran the §13 recount against the merged file**: 68 total `^- ` lines, 68 regex matches
+   (positive control holds), zero duplicates, Lane C's 8 ids confined to 1–40, Lane D's 60 ids confined
+   to 41–100, nothing outside either block.
+9. ~~Re-run the full gate at the rebased head~~ — done: `pnpm install --frozen-lockfile` (no lockfile
+   diff vs `origin/main` — I added no dependencies), `pnpm rebuild better-sqlite3`, full build clean,
+   then `pnpm turbo run build test typecheck --force --concurrency=1` under the lock →
+   **30/30 tasks, 0 cached, exit 0**, node v22.22.2. Server **104 files / 1078 tests**, all green
+   (up from 1062 pre-rebase — the +16 is `#141`/`#146`'s own new tests, not anything from this PR).
+   Monorepo total 3360 tests. **Gate-lock exclusion gap found and reported during release — see §6b.**
+10. **NEXT: push, open the PR** (T9+T10, one PR per the override brief). Re-check `origin/main` hasn't
+    moved again since `9024bb5` before pushing; re-rebase if so.
 11. **Report to the controller** (`gisik-nokma-0d`): PR link, head sha, test/gate summary, the two
     load-bearing contract deviations (§3.7, §3.8) that any FUTURE task consuming `CcSeedDeps`/`SeedReport`
-    must know about, and the door-assertion strengthening (case 13.91) the review's mutation testing
-    prompted.
+    must know about, the door-assertion strengthening (case 13.91) the review's mutation testing
+    prompted, and the §6b lock-exclusion gap (already sent ahead of the PR, but restate at PR-open time
+    with whatever Lane E has since confirmed).
 12. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
 
 ## 8. Handoff freshness
