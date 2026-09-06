@@ -17,14 +17,14 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/29-closure5b-reach` | `git branch --show-current` |
-| cut from | `origin/main` = **`1b72900`** (the #139 merge — closure 5, ruling P37 + P37.1's cap) | `git checkout -b … origin/main`; `git branch --contains 1b72900` prints this branch, `main`, `exec/23-plan11` |
-| HEAD | **`ba5e85d`** — commit 1 of closure 5b (the reconcile extraction). NOT yet pushed at this writing | `git rev-parse HEAD` |
-| ahead of `origin/main` | 1 | `git rev-list --count origin/main..HEAD` |
+| cut from | originally `origin/main` = `1b72900` (#139); **REBASED ONTO `c8268e1`** (Lane A's closure 4, #141) — rebase exit 0, 4 commits replayed | `git rebase origin/main` |
+| HEAD | **`8e45ef7`** at this writing (closure 5b commits 1–8) | `git rev-parse HEAD` |
 | tree | clean | `git status --porcelain` |
 | node | v22.22.2 | `node -v` after `source ~/.nvm/nvm.sh && nvm use 22` |
-| build | `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --concurrency=1` → **exit 0**, 10/10 tasks | one backgrounded invocation, `/tmp/laneB-build.log` |
-| typecheck | `apps/server` `tsc -p tsconfig.typecheck.json --noEmit` → **exit 0** at `ba5e85d` | direct run, not the gate |
-| gate | **NOT YET RUN on this branch.** The last gate this lane owns is `9762cda` (30/30, 3333 tests) and it is a fact about a tree that no longer exists | — |
+| build | after the rebase: `pnpm install --frozen-lockfile` + `pnpm turbo run build --concurrency=1` → **exit 0** | one invocation |
+| typecheck | **`pnpm turbo run typecheck --concurrency=1` → exit 0, 16/16** at every commit boundary | direct runs, not the gate |
+| §12 recount | at `8e45ef7`: **plain 217 + bold 10 = 227 = union, zero duplicates, max `12.291`** — union equals the SUM, which is the signal that no id style is being missed | the union-vs-sum control below |
+| gate | **NOT YET RUN on this branch.** Adopt **GATE LOCK v3** (controller, 2026-09-06 08:15) — an `O_EXCL` FILE, not a directory; see controller-state | — |
 
 **§12 ids: this lane holds 12.290–12.319. 12.290 (the wedge, ❌) and 12.291 (the cap) were consumed by
 #139 — MINT FROM 12.292.** Ask the controller before 12.320. Use the union-vs-sum control (below); the
@@ -36,16 +36,18 @@ one-style grep cannot see a collision against a bold-style id.
 
 | # | commit | state |
 |---|---|---|
-| 1 | **reconcile extraction** — `reconcileHeldIds` out of the route body; the rig calls it instead of restating it | **DONE, `ba5e85d`** |
-| 2 | **(d)(i)** replica per-ticket bootstrap door + the durable pending-pull store | NEXT |
-| 3 | **(d)(ii)+(iii)** export `bootstrapTicket`; the per-ticket route, carrying scoped definitions | |
-| 4 | **(d)** the NOTICE — domain frame arm, both `SyncItem` mirrors, hub, http-transport branch, `grant-backfill.ts` reshaped from push to notice, `visible-events-for.ts` wiring | |
-| 5 | **(d)** the engine — bootstrap-before-apply inside `applyOne`, the pending drain, the pull timeout | |
-| 6 | **(a)** 12.283 — widening because the READER's reach grew, as a viewer-keyed NOTICE | |
-| 7 | **(b)** 12.288 — reconcile on reconnect/catch-up, with a single-flight latch and a minimum interval | |
-| 8 | **(c)** 6.102's guest side, or an escalation if it needs a new visibility rule | |
-| 9 | catalogue (`Features.md` §12 + `test-cases/12`), gate, Fable branch review, PR | |
-| 10 | **T18** — `Features.md` §12 + `test-cases/12` final shape. **STILL HELD**, after 5b merges, re-measured against `origin/main` at the moment it starts | |
+| 1 | **reconcile extraction** — `reconcileHeldIds` out of the route body; the rig calls it | **DONE** |
+| 2 | **(d)(i)** replica per-ticket door + durable pending-pull store (12.292–12.298) | **DONE**, 4 mutations |
+| 3 | **(d)(ii)+(iii)** `bootstrapTicket` exported; the per-ticket route (12.299–12.301, 12.303) | **DONE** |
+| 3b | **provenance regression** the rebase exposed (12.302) | **DONE**, 1 mutation |
+| 4 | **(d)** the NOTICE — domain frame, both `SyncItem` mirrors, hub, transport, `grant-backfill.ts` reshaped, `visible-events-for.ts` | **DONE** |
+| 5 | **(d)** the engine — drain in `applyOne`, leftover drain + reconcile in `onCaughtUp`, pull timeout, single-flight latch | **DONE** |
+| 6 | **(a)** 12.283 — `readerReachNoticeFor`, wired into the roster arm | **DONE (code); case pending** |
+| 7 | **(b)** 12.288 — reconcile on catch-up, 60 s minimum interval | **DONE (code); cases with an agent** |
+| 8 | **(c)** 6.102's guest side — 12.304, an APPLICATION, no escalation | **DONE** |
+| 9 | rewrite 12.275–12.282, 12.289, 12.291 for the notice shape | **agents running** |
+| 10 | catalogue (`Features.md` §12 + `test-cases/12`), gate, Fable branch review, PR | |
+| 11 | **T18** — still HELD, after 5b merges, re-measured against `origin/main` at the moment it starts | |
 
 ### ⚠️ (a) MUST COME AFTER (d), AND IT IS NOT THE ORDER THE OVERRIDE WRITES
 
