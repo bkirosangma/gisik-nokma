@@ -1093,3 +1093,44 @@ was in the acquire loop, not running turbo).
 measurement. It is false for the milliseconds between a holder's `mkdir` and its `echo $$ > pid`. The 60s
 threshold is what makes a false reclaim implausible rather than impossible — **if two gates are ever seen
 running at once, this is the first place to look.**
+
+---
+
+# SCOPE REDUCED AGAIN — Lane C takes T11 + T12
+
+**Controller re-task, 2026-09-06.** Lane C takes **T11 (backups) and T12 (restore drill)** once its T15
+PR (#146) merges, carrying this lane's seven T11/T12 pre-flight findings verbatim.
+
+**This lane's queue is now: seam 1 (T2 ✅ → T3 → T4 → shutdown path → T6) → T13 → T16.**
+**T7–T10 are Lane D's. T11–T12 and T14–T15 are Lane C's.** Do not start any of them.
+
+Confirmed to the controller with a measurement rather than memory: **nothing of this lane is under
+`src/ops/`** — filtered `git log origin/main..HEAD --name-only` over all 23 commits returns empty for
+`src/ops|backup|restore`, the working tree has nothing, the directory does not exist, and
+`object-store.ts` has 0 occurrences and no diff. **Positive control from the same query: `src/http/`
+returns 2 commits.** Without it, the empty results would be indistinguishable from a broken filter.
+
+## `main` at `1b72900` = 3334 tests — confirmed from two directions
+
+The controller's forced gate reports **30/30, 3334**. This lane's gate at `f342c87` reads
+**259 files / 3408 tests**, and this branch contributes exactly **74** (A0 2, T1 16, T2 56).
+**3408 − 74 = 3334.** Two lanes arriving at the same figure by different routes is worth more than either
+measurement alone.
+
+## The one handover this lane cares about: `object-store.ts`
+
+`assertValidObjectKey`'s per-segment regex `^[A-Za-z0-9_-]+$` refuses both of T11's key formats (dots,
+and a colon-derived stamp), and it is a **security control with a planted-defect test across all three S3
+verbs** (`s3-store.test.ts:76-89`). C is instructed to extend that test if it widens the regex.
+**The specific addition that matters: whatever the new charset is, `..` must remain unrepresentable**, and
+the planted-defect test must assert THAT rather than only asserting the new format is accepted — a
+widened regex admitting dots also admits `..` unless something forbids it, and path traversal into an
+object store is the failure that regex exists to prevent.
+
+## A correction sent to the controller so C does not chase a phantom
+
+The relayed findings list still says T11's alerter is missing. **T3 (in flight) creates it** —
+`src/alerts/error-alerter.ts` exporting `ErrorAlerter` and `alerterFromConfig`, which is exactly the
+import path T11's daemon is written against; T3 was briefed to match that shape so C inherits it.
+**If C reaches T11 before T3 merges it must inject a local alerter shape and swap on rebase, NOT create
+`src/alerts/` itself** — otherwise there will be two.
