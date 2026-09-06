@@ -1,5 +1,5 @@
 import type { SubmittedEvent } from '@gisik-nokma/domain';
-import type { BootstrapResponse, Replica } from '../replica/replica.js';
+import type { BootstrapResponse, Replica, TicketBootstrap } from '../replica/replica.js';
 import { isSyncInstruction, type SyncItem } from '../replica/sync-item.js';
 import type { Outbox, SyncEventResult } from '../outbox/outbox.js';
 
@@ -54,6 +54,21 @@ export type SyncTransport = {
    * `apps/server/src/routes/events.ts`); `SyncEngine.reconcile` chunks to it.
    */
   reconcile(workspaceId: string, heldIds: string[]): Promise<ReconcileAnswer>;
+  /**
+   * `GET /v1/sync/bootstrap/ticket` — closure 5b(d)'s pull door, ruling P37.1.
+   *
+   * One ticket's snapshot, tail and the definitions needed to fold it. The
+   * server answers 404 identically for a ticket the caller may not see and one
+   * that never existed; an implementation MUST surface that as a rejection like
+   * any other failure rather than as `null`, because the two are the same
+   * answer here and a caller that could tell them apart would have the
+   * existence oracle this whole shape refuses.
+   *
+   * It is the fifth method on this type. The fourth (`reconcile`) needed an
+   * enumeration ruling because the interface has implementors a grep cannot
+   * find — the compiler is the enumerator, and it located five last time.
+   */
+  bootstrapTicket(workspaceId: string, ticketId: string): Promise<TicketBootstrap>;
 };
 
 export type SyncStatus = 'offline' | 'connecting' | 'catching-up' | 'live';
@@ -251,6 +266,60 @@ function messageOf(err: unknown): string {
  */
 const RECONCILE_CHUNK_SIZE = 100;
 
+/**
+ * How long one per-ticket pull may take before it is abandoned.
+ *
+ * **This is not a polish item, and closure 5b(d) does not work without it.**
+ * `net/http-transport.ts` calls bare `fetch` with no `AbortSignal` anywhere in
+ * the file, and this engine's `applyChain` is strictly serial. A pull that
+ * never settles therefore never rejects and never resolves: the chain simply
+ * stops. Status stays `live`, `stalled` stays false, `settled()` never
+ * resolves, `lastApplyFailure()` stays null, and nothing anywhere surfaces it.
+ * Without a timeout, (d) would trade today's LOUD terminal brick for a silent
+ * one, which is the worse of the two by this repo's stated preference for a
+ * check whose failure is loud.
+ *
+ * Enforced HERE rather than in the transport deliberately: the transport is an
+ * interface with other implementors (the dual-client rig's, app-core's), and a
+ * bound that lives in one implementation is a bound the others do not have.
+ * `Promise.race` against a timer is implementation-independent — it bounds the
+ * engine's wait, which is the thing that must be bounded, rather than the
+ * request, which only one implementor even makes.
+ *
+ * *What it does NOT do: cancel the underlying request.* Nothing here can — that
+ * needs the `AbortSignal` the transport does not take. The abandoned fetch runs
+ * to completion and its result is dropped. *Owner: unassigned; threading an
+ * `AbortSignal` through `SyncTransport` closes it and is a signature change to
+ * a type with five implementors, which is why it is recorded rather than
+ * bundled into this change set.*
+ */
+const PULL_TIMEOUT_MS = 15_000;
+
+/**
+ * The least time between two automatic reconciles of one workspace.
+ *
+ * Case 12.288 asked for a schedule and named the cost: one request per 100
+ * tickets held. The schedule chosen is *on every catch-up completion* — the
+ * moment a device's cursor is current is exactly the moment its HOLDINGS may be
+ * stale, because a narrowing sends the losing device nothing at all
+ * (`reconcile-route.ts` on case 6.104). That is also why the tempting cheaper
+ * trigger is wrong: **gating on "the catch-up delivered something" would skip
+ * the zero-frame catch-up, which is precisely the case reconcile exists for.**
+ *
+ * So the bound is time, not activity. Measured reason it needs one:
+ * `reconnectDelayMs` is a FIXED 2000 with no growth and no jitter, and the hub
+ * sends one `caught-up` per subscription unconditionally — so a flapping socket
+ * is a reconcile every two seconds, forever, at `ceil(held / 100)` requests
+ * each. A device holding a thousand tickets would issue ten requests every two
+ * seconds while the network wobbles.
+ *
+ * In-memory rather than stored, and that is correct rather than a shortcut:
+ * this engine takes no storage dependency, and a process restart SHOULD
+ * reconcile promptly — a device that was off is a device whose holdings had the
+ * longest time to go stale.
+ */
+const RECONCILE_MIN_INTERVAL_MS = 60_000;
+
 export function createSyncEngine(deps: {
   replica: Replica;
   outbox: Outbox;
@@ -274,6 +343,10 @@ export function createSyncEngine(deps: {
   let flushing: Promise<void> | null = null;
   let lastStreamError: { code: string; message: string } | null = null;
   let applyFailure: ApplyFailure | null = null;
+  /** Single-flight latch for `reconcile`, modelled on `flushing` — see `reconcile`. */
+  let reconciling: Promise<{ presented: number; purged: string[] }> | null = null;
+  /** When the last automatic reconcile ran. See `RECONCILE_MIN_INTERVAL_MS`. */
+  let lastReconcileAt = 0;
   const statusListeners = new Set<(s: SyncStatus) => void>();
   const itemListeners = new Set<(item: SyncItem) => void>();
 
@@ -338,9 +411,94 @@ export function createSyncEngine(deps: {
     closeStream();
   }
 
+  /**
+   * Fetch every ticket this device has been told it may now read and does not
+   * hold. Closure 5b(d), ruling P37.1.
+   *
+   * ## Why a failure here is SWALLOWED, when every other failure in this file stalls
+   *
+   * `stall()` is a one-way latch: `stalled` is set in exactly one place and
+   * cleared in exactly one other, `start()`. Mobile never calls `start()` again
+   * and the shell renders the state as plain "Offline", so a stall is terminal
+   * until the process restarts. That is the RIGHT answer for a frame this
+   * replica could not fold — the alternative is a permanent silent skip. It is
+   * the WRONG answer for a pull, because a pull crosses the network on its own
+   * and a five-second wobble would brick the device where, before closure 5b,
+   * the same wobble merely lost a backfill.
+   *
+   * Swallowing alone is not enough either: it advances the cursor past the
+   * trigger with the ids never fetched, and `needsBootstrap` refuses to
+   * re-bootstrap over a local baseline, so they would be lost until a manual
+   * reinstall. So the id STAYS in the replica's durable pending set and the
+   * next catch-up tries again. Three outcomes, one of them acceptable, and this
+   * is the one.
+   *
+   * ## The ORDER is the property, and it is why this is awaited inside `applyOne`
+   *
+   * `onItem` and `onCaughtUp` are queued onto ONE promise chain, and the
+   * caught-up link re-reads its guards INSIDE the link rather than at enqueue
+   * time. So a drain awaited here completes before any `setCursor` behind it,
+   * and a drain that leaves work owed is a drain whose ids are still pending
+   * when the cursor moves — which is safe precisely because the pending set is
+   * durable. Putting this in an `onItem` LISTENER instead would look identical
+   * and be wrong: listeners are called synchronously, their return values are
+   * not awaited and their throws are swallowed, so the cursor would advance
+   * while the pull was still in flight.
+   */
+  async function drainPendingPulls(ws: string): Promise<void> {
+    if (stopped || stalled || streamEnded) return;
+    for (const ticketId of await replica.listPendingPulls(ws)) {
+      if (stopped || stalled || streamEnded) return;
+      try {
+        // Bounded HERE and not in the transport — see `PULL_TIMEOUT_MS`. A
+        // transport that never settles would otherwise stop this chain in
+        // total silence, which is the one failure mode worse than the stall
+        // this function exists to avoid.
+        const payload = await withTimeout(transport.bootstrapTicket(ws, ticketId));
+        await replica.loadTicketBootstrap(payload);
+        await replica.clearPendingPull(ws, ticketId);
+      } catch {
+        // Deliberately silent, and deliberately WITHOUT clearing the id. See
+        // the docblock: the next catch-up retries. A 404 is left pending along
+        // with a network failure, which is the conservative reading — the
+        // server answers 404 identically for "may not see" and "never existed",
+        // so this device cannot tell a race (visibility narrowed again between
+        // the notice and the pull) from a phantom, and an id that is genuinely
+        // gone costs one request per catch-up rather than a wrong deletion.
+        // *Owner: unassigned; an attempt counter would bound it and needs a
+        // durable home this engine has no dependency on.*
+      }
+    }
+  }
+
+  /** `Promise.race` with a timer, so an unsettling transport cannot stop the chain. */
+  async function withTimeout<T>(work: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        work,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error(`sync: a per-ticket pull exceeded ${PULL_TIMEOUT_MS}ms and was abandoned`));
+          }, PULL_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
   async function applyOne(item: SyncItem): Promise<void> {
     if (stopped || stalled || streamEnded) return;
     await replica.applyServerItem(item);
+    // A notice records what this device is owed; fetching it is this engine's
+    // job, and it happens HERE — inside the chain, ahead of the cursor write
+    // queued behind it — so the trigger event that follows folds against a
+    // ticket that is already held. That ordering is the whole reason the
+    // notice is yielded before its trigger on the server side.
+    if (isSyncInstruction(item) && item.kind === 'reach-granted') {
+      await drainPendingPulls(item.workspaceId);
+    }
     // A workspace-wide revocation is TERMINAL for the subscription
     // (`stream-frames.ts`): it carries no cursor, and reconnecting into a
     // workspace you were just removed from earns `not-a-member` forever. It is
@@ -385,9 +543,36 @@ export function createSyncEngine(deps: {
         applyChain = applyChain
           .then(async () => {
             if (stopped || stalled || streamEnded || workspaceId === null) return;
-            await replica.setCursor(workspaceId, seq);
+            const ws = workspaceId;
+            // BEFORE the cursor: anything still owed from a pull that failed
+            // earlier is retried while this link still holds the chain. It is
+            // safe for it to fail again — the ids stay pending and the next
+            // catch-up tries once more.
+            await drainPendingPulls(ws);
+            await replica.setCursor(ws, seq);
             setStatus('live');
             await engine.flush();
+            // AND the schedule case 12.288 asked for. The moment this device's
+            // cursor is current is the moment its HOLDINGS may be stale: a
+            // narrowing sends the losing device nothing at all, so there is no
+            // frame to notice and no other trigger available.
+            //
+            // Wrapped in its own try/catch, INSIDE the link and ahead of the
+            // link's own `.catch(stall)`. A 500 from `/v1/sync/reconcile` must
+            // not brick this client: reconcile is idempotent (every action it
+            // takes is a delete) and a missed one is retried at the next
+            // catch-up, so there is nothing a stall would protect.
+            try {
+              if (Date.now() - lastReconcileAt >= RECONCILE_MIN_INTERVAL_MS) {
+                lastReconcileAt = Date.now();
+                await engine.reconcile(ws);
+              }
+            } catch {
+              // See above. `lastReconcileAt` is deliberately stamped BEFORE the
+              // attempt rather than after it: a reconcile that fails fast would
+              // otherwise be retried at full rate on a flapping socket, which
+              // is the storm the interval exists to prevent.
+            }
           })
           .catch((err: unknown) => stall(err, null));
       },
@@ -643,6 +828,25 @@ export function createSyncEngine(deps: {
     },
 
     async reconcile(ws) {
+      // SINGLE-FLIGHT, modelled verbatim on `flush`'s `flushing` latch and for
+      // the same reason: this method is public, so a shell's pull-to-refresh can
+      // overlap the automatic call in `onCaughtUp`. Two concurrent runs would
+      // present the same ids twice and race each other's purges. Handing back
+      // the in-flight promise means no caller is refused and none is duplicated.
+      if (reconciling !== null) return reconciling;
+      reconciling = (async () => {
+        try {
+          return await runReconcile(ws);
+        } finally {
+          reconciling = null;
+        }
+      })();
+      return reconciling;
+    },
+  };
+
+  async function runReconcile(ws: string): Promise<{ presented: number; purged: string[] }> {
+    {
       const held = (await replica.listTickets(ws)).map((t) => t.ticketId);
       const purged: string[] = [];
       for (let i = 0; i < held.length; i += RECONCILE_CHUNK_SIZE) {
@@ -662,7 +866,8 @@ export function createSyncEngine(deps: {
         }
       }
       return { presented: held.length, purged };
-    },
-  };
+    }
+  }
+
   return engine;
 }

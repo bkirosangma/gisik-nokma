@@ -40,6 +40,7 @@ import {
 } from '../../src/sync/sync-routes.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { reconcileHeldIds } from '../../src/sync/reconcile-route.js';
+import { ticketBootstrapFor } from '../../src/sync/sync-routes.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
 import { canSee } from '../../src/visibility/can-see.js';
@@ -355,6 +356,38 @@ export async function createHarness(): Promise<Harness> {
        * better-auth users with ids better-auth chose. Stated so nobody reads
        * "calls the real route" as more than it is.
        */
+      /**
+       * Closure 5b(d)'s pull door — the ROUTE's own assembly function, called.
+       *
+       * `ticketBootstrapFor` is the body of `GET /v1/sync/bootstrap/ticket`;
+       * this transport and that route are its only two callers. What this does
+       * NOT reach is the route's HTTP shell — the bearer session, the 403
+       * membership gate, the query schema — covered by
+       * `test/sync/ticket-bootstrap-route.test.ts`.
+       *
+       * **The `canSee` is asked here on purpose.** It lives in the route rather
+       * than in the shared function, because a 404 is a reply and this harness
+       * has none to send — but a rig that simply skipped it would be a door
+       * with a weaker gate than the product's, and every scenario asserting who
+       * can pull what would be asserting it against a server that does not
+       * exist. This rig has paid that price once already, on `ingestBatch`
+       * versus `ingestClientBatch`.
+       *
+       * The rejection, not a null: the route answers 404 identically for
+       * "may not see" and "never existed", so a transport that could tell them
+       * apart would hand the engine the oracle the whole shape refuses.
+       */
+      async bootstrapTicket(ws, ticketId) {
+        const client = await pool.connect();
+        try {
+          if (!(await canSee(client, userId, ticketId))) {
+            throw new Error(`bootstrapTicket failed: 404 (${ticketId})`);
+          }
+          return await ticketBootstrapFor(client, ws, ticketId);
+        } finally {
+          client.release();
+        }
+      },
       async reconcile(ws, heldIds) {
         return { workspaceId: ws, restricted: await reconcileHeldIds(pool, userId, heldIds) };
       },

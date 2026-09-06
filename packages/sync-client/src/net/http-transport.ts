@@ -1,5 +1,5 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
-import type { BootstrapResponse } from '../replica/replica.js';
+import type { BootstrapResponse, TicketBootstrap } from '../replica/replica.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -155,6 +155,22 @@ export function createHttpTransport(opts: {
       // concluding it had nothing to give back.
       if (!res.ok) throw new Error(`reconcile failed: ${res.status}`);
       return (await res.json()) as ReconcileAnswer;
+    },
+
+    async bootstrapTicket(workspaceId: string, ticketId: string): Promise<TicketBootstrap> {
+      const res = await doFetch(
+        `${opts.baseUrl}/v1/sync/bootstrap/ticket?workspaceId=${encodeURIComponent(workspaceId)}&ticketId=${encodeURIComponent(ticketId)}`,
+        { headers },
+      );
+      // A 404 throws like every other non-2xx, and that is the point rather than
+      // an oversight: the server answers 404 identically for a ticket the caller
+      // may not see and one that never existed, so returning `null` for it would
+      // hand the caller a distinction the server refuses to make and the
+      // existence oracle `reconcile-route.ts` exists to deny. The engine's drain
+      // treats every rejection alike — the id stays pending and the next
+      // catch-up retries.
+      if (!res.ok) throw new Error(`bootstrapTicket failed: ${res.status}`);
+      return (await res.json()) as TicketBootstrap;
     },
 
     openStream(workspaceId: string, afterSeq: number, handlers: StreamHandlers): StreamHandle {

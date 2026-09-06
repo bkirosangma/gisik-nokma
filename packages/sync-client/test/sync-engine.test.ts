@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newSubmittedEvent, newUlid, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
-import { createReplica, type BootstrapResponse, type Replica } from '../src/replica/replica.js';
+import { createReplica, type BootstrapResponse, type Replica, type TicketBootstrap } from '../src/replica/replica.js';
 import type { SyncItem } from '../src/replica/sync-item.js';
 import { createOutbox, type Outbox, type SyncEventResult } from '../src/outbox/outbox.js';
 import {
@@ -146,6 +146,9 @@ type Script = {
   syncImpl: (events: SubmittedEvent[]) => Promise<SyncEventResult[]>;
   reconcileCalls: Array<{ workspaceId: string; heldIds: string[] }>;
   reconcileImpl: (workspaceId: string, heldIds: string[]) => Promise<ReconcileAnswer>;
+  /** Closure 5b(d): every per-ticket pull the engine made, in order. */
+  pullCalls: Array<{ workspaceId: string; ticketId: string }>;
+  pullImpl: (workspaceId: string, ticketId: string) => Promise<TicketBootstrap>;
 };
 
 const committedFor = (events: SubmittedEvent[]): SyncEventResult[] =>
@@ -166,6 +169,14 @@ function fakeTransport(script: Script): SyncTransport {
     async sync(events) {
       script.syncBatches.push(events);
       return script.syncImpl(events);
+    },
+    async bootstrapTicket(workspaceId, ticketId) {
+      // Recorded for the same reason `reconcile` is: the closure 5b(d) cases
+      // assert WHICH tickets were pulled and in what order, and a fake that
+      // only returned a payload could not tell a drain that fetched two from
+      // one that fetched the same one twice.
+      script.pullCalls.push({ workspaceId, ticketId });
+      return script.pullImpl(workspaceId, ticketId);
     },
     async reconcile(workspaceId, heldIds) {
       // Recorded, not merely answered: the reconcile cases assert WHAT was
@@ -200,7 +211,7 @@ function fakeTransport(script: Script): SyncTransport {
 type Fixture = { script: Script; replica: Replica; outbox: Outbox; engine: SyncEngine };
 
 async function fixture(
-  over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl' | 'reconcileImpl'>> = {},
+  over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl' | 'reconcileImpl' | 'pullImpl'>> = {},
 ): Promise<Fixture> {
   seqCounter = 0;
   streamCounter = 0;
@@ -218,6 +229,17 @@ async function fixture(
     // nothing.
     reconcileImpl:
       over.reconcileImpl ?? (async (workspaceId) => ({ workspaceId, restricted: [] })),
+    pullCalls: [],
+    // The default REFUSES. A pull that silently succeeded with an empty payload
+    // would let every case here pass whether or not the drain ran, which is the
+    // shape of check this repo has paid for more than once. Cases that expect a
+    // pull override this; cases that do not are asserting `pullCalls` is empty,
+    // and an accidental pull must be loud rather than invisible.
+    pullImpl:
+      over.pullImpl ??
+      (async (_workspaceId, ticketId) => {
+        throw new Error(`fakeTransport: unexpected per-ticket pull for ${ticketId}`);
+      }),
   };
   const storage = createBetterSqliteStorage();
   const replica = await createReplica({ storage });

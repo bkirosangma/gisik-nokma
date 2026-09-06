@@ -207,6 +207,42 @@ export type SyncRouteDeps = {
   serverAppend: ServerAppend;
 };
 
+/**
+ * One ticket's pull payload, given that the caller has already been admitted.
+ *
+ * **Extracted for the reason `reconcileHeldIds` was, and pre-emptively rather
+ * than after the fact.** `test/dual-client/rig.ts` needs this exact assembly for
+ * its `SyncTransport.bootstrapTicket`, and the rig's history on this branch is
+ * that it restates what it cannot import — which is how a harness ends up
+ * proving replicas against a payload the server does not send. So the route and
+ * the rig call one function, and there is nothing to drift.
+ *
+ * **The admission checks are NOT in here, deliberately**, and the split is not
+ * arbitrary: `resolveEffectiveRole`'s 403 and `canSee`'s 404 are HTTP answers
+ * with reply bodies, and a caller that is not a route has no reply to send. The
+ * rig asks `canSee` itself, on the same pool, so the harness does not become a
+ * door with a weaker gate than the product's — which is the failure mode
+ * `ingestBatch` versus `ingestClientBatch` already cost this rig one finding.
+ */
+export async function ticketBootstrapFor(
+  client: PoolClient,
+  workspaceId: string,
+  ticketId: string,
+): Promise<TicketBootstrapResponse> {
+  // The workspace's definitions WHOLE, not scoped to this ticket's workflows —
+  // see the route's docblock for why scoping is where the silent failure lives.
+  // Same query and same `ORDER BY workspace_seq` as `/v1/sync/bootstrap`, whose
+  // own comment explains why that ordering and not `(entity_kind, entity_id,
+  // seq)`.
+  const { rows: defRows } = await client.query<EventRow>(
+    `SELECT * FROM events
+      WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
+      ORDER BY workspace_seq`,
+    [workspaceId],
+  );
+  return { workspaceId, definitions: defRows.map(rowToEnvelope), ticket: await bootstrapTicket(client, ticketId) };
+}
+
 export function registerSyncRoutes(
   app: FastifyInstance,
   deps: SyncRouteDeps,
@@ -323,19 +359,8 @@ export function registerSyncRoutes(
           // See the docblock: this is the answer for "never existed" too.
           return await reply.code(404).send({ error: 'not_found' });
         }
-        const { rows: defRows } = await client.query<EventRow>(
-          `SELECT * FROM events
-            WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
-            ORDER BY workspace_seq`,
-          [workspaceId],
-        );
-        const ticket = await bootstrapTicket(client, ticketId);
+        const body = await ticketBootstrapFor(client, workspaceId, ticketId);
         await client.query('COMMIT');
-        const body: TicketBootstrapResponse = {
-          workspaceId,
-          definitions: defRows.map(rowToEnvelope),
-          ticket,
-        };
         return body;
       } catch (err) {
         await client.query('ROLLBACK');
