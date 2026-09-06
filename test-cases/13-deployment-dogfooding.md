@@ -17,18 +17,21 @@ that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane
 [13.1–13.6, pushed], 15 [13.7–13.8], and — per `docs/lanes/controller-state.md`'s "Re-task 07:50 — Lane
 C takes Plan 11 T11 + T12 (backups, restore drill) after #146" — Tasks 11 [13.9–13.39] and 12) · **Lane
 D 13.41–13.100** (Tasks 7, 8) · **Lane E 13.101–13.200** (the rest of Plan 11: seam 1, Task 13, Task 16;
-NOT Tasks 11–12, which the 07:50 re-task moved to Lane C). **The next free block is `13.201`, controller-allocated ON REQUEST
-ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount the
-MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
+NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201–13.240**, allocated
+2026-09-06 once `13.1–13.40` was confirmed exhausted (the scheduler-generalisation errand, minted at
+13.201–13.203). **The next free block is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
+its assigned block and does not derive the next free id from this file — recount the MAXIMUM in use
+against `origin/main` at every rebase as the control, but never mint from it.
 
 **Numbering is BLOCK-allocated across parallel lanes, controller-assigned 2026-09-06, because more than
 one lane opened this section before Plan 11 Task 16's own catalogue pass (normally the sole opener, held
 until Tasks 1–15 merge) could run: Lane C `13.1–13.40` (Task 14 landed at 13.1–13.6; Task 15 continues
 inside the block at 13.7–13.8; Tasks 11–12 too, at 13.9+, after the 07:50 re-task cited above moved them
 from Lane E) · Lane D `13.41–13.100` (Tasks 7–8 below, at 13.41–13.76; Tasks 9–10 continue inside the
-block) · Lane E `13.101–13.200` (seam 1, Task 13, Task 16). Next block starts at `13.201`,
-controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks the
-controller for another rather than borrowing a neighbour's.**
+block) · Lane E `13.101–13.200` (seam 1, Task 13, Task 16) · Lane C `13.201–13.240` (the scheduler
+generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted). Next block starts at
+`13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
+the controller for another rather than borrowing a neighbour's.**
 
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
 there is no test runner for GitHub Actions YAML. `🧪` there means: reproduced by hand against the actual
@@ -683,20 +686,15 @@ case above credits Task 6 with authoring it; flagging this so a future edit does
 
 ## The scheduler generalisation and the notification-sweep registration (Plan 11's two deferred "ops errands")
 
-**NO ID MINTED — Lane C's `13.1–13.40` block is fully exhausted (13.40 above already spends the last one on
-the restore-drill guard pair). The cases below are written out in full, exactly as this file's own Task 12
-precedent does two sections up, and await one id in the next block the controller allocates (`13.201` or
-whatever is current when that happens) — never borrowed from Lane D's `13.41–13.100` or Lane E's
-`13.101–13.200`, and never sub-numbered onto `13.40` (`check-case-ids.mjs`'s `ID_LINE` would extract a
-`13.40.1` as a duplicate `13.40` and miss a `13.40a` entirely).** This contradicts the brief this task was
-given ("13.40 is your LAST free id") — 13.40 was already spent before this task started, so the block held
-exactly zero, not one. **The ASK, precisely: three PENDING BLOCK entries below, covering TEN new real
-vitest tests (four `startScheduler` cases and six `requirePositiveIntervalMs` cases, all in
-`apps/server/test/ops/schedule.test.ts`, all passing) plus the `backup-daemon-main.ts` wiring claim, need
-one id each from Lane C's next allocated block.** Flagged in this task's own report as a block-exhaustion
-ask, per the rule at the head of this file.
+**Lane C's `13.1–13.40` block was fully exhausted (13.40 above already spends the last one on the
+restore-drill guard pair) — this contradicted the brief this task was given ("13.40 is your LAST free
+id"), which was already stale by the time this task started. The three cases below were written out in
+full with no id first (following this file's own Task 12 precedent two sections up) and flagged as a
+block-exhaustion ask in this task's own report; the controller then allocated Lane C a new block,
+`13.201–13.240` (next block `13.241`, on request), and they are minted below at 13.201–13.203.** Header
+paragraphs at the top of this file updated to record the new block.
 
-**PENDING BLOCK — `startScheduler` generalises the daemon's private `loop`/`onFailure` primitive from a
+- ✅ **13.201 — `startScheduler` generalises the daemon's private `loop`/`onFailure` primitive from a
 fixed two-job shape to an arbitrary list of `{name, run, delayMs}` jobs, and `startBackupDaemon` becomes a
 thin wrapper over it with an UNCHANGED external signature.** Every existing `startBackupDaemon` case in
 `test/ops/schedule.test.ts` (the stderr shape, the `` `backup:${name}` `` alerter key, two timers armed
@@ -719,7 +717,7 @@ assertion, at exactly the pre-fix value 2, with every other case in the file sti
 list where the first throws proves the second job's `delayMs()` is never even called.
 `apps/server/src/ops/schedule.ts`, `apps/server/test/ops/schedule.test.ts`
 
-**PENDING BLOCK — `requirePositiveIntervalMs` refuses rather than clamps a millisecond interval, the same
+- ✅ **13.202 — `requirePositiveIntervalMs` refuses rather than clamps a millisecond interval, the same
 "refuse, don't clamp" bargain `msUntilNextUtc`'s HH:MM and day-of-week checks already make for the two
 existing backup jobs, applied to the notification sweep's configurable interval.** Six cases: a legitimate
 positive integer (and the boundary value `1`) pass through unchanged; `0` is refused, naming `0` in the
@@ -733,7 +731,7 @@ the failure mode this guards against is not a wrong value but a call that never 
 the daemon in a tight re-arm loop; the pre-fix code had no guard against either).
 `apps/server/test/ops/schedule.test.ts`
 
-**PENDING BLOCK — `backup-daemon-main.ts` registers two more jobs on the SAME scheduler as the existing
+- ✅ **13.203 — `backup-daemon-main.ts` registers two more jobs on the SAME scheduler as the existing
 pg-dump and ledger-export jobs, and neither reaches the `--once` path.** The entry point now calls
 `startScheduler` DIRECTLY with all four jobs, not `startBackupDaemon` — one scheduler, one `stop()`, one
 `'backup daemon scheduled'` log line, for all four. `startBackupDaemon`'s only remaining caller is its own
