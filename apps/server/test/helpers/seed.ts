@@ -216,6 +216,17 @@ export interface SeedTicketArgs {
    * head row was written, now available one ticket at a time.
    */
   stateCategory?: 'open' | 'active' | 'terminal' | null;
+  /**
+   * Assign the ticket to this user, as a REAL `ticket.assigned` event appended
+   * in the same per-entity sequence as the creation — not just a column.
+   *
+   * Both halves are needed and neither alone is honest: `assembleTicketCards`
+   * throws for a head row with an `assignee_id` and no assignment in the
+   * ledger ("proj_tickets and the ledger disagree"), and `readMyWork` filters
+   * on the COLUMN, so a fixture with only the event answers an empty list.
+   * Seeding one without the other reproduces a corrupt store, not an assignment.
+   */
+  assigneeId?: string;
 }
 
 /**
@@ -278,6 +289,17 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
   });
   await appendTestEvent(pool, created);
   await applyAll(pool, [created]);
+  if (args.assigneeId !== undefined) {
+    const assigned = testEnvelope({
+      workspaceId: args.workspaceId,
+      entity: { kind: 'ticket', id: args.ticketId },
+      type: 'ticket.assigned',
+      payload: { assigneeId: args.assigneeId },
+      actorId: args.createdBy ?? SEED_ACTOR,
+    });
+    await appendTestEvent(pool, assigned);
+    await applyAll(pool, [assigned]);
+  }
   // `stateCategory: null` means NO head row — see `SeedTicketArgs`. Every other
   // caller passes nothing and gets one, as they did before the option existed.
   if (args.stateCategory !== null) {
@@ -308,7 +330,7 @@ async function insertTicketHead(
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, $10, $11, $12)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      ON CONFLICT (ticket_id) DO NOTHING`,
     [
       args.ticketId,
@@ -320,6 +342,8 @@ async function insertTicketHead(
       SEED_WORKFLOW_VERSION,
       SEED_STATE_ID,
       args.stateCategory ?? 'open',
+      // The COLUMN half of an assignment; the ledger half is appended above.
+      args.assigneeId ?? null,
       JSON.stringify([]),
       JSON.stringify({
         title: {

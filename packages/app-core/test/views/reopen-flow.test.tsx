@@ -325,12 +325,11 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // Non-vacuity, so this is a fact about `getTicket` and not about an empty
     // register: the methods that DO still refuse are named, and one of them
     // carries a real absence.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual([
-      'getAttention',
-      'getMyWork',
-      'getMyWorkspaces',
-      'search',
-    ]);
+    // Three, and it read four until rulings P32/P38 served `getMyWorkspaces`.
+    // The closure-2 commit that wrote this list said in as many words that it
+    // was SCHEDULED TO EXPIRE and named the step that would expire it; this is
+    // that expiry arriving, which is the check working rather than breaking.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['getAttention', 'getMyWork', 'search']);
     expect((SERVING_GAPS['getMyWork'] ?? []).length).toBeGreaterThan(0);
   });
 

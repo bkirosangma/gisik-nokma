@@ -241,7 +241,6 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     });
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const expected: ReadonlyArray<[string, () => Promise<unknown>, string]> = [
-      ['getMyWorkspaces', () => source.query.getMyWorkspaces(), 'WorkspaceRef.projects'],
       ['search', () => source.query.search(WORKSPACE, 'q'), 'SearchHit.matchedIn'],
       ['getMyWork', () => source.query.getMyWork(WORKSPACE), 'ContestedClaim.title'],
       ['getAttention', () => source.query.getAttention(WORKSPACE), "kind 'contested'"],
@@ -263,6 +262,10 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     const nowServed: ReadonlyArray<[string, () => Promise<unknown>]> = [
       ['getTickets', () => source.query.getTickets(PROJECT, {}, 'flat')],
       ['getTicket', () => source.query.getTicket(WORKSPACE, 't_1')],
+      // Joined by rulings P32/P38. Kept as a ROW rather than deleted, for the
+      // reason this block exists: a refusal that stops refusing has to be
+      // pinned as SERVED, or the only record it ever refused is a shorter array.
+      ['getMyWorkspaces', () => source.query.getMyWorkspaces()],
     ];
     for (const [method, call] of nowServed) {
       const outcome = await call().then(

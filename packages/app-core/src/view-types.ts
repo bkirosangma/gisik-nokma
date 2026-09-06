@@ -153,7 +153,14 @@ export type WorkItem = {
   ticketId: string;
   workspaceId: string;
   projectId: string;
-  projectName: string;
+  /**
+   * `null` when this viewer may not be told the project's NAME (rulings
+   * P32/P38) — they still have `projectId`, so the item renders id-only rather
+   * than blank. Nullable rather than absent, because "no name for you" is a
+   * fact the renderer must be able to act on; an optional key would let a
+   * mapper that simply forgot the field look the same as the rule applying.
+   */
+  projectName: string | null;
   title: string;
   stateId: string;
   stateName: string;

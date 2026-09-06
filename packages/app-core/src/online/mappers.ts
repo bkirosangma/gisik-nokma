@@ -26,6 +26,7 @@ import type {
   TicketRead,
   TransitionCause,
   UserPreferences,
+  WorkspaceRef,
 } from '../view-types.js';
 
 /**
@@ -895,28 +896,58 @@ export function toServerPreferences(preferences: UserPreferences): Record<string
  * The refusals. Each list is read by the server's contract suite.
  * ------------------------------------------------------------------ */
 
-const MAP_WORKSPACE_REFS_ABSENCES: readonly Absence[] = [
-  {
-    field: 'WorkspaceRef.projects',
-    wireKey: 'projects',
-    wireRoute: '/v1/me/workspaces',
-    because:
-      'no /v1 route reads proj_projects — there is no project-list read anywhere on the surface, so this is not a field a route forgot but a read nobody has designed, and its first question is what a project-scoped guest sees of a workspace it is not otherwise in',
-    owner: 'P25 clause 1 — HELD pending the owner ruling, because it carries a visibility decision',
-  },
-];
 
 /**
- * `GET /v1/me/workspaces` → `WorkspaceRef[]`. REFUSED.
+ * `GET /v1/me/workspaces` → `WorkspaceRef[]`. **ANSWERS** since rulings P32/P38.
+ *
+ * It REFUSED, and the reason it gave was right: "a nav rendering workspaces with
+ * no projects under them, or with an invented empty list, is a nav that says
+ * this workspace holds no projects." No `/v1` route read `proj_projects` at all,
+ * so there was nothing honest to render.
+ *
+ * What unblocked it was not a new read but a RULING about who may be told a
+ * project's name. `read/visible-projects.ts` applies `resolveEffectiveRole`:
+ * owner sees every project (the shipped `canSeeResolved` switch exempts owner by
+ * name), everyone else sees `eff.projects` — the same set that function already
+ * consults for project-mode tickets, with no admin bypass.
+ *
+ * So the list is PARTIAL for most viewers, and that is the correct answer rather
+ * than the "invented empty list" the old refusal feared. The difference between
+ * the two is the difference between withholding a name and asserting an absence.
  *
  * The `workspaceId` → `id` rename is adaptable and `role` is a field the server
- * discloses that the client does not read; neither is a gap. `projects` is, and
- * with it the whole method: a nav rendering workspaces with no projects under
- * them, or with an invented empty list, is a nav that says this workspace holds
- * no projects.
+ * discloses that the client does not read; neither was ever a gap.
  */
-export function mapWorkspaceRefs(_raw: unknown): never {
-  throw new ServingGapError('getMyWorkspaces', MAP_WORKSPACE_REFS_ABSENCES);
+export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
+  const record = asRecord(raw, 'workspaces');
+  return asArray(record['workspaces'], 'workspaces.workspaces').map((entry, index) => {
+    const path = `workspaces[${index}]`;
+    const workspace = asRecord(entry, path);
+    return {
+      id: asString(workspace['workspaceId'], `${path}.workspaceId`),
+      name: asString(workspace['name'], `${path}.name`),
+      // A PARTIAL LIST IS THE CORRECT ANSWER, not a defect (rulings P32/P38).
+      // Every role except owner is served only the projects it holds a
+      // membership in, because a project's NAME is itself a disclosure. The
+      // client renders what it is given and asserts nothing about what it is
+      // not: there is deliberately no "and N more", because the COUNT would
+      // itself be the disclosure the rule withholds.
+      //
+      // The key is REQUIRED, never defaulted to `[]`. An absent `projects`
+      // would mean the route did not answer this question at all; `[]` is a
+      // different claim — "you are in none of this workspace's projects" —
+      // which a viewer may act on. `asArray` refuses the first and serves the
+      // second, which is the same distinction `mapRollup` draws for a null.
+      projects: asArray(workspace['projects'], `${path}.projects`).map((project, projectIndex) => {
+        const projectPath = `${path}.projects[${projectIndex}]`;
+        const row = asRecord(project, projectPath);
+        return {
+          id: asString(row['projectId'], `${projectPath}.projectId`),
+          name: asString(row['name'], `${projectPath}.name`),
+        };
+      }),
+    };
+  });
 }
 
 /**
@@ -1270,13 +1301,6 @@ export function mapSearchHits(_raw: unknown): never {
 
 const MAP_MY_WORK_ABSENCES: readonly Absence[] = [
   {
-    field: 'WorkItem.projectName',
-    wireKey: 'projectName',
-    wireRoute: '/v1/me/work',
-    because: 'cards carry projectId, and no /v1 route reads proj_projects to name it',
-    owner: 'P25 clause 1 — HELD (the same missing project read as WorkspaceRef.projects)',
-  },
-  {
     field: 'WorkItem.stateName',
     wireKey: 'stateName',
     wireRoute: '/v1/me/work',
@@ -1400,7 +1424,6 @@ export function mapAttention(_raw: unknown): never {
  * an entry out would have left two methods claiming to refuse over nothing.
  */
 export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
-  getMyWorkspaces: MAP_WORKSPACE_REFS_ABSENCES,
   search: MAP_SEARCH_HITS_ABSENCES,
   getMyWork: MAP_MY_WORK_ABSENCES,
   getAttention: MAP_ATTENTION_ABSENCES,
