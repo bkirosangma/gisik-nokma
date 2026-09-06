@@ -4,7 +4,7 @@ import { newSubmittedEvent, newUlid } from '@gisik-nokma/domain';
 import type { IngestService } from '../../src/ingest/ingest-service.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { applyAll, seedMember, setVisibilityEnv } from '../helpers/seed.js';
+import { applyAll, seedGuest, seedMember, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
@@ -47,9 +47,15 @@ const TASK_TYPE = newUlid();
 const KEPT = newUlid();
 /** Narrowed away from the member by a real `visibility.set`. This is 6.104's ticket. */
 const LOST = newUlid();
+/** Explicitly shared with the guest and kept — the guest-side positive control. */
+const SHARED_TO_GUEST = newUlid();
+/** Explicitly shared with the guest and then taken back. This is 6.102's ticket. */
+const UNSHARED = newUlid();
 
 let memberId = '';
 let strangerId = '';
+/** Closure 5b(c) — 6.102's guest side. Holds SHARED_TO_GUEST, loses UNSHARED. */
+let guestHeaders: Record<string, string> = {};
 let memberHeaders: Record<string, string> = {};
 let strangerHeaders: Record<string, string> = {};
 
@@ -63,6 +69,8 @@ beforeAll(async () => {
   const member = await signInWithPhone(app, otp, '+913333333331');
   const stranger = await signInWithPhone(app, otp, '+913333333332');
   const owner = await signInWithPhone(app, otp, '+913333333333');
+  const guest = await signInWithPhone(app, otp, '+913333333334');
+  guestHeaders = { authorization: `Bearer ${guest.token}` };
   memberId = member.userId;
   strangerId = stranger.userId;
   memberHeaders = { authorization: `Bearer ${member.token}` };
@@ -70,6 +78,9 @@ beforeAll(async () => {
 
   await seedMember(db.pool, WS, memberId, 'member', [{ projectId: PROJECT }]);
   await seedMember(db.pool, WS, owner.userId, 'owner', [{ projectId: PROJECT, projectAdmin: true }]);
+  // A guest belongs to the workspace and to NO project; everything they reach
+  // comes from an explicit `visibility.set` list.
+  await seedGuest(db.pool, WS, guest.userId);
   // The stranger is deliberately given NO row in WS at all.
   expect(strangerId).not.toBe(memberId);
 
@@ -108,6 +119,18 @@ beforeAll(async () => {
       parentId: null,
       title: 'Taken away',
     }),
+    submit({ kind: 'ticket', id: SHARED_TO_GUEST }, 'ticket.created', {
+      typeId: TASK_TYPE,
+      projectId: PROJECT,
+      parentId: null,
+      title: 'Still shared with the guest',
+    }),
+    submit({ kind: 'ticket', id: UNSHARED }, 'ticket.created', {
+      typeId: TASK_TYPE,
+      projectId: PROJECT,
+      parentId: null,
+      title: 'Was shared with the guest',
+    }),
   ]);
   for (const r of results) {
     if (r.status !== 'committed') throw new Error(`seed failed: ${JSON.stringify(r)}`);
@@ -115,7 +138,16 @@ beforeAll(async () => {
 
   // THE NARROWING. `LOST` becomes explicit to the owner alone; the member keeps
   // the copy on their device and is told nothing, which IS case 6.104.
-  await applyAll(db.pool, [setVisibilityEnv(WS, LOST, 'explicit', [owner.userId], owner.userId)]);
+  await applyAll(db.pool, [
+    setVisibilityEnv(WS, LOST, 'explicit', [owner.userId], owner.userId),
+    // The guest's two tickets. Both were explicitly shared with them; then
+    // UNSHARED is retargeted to the owner alone, which is 6.102 exactly — the
+    // guest keeps the copy and is told nothing, because the `!isGuest` gate
+    // that closes 6.100 closes this door too.
+    setVisibilityEnv(WS, SHARED_TO_GUEST, 'explicit', [owner.userId, guest.userId], owner.userId),
+    setVisibilityEnv(WS, UNSHARED, 'explicit', [owner.userId, guest.userId], owner.userId),
+    setVisibilityEnv(WS, UNSHARED, 'explicit', [owner.userId], owner.userId),
+  ]);
 });
 
 afterAll(async () => {
@@ -201,5 +233,41 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // and must not make the answer's LENGTH a second channel.
     const repeated = await reconcile(memberHeaders, [LOST, LOST, LOST]);
     expect(repeated.body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: LOST }] });
+  });
+
+  it('12.304 CLOSURE 5b(c): the same door answers a GUEST, which is 6.102 and was never measured', async () => {
+    // 6.102 is 6.104's guest-side sibling and closure 5 closed only the member
+    // half — not because the guest half needed anything different, but because
+    // nothing had ever asked. The primitive is role-independent by
+    // construction: `reconcileHeldIds` asks `canSee` and nothing else, and
+    // `canSee` resolves a guest through the explicit list the same way it
+    // resolves a member through a project. So this is an APPLICATION of the
+    // shipped rule rather than a new one, and it is closed by measuring it.
+    //
+    // Both ids in ONE request, and the assertion is exact. A guest presenting
+    // only the lost id could be answered "restricted" by a door that restricted
+    // everything a guest named — which is the shape that would wipe a guest's
+    // whole device — and an exact `toEqual` over both is the only assertion
+    // that can tell the two apart.
+    const { statusCode, body } = await reconcile(guestHeaders, [SHARED_TO_GUEST, UNSHARED]);
+    expect(statusCode).toBe(200);
+    expect(body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: UNSHARED }] });
+
+    // The MEMBER's answer for the same two ids, in the same run. Neither is
+    // shared with them and neither is in a mode they reach, so both come back
+    // restricted — which is the control proving the guest's asymmetric answer
+    // above is about the explicit list and not about the door being lenient.
+    const asMember = await reconcile(memberHeaders, [SHARED_TO_GUEST, UNSHARED]);
+    expect(asMember.body).toEqual({
+      workspaceId: WS,
+      restricted: [{ kind: 'restricted', id: SHARED_TO_GUEST }, { kind: 'restricted', id: UNSHARED }],
+    });
+
+    // And a guest is still refused nothing structurally: they are a member of
+    // the workspace, so the 403 gate does not fire on them. Without this line
+    // the case could pass against a door that refused guests outright, since a
+    // 403 body would not equal the expected object either — but it would fail
+    // for the wrong reason, and a reader would not know which.
+    expect(statusCode).not.toBe(403);
   });
 });
