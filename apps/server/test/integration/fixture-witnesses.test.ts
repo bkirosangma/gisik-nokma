@@ -98,8 +98,9 @@ async function post(
  * set rather than passed in, because `ok` is the one field a hand-built fake gets
  * to decide for itself, and deciding it is how a fake stops being evidence.
  */
-function injectFetch(headers: { authorization: string }): FetchLike {
+function injectFetch(headers: { authorization: string }, calls: string[] = []): FetchLike {
   return (async (input: string, init?: RequestInit) => {
+    calls.push(input);
     const method = (init?.method ?? 'GET') as 'GET' | 'POST' | 'PUT';
     const res = await app.inject({
       method,
@@ -203,7 +204,7 @@ describe('the list cursor, against the real route', () => {
       headers: owner.headers,
     });
     expect(populated.statusCode).toBe(200);
-    expect((populated.json() as { groups: { rows: unknown[] }[] }).groups[0]?.rows.length).toBe(3);
+    expect((populated.json() as { groups: { cards: unknown[] }[] }).groups[0]?.cards).toHaveLength(3);
 
     const res = await app.inject({
       method: 'GET',
@@ -214,37 +215,60 @@ describe('the list cursor, against the real route', () => {
     // THE PROPERTY. A 404 here would mean `pagingFetch` was right and this case
     // is what tells the two apart.
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { groups: { rows: unknown[] }[]; nextCursor: string | null };
-    expect(body.groups[0]?.rows ?? []).toHaveLength(0);
+    const body = res.json() as { groups: { cards: unknown[] }[]; nextCursor: string | null };
+    // `list.ts:205` — "An empty page has NO groups". Asserting on `groups` itself
+    // rather than on `groups[0].cards` is the difference between measuring the
+    // route's documented empty shape and reading a property off `undefined`.
+    expect(body.groups).toHaveLength(0);
     expect(body.nextCursor).toBeNull();
   });
 
   /**
-   * 12.324 — **THE SHIPPED PAGING LOOP, EXECUTED AGAINST THE SHIPPED ROUTE.**
+   * 12.324 — **THE SHIPPED LOOP, EXECUTED AGAINST THE SHIPPED ROUTE, RETURNS THE
+   * COMPLETE ROW SET.**
    *
    * 7.220 proved the route accepts a cursor and that `mapListPage` carries the
-   * value the route resolves — two requests, driven by the case itself. It did
-   * NOT run the client's own loop. This does: `createOnlineDataSource`'s real
-   * `getTickets` walks to exhaustion over `injectFetch`, so the termination
-   * condition, the cursor threading and the row accumulation are the shipped
-   * ones rather than the case's.
+   * value the route resolves — but the case drove the two requests itself. This
+   * runs the client's OWN `getTickets`: the termination condition, the row
+   * accumulation and the request shape are the shipped ones.
    *
-   * Every ticket exactly once and in the route's own order is the property that
-   * matters past the cap work: a loop that re-served page one would duplicate,
-   * and a loop that stopped early would drop.
+   * ## What this case does NOT witness, asserted rather than left to be assumed
+   *
+   * `LIST_PAGE_SIZE` is 200 and the loop hard-codes `limit=200`
+   * (`online-data-source.ts:223`), so against a three-ticket world the route
+   * answers everything in ONE page with `nextCursor: null` and the loop returns
+   * after a single request. **The multi-page cursor threading is therefore NOT
+   * exercised here**, and calling this "walks to exhaustion" would be the same
+   * defect this file catches at `founding.test.ts:64` — a title claiming more
+   * than the body keeps.
+   *
+   * So the round-trip count is ASSERTED, not narrated: if anyone later seeds 201
+   * tickets, or drops `LIST_PAGE_SIZE`, this line goes red and whoever is here
+   * next is told the case's reach changed rather than left to assume it. The
+   * multi-page half is covered at the route level by 7.220. *Owner for closing
+   * the client-loop multi-page gap end to end: whoever can afford a 201-ticket
+   * fixture, or a seam that lets the page size be injected.*
    */
-  it('12.324 the real getTickets loop walks the real route to exhaustion — every row once', async () => {
-    const source = createOnlineDataSource({ baseUrl: '', fetchImpl: injectFetch(owner.headers) });
+  it('12.324 the real getTickets returns the complete row set from the real route, in one page', async () => {
+    const calls: string[] = [];
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl: injectFetch(owner.headers, calls) });
 
-    const view = await source.query.getTickets(projectId, {}, { kind: 'flat' });
+    const view = await source.query.getTickets(projectId, {}, 'flat');
 
-    // NON-VACUITY FIRST, and it is not `length > 0`: the world was seeded with
-    // exactly three, so a loop that returned one page would pass a bare
+    // NON-VACUITY FIRST, and it is not `length > 0`: the world holds exactly
+    // three, so a loop returning one page of one row would pass a bare
     // non-empty check while dropping two thirds of the project.
     expect(view.rows).toHaveLength(3);
     expect(view.rows.map((row) => row.ticketId)).toEqual(ticketIds);
-    // No duplicates — the failure a cursor-ignoring route produces.
+    // No duplicates — the failure a cursor-ignoring route produces once paging
+    // is actually reached.
     expect(new Set(view.rows.map((row) => row.ticketId)).size).toBe(3);
+
+    // THE REACH OF THIS CASE, PINNED. One request, because 3 < 200. This is the
+    // assertion that stops the docblock above from rotting into a false claim.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('limit=200');
+    expect(calls[0]).not.toContain('cursor=');
   });
 });
 
@@ -267,7 +291,7 @@ describe('the founding refusal, against the real route', () => {
    */
   it('7.221 the real founding gateway carries the door’s own sentence out of a real 400', async () => {
     const gateway = createHttpFoundingGateway(
-      createHttpClient({ baseUrl: '', fetchImpl: injectFetch(owner.headers) }),
+      createHttpClient('', injectFetch(owner.headers)),
     );
 
     // NON-VACUITY FIRST: the constant this case measures against must be a real
@@ -322,11 +346,19 @@ describe('the notifications cursor, against the real route', () => {
         id,
         userId: reader.userId,
         workspaceId,
-        kind: 'ticket.assigned',
-        ticketId: ticketIds[0] ?? newUlid(),
-        actorId: owner.userId,
-        createdAt: new Date().toISOString(),
-      } as unknown as Notification);
+        kind: 'assignment',
+        dedupeKey: `assignment:${id}`,
+        payload: {
+          ticketId: ticketIds[0] ?? newUlid(),
+          ticketTitle: 'Renew the DLT registration',
+          assignedBy: owner.userId,
+          eventId: id,
+          clientTime: '2026-08-19T10:00:00.000Z',
+          serverTime: '2026-08-19T10:00:01.000Z',
+        },
+        read: false,
+        createdAt: '2026-08-23T05:00:00.000Z',
+      } satisfies Notification);
     }
 
     const page = await app.inject({
