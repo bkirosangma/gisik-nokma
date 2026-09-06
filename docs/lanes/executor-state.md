@@ -16,7 +16,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — `exec/37-c2-cursor`. **DOOR B BUILT + both P36 residuals done. GATE PENDING, then review, then PR.**
+# LANE A — `exec/37-c2-cursor`. **PR #176 OPEN AND HELD on the opus verdict. Gate green 30/30, 0 cached, 3,387 tests.**
 
 > Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
 > — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
@@ -28,7 +28,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 |---|---|
 | branch | `exec/37-c2-cursor`, cut from `origin/main` `aa17046` (#169, Rulings P39+P40, MERGED) |
 | merge-base | `aa17046` — `git branch --contains aa17046` lists `main`, so it is REACHABLE, not orphaned |
-| HEAD | this commit |
+| HEAD | `b9453ed` at PR time; later commits pushed on the same branch — RECOUNT, do not adopt |
 | tree | clean at cut |
 | node | **v22.22.2** |
 | build | `pnpm turbo run build --force --concurrency=1` → **BUILD_EXIT=0, `0 cached, 10 total`** |
@@ -228,14 +228,36 @@ count.
   `search` alone. P41's phrase "in the register" admits the other reading, so a reviewer should see
   the choice.
 
-## STILL OUTSTANDING
+## PR #176 IS OPEN AND HELD — https://github.com/bkirosangma/gisik-nokma/pull/176
 
-1. **The final full gate** — `/tmp/gate37b.sh`, lock acquired, running at node v22.22.2. The earlier
-   green (30/30) predates 7.220, the keyset fixture and the prose fixes, so it does NOT cover them.
-2. **The opus reviewer is DISPATCHED** and running (loop correctness incl. cap off-by-one and cycle
-   risk, fixture honesty, consumers of the removed `mapListView`, the unchanged-type claim, and the
-   cap as product behaviour). Findings not yet seen.
-3. **Then the PR. The controller merges; I never do.**
+**Held by the controller until I relay the opus reviewer's verdict applied.** It merges on its eleven
+jobs after that. **I never merge.**
+
+**Gate, forced and uncached, at the sha in the PR:** `pnpm turbo run build test typecheck --force
+--concurrency=1` → `GATE_EXIT=0`, **30 successful / 30 total, 0 cached**, **3,387 tests passed, 0
+failed** across ten packages. `pnpm run check:env` → 0. Node **v22.22.2**. `check-case-ids` → 0,
+1331 ids, union == sum.
+
+## CONTROLLER RULINGS RECEIVED THIS TASK
+
+- **RATIFIED:** the cap's absence is NOT a `SERVING_GAPS` key. My reading at `LIST_PAGE_CAP` is the
+  record; P41's "register" meant the ERROR TYPE. Do not revisit.
+- **§12 REALLOCATED:** 12.240–12.259 is exhausted; **Lane A now holds 12.320–12.339, entirely
+  unused.** Lane B holds 12.290–12.319. Next free block 12.340 ON REQUEST. Header updated.
+- **CARRIED with a named owner:** the web shell's behaviour when `getTickets` throws past the cap —
+  owner Task 13's E2E or a web render test, named at 12.258.
+- The page-index-vs-keyset finding goes to **Lane F** in these words: *any fixture whose protocol was
+  authored alongside its consumer.*
+
+## STILL OUTSTANDING — the only things left
+
+1. **The opus reviewer's findings** — dispatched, still running when this was written. Fix on
+   Important-or-worse; scoped re-review only if the fix over-reaches. Relay the verdict to the
+   controller either way, because #176 is HELD on it.
+2. **CI on #176** — eleven jobs. At the time of writing: `check-tasks`, `e2e`, `scope`, `check-env`
+   pass; `build` pending. **Report job steps, never the fan-in alone.**
+3. **After #176 merges: report and STOP.** The override says so and the controller confirmed it
+   re-tasks at the reset.
 
 ## §12 IS EXHAUSTED
 
@@ -246,7 +268,7 @@ block — ask, do not derive.** §7 next free **7.220**.
 ## NEXT, IN ORDER
 
 1. **Final gate → read the reviewer's findings → fix only on Important-or-worse → PR.**
-2. §7 next free is **7.221** (7.219, 7.220 minted here). §12 is EXHAUSTED — ask for a block.
+2. §7 next free is **7.221** (7.219, 7.220 minted here). §12: Lane A holds **12.320–12.339**, unused.
 2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
    narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
    dangling-`parent_id` branch has no fixture and survives its own mutation).
