@@ -79,6 +79,57 @@ excluding fixtures.
   file lists exchanged in both directions, no import of mine changes signature except `parseFrame`'s
   return type (app-core, which D does not import). Whoever lands second rebases.
 
+
+### CORRECTION TO THE 14:47 BLOCK ABOVE — the freshness check I prescribed does not work
+
+I wrote *"check the log carries this run's `LOCK ACQUIRED` timestamp"*. **It does not.** `LOCK ACQUIRED`
+is printed by the wrapper to ITS OWN STDOUT and never reaches the logfile — `grep -c "LOCK ACQUIRED
+pid=62853" /tmp/laneB-gate.log` returns **0** on a run that genuinely acquired that lock. A freshness
+check that cannot fire is the same defect as the stale log it was written to catch, committed in the
+paragraph describing that defect. **The check that works: read `GATE_EXIT=` from the WRAPPER's stdout
+(the background task's output file), never from a logfile path you chose** — and if you must judge a
+logfile, compare its per-package composition against a number you can re-derive right now.
+
+### THE REBASE PAST #196, and the re-gate it owed
+
+Lane D's socket-cutting fixture landed as `c5dfdcd`. **Three conflicts, all in `test-cases/12`'s header**
+(the block table and the MAXIMUM line), none in source — resolved keeping BOTH lanes: Lane D's
+`12.340–12.359` *used through 12.343*, and Lane B's `12.360–12.379` *used through 12.364*. The header's
+counters were resolved to their FINAL values once rather than replayed per intermediate commit, then
+**recounted at the rebased sha**: max `12.364`, Lane D's four ids all present, `check-case-ids`
+**`EXIT=0`, 1536 unique, union == sum**.
+
+**The re-gate was genuinely owed and is not a formality**: the branch-vs-base diff carries SOURCE
+(`stream.ts`, `http-transport.ts`, `outbox.ts`), and D's new fixture drives the very transport whose
+ping/pong arm this branch deleted. Checked directly as well as by gate: `grep` for `ping|pong` in
+`apps/server/test/dual-client/socket-cut.test.ts` finds no protocol use, so the two changes are
+independent — but that was measured, not assumed.
+
+**A worktree trap, paid for here:** `[ -d .git/rebase-merge ]` is ALWAYS false in a git worktree, because
+`.git` is a FILE pointing at the real gitdir. A resolve-and-continue loop guarded on it reported
+"REBASE DONE" immediately, with conflict markers still on disk and a rebase still in progress. Use
+`git rev-parse --git-path rebase-merge`.
+
+### FULL GATE AT THE REBASED HEAD — GREEN
+
+`GATE_EXIT=0` · **`Tasks: 30 successful, 30 total`** · **`0 cached, 30 total`** · 2m11.689s ·
+**node `v22.22.2`** · `PNPM=9.15.0` · **`CHECK_ENV_EXIT=0`** · `Unsupported engine` **0** ·
+**no orphaned vitest workers**. Lock acquired pid 88476, released clean.
+**`check-case-ids` is a SEPARATE step and is not in that run: `CHECK_CASE_IDS_EXIT=0`, 1536 unique,
+union == sum.**
+
+**3612 passed / 283 files** (+5 skipped, server): domain 464/27 · ui 37/4 · editor 178/15 ·
+rule-engine 282/12 · **sync-client 88/8** · app-core 1102/68 · web 138/18 · mobile 20/3 · desktop 5/2 ·
+**server 1298/126**.
+
+**The branch's own test delta is +3, and it decomposes** — stated because a delta that does not
+decompose is a number nobody can check: **sync-client +1** (12.364), **server +2** (12.362, 12.363),
+**app-core +0** — 12.360 REPLACED the deleted `answers ping with pong` test one-for-one, which is why
+app-core's 1102 is unchanged rather than +1. 12.361 is 🚫 and has no test by construction.
+**The gate log names files, not tests**: each of the four new cases was confirmed to EXECUTE by name
+under `--reporter=verbose` in a targeted run, never inferred from a green total. That distinction was
+paid for on this branch — a first run of 12.363 reported `11 skipped` behind a failed suite.
+
 ### THE FOUR ITEMS, and the shape each has to have
 
 One PR, each item its own commit, **commit then mutate**, mutation confirmed present before the run,
