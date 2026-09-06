@@ -3,7 +3,7 @@ import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canSee } from './can-see.js';
-import { grantNoticeFor, isGrantBackfillTrigger } from './grant-backfill.js';
+import { grantNoticeFor, isGrantBackfillTrigger, readerReachNoticeFor } from './grant-backfill.js';
 
 /**
  * "This ticket is gone — delete whatever you hold for it."
@@ -511,6 +511,28 @@ export async function* visibleEventsFor(
                 await nowInvisibleTicketsInScope(db, userId, workspaceId, 'workspace'),
               );
             }
+          } else if (env.type === 'membership.granted' || env.type === 'project.member_added') {
+            // THE WIDENING HALF of this arm, and it was missing until closure
+            // 5b (case 12.283). Its two siblings above answer the narrowings —
+            // `membership.revoked` and `project.member_removed` — and a reader
+            // finding only those could reasonably conclude that a grant needed
+            // nothing. It does: every ticket this event reveals sits below the
+            // client's cursor, because the client's cursor advanced past that
+            // history while the tickets were invisible to it. Identical gap to
+            // the one `grant-backfill.ts` closes on the ticket's side, so it
+            // gets the identical repair — a bounded notice, and the client
+            // pulls what it lacks.
+            //
+            // `membership.granted` cannot scope; `project.member_added` names
+            // its project in `entity.id`, exactly as `project.member_removed`
+            // one branch down reads it.
+            const ticketIds = await readerReachNoticeFor(
+              db,
+              userId,
+              workspaceId,
+              env.type === 'project.member_added' ? { projectId: env.entity.id } : 'workspace',
+            );
+            if (ticketIds.length > 0) yield { kind: 'reach-granted', workspaceId, ticketIds };
           } else if (env.type === 'project.member_removed') {
             // A guest holds no project (the 2026-08-27 collapse, stated in
             // `can-see.ts`), so this site is reached by members only and the

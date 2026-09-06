@@ -1,5 +1,6 @@
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from './can-see.js';
+import { listVisibleTickets } from './visible-tickets.js';
 
 /**
  * Notice on newly GRANTED visibility — the half of closure 5 that gives back
@@ -238,4 +239,77 @@ export async function grantNoticeFor(
     admitted.push(candidate);
   }
   return admitted;
+}
+
+/**
+ * The ids one reader may now see because THEIR OWN reach grew — case 12.283,
+ * the third shape of grant, and the one `GRANT_BACKFILL_TRIGGERS` structurally
+ * cannot carry.
+ *
+ * ## Why it could not just be another trigger type
+ *
+ * `membership.granted` and `project.member_added` are ROSTER events, filed
+ * against the roster entity, not against a ticket. `grantNoticeFor` above starts
+ * from a ticket and walks its inheriting subtree; there is no ticket here to
+ * start from. The widening is on the READER's side of `canSee`, so the question
+ * inverts with it: not "who can now see this ticket" but "which tickets can this
+ * viewer now see".
+ *
+ * Every ticket such an event reveals carries the identical pre-cursor gap — the
+ * client's cursor has already passed the history of tickets it could not see —
+ * so it is the same defect and it gets the same repair.
+ *
+ * ## Scoped to the event, and over-naming rather than guessing
+ *
+ * `project.member_added` scopes to the project it names; `membership.granted`
+ * cannot scope at all and names the workspace. Both then ask
+ * `listVisibleTickets` — the SAME predicate every read endpoint uses
+ * (`read/visible-where.ts`), not a second definition of visibility, which is the
+ * line 6.82 and 6.94 draw and the reason this function does no filtering of its
+ * own beyond the project scope.
+ *
+ * It answers "what can they see NOW", not "what did they gain", because there is
+ * no before-image to subtract and inventing one here would be exactly the second
+ * definition of visibility that is banned. So it OVER-NAMES, deliberately, and
+ * over-naming is affordable in a way it was not under the push shape: the client
+ * drops every id it already holds without asking the server anything. A member
+ * added to a project they were already effectively reading pulls nothing.
+ *
+ * **The narrowing counterpart already exists and is not touched**:
+ * `membership.revoked` and `project.member_removed` yield itemised purges or a
+ * `scope-revoked` from `visible-events-for.ts`'s roster arm. This is that arm's
+ * missing half, and the asymmetry — narrowings itemised there, widenings named
+ * here — is why the two live in different files rather than one.
+ *
+ * ## The cap matters MORE here than it does above
+ *
+ * A subtree walk is bounded by a subtree. A workspace-wide `membership.granted`
+ * is bounded by the workspace, which is the largest set this module can produce
+ * — and it is also the case where the client is most likely to hold none of it
+ * and pull all of it. `GRANT_BACKFILL_MAX_TICKETS` applies unchanged and is felt
+ * here as a real limit rather than a formality. Truncation stays silent for the
+ * same reason as above, and the residual is the same one: what a truncated
+ * client does not get is history it did not have a moment ago.
+ *
+ * *A first-ever `membership.granted` needs none of this — a device with no
+ * cursor bootstraps the whole workspace through `/v1/sync/bootstrap` and this
+ * notice would be redundant with it. What this closes is the RE-grant and the
+ * role change: a guest promoted to member, a member re-granted after a
+ * revocation, someone added to a project on a device that has been syncing all
+ * along. Stated because "membership.granted" reads like the first-run case and
+ * is not the one that was broken.*
+ */
+export async function readerReachNoticeFor(
+  db: Queryable,
+  userId: string,
+  workspaceId: string,
+  scope: 'workspace' | { projectId: string },
+): Promise<string[]> {
+  const rows = await listVisibleTickets(db, userId, workspaceId);
+  const inScope =
+    scope === 'workspace' ? rows : rows.filter((row) => row['project_id'] === scope.projectId);
+  return inScope
+    .map((row) => row['ticket_id'])
+    .filter((id): id is string => typeof id === 'string')
+    .slice(0, GRANT_BACKFILL_MAX_TICKETS);
 }
