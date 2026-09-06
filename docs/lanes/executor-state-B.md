@@ -12,6 +12,72 @@ only what is written here.
 
 ---
 
+## ✅ POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
+
+**Everything the 12:35 override asked for is done.** The block below this one is that override's position
+and is now HISTORY; this block is the live state.
+
+| anchor | value | how verified |
+|---|---|---|
+| HEAD | **`bdc93d7`**, pushed; tree clean | `git rev-parse HEAD`, `git status --porcelain` empty |
+| rebased onto | **`origin/main` = `d92dd41`** (moved three times during the session: `5fca89e` → `3e6d606` → `81a7e44` → `d92dd41`); 48 commits replayed, ahead 48 | `git rev-list --count origin/main..HEAD` |
+| **full gate** | **`EXIT=0` · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 2m5.386s · node **v22.22.2** · zero `Unsupported engine` · no orphaned workers.** Lock v3.2, acquired 13:08:54, released clean | ONE backgrounded invocation, `$?` on its own line |
+| tests | **3470 passed / 272 files** (+5 skipped). ui 37 · domain 464 · editor 178 · rule-engine 282 · sync-client 87 · app-core 1102 · server 1157 · web 138 · desktop 5 · mobile 20 | **recounted from the log by `awk`**, not summed by hand |
+| `check:env` | **`CHECK_ENV_EXIT=0`**, on its own line, SEPARATE from the turbo graph | in the gate script |
+| `check-case-ids` | **`CHECK_CASE_IDS_EXIT=0`** — bare 865 + bold 492 + marker-first 40 = **sum 1397 == union 1397**, zero duplicates, highest `13.100`, 10 files. **A SEPARATE STEP**: the controller corrected the override at 12:5x — `pnpm check:env` runs `check-env-example.mjs` ALONE, and `check-case-ids.mjs` is its own job in `ci.yml`. "check:env 0" says nothing about case ids | `node scripts/check-case-ids.mjs` |
+| §12 ids | **12.317 and 12.318 used; 12.319 is this lane's last.** The block 12.340–12.359 offered by the override was **NOT claimed** — two ids were enough — so it is still free for whoever asks next | — |
+
+### What the gate caught that nothing else had — the one finding of this round
+
+The FIRST gate at `20c1844` was **RED**: 3 failed in `apps/server/test/dual-client/grant-backfill.test.ts`
+(12.275, 12.276, 12.316). Ruling **P37.2** changed `listPendingPulls` from `string[]` to
+`{ id, headSeq }[]`, and the dual-client rig's **hand-mirrored** copy of `drainPendingPulls` kept iterating
+it as ids. The whole object then travelled as a ticket id into `bootstrapTicket` **and** into
+`clearPendingPull`, whose filter is `t.id !== ticketId` — an object never equals a string, **so nothing was
+ever cleared and the second drain re-pulled every id**. The diff said it: the received array held the same
+id TWICE. Not a wrong id, a duplicate one.
+
+**`typecheck` catches it** — re-introducing the single line alone gives `EXIT=2`, two `TS2345` at
+`rig.ts` 481/482. So it was statically catchable all along and nothing had run it: this file's own previous
+block records that **no green full gate existed after P37.2/P37.3**, and this is what was sitting in that
+gap. In the red gate turbo stopped at `server#test` with 20 of 30 tasks done, so `server#typecheck` never
+reported either — a failing test can hide a type error behind it.
+
+Fixed at **`bdc93d7`**; `grant-backfill.test.ts` 4 passed (4), server typecheck 6/6 exit 0. **The controller
+found the identical defect independently in CI at `20c1844` and messaged it while the fix was already
+committed** — two parties, same root cause, which is the peer-review property this topology exists for.
+*The rig's docblock argues its mirror is FORCED rather than chosen, and that argument is still right. This
+is the cost it carries: a forced mirror drifts, silently, until something runs it.*
+
+### The fixtures, and the derivation that decided their shape
+
+12.317 and 12.318 are P37.3's excluding pair. Reviewed by an opus reviewer that read the RUNS; it confirmed
+discrimination from the failure shapes and independently swept for other `applyServerItem` doors
+(`outbox.ts:334` is the only one and carries a rebuilt envelope, never an instruction). Two Minor findings,
+both false sentences in the file, both fixed at `84514aa`. **Measured, all four matching prediction:**
+never-drop → **12.317 ALONE**; always-drop → **12.318 ALONE**; never-below → **9** (12.310 surviving);
+always-pull → **12.305 + 12.313**.
+
+⚠️ **The race 12.318 models is NOT socket-reachable today** — `applyChain` is strictly serial and every
+`drainPendingPulls` call site is on it, so keyed and unconditional drop are behaviourally identical through
+`onItem` alone and a socket-driven fixture would have passed a guard that does nothing. 12.318 writes
+through `replica.applyServerItem` from inside `pullImpl`, the public-API writer `replica.ts` documents.
+
+### Honest limits — what is NOT verified
+
+- **12.290 stays 🟡.** Nothing here can cut a socket; Lane D takes that fixture after #161 merges.
+- The negative-existence half of the unreachability claim is scoped to `packages/sync-client` as it stands.
+  A shell outside the package holding the `Replica` can reach it — which is exactly what 12.318 models.
+- ⚠️ **`locked-test.sh` and `gate.sh` in the reference copy hard-code `REPO=/…/lane5-plan11`.** Repointed in
+  this lane's scratchpad copies. **The first mutation sweep's `CHECK_ENV_EXIT=0` was therefore a fact about
+  Lane E's tree**; the gate figures above are from the repointed script and are this tree's.
+- **Recorded with an owner, not fixed:** a pull abandoned by `withTimeout` that later rejects with
+  `TicketPullNotFound` is an unhandled rejection nobody catches. Owner Plan 6 / sync-client.
+- §12's header contradicted itself after the rebase — it said both "next free 12.340" and "The next free
+  block is `12.320`" (Lane A's, landed). Reconciled at `20c1844`.
+
+---
+
 ## ⏸ POSITION AT THE 12:35 RELAUNCH — READ THIS FIRST
 
 **PR #161 is OPEN, CONFLICTING, and HELD at `632ad04`.** It is NOT clear to merge. `CONFLICTING` is the
