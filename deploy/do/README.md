@@ -142,3 +142,44 @@ startup options and runs no `SET TIME ZONE`, so the only thing that can make
 it print `Asia/Kolkata` is the database's own default. It can fail, which is
 the entire point of having it — proven above against a throwaway database
 forced to `UTC`.
+
+## The projection verifier's database privileges — RECORDED DECISION (Plan 11 Task 16)
+
+The coordination doc requires this directory to carry **either** a DDL-capable credential for the
+projection verifier **or** an explicit recorded decision that it runs only against restore scratch
+databases. Until now it carried neither, which is why this section exists rather than a credential.
+
+**Decision: `verify:projections` runs ONLY against restore scratch databases, never against production.
+`deploy/do/` therefore carries no DDL-capable credential, and none should be added.**
+
+Reasons, in order of weight:
+
+1. **It needs DDL on whatever database it verifies, and a scratch copy is the only safe place to grant
+   that.** `verifyProjections` creates a `verify_shadow` schema and a `LIKE public.<t> INCLUDING ALL` copy
+   of every *declared* projection table, rebuilding into it under `search_path = verify_shadow, public`.
+   That is `CREATE SCHEMA` + `CREATE TABLE` per run — a standing DDL grant on production for one monthly
+   procedure.
+
+   **An earlier draft of this section had the reason backwards and it is worth stating plainly:** the
+   verifier does NOT rewrite live projections. Its docblock says "Live tables are never written" and three
+   cases assert it by execution (5.55, 6.117, 7.63).
+
+   **The hazard the grant would expose is real, and sharper than the false one.** The shadow trick holds
+   only while every registered projection declares its table: one missing from `tables` gets no shadow
+   copy, so its unqualified `TRUNCATE` resolves through `search_path` to `public` and truncates the LIVE
+   table. On a scratch database that costs a scratch database; on production it costs a projection.
+2. **A DDL credential in the deploy spec is a standing privilege for one monthly procedure.** The restore
+   drill already yields a scratch database with full rights by construction, so the privilege exists
+   exactly when needed and never otherwise.
+3. **The scratch database is the honest place to verify a backup.** Verifying production says production
+   is consistent; verifying the restored copy says the *backup* is restorable and consistent — the
+   question a drill actually asks.
+
+**What it costs, recorded so it can be revisited rather than rediscovered:** production projection drift
+is not detected continuously. It surfaces at the next monthly drill against the most recent dump, so the
+exposure window is up to a month and drift introduced after the last dump is invisible until the
+following one. If that becomes unacceptable, the answer is a read-only continuous checker that compares
+without rebuilding — **not** a DDL credential here.
+
+*(This file is Lane C's, from Plan 11 Task 15; Lane C is finished with it. The obligation this discharges
+travels with the file, which is why the decision is recorded here as well as in `docs/runbook.md`.)*

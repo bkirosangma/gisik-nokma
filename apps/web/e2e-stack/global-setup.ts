@@ -14,10 +14,18 @@ import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
  * WHICH SEED, AND WHY IT IS NOT A PREFERENCE. The visibility spec needs a guest
  * with explicit per-ticket visibility and the Convenience Corner names. Only
  * `seed-convenience-corner` produces those; `seed-dev-workspace` has no guest at
- * all, so that spec is unbuildable on it. Measured on this image: `reference/`
- * IS present at /app, so the CC seed runs in-container exactly as the plan
- * wrote — while `docs/superpowers/plans` is ABSENT, which is why the dev seed
- * cannot be run this way and is not used here.
+ * all, so that spec is unbuildable on it.
+ *
+ * WHY THE IN-CONTAINER EXEC WORKS HERE, stated correctly after review caught the
+ * first version measuring the wrong environment: `reference/` is NOT in the
+ * server image. `docker run --rm --entrypoint sh <image> -c 'ls /app'` shows
+ * `dist`, `migrations`, `node_modules`, `package.json` and config — nothing
+ * else. It is present in THIS container because `docker-compose.dev.yml`
+ * bind-mounts `./reference:/app/reference:ro`, which is a dev-stack affordance
+ * App Platform has no equivalent of. So this exec is correct for the dev stack
+ * and must NOT be read as evidence that the CC seed can run in a production
+ * container — the runbook's "Seeding production" says to run it from a
+ * checkout, and that is not merely a preference.
  */
 
 const COMPOSE_FILE = 'docker-compose.dev.yml';

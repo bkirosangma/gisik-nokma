@@ -176,6 +176,32 @@ jobs:
   # own rule -- the one case this job exists to still cover. Needs full
   # history (the script resolves `origin/main` and walks merge-base
   # ancestry); no pnpm install -- the script imports only node builtins.
+
+  # ITS OWN JOB, INDEPENDENT OF THE DOCS-ONLY SKIP -- the same reason
+  # `check-tasks` is, and for a sharper version of the same hazard.
+  #
+  # This check first landed as a step inside `check-env`, which carries
+  # `if: needs.scope.outputs.code_changed == 'true'`. `docs/runbook.md` is
+  # under `docs/`, so a PR that edits ONLY the runbook is a docs-only diff:
+  # `check-env` skipped, this check never ran, and `gate` counts `skipped` as
+  # success. That is precisely the diff shape that introduces a ghost command --
+  # and the shape both of the defects this check was written for actually had.
+  # A check that is skipped on exactly the change class it guards is not a
+  # check. Found by review, not by CI, because CI could not have found it.
+  check-runbook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: every command the runbook names must resolve
+        run: pnpm check:runbook
+
   check-tasks:
     needs: scope
     runs-on: ubuntu-latest
@@ -454,7 +480,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-tasks, build, typecheck, server-tests, other-tests, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4

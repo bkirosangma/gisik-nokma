@@ -1,6 +1,5 @@
 import { pathToFileURL } from 'node:url';
 import type { Pool, PoolClient } from 'pg';
-import { loadConfig } from '../config.js';
 import { createPool } from '../db.js';
 import { readLedger } from '../ledger/event-store.js';
 import { buildProjectionRegistry } from '../projections/index.js';
@@ -104,9 +103,33 @@ export function formatReport(report: VerifyReport): string {
   return lines.join('\n');
 }
 
+/**
+ * `DATABASE_URL` directly, NOT `loadConfig`.
+ *
+ * This tool used to open with `loadConfig(process.env)`, which validates the
+ * WHOLE server configuration and therefore demanded `BETTER_AUTH_URL`, a
+ * 32-character `BETTER_AUTH_SECRET` and `WEB_ORIGIN` — **none of which this
+ * file reads.** The runbook's restore drill invokes it as
+ * `DATABASE_URL='<scratch url>' … run verify:projections`, and that
+ * invocation could not work: reproduced with only `DATABASE_URL` set,
+ * `ConfigError: invalid server configuration — check: BETTER_AUTH_URL,
+ * BETTER_AUTH_SECRET, WEB_ORIGIN`.
+ *
+ * A drill nobody can run is not a recovery procedure, and demanding three
+ * auth secrets to read a scratch database is worse than useless — it invites
+ * an operator to invent values for a production-shaped variable while holding
+ * a restored copy of production. `cli-seed-convenience-corner.ts`,
+ * `cli-seed-dev-workspace.ts` and `sweep-notifications.ts` all read
+ * `DATABASE_URL` directly for exactly this reason and say so; this now matches
+ * them.
+ */
 async function main(): Promise<void> {
-  const config = loadConfig(process.env);
-  const pool = createPool(config.databaseUrl);
+  const databaseUrl = process.env['DATABASE_URL'];
+  if (!databaseUrl) {
+    console.error('DATABASE_URL is required');
+    process.exit(2);
+  }
+  const pool = createPool(databaseUrl);
   try {
     const report = await verifyProjections({ pool, projections: buildProjectionRegistry() });
     console.log(formatReport(report));

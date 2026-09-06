@@ -1754,18 +1754,13 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 
 ## 13. Deployment & dogfooding
 
-*(Plan 11's own Task 16 normally opens this section, held until Tasks 1–15 merge. It is opened early
-here, by Tasks 1–12, 14 and 15 (landed independently, across multiple lanes) — what follows is ONLY
-those tasks' additions; everything else Plan 11 produces (E2E against the compose stack, and the
-operator runbook itself — several files reference "the runbook" as a document to be written. The
-runbook is **Task 16**, and its gate is NOT cleared: Task 16 is held until Tasks 1–15 have merged, and
-Task 13 — the compose-stack E2E named two clauses above — has not landed. An earlier draft of this
-sentence named Task 11 as "the task that gates it"; Task 11 is Backups, and the error read as
-"unblocked" to anyone skimming) is still `❌`/unwritten here and arrives
-with whichever task lands it — do not infer completion of Plan 11 as a whole from this section's
-presence. (Backups and the restore drill — Tasks 11–12 — have landed; see their bullets below.) Tasks
-1–6's entries below were catalogued retroactively, in one pass at the seam-1 PR rather than in each
-task's own change set — see the note at the top of `test-cases/13-deployment-dogfooding.md`.)*
+*(Plan 11's own Task 16 opens this section by convention, held until Tasks 1–15 merge. In practice it was
+opened early, incrementally, by Tasks 1–15 across five parallel lanes — so what Task 16 did was give it
+its FINAL SHAPE, reconciling what was already here rather than writing it fresh. **All sixteen tasks have
+now landed**, and the runbook named throughout this section exists at `docs/runbook.md`. What remains
+outside it is the live production deploy itself, which is out of scope by the owner's instruction: the
+DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning is verified at deploy time
+(`13.21`), not by CI.)*
 
 - ⚙️ **Graceful shutdown on SIGTERM / SIGINT** — `installShutdownHandlers(app, pool)` is installed by
   the one non-test boot path BEFORE `app.listen`, and runs `app.close()` (bounded 5 s) → `pool.end()`
@@ -2147,3 +2142,29 @@ task's own change set — see the note at the top of `test-cases/13-deployment-d
   Trusting the origin is necessary and **not sufficient** for a genuinely cross-origin deployment — the
   CORS preflight is still unmounted on the auth catch-all, which `sign-in-flows.test.ts` pins as a known
   gap. `apps/server/src/auth/auth.ts`, `apps/server/src/index.ts`, `apps/server/src/auth/auth-dev.ts`
+- ⚙️ **Operator runbook — and the one thing about prose that can be made to fail** — `docs/runbook.md`
+  carries deploy (routine and first-time), the three separate settings that hold Asia/Kolkata up and why
+  they are not redundant, secret rotation, backups, the orphaned-upload sweep, the monthly restore drill,
+  production seeding, and incident basics. **Every command it names is checked by
+  `scripts/check-runbook-commands.mjs`**, wired as its own CI step: each `pnpm --filter <pkg> run
+  <script>`, each root `pnpm <script>` and each repo-relative script path must resolve, and the checker
+  self-tests against four planted defects before it will report a clean sweep. That is claimed as nothing
+  more than it is — it proves no named command is a ghost, not that any procedure is correct. It exists
+  because the first draft contained two ghosts: `ops:sweep-orphans`, which has never existed (the script
+  is `sweep:orphans`), and a restore-drill step that could not run at all. `docs/runbook.md`,
+  `scripts/check-runbook-commands.mjs`
+- ⚙️ **`verify:projections` runs from `DATABASE_URL` alone** — it previously opened with
+  `loadConfig(process.env)`, demanding `BETTER_AUTH_URL`, a 32-character `BETTER_AUTH_SECRET` and
+  `WEB_ORIGIN`, none of which it reads, so the runbook's own restore drill answered `ConfigError`. A drill
+  nobody can run is not a recovery procedure. It now matches the seed CLIs and `sweep-notifications`,
+  which read `DATABASE_URL` directly for the same reason. **The privilege question the deploy spec owed is
+  discharged as a recorded decision** in `docs/runbook.md` and `deploy/do/README.md`: the verifier runs
+  only against restore scratch databases, never production, and no DDL-capable credential is added. It
+  needs `CREATE SCHEMA` + `CREATE TABLE` on whatever database it verifies (it rebuilds into a
+  `verify_shadow` schema), and that shadow trick is safe only while every registered projection declares
+  its table — one missing from `tables` gets no shadow copy and its unqualified `TRUNCATE` resolves to
+  `public`, truncating the LIVE table. It does **not** rewrite live projections; an earlier draft said it
+  did, and the verifier's own docblock ("Live tables are never written") plus cases 5.55/6.117/7.63
+  contradict that.
+  The cost is recorded with the decision: production drift surfaces at the next monthly drill, so the
+  exposure window is up to a month. `apps/server/src/tools/verify-projections.ts`, `deploy/do/README.md`
