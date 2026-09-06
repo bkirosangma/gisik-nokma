@@ -151,40 +151,70 @@ export class ServingGapError extends MappingError {
 export type ListPage = { projectId: string; rows: ListRow[]; nextCursor: string | null };
 
 /**
- * The bound on the paging loop, and it is a DISCLOSED ASSUMPTION rather than a
- * measurement (ruling P41).
+ * The page size this client ASKS FOR, and the reason it asks at all.
  *
- * 40 pages at the list route's `DEFAULT_LIMIT` of 50 is 2000 tickets. Nobody
- * has measured a real project's ticket count on this product — there is no
- * production instance — so this number is a guess with a stated basis and not
- * a finding. It exists because an unbounded loop against a hostile or
- * pathological project is an unbounded number of round trips, and it is a
- * REFUSAL rather than a truncation because a silently truncated set is exactly
- * the defect this whole change closes, one bound further out.
+ * The route's own default is 50 and its validated maximum is 200
+ * (`routes/list.ts`, `MAX_LIMIT`; a larger value is a 400, so this is the
+ * biggest legal page). Sending it explicitly does two things. It **cuts the
+ * round trips for a large project four-fold** — 2000 rows is 10 requests here
+ * rather than 40 at the server's default, and each one runs a recursive
+ * ancestor CTE. And it makes the row bound below **true by construction**
+ * instead of true by coupling: the first draft of this constant computed
+ * "2000 rows" from the server's `DEFAULT_LIMIT`, which is a NON-EXPORTED const
+ * in another package that this client never sent and could not observe. Had it
+ * dropped to 25, the shipped client would have refused at 1000 rows while
+ * telling the user, in a message it renders, that it refused at 2000.
+ */
+export const LIST_PAGE_SIZE = 200;
+
+/**
+ * The row bound, and it is a DISCLOSED ASSUMPTION rather than a measurement
+ * (ruling P41).
+ *
+ * Nobody has measured a real project's ticket count on this product — there is
+ * no production instance — so 2000 is a guess with a stated basis and not a
+ * finding. It exists because an unbounded loop against a pathological project
+ * is an unbounded number of round trips, and it is a REFUSAL rather than a
+ * truncation because a silently truncated set is exactly the defect this whole
+ * change closes, one bound further out.
  *
  * Owner: whoever first has a real project-size distribution. Raising it is a
- * one-line change and needs no new argument; the loud refusal below is what
- * makes the limit safe to be wrong about.
- *
- * ## This absence is NOT added to `SERVING_GAPS`, and that is a decision
- *
- * P41 said "a loud refusal in the `ServingGapError` register". It is one — it
- * throws `ServingGapError` carrying a named `Absence`, which is what a shell
- * renders. It is deliberately NOT a `SERVING_GAPS['getTickets']` key, because
- * that map means *this method refuses ALWAYS*, and `getTickets` answers for
- * every project small enough to finish. Adding the key would also detonate
- * `stub-services.ts`'s `refuse(method)` register lookup — the mechanism that
- * took 86 web tests down in one line last change set — and would contradict
- * the standing fact that `SERVING_GAPS` carries `search` alone. Written down
- * because "in the register" admits the other reading and a reviewer should see
- * the choice rather than infer it.
+ * one-line change and needs no new argument; the loud refusal is what makes the
+ * limit safe to be wrong about.
  */
-export const LIST_PAGE_CAP = 40;
+export const LIST_ROW_CAP = 2000;
+
+/**
+ * Derived, never typed twice. The row cap is the number a human reasons about
+ * and the page cap is the number the loop counts, and writing both by hand is
+ * how they drift apart.
+ */
+export const LIST_PAGE_CAP = LIST_ROW_CAP / LIST_PAGE_SIZE;
 
 /**
  * The refusal beyond the cap. In the register with every other absence, so a
  * shell renders it the same way, and SELF-EXPIRING: the moment the loop can
  * finish, it never constructs this.
+ */
+/**
+ * ## This absence is NOT added to `SERVING_GAPS`, and that is a decision
+ *
+ * P41 said "a loud refusal in the `ServingGapError` register". It is one — it
+ * throws `ServingGapError` carrying a named `Absence`, which is what a shell
+ * renders. It is deliberately NOT a `SERVING_GAPS['getTickets']` key, because
+ * **that map means *this method refuses ALWAYS***, and `getTickets` answers for
+ * every project small enough to finish. It would also contradict the standing
+ * fact that the register carries `search` alone. Ratified by the controller
+ * 2026-09-06.
+ *
+ * *(An earlier draft of this note also claimed a key would "detonate
+ * `stub-services.ts`'s `refuse(method)` lookup". **That was false and is
+ * corrected rather than deleted, per ruling P40**: `refuse()` throws only when
+ * a named gap DISAPPEARS from the register, and `getTickets` is `unstubbed`
+ * there — `refuse('getTickets')` is called nowhere. What a key would actually
+ * break is `mappers.test.ts`'s register assertions and two web tests. The
+ * decision was right; the mechanism named for it was not, and a maintainer
+ * sent to `stub-services.ts` would have found nothing.)*
  */
 export const LIST_TOO_LARGE_ABSENCE: Absence = {
   field: 'TicketListView.rows',
@@ -194,8 +224,8 @@ export const LIST_TOO_LARGE_ABSENCE: Absence = {
   // and no wire key exists for "the project is too big for the view type".
   wireKey: null,
   wireRoute: null,
-  because: `the project has more than ${LIST_PAGE_CAP} pages of tickets and TicketListView is the COMPLETE row set — serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
-  owner: `raise LIST_PAGE_CAP once a real project-size distribution is known, or give the list surface a paged view type — the cap is a disclosed assumption (${LIST_PAGE_CAP} pages x DEFAULT_LIMIT 50 = ${LIST_PAGE_CAP * 50} rows), never a measurement`,
+  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set — serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
+  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type — the bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
 };
 
 /** A request the shipped route's query language cannot express. */

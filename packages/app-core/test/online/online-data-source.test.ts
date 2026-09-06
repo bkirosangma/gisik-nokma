@@ -7,6 +7,7 @@ import {
 } from '../../src/online/online-data-source.js';
 import {
   LIST_PAGE_CAP,
+  LIST_PAGE_SIZE,
   LIST_TOO_LARGE_ABSENCE,
   ServingGapError,
   UnexpressibleFilterError,
@@ -687,6 +688,41 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // The filter and grouping survive paging — a second page requested without
     // them would silently be a different query against the same accumulator.
     expect(urls[1]).toContain('groupBy=flat');
+    // The page size is SENT, not inherited from the server's default — the
+    // constant the row bound is computed from, so if this stops being sent the
+    // "2000 rows" the user is told becomes a different number silently.
+    expect(urls[0]).toContain(`limit=${LIST_PAGE_SIZE}`);
+    expect(urls[1]).toContain(`limit=${LIST_PAGE_SIZE}`);
+  });
+
+  /**
+   * 12.320 — THE EXACT-CAP BOUNDARY, which the three cases above do not reach
+   * and a mutant survives.
+   *
+   * Measured: moving the refusal to `page >= LIST_PAGE_CAP - 1`, thrown after
+   * the fetch and before the `nextCursor` check, leaves 12.257 (two pages),
+   * 12.259 (one page) and even 12.258 (which asserts `urls.length` AND the
+   * absences) all green — while a legitimate project of exactly `LIST_ROW_CAP`
+   * tickets refuses. Nothing exercised `pages.length === LIST_PAGE_CAP`, so the
+   * boundary between "the largest project that works" and "the smallest that
+   * refuses" was asserted on one side only.
+   *
+   * A cap is a claim about BOTH sides of a line. This is the other side.
+   */
+  it('12.320 a project of exactly the cap ASSEMBLES — the boundary is inclusive, and refusal starts one page later', async () => {
+    const pages = Array.from({ length: LIST_PAGE_CAP }, (_unused, index) => ({
+      ticketIds: [`t${index}`],
+    }));
+    const { fetchImpl, urls } = pagingFetch(pages);
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+    expect(view.rows).toHaveLength(LIST_PAGE_CAP);
+    expect(urls).toHaveLength(LIST_PAGE_CAP);
+    // Complete and in order, so "did not throw" is not the whole assertion.
+    expect(view.rows.map((row) => row.ticketId)).toEqual(
+      pages.map((page) => page.ticketIds[0]),
+    );
   });
 
   it('12.258 refuses LOUDLY past the cap rather than serving a truncated project', async () => {

@@ -9,6 +9,7 @@ import {
   mapHistory,
   mapIngestResults,
   LIST_PAGE_CAP,
+  LIST_PAGE_SIZE,
   LIST_TOO_LARGE_ABSENCE,
   ServingGapError,
   mapListPage,
@@ -187,6 +188,22 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
      * notice for being bigger. The cap is a disclosed assumption, not a
      * measurement, and its own docblock says so.
      *
+     * ## THE ASSEMBLED VIEW IS NOT A SNAPSHOT, and that is disclosed here
+     *
+     * Ten requests are ten transactions. A ticket that becomes visible to this
+     * caller MID-WALK — a `proj_visibility` widening, or being added to the
+     * project — with an id BELOW the cursor already passed is silently absent
+     * from a view whose whole contract is "the complete row set", and that
+     * contract is what licenses `list-model.ts` to group it. The window is
+     * small and it self-heals on the next stream-triggered reload, and there is
+     * no server-side snapshot cursor to close it with today.
+     *
+     * Written down rather than left for a reader to deduce, because the cap
+     * above got a full disclosed-assumption docblock and this is the same class
+     * of thing: an assumption the code depends on and cannot enforce. *Owner:
+     * whoever gives the list route a consistent-read cursor, if the product
+     * ever needs one.*
+     *
      * ## The cursor is sent as a VALUE, and the server already takes one
      *
      * `routes/list.ts` binds `cursor` as a parameter (its docblock: "both
@@ -199,12 +216,24 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const rows: ListRow[] = [];
       let cursor: string | null = null;
       for (let page = 0; page < LIST_PAGE_CAP; page += 1) {
-        const query = listQueryString(filter, grouping);
+        // `limit` is SENT rather than inherited — see `LIST_PAGE_SIZE`. It is
+        // the route's validated maximum, so the walk is four times shorter than
+        // it would be at the server's default and the row bound is this
+        // client's own arithmetic rather than another package's constant.
+        const query = `${listQueryString(filter, grouping)}&limit=${LIST_PAGE_SIZE}`;
         const url =
           cursor === null
             ? `/v1/projects/${projectId}/tickets?${query}`
             : `/v1/projects/${projectId}/tickets?${query}&cursor=${encodeURIComponent(cursor)}`;
-        const answered: ListPage = mapListPage(await http.get(url));
+        const raw = await http.get(url);
+        // A 404 becomes `null` here (`http.ts`, the read affordance), and a
+        // `null` handed to the mapper would surface as "expected an object" — a
+        // MAPPING failure for what was an HTTP one. The window matters more now
+        // than it did: access revoked between page 3 and page 4 was impossible
+        // when there was only ever a page 1. Raised as the STATUS it was,
+        // exactly as `getBoard` does one method up.
+        if (raw === null) throw new HttpError(404, url);
+        const answered: ListPage = mapListPage(raw);
         rows.push(...answered.rows);
         if (answered.nextCursor === null) {
           return { projectId: answered.projectId, rows };
@@ -222,7 +251,9 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
      * this signature already names the workspace, so the display names are one
      * shipped route away. `getTickets` above gets an EMPTY roster instead —
      * neither its signature nor the list body names a workspace — and
-     * `mapListView`'s docblock argues why that degrades rather than lies.
+     * `mapListPage`'s docblock argues why that degrades rather than lies.
+     * (It was `mapListView` until ruling P41. This cross-reference is LIVE, so
+     * it is repointed rather than left naming a symbol that no longer exists.)
      *
      * The roster is fetched only after a non-null body: a 404 here means "no
      * such ticket, or not yours", and fetching a roster for it would be a round

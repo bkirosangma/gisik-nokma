@@ -270,15 +270,47 @@ claims is already occupied. Measured against `origin/main`: ids in 12.290–12.3
 12.291 only**, both inside LANE B's range where they belong. **12.320–12.339 is genuinely free**, so
 the header is accurate rather than merely transcribed. Nothing was minted from it.
 
+## THE OPUS REVIEW LANDED — no Critical, 3 Important, 5 Minor. FIX ROUND APPLIED.
+
+**It was a real review, not a dead agent** (163k tokens, 53 tool uses, 13 min): it EXECUTED a
+transcription of the loop to prove the cap arithmetic, and ran mutants of its own. It cleared three
+things I had claimed — cap has no off-by-one, no infinite-loop hazard, `TicketListView` genuinely
+unchanged with the tripwire intact (`git diff` on those two files is EMPTY) — and it independently
+confirmed the keyset fixture now mirrors the route.
+
+### Fixed in this round
+
+| # | finding | what I did |
+|---|---|---|
+| **Imp 2** | cap expressed in PAGES but justified in ROWS, coupled to the server's non-exported `DEFAULT_LIMIT` the client never sent | **The client now SENDS `limit=200`** (the route's validated `MAX_LIMIT`). `LIST_ROW_CAP = 2000`, `LIST_PAGE_SIZE = 200`, **`LIST_PAGE_CAP` DERIVED** so the two cannot drift. The row number is now true by construction. |
+| **Imp 1** (partial) | refetch amplification — 1 request became N under a hook that reloads on every stream event with no cancellation | Mitigated 4× by the same change: 2000 rows is **10 round trips, not 40**. Cancellation NOT done — carried as **12.321** with a named owner. |
+| **Min 4** | a surviving mutant: the exact-cap boundary was untested | **12.320** added. Verified it kills that mutant ALONE (1 failed, 23 passed; 12.257/12.258/12.259 all still green). |
+| **Min 5** | **a FALSE claim in my own docblock** | Corrected in place per P40. I wrote that a `SERVING_GAPS` key "would detonate `stub-services.ts`'s `refuse(method)` lookup". **It would not** — `refuse()` throws only when a gap DISAPPEARS, and `getTickets` is `unstubbed` there; `refuse('getTickets')` is called nowhere (measured: 0 hits). The DECISION was right, the mechanism named for it was invented. |
+| **Min 6** | the assembled view is not a snapshot and nothing said so | Disclosed at the loop with an owner. Ten requests are ten transactions. |
+| **Min 7** | a LIVE cross-reference to the removed `mapListView` | Repointed to `mapListPage`. |
+| **Min 8** | a mid-loop 404 surfaced as a mapping error | Now `HttpError(404)`, the conversion `getBoard` already makes. Window was 40× wider than before. |
+
+### Carried with named owners, NOT fixed — both are product calls beyond a correctness closure
+
+- **12.321** refetch cancellation. Owner: whoever measures walk duration against stream event rate.
+  The reviewer flagged its own "pile up" wording as its least-sure claim; I did not adopt it as fact.
+- **12.322** the cap is a CLIFF — the filter is hardcoded `{}` so a user cannot narrow under it, and
+  three of four project tabs go to `ShellRefusal`. Throwing is still right; the missing thing is a
+  graceful path. Owner: the list surface's product design.
+
+**§12 now used through 12.322** of Lane A's 12.320–12.339.
+
 ## STILL OUTSTANDING — the only things left
 
-1. **The opus reviewer's findings** — dispatched, still running when this was written. Fix on
-   Important-or-worse; scoped re-review only if the fix over-reaches. Relay the verdict to the
-   controller either way, because #176 is HELD on it.
-2. **CI on #176** — eleven jobs. At the time of writing: `check-tasks`, `e2e`, `scope`, `check-env`
-   pass; `build` pending. **Report job steps, never the fan-in alone.**
-3. **After #176 merges: report and STOP.** The override says so and the controller confirmed it
-   re-tasks at the reset.
+1. **The post-fix gate** — running. The previous green (30/30, 0 cached, 3,387 tests) predates the
+   whole fix round and does NOT cover it.
+2. **CI re-run on #176** — it went **12/12 green** (not eleven: there is a `gate` job too) on the
+   pre-fix head. It restarts on the fix commit.
+3. **Relay the verdict to the controller, then report and STOP.**
+
+**No scoped re-review was run.** The fixes are confined to the files the review named, and the one
+behavioural change (`limit=200`) is covered by new assertions in 12.257 and by 12.320. Recorded so
+the absence is a decision rather than an omission.
 
 ## §12 IS EXHAUSTED
 
