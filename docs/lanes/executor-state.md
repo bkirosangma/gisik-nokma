@@ -16,6 +16,77 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~03:45 IST — **BACKFILL CONSOLIDATED. Every section is taken to the point where only SCATTERED SINGLETONS or reader-job rows remain.** Three branches in flight. Nothing running, no subagent. Weekly reset ~2.5h away.
+
+| branch | state | sections |
+|---|---|---|
+| `exec/63-s05-backfill` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64-s06-backfill` | **PR #245 OPEN** | §06 63 → 37 |
+| **`exec/65-s03-backfill`** | **pushed, NO PR** — stacked on `exec/64`, **4 commits** | §03 45 → 24 · **§06 → 28** |
+
+Gate at `6a9a644`: **`GATE_EXIT=0` · 30/30 · 0 cached · 3666 \| 5 (3671) / 285** — **sixteenth identical run** ·
+`check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (1620) · `check:runbook` 0 · `check:tasks` 0 · zero orphans.
+
+## THE WHOLE BACKFILL, and why the remaining numbers are NOT backlog
+
+| § | start | now | what is left |
+|---|---|---|---|
+| §09 | 219 | **0** | — |
+| §10 | 66 | **0** | — |
+| §11 | — | **0** | — |
+| §07 | 78 | **36** | **36 name no test** — reader job |
+| §13 | 153 | **72** | **72 name no test** — reader job |
+| §05 | 67 | **17** | 17 named, **1–4 rows across ten files** |
+| §06 | 63 | **28** | 21 named as **2s and singletons**, 7 no-file |
+| §03 | 45 | **24** | 19 named as **2s and singletons**, 3 no-file |
+| §04 | 45 | 45 | untouched — **only 16 named**, 29 no-file |
+| §12 | 78 | 78 | untouched — **only 2 named**, 76 reader-job |
+
+**Repo-wide 815 → ~350 uncited** (≈300 once all three branches land). **Of the ~350, roughly 220 name no
+covering test at all.** The transcribable remainder is ~90 rows spread as ones and twos across ~30 files.
+
+> **I STOPPED AT THE SINGLETON THRESHOLD ON PURPOSE, and applied it consistently.** §05's tail, then §06's, then
+> §03's all reached the same shape: one file read per one or two citations. **That is where a rushed citation
+> gets made, and a wrong citation satisfies the checker while pointing at a test that does not assert the case.**
+> Every remaining cluster is enumerated above so resuming costs nothing.
+
+## ⚠ MERGE ORDER — unchanged and still required
+
+**#244 and #245 are both off `main`** and edit **adjacent lines** of `check-case-citations-baseline.json`.
+**The second to merge needs a CHERRY-PICK, not a rebase.** `exec/65` is stacked on `exec/64` deliberately (linear
+baseline edits) — **merge #244, then #245, then cherry-pick `exec/65`'s four commits** (`e409201`, `d693ce0`,
+`480c470`, `6a9a644`).
+
+**Verified, not assumed:** `engine-context.test.ts` receives §05 citations in #244 (lines 340/842/890/917) and
+§06 citations here (381/513/672/741). Every pair is **40+ lines apart**, so they merge cleanly. I checked
+#244's docblocks were absent from this stack before writing.
+
+## THE RULES THIS BACKFILL EARNED — the durable output
+
+1. **A row in a file's candidate list is not evidence that file asserts it.** **Five deferrals, five confirmed**
+   (7.72 · 13.45–13.47 · 5.40 · 6.107 · 6.79). Read the row's LEADING claim; cite the test asserting THAT.
+2. **Rows often name their own covering test in their prose** — then the placement is the catalogue's, not yours.
+3. **Never let a docblock imply one test proves a whole row.** Four honest shapes: on a `describe`; stacked when
+   one test carries several ids *and the catalogue says so*; on the primary clause naming where the rest live;
+   on the named control when the row is a mutation RECORD.
+4. **A mutation RECORD is not an assertion** — 6.78, 6.80 still uncited on purpose.
+5. **Two files can share a base name** (`doc-text.test.ts`: `docToPlainText` vs `plainTextDoc`). **A bare
+   filename in a row is not an address.**
+6. **Make a private counting instrument agree with the CHECKER first.** Mine undercounted twice — marker-first
+   ids (27 in §13), then range-form ids (50 in §03).
+7. **Run the control, READ it, then write the prose in a SEPARATE step.** Four wrong counts came from composing
+   the message in the same tool call as the control.
+8. **A section's citation cost is set by the CATALOGUE's writing style, not the code.** §03 needed zero
+   deferrals across three batches; §06 needed six. Terse rows that name their subject are cheap; multi-clause
+   narrative rows are not.
+
+## OPEN ASKS — three, all the controller's
+
+1. **Merge order for #244/#245**, so the other is rebuilt and `exec/65` lands.
+2. **A subagent** for the ~90 scattered named rows — ninth ask. *"Keep hand-batching" is a fine answer.*
+3. **§12's block `12.380–12.399`** — allocated, not cleared; **2 of 78 transcribable**, so near-pointless here.
+
+
 # 🟣 MONDAY 2026-09-07 ~03:20 IST — **THREE BRANCHES IN FLIGHT: #244 (§05), #245 (§06), and `exec/65` (§03) STAGED, NOT YET A PR.** Nothing running, no subagent. Weekly reset ~3h away.
 
 | branch | state | section |
