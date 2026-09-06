@@ -177,12 +177,17 @@ export type SyncEngine = {
    * stale" from "nothing was asked". Those are different facts and a bare void
    * return would hide the second inside the first.
    *
-   * Deliberately NOT wired into `start()` or the reconnect path. When a device
-   * should reconcile — every reconnect, on a timer, on the user pulling to
-   * refresh — is a product decision with a cost attached (one request per 100
-   * tickets held), and no plan states it. **Owner: unassigned; case 12.288.**
-   * The primitive is here and correct; nothing calls it on a schedule yet, and
-   * a reader should not infer a schedule from its existence.
+   * **WIRED, since closure 5b — this docblock said the opposite for one commit
+   * and the branch review caught it.** Two callers run it automatically:
+   * `onCaughtUp` (case 12.288), bounded by `RECONCILE_MIN_INTERVAL_MS`; and the
+   * `reach-granted` handler, over the ids a notice NAMED (closure 5c's minimal
+   * form). It remains public for a shell's pull-to-refresh, and the
+   * single-flight latch is what makes that overlap safe.
+   *
+   * **The automatic one is once per RECONNECT, not once per catch-up**, because
+   * `hub.ts` sends `caught-up` once per subscription (`caughtUpSent`). That is
+   * why the notice handler reconciles the named ids itself rather than trusting
+   * the schedule — on a stable socket the schedule never fires again.
    */
   reconcile(workspaceId: string): Promise<{ presented: number; purged: string[] }>;
 };
@@ -299,7 +304,12 @@ const PULL_TIMEOUT_MS = 15_000;
  * The least time between two automatic reconciles of one workspace.
  *
  * Case 12.288 asked for a schedule and named the cost: one request per 100
- * tickets held. The schedule chosen is *on every catch-up completion* — the
+ * tickets held. The schedule chosen is *on catch-up completion* — which is once
+ * per SUBSCRIPTION, not once per catch-up, because `hub.ts` gates the frame on
+ * `caughtUpSent`. **So this is a per-RECONNECT schedule**, and saying "every
+ * catch-up" overstated it for one commit until the branch review measured the
+ * latch. It is why the `reach-granted` handler reconciles its named ids itself
+ * rather than trusting this to fire. The
  * moment a device's cursor is current is exactly the moment its HOLDINGS may be
  * stale, because a narrowing sends the losing device nothing at all
  * (`reconcile-route.ts` on case 6.104). That is also why the tempting cheaper
@@ -488,15 +498,138 @@ export function createSyncEngine(deps: {
     }
   }
 
+  /**
+   * Ask the server about exactly the ids a notice named, purge the ones it says
+   * are restricted, and hand back what went.
+   *
+   * The same door and the same rule as `engine.reconcile`, over a caller-chosen
+   * id list instead of the whole holding set. The client's own half of "the
+   * answer contains only ids I presented" is kept — `chunk.includes` — because
+   * a purge is destructive and local and this device does not need to trust the
+   * server to be safe from it.
+   */
+  async function reconcileNamed(ws: string, ids: readonly string[]): Promise<string[]> {
+    const held = new Set((await replica.listTickets(ws)).map((t) => t.ticketId));
+    // Only ids we actually hold can be stale, and only they can be purged.
+    // Presenting one we do not hold would ask the server a question whose
+    // answer we could not act on.
+    const present = ids.filter((id) => held.has(id));
+    const purged: string[] = [];
+    for (let i = 0; i < present.length; i += RECONCILE_CHUNK_SIZE) {
+      const chunk = present.slice(i, i + RECONCILE_CHUNK_SIZE);
+      const answer = await transport.reconcile(ws, chunk);
+      for (const restricted of answer.restricted) {
+        if (!chunk.includes(restricted.id)) continue;
+        await replica.purgeEntity(restricted.id);
+        purged.push(restricted.id);
+      }
+    }
+    return purged;
+  }
+
+  /**
+   * `true` when a fold failure was answered by owing a pull instead of stalling.
+   *
+   * Deliberately narrow. It answers `false` — so the caller rethrows and the
+   * engine stalls — for an instruction, for a non-ticket entity, and for a
+   * ticket this device HOLDS. Only the one case it can actually repair is
+   * swallowed.
+   *
+   * `getTicket` answers `null` for a ticket held solely as unfolded events with
+   * no `tickets` row, so such a ticket is treated as not held and is pulled.
+   * That is over-delivery, and over-delivery is the safe side here:
+   * `loadTicketBootstrap` is idempotent by event id.
+   */
+  async function recoverByPull(item: SyncItem): Promise<boolean> {
+    if (isSyncInstruction(item)) return false;
+    if (item.entity.kind !== 'ticket') return false;
+    if ((await replica.getTicket(item.entity.id)) !== null) return false;
+    await replica.addPendingPulls(item.workspaceId, [item.entity.id]);
+    // Drain immediately rather than waiting for the next catch-up: `onCaughtUp`
+    // fires once per SUBSCRIPTION (`hub.ts`'s `caughtUpSent`), so "the next
+    // catch-up" can be the next reconnect, which may be hours away.
+    await drainPendingPulls(item.workspaceId);
+    return true;
+  }
+
+  /**
+   * Apply a frame, and — for a ticket-entity event this device does NOT hold —
+   * fetch the ticket instead of stalling on it.
+   *
+   * ## This is "bootstrap-before-apply on any event for an entity not held",
+   * ## and until the branch review it was a CLAIM rather than a rule
+   *
+   * `grant-backfill.ts` said the refold hazard closes by that rule. It did not.
+   * `applyServerItem` refolds on ANY folding ticket event with no holdings
+   * check; `refoldTicket` starts from `state === undefined` when there is no
+   * snapshot; and `applyTicketEvent` throws *"… that was never created"*. The
+   * only bootstrap-before-apply that existed was for ids a notice had named AND
+   * whose pull had already succeeded — which is the narrow case, not the rule.
+   *
+   * **Two sequences reached the terminal stall through the gap, and the second
+   * had no recovery at all:**
+   *
+   * 1. A pull fails transiently, its id stays owed, and the TRIGGER for that
+   *    same ticket arrives one link later. `ticket.reparented` is folded, so the
+   *    refold throws and `stall()` latches — the exact outcome the swallow at
+   *    `drainPendingPulls` was written to prevent, produced one link past where
+   *    that docblock was looking. The claim was true of the pull's own rejection
+   *    and false of the chain behind it.
+   * 2. `GRANT_BACKFILL_MAX_TICKETS` truncates a notice, so ticket 201 is never
+   *    named; a later ORDINARY event on it — not a trigger, so no notice —
+   *    throws the same way. `needsBootstrap` refuses to re-bootstrap over a
+   *    local baseline and the next widening slices identically, so a restart
+   *    does not clear it.
+   *
+   * ## What this does instead, and what it deliberately still refuses to swallow
+   *
+   * A fold failure for a ticket the replica DOES hold is a real fold bug and
+   * still stalls, loudly, because a device that mis-folds state it holds must
+   * not quietly diverge. A fold failure for a ticket it does NOT hold is not a
+   * bug at all — it is the ordinary consequence of the ticket's history sitting
+   * below this device's cursor — so the id is recorded as owed and the drain
+   * fetches it. The ticket's own bootstrap payload carries the event that just
+   * failed, so dropping the streamed copy loses nothing.
+   *
+   * That asymmetry is the whole design: **held-and-unfoldable is loud;
+   * not-held-and-unfoldable is a pull.**
+   */
   async function applyOne(item: SyncItem): Promise<void> {
     if (stopped || stalled || streamEnded) return;
-    await replica.applyServerItem(item);
+    try {
+      await replica.applyServerItem(item);
+    } catch (err) {
+      if (!(await recoverByPull(item))) throw err;
+      return;
+    }
     // A notice records what this device is owed; fetching it is this engine's
     // job, and it happens HERE — inside the chain, ahead of the cursor write
     // queued behind it — so the trigger event that follows folds against a
     // ticket that is already held. That ordering is the whole reason the
     // notice is yielded before its trigger on the server side.
     if (isSyncInstruction(item) && item.kind === 'reach-granted') {
+      // CLOSURE 5c, minimal form (controller ruling 2026-09-06). Reconcile the
+      // ids the notice NAMED before pulling, and re-owe anything that purged.
+      //
+      // Without this, the grant half does not close case 12.274 at all on a
+      // live socket. The holdings filter cannot tell a complete local copy from
+      // a STALE PARTIAL one — a narrowing purges nothing (6.101 struck the
+      // walk; 6.104 is the disclosed residual) — so a re-widening's notice
+      // names a ticket the device "holds", nothing is fetched, and the
+      // divergence survives. The scheduled reconcile does not save it either:
+      // `hub.ts` sends `caught-up` ONCE PER SUBSCRIPTION (`caughtUpSent`), so
+      // the automatic reconcile is once per RECONNECT, and a narrow-and-
+      // re-widen with no reconnect between them never reconciles at all.
+      // *An earlier version of this branch said that residual was "bounded in
+      // time" by `RECONCILE_MIN_INTERVAL_MS`. It was not: on a stable socket it
+      // was the full defect.*
+      //
+      // Reconciling only the NAMED ids — not the whole holding set — is what
+      // keeps this cheap: it is one request per 100 ids a notice already
+      // carries, on an event that is already rare, and it makes the interval
+      // and the reconnect latch irrelevant for exactly the tickets in question.
+      const purged = await reconcileNamed(item.workspaceId, item.ticketIds);
+      if (purged.length > 0) await replica.addPendingPulls(item.workspaceId, purged);
       await drainPendingPulls(item.workspaceId);
     }
     // A workspace-wide revocation is TERMINAL for the subscription

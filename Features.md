@@ -1509,12 +1509,16 @@ survived a whole task.)*
   never consulted — a fabricated id comes back exactly as a genuine loss does, so the reply's SHAPE
   carries no oracle either. The engine deletes only what it itself presented, because a purge is
   destructive and local and this device does not need to trust the server to be safe from it.
-  **The schedule is every catch-up completion** *(closure 5b, case 12.288)* — the moment a device's
-  cursor is current is the moment its holdings may be stale, because a narrowing sends the losing device
-  nothing at all. Gating instead on "the catch-up delivered something" would skip the zero-frame
-  catch-up, which is precisely the case reconcile exists for, so the bound is a minimum interval rather
-  than activity: reconnects are on a fixed delay with no growth, and a flapping socket would otherwise
-  reconcile every two seconds for ever. A failure there is swallowed — reconcile is idempotent and the
+  **The schedule is catch-up completion — which is once per RECONNECT, not once per catch-up**
+  *(closure 5b, case 12.288)*, because the hub sends that frame once per subscription. The moment a
+  device's cursor is current is the moment its holdings may be stale, because a narrowing sends the
+  losing device nothing at all. Gating instead on "the catch-up delivered something" would skip the
+  zero-frame catch-up, which is precisely the case reconcile exists for, so the bound is a minimum
+  interval rather than activity: reconnects are on a fixed delay with no growth, and a flapping socket
+  would otherwise reconcile every two seconds for ever. **Because that schedule is per-reconnect, a
+  grant notice ALSO reconciles the ids it names, before deciding what to pull** *(closure 5c's minimal
+  form)* — otherwise a device on a stable socket that was narrowed and re-widened would keep a stale
+  partial copy indefinitely, the holdings filter being unable to tell it from a complete one. A failure there is swallowed — reconcile is idempotent and the
   next catch-up retries — and concurrent callers share one in-flight run. **A guest gets the same
   answers as a member**, which closes case 6.102: the door asks only `canSee`, and `canSee` resolves a
   guest through the explicit share list exactly as it resolves a member through a project, so nothing

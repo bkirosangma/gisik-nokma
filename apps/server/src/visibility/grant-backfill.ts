@@ -79,13 +79,20 @@ import { listVisibleTickets } from './visible-tickets.js';
  * not an independent feature that happens to ship alongside this one; it is a
  * precondition of this one converging.
  *
- * **The residual that leaves, stated rather than implied.** `reconcile` is
- * bounded by `RECONCILE_MIN_INTERVAL_MS`, so a narrow-and-re-widen inside that
- * window of the last automatic reconcile leaves the device holding the stale
- * partial copy with no repair: the notice is spent, and the next reconcile will
- * not purge a ticket the device may now legitimately see. It is 12.274's defect
- * at reduced width — bounded in time where it used to be permanent and
- * unconditional — and it is not closed here. *Owner: unassigned.*
+ * **CLOSED, by closure 5c's minimal form, and the first account of this was
+ * WRONG in a way worth keeping.** It said the residual was "bounded in time" by
+ * `RECONCILE_MIN_INTERVAL_MS`. It was not: `hub.ts` sends `caught-up` once per
+ * SUBSCRIPTION (`caughtUpSent`), so the automatic reconcile is once per
+ * RECONNECT — and a narrow-and-re-widen with no reconnect between them never
+ * reconciles at all. On a stable socket the "bounded" residual was the FULL
+ * defect. The branch review found it; the sentence that was wrong is kept here
+ * rather than deleted, because "bounded in time" is exactly the kind of
+ * reassurance a later reader would have taken on trust.
+ *
+ * What closes it: the client's `reach-granted` handler reconciles the ids the
+ * notice NAMED before deciding what to pull, and re-owes anything that purged.
+ * The schedule and the reconnect latch are then irrelevant for exactly the
+ * tickets a notice names, which are exactly the tickets at risk.
  *
  * **THE CANDIDATE CLOSE, ruled by the controller 2026-09-06 and deliberately NOT
  * built here — "closure 5c: reconcile-on-notice", OWNER: Lane F.** A grant

@@ -318,8 +318,12 @@ hazard requires it — and that is before any reconcile in the same catch-up.
   socket by construction (`openStream` throws, deliberately) and the engine's tests use a fake transport
   with no buffer bound. Measured link by link, never end to end. *Owner of the remaining measurement:
   unassigned — it needs a harness that can cut a socket mid-drain, which no lane has built.*
-- **The stale-partial-copy window.** `RECONCILE_MIN_INTERVAL_MS` bounds the reconcile, so a
-  narrow-and-re-widen inside it leaves a stale partial copy with no repair. *Owner: unassigned.*
+- ~~**The stale-partial-copy window.**~~ **CLOSED in the fix round by closure 5c's minimal form, and the
+  original entry here was WRONG.** It said `RECONCILE_MIN_INTERVAL_MS` bounded the window. It does not:
+  `hub.ts` sends `caught-up` once per SUBSCRIPTION (`caughtUpSent`), so the automatic reconcile is once
+  per RECONNECT and a narrow-and-re-widen with no reconnect between them never reconciles at all — on a
+  stable socket the "bounded" residual was the FULL defect. Found by the branch review. The client's
+  `reach-granted` handler now reconciles the ids the notice NAMED before deciding what to pull.
 - **The subtree walk has no workspace predicate** — inherited from `reResolveSubtree`, whose own children
   query has none. Not a disclosure (`canSee` resolves each candidate's own workspace). *Owner: whoever
   refuses or legalises a cross-workspace `parent_id`.*

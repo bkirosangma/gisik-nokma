@@ -1947,11 +1947,17 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   `refoldTicket` inside `loadTicketBootstrap`, so it now compares two different construction paths.
   *Residual recorded at the case and in `grant-backfill.ts`: `RECONCILE_MIN_INTERVAL_MS` bounds the
   reconcile, so a narrow-and-re-widen inside that window leaves the stale copy with no repair — 12.274 at
-  reduced width, bounded in time where it used to be permanent.* **Accepted as a disclosed residual in
-  6.104/12.274's family (controller, 2026-09-06). OWNER: Lane F, as "closure 5c: reconcile-on-notice".
-  The candidate close, stated so nobody re-derives it: a grant notice naming a ticket the client already
-  holds triggers a reconcile of THAT id before the pull decision, which makes the minimum interval
-  irrelevant for exactly the tickets a notice names. Deliberately NOT built in #161.**
+  reduced width.* **⚠️ THE "BOUNDED IN TIME" CLAIM THAT STOOD HERE WAS WRONG, and the branch review found
+  it.** It said `RECONCILE_MIN_INTERVAL_MS` bounded the window. It does not: `hub.ts` sends `caught-up`
+  once per SUBSCRIPTION (`caughtUpSent`), so the automatic reconcile is once per RECONNECT — and a
+  narrow-and-re-widen with no reconnect between them never reconciles at all. **On a stable socket the
+  "bounded" residual was the FULL defect**, and this case was green only because it calls
+  `b.engine.reconcile()` by hand. *The wrong sentence is recorded rather than deleted: "bounded in time"
+  is exactly the reassurance a later reader takes on trust.*
+  **CLOSED in the same PR by closure 5c's minimal form** (controller ruling, 2026-09-06): the client's
+  `reach-granted` handler reconciles the ids the notice NAMED before deciding what to pull, and re-owes
+  anything that purged — so the schedule and the reconnect latch are irrelevant for exactly the tickets
+  at risk. Cases 12.312 and 12.313.
 - 12.276 ✅ **A repeated no-op `visibility.set` costs a holding client NOTHING** *(retitled: it used to
   measure "the same history handed back twice is idempotent", which was the push shape's property and has
   no subject now)*. This is the amplifier bound ruling P37.1 claims, measured rather than cited —
@@ -2043,7 +2049,10 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   replica is asserted to hold both tickets before the reconcile.
 - 12.288 ✅ **The reconcile SCHEDULE — CLOSED by closure 5b(b).** *(Was 🚫: "nothing calls `reconcile` on
   a schedule; when a device should is a product decision with a cost and no plan states it".)* The engine
-  calls it on every catch-up completion, with **no `engine.reconcile()` call anywhere in the test** — the
+  calls it on catch-up completion — **which is once per SUBSCRIPTION, not once per catch-up**, because
+  `hub.ts` gates the frame on `caughtUpSent`; an earlier version of this entry said "every catch-up
+  completion" and overstated it until the branch review measured the latch — with **no
+  `engine.reconcile()` call anywhere in the test** — the
   moment a device's cursor is current is the moment its HOLDINGS may be stale, because a narrowing sends
   the losing device nothing at all (6.104). **The tempting cheaper trigger is unsound and is refused in
   the source:** gating on "the catch-up delivered something" would skip the zero-frame catch-up, which is

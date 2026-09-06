@@ -1212,11 +1212,16 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // way, and a DataSource that quietly dropped a frame the engine acted
           // on would be a second, disagreeing account of the stream.
           //
-          // It is a NOTIFICATION and nothing more — the pull itself is the
-          // engine's, and the ids named here are not held yet. A consumer that
-          // treats this as "these tickets are now readable" will read too
-          // early; the arrival that matters is the ordinary `event` frame that
-          // follows once each pull lands.
+          // **WHEN this fires, corrected — the first version of this comment
+          // got both halves wrong and the branch review caught it.** Item
+          // listeners run AFTER the engine's drain, so by the time a subscriber
+          // sees this frame the successful pulls have already landed and those
+          // tickets ARE readable. And no `event` frame follows a pull:
+          // `loadTicketBootstrap` calls `notify()` only, and nothing routes a
+          // pulled ticket through `onItem`. What refreshes a view is the
+          // ordinary TRIGGER envelope arriving behind this frame — the right
+          // outcome by a different mechanism, and a consumer waiting for a
+          // per-pull frame would wait for one that never comes.
           if (item.workspaceId === workspaceId) {
             cb({ type: 'reach-granted', workspaceId, ticketIds: item.ticketIds });
           }

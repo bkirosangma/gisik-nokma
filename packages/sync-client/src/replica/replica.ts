@@ -837,6 +837,17 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           if (published === null) continue;
           const held = latestByWorkflow.get(published.id);
           if (held === undefined || published.version > held.version) latestByWorkflow.set(published.id, published);
+          // MOVE THE TICKETS THIS DEVICE ALREADY HOLDS, exactly as
+          // `applyServerItem` does. Storing the definition is not enough, and
+          // the omission was silent AND self-sealing: `applyServerItem` returns
+          // early on a duplicate event id, so once this door had inserted the
+          // envelope, the SAME `workflow.defined` arriving later over the stream
+          // became a no-op and `foldTicketsOntoVersion` never ran for it at all.
+          // A client that pulled a ticket across a workflow publish would keep
+          // the old categories until the NEXT publish — the precise divergence
+          // `refresh on publish` exists to prevent. Found by the branch review;
+          // case 12.311.
+          await foldTicketsOntoVersion(tx, published);
         }
         const localDeps = await buildLocalDeps(tx);
         const ticket = data.ticket;
