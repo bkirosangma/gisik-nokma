@@ -24,7 +24,7 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 |---|---|
 | `main` | **`2d90a03`** — forty-plus merges this context; since `b4e2f14`: docs #158/#159/#160 (P40)/#162/#163/#164 (P37.2)/#165/#166/#168/#170 (P37.3) · **#167** (Lane D, the two P33 retention errands — `invite_tokens` sweep 6.131 ✅, `user_preferences` retention for revoked members, cases 6.143–6.149, `5ca3be1`, re-gated 30/30 at `ac7a185`) · **#169** (Lane A, `getMyWork`'s three residuals + `getAttention` under P39/P40, `aa17046`, twelve checks green at `7138217`; **`SERVING_GAPS` now carries `search` alone**). Every `gh pr merge` exit read from `$?` on its own line |
 | ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (+ T1–T4, A0, T5, the shutdown path on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E). The P33 errands and the closures have no ledger rows by design — closed by name here: retention sweeps ✅ (#167); scheduler errands with C; the DDL decision with T16 |
-| last forced gate | **`b4e2f14`** 3364 (above); **a gate at `aa17046` is QUEUED behind Lane B's lock as this is written (09:45)** — its row lands when it does. Lane A's own gate at `4aecf26` (#169's code sha): 30/30 · 0 cached · **3371** (server 1088, app-core 1094); Lane D's at `ac7a185`: 30/30 · 0 cached · server 1094. |
+| last forced gate | **`aa17046`** (code-identical to `2d90a03`/#171's merge) — ONE backgrounded invocation under **lock v3.2** (queued 2½ min behind Lane B, acquired 09:40:25, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m46.6s · node v22.22.2** · zero `Unsupported engine` · **3382 tests / 263 files** — server **1099** (#167's sweeps + #169's routes), app-core **1094**, the rest unchanged. Covers #167 and #169 together. *(Previous: `b4e2f14` 3364.)* |
 | open PRs | **#161 only** (Lane B closure 5b — held through two review rounds; the Critical fixed as bootstrap-before-apply made real; P37.2's `headSeq` notice with the corrected definition (MAX at or below `afterSeq`); **P37.3's keyed drop-on-404 landing now**; two handed-over `headSeq` mutations to run under the lock; gate running at `f814db3`+; **merge only on B's re-report at a green head, then restart B onto T18 — override staged as `override-laneB-next.md`**). **Restarted this hour:** A (09:37, `gisik-nokma-exec-43`, onto **C2's proper close** then `BoardCard.cause` and 7.211 — 7.210 discharged by measurement; `exec/37-c2-cursor`), D (09:37, `lane4-periphery-22`, onto **four entity-keyed `data-testid` hooks** for T13 per Lane E's list — `workspace-card-*`, `project-card-*`, `board-column-*`, `ticket-card-*`; NOT the seven that work by accessible name, NOT the four scenario-shaped ones that stay with T13; `exec/36-e2e-testids`). In flight: C T11+T12 (workflow, `exec/30-plan11-backups`, then the two scheduler errands — `override-laneC-next.md` staged); E seam 1 (T4 landed at `c7aad93`, shutdown path in flight, T6 last; ctx 82%; `override-laneE-next.md` staged for T13 → T16). **⛔ SESSION METERS: 87% on EVERY pane at 09:40 — the meter is account-wide.** From 76% at 09:20 that is ~0.55%/min: **every session, this controller included, halts around 10:05 until the 12:20 reset.** Every lane was told at 09:42 to commit + push what has landed with its handoff position in the same push, and not to start a phase that cannot finish by ~10:00; running workflow agents die with the halt (03:50's shape); the limit-resumer resumes sessions at the reset. **Rule for the resumed controller:** read this file, re-measure every anchor, `gh pr list`, and each lane's branch head before acting — the panes will show `/limit-reset` or the resumer's paste. |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
@@ -575,6 +575,45 @@ SERIALLY inside one lock acquisition, from a written list, nothing else touching
 `git checkout HEAD -- <path>` and verified by READING the region plus an empty `git status --porcelain`.
 Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
 3,285 lines of lessons and stopped.
+
+### RULING P41 (2026-09-06 09:48, controller as ruling tier) — C2's proper close is Door B: the online source pages to COMPLETENESS; a bare cursor on the view type is refused
+
+**Lane A escalated before building — the override's own tie-break fired.** Three measurements at
+`aa17046`: `FilterSpec` (`view-types.ts:70-81`) has ten optional fields and no position;
+`listQueryString(filter, grouping)` builds the whole query string; `DataSourceQuery.getTickets(projectId,
+filter, grouping)` (`data-source.ts:135`) takes no cursor. So a cursor on the RETURN type says "there is
+more" and no caller can ask for the next page. **Bigger:** `views/list-model.ts:9-31` licenses
+client-side grouping ONLY because `TicketListView` is the complete row set, and
+`test/views/list-model.test.ts:53-71` enforces that as a TYPE tripwire (`paginationTripwire`, whose
+docblock records that adding `nextCursor` fails typecheck with TS2322) — a decision point whose own text
+says it must be retaken, never silently inverted. A bare cursor would delete the tripwire and invert the
+grouping decision in one commit while leaving no consumer able to page: sections would read "Doing (3)"
+on a project holding forty. **Doors:** A — widen `DataSourceQuery.getTickets` with a cursor (breaks P30
+for that signature; partial-page rendering becomes product behaviour); B — a paging loop in the online
+source, the closure `mappers.ts:1156` names itself (view type unchanged, tripwire intact, grouping stays
+licensed, P30 untouched; cost: round trips); C — a cursor inside `FilterSpec` (refused: `FilterSpec` is
+embedded in `SavedFilter`, so a cursor becomes a persisted saved-filter field).
+**RULING: B, bounded and loud.** The online source pages through the server's cursor until exhausted and
+hands the view the complete set — the only door that makes the completeness claim TRUE again rather than
+expressible-and-unactionable; A is a product decision (the owner's), not a closure's. The loop carries a
+documented page cap (start at 40 × `DEFAULT_LIMIT` 50 = 2000 rows — a disclosed assumption, since no
+ticket count per project has been measured; owner named at the case) and a LOUD refusal beyond it in the
+`ServingGapError` register — self-expiring, never a silent truncation (a silently truncated set is C2 one
+bound further out). Excluding fixtures, alone: a two-page project assembles both pages, disjoint and
+complete together (loop stops after page one → red); one page beyond the cap refuses loudly (cap removed
+→ red); the existing C2 refusal case flips to served. The replica source already holds the full set
+locally and needs no change — stated at the case.
+
+### PRE-HALT POSITIONS, 09:45 — every lane's head is PUSHED; read each from its BRANCH, not from `main`
+
+| lane | session | branch · head | state | first action after the reset |
+|---|---|---|---|---|
+| **A** | `gisik-nokma-exec-43` (restarted 09:37, ctx 7%) | `exec/37-c2-cursor` (to be cut from `origin/main`) | orienting onto C2's proper close | continue the override; commit + push at every checkpoint |
+| **B** | `lane2-plan4-a9` (ctx ~67%) | `exec/29-closure5b-reach` · `632ad04` | **#161 HELD by B's own call**: P37.3 implemented, sync-client 85/85, but NO full gate since P37.2/P37.3, P37.3's two excluding fixtures unwritten (ids from 12.317), the two handed-over `headSeq` mutations unrun, rebase onto `aa17046`+ pending; position in `executor-state-B.md`'s top block | fixtures → mutations under the lock in a quiet window → rebase, install, rebuild, full gate → re-report; **then restart onto T18** |
+| **C** | `lane3-plan7-8-3d` (ctx ~29%) | `exec/30-plan11-backups` · `ee5d5f6` | `cf5b3c5` T11 core (reviewed by the workflow); `1c5df30` **labelled WIP** (T11 follow-ups the commit step never staged + T12's restore.sh/drill/catalogue — unverified, unreviewed, ungated); `ee5d5f6` handoff. **No gate has run on this branch.** Workflow `wf_b926b912-c39` resumability across the halt untested | verify the four WIP claims against the tree; run check-case-ids/check-env; run restore-drill for the first time; resume or redo T12's review; split the WIP into clean commits; rebase onto `aa17046`+; gate v3.2; PR |
+| **D** | `lane4-periphery-22` (restarted 09:37, ctx 9%) | `exec/36-e2e-testids` (to be cut) | orienting onto the four entity-keyed `data-testid` hooks | continue the override; small direct commits, no long fan-out |
+| **E** | `lane5-plan11-1d` (ctx ~82%) | `exec/23-plan11` · `1564d16` (37 ahead, 15 behind `aa17046`) | T4 landed; **the shutdown path committed and LABELLED unreviewed** (implementer green, review round not run); T6 NOT started by instruction; retroactive §13 catalogue from 13.101 and the DDL/scratch-DB written decision still owed | **run the shutdown review round first** (`Workflow({scriptPath: '…/scratchpad/t5b-workflow.js', resumeFromRunId: 'wf_8d8cd44c-120'})`; decisive check: delete the handler, re-run, still green = Critical) → rebase → T6 on 54330 with `OBJECT_STORE_S3_*` → catalogue → the seam-1 PR — **consider restarting E first at ctx 82%, with the mid-step override naming `1564d16`** |
+| **controller** | `gisik-nokma-0d` (this session) | `main` `451a92b` (+ #172 pending) | everything above is on `main` or in an open PR; gate at `aa17046` green (3382); lock free; monitor armed (dies with the session — re-arm) | read this file from the top, `gh pr list`, every lane's branch head, the meters; then the loop |
 
 ### #169 (Lane A) and #167 (Lane D) landed — what each changed on `main`, 09:37
 
