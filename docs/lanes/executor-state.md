@@ -16,7 +16,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — `exec/37-c2-cursor`, C2's proper close. **ESCALATED BEFORE BUILDING — awaiting ruling P41.**
+# LANE A — `exec/37-c2-cursor`. **P41 RULED: DOOR B. Two items landed; Door B is NEXT and unstarted.**
 
 > Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
 > — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
@@ -105,9 +105,50 @@ pool that cannot finish it … defer and record the deferral"* — **no fan-out 
 The three measurements above were made directly. When C2 is ruled and built, it needs an opus reviewer
 (client type change, N consumers — closure 3's class).
 
+## RULING P41 RECEIVED (2026-09-06 09:48) — **DOOR B**, and it is the next thing to build
+
+The controller ruled my recommendation: **the online source pages through the server's cursor until
+exhausted and hands the view the COMPLETE row set.** `TicketListView` stays `{projectId, rows}`,
+`list-model.ts`'s grouping license stays TRUE rather than expressible-and-unactionable, the
+`paginationTripwire` STAYS as the decision's guard, and P30 is untouched. Door A is a product decision
+that belongs to the owner; Door C refused for the `SavedFilter` reason.
+
+**The ruling's own conditions, which are part of the build and not optional:**
+- **Bound the loop.** A documented page cap — start at **40 pages × `DEFAULT_LIMIT` 50 = 2000 rows** —
+  named at the case as a DISCLOSED ASSUMPTION with its owner, because I hold no ticket-count
+  measurement for a real project and said so.
+- **A LOUD refusal beyond the cap** in the `ServingGapError` register ("project too large for the
+  complete list"), self-expiring, **never a silent truncation** — a silently truncated set is exactly
+  the C2 defect one bound further out.
+- **Excluding fixtures, alone:** a two-page project assembles both pages, disjoint and complete
+  together (mutate the loop to stop after page one → red); a project one page beyond the cap refuses
+  loudly (mutate the cap away → the refusal never fires → red); and the existing C2 refusal case flips
+  to the served path.
+- **The replica source needs NO change** — it already holds the full set locally. Say so AT THE CASE
+  rather than leaving it inferred.
+- Reviewer when built: **opus** (client-path change, N consumers — closure 3's class).
+
+`routes/list.ts:103` confirms the server side already takes a `cursor` as a bound value, so nothing on
+the server needs to change either. **Not started — the halt arrived first.**
+
+## WHAT LANDED THIS SESSION
+
+1. **7.219 — 7.211's third branch, CLOSED** (commit `8df6fb5`). A `parent_id` naming no
+   `proj_visibility` row answers `false`. 7.211 had recorded that dropping the `knownParents.has(...)`
+   conjunct left all 74 cases green; it no longer does. **Measured: 33 passed clean; mutated → 1
+   failed, 32 passed, 7.219 ALONE**, `expected true to be false` at its own line. Mutation restored
+   with `git checkout HEAD --` and verified by READING the file. The dangling row is hand-written and
+   the case says so (7.214's precedent) — the door refuses a `ticket.created` naming a parent with no
+   row, so the product path cannot reach it and a scenario fixture would be a fiction.
+2. **12.255 — `BoardCard.cause` catalogued as ❌** with its full reason and the case to write. Not
+   built: closing it properly means growing the snapshot block to carry the cause, which couples
+   `sync-client` to a domain type it does not otherwise know — which is why P36 left it. §12 now used
+   through **12.255; FOUR left (12.256–12.259); ask before 12.259.**
+
 ## NEXT, IN ORDER
 
-1. **BLOCKED on ruling P41** — C2's cursor. Do not build any door before the ruling.
+1. **BUILD DOOR B** under ruling P41's five conditions above. This is the first item for the resumed
+   session.
 2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
    narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
    dangling-`parent_id` branch has no fixture and survives its own mutation).
@@ -117,8 +158,8 @@ The three measurements above were made directly. When C2 is ruled and built, it 
 
 ## IDS
 
-§12 block 12.240–12.259, **used through 12.254 — FIVE left; ask before 12.259.** §7 next free
-**7.219** (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
+§12 block 12.240–12.259, **used through 12.255 — FOUR left; ask before 12.259.** §7 next free
+**7.220** (7.219 minted this session) (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
 Never edit `docs/lanes/task-ledger.tsv`. Never merge my own PR. Never commit to `main`.
 
 # LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
