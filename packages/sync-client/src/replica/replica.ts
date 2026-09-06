@@ -846,7 +846,16 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
             ticket.snapshot.state,
             latestByWorkflow.get(ticket.snapshot.state.workflowId),
           );
-          await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded);
+          // The provenance block travels with the snapshot, exactly as it does
+          // through `loadBootstrap` — passed through, never constructed, and
+          // never an explicit null of this door's own making (`writeSnapshot`
+          // treats absent as "nothing new to say", not as "forget what you
+          // knew"). Dropping it here would be silent and would matter most:
+          // `replica-data-source.ts` refuses a snapshot-bounded read with no
+          // provenance, so a ticket arriving through THIS door — a ticket the
+          // device has by definition never held — would be the one case
+          // ruling P36 fixed and closure 5b(d) quietly reopened. Case 12.302.
+          await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded, ticket.snapshot.provenance ?? null);
         }
         for (const env of ticket.events) {
           const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);

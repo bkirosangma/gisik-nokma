@@ -351,3 +351,63 @@ describe('12.298 definitions travel with the pulled ticket, because ordering no 
     expect((await with_.getTicket(TICKET))?.confirmed?.stateId).toBe('done');
   });
 });
+
+describe('12.302 a pulled ticket keeps the provenance closure 4 shipped it', () => {
+  /**
+   * Ruling P36 closed this: a snapshot-bounded device cannot name who put a
+   * ticket in its state, because the creating and transitioning events are
+   * below the snapshot's seq and were never shipped — so the snapshot carries
+   * the recorded claim beside it.
+   *
+   * **The per-ticket door is the one place that reopens most easily, and the
+   * one where it matters most.** A ticket arriving here is by definition one
+   * this device has never held, so it is snapshot-bounded on arrival by
+   * construction — the exact shape `replica-data-source.ts` refuses without a
+   * provenance block. Dropping the argument compiles (it defaults to `null`)
+   * and every other case in this file stays green, which is the whole reason
+   * this one exists.
+   *
+   * The block is passed THROUGH and never constructed: `writeSnapshot` treats
+   * an absent block as "nothing new to say" rather than "forget what you knew",
+   * so a door that helpfully supplied its own `null` would erase a good block
+   * on a re-pull.
+   */
+  it('12.302 carries the snapshot provenance through, and a door that drops it is not visible any other way', async () => {
+    const replica = await seededReplica();
+    const claim = { actorId: USER_A, clientTime: CLIENT_TIME, serverTime: SERVER_TIME };
+
+    await replica.loadTicketBootstrap(
+      ticketBootstrapOf({
+        ticket: {
+          ticketId: TICKET,
+          snapshot: {
+            seq: 1,
+            state: {
+              kind: 'ticket',
+              id: TICKET,
+              workspaceId: WS,
+              projectId: PROJECT,
+              typeId: TYPE,
+              parentId: null,
+              workflowId: WF,
+              workflowVersion: 1,
+              stateId: 'doing',
+              stateCategory: 'active',
+              assigneeId: null,
+              collaboratorIds: [],
+              fields: { title: { value: 'Pulled with provenance', actorId: USER_A, clientTime: CLIENT_TIME, serverTime: SERVER_TIME } },
+              transitions: [],
+            },
+            provenance: { state: claim, assigned: null },
+          },
+          events: [],
+        },
+      }),
+    );
+
+    // The positive control first: the pull landed at all. Without it, a door
+    // that threw early would satisfy "no provenance was invented".
+    expect((await replica.getTicket(TICKET))?.confirmed?.stateId).toBe('doing');
+    expect(await replica.getSnapshotProvenance(TICKET)).toEqual({ state: claim, assigned: null });
+  });
+});
