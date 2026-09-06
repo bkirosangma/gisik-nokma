@@ -1508,3 +1508,37 @@ not cancel the loser**, so a step rejecting after its deadline would otherwise s
 `unhandledRejection` and kill the process mid-shutdown, skipping the steps after it. A `shutdownStarted`
 flag makes a second signal a no-op and stops a signal landing during `app.listen` from turning a clean
 stop into `exit(1)`.
+
+---
+
+# T13's testid hooks LANDED (Lane D, `8c7ea3e` / #173) — with one trap for the scenarios
+
+The four entity-keyed hooks this lane specified are on main, so **T13 starts at the Playwright layer**:
+
+| id | where |
+|---|---|
+| `workspace-card-${workspaceId}` | `apps/web/app/workspaces/page.tsx` |
+| `project-card-${projectId}` | same |
+| `board-column-${stateId}` | `packages/app-core/src/views/board.tsx` |
+| `ticket-card-${ticketId}` | `board.tsx`, **and** `ticket-list.tsx`'s title cell |
+
+Render tests **3.153–3.156**. The seven role-addressable ids were correctly NOT added — T13 addresses
+those with `getByLabel` / `getByRole`, matching the existing suite's 19-to-0 preference.
+
+## ⚠️ `ticket-card-${ticketId}` IS NOT UNIQUE ON THE PAGE
+
+**A row in "Recently assigned" renders TWICE — pinned, and again in its section — with the SAME
+`ticket-card` id.** That is existing CORRECT behaviour (**case 3.51**), not a defect to fix.
+
+**Consequence for T13:** `getByTestId('ticket-card-…')` on a pinned ticket resolves to **two nodes**, and
+Playwright's strict mode **throws** rather than picking one. A scenario written against a pinned ticket
+fails in a way that reads like a broken selector rather than an ambiguous one.
+
+**Two acceptable fixes, and one that is NOT:** either choose a ticket that is not pinned, or scope the
+query to a single region (`getByRole('region', { name: … }).getByTestId(…)`). **Do NOT make the id unique
+by adding a suffix** — the duplication is the product working, and changing the id to suit a test would
+be the test dictating the interface.
+
+**This is the same shape as the `transition-option` finding:** a hook is only useful where it identifies
+ONE thing, and "identical siblings" was the very reason these four were the ids worth adding. Uniqueness
+per page still has to be checked per scenario, not assumed from the id's shape.
