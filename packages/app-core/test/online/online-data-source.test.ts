@@ -5,7 +5,12 @@ import {
   createOnlineDataSource,
   listQueryString,
 } from '../../src/online/online-data-source.js';
-import { ServingGapError, UnexpressibleFilterError } from '../../src/online/mappers.js';
+import {
+  LIST_PAGE_CAP,
+  LIST_TOO_LARGE_ABSENCE,
+  ServingGapError,
+  UnexpressibleFilterError,
+} from '../../src/online/mappers.js';
 import { HttpError } from '../../src/online/http.js';
 import { submittedTicketCreated } from '../helpers/seed.js';
 
@@ -33,6 +38,70 @@ function recordingFetch(answers: Record<string, unknown>) {
     } as Response;
   };
   return { fetchImpl, calls };
+}
+
+/**
+ * A fetch that PAGES: it answers `/v1/projects/:id/tickets` differently
+ * depending on the `cursor` in the query string, and records every URL it was
+ * asked for. `recordingFetch` above strips the query before looking the answer
+ * up, which is exactly what a paging test must not do — it would answer page
+ * one forever and a loop that ignored the cursor would still "assemble two
+ * pages" out of the same rows.
+ */
+function pagingFetch(pages: readonly { ticketIds: readonly string[]; nextCursor: string | null }[]) {
+  const urls: string[] = [];
+  const fetchImpl = async (input: string) => {
+    urls.push(input);
+    const cursor = new URL(input, 'http://x').searchParams.get('cursor');
+    const index = cursor === null ? 0 : Number(cursor);
+    const page = pages[index];
+    if (page === undefined) {
+      return { ok: false, status: 404, json: async () => undefined } as Response;
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        projectId: PROJECT,
+        groupBy: 'flat',
+        groups: [
+          {
+            key: 'all',
+            label: 'All',
+            cards: page.ticketIds.map((ticketId) => listCard(ticketId)),
+          },
+        ],
+        nextCursor: page.nextCursor,
+      }),
+    } as Response;
+  };
+  return { fetchImpl, urls };
+}
+
+/** The minimum a `ListCard` must carry for `mapListPage` to accept it. */
+function listCard(ticketId: string) {
+  return {
+    ticketId,
+    workspaceId: WORKSPACE,
+    projectId: PROJECT,
+    typeId: 'task',
+    parentId: null,
+    workflowId: 'wf-errand',
+    stateId: 'doing',
+    stateCategory: 'active',
+    assigneeId: null,
+    collaboratorIds: [],
+    title: `Ticket ${ticketId}`,
+    dueDate: { state: 'never-claimed' },
+    fields: {},
+    stateProvenance: { actorId: ANSELMA, clientTime: 'c', serverTime: 's', cause: null },
+    rollup: null,
+    typeRank: 3,
+    epicId: null,
+    stateName: 'Doing',
+    assignedProvenance: null,
+    hasRestrictedParent: false,
+  };
 }
 
 const MEMBERS: MemberListResponse = {
@@ -561,5 +630,94 @@ describe('3.140 getTicketTypes reads the route that shipped', () => {
     await expect(source.query.getTicketTypes(WORKSPACE)).rejects.toThrowError(
       'response mapping failed at ticketTypes.ticketTypes[0].rank: expected a number',
     );
+  });
+});
+
+/**
+ * RULING P41, DOOR B — `getTickets` answers the COMPLETE row set or it refuses.
+ *
+ * C2 was "served a project's first 50 tickets as the whole project". The mapper
+ * closed it by REFUSING any page, which was honest and left `getTickets`
+ * unusable past 50 tickets. P41 chose the second of the two closures the mapper
+ * itself named: a paging loop here, so `TicketListView` keeps meaning *the
+ * complete row set* and `views/list-model.ts`'s client-side grouping license
+ * stays TRUE. The type is unchanged, so `test/views/list-model.test.ts`'s
+ * `paginationTripwire` still compiles and still guards the decision.
+ *
+ * **The replica source needs no change and this is the place that says so**
+ * rather than leaving it inferred: `replicaDataSource.getTickets` reads the
+ * local confirmed set directly, so it has always answered the whole project.
+ * Paging is a property of the HTTP route, not of the view.
+ */
+describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
+  it('12.257 assembles a two-page project: both pages, disjoint, and complete together', async () => {
+    const { fetchImpl, urls } = pagingFetch([
+      { ticketIds: ['t1', 't2'], nextCursor: '1' },
+      { ticketIds: ['t3', 't4'], nextCursor: null },
+    ]);
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+
+    // COMPLETE — all four, in page order. A loop that stopped after page one
+    // returns ['t1','t2'] and fails here, which is the ruling's first mutation.
+    expect(view.rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3', 't4']);
+    // DISJOINT — no row appears twice. A loop that re-sent the same cursor, or
+    // failed to advance it, would double the first page and pass the length
+    // check only by accident; this fails on the duplicate.
+    expect(new Set(view.rows.map((row) => row.ticketId)).size).toBe(4);
+    expect(view.projectId).toBe(PROJECT);
+
+    // TWO REQUESTS, and the second carried the cursor. Without this, a source
+    // that fetched page one twice from a stubbed fetch answering everything
+    // would satisfy every assertion above.
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).not.toContain('cursor=');
+    expect(urls[1]).toContain('cursor=1');
+    // The filter and grouping survive paging — a second page requested without
+    // them would silently be a different query against the same accumulator.
+    expect(urls[1]).toContain('groupBy=flat');
+  });
+
+  it('12.258 refuses LOUDLY past the cap rather than serving a truncated project', async () => {
+    // One page beyond the cap, every page still offering a cursor. The rows
+    // fetched so far are real and sufficient-looking, which is exactly why
+    // returning them would be the C2 defect one bound further out.
+    const pages = Array.from({ length: LIST_PAGE_CAP + 1 }, (_unused, index) => ({
+      ticketIds: [`t${index}`],
+      nextCursor: String(index + 1),
+    }));
+    const { fetchImpl, urls } = pagingFetch(pages);
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+
+    const thrown = await source.query
+      .getTickets(PROJECT, {}, 'flat')
+      .then(() => null)
+      .catch((error: unknown) => error);
+
+    // A NAMED refusal in the register, not a bare Error and not a silent
+    // truncation — a shell renders it the way it renders every other absence.
+    expect(thrown).toBeInstanceOf(ServingGapError);
+    expect((thrown as ServingGapError).absences).toEqual([LIST_TOO_LARGE_ABSENCE]);
+    // The absence says WHY in a sentence a maintainer can act on, and names the
+    // cap as a disclosed assumption rather than a measurement.
+    expect((thrown as ServingGapError).message).toContain('COMPLETE row set');
+    expect(LIST_TOO_LARGE_ABSENCE.owner).toContain('disclosed assumption');
+
+    // It stopped AT the cap — it did not run away, and it did not stop early.
+    // Removing the cap (the ruling's second mutation) makes this loop run to
+    // exhaustion and the refusal never fires, so the `toBeInstanceOf` above
+    // goes red; without this length check, a cap of 1 would also pass.
+    expect(urls).toHaveLength(LIST_PAGE_CAP);
+  });
+
+  it('12.259 a single-page project makes ONE request and never pages', async () => {
+    // The control that keeps the two cases above from being satisfied by a
+    // source that always pages: the ordinary small project must not pay a
+    // second round trip, and its cursor is null on the first answer.
+    const { fetchImpl, urls } = pagingFetch([{ ticketIds: ['t1'], nextCursor: null }]);
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+    expect(view.rows.map((row) => row.ticketId)).toEqual(['t1']);
+    expect(urls).toHaveLength(1);
   });
 });

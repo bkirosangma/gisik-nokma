@@ -48,6 +48,8 @@ export {
 } from './founding.js';
 export {
   MappingError,
+  LIST_PAGE_CAP,
+  LIST_TOO_LARGE_ABSENCE,
   SERVING_GAPS,
   ServingGapError,
   UnexpressibleFilterError,
@@ -57,7 +59,7 @@ export {
   mapBoardView,
   mapHistory,
   mapIngestResults,
-  mapListView,
+  mapListPage,
   mapMyWork,
   mapPreferences,
   mapProvenance,
