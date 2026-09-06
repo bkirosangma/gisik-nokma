@@ -1,4 +1,4 @@
-# Lane B — executor state (Plan 10 T13–T15 · closure 5 · **closure 5b** → T18)
+# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · **T18**)
 
 **This file is Lane B's restart surface, and nobody else's.** `executor-state.md` is Lane A's — never
 edit it. A Lane B session relaunched from `dispatch-executor-serial.md` + the Lane B override recovers
@@ -6,13 +6,182 @@ only what is written here.
 
 > **Shas in narrative prose below are facts about when they were written.** Verify with
 > `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
-> commits and will lie to you. The NARRATIVE SECTIONS BELOW THE PRE-FLIGHT (T13, T14, T15, closure 5)
-> are history: their anchors were true when written and most are now orphaned by rebases. The LIVE
-> ANCHORS table immediately below is the only part measured at this HEAD.
+> commits and will lie to you. Every block below this one is HISTORY. The LIVE ANCHORS table
+> immediately below is the only part measured at this HEAD.
 
 ---
 
-## ✅ POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
+## ▶ LIVE — Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
+
+Closure 5b merged as **`2f18f3f`** (#161). T13 (#117), T14+T15 (#126), closure 5 (#139) and closure 5b are
+**all on `main`** — none of them is re-implemented here.
+
+| anchor | value | how verified |
+|---|---|---|
+| branch | `exec/33-plan10-t18`, cut from `origin/main` | `git checkout -b … origin/main` |
+| merge-base / HEAD at cut | **`2f18f3f`** | `git rev-parse HEAD`; **`git branch --contains 2f18f3f` → `exec/33-plan10-t18`, `main` = REACHABLE, not orphaned** |
+| toolchain | node **v22.22.2**, `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --force --concurrency=1` → **`BUILD_EXIT=0`** | one shell invocation, `$?` on its own line |
+| `check-case-ids` (repo-wide) | **`EXIT=0`** — bare 865 + bold 492 + marker-first 40 = **sum 1397 == union 1397**, zero duplicates, highest `13.100`, 10 files | `node scripts/check-case-ids.mjs`; **a SEPARATE step, NOT part of `pnpm check:env`** |
+| **§12 max, recounted** | **`12.322`** — bare 244 + bold 23 + marker-first 0 = **sum 267 == union 267**, zero duplicates | §12-scoped, three styles, per-style counts printed as the control |
+| ruling | **Door A**, controller 13:2x: proceed now, do not wait for A or D | `SendMessage` reply |
+| **PR** | **#188 OPEN**, `exec/33-plan10-t18` → main, head **`73613da`**, **REBASED past #187 onto `e33c429`**. **NOT clear to merge while the opus review is outstanding** | `gh pr view 188` |
+| **rebase past #187** | base `2f18f3f` → **`e33c429`**; ONE conflict hunk, the 12.250–12.328 block. Resolved by keeping HEAD's side (it carries A's new entries) and normalising all 19 bold heads to bare, per the controller's ruling (i) with Lane A informed BEFORE the rebase | `git rebase origin/main`, markers 0 after |
+| **§12 recount at `73613da`** | **bare 318 · bold 0 · marker-first 0; sum 318 == union 318**, zero duplicates, **max `12.328`**, 19 headings. `check-case-ids` repo-wide **`EXIT=0`**, 1449 unique | recounted at the sha reported, not carried |
+| **re-gate owed?** | **NO.** `git diff --name-only origin/main...HEAD` = **`Features.md`, `docs/lanes/executor-state-B.md`, `test-cases/12`** — **zero non-docs**, with a positive control that the filter finds a non-docs path. The three non-docs files in the `a018f7d..73613da` diff are **#187's own** (`--diff-filter=AM` at `e33c429` names them) | stated either way, per the order |
+| **full gate at `4d2d398`** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m47.837s · node v22.22.2 · `CHECK_ENV_EXIT=0` · `CHECK_CASE_IDS_EXIT=0`.** Lock v3.2 acquired 13:39:58 pid 74149, **released clean**; **0 orphans** | ONE backgrounded invocation, `$?` on its own line |
+| tests at that sha | **3470 passed / 272 files** (+5 skipped). domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 87 · app-core 1102 · web 138 · mobile 20 · desktop 5 · server 1157 | **recounted from the log by `awk`** |
+| §12 census after | **bare 312 · bold 0 · marker-first 0; sum 312 == union 312**, zero duplicates, max **`12.322`**, 19 headings | §12-scoped, three styles |
+
+**What T18 delivered:** the reserved block `12.1–12.44` written from tests rather than from the plan text
+(35 ✅ · 7 🟡 · 2 🧪 · 0 ❌); `12.319` spent on the two `sync-client` guard suites, **exhausting Lane B's
+block**; §12 normalised to bare (23 bold heads, no id renumbered); `Features.md` §12's banner rewritten so
+its "still absent" list is EMPTY; and three live falsehoods removed, two of them Lane B's own.
+
+**36 of the 44 are cross-references, not new coverage** — verified **zero dangling**, 33 distinct refs all
+resolving, with a positive control that a planted bad reference IS detected. Eight ids add coverage:
+`12.1`, `12.2`, `12.3`, `12.5`, `12.15`, `12.40`, `12.41`, `12.42`.
+
+**Downgraded from the plan's pre-written ✅ (each names the conjunct with no witness):** `12.5`
+("identically" — one runner), `12.6` ("exactly like ingest" — both cross-door comparisons compare a
+refusal), `12.13` (attachments — `attachment.added` deletable with the server suite still green), `12.16`
+(`workspace_seq`), `12.24` (the user-visible label), `12.33` (**the plan is wrong, not the test** — the
+per-event purge walk was struck by 6.101/6.104), `12.38` (component wiring).
+
+⚠️ **OPEN AT THIS WRITING: Lane A began writing §12 after the Door A ruling** — `exec/39-fixture-witnesses`
+at `137d48a` adds **12.323–12.328 in BOLD**. T18's header is true at merge and stale the moment A lands;
+the controller has been asked to **broadcast that bare is canonical in §12**. `git log 2f18f3f..origin/main
+-- test-cases/12 Features.md` is **still empty**, so the merge condition holds.
+
+### The §12 header on `main` is FALSE, and T18 is what fixes it
+
+`test-cases/12`'s header says **"HIGHEST ID IN USE ON THIS BRANCH IS `12.318`"**. It is not: **`12.322` is
+in use**, landed by Lane A's #176 (`2d2bc5c`) as bold-style line heads. The controller caught this against
+my own measurement 2 and was right; I verified it rather than adopting it — `git log -S'12.322'` names
+`2d2bc5c`, and the three lines sit two sections above the closure-5b block. **`12.319` is genuinely free**
+(the recounted list runs `… 12.317 12.318 12.320 …`), so Lane B's block 12.290–12.319 is used through
+12.318 exactly as the previous block claimed.
+
+⚠️ **marker-first = 0 in §12 is a MEASUREMENT, not a dead matcher** — the same pattern returns **40** on
+`test-cases/13`, watched firing before the zero was believed. This is the exact trap this file recorded on
+2026-09-06 03:30 (*a zero from a matcher you have not seen fire is not a measurement*), and the rule now
+costs one extra command instead of a false clean.
+
+### `listPendingPulls` — the consumer enumeration owed from `fff3cbf`
+
+Recorded here because the previous block asserted "the rig was the only miss" without ever committing the
+enumeration that would let a reader check it. **Two independent sweeps, agreeing**, plus a positive control
+from the same runs:
+
+| file | lines | role |
+|---|---|---|
+| `packages/sync-client/src/replica/replica.ts` | 2 (`:128` declaration, `:959` impl) | **definition — not a consumer** |
+| `packages/sync-client/src/engine/sync-engine.ts` | 1 (`:484`) | **real consumer**, destructures `{ id: ticketId, headSeq }` — updated by P37.2 |
+| `apps/server/test/dual-client/rig.ts` | 4 (`:480` iteration + 3 docblock) | **the miss** — kept iterating the array as ids |
+| `packages/sync-client/test/sync-engine.test.ts` | 13 | shape-aware (`.map((t) => t.id)`, `toEqual([{ id, headSeq }])`) |
+| `packages/sync-client/test/ticket-bootstrap.test.ts` | 9 | shape-aware (`idsOwed(…)`, `.find((t) => t.id === …)?.headSeq`) |
+| `apps/server/test/dual-client/grant-backfill.test.ts` | 4 | **shape-BLIND — every site is `toEqual([])`** |
+
+**Six files, 33 lines; minus the definition file, FIVE consumer files.** Positive control from the same two
+sweeps: `addPendingPulls` = **13 lines across 6 files** (both methods agreed on 13), so neither sweep was a
+silent-empty. Method 1 `/usr/bin/grep -rn … | grep -v node_modules | grep -v dist`; method 2 `git grep -n`
+(tracked files only, so `dist/` is excluded by construction rather than by a filter that can be wrong).
+
+**The honest refinement to "the rig was the only miss":** it was the only site that *iterated the element
+shape wrongly*, but `grant-backfill.test.ts` is the file where the failure *showed*, and it is itself
+**shape-blind** — four `toEqual([])` assertions that pass against `string[]` and `{id,headSeq}[]` alike.
+An empty-array assertion cannot witness an element-shape change. So of the five consumers, three were
+shape-aware and updated, one was shape-aware and wrong (the rig), and one could never have caught it.
+*That is why typecheck, not the suite, was the instrument that identified the site.*
+
+### Position in T18
+
+T18 is the **last task in Plan 10** (17/18 → 18/18). Its content is the **RESERVED block 12.1–12.44** —
+the plan text (`docs/superpowers/plans/2026-08-20-10-offline-sync-apps.md:7471–7629`) pins those ids and
+`test-cases/12`'s own header says the file "continues from 12.45 … those ids are RESERVED … when Task 18
+lands, its 12.1–12.44 fill in above these." **12.1–12.44 is disjoint from Lane A's 12.320–12.339 and Lane
+D's 12.340–12.359**, which is why the controller ruled Door A: no id can collide, and the three genuinely
+shared surfaces (the header line, `Features.md` §12's banner and "still absent" list, and the statuses A or
+D flip) are ordinary rebase conflicts for whoever lands second.
+
+**Live at this writing:** Lane A `exec/39-fixture-witnesses` @ `4f7751f` — four commits, `git diff --stat
+origin/main...` = **one file, `docs/lanes/executor-state.md`, docs-only**; it has minted nothing on top of
+the 12.320–12.322 already on `main`. Lane D has **pushed no branch** (`git ls-remote --heads origin
+'exec/40*'` empty). **12.290 stays 🟡, owner Lane D.**
+
+
+### T18's measurements — what §12 actually needed, and three live falsehoods
+
+**`Features.md` §12 needs the BANNER rewritten, not new bullets.** All 15 probed features from the plan's
+22-bullet §12 block are already present (`outbox` 16 hits, `proj_contested` 9, `reopen` 12, `dual-client`
+5, …). Exactly two are absent from §12 and **both are absent on purpose**: Tasks 1–2's shared vocabulary
+(`formatIstInstant`, `IST_CLOCK_NOTE`, `istDayOf`/`istDayBounds`) is catalogued in **§3**, and the contest
+*evaluators* (`contest.server-only` and kin) in **§4** — the sections that own the domain and the rule
+engine, exactly as the §3 notes and the coordination doc's reservation table say. Measured with a positive
+control: those four tokens read **0** inside §12 and **7 / 2 / 4 / 2** elsewhere in `Features.md`, while
+`proj_contested` reads **9** inside §12, so the zeros are measurements rather than a search that cannot
+fire.
+
+**Three contradictions were LIVE when T18 measured, and two are Lane B's own:**
+1. `test-cases/12` header: *"HIGHEST ID IN USE ON THIS BRANCH IS `12.318`"* — **`12.322`** has been on
+   `main` since #176 (`2d2bc5c`). Not Lane B's.
+2. `test-cases/12` header: *"Tasks 14–15 … are absent rather than missing"* — **both have sections**, at
+   L1755 and L1827, landed by **Lane B's own #126**.
+3. `Features.md` §12: *"Still absent … both app shells — Plan 10 Tasks 16–17"* — **both exist**, bulleted
+   inside that same section, with catalogue sections at L1624 and L1686.
+
+**§8 is the only thing genuinely absent from `Features.md`, and it is absent BY RULING** — the
+coordination doc's table makes §8 Plan 6's, but that row was superseded 2026-09-02 (Plan 6 Task 16): every
+Plan 6 feature had already landed in §3 under 3.x ids, and renumbering 112+ cross-referenced ids for a
+cosmetic relocation would violate never-renumber. `ls test-cases/` confirms no `08-` bucket.
+
+**The staleness count is TWENTY, not fourteen** — and `grep -c` says **1**, because it counts matching
+LINES and the whole running parenthesis is one line. The real enumeration comes from `uniq -c`. A
+measurement instrument answering a question nobody asked, in the middle of the paragraph about
+measurement instruments.
+
+### Style normalisation — safe, and it touches only Lane A's lines
+
+§12 was **bare 244 / bold 23 / marker-first 0**. Canonical is **bare**. All 23 bold heads convert with the
+strict `- **ID** rest` form and **zero** lines need a manual look. Verified the conversion renumbers
+nothing by two independent instruments **with a positive control that the comparator can detect a
+difference**: id sets identical at 267 before and after, same md5, and deliberately dropping one id makes
+the comparator report a difference. ⚠️ **All 23 bold lines are Lane A's** (12.240–12.259, 12.320–12.322),
+so this is the one part of T18 that can conflict with a live lane — the controller is asked to broadcast
+that **bare is canonical in §12** so A and D do not land new bold heads and drift the census back.
+
+⚠️ **marker-first = 0 is a MEASUREMENT** — the same pattern returns **40** on `test-cases/13`, watched
+firing before the zero was believed.
+
+### A standing brief claim is now FALSE — recorded, not acted on
+
+The executor brief's *"TWO KNOWN GAPS"* §2 says *"Zero of 48 test files vary `TZ`"*. **Measured at
+`2f18f3f`: 17 of 272 test files vary it.** The counterexample is inside T18's own range —
+`packages/app-core/test/contests.test.tsx:97` is case **12.194**, *"renders the IST day under a non-IST
+TZ, and the TZ actually took effect"*, and it carries its own control that the TZ took effect plus a
+docblock on the `process.env.TZ = original` restore bug that assigns the STRING `"undefined"` when TZ was
+unset. The gap was real when written and has been closed by work since; the brief was not updated. **The
+rule it states — vary `TZ` explicitly on any clock-sensitive assertion — still stands and is now
+followed in 17 files.**
+
+### Uncatalogued surfaces T18 owns, measured
+
+- `packages/sync-client/test/barrel.test.ts` (**4** tests) and `test/storage.test.ts` (**4**: three from
+  `storageConformanceTests` plus `migrateLocal`) are catalogued in **no** `test-cases/` file — only named
+  in §12's prose as an owed item. Control: `outbox` returns 47 hits in `test-cases/`, so the search fires.
+  The header's *"the storage conformance suite's four"* mis-attributes: the suite has **three**, and the
+  fourth is `migrateLocal`. Two of barrel's four are self-controls (*"actually walked the graph — the
+  guard is not passing by reading nothing"*, *"the walker finds the forbidden imports where they really
+  live"*) — the antidote to this series' signature defect, and uncatalogued.
+- `apps/server/test/sync/stream-seq.test.ts` holds **four** green assertions with **no case id anywhere**.
+  **`12.15` is the reserved id for exactly this**, and the header already names *"Owner: Plan 10 Task 18."*
+- **Found by a verifier, recorded with an owner, NOT fixed here:** `attachment.added` is a live member of
+  `BOOTSTRAP_BACKFILL_TYPES` (`apps/server/src/sync/sync-routes.ts:59`) **with no server-side test
+  witness — deleting it from that constant leaves the whole server suite green.** Owner: Plan 10 Task 6 /
+  bootstrap.
+
+---
+
+## ✅ (HISTORY) POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
 
 **Everything the 12:35 override asked for is done.** The block below this one is that override's position
 and is now HISTORY; this block is the live state.
