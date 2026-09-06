@@ -1,4 +1,4 @@
-# Lane C — executor state (Plan 11 T14 → T15)
+# Lane C — executor state (Plan 11 T14 done, T15 in flight)
 
 **This file is Lane C's restart surface, and nobody else's.** `executor-state.md` is Lane A's,
 `executor-state-B.md`/`-D.md`/`-E.md` belong to their own lanes — never edit them. A Lane C session
@@ -10,112 +10,112 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
-## STATUS AS OF THIS WRITE: T14 PR #134 open with two amendments, third CI run in flight; T15 committed locally, not yet its own PR
+## SAFETY CORRECTIONS received from peers — adopt all, they still bind
 
-**PR #134** (Plan 11 T14, ci.yml 8-job split) head is `0761d08`, rebased onto `63296d2`. Two amendments
-landed on top of the original `e78212b`:
-1. Root-`package.json` script omission stated explicitly + §13 id-block allocation header (controller's
-   first catch: the plan's Files: block names root scripts this PR never added or explained).
-2. Two more controller catches, both fixed: (a) `test-cases/13`'s 13.7/13.8 described T15 artifacts
-   (`deploy/do/app.yaml`, `check-db-timezone.mjs`) not on this branch — flipped to `❌` naming Task 15's
-   PR as the real landing point; (b) added `scripts/check-case-ids.mjs` (a cross-style duplicate-case-id
-   detector, self-tested against a checked-in fixture BEFORE trusting the real sweep — this session's own
-   first draft had a real bug the fixture caught: a greedy marker-group swallowed a compound id line
-   whole and reported the wrong number as duplicated), which found two genuine pre-existing ambiguities
-   in `test-cases/07-api-realtime-search.md` (not this PR's file). Controller ruled: reword the two
-   ambiguous lines rather than add a checker exception (an exception for that section shape would itself
-   be a check that cannot fail for what it exempts) — done, Lane A notified (it mints in §7).
+**1. Reap by `ppid=1`, never `pgrep -f vitest`.** `pgrep -f vitest` matches every lane session's own
+command line (each embeds brief text containing the word "vitest") plus any peer's live test run.
+`pkill -f vitest` or killing its output would kill lanes A–E and a peer's live gate.
 
-**CI run in flight at push time** (`33995268917`) — **re-check its conclusion, do not assume green.** Two
-earlier runs at prior heads were both fully green (all 11 jobs each, verified via `gh api .../jobs`, not
-just top-level conclusion): `e78212b` (original) and the first-amendment head. The SECOND amendment's own
-run has not yet been read by this session as of this write.
+    ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
 
-**T15** (deploy/do/ spec) is fully drafted, sonnet-reviewed (one nit, fixed), and refined via repeated
-cross-session exchange with Lane E (DEPLOY_SHA shape/scope, an sslmode/verify-full downgrade risk, pg
-moved to root devDependencies not a new dependencies block). Committed LOCALLY as a WIP checkpoint on
-top of PR #134's current head — **NOT yet pushed as its own branch/PR**, held per "two PRs, T14 first"
-until #134 actually merges.
+Read the list before killing anything; expect it EMPTY.
 
-## LIVE ANCHORS — verified 2026-09-06, re-verify before trusting
+**2. The gate lock — a bare `echo $$ > pid` pattern never actually holds it** (each Bash tool call is a
+fresh shell, so the pid dies in seconds and every peer's stale-check reclaims almost immediately). Use an
+`mkdir`-based lock, ONE `run_in_background: true` invocation, never split across calls or foregrounded:
+acquire by looping `mkdir /tmp/gisik-gate.lock`, record `$$` in `pid` inside it, `trap` cleanup on EXIT,
+then run `pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1; echo
+GATE_EXIT=$? >> gate.log` inside the held lock. This session's own script:
+`scripts/laneC-gate.sh` pattern (kept in the session scratchpad, not committed) — reap orphans first,
+then wait-and-acquire, then run.
+
+**3. Verify shared external state independently before trusting a peer's word or a stale gate log** —
+Postgres reachability, whether a branch a peer describes has actually merged, whether `origin/main`
+moved again since your last fetch. This session hit exactly that last one twice in one restart (below).
+
+## STATUS AS OF THIS WRITE, 2026-09-06 ~07:45 IST
+
+**T14 is MERGED** — PR #134 at `3571d38` on `main`, promoted to done (11/14) at `cc42d01` (#144), both
+confirmed reachable via `git branch --contains`. Nothing to do there; do not re-implement it.
+
+**T15 is committed and gated green on branch `exec/28-plan11-do-spec`, not yet pushed/PR'd as of this
+write — check below before assuming it still isn't.** Restarted this session cut the branch fresh from
+`origin/main` (`git checkout -b exec/28-plan11-do-spec origin/main`, base `3571d38`), cherry-picked the
+prior session's WIP commit (`2df7cf5`, held on the old branch `exec/24-plan11-ci-deploy` for exactly this
+reason), then amended it into a real commit (dropped the "WIP" message) after folding in cross-lane
+review from Lane E and rebasing.
+
+## LIVE ANCHORS — verified 2026-09-06 ~07:48 IST, re-verify before trusting
 
 | anchor | value | how verified |
 |---|---|---|
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8` | `pwd` |
-| branch | `exec/24-plan11-ci-deploy` | `git branch --show-current` |
-| PR #134 head | `0761d08` | `git log --oneline`, matches what was pushed |
-| local HEAD (T15 WIP on top) | one commit ahead of `0761d08` | `git log --oneline -3` |
-| `0761d08`'s parent chain | `0761d08` → `19f68b3` (amendment 1) → `9c19d2a` (T14) → `63296d2` (origin/main at rebase time) | `git log --oneline` |
-| full rebuild at this HEAD | green, cached FULL TURBO; `actionlint`/`check:env`/`check-skipif-coverage`/`check-case-ids`/`check-task-ledger` all clean | ran directly, this session |
-| PR #134's 3rd CI run | in flight at write time (`33995268917`) — **re-check**, do not assume green | `gh run view 33995268917` |
+| branch | `exec/28-plan11-do-spec` (NEW — the old `exec/24-plan11-ci-deploy` is merged, left alone) | `git branch --show-current` |
+| HEAD | `c48302c` | `git rev-parse HEAD` |
+| `origin/main` at last rebase | `1b72900` (Closure 5 / Ruling P37, #139) | `git rev-parse origin/main`, `git branch --contains 1b72900` includes this branch |
+| ahead of `origin/main` | 1 commit (T15, real message) | `git log origin/main..HEAD --oneline` |
+| `pnpm check:env` | exit 0, 47 documented / 26 referenced, unchanged by this branch's additions | ran directly on the rebased tree |
+| `scripts/check-case-ids.mjs` | exit 0, 1272 unique ids, highest `13.76`, self-test passes | ran directly on the rebased tree |
+| `scripts/check-db-timezone.mjs` | exit 0 against shared dev Postgres (`localhost:54329`), prints `Asia/Kolkata` | ran directly |
+| full forced gate at `3571d38`+T15 (BEFORE the Closure-5 rebase) | green: `GATE_EXIT=0`, 30/30 tasks, 0 cached, 253 files / 3320 tests, 1m45s | `/tmp/laneC-gate2.log` — **superseded by the re-gate below, kept only as a data point** |
+| full forced gate at `c48302c` (AFTER rebasing past Closure 5, HEAD before the handoff commit) | **green: `GATE_EXIT=0`, 30/30 tasks, 0 cached, 256 files / 3334 tests, 1m27s** — `origin/main` re-fetched immediately after and confirmed unchanged (`1b72900`) before trusting this | `/tmp/laneC-gate3.log`, summed directly from its per-package `Test Files`/`Tests` lines, not estimated |
 
-## WHAT'S IN #134 (T14, both amendments included)
+**The trap this restart actually hit, twice, worth naming for the next one:** `origin/main` moved TWICE
+between "fetch and branch" and "ready to commit" — once by two docs-only commits (safe to ignore), once
+by a real code merge (Lane B's Closure 5, `visible-events-for.ts`/sync surface) that landed **during the
+gate run this session had already kicked off against the pre-Closure-5 tree**. A gate that passed against
+a tree you then rebased past is not evidence about the tree you're now on — **re-verify `origin/main`'s
+sha immediately before trusting any completed gate, not just before starting one.**
 
-`.github/workflows/ci.yml` split into 8 jobs (`scope`, `check-env` + `check-skipif-coverage.mjs` +
-`check-case-ids.mjs`, `check-tasks`, `build`, `typecheck`, `server-tests` [4-shard], `other-tests`, `e2e`,
-aggregating `gate`), `scripts/check-no-silent-skips.mjs`, `scripts/check-skipif-coverage.mjs`,
-`scripts/check-case-ids.mjs` + `scripts/fixtures/check-case-ids-fixture.md`, `Features.md` §13 stub,
-`test-cases/13-deployment-dogfooding.md` (opened early, merged with Lane D's Tasks 7/8 cases at rebase),
-`test-cases/07-api-realtime-search.md` (two disposition bullets reworded), `test-cases/README.md`.
+## WHAT'S IN THE T15 COMMIT
 
-**Opus review findings on the original ci.yml split, all fixed**: (1) `check-no-silent-skips.mjs`'s
-`assertions.length > 0` guard let a skipIf file with ZERO assertionResults (an empty-fixture-list guard)
-print "ok" — dropped the guard. (2) The guard only covered `server-tests`; added
-`check-skipif-coverage.mjs` as a trip-wire in `check-env`. (3) The `e2e` job's stack-detection would have
-mis-triggered on `apps/web/playwright.config.ts`, which already exists for an unrelated, deliberately
-off-gate mock smoke — fixed to check only for `docker-compose.dev.yml` and never attempt a run.
+`deploy/do/app.yaml` + `deploy/do/README.md` (DigitalOcean App Platform spec: server/web/backup-worker,
+region `blr`, managed Postgres, object storage + backup env vars named against the ACTUAL schema —
+`OBJECT_STORE_S3_*`/`SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, not the plan's unread `S3_*`/
+`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` draft; `MAGIC_LINK_FROM=contact@artsourced.in` per the 2026-09-02
+owner correction; not applied to any live app), `scripts/check-db-timezone.mjs` (falsifiable against a
+throwaway UTC-forced database, re-verified against the shared dev Postgres this restart), root
+`package.json` (+`check:db-tz` script, +`pg` devDependency `^8.13.0`→resolved `8.23.0`) + regenerated
+`pnpm-lock.yaml` (cleared with Lane E as manifest owner — confirmed by Lane E directly, no collision),
+`Features.md` + `test-cases/13-deployment-dogfooding.md` (13.7/13.8 flipped `❌`→`🧪` now the files
+actually exist on this branch).
 
-## WHAT'S IN THE LOCAL T15 WIP (not yet its own PR)
+**Two items folded in from Lane E's cross-lane review during this restart, both phrased to hold
+regardless of merge order** (Lane E flagged that the first draft of both was only true *because* of an
+assumed merge order — the exact "checks that cannot fail" class this whole series hunts):
+- README's `DATABASE_CA_CERT`/`sslmode` item now states the CA-discard as a present-tense fact about
+  `main` today (not "Lane E fixed it"), naming Lane E's T1 `withoutSslParameters` (`apps/server/src/db.ts`,
+  on unmerged `origin/exec/23-plan11`) as the fix and stating plainly "until that lands, a CA set here has
+  no effect."
+- `app.yaml`'s `TRUST_PROXY` comment now names the rightmost-XFF rate-limit-key fix as "Plan 11 T2 (not
+  yet on main)" and states the forged-header gap is open on whatever's on `main` today — not contingent on
+  which PR merges first.
 
-`deploy/do/app.yaml`, `deploy/do/README.md`, `scripts/check-db-timezone.mjs`, root `package.json`
-(+`check:db-tz` script, +`pg` in devDependencies), `pnpm-lock.yaml` (regenerated via `pnpm install`),
-`Features.md`/`test-cases/13`'s T15 bullets (13.7–13.8, currently `❌` inside PR #134's committed
-content — flip them to `🧪` in T15's own PR once these files actually land).
-
-**Corrected against the plan's own draft**: object-storage/web-client env var names
-(`OBJECT_STORE_S3_*`/`SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, confirmed via `pnpm check:env`'s own
-output — not the plan's `S3_*`/`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`, which nothing reads).
-`DEPLOY_SHA` deliberately OMITTED from `app.yaml` (Lane E confirmed the shape, forthcoming on their
-branch; the CI step to keep it current per-deploy is a live-deploy action, out of scope). A third open
-item (`sslmode=require` vs `verify-full` on `pg` major bumps) is documented in `deploy/do/README.md`'s
-unresolved section.
-
-## GATE LOCK PROTOCOL, AND A MEMORY-PRESSURE NOTE
-
-ONE backgrounded invocation, `mkdir`-based lock, 60s empty-pid grace, 10-min loud-proceed bound. Never
-`pkill -f vitest`. **Background wait loops for another lane's PR merge status got killed twice this
-session for system-wide memory pressure** (verified: zero of this lane's own orphaned vitest processes
-both times) — prefer single lightweight `gh pr view`/`gh run view` checks over a polling loop.
-
-## A STAGING MISTAKE MADE TWICE THIS SESSION — the actual trap for a restarted session
-
-**`git reset --soft <ref>` does NOT unstage anything — it only moves HEAD, leaving the index exactly as
-it was.** Twice this session, after `git reset --soft` to re-split a combined commit, `git add <the T14
-files>` was additive on top of an index that STILL had T15's files staged from before the reset — and
-`git commit` (no pathspec) picked up everything staged, silently recombining T14 and T15 into one commit
-again. The fix both times: after `reset --soft`, explicitly `git restore --staged <files to exclude>`
-before committing — never assume the index is clean just because the working tree diff looks right.
-**Verify with `git diff --cached --name-only` before every commit that is supposed to be scoped.**
+Confirmed directly against Lane E's branch (`origin/exec/23-plan11` at `f7c9b0f` when checked, later
+`T2 committed and green` per Lane E's own report): `DEPLOY_SHA`, `TRUST_PROXY`, `RATE_LIMIT_*`,
+`ALERT_WEBHOOK_URL`, `SMTP_URL`, `MAGIC_LINK_FROM`, `DATABASE_CA_CERT` all land in `config.ts` under the
+exact names this spec already uses — no renaming needed when Lane E's branch merges.
 
 ## NEXT STEPS, IN ORDER
 
-1. Check `gh run view 33995268917 --json conclusion` and read job steps via `gh api
-   repos/bkirosangma/gisik-nokma/actions/runs/33995268917/jobs` before reporting or assuming green.
-2. Wait for the controller to merge #134. Do not start T15's PR before that (two-PRs-T14-first).
-3. Once #134 merges: `git log --oneline` to find the T15 WIP commit fresh (its sha will have moved),
-   `git fetch origin`, rebase T15 onto the new `origin/main`, re-run the FULL forced gate (package.json/
-   lockfile changed, so a cached partial run is not sufficient evidence), flip 13.7/13.8 back to `🧪`
-   in `test-cases/13-deployment-dogfooding.md` and the matching Features.md bullets, commit for real
-   (drop the "WIP" message), push, open PR #2.
-4. Report PR #2 to the controller: head sha, `Tasks:` line, test count, node version, `0 cached`,
-   `check:env` on its own line, "the spec was not applied to any live app".
-5. Do NOT start any other Plan 11 task without a controller message.
+1. **Re-verify `origin/main`'s sha right now** — do not trust the "AFTER rebasing past Closure 5" gate
+   row above without re-fetching first; another lane may have merged again since this was written.
+2. Confirm the re-gate's `GATE_EXIT=` line is `0` at the CURRENT `origin/main` sha. If `origin/main` moved
+   again while that gate ran, rebase again and re-gate again — do not commit/push on a stale gate.
+3. Push `exec/28-plan11-do-spec`, open the T15 PR. Report to `gisik-nokma-0d`: head sha, `Tasks:` line,
+   test count, node version, `0 cached`, `check:env` on its own line, and the honest sentence: "the spec
+   was not applied to any live app."
+4. Do NOT start any other Plan 11 task without a controller message (Lane D has T7/T8/T9/T10, Lane E has
+   everything else named in the file map from the override brief).
 
 ## THINGS A RESTARTED SESSION MUST NOT ASSUME
 
-- A CI run starting, or even a prior head's run being green, is not this head's run being green —
-  always re-check the specific run id's conclusion and read its job steps.
-- Any sha quoted above will be stale the moment another lane's PR merges — `origin/main` moved five
-  times in this session's roughly two hours of work. `git fetch` and compare before trusting an anchor.
-- The T15 WIP commit's position and sha will have moved if this session did anything after writing this
-  section — use `git log --oneline` fresh.
+- Any sha in this file is stale the moment another lane's PR merges — `origin/main` moved three times in
+  the roughly 20 minutes this restart took to get T15 from cherry-pick to gate. `git fetch` and compare
+  before trusting an anchor, including the ones in this file.
+- A gate log's `GATE_EXIT=0` is evidence about the tree it ran against, not about "the branch" in general —
+  check the log's own timestamp against `git log -1 --format=%cd` and against whether you've rebased since.
+- Lane E's branch (`origin/exec/23-plan11`) is unmerged and moving — anything cited from it above
+  (`DEPLOY_SHA`, `TRUST_PROXY` semantics, the CA fix) is real on that branch, not yet on `main`. The T15
+  files are written so their prose stays true either way; re-check that a later edit hasn't broken that
+  property if you touch them again.
