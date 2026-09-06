@@ -39,6 +39,7 @@ import {
   type BootstrapTicket,
 } from '../../src/sync/sync-routes.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
+import { reconcileHeldIds } from '../../src/sync/reconcile-route.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
 import { canSee } from '../../src/visibility/can-see.js';
@@ -335,23 +336,27 @@ export async function createHarness(): Promise<Harness> {
         return syncService.processBatch(userId, events);
       },
       /**
-       * Closure 5's reconcile door, on the same in-process service the HTTP
-       * route delegates to — `canSee` per presented id, nothing else consulted.
-       * Restated here rather than reached for through `registerReconcileRoute`
-       * for the same reason `bootstrapFor` restates `bootstrapTicket`: the route
-       * is Fastify-shaped and this harness has no HTTP. The ONE rule it
-       * reproduces is the one the route's safety rests on — existence is never
-       * asked, so an unknown id answers exactly as a lost one does.
+       * Closure 5's reconcile door — **the route's own function, called, not
+       * restated.** `reconcileHeldIds` is the body of `POST /v1/sync/reconcile`
+       * (`src/sync/reconcile-route.ts`), and this transport and that route are
+       * its only two callers.
+       *
+       * It used to be a copy of the loop, and #139's review named that as the
+       * branch's weakest claim. The copy was correct; the hazard was that it
+       * could stop being correct silently, leaving this harness proving
+       * replicas against a rule the server no longer has. Closure 5b deleted
+       * the copy rather than annotating it.
+       *
+       * What this call does NOT reach is the route's HTTP shell — the bearer
+       * session, the 403 membership gate, the body schema and its
+       * `MAX_BATCH_SIZE` bound. Those are covered by
+       * `test/sync/reconcile-route.test.ts`'s eight cases, and reaching them
+       * from here would mean the harness's three seeded users had to be real
+       * better-auth users with ids better-auth chose. Stated so nobody reads
+       * "calls the real route" as more than it is.
        */
       async reconcile(ws, heldIds) {
-        const restricted: Array<{ kind: 'restricted'; id: string }> = [];
-        const asked = new Set<string>();
-        for (const id of heldIds) {
-          if (asked.has(id)) continue;
-          asked.add(id);
-          if (!(await canSee(pool, userId, id))) restricted.push({ kind: 'restricted', id });
-        }
-        return { workspaceId: ws, restricted };
+        return { workspaceId: ws, restricted: await reconcileHeldIds(pool, userId, heldIds) };
       },
       // Only `engine.start()` opens a stream, and the harness never calls it:
       // sync-down is `syncDown()` below, on the same primitive the socket

@@ -1,5 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Pool } from 'pg';
+import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canSee } from '../visibility/can-see.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
@@ -87,6 +88,61 @@ export type ReconcileRouteDeps = { pool: Pool };
  * tidiness — repeating an id must not multiply the work `canSee` does per
  * request.
  */
+/**
+ * The reconcile RULE, extracted so it has exactly one implementation.
+ *
+ * **This function exists because a second implementation of it already
+ * existed.** `apps/server/test/dual-client/rig.ts` restated this loop
+ * in-process for its `SyncTransport.reconcile`, and #139's own review named
+ * that as the branch's weakest claim: *"the rig restates the route's rule
+ * rather than calling it, so no case runs client and real route together."*
+ * The hazard a restatement carries is not that the copy is wrong today — it
+ * was right — but that the two can drift, and the harness would then prove
+ * replicas against a rule the server does not have. That is this series'
+ * signature failure, and it is closed by deletion rather than by a comment
+ * asking the next author to keep two copies in step.
+ *
+ * **Why extraction and not `inject()`.** The lane's brief asked for the rig to
+ * call the real route over HTTP. Measured cost: the route reads
+ * `request.currentUserId`, which `makeRequireSession` fills from better-auth's
+ * session — so the rig's three seeded users (`USER_A`, `USER_B`, `USER_ADMIN`,
+ * fixed ULIDs referenced 96 times across `scenarios.test.ts`) would have to
+ * become real auth users signed in through `signInWithPhone`, whose ids
+ * better-auth mints and the rig cannot choose. That is a large mechanical
+ * ripple through shared test files for a property already covered: the HTTP
+ * shell — bearer session, the 403 membership gate, the body schema and its
+ * bounds — has eight cases of its own in `test/sync/reconcile-route.test.ts`.
+ * What those cases could NOT cover is the rig holding a second copy of the
+ * rule, and that is precisely what this extraction removes. One implementation,
+ * two callers, and the HTTP layer tested where it lives.
+ *
+ * The membership gate stays in the ROUTE and is deliberately not pulled in
+ * here: it is a 403 with a reply body, an HTTP fact, and a caller that is not a
+ * route has no reply to send. Callers that need it ask `resolveEffectiveRole`
+ * as the route does.
+ *
+ * Duplicates in `heldIds` are answered once — not for tidiness, but so
+ * repeating an id cannot multiply the `canSee` work one request does.
+ */
+export async function reconcileHeldIds(
+  db: Queryable,
+  userId: string,
+  heldIds: readonly string[],
+): Promise<ReconcileRestriction[]> {
+  const restricted: ReconcileRestriction[] = [];
+  const asked = new Set<string>();
+  for (const id of heldIds) {
+    if (asked.has(id)) continue;
+    asked.add(id);
+    // The ONE question. Not "does it exist", not "did they hold it" — see the
+    // route's docblock on why either would reopen what this door closes.
+    if (!(await canSee(db, userId, id))) {
+      restricted.push({ kind: 'restricted', id });
+    }
+  }
+  return restricted;
+}
+
 export function registerReconcileRoute(
   app: FastifyInstance,
   deps: ReconcileRouteDeps,
@@ -120,18 +176,10 @@ export function registerReconcileRoute(
       if (eff.workspaceRole === null) {
         return await reply.code(403).send({ error: 'not_a_member' });
       }
-      const restricted: ReconcileRestriction[] = [];
-      const asked = new Set<string>();
-      for (const id of heldIds) {
-        if (asked.has(id)) continue;
-        asked.add(id);
-        // The ONE question. Not "does it exist", not "did they hold it" — see
-        // the docblock on why either would reopen what this door closes.
-        if (!(await canSee(deps.pool, userId, id))) {
-          restricted.push({ kind: 'restricted', id });
-        }
-      }
-      const body: ReconcileResponse = { workspaceId, restricted };
+      const body: ReconcileResponse = {
+        workspaceId,
+        restricted: await reconcileHeldIds(deps.pool, userId, heldIds),
+      };
       return body;
     },
   );
