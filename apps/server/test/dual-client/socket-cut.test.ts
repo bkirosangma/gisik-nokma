@@ -703,6 +703,14 @@ describe('12.290 — a real socket, really cut, mid-pull', () => {
         { code: 1013, reason: 'slow-consumer' },
         { code: 1013, reason: 'slow-consumer' },
       ]);
+      // EXACTLY three upgrades, counted at the SERVER's door. The status
+      // sequence above counts subscriptions this engine believes it made; this
+      // counts the connections the server actually accepted, and only both
+      // together rule out a reconnect that opened a socket the engine then
+      // abandoned. The control asserts `toHaveLength(1)` on the same array, so
+      // the bound is asserted on both sides of its line rather than one — the
+      // shape this repo has already paid for twice.
+      expect(f.viewerSockets, 'three real upgrades: the original and two reconnects').toHaveLength(3);
     },
     120_000,
   );
