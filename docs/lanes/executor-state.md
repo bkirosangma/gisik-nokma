@@ -16,6 +16,324 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — `exec/37-c2-cursor`. **PR #176 OPEN AND HELD on the opus verdict. Gate green 30/30, 0 cached, 3,387 tests.**
+
+> Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
+> — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
+> pre-rebase content while looking like it worked.
+
+## ANCHORS — measured 2026-09-06 ~09:45 IST
+
+| what | value |
+|---|---|
+| branch | `exec/37-c2-cursor`, cut from `origin/main` `aa17046` (#169, Rulings P39+P40, MERGED) |
+| merge-base | `aa17046` — `git branch --contains aa17046` lists `main`, so it is REACHABLE, not orphaned |
+| HEAD | `b9453ed` at PR time; later commits pushed on the same branch — RECOUNT, do not adopt |
+| tree | clean at cut |
+| node | **v22.22.2** |
+| build | `pnpm turbo run build --force --concurrency=1` → **BUILD_EXIT=0, `0 cached, 10 total`** |
+
+`SERVING_GAPS` now carries **`search` alone**. Closures 2 (#125), 3 (#128), 2b (#137), the mapper
+round trip (#143), 4 (#141), the HELD pair (#150) and #169 are all on `main`. Do not re-implement them.
+
+## WHY C2 IS ESCALATED RATHER THAN BUILT — three measurements, none of them a reading of prose
+
+The override says: *"a cursor on `TicketListView` … the web list view pages through it … P30 holds:
+`data-source.ts` is not widened … If it turns out to need a `DataSourceQuery` change, escalate before
+building."* **It needs one.** Measured at `aa17046`:
+
+1. **`FilterSpec` has no cursor key** — `view-types.ts:70-81`, ten optional fields (`text`,
+   `assigneeIds`, `collaboratorIds`, `typeIds`, `stateIds`, `stateCategories`, `projectIds`,
+   `dueBefore`, `dueAfter`, `fields`). None is a position.
+2. **`listQueryString(filter, grouping)`** — `online-data-source.ts:63` — takes exactly two arguments
+   and builds the entire query string. `getTickets` calls it at line 164 with nothing else.
+3. **`DataSourceQuery.getTickets(projectId, filter, grouping)`** — `data-source.ts:135`. Three
+   parameters, no cursor in.
+
+**So a cursor on the RETURN type reports "there is more" and no caller can ask for the next page.**
+A view type that can say *incomplete* but not *continue* is strictly better than today's refusal only
+if some consumer can act on it; the web list view cannot. `mappers.ts:1114-1118` already says this in
+its own words — *"a caller of `getTickets` sees the first page and cannot ask for the next … the owner
+is `DataSourceQuery.getTickets`, whose signature has nowhere to put one."* The override's P30 clause
+and its "pages through it" clause are in direct conflict, and the override itself names the tie-break:
+escalate.
+
+### The second, independent blocker: the cursor INVERTS a decision that was deliberately tripwired
+
+`views/list-model.ts:9-31` states that **client-side grouping is licensed only because
+`TicketListView` is the complete row set**, and that the shipped `/v1/list` route groups PER PAGE, so
+a client regrouping a page labels sections with the project's name — *"the grouping-as-filter lie
+wearing a pagination costume … worse than the plain one because the number looks authoritative."*
+`test/views/list-model.test.ts:53-71` carries a **TYPE tripwire** — `paginationTripwire(key: keyof
+TicketListView): CompleteRowSetOnly` — whose kill is a `typecheck` error, and whose docblock records
+the measurement: *adding `nextCursor: string | null` fails `pnpm --filter @gisik-nokma/app-core
+typecheck` with TS2322.*
+
+**That tripwire is not an obstacle to route around. It is a decision point, and its own text says the
+decision "has to be retaken rather than silently inverted."** A bare `nextCursor` added to the view
+type deletes the tripwire and inverts the grouping decision in the same commit, with no consumer
+able to page and therefore no way for grouping to recover completeness.
+
+### THE RULING I AM ASKING FOR (P41) — three doors, my recommendation last
+
+- **Door A — widen `DataSourceQuery.getTickets` to take a cursor** (breaks P30 for this one signature;
+  `data-source.ts` is on the collision map). The view type grows `nextCursor`, the web view pages, and
+  `groupRows` must then be re-licensed: grouping accepts only a set proven complete, so the tripwire is
+  REPLACED by a completeness precondition rather than deleted.
+- **Door B — a paging loop inside the online source** (the OTHER closure `mappers.ts:1156` names).
+  `TicketListView` stays `{projectId, rows}`, the tripwire stays intact and untouched, grouping stays
+  licensed, P30 is untouched, and `getTickets` answers the whole project by looping until the cursor is
+  null. Cost: unbounded round trips on a large project, and the client cannot show partial progress.
+- **Door C — cursor rides in `FilterSpec`.** **I recommend AGAINST it and did not cost it further:** a
+  cursor is not a filter, and `FilterSpec` also feeds `search` and is embedded in `SavedFilter`
+  (`view-types.ts:264`), so a cursor key would become a persistable saved-filter field.
+
+**My recommendation is Door B**, and the reason is that it is the only door that closes C2 without
+inverting a decision the codebase deliberately tripwired: it makes the view type's completeness claim
+TRUE again rather than making it expressible-but-unactionable. Door A is the right answer only if the
+owner wants partial-page rendering as a product behaviour, which is a product call, not mine.
+
+**I am least sure of:** whether Door B's unbounded loop is acceptable at the project sizes this
+product targets. I have not measured a realistic ticket count per project, and `DEFAULT_LIMIT = 50`
+is the only number I have.
+
+## FAN-OUT DEFERRED, AND RECORDED AS THE BRIEF REQUIRES
+
+Session meter read **87% at 09:40** with the reset at **12:20**; the controller's own message says a
+Fable dispatch dies with zero findings and looks clean. Per the brief — *"No fan-out starts against a
+pool that cannot finish it … defer and record the deferral"* — **no fan-out was started this task.**
+The three measurements above were made directly. When C2 is ruled and built, it needs an opus reviewer
+(client type change, N consumers — closure 3's class).
+
+## RULING P41 RECEIVED (2026-09-06 09:48) — **DOOR B**, and it is the next thing to build
+
+The controller ruled my recommendation: **the online source pages through the server's cursor until
+exhausted and hands the view the COMPLETE row set.** `TicketListView` stays `{projectId, rows}`,
+`list-model.ts`'s grouping license stays TRUE rather than expressible-and-unactionable, the
+`paginationTripwire` STAYS as the decision's guard, and P30 is untouched. Door A is a product decision
+that belongs to the owner; Door C refused for the `SavedFilter` reason.
+
+**The ruling's own conditions, which are part of the build and not optional:**
+- **Bound the loop.** A documented page cap — start at **40 pages × `DEFAULT_LIMIT` 50 = 2000 rows** —
+  named at the case as a DISCLOSED ASSUMPTION with its owner, because I hold no ticket-count
+  measurement for a real project and said so.
+- **A LOUD refusal beyond the cap** in the `ServingGapError` register ("project too large for the
+  complete list"), self-expiring, **never a silent truncation** — a silently truncated set is exactly
+  the C2 defect one bound further out.
+- **Excluding fixtures, alone:** a two-page project assembles both pages, disjoint and complete
+  together (mutate the loop to stop after page one → red); a project one page beyond the cap refuses
+  loudly (mutate the cap away → the refusal never fires → red); and the existing C2 refusal case flips
+  to the served path.
+- **The replica source needs NO change** — it already holds the full set locally. Say so AT THE CASE
+  rather than leaving it inferred.
+- Reviewer when built: **opus** (client-path change, N consumers — closure 3's class).
+
+`routes/list.ts:103` confirms the server side already takes a `cursor` as a bound value, so nothing on
+the server needs to change either. **Not started — the halt arrived first.**
+
+## WHAT LANDED THIS SESSION
+
+1. **7.219 — 7.211's third branch, CLOSED** (commit `8df6fb5`). A `parent_id` naming no
+   `proj_visibility` row answers `false`. 7.211 had recorded that dropping the `knownParents.has(...)`
+   conjunct left all 74 cases green; it no longer does. **Measured: 33 passed clean; mutated → 1
+   failed, 32 passed, 7.219 ALONE**, `expected true to be false` at its own line. Mutation restored
+   with `git checkout HEAD --` and verified by READING the file. The dangling row is hand-written and
+   the case says so (7.214's precedent) — the door refuses a `ticket.created` naming a parent with no
+   row, so the product path cannot reach it and a scenario fixture would be a fiction.
+2. **12.255 — `BoardCard.cause` catalogued as ❌** with its full reason and the case to write. Not
+   built: closing it properly means growing the snapshot block to carry the cause, which couples
+   `sync-client` to a domain type it does not otherwise know — which is why P36 left it. §12 now used
+   through **12.255; FOUR left (12.256–12.259); ask before 12.259.**
+
+## DOOR B IS BUILT — committed and pushed; the FULL GATE is the only thing outstanding
+
+All five of P41's conditions are met. `mapListView` is gone; `mapListPage` maps ONE page to a new
+`ListPage {projectId, rows, nextCursor}` and `onlineDataSource.getTickets` follows the cursor to
+exhaustion. **`TicketListView` is UNCHANGED**, so `test/views/list-model.test.ts`'s
+`paginationTripwire` still compiles and still guards the grouping decision — that was the whole point
+of Door B over Door A.
+
+| condition | state |
+|---|---|
+| bounded loop, 40 pages × 50 = 2000 rows | `LIST_PAGE_CAP` in `mappers.ts`, docblock says DISCLOSED ASSUMPTION |
+| loud refusal in the register | `LIST_TOO_LARGE_ABSENCE`, `wireKey`/`wireRoute` both null (no route can close it) |
+| two-page assembly, disjoint + complete | **12.257** |
+| cap refuses loudly | **12.258** |
+| C2 refusal flips to served | **12.256** |
+| replica needs no change, SAID at the case | 12.257's describe block |
+| control: one page, one request | **12.259** |
+
+**Measured:** app-core `tsc --noEmit` exit 0; 155 tests pass across `test/online` + the tripwire.
+
+### MUTATIONS — both run, both outputs read, one recorded against my own interest
+
+| mutation | result |
+|---|---|
+| loop stops after page one | **2 failed, 21 passed** — 12.257 (`expected [ 't1', 't2' ] to deeply equal [ 't1', 't2', 't3', 't4' ]`) AND 12.258, since the cap becomes unreachable |
+| cap removed (`Number.MAX_SAFE_INTEGER`) | **1 failed, 22 passed — 12.258 alone** |
+
+**The second mutation reddens for a mechanism that is not the naive one, and this is written into the
+case:** it fails as `expected MappingError … to be an instance of ServingGapError`, because the
+unbounded loop runs off the end of the fixture and 404s. The property killed is correct — the refusal
+never fires — but a reader comparing that message to the case text would reasonably think the mutation
+had missed.
+
+### THE MISTAKE THIS TASK MADE, so the next session does not repeat it
+
+**`git checkout HEAD -- <path>` on an UNCOMMITTED file deletes the work, not the mutation.** I mutated
+the loop before committing it; HEAD predated Door B, so the restore wiped the whole loop and it had to
+be rewritten. The restore idiom in the brief assumes the file is committed. **Commit, then mutate.**
+
+## THE FIXTURE LIED, AND AN ADVISOR CAUGHT IT — the most important thing on this branch
+
+The first gate was **GREEN (30 successful, 30 total, GATE_EXIT=0)** with all four client cases
+passing, and the evidence was still wrong. **`pagingFetch` implemented the cursor as a PAGE INDEX**
+(`Number(cursor)`, `nextCursor: String(index+1)`). The shipped route is KEYSET —
+`routes/list.ts:143` binds `t.ticket_id > $n` and line 187 emits the LAST ID OF THE PAGE. So 12.257,
+12.258 and 12.259 proved the loop was internally consistent with a protocol I had written myself.
+**That is this series' signature failure verbatim: a mocked contract is the thing that excuses the
+server from existing** — and four green cases plus a green gate did not surface it.
+
+Two repairs. The fake is keyset now (looks the cursor up as a page's last id, emits the last id, and
+12.257 pins `cursor=t2` rather than `cursor=1`). And **7.220** runs the real `mapListPage` over the
+real route TWICE, carrying the server's own cursor between requests — the only thing that can prove
+the route ACCEPTS `cursor` here, that the mapper's value is the one the route RESOLVES, and that it
+ADVANCES. `limit=1`, not 51 seeded tickets: the route pages at `limit + 1`, so the protocol is
+identical at any size. Non-vacuity asserted first, so a one-ticket fixture fails loudly.
+
+**The loop itself needed no change and that is worth stating rather than implying** — it passes the
+cursor back as an opaque string, so it was always protocol-agnostic. Only the evidence was wrong.
+
+| mutation | result |
+|---|---|
+| route ignores the cursor (`params.add('')`) | **6 failed, 50 passed** — 7.220 among them, `expected '01M1TFYYSPBXJSXF82YFSSVBB9' not to be '01M1TFYYSPBXJSXF82YFSSVBB9'` |
+
+**Recorded against my own interest: that blast radius is NOT surgical.** Five list-route cases die
+with it. What makes it evidence about 7.220 is the MESSAGE naming this case's own property, not the
+count.
+
+## THREE SMALLER THINGS, all done
+
+- **`stream.ts` carried a false PRESENT tense** — "the fabrication `mapListView` refuses a truncated
+  page for", about a refusal that no longer exists. Corrected in place per P40 (the analogy still
+  holds; the tense did not). The other three prose hits (`page.tsx:50`, `e2e/smoke.spec.ts:131`,
+  `ticket-dates-input.ts:26`) read as historical and are fine.
+- **The four cases were verified BY NAME** with `--reporter=verbose`, not inferred from an aggregate:
+  12.256, 12.257, 12.258, 12.259 all ✓, and 12.257/12.258 still ✓ under keyset semantics. The earlier
+  `PASS (155)` line could not have told me a case had silently stopped running.
+- **The cap's absence is deliberately NOT a `SERVING_GAPS['getTickets']` key**, and the reasoning is
+  written at `LIST_PAGE_CAP` rather than left to inference: that map means *refuses ALWAYS*,
+  `getTickets` answers for every project small enough to finish, the key would detonate
+  `stub-services.ts`'s `refuse(method)` lookup (the 86-web-test mechanism), and the register carries
+  `search` alone. P41's phrase "in the register" admits the other reading, so a reviewer should see
+  the choice.
+
+## PR #176 IS OPEN AND HELD — https://github.com/bkirosangma/gisik-nokma/pull/176
+
+**Held by the controller until I relay the opus reviewer's verdict applied.** It merges on its eleven
+jobs after that. **I never merge.**
+
+**Gate, forced and uncached, at the sha in the PR:** `pnpm turbo run build test typecheck --force
+--concurrency=1` → `GATE_EXIT=0`, **30 successful / 30 total, 0 cached**, **3,387 tests passed, 0
+failed** across ten packages. `pnpm run check:env` → 0. Node **v22.22.2**. `check-case-ids` → 0,
+1331 ids, union == sum.
+
+## CONTROLLER RULINGS RECEIVED THIS TASK
+
+- **RATIFIED:** the cap's absence is NOT a `SERVING_GAPS` key. My reading at `LIST_PAGE_CAP` is the
+  record; P41's "register" meant the ERROR TYPE. Do not revisit.
+- **§12 REALLOCATED:** 12.240–12.259 is exhausted; **Lane A now holds 12.320–12.339, entirely
+  unused.** Lane B holds 12.290–12.319. Next free block 12.340 ON REQUEST. Header updated.
+- **CARRIED with a named owner:** the web shell's behaviour when `getTickets` throws past the cap —
+  owner Task 13's E2E or a web render test, named at 12.258.
+- The page-index-vs-keyset finding goes to **Lane F** in these words: *any fixture whose protocol was
+  authored alongside its consumer.*
+
+## TWO ANSWERS PREPARED FOR THE REVIEWER — measured from the route, not asserted
+
+If the opus reviewer raises either of these, the argument is already made; do not re-derive it.
+
+- **Cycle risk in the loop.** None. `routes/list.ts:143` binds `t.ticket_id > $n` — a STRICT
+  inequality — and :187 emits the page's LAST id as `nextCursor`. So each cursor is strictly greater
+  than the one before it and the sequence is monotone increasing: a repeated or backward cursor
+  cannot advance and cannot recur. A server misbehaving outside that contract is still bounded by
+  `LIST_PAGE_CAP`, which terminates with a refusal rather than spinning.
+- **`projectId` taken from the LAST page** (`online-data-source.ts:210`). Harmless. The route echoes
+  the projectId from the REQUEST PATH (`routes/list.ts:184`), and the loop requests the same
+  `projectId` on every iteration, so every page returns an identical value. Taking it from the last
+  page is the same as taking it from the first.
+
+## BLOCK OWNERSHIP RE-VERIFIED (a check `check-case-ids` structurally cannot do)
+
+`check-case-ids` proves uniqueness and union==sum. It CANNOT tell you whether a range your header
+claims is already occupied. Measured against `origin/main`: ids in 12.290–12.339 are **12.290 and
+12.291 only**, both inside LANE B's range where they belong. **12.320–12.339 is genuinely free**, so
+the header is accurate rather than merely transcribed. Nothing was minted from it.
+
+## THE OPUS REVIEW LANDED — no Critical, 3 Important, 5 Minor. FIX ROUND APPLIED.
+
+**It was a real review, not a dead agent** (163k tokens, 53 tool uses, 13 min): it EXECUTED a
+transcription of the loop to prove the cap arithmetic, and ran mutants of its own. It cleared three
+things I had claimed — cap has no off-by-one, no infinite-loop hazard, `TicketListView` genuinely
+unchanged with the tripwire intact (`git diff` on those two files is EMPTY) — and it independently
+confirmed the keyset fixture now mirrors the route.
+
+### Fixed in this round
+
+| # | finding | what I did |
+|---|---|---|
+| **Imp 2** | cap expressed in PAGES but justified in ROWS, coupled to the server's non-exported `DEFAULT_LIMIT` the client never sent | **The client now SENDS `limit=200`** (the route's validated `MAX_LIMIT`). `LIST_ROW_CAP = 2000`, `LIST_PAGE_SIZE = 200`, **`LIST_PAGE_CAP` DERIVED** so the two cannot drift. The row number is now true by construction. |
+| **Imp 1** (partial) | refetch amplification — 1 request became N under a hook that reloads on every stream event with no cancellation | Mitigated 4× by the same change: 2000 rows is **10 round trips, not 40**. Cancellation NOT done — carried as **12.321** with a named owner. |
+| **Min 4** | a surviving mutant: the exact-cap boundary was untested | **12.320** added. Verified it kills that mutant ALONE (1 failed, 23 passed; 12.257/12.258/12.259 all still green). |
+| **Min 5** | **a FALSE claim in my own docblock** | Corrected in place per P40. I wrote that a `SERVING_GAPS` key "would detonate `stub-services.ts`'s `refuse(method)` lookup". **It would not** — `refuse()` throws only when a gap DISAPPEARS, and `getTickets` is `unstubbed` there; `refuse('getTickets')` is called nowhere (measured: 0 hits). The DECISION was right, the mechanism named for it was invented. |
+| **Min 6** | the assembled view is not a snapshot and nothing said so | Disclosed at the loop with an owner. Ten requests are ten transactions. |
+| **Min 7** | a LIVE cross-reference to the removed `mapListView` | Repointed to `mapListPage`. |
+| **Min 8** | a mid-loop 404 surfaced as a mapping error | Now `HttpError(404)`, the conversion `getBoard` already makes. Window was 40× wider than before. |
+
+### Carried with named owners, NOT fixed — both are product calls beyond a correctness closure
+
+- **12.321** refetch cancellation. Owner: whoever measures walk duration against stream event rate.
+  The reviewer flagged its own "pile up" wording as its least-sure claim; I did not adopt it as fact.
+- **12.322** the cap is a CLIFF — the filter is hardcoded `{}` so a user cannot narrow under it, and
+  three of four project tabs go to `ShellRefusal`. Throwing is still right; the missing thing is a
+  graceful path. Owner: the list surface's product design.
+
+**§12 now used through 12.322** of Lane A's 12.320–12.339.
+
+## STILL OUTSTANDING — the only things left
+
+1. **The post-fix gate** — running. The previous green (30/30, 0 cached, 3,387 tests) predates the
+   whole fix round and does NOT cover it.
+2. **CI re-run on #176** — it went **12/12 green** (not eleven: there is a `gate` job too) on the
+   pre-fix head. It restarts on the fix commit.
+3. **Relay the verdict to the controller, then report and STOP.**
+
+**No scoped re-review was run.** The fixes are confined to the files the review named, and the one
+behavioural change (`limit=200`) is covered by new assertions in 12.257 and by 12.320. Recorded so
+the absence is a decision rather than an omission.
+
+## §12 IS EXHAUSTED
+
+**12.240–12.259 is fully used** (12.255 ❌ catalogue, 12.256–12.259 this build). The header in
+`test-cases/12-offline-sync-apps.md` says so. **The next Lane A §12 id needs a controller-allocated
+block — ask, do not derive.** §7 next free **7.220**.
+
+## NEXT, IN ORDER
+
+1. **Final gate → read the reviewer's findings → fix only on Important-or-worse → PR.**
+2. §7 next free is **7.221** (7.219, 7.220 minted here). §12: Lane A holds **12.320–12.339**, unused.
+2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
+   narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
+   dangling-`parent_id` branch has no fixture and survives its own mutation).
+3. **7.210 is DISCHARGED** — `projections/tickets.ts` forward-folds on `workflow.defined`, so `folded`
+   and `latest` agree on the product path by construction; 7.214/7.215 pin it. **Do not reopen it.**
+4. Report and STOP; the controller re-tasks.
+
+## IDS
+
+§12 block 12.240–12.259 is **EXHAUSTED** — ask the controller for a new block. §7 next free **7.220** (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
+Never edit `docs/lanes/task-ledger.tsv`. Never merge my own PR. Never commit to `main`.
+
 # LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
 
 > **Shas in narrative prose are facts about when they were written.** Verify with

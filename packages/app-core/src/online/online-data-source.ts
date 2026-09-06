@@ -1,5 +1,5 @@
 import type { DataSource, DataSourceQuery } from '../data-source.js';
-import type { FilterSpec, Grouping, UserPreferences } from '../view-types.js';
+import type { FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { HttpError, createHttpClient, type FetchLike, type HttpClient } from './http.js';
 import {
   boardWorkspaceId,
@@ -8,7 +8,11 @@ import {
   mapBoardView,
   mapHistory,
   mapIngestResults,
-  mapListView,
+  LIST_PAGE_CAP,
+  LIST_PAGE_SIZE,
+  LIST_TOO_LARGE_ABSENCE,
+  ServingGapError,
+  mapListPage,
   mapMyWork,
   mapPreferences,
   mapSearchHits,
@@ -19,6 +23,7 @@ import {
   rosterByActorId,
   toServerFilterSpec,
   toServerPreferences,
+  type ListPage,
 } from './mappers.js';
 import { createStreamSubscriber, type WebSocketLike } from './stream.js';
 
@@ -159,17 +164,96 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       return mapBoardView(raw, await workspaceRoster(boardWorkspaceId(raw)));
     },
 
-    getTickets: async (projectId, filter, grouping) =>
-      mapListView(
-        await http.get(`/v1/projects/${projectId}/tickets?${listQueryString(filter, grouping)}`),
-      ),
+    /**
+     * THE PAGING LOOP — ruling P41, Door B. This method answers the COMPLETE
+     * row set for the project or it refuses; it never answers a page.
+     *
+     * `mapListPage` maps one page and hands back the server's cursor;
+     * everything below decides when the list is finished. That division is the
+     * point: the mapper cannot know whether a page is the whole project, and
+     * `TicketListView` means the whole project — `views/list-model.ts` groups
+     * it on that promise and `test/views/list-model.test.ts` enforces the
+     * promise as a TYPE guard on `keyof TicketListView`. Assembling here is
+     * what keeps that guard TRUE instead of something to route around.
+     *
+     * The alternative doors, and why P41 refused them, are argued at
+     * `mapListPage`.
+     *
+     * ## The loop is BOUNDED and the bound REFUSES
+     *
+     * Past `LIST_PAGE_CAP` pages this throws `ServingGapError` with
+     * `LIST_TOO_LARGE_ABSENCE` rather than returning what it has. Returning the
+     * rows so far would be the original defect exactly — a page presented as a
+     * project — just at 2000 rows instead of 50, and it would be HARDER to
+     * notice for being bigger. The cap is a disclosed assumption, not a
+     * measurement, and its own docblock says so.
+     *
+     * ## THE ASSEMBLED VIEW IS NOT A SNAPSHOT, and that is disclosed here
+     *
+     * Ten requests are ten transactions. A ticket that becomes visible to this
+     * caller MID-WALK — a `proj_visibility` widening, or being added to the
+     * project — with an id BELOW the cursor already passed is silently absent
+     * from a view whose whole contract is "the complete row set", and that
+     * contract is what licenses `list-model.ts` to group it. The window is
+     * small and it self-heals on the next stream-triggered reload, and there is
+     * no server-side snapshot cursor to close it with today.
+     *
+     * Written down rather than left for a reader to deduce, because the cap
+     * above got a full disclosed-assumption docblock and this is the same class
+     * of thing: an assumption the code depends on and cannot enforce. *Owner:
+     * whoever gives the list route a consistent-read cursor, if the product
+     * ever needs one.*
+     *
+     * ## The cursor is sent as a VALUE, and the server already takes one
+     *
+     * `routes/list.ts` binds `cursor` as a parameter (its docblock: "both
+     * arrive from the caller and both are bound"), so nothing on the server
+     * changes for this. `DataSourceQuery.getTickets` does NOT grow a cursor
+     * parameter — P30 holds, and the whole reason the loop lives here is that
+     * no caller should have to hold a position to get an answer.
+     */
+    getTickets: async (projectId, filter, grouping) => {
+      const rows: ListRow[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < LIST_PAGE_CAP; page += 1) {
+        // `limit` is SENT rather than inherited — see `LIST_PAGE_SIZE`. It is
+        // the route's validated maximum, so the walk is four times shorter than
+        // it would be at the server's default and the row bound is this
+        // client's own arithmetic rather than another package's constant.
+        const query = `${listQueryString(filter, grouping)}&limit=${LIST_PAGE_SIZE}`;
+        const url =
+          cursor === null
+            ? `/v1/projects/${projectId}/tickets?${query}`
+            : `/v1/projects/${projectId}/tickets?${query}&cursor=${encodeURIComponent(cursor)}`;
+        const raw = await http.get(url);
+        // A 404 becomes `null` here (`http.ts`, the read affordance), and a
+        // `null` handed to the mapper would surface as "expected an object" — a
+        // MAPPING failure for what was an HTTP one. The window matters more now
+        // than it did: access revoked between page 3 and page 4 was impossible
+        // when there was only ever a page 1. Raised as the STATUS it was,
+        // exactly as `getBoard` does one method up.
+        if (raw === null) throw new HttpError(404, url);
+        const answered: ListPage = mapListPage(raw);
+        rows.push(...answered.rows);
+        if (answered.nextCursor === null) {
+          return { projectId: answered.projectId, rows };
+        }
+        cursor = answered.nextCursor;
+      }
+      // Only reachable with a cursor still outstanding: the loop returns from
+      // inside the moment the server says there is no more. So this is "more
+      // pages exist than this client will fetch", never "we happened to stop".
+      throw new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE]);
+    },
 
     /**
      * The roster join, the same one `getBoard` makes and for the same reason:
      * this signature already names the workspace, so the display names are one
      * shipped route away. `getTickets` above gets an EMPTY roster instead —
      * neither its signature nor the list body names a workspace — and
-     * `mapListView`'s docblock argues why that degrades rather than lies.
+     * `mapListPage`'s docblock argues why that degrades rather than lies.
+     * (It was `mapListView` until ruling P41. This cross-reference is LIVE, so
+     * it is repointed rather than left naming a symbol that no longer exists.)
      *
      * The roster is fetched only after a non-null body: a 404 here means "no
      * such ticket, or not yours", and fetching a roster for it would be a round

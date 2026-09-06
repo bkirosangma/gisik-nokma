@@ -22,7 +22,7 @@ import {
   mapBoardView,
   mapHistory,
   mapIngestResults,
-  mapListView,
+  mapListPage,
   mapMyWork,
   mapPreferences,
   mapRollup,
@@ -1206,7 +1206,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
       groups: [{ key: 'all', label: 'All tickets', cards: [serverListCard()] }],
       nextCursor: null,
     };
-    const view = mapListView(body);
+    const view = mapListPage(body);
     expect(view.projectId).toBe('01J9GPRJ000000000000000000');
     const row = view.rows[0];
     // The five, by value and not by presence: a `toHaveProperty` sweep would
@@ -1241,28 +1241,51 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
       // encoding the defect, not merely failing to catch it.
       nextCursor: null,
     };
-    expect(mapListView(body).rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3']);
+    expect(mapListPage(body).rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3']);
   });
 
-  it('REFUSES a page: a non-null nextCursor is not served as the whole project', () => {
-    // The server pages at 50 and emits a cursor when it saw a 51st row.
-    // `TicketListView` is `{projectId, rows}` — no cursor, no "there is more" —
-    // so dropping it hands the caller fifty rows meaning "this project's
-    // tickets". The project page renders that as the complete set and a
-    // calendar then asserts nothing is due on a day that has work on it.
+  /**
+   * **12.256 — THE C2 REFUSAL FLIPS TO THE SERVED PATH (ruling P41, Door B).**
+   *
+   * This case used to assert that `mapListView` THREW on a non-null cursor,
+   * because `TicketListView` had nowhere to say "there is more" and serving the
+   * rows would have presented a page as the whole project. The refusal was
+   * right and it is now unnecessary rather than wrong: the mapper no longer
+   * claims to produce the view. It maps a PAGE and CARRIES THE CURSOR OUT, and
+   * `onlineDataSource.getTickets` follows it to exhaustion (12.257).
+   *
+   * The property that mattered is preserved one level up, not abandoned: no
+   * caller can still mistake a page for a project, because no caller ever
+   * receives a page. What changed is WHO enforces it.
+   */
+  it('12.256 carries the cursor out instead of refusing — a page is a page, and it says so', () => {
     const paged = {
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'A', cards: [serverListCard({ ticketId: 't1' })] }],
       nextCursor: 't1',
     };
-    expect(() => mapListView(paged)).toThrow(MappingError);
+    const page = mapListPage(paged);
+    expect(page.nextCursor).toBe('t1');
+    expect(page.rows.map((row) => row.ticketId)).toEqual(['t1']);
 
-    // THE CONTROL, in the same run and over the same body: with the cursor
-    // null, the identical rows map. So this is a fact about the cursor and not
-    // about `mapListView` having stopped answering — the distinction the
-    // "flattens groups" case above could not make while its own cursor was set.
-    expect(mapListView({ ...paged, nextCursor: null }).rows.map((r) => r.ticketId)).toEqual(['t1']);
+    // THE CONTROL, same run, same body: with the cursor null the identical rows
+    // map and the cursor is null. So `nextCursor` is being READ, not defaulted
+    // — a mapper that hard-coded either value would fail one of these two.
+    const complete = mapListPage({ ...paged, nextCursor: null });
+    expect(complete.nextCursor).toBeNull();
+    expect(complete.rows.map((row) => row.ticketId)).toEqual(['t1']);
+
+    // And an ABSENT key is the same answer as null, which is deliberate: the
+    // server omits the key on some terminal shapes and a mapper that
+    // distinguished them would make an unobservable wire detail load-bearing.
+    const { nextCursor: _dropped, ...withoutKey } = paged;
+    expect(mapListPage(withoutKey).nextCursor).toBeNull();
+
+    // A cursor of the wrong TYPE is a mapping error rather than a silent
+    // stringify — it would otherwise become a request the server cannot
+    // resolve, and the loop would page forever against it.
+    expect(() => mapListPage({ ...paged, nextCursor: 7 })).toThrow(MappingError);
   });
 
   it('refuses a row whose hasRestrictedParent is missing rather than reading it as false', () => {
@@ -1272,7 +1295,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     const card = serverListCard() as Record<string, unknown>;
     delete card['hasRestrictedParent'];
     expect(() =>
-      mapListView({ projectId: 'p', groupBy: 'flat', groups: [{ key: 'all', label: 'A', cards: [card] }] }),
+      mapListPage({ projectId: 'p', groupBy: 'flat', groups: [{ key: 'all', label: 'A', cards: [card] }] }),
     ).toThrow(MappingError);
   });
 

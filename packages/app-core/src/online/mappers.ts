@@ -138,6 +138,96 @@ export class ServingGapError extends MappingError {
   }
 }
 
+/**
+ * ONE PAGE of the list route, which is what the wire actually carries.
+ *
+ * Deliberately NOT `TicketListView` and deliberately not exported as a view:
+ * `TicketListView` means *the complete row set for this project*, and
+ * `views/list-model.ts` groups it on exactly that promise. This type is the
+ * thing that is true before the loop finishes — rows, plus whether there are
+ * more — and it exists so that "a page" and "the project" have different names
+ * in the one place where confusing them served fifty tickets as a project.
+ */
+export type ListPage = { projectId: string; rows: ListRow[]; nextCursor: string | null };
+
+/**
+ * The page size this client ASKS FOR, and the reason it asks at all.
+ *
+ * The route's own default is 50 and its validated maximum is 200
+ * (`routes/list.ts`, `MAX_LIMIT`; a larger value is a 400, so this is the
+ * biggest legal page). Sending it explicitly does two things. It **cuts the
+ * round trips for a large project four-fold** — 2000 rows is 10 requests here
+ * rather than 40 at the server's default, and each one runs a recursive
+ * ancestor CTE. And it makes the row bound below **true by construction**
+ * instead of true by coupling: the first draft of this constant computed
+ * "2000 rows" from the server's `DEFAULT_LIMIT`, which is a NON-EXPORTED const
+ * in another package that this client never sent and could not observe. Had it
+ * dropped to 25, the shipped client would have refused at 1000 rows while
+ * telling the user, in a message it renders, that it refused at 2000.
+ */
+export const LIST_PAGE_SIZE = 200;
+
+/**
+ * The row bound, and it is a DISCLOSED ASSUMPTION rather than a measurement
+ * (ruling P41).
+ *
+ * Nobody has measured a real project's ticket count on this product — there is
+ * no production instance — so 2000 is a guess with a stated basis and not a
+ * finding. It exists because an unbounded loop against a pathological project
+ * is an unbounded number of round trips, and it is a REFUSAL rather than a
+ * truncation because a silently truncated set is exactly the defect this whole
+ * change closes, one bound further out.
+ *
+ * Owner: whoever first has a real project-size distribution. Raising it is a
+ * one-line change and needs no new argument; the loud refusal is what makes the
+ * limit safe to be wrong about.
+ */
+export const LIST_ROW_CAP = 2000;
+
+/**
+ * Derived, never typed twice. The row cap is the number a human reasons about
+ * and the page cap is the number the loop counts, and writing both by hand is
+ * how they drift apart.
+ */
+export const LIST_PAGE_CAP = LIST_ROW_CAP / LIST_PAGE_SIZE;
+
+/**
+ * The refusal beyond the cap. In the register with every other absence, so a
+ * shell renders it the same way, and SELF-EXPIRING: the moment the loop can
+ * finish, it never constructs this.
+ */
+/**
+ * ## This absence is NOT added to `SERVING_GAPS`, and that is a decision
+ *
+ * P41 said "a loud refusal in the `ServingGapError` register". It is one — it
+ * throws `ServingGapError` carrying a named `Absence`, which is what a shell
+ * renders. It is deliberately NOT a `SERVING_GAPS['getTickets']` key, because
+ * **that map means *this method refuses ALWAYS***, and `getTickets` answers for
+ * every project small enough to finish. It would also contradict the standing
+ * fact that the register carries `search` alone. Ratified by the controller
+ * 2026-09-06.
+ *
+ * *(An earlier draft of this note also claimed a key would "detonate
+ * `stub-services.ts`'s `refuse(method)` lookup". **That was false and is
+ * corrected rather than deleted, per ruling P40**: `refuse()` throws only when
+ * a named gap DISAPPEARS from the register, and `getTickets` is `unstubbed`
+ * there — `refuse('getTickets')` is called nowhere. What a key would actually
+ * break is `mappers.test.ts`'s register assertions and two web tests. The
+ * decision was right; the mechanism named for it was not, and a maintainer
+ * sent to `stub-services.ts` would have found nothing.)*
+ */
+export const LIST_TOO_LARGE_ABSENCE: Absence = {
+  field: 'TicketListView.rows',
+  // Both `null`, which in this register means NO ROUTE CAN CLOSE IT — the
+  // client TYPE is the owner. The server serves every page asked for; what
+  // cannot be served is a COMPLETE row set inside a bound this client chose,
+  // and no wire key exists for "the project is too big for the view type".
+  wireKey: null,
+  wireRoute: null,
+  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set — serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
+  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type — the bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
+};
+
 /** A request the shipped route's query language cannot express. */
 export class UnexpressibleFilterError extends Error {
   constructor(key: string, detail: string) {
@@ -1109,13 +1199,27 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
  * page arrived in. Flattening REARRANGES and never filters — every card the
  * server sent becomes exactly one row.
  *
- * ## `nextCursor` is dropped, and that IS a limitation of the client type
+ * ## `nextCursor` is RETURNED, and this mapper maps a PAGE (ruling P41, Door B)
  *
- * `TicketListView` has no cursor field, so a caller of `getTickets` sees the
- * first page and cannot ask for the next. That is not a serving gap — the
- * server sends the cursor — and it is not this module's to fix: the owner is
- * `DataSourceQuery.getTickets`, whose signature has nowhere to put one.
- * Recorded here so the next reader does not go looking on the server for it.
+ * It used to refuse a non-null cursor outright, because `TicketListView` is
+ * `{projectId, rows}` and had nowhere to say "there is more" — so serving the
+ * rows would have presented a page as the whole project. That refusal was
+ * honest and it is now unnecessary rather than wrong: **this function no longer
+ * claims to produce the view.** It maps ONE PAGE to `ListPage`, a wire-shaped
+ * type that carries the cursor, and `onlineDataSource.getTickets` follows the
+ * cursor to exhaustion and assembles the complete `TicketListView` itself.
+ *
+ * Ruling P41 chose that door over the other two. A cursor ON `TicketListView`
+ * was refused because nothing could act on it: `DataSourceQuery.getTickets`
+ * (`data-source.ts`) takes `(projectId, filter, grouping)` and has nowhere to
+ * put an incoming cursor, so the view type would have become able to express
+ * partiality and unable to resolve it. It also would have inverted a decision
+ * that is deliberately tripwired — `views/list-model.ts` licenses client-side
+ * grouping ONLY because the view is the complete row set, and
+ * `test/views/list-model.test.ts` enforces that as a TYPE guard on
+ * `keyof TicketListView`. **Door B keeps that license TRUE rather than making
+ * the tripwire something to route around**, which is why the guard is still
+ * there and still passing.
  *
  * ## The roster is EMPTY, by force rather than by choice
  *
@@ -1130,10 +1234,13 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
  * `workspaceId` to close it would be a route change for a display convenience,
  * and it is left to whoever owns the signature.
  */
-export function mapListView(raw: unknown): TicketListView {
+export function mapListPage(raw: unknown): ListPage {
   const record = asRecord(raw, 'list');
 
-  // A TRUNCATED PAGE IS REFUSED, not silently served as the whole project.
+  // THE CURSOR IS CARRIED OUT, not dropped and not refused (ruling P41).
+  //
+  // What follows is the argument that USED to end in a refusal here, kept
+  // because it is the reason the loop above this function has to exist.
   //
   // `GET /v1/projects/:id/tickets` pages at `DEFAULT_LIMIT = 50` and emits a
   // non-null `nextCursor` when it saw a 51st row. `TicketListView` is
@@ -1151,20 +1258,20 @@ export function mapListView(raw: unknown): TicketListView {
   // the view type cannot express partiality, so partiality is refused rather
   // than dropped.
   //
-  // Loud, and deliberately not degraded to fifty-rows-plus-a-warning: the
-  // caller cannot render a warning it has no field to receive. Closing this
-  // properly means either a cursor on `TicketListView` or a paging loop in the
-  // online source, and BOTH are larger than a mapper — the type is exported
-  // from `packages/app-core/src/index.ts`, which is on the cross-lane collision
-  // map. Refusing is the conservative default that cannot lie while that is
-  // decided.
-  const cursor = record['nextCursor'];
-  if (cursor !== null && cursor !== undefined) {
-    throw new MappingError(
-      'list.nextCursor',
-      `null — the server answered a PAGE (it emitted the cursor ${JSON.stringify(cursor)}, meaning at least one more ticket exists) and TicketListView has no field to say the list is incomplete, so serving these rows would present a page as the whole project`,
-    );
-  }
+  // That was the choice ruling P41 made: the SECOND of the two closures named
+  // there — a paging loop in the online source — rather than a cursor on the
+  // view type. So the cursor is validated and returned, and the caller that
+  // receives it is the only thing allowed to decide the list is complete.
+  //
+  // `null` and absent are the same answer — "no more pages" — because the
+  // server omits the key rather than sending null on a terminal page for some
+  // shapes, and a mapper that distinguished them would make an unobservable
+  // wire detail load-bearing. Anything else is a type error rather than a
+  // silent coercion: a cursor arriving as a number would otherwise be
+  // stringified into a request the server cannot resolve.
+  const rawCursor = record['nextCursor'];
+  const nextCursor =
+    rawCursor === null || rawCursor === undefined ? null : asString(rawCursor, 'list.nextCursor');
 
   const roster: ReadonlyMap<string, string> = new Map();
   const rows: ListRow[] = [];
@@ -1175,7 +1282,7 @@ export function mapListView(raw: unknown): TicketListView {
       rows.push(mapListRow(card, `${path}.cards[${cardIndex}]`, roster));
     });
   });
-  return { projectId: asString(record['projectId'], 'list.projectId'), rows };
+  return { projectId: asString(record['projectId'], 'list.projectId'), rows, nextCursor };
 }
 
 /**
