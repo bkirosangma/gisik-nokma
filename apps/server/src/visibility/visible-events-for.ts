@@ -460,7 +460,7 @@ export async function* visibleEventsFor(
           // accident, because the notice must be RE-DELIVERED if the socket
           // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
-            const tickets = await grantNoticeFor(db, userId, env.entity.id, backfilled);
+            const tickets = await grantNoticeFor(db, userId, env.entity.id, afterSeq, backfilled);
             if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           }
           yield env;
@@ -534,6 +534,7 @@ export async function* visibleEventsFor(
               userId,
               workspaceId,
               env.type === 'project.member_added' ? { projectId: env.entity.id } : 'workspace',
+              afterSeq,
             );
             if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
           } else if (env.type === 'project.member_removed') {

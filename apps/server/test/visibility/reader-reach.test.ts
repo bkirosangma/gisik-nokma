@@ -66,6 +66,27 @@ async function record(env: LedgerEvent): Promise<LedgerEvent> {
   return env;
 }
 
+/**
+ * The workspace's current stream head — a fixture's stand-in for "where this
+ * device's cursor already is".
+ *
+ * **Needed because `afterSeq = 0` models the WRONG client.** A notice reports
+ * the history a reader will NOT receive by staying subscribed, which is the
+ * part at or below their cursor; at cursor 0 there is none, so the correct
+ * answer is an empty notice. A fixture that collects from 0 is therefore
+ * asking about a client that is already current — the opposite of the reader
+ * these cases are about, who is missing everything filed while the tickets
+ * were invisible to them. The first draft of this file collected from 0 and
+ * passed only because `headSeq` did not exist yet.
+ */
+async function streamHead(workspaceId: string): Promise<number> {
+  const { rows } = await db.pool.query<{ head: string | null }>(
+    'SELECT MAX(workspace_seq) AS head FROM events WHERE workspace_id = $1',
+    [workspaceId],
+  );
+  return Number(rows[0]?.head ?? 0);
+}
+
 async function collect(userId: string, workspaceId: string, afterSeq = 0): Promise<SyncItem[]> {
   const items: SyncItem[] = [];
   for await (const item of visibleEventsFor(db.pool, userId, workspaceId, afterSeq)) {
@@ -133,6 +154,12 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     await seedTicket(db.pool, { workspaceId: ws, ticketId: alreadyVisibleElsewhere, projectId: other, createdBy: owner });
     await applyAll(db.pool, [setVisibilityEnv(ws, alreadyVisibleElsewhere, 'workspace', undefined, owner)]);
 
+    // THE CURSOR. Everything seeded above is now BELOW it, which is what makes
+    // these tickets pre-cursor history for the newcomer — the gap 12.283 is
+    // about. Collecting from 0 instead would ask about a client that is already
+    // current, for whom the correct notice is empty.
+    const cursor = await streamHead(ws);
+
     // THE TRIGGER, and it is in the ledger so a drain can reach it.
     await record(
       testEnvelope({
@@ -153,7 +180,7 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     expect(await canSee(db.pool, newcomer, alreadyVisibleElsewhere)).toBe(true);
     expect(await canSee(db.pool, newcomer, inOther)).toBe(false);
 
-    const forNewcomer = noticesIn(await collect(newcomer, ws));
+    const forNewcomer = noticesIn(await collect(newcomer, ws, cursor));
     // EXACTLY the joined project's two tickets — not the workspace-mode ticket
     // this member could already see, and not the other project's. Not
     // `toContain`: an implementation that named everything visible would satisfy
@@ -170,7 +197,7 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     // THE EXCLUDING HALF. The bystander's reach did not grow, so no notice is
     // owed them at all — and this runs against the SAME trigger in the SAME
     // ledger, so it cannot be satisfied by a fixture where nothing happened.
-    expect(noticesIn(await collect(bystander, ws))).toEqual([]);
+    expect(noticesIn(await collect(bystander, ws, cursor))).toEqual([]);
   });
 
   it('12.283 membership.granted cannot scope, so it names what the reader can see now — and only for them', async () => {
@@ -198,6 +225,10 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     await seedTicket(db.pool, { workspaceId: ws, ticketId: ownerOnly, projectId: project, createdBy: owner });
     await applyAll(db.pool, [setVisibilityEnv(ws, ownerOnly, 'explicit', [owner], owner)]);
 
+    // See the project case: the cursor is what makes the seeded tickets
+    // pre-cursor history rather than events still on their way.
+    const cursor = await streamHead(ws);
+
     await record(
       testEnvelope({
         workspaceId: ws,
@@ -208,7 +239,7 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
       }),
     );
 
-    const forPromoted = noticesIn(await collect(promoted, ws));
+    const forPromoted = noticesIn(await collect(promoted, ws, cursor));
     expect(forPromoted).toEqual([[visible]]);
     // The owner-only ticket is in the same workspace and the same project. A
     // notice built from a workspace listing rather than from the visibility
@@ -219,6 +250,6 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     // though the bystander CAN see `visible` and would be a plausible
     // recipient for an implementation that keyed on the ticket rather than on
     // the event's subject.
-    expect(noticesIn(await collect(bystander, ws))).toEqual([]);
+    expect(noticesIn(await collect(bystander, ws, cursor))).toEqual([]);
   });
 });

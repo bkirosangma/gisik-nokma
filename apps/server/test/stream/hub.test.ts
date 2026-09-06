@@ -89,7 +89,7 @@ type ScriptedInstruction =
   | {
       kind: 'reach-granted';
       workspaceId: string;
-      ticketIds: readonly string[];
+      tickets: readonly { id: string; headSeq: number }[];
       atSeq: number;
       /**
        * What the YIELDED instruction NAMES, when that has to differ from the
@@ -168,7 +168,7 @@ function scriptedVisibleEvents(script: Script): VisibleEventsFn {
             kind: 'reach-granted',
             // The CLAIM, not the routing key — see `claimsWorkspaceId`.
             workspaceId: item.claimsWorkspaceId ?? item.workspaceId,
-            ticketIds: [...item.ticketIds],
+            tickets: item.tickets.map((t) => ({ ...t })),
           };
         else
           yield {
@@ -670,7 +670,7 @@ describe('stream hub — a reach notice', () => {
           kind: 'reach-granted',
           workspaceId: WS_A,
           claimsWorkspaceId: WS_B,
-          ticketIds: reached,
+          tickets: reached.map((id) => ({ id, headSeq: 1 })),
           atSeq: 11,
         },
         e12,
@@ -684,13 +684,13 @@ describe('stream hub — a reach notice', () => {
     // WS_A-not-WS_B half of this case is unassertable through it.
     expect(socket.frames).toEqual([
       { type: 'event', envelope: expect.objectContaining({ id: e11.id, workspaceSeq: 11 }) },
-      { type: 'reach-granted', workspaceId: WS_A, ticketIds: reached },
+      { type: 'reach-granted', workspaceId: WS_A, tickets: reached.map((id) => ({ id, headSeq: 1 })) },
       // The envelope BEHIND the notice. This frame existing at all is the proof
       // that the arm did not end the subscription.
       { type: 'event', envelope: expect.objectContaining({ id: e12.id, workspaceSeq: 12 }) },
       { type: 'caught-up', workspaceId: WS_A, seq: 12 },
     ]);
-    // A `ticketIds` the published schema refuses throws inside the drain, the
+    // A `tickets` entry the published schema refuses throws inside the drain, the
     // pump catches it and closes 1011 — so a bad notice reads as MISSING frames
     // above rather than as a mismatch. Naming the close keeps that legible.
     expect(socket.closes).toEqual([]);
@@ -751,7 +751,7 @@ describe('stream hub — a reach notice', () => {
     const e12 = event(WS_A, t1, 12);
     const drains: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
     const world = hubWith({
-      ledger: [e11, { kind: 'reach-granted', workspaceId: WS_A, ticketIds: reached, atSeq: 11 }],
+      ledger: [e11, { kind: 'reach-granted', workspaceId: WS_A, tickets: reached.map((id) => ({ id, headSeq: 1 })), atSeq: 11 }],
       drains,
     });
     const socket = fakeSocket();

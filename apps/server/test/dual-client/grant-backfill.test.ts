@@ -160,17 +160,20 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
    * it calls `reconcile` by hand. Found by the branch review; the wrong
    * sentence is quoted rather than deleted, because "bounded in time" is
    * exactly the reassurance a later reader takes on trust.
-   * **AND CLOSURE 5c's MINIMAL FORM DOES NOT FIX IT — measured, not argued.**
-   * A fixture running this script with no manual reconcile is RED: the pull
-   * never happens. The reason is structural. A notice only ever names ids the
-   * reader can see NOW (`grant-backfill.ts` yields a candidate only if
-   * `canSee`), and reconcile only ever returns ids the reader CANNOT see
-   * (`reconcile-route.ts` marks one restricted only if `!canSee`). Same
-   * function, same instant, complementary predicates — the intersection is
-   * empty by construction. The stale copy is stale in its CONTENT and `canSee`
-   * answers about its AUDIENCE, so reconcile is the wrong instrument rather
-   * than a mistimed one. **Case 12.316 records the measurement; the residual is
-   * ESCALATED, because closing it needs the notice to carry more than ids.**
+   * **CLOSED by ruling P37.2 — see 12.316, which runs this same script with no
+   * manual reconcile and no reconnect.** Closure 5c's FIRST form (reconcile the
+   * notice's named ids) could not work, and the reason is a derivation rather
+   * than a measurement:
+   * a notice only ever names ids the reader can see NOW (`grant-backfill.ts`
+   * yields a candidate only if `canSee`), and reconcile only ever returns ids
+   * the reader CANNOT see (`reconcile-route.ts` marks one restricted only if
+   * `!canSee`). Same function, same instant, complementary predicates — the
+   * intersection is empty by construction. The stale copy is stale in its
+   * CONTENT and `canSee` answers about its AUDIENCE, so reconcile was the wrong
+   * instrument rather than a mistimed one. **What closes it is the notice
+   * carrying each ticket's `headSeq`** (P37.2): the client pulls iff its own
+   * local maximum for that ticket is lower, which is the one thing `canSee`
+   * cannot answer at any timing.
    */
   it('12.275 a re-widened ticket comes back EVEN IF the client read something else meanwhile — 12.274’s probe, green, and green only with BOTH halves', async () => {
     const { ticketId, created } = await seedSharedTicket('The shared one');
@@ -543,4 +546,68 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     expect(again).toEqual({ presented: 1, purged: [] });
   });
 
+
+  /**
+   * ## 12.316 — the same script, with nothing called by hand
+   *
+   * 12.275 proves the pull converges once the stale copy is gone, but it
+   * removes that copy with an explicit `engine.reconcile()`. Honest, and it
+   * leaves the real question open: **does a device on a live socket, with no
+   * reconnect and no manual call, converge at all?**
+   *
+   * Under an ID-ONLY notice the answer was NO, and not "sometimes". The
+   * client's test was "do I hold this ticket", which cannot see a stale partial
+   * copy; and the scheduled reconcile could not rescue it, because `caught-up`
+   * is sent once per SUBSCRIPTION — on a socket that never drops it never fires
+   * again. Ruling P37.2 gives the notice each ticket's `headSeq`, and the
+   * client pulls iff its own local maximum is lower.
+   *
+   * So this is the case that decides whether the branch closes 12.274 in the
+   * PRODUCT rather than in a fixture that helps it along.
+   */
+  it('12.316 P37.2: the 12.274 script converges with NO manual reconcile and NO reconnect', async () => {
+    const { ticketId, created } = await seedSharedTicket('The shared one, unaided');
+    const { ticketId: unrelated } = await seedSharedTicket('The unrelated one, unaided');
+
+    await commit(USER_A, ticketEvent(USER_A, ticketId, 'visibility.set', { ticketId, mode: 'explicit', userIds: [USER_A] }));
+    const whileHidden = ticketEvent(USER_A, ticketId, 'comment.added', { body: plainTextToDoc('said while hidden, unaided') });
+    await commit(USER_A, whileHidden);
+    await commit(USER_A, ticketEvent(USER_A, unrelated, 'comment.added', { body: plainTextToDoc('elsewhere, unaided') }));
+    await b.syncDown();
+
+    // THE PRECONDITION, and it is what makes the assertion below mean anything:
+    // B holds a STALE PARTIAL copy — a `tickets` row, and only the creation
+    // event. Without it, "B converged" could be satisfied by a B that simply
+    // never held the ticket, which is the easy case.
+    expect((await b.replica.listEntityEvents(ticketId)).map((e) => e.id)).toEqual([created.id]);
+    expect(await b.replica.getTicket(ticketId)).not.toBeNull();
+
+    // RE-WIDEN. No reconcile is called anywhere in this test and there is no
+    // reconnect — `syncDown()` is one continuous subscription's drain.
+    await commit(
+      USER_A,
+      ticketEvent(USER_A, ticketId, 'visibility.set', { ticketId, mode: 'explicit', userIds: [USER_A, USER_B] }),
+    );
+    await b.syncDown();
+    await a.syncDown();
+
+    // B PULLED IT. Under an id-only notice this list was empty: the notice named
+    // a ticket B "held" and the holdings filter skipped it.
+    expect(b.pulls).toEqual([ticketId]);
+    expect(await b.replica.listPendingPulls(h.workspaceId)).toEqual([]);
+
+    // And B converged — including the row filed while the ticket was hidden,
+    // which is exactly what 12.274 measured B losing for ever.
+    expect((await b.replica.listEntityEvents(ticketId)).map((e) => e.id)).toContain(whileHidden.id);
+    const onA = await a.replica.getTicket(ticketId);
+    const onB = await b.replica.getTicket(ticketId);
+    expect(onA).not.toBeNull();
+    expect(onB).toEqual(onA);
+    expect(await b.replica.listEntityEvents(ticketId)).toEqual(await a.replica.listEntityEvents(ticketId));
+
+    // BOUNDEDNESS CONTROL: the unrelated ticket B could always see was not
+    // dragged along. Without it, a handler that pulled everything named would
+    // satisfy every assertion above.
+    expect(await b.replica.getTicket(unrelated)).not.toBeNull();
+  });
 });

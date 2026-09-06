@@ -289,6 +289,7 @@ export async function grantNoticeFor(
   db: Queryable,
   userId: string,
   ticketId: string,
+  afterSeq: number,
   backfilled: Set<string>,
 ): Promise<ReachGrantedTicket[]> {
   const admitted: string[] = [];
@@ -301,7 +302,7 @@ export async function grantNoticeFor(
     if (!(await canSee(db, userId, candidate))) continue;
     admitted.push(candidate);
   }
-  return withHeadSeq(db, admitted);
+  return withHeadSeq(db, admitted, afterSeq);
 }
 
 /**
@@ -322,6 +323,19 @@ export async function grantNoticeFor(
  * over for exactly this reason: a number the server derives rather than reads is
  * one that can disagree with the ledger, and it would pass a gate.
  *
+ * **BOUNDED AT `afterSeq`, and that bound is the whole correctness of the
+ * comparison.** The notice answers "how much of this ticket's history will you
+ * NOT receive by simply staying subscribed" — which is the part at or below the
+ * reader's cursor. Everything above it, the trigger event included, is already
+ * in the caller's own range and arrives moments later on the stream.
+ *
+ * Taking the ticket's absolute head instead is WRONG and was measured wrong:
+ * the notice is yielded BEFORE its trigger, so the trigger's own row is always
+ * above the client's local maximum at the instant it compares — making
+ * `localHead < headSeq` true for every trigger ticket, forever, and pulling on
+ * every no-op `visibility.set`. That is precisely the amplifier bound ruling
+ * P37.1 exists to hold, and case 12.276 caught it.
+ *
  * ONE query for the whole notice, not one per candidate — the walk above already
  * costs a query each, and doubling that for something a single `GROUP BY`
  * answers would be real cost for no property.
@@ -331,16 +345,34 @@ export async function grantNoticeFor(
  * rather than asserted away: zero makes the client PULL, which is the safe
  * direction, where a throw would take down the whole drain.
  */
-async function withHeadSeq(db: Queryable, ticketIds: readonly string[]): Promise<ReachGrantedTicket[]> {
+async function withHeadSeq(
+  db: Queryable,
+  ticketIds: readonly string[],
+  afterSeq: number,
+): Promise<ReachGrantedTicket[]> {
   if (ticketIds.length === 0) return [];
   const { rows } = await db.query<{ entity_id: string; head: string }>(
     `SELECT entity_id, MAX(workspace_seq) AS head FROM events
-      WHERE entity_kind = 'ticket' AND entity_id = ANY($1::text[])
+      WHERE entity_kind = 'ticket' AND entity_id = ANY($1::text[]) AND workspace_seq <= $2
       GROUP BY entity_id`,
-    [[...ticketIds]],
+    [[...ticketIds], afterSeq],
   );
   const heads = new Map(rows.map((r) => [r.entity_id, Number(r.head)]));
-  return ticketIds.map((id) => ({ id, headSeq: heads.get(id) ?? 0 }));
+  // A ticket with NOTHING at or below the cursor is DROPPED, not named with a
+  // zero — and the reason is semantic before it is schematic. Such a ticket has
+  // no pre-cursor history to be missing: every one of its events is above the
+  // reader's cursor and arrives on the stream unaided, so naming it would ask
+  // for a pull that could only re-fetch what is already on its way.
+  //
+  // The published schema also refuses `headSeq: 0` (`min(1)`), and an earlier
+  // draft of this function emitted one. It did not surface as a bad frame: the
+  // drain THREW, the hub closed 1011, and the symptom was a MISSING `caught-up`
+  // three assertions away in `client-contract.test.ts`. Recorded because that
+  // is what a schema violation looks like from the outside here — not a
+  // rejected frame, a silent stream.
+  return ticketIds
+    .map((id) => ({ id, headSeq: heads.get(id) ?? 0 }))
+    .filter((t) => t.headSeq > 0);
 }
 
 /**
@@ -406,6 +438,7 @@ export async function readerReachNoticeFor(
   userId: string,
   workspaceId: string,
   scope: 'workspace' | { projectId: string },
+  afterSeq: number,
 ): Promise<ReachGrantedTicket[]> {
   const rows = await listVisibleTickets(db, userId, workspaceId);
   const inScope =
@@ -416,5 +449,6 @@ export async function readerReachNoticeFor(
       .map((row) => row['ticket_id'])
       .filter((id): id is string => typeof id === 'string')
       .slice(0, GRANT_BACKFILL_MAX_TICKETS),
+    afterSeq,
   );
 }
