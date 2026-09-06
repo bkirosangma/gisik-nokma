@@ -11,6 +11,7 @@ import {
   type SyncStatus,
   type ReconcileAnswer,
   type SyncTransport,
+  TicketPullNotFound,
 } from '../src/engine/sync-engine.js';
 import { createHttpTransport, type WebSocketLike } from '../src/net/http-transport.js';
 
@@ -2316,6 +2317,260 @@ describe('12.311-12.313 the pull door’s fold, and the notice door’s head com
     expect(await replica.listPendingPulls(WS)).toEqual([]);
     expect(engine.lastApplyFailure()).toBeNull();
     expect(engine.status()).toBe('catching-up');
+    engine.stop();
+  });
+});
+
+/**
+ * 12.317-12.318 — RULING P37.3: A 404 DROPS THE OWED ID, KEYED TO THE NOTICE
+ * THAT ISSUED THE PULL.
+ *
+ * The Critical's fix — `recoverByPull` swallowing a fold failure for a ticket
+ * the device does not hold — turned the revoked-project sequence from a loud
+ * stall into a QUIET PERMANENT LEAK: a pull that 404s and an id owed on every
+ * catch-up, for ever. The obvious bound (drop on 404) was deliberately not
+ * built at first, because `bootstrapTicket` answers "you may not see it" and
+ * "it never existed" with the SAME 404 — deliberately, so that
+ * presence-versus-absence is not an oracle — so the device cannot tell a
+ * genuine phantom from a race in which visibility narrowed again between the
+ * notice and the pull. Dropping on the status code would discard a re-widening
+ * that arrived a millisecond late.
+ *
+ * The ruling's deciding fact is that **a 404 is never the last word; the next
+ * notice is.** Every re-widening emits a fresh grant/reach notice naming the
+ * id, so the notice mechanism IS the recovery path. Each pending entry
+ * therefore carries the `workspaceSeq` of the notice that named it, and a 404
+ * drops the entry only if that recorded seq is still the one the pull was
+ * issued for. The drop is keyed to the NOTICE, not to the status code.
+ *
+ * ## These two cases are a matched pair and neither means anything alone
+ *
+ * 12.317 says the drop HAPPENS; 12.318 says it is not UNCONDITIONAL. A file
+ * with only the first ratifies the leak's fix and the race's regression in one
+ * breath; a file with only the second cannot tell the keyed drop from no drop
+ * at all. So each is written to redden under its own mutation and to SURVIVE
+ * the other's — 12.318 deliberately does not re-assert 12.317's property, and
+ * that omission is the design rather than a gap:
+ *
+ * | mutation | 12.317 | 12.318 |
+ * |---|---|---|
+ * | the `TicketPullNotFound` arm deleted (never drop) | RED | passes |
+ * | the `headSeq` guard deleted (always drop) | passes | RED |
+ *
+ * If 12.318 also reddened under the first, its racing write would not be doing
+ * the work and the case would be measuring 12.317 twice.
+ *
+ * ## ⚠️ THE RACE 12.318 MODELS IS NOT REACHABLE THROUGH THE SOCKET TODAY
+ *
+ * Derived at this tree before the case was written, and it is the case's whole
+ * justification for existing in the shape it has. `applyChain` is STRICTLY
+ * SERIAL, and every `drainPendingPulls` call site — `applyOne`'s
+ * `reach-granted` arm, `recoverByPull`, and `onCaughtUp` — sits on that chain.
+ * A second notice arriving over the socket is queued BEHIND the link that is
+ * holding the in-flight pull, so it cannot write between the pull's issue and
+ * its 404. `withTimeout`'s abandonment cannot deliver a late 404 to the `catch`
+ * either: `Promise.race` has already settled, so that rejection is unhandled
+ * and never reaches `dropPendingPullIfUnchanged`.
+ *
+ * **So through the socket path alone, the keyed drop and an unconditional drop
+ * are behaviourally identical** — the second notice has not written at drop
+ * time, and it re-adds the id afterwards either way. A fixture driven purely
+ * through `onItem` would let the unconditional mutation survive, and would
+ * report a green case for a guard that does nothing.
+ *
+ * The honest second writer is the one `replica.ts`'s own docblock names when it
+ * explains why `addPendingPulls` reads inside its transaction: *"the set is
+ * public API and a shell may add to it too."* 12.318 therefore applies the
+ * racing notice through `replica.applyServerItem` from inside `pullImpl` —
+ * off-chain, exactly as a shell would, and through the REAL `reach-granted`
+ * filter rather than around it. The keying becomes socket-load-bearing the
+ * moment the drain ever runs off the apply chain, and this case is what will
+ * already be there when it does.
+ */
+describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () => {
+  /** As `12.305-12.308`'s, and local for the same reason: that one is describe-scoped. */
+  const pullPayloadOf = (body: BootstrapResponse, ticketId: string): TicketBootstrap => ({
+    workspaceId: WS,
+    definitions: body.definitions,
+    ticket: { ticketId, snapshot: null, events: [created(ticketId)] },
+  });
+
+  /**
+   * 12.317 — ONE 404 FORGETS THE ID FOR GOOD.
+   *
+   * The revoked-project sequence, which is the one that reliably produces the
+   * leak: a notice names a ticket, visibility is withdrawn before the device
+   * pulls it, and the pull answers 404 for ever after. Before the ruling the id
+   * sat in the pending set and cost one HTTP request on every single catch-up
+   * for the life of the install.
+   *
+   * ## Two ids, two failure kinds, one drain
+   *
+   * "No request was issued" is trivially true of a drain that stopped running,
+   * of a stalled engine, and of a catch-up that never fired — so the phantom
+   * does not travel alone. Beside it is an id whose pull fails with an ORDINARY
+   * error, which is 12.306's property and must NOT drop: a network wobble is
+   * not an answer. Both ids ride the same notice, the same drain and the same
+   * catch-ups, so the assertion is a contrast measured in one run rather than
+   * an absence measured against nothing. A drain that stopped running shows the
+   * wobbling id missing too, and the case fails loudly instead of passing.
+   *
+   * ## TWO later catch-ups, not one
+   *
+   * "No request on ANY later catch-up" is a claim about the steady state. One
+   * catch-up cannot distinguish it from one-shot suppression — a bug that
+   * skipped the first retry and resumed on the second would read as green. The
+   * wobbling id supplies the positive on both of them, so each catch-up is
+   * independently known to have drained.
+   */
+  it('12.317 one 404 forgets the owed id for good, while a wobbling id beside it is retried on every catch-up', async () => {
+    const phantom = newUlid();
+    const wobble = newUlid();
+    const body = bootstrapOf();
+    const { script, replica, engine } = await fixture({
+      bootstrapImpl: async () => body,
+      pullImpl: async (_workspaceId, ticketId) => {
+        // "Nothing travels" — the route's answer for a ticket the caller may
+        // not see AND for one that never existed, indistinguishably.
+        if (ticketId === phantom) throw new TicketPullNotFound(ticketId);
+        // An ordinary transport failure, which carries no answer at all.
+        throw new Error(`transport refused the pull for ${ticketId}`);
+      },
+    });
+    await engine.start(WS);
+
+    script.handlers!.onItem({
+      kind: 'reach-granted',
+      workspaceId: WS,
+      tickets: [
+        { id: phantom, headSeq: 5 },
+        { id: wobble, headSeq: 5 },
+      ],
+    });
+    await engine.settled();
+
+    // Both were attempted: the drop is a fact about a pull that RAN.
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: phantom },
+      { workspaceId: WS, ticketId: wobble },
+    ]);
+    // And the outcomes diverge. The 404'd id is gone from the set; the wobbling
+    // one is still owed, at the head the notice gave it. This exact array is
+    // the case — a `toContain` would be satisfied by dropping neither.
+    expect(await replica.listPendingPulls(WS)).toEqual([{ id: wobble, headSeq: 5 }]);
+    // Nothing latched: the 404 is handled, not survived.
+    expect(engine.lastApplyFailure()).toBeNull();
+
+    // FIRST later catch-up. The wobbling id is retried — which is what proves
+    // the drain ran — and the phantom is not.
+    script.handlers!.onCaughtUp(9);
+    await engine.settled();
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: phantom },
+      { workspaceId: WS, ticketId: wobble },
+      { workspaceId: WS, ticketId: wobble },
+    ]);
+
+    // SECOND later catch-up, and the same again. One catch-up could not tell
+    // "forgotten" from "skipped once".
+    script.handlers!.onCaughtUp(11);
+    await engine.settled();
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: phantom },
+      { workspaceId: WS, ticketId: wobble },
+      { workspaceId: WS, ticketId: wobble },
+      { workspaceId: WS, ticketId: wobble },
+    ]);
+
+    // The set is unchanged across both, and the phantom never became readable —
+    // it is forgotten, not quietly satisfied by an empty payload.
+    expect(await replica.listPendingPulls(WS)).toEqual([{ id: wobble, headSeq: 5 }]);
+    expect(await replica.getTicket(phantom)).toBeNull();
+    expect(engine.lastApplyFailure()).toBeNull();
+    expect(engine.status()).toBe('live');
+    engine.stop();
+  });
+
+  /**
+   * 12.318 — A NOTICE ARRIVING DURING THE PULL SURVIVES THE 404.
+   *
+   * The race the ruling refused to lose. Visibility is withdrawn, the pull is
+   * issued, visibility is RE-WIDENED while it is in flight, and the 404 lands
+   * afterwards answering a question nobody is asking any more. An unconditional
+   * drop discards the re-widening and the device never learns it may read the
+   * ticket — silently, because there is no error and nothing to retry.
+   *
+   * The second notice is applied through `replica.applyServerItem` from inside
+   * `pullImpl` rather than through `onItem`, and the block comment above this
+   * describe carries the derivation for why it MUST be: the apply chain is
+   * serial, so a socket-delivered notice cannot land inside the pull's window,
+   * and a case driven that way would let the unconditional mutant live. This
+   * models the public-API writer `replica.ts` documents, through the real
+   * `reach-granted` filter.
+   *
+   * ## What the assertions are shaped to exclude
+   *
+   * `headSeq: 9` is asserted, not merely presence. "The id is still owed" is
+   * also true of a drop that never ran at all, so the number is what says the
+   * racing notice REPLACED the recorded seq and that the guard compared against
+   * the new value — the whole mechanism, in one integer. And `pullCalls` is
+   * asserted before it, so the survival is a fact about a 404 that was actually
+   * received rather than about a pull that never happened.
+   *
+   * This case deliberately does NOT also assert that an unraced 404 drops.
+   * That is 12.317's property, and re-asserting it here would make this case
+   * redden under 12.317's mutation too — at which point the pair would no
+   * longer discriminate and the racing write would be doing no work.
+   */
+  it('12.318 a notice arriving during the pull keeps the id owed through its 404, and the next catch-up fetches it', async () => {
+    const raced = newUlid();
+    const body = bootstrapOf();
+    const { script, replica, engine } = await fixture({ bootstrapImpl: async () => body });
+    await engine.start(WS);
+
+    // The re-widening, landing while the pull is in flight. `fakeTransport`
+    // reads `script.pullImpl` at call time, so this is the pull's own window.
+    script.pullImpl = async (_workspaceId, ticketId) => {
+      await replica.applyServerItem({
+        kind: 'reach-granted',
+        workspaceId: WS,
+        tickets: [{ id: ticketId, headSeq: 9 }],
+      });
+      throw new TicketPullNotFound(ticketId);
+    };
+
+    script.handlers!.onItem({
+      kind: 'reach-granted',
+      workspaceId: WS,
+      tickets: [{ id: raced, headSeq: 5 }],
+    });
+    await engine.settled();
+
+    // The pull ran and answered 404 — without this line the survival below is
+    // a claim about a request that was never made.
+    expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: raced }]);
+    // It survived, AT THE NEWER NOTICE'S HEAD. The 9 is the mechanism: the
+    // recorded seq was replaced mid-pull, so the guard's comparison against the
+    // 5 the pull was issued for could not match, and the entry stayed.
+    expect(await replica.listPendingPulls(WS)).toEqual([{ id: raced, headSeq: 9 }]);
+    expect(await replica.getTicket(raced)).toBeNull();
+    expect(engine.lastApplyFailure()).toBeNull();
+
+    // The re-widening is real on the server side now, so the next catch-up's
+    // drain converges. This is the half that makes the survival worth having.
+    script.pullImpl = async (_workspaceId, ticketId) => pullPayloadOf(body, ticketId);
+    script.handlers!.onCaughtUp(9);
+    await engine.settled();
+
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: raced },
+      { workspaceId: WS, ticketId: raced },
+    ]);
+    // A ticket that READS, not a row that exists.
+    expect((await replica.getTicket(raced))?.confirmed?.stateId).toBe('todo');
+    expect(await replica.listPendingPulls(WS)).toEqual([]);
+    expect(engine.lastApplyFailure()).toBeNull();
+    expect(engine.status()).toBe('live');
     engine.stop();
   });
 });

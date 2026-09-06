@@ -1500,6 +1500,14 @@ survived a whole task.)*
   baseline. Each pull is bounded by a timeout enforced in the ENGINE rather than the transport, because
   the transport has other implementors and a wait that never ends would stop the serial apply chain in
   total silence. Cases 12.292-12.298, 12.305-12.308.
+  - ✅ **…and an id the server will never serve is dropped — keyed to the NOTICE, not to the status code**
+    *(ruling P37.3)* — remembering without a bound was a quiet permanent leak: a revoked project left one
+    HTTP request per catch-up, for ever. The drop cannot key on the 404, because the route answers "you may
+    not see it" and "it never existed" identically **by design**, so the device cannot tell a phantom from a
+    re-widening that raced the pull. Each pending entry instead carries the `workspaceSeq` of the notice that
+    named it, and the 404 drops the entry only if that seq is still the one the pull was issued for — a later
+    notice has already replaced it, so the entry survives and the next catch-up fetches it. **A 404 is never
+    the last word; the next notice is.** Cases 12.317-12.318.
   `packages/sync-client/src/replica/replica.ts`, `packages/sync-client/src/engine/sync-engine.ts`
 - ✅ **`POST /v1/sync/reconcile` — the client names what it holds and the server says what is no longer
   theirs** *(closure 5's other half; it closes case 6.104, the stale copy nobody takes away)* — a member
