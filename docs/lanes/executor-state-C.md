@@ -35,6 +35,16 @@ account payments have failed"; owner-only fix). The PR's CI will show red-at-sta
 branch's own correctness; say so plainly in the PR body rather than let it read as this branch's fault.
 Nothing merges until the owner resolves it — this is a controller-wide hold, not specific to this PR.
 
+## PR #203 OPEN — HEAD FROZEN at `9d37936`, per the controller
+
+https://github.com/bkirosangma/gisik-nokma/pull/203. After opening at `d5ea37a`/`0678007`, the controller
+allocated Lane C a new §13 block (`13.201–13.240`, next block `13.241` on request) once `13.1–13.40` was
+confirmed exhausted. Minted the three PENDING BLOCK entries as `13.201–13.203`, updated both header
+paragraphs, re-ran `check-case-ids.mjs` (1545 unique ids, highest 13.203, no duplicates), pushed once more
+as instructed ("push once — then the head is frozen"), commented on the PR with the summary. **Do not push
+again to this branch without a fresh instruction** — the head is frozen at `9d37936` pending controller
+review/merge. HOLDING through the session halt from here; nothing else queued for Lane C.
+
 ## THE WORK, WHAT IT IS AND WHY
 
 Two of Plan 11's eighteen deferred errands (Ruling P33), assigned to Lane C by the 07:50-class re-task
