@@ -59,8 +59,19 @@ scheduler reads only UTC accessors).
   invalidates sessions — announce first.**
 - Database password: rotate in the managed-DB control panel; the injected `${db.DATABASE_URL}` follows
   automatically on redeploy.
-- Spaces keys: create the new pair, update SECRETs, verify a `--once` backup succeeds, **then** revoke
-  the old pair.
+- Object-store keys: create the new pair, update the SECRETs, redeploy, **then** verify against the
+  DEPLOYED environment before revoking anything:
+
+      doctl apps logs <app-id> backup-worker --follow      # watch the next scheduled run succeed
+
+  or force one inside the running container, which is the only place the rotated SECRETs exist:
+
+      node dist/ops/backup-daemon-main.js --once
+
+  **Do not verify by running `ops:backup-once` from a checkout.** That exercises your LOCAL
+  `OBJECT_STORE_S3_*`, not the rotated App Platform secrets, so it can pass while the deployed worker is
+  broken — and the next instruction revokes the working pair on the strength of it. Revoke the old pair
+  only after a run that used the new keys **in the deployment**.
 
 ## Backups
 
@@ -73,25 +84,42 @@ The managed database's own daily backups are a second string, not the plan.
 
 ## Orphaned uploads (monthly, with the restore drill)
 
-An upload whose `attachment.added` never landed leaves an object and a row no view can reach and no
-ledger event names. Harmless to honesty, unbounded in storage.
+An upload whose object reached the store but whose row and ledger event never landed leaves **bytes** no
+view can reach and no claim names. Harmless to honesty, unbounded in storage.
 
     pnpm --filter @gisik-nokma/server run sweep:orphans
 
 **The script is `sweep:orphans`.** (An earlier draft of this runbook called it `ops:sweep-orphans`, which
-has never existed — one of the two defects that motivated the command check at the top of this file.)
+has never existed — one of the two ghosts that motivated the command check at the top of this file.)
 
-It deletes attachment rows and their objects that are **older than 30 days** and **referenced by no
-`attachment.added` in the ledger** — both conditions in one query, and the ledger is never touched. That
-constraint is the whole design: the sweep may only ever delete what the ledger has never heard of, so
-nothing a claim points at can vanish. Run with `--dry-run` first and expect single digits; a large count
-means clients are failing between upload and ingest, which is an incident, not a cleanup.
+**What it deletes, stated exactly, because a wrong delete here is unrecoverable.** It lists OBJECTS from
+the store and deletes an object only when it is **older than 30 days** *and* **named by nothing** — where
+"named by nothing" means **neither** an `attachments` row **nor** an `attachment.added` event references
+it. Both signals, joined by OR, in two queries per object with the age compared in JS; not one query, and
+not the ledger event alone.
+
+**That union is load-bearing and must not be "simplified" to the ledger event.** `sweep-orphans.ts`'s own
+docblock says why: the web client does not currently post `attachment.added` at all, so treating the
+ledger event as the only survival signal would flag essentially every live attachment in this product as
+an orphan. An earlier draft of this section described exactly that one-signal rule — if you are here to
+make the code match the runbook, the runbook was wrong, not the code.
+
+**It does not delete `attachments` rows.** There is no `DELETE FROM attachments` anywhere in
+`apps/server/src`. Orphaned rows — a row whose object never arrived — therefore accumulate and are not
+swept by this tool. That is a known gap, not an oversight of this runbook.
+
+Run with `--dry-run` first and expect single digits; a large count means clients are failing between
+upload and ingest, which is an incident, not a cleanup.
 
 ## Restore drill (monthly, and after any schema change)
 
+0. Export the object-store credentials the fetch needs — `OBJECT_STORE_S3_*` and the backups bucket
+   (`ops:fetch-backup` prints exactly which when they are missing). Against DO managed Postgres, the
+   `createdb` and connection strings below also need `-U <user> -p 25060` and TLS.
 1. `pnpm --filter @gisik-nokma/server run ops:fetch-backup -- pg/<latest>.dump /tmp/drill.dump`
 2. `createdb -h <host> gisik_drill_$(date +%Y%m%d)` (any scratch name containing `drill`)
-3. `scripts/restore.sh /tmp/drill.dump '<scratch database url>'`
+3. `scripts/restore.sh /tmp/drill.dump '<scratch database url>'` — the script refuses any target whose
+   name does not contain `scratch`, `restore` or `drill`
 4. `DATABASE_URL='<scratch url>' pnpm --filter @gisik-nokma/server run verify:projections`
    — the drill passes only on the clean line and exit 0.
 5. Drop the scratch database. Record the drill — date, dump key, verdict — as a ticket in the Gisik Nokma
@@ -122,10 +150,22 @@ existed. **The decision, recorded here and in `deploy/do/README.md`:**
 
 The reasons, in order of weight:
 
-1. **The verifier's job is to detect drift, and drift is detected by rebuilding projections and diffing.**
-   A rebuild against production would rewrite the very rows being judged — the check would destroy its own
-   evidence and could not distinguish "projections were correct" from "projections have just been made
-   correct".
+1. **It needs DDL on the database it verifies, and the only safe place to grant that is a scratch copy.**
+   `verifyProjections` creates a `verify_shadow` schema, makes a `LIKE public.<t> INCLUDING ALL` copy of
+   every *declared* projection table, and rebuilds into it under `search_path = verify_shadow, public`.
+   That is a `CREATE SCHEMA` + `CREATE TABLE` per run — a standing DDL grant on production, for one
+   monthly procedure, so that a tool can build and drop scratch tables next to live data.
+
+   **NOTE, because an earlier draft of this section got it backwards:** the verifier does **not** rewrite
+   live projections. Its own docblock says "Live tables are never written", and three cases assert it by
+   execution (5.55, 6.117, 7.63). The reason to keep it off production is the DDL grant and the hazard
+   below — *not* that a run would clobber the rows it judges.
+
+   **The hazard that grant would expose is real and sharper than the false one.** The shadow trick is safe
+   only while every registered projection *declares* its table: a projection missing from `tables` gets no
+   shadow copy, so its unqualified `TRUNCATE` resolves through `search_path` to **`public`** and truncates
+   the live table. Cases 5.55 and 7.63 both name that trap. On a scratch database that is a lost scratch
+   database; on production it is a lost projection.
 2. **A DDL-capable credential in the deploy spec is a standing privilege that exists for one monthly
    procedure.** The restore drill already produces a scratch database with full rights by construction —
    whoever runs `createdb` owns it — so the privilege is available exactly when it is needed and at no
@@ -142,17 +182,31 @@ rebuilding, **not** a DDL credential in the deploy spec.
 
 ## Seeding production
 
-People are never invented: the owner signs in once first. Then, from a checkout with `DATABASE_URL`
-pointed at production:
+People are never invented: the owner signs in once first. Then, **from a repo checkout** with
+`DATABASE_URL` pointed at production:
 
     pnpm --filter @gisik-nokma/server run seed:cc -- --owner-email <email> --allow-missing-guest
 
 Re-run with `--accountant-email` once the accountant has signed in — the seed is idempotent; the second
 run adds only the guest surface.
 
-`seed:dev` the same way. **It must be run from a repo checkout, not from the container**: it reads
-`docs/superpowers/plans/`, and that directory is not in the server image (`reference/` is, which is why
-`seed:cc` runs in-container and `seed:dev` cannot).
+`seed:dev` the same way, but **without** `--allow-missing-guest`, which it does not accept:
+
+    pnpm --filter @gisik-nokma/server run seed:dev -- --owner-email <email>
+
+**Both seeds must run from a checkout. Neither can run inside the production container**, and an earlier
+draft of this section said the opposite about `seed:cc` — measured in the wrong environment, which is
+worth stating because the mistake is easy to repeat:
+
+- The runtime image has **no `reference/`, no `src/`, no `tsx` and no `pnpm`** — verified against the
+  image itself, `docker run --rm --entrypoint sh <image> -c 'ls /app'`: `dist`, `migrations`,
+  `node_modules`, `package.json` and config, nothing else. `Dockerfile` deletes `/out/src`, and `tsx` is a
+  devDependency pruned by `pnpm deploy --prod`.
+- `seed:cc` reads `reference/convenience-corner-tracker/board.data.js` at runtime and `seed:dev` reads
+  `docs/superpowers/plans/`; `docs` is in `.dockerignore`.
+- **Why it looked otherwise:** `docker-compose.dev.yml` bind-mounts `./reference:/app/reference:ro`, so
+  `reference/` *is* present in the DEV container — via a host mount App Platform has no equivalent of.
+  Checking inside a running dev container answers a different question than checking the image.
 
 ## Incident basics
 

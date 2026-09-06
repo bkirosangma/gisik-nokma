@@ -829,9 +829,17 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   (9 jobs, `e2e` 11 steps, `gate`'s `needs` unchanged) and by Lane C's review of the hunk
 - 13.179 ❌ what the web shell RENDERS when `getTickets` throws past the 2000-row cap (case 12.258) —
   **Task 13 does not cover it**; the E2E never reaches that path. Owner: Plan 6 / web render tests
-- 13.180 ✅ `seed:cc` runs INSIDE the server container exactly as the plan wrote — `reference/convenience-
-  corner-tracker` is present at `/app` in the image (measured) — and it is the seed T13 needs, because the
-  visibility spec requires a guest and only this seed produces one
+- 13.180 ✅ `seed:cc` runs inside the DEV compose container — which is what the E2E's `global-setup` does
+  on every run, so it is exercised continuously. **CORRECTED after review: the stated reason was wrong.**
+  This case used to say `reference/` "is present at `/app` in the image". It is not. Measured against the
+  IMAGE rather than a running container — `docker run --rm --entrypoint sh <image> -c 'ls /app'` — the
+  runtime image holds `dist`, `migrations`, `node_modules`, `package.json` and config and nothing else: no
+  `reference/`, no `src/`, no `tsx`. `reference/` is present in the DEV container only, via
+  `docker-compose.dev.yml`'s `./reference:/app/reference:ro` bind mount, which App Platform has no
+  equivalent of. **The original measurement was taken inside a container that had the mount** — the same
+  class of error as reading a stale image's health as the stack's health, and the third time this lane
+  measured the wrong environment. In production both seeds run from a checkout (runbook, "Seeding
+  production")
 - 13.181 ❌ `seed:dev` has no runtime coverage and CANNOT be run the plan's way: it reads
   `docs/superpowers/plans`, which is **absent** from the image (measured, against `reference/` present as
   the positive control), so `docker compose exec server node dist/seed/cli-seed-dev-workspace.js` cannot
@@ -898,12 +906,14 @@ shape rather than a first draft — both had been filled incrementally by Tasks 
 the plan's Step 2 and Step 3 texts (which write them as if new) are stale by construction and were
 reconciled, never overwritten.
 
-- 13.190 ✅ every command `docs/runbook.md` names RESOLVES — each `pnpm --filter <pkg> run <script>`, each
-  root `pnpm <script>`, and each repo-relative script path — checked by `scripts/check-runbook-commands.mjs`,
-  wired as its own CI step in the `check-env` job and reported on its own line. **12 commands/paths named,
-  all resolving.** A runbook is prose and prose cannot fail; this is the one thing about it that can be
-  made falsifiable, and it is claimed as nothing more — it does not prove a procedure is correct, that the
-  arguments are right, or that the steps are ordered correctly
+- 13.190 ✅ every command `docs/runbook.md` names **in a matched shape** resolves — `pnpm --filter <pkg>
+  run|exec <script>` (with `--filter @pkg` and `--filter=@pkg`), root `pnpm <script>` with or without a
+  colon, repo-relative script paths, and `node dist/…` resolved to the source that builds it. **14
+  references, 12 distinct** — both numbers printed, because an earlier version reported only the raw count
+  and a reader takes one figure for "how many things the runbook names". `scripts/check-runbook-commands.mjs`,
+  **its own CI job**. **Stated limits, because coverage is the thing this kind of check lies about:** a
+  command named in PROSE with no `pnpm` in front of it is invisible to the matchers, and so is a directory
+  path with no extension. The claim is "every command named in a matched shape", not "every command"
 - 13.191 ✅ the checker refuses a clean answer it has not earned: a SELF-TEST runs first against four
   planted defects (an unknown script under a real package, an unknown package, an unknown root script, a
   missing file path) and exits 1 unless all four are caught, and a mirror control requires three
@@ -922,18 +932,31 @@ reconciled, never overwritten.
   with none it exits 2 saying `DATABASE_URL is required`. A drill nobody can run is not a recovery
   procedure, and demanding three auth secrets to read a scratch database invites an operator to invent
   production-shaped values while holding a restored copy of production
-- 13.194 🧪 the projection verifier's privilege question is DISCHARGED AS A RECORDED DECISION, in both
+- 13.194 🚫 the projection verifier's privilege question is DISCHARGED AS A RECORDED DECISION, in both
   `docs/runbook.md` and `deploy/do/README.md` (coordination doc lines 1607–1611, which required either a
-  DDL-capable credential or an explicit decision, and neither existed): **`verify:projections` runs only
-  against restore scratch databases, never production, and no DDL credential is added.** Because the
-  verifier detects drift by rebuilding and diffing, running it against production would rewrite the rows
-  it is judging and could not distinguish "was correct" from "has just been made correct". 🧪 and not ✅
-  because a recorded decision is a document, and the only automated part of it — that the two files say
-  so — is what 13.190 checks. **Its cost is recorded with it:** production drift is not detected
-  continuously, surfacing at the next monthly drill against the latest dump, so the exposure window is up
-  to a month; the answer if that becomes unacceptable is a read-only continuous checker, not a DDL
-  credential in the deploy spec
-- 13.195 🚫 the whole-stack final smoke the plan names as Task 16 Step 4 is **not run here**: it requires
-  the production deployment, and the live deploy is explicitly OUT of this lane's scope by the owner's
-  instruction. The deployed-stack E2E against the dev compose stack (13.169–13.175) is the automated part
-  of it and has run; production provisioning stays 🧪 at deploy time
+  DDL-capable credential or an explicit decision; neither existed): **`verify:projections` runs only
+  against restore scratch databases, never production, and no DDL credential is added.** It needs
+  `CREATE SCHEMA` + `CREATE TABLE` on whatever database it verifies, and the shadow trick is safe only
+  while every registered projection declares its table — one missing from `tables` gets no shadow copy and
+  its unqualified `TRUNCATE` resolves to `public`, truncating the live table (cases 5.55, 7.63).
+  **🚫-with-reason, not 🧪 and not ✅:** a recorded decision is a document, nothing about it is verified at
+  deploy time, and **no automated check reads it.** An earlier version of this case claimed 13.190 checked
+  "that the two files say so" — it does not: 13.190 asserts `deploy/do/README.md` EXISTS and never reads a
+  byte of it, so the decision section could be deleted entirely with the check still green. **The cost is
+  recorded with the decision:** production drift is not detected continuously — the drill restores a
+  ≤1-day-old dump, so what is bounded by a month is DETECTION LATENCY, not dump staleness — and the answer
+  if that becomes unacceptable is a read-only continuous checker, not a DDL credential in the deploy spec
+- 13.195 🟡 the plan's Task 16 Step 4 whole-stack smoke is PARTLY run and partly not, and the split is
+  named rather than written off. **Its targets are all LOCAL** — an earlier version of this case said it
+  "requires the production deployment", which is simply false; Step 4 names no production resource. What
+  it does name is four root scripts that **do not exist** (`lint`, `test:fixtures`, `test:dual-client`,
+  `test:e2e`) and a stale Postgres port (54329; the dev stack is on 54330), so it cannot be run verbatim.
+  RUN: the gate half (build/test/typecheck — 30/30, 285 files, 3655 passed) and the E2E half
+  (13.169–13.175, merged with Task 13). **NOT RUN, and owned:** the docker half — `compose up --build`,
+  `check:db-tz` against the compose database, and the in-container `--once` backup. Owner: this lane if it
+  returns, otherwise whoever next runs a full deployment rehearsal
+- 13.196 ❌ `check-runbook-commands.mjs` does not read the CONTENT of the files it names — it asserts
+  `deploy/do/README.md` and `docs/runbook.md` exist, never what is in them, so the recorded DDL decision
+  (13.194) could be deleted wholesale with the check still green. A content assertion — "this file
+  contains the recorded decision" — is the obvious next step and is deliberately not claimed here. Owner:
+  this lane

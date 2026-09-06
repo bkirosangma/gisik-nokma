@@ -154,9 +154,20 @@ databases. Until now it carried neither, which is why this section exists rather
 
 Reasons, in order of weight:
 
-1. **The verifier detects drift by rebuilding projections and diffing.** Run against production it would
-   rewrite the rows it is judging — destroying its own evidence, and unable to distinguish "projections
-   were correct" from "projections have just been made correct".
+1. **It needs DDL on whatever database it verifies, and a scratch copy is the only safe place to grant
+   that.** `verifyProjections` creates a `verify_shadow` schema and a `LIKE public.<t> INCLUDING ALL` copy
+   of every *declared* projection table, rebuilding into it under `search_path = verify_shadow, public`.
+   That is `CREATE SCHEMA` + `CREATE TABLE` per run — a standing DDL grant on production for one monthly
+   procedure.
+
+   **An earlier draft of this section had the reason backwards and it is worth stating plainly:** the
+   verifier does NOT rewrite live projections. Its docblock says "Live tables are never written" and three
+   cases assert it by execution (5.55, 6.117, 7.63).
+
+   **The hazard the grant would expose is real, and sharper than the false one.** The shadow trick holds
+   only while every registered projection declares its table: one missing from `tables` gets no shadow
+   copy, so its unqualified `TRUNCATE` resolves through `search_path` to `public` and truncates the LIVE
+   table. On a scratch database that costs a scratch database; on production it costs a projection.
 2. **A DDL credential in the deploy spec is a standing privilege for one monthly procedure.** The restore
    drill already yields a scratch database with full rights by construction, so the privilege exists
    exactly when needed and never otherwise.

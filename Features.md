@@ -2121,7 +2121,12 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   nobody can run is not a recovery procedure. It now matches the seed CLIs and `sweep-notifications`,
   which read `DATABASE_URL` directly for the same reason. **The privilege question the deploy spec owed is
   discharged as a recorded decision** in `docs/runbook.md` and `deploy/do/README.md`: the verifier runs
-  only against restore scratch databases, never production — it detects drift by rebuilding and diffing,
-  so against production it would rewrite the rows it is judging — and no DDL-capable credential is added.
+  only against restore scratch databases, never production, and no DDL-capable credential is added. It
+  needs `CREATE SCHEMA` + `CREATE TABLE` on whatever database it verifies (it rebuilds into a
+  `verify_shadow` schema), and that shadow trick is safe only while every registered projection declares
+  its table — one missing from `tables` gets no shadow copy and its unqualified `TRUNCATE` resolves to
+  `public`, truncating the LIVE table. It does **not** rewrite live projections; an earlier draft said it
+  did, and the verifier's own docblock ("Live tables are never written") plus cases 5.55/6.117/7.63
+  contradict that.
   The cost is recorded with the decision: production drift surfaces at the next monthly drill, so the
   exposure window is up to a month. `apps/server/src/tools/verify-projections.ts`, `deploy/do/README.md`
