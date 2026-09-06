@@ -9,18 +9,31 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
-## Anchors — recounted 2026-09-06, at the sha named
+## Anchors — re-measured 2026-09-06 ~12:35 IST by the RELAUNCHED session, at `c0bba56`
+
+*The previous table said HEAD `5744489` / 29 ahead / 0 behind. All three were stale: two commits landed
+after it was written and thirty-nine merges landed on `main`. The stale row is not preserved here — an
+anchors table is the one place in this file where history is a hazard, because a restart reads it as
+position. The narrative sections below keep their own shas, and those remain facts about when they were
+written.*
 
 | anchor | value |
 |---|---|
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
-| merge-base with `origin/main` | `de88248` — rebased 3× (`1e372e3` → `1394396` → `1b72900` → `de88248`) |
-| HEAD at last refresh | `5744489` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | **29**, 0 behind |
-| tree state | clean |
-| node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | **GREEN at `5744489` THROUGH GATE LOCK v3.1**: `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **263 files / 3450 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers. Server 108 files. Lock acquired as a regular file (pid 8070) and released by the EXIT trap |
+| merge-base with `origin/main` | `de88248` — rebased 3× (`1e372e3` → `1394396` → `1b72900` → `de88248`); **a 4th rebase onto `5fca89e` is the next action** |
+| HEAD | **`c0bba56`** ("The shutdown path, reviewed — and my own rationale for it was false"). Reachable: `git branch -r --contains c0bba56` → `origin/exec/23-plan11`. Not orphaned |
+| `origin/main` | **`5fca89e`** at the measurement |
+| ahead / behind `origin/main` | **25 ahead, 39 behind** (`git rev-list --left-right --count origin/main...HEAD` → `39	25`) |
+| tree state | clean (`git status --porcelain --branch` → branch line only) |
+| node | `v22.22.2` (`source ~/.nvm/nvm.sh && nvm use 22`), pnpm **9.15.0** — measured in this session |
+| gate composition | **30/30 · 267 files / 3467 tests · `check:env` 0**, reported by the shutdown-path review round at the sha that became `c0bba56`. **NOT re-measured by this session** — it is the previous session's reading, carried because the tree has not changed since, and it will be superseded by the post-rebase gate before the PR. The last figure this lane measured end-to-end itself was `5744489`: 30/30 · 0 cached · 263 files / 3450 tests · `CHECK_ENV_EXIT=0` under lock v3.1 |
+
+### Position, in one line
+Seam 1 is complete **through the reviewed shutdown path**. Remaining, in order: **rebase onto `5fca89e`**
+→ **T6** (`docker-compose.dev.yml`) → **retroactive §13 catalogue from 13.105** → **gate under lock v3.2**
+→ **the seam-1 PR**, then HOLD for the controller. T13/T16 are seam 3 and are NOT this branch's work; the
+DDL / scratch-DB written decision is **T16's**, carried not discharged.
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
