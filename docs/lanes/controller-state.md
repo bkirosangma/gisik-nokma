@@ -37,12 +37,46 @@ section is the dispatch record this block confirms — every lane was observed a
 
 | lane | session · branch | observed |
 |---|---|---|
-| **A** (17:32) | `gisik-nokma-exec-f3` · `exec/47-post-204` from `ebba353` | **#204 MERGED.** Re-tasked by message 17:32 (ctx 63%), read-only + docs: first commit corrects its handoff header (A's rule); then SCOPE the next cluster on paper in its state file — at most eight of the addressable MIRRORs remaining after #204 (A's 29 − 8), in the invite/refusal-set shape (symbol / models / real producer / witness shape), collisions measured against B's `exec/46` and D's `exec/45`, the six borderline `helpers/seed.ts` / `flows/` rows classified so 23-vs-29 goes firm; push once, report ≤15 lines, HOLD. **The cluster is built by a FRESH Lane A relaunched at that fixed point from the scoping** — the override to write from it. Observed acting at 17:33 (branch cut, measuring B's files, asking D for its list) |
+| **A** (17:40) | **`gisik-nokma-exec-8e`** (fresh) · `exec/48-refusal-vocabulary` from `9d2a0b2` | **RELAUNCHED on the transcribed-refusal-vocabulary cluster** (section below); the scoping session `-f3` is gone |
+| **A** (17:32, history) | `gisik-nokma-exec-f3` · `exec/47-post-204` from `ebba353` | **#204 MERGED.** Re-tasked by message 17:32 (ctx 63%), read-only + docs: first commit corrects its handoff header (A's rule); then SCOPE the next cluster on paper in its state file — at most eight of the addressable MIRRORs remaining after #204 (A's 29 − 8), in the invite/refusal-set shape (symbol / models / real producer / witness shape), collisions measured against B's `exec/46` and D's `exec/45`, the six borderline `helpers/seed.ts` / `flows/` rows classified so 23-vs-29 goes firm; push once, report ≤15 lines, HOLD. **The cluster is built by a FRESH Lane A relaunched at that fixed point from the scoping** — the override to write from it. Observed acting at 17:33 (branch cut, measuring B's files, asking D for its list) |
 | **A** (17:25, history) | `gisik-nokma-exec-f3` · `exec/44-next-cluster` | **seven mutations run inside ONE lock acquisition, every prediction matched** (7.234's blast radius of 2 predicted, not discovered); every red an `AssertionError` from the case's own `expect` — none a `MappingError` shape gate, none grey (disguises #14/#15 answered in practice); rule minted into the catalogue: *where a mutation could die at a shape gate, keep the key and corrupt the value — a renamed key dies in `asString`/`asRecord` before any assertion runs and measures the parse, not the property.* Full gate RUNNING under the lock; then ONE push + report |
 | **B** | `lane2-plan4-a2` · `exec/46-reach-granted-wire` (not on origin yet) | `parseFrame` found deeply witnessed — the gap is the transport only; the wire case GREEN; docs + commit done; now the state file, then gate and an opus review, one at a time |
 | **C** | `lane3-plan7-8-34` | HOLDING, acknowledged 17:21; will treat a fired nudger line as noise and say so |
 | **D** | `lane4-periphery-2d` · `exec/45-ping-hazard` (not on origin yet) | oriented, build green, verifying 12.344 is free in its block before dispatching its one subagent |
 | **E** | `lane5-plan11-c9` · `exec/43-plan11-t13` @ `96e1c91` | **ONE opus reviewer over the whole branch (37 files) dispatched**; tree deliberately untouched while it reads. Queued: fix → re-gate at the content head → rebase (3 behind, all docs-only) → re-run the non-docs-delta test to decide whether the re-gate covers the final head → report |
+
+### Since 17:34 — #211, A RELAUNCHED FRESH onto the refusal-vocabulary cluster, a transient ACCESS ERROR halted B/D/E, the WEEKLY meter is the binding limit tonight (17:48)
+
+- **`main` is `9d2a0b2`** — #210 (anchors, `c2fee05`) · **#211 (Lane A's post-#204 handoff, docs-only, opened by
+  the controller for A's pushed-and-stopped branch as #181 was; `9d2a0b2`, 17:36)**. Both docs-only; the
+  forced gate at `ebba353` covers the code. Remote `exec/47-post-204` deleted.
+- **A's scoping (in `executor-state.md` on `main`, "THE NEXT CLUSTER I WOULD TAKE — THE TRANSCRIBED REFUSAL
+  VOCABULARY"):** eight rows, two of which document themselves as copies; every producer verified against a
+  fabricated-name control; seven buildable through `POST /v1/events`, the eighth (`notifications-gateway`)
+  catalogue-only (`apps/server` has no dependency on `apps/web`). **The 23-vs-29 number is FIRM at 21** — read
+  row by row, neither number was right (four not addressable, one discharged by 7.226/7.234, three promoted
+  into the cluster). Collisions: B measured from origin, disjoint; D REPORTED (not on origin), disjoint.
+  **LIVE FINDING with an owner:** `'ticket.unknown-state'` (2 sites) and `'state-machine'` (2 sites) asserted
+  in app-core tests and emitted by NO producer in `rule-engine/src`, `apps/server/src`, `packages/domain/src`
+  — the `'bad-envelope'` class (12.327); **owner Plan 5 / the client pre-check vocabulary**; the new A
+  measures `packages/app-core/src` first and settles it (N.A. with the emitter cited, or a ❌ case) — a source
+  change escalates.
+- **Lane A RELAUNCHED 17:40 at the fixed point** (`start-lanes.sh A`; old override → `override-laneA-fixture-witness-pass-done.md.bak`;
+  new `override-laneA.md` written from the scoping: branch `exec/48-refusal-vocabulary` from `9d2a0b2`, §7 from
+  7.238, rows 1–7 as witnesses + un-literal the client sites per 12.327, row 8 ❌ owner Lane F web-side harness,
+  the finding settled with the escalation rule, ONE subagent, opus reviewer on the two axes). New session
+  **`gisik-nokma-exec-8e`**; observed reading the state files and sweeping the rule names by 17:43.
+- **⚠ TRANSIENT ACCESS ERROR, 17:38–17:43:** B, D and E each ended a turn with *"Your organization has
+  disabled Claude subscription access for Claude Code · Use an Anthropic API key instead"* — B mid-verification
+  of its reviewer's Critical, D with its 12.344 workflow COMPLETED but unread, E with its opus reviewer FINISHED
+  (18m10s) but unread. Not a limit (session 20%); the fresh A launched at 17:40 ran through it. **Nudged all
+  three at 17:44 by tmux paste with the exact resume point; all three resumed within 30 s.** If it recurs and a
+  nudge does not clear it, it is the owner's account, not the code — escalate, dispatch nothing.
+- **⏳ THE WEEKLY METER IS THE BINDING LIMIT TONIGHT:** 78% at 17:24 → **81% at 17:47** with five lanes
+  live (~7%/hour); resets **Mon 2026-09-07 06:30 IST**. At this burn 100% lands ~20:30. **Rule for the
+  evening: land what is in flight (#205, B's and D's small PRs, A's cluster); past ~90% take pushed handoffs
+  and dispatch nothing new; at 100% everything halts together until Monday.** The session meter (20%, reset
+  22:20) is not the constraint.
 
 **Controller's next actions, in order (17:34; #204 done):** E's report → the reviewer's verdict + the re-gate
 at the exact head (+ the non-docs-delta test if it rebased after gating) → merge #205 under the waiver →
