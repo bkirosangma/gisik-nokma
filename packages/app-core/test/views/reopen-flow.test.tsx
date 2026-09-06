@@ -10,39 +10,47 @@ import { createClientStateCache } from '../../src/cache.js';
 import { SERVING_GAPS, ServingGapError } from '../../src/online/mappers.js';
 import { CreateTicketFlow } from '../../src/views/create-ticket-flow.js';
 import type { TicketRead } from '../../src/view-types.js';
+import { parentTerminalRefusal, rankRefusal } from '@gisik-nokma/rule-engine';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { PARENT, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 
 /**
- * The engine's real CREATE-arm sentence, and the value here was a fabrication
- * until case 7.239 read the wire.
+ * The engine's real CREATE-arm sentence, IMPORTED — and the two states this
+ * constant has been through are both worth seeing.
  *
- * The name says SERVER, and the string was not the server's: it read
- * `'Parent "Registrations" is Done; it must reopen because it is acquiring live
- * work.'`, which no version of `parentTerminalRefusal`
- * (`packages/rule-engine/src/checks/refusals.ts:197`) can produce — the engine
- * says `"<title>" is finished (<state>). <remedy>`. The identical string sat in
- * `test/flows/guarded-child-event.test.ts` under a comment claiming it was
- * "copied from `checks/hierarchy.ts`". Two files, both naming the producer, both
- * wrong, and neither detectable inside this package: every case feeds the client
- * this constant and reads it back.
+ * It was `'Parent "Registrations" is Done; it must reopen because it is acquiring
+ * live work.'`, under a name asserting it is the SERVER's. The engine has never
+ * emitted it. #219 corrected the value by reading the wire but had to leave it a
+ * literal, because `checks/refusals.ts` was re-exported from nowhere — case
+ * 7.245. That is now closed and the value is the producer's own function.
  *
- * Corrected here as well as at its twin ON PURPOSE. Fixing one and leaving the
- * other would leave the repo carrying two constants for one sentence with
- * different values, which is worse than the state this found. **This file was not
- * in the scoped row table** — it was reached through the `'hierarchy.rank'` /
- * `'hierarchy.parent-terminal'` site clause — and the scope call is reported
- * rather than buried.
- *
- * Kept a LITERAL because `checks/refusals.ts` is not exported from
- * `packages/rule-engine`'s index or any subpath, so no consumer can import the
- * producer's words. Case 7.245; owner: whoever next touches
- * `rule-engine/src/index.ts`.
+ * **The import does not make this file a witness**: reword the builder and this
+ * moves with it, silently. That reword is caught by 7.238/7.239, which hold a
+ * literal over a real round trip. What it buys is that this constant can never
+ * again say SERVER while being a fabrication.
  */
 const SERVER_PARENT_TERMINAL_REASON =
   '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 
-/** What the pre-check writes when it refuses off cached state (`precheck.ts`'s own words). */
+/** `rankRefusal('Task', 'Sub-task')`'s real output, pinned below. */
+const RANK_REASON =
+  `"Task" cannot go under "Sub-task": a ticket's parent must be a bigger kind of work.`;
+
+/**
+ * What the LOCAL pre-check writes when it refuses off cached state — and this one
+ * is ACCURATE, byte for byte against `app-core/src/precheck.ts:268`.
+ *
+ * It stays a literal, and the reason is a gap rather than a choice: `precheck.ts`
+ * builds that sentence with an INLINE template inside the function that returns
+ * it, so there is no symbol to import — the same shape as `rule-engine/src/rules/*.ts`
+ * (case 7.252). Recorded, not fixed: minting a builder for it is a source change
+ * to a shipped client path and therefore a ruling.
+ *
+ * **Keeping the two constants apart is the point of this file.** The engine and
+ * the client pre-check refuse the same situation in DIFFERENT words, and the
+ * neighbouring `SERVER_…` constant spent three files' worth of history being a
+ * hybrid of the two — an invented head on this sentence's tail (case 7.250).
+ */
 const INSTANT_PARENT_TERMINAL_REASON =
   '"Registrations" is in a terminal state; it must reopen because it is acquiring live work.';
 
@@ -210,7 +218,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
       if (call === 1) return events.map((event) => parentTerminal(event.id));
       if (call === 2) return events.map((event) => committed(event.id));
       return events.map((event) =>
-        refused(event.id, 'hierarchy.rank', 'A task cannot sit under a sub-task.'),
+        refused(event.id, 'hierarchy.rank', RANK_REASON),
       );
     });
     const onCreated = renderFlow(source);
@@ -222,7 +230,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const alertBox = await screen.findByRole('alert');
     expect(alertBox).toHaveTextContent('Registrations was reopened — that is now recorded history.');
     expect(alertBox).toHaveTextContent(
-      'Refused by the server — hierarchy.rank: A task cannot sit under a sub-task.',
+      `Refused by the server — hierarchy.rank: ${RANK_REASON}`,
     );
     expect(onCreated).not.toHaveBeenCalled();
     // Three claims and no fourth: nothing was sent to compensate the reopen away.
@@ -438,5 +446,31 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
       'Refused by the server — invalid-payload: title: must not be blank — a title of only spaces names nothing',
     );
     expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **RULING P43: a literal ALONGSIDE the import, never instead.** The literals above
+ * are the pins; the case below is what makes them pins rather than decoration.
+ *
+ * The shape matters and this branch got it wrong once. Replacing a literal WITH the
+ * builder call reads as an improvement and is not: the fixture then feeds the
+ * builder's output to a fake and reads it back, so a reword moves both sides
+ * together and every test here stays green. Measured, not argued — the first draft
+ * of this change did exactly that and its excluding mutation came back SERVER RED /
+ * CLIENT GREEN, which is the condition P43 named as the failure.
+ *
+ * With the literal kept and pinned, the same mutation reddens BOTH halves, each at
+ * its own sentence: the witness (7.238/7.240, over a real round trip) and this case.
+ * That is the acceptance test the ruling wrote, and it is the only reason the
+ * import is worth having here at all.
+ */
+describe('7.249 the fixture sentences are pinned to the producer they claim', () => {
+  it('7.249d SERVER_PARENT_TERMINAL_REASON is byte-identical to the engine\'s ADD arm', () => {
+    expect(SERVER_PARENT_TERMINAL_REASON).toBe(parentTerminalRefusal('Registrations', 'Done', 'add'));
+  });
+
+  it('7.249e the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
+    expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
   });
 });

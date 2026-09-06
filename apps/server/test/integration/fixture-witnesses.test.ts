@@ -47,7 +47,7 @@ import { PARENT_TERMINAL_RULE } from '@gisik-nokma/app-core';
 // carried ALONGSIDE a literal at every case that uses them, never instead of
 // one — see the refusal-vocabulary describe's header for why an assertion
 // against a producer's own constant, on its own, cannot fail.
-import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
+import { REFUSAL_RULES, parentTerminalRefusal, rankRefusal } from '@gisik-nokma/rule-engine';
 import { MIGRATION_RULES } from '../../src/routes/builder-reads.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -1508,6 +1508,16 @@ describe('the refusal vocabulary, against the real engine over the real door', (
     expect(result.reason).toBe(
       `"${TERMINAL_PARENT_TITLE}" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`,
     );
+    // AND THE NEWLY EXPORTED BUILDER, over the same bytes. **This line cannot catch
+    // a reword** — `parentTerminalRefusal` is the function the route just ran, so a
+    // change to its body moves this side too; the LITERAL above is what catches a
+    // reword and it stays for that reason alone. What this line CAN catch is the
+    // export being wired to the wrong thing: `packages/rule-engine/src/index.ts`
+    // now re-exports `checks/refusals.js` (case 7.249, closing 7.245), and a
+    // same-named symbol re-exported from a forked or stale module would disagree
+    // with the wire here and nowhere else. Narrow, real, and stated rather than
+    // dressed up as the stronger check next to it.
+    expect(result.reason).toBe(parentTerminalRefusal(TERMINAL_PARENT_TITLE, 'Done', 'add'));
     // THE VERB PAIR from this side, so a producer that collapsed the two arms into
     // one sentence reddens at BOTH 7.238 and 7.239 rather than at neither.
     expect(result.reason).not.toContain('Moving live work');
@@ -1522,14 +1532,21 @@ describe('the refusal vocabulary, against the real engine over the real door', (
    * (`checks/hierarchy.ts:298`). A mutation at one site only reddens one of these
    * two cases, which is the point of having both.
    *
-   * **The reason is asserted STRUCTURALLY, and the limit is stated rather than
-   * hidden.** `parentTerminalRefusal` lives in `checks/refusals.ts`, which
-   * `packages/rule-engine/src/index.ts` does not re-export and which no subpath
-   * reaches (`package.json` exposes `.` and `./fixtures`), so no consumer of the
-   * package can compare against the producer's own words — every downstream test
-   * must transcribe them, which is exactly how the two fabrications below
-   * survived. *Recorded, not fixed: owner is whoever next touches
-   * `rule-engine/src/index.ts`.*
+   * **The reason is asserted STRUCTURALLY, and this paragraph was a present-tense
+   * falsehood for one commit.** It read: *"`parentTerminalRefusal` lives in
+   * `checks/refusals.ts`, which `packages/rule-engine/src/index.ts` does not
+   * re-export … so no consumer of the package can compare against the producer's
+   * own words."* **That was case 7.245 and ruling P43 closed it** — this file's own
+   * import list now names `parentTerminalRefusal`, and 7.238 compares against it.
+   * The stale sentence survived the commit that falsified it, in the file that
+   * commit edited, which is the defect class 7.245 exists to record showing up
+   * inside its own fix. Caught by review, not by a test; nothing can test it.
+   *
+   * The structural assertions below stay anyway, and not from inertia: they pin
+   * values the SERVER resolved (the parent's real title, the state's real NAME)
+   * against a sentence built from a real round trip, which an equality against the
+   * builder cannot do — see 7.238 for why the builder comparison catches only a
+   * mis-wired export.
    *
    * What CAN be asserted without that export is worth more than a transcription
    * anyway: the sentence carries the parent's real title and the state's real
@@ -1614,6 +1631,15 @@ describe('the refusal vocabulary, against the real engine over the real door', (
     expect(result.reason).toBe(
       '"Story" cannot go under "Task": a ticket\'s parent must be a bigger kind of work.',
     );
+    // AND THE EXPORTED BUILDER, for the reason 7.238 states — with one addition
+    // review found and this case is the answer to. `rankRefusal` and
+    // `fieldKindRefusal` share the signature `(string, string) => string`, so
+    // re-exporting one under the other's name PASSES THE TYPECHECK: the arity
+    // mismatch that makes a mis-wired `parentTerminalRefusal` a TS2554 does not
+    // exist here. Without this line that swap is green at typecheck, green in
+    // app-core and green on the server — the only mis-wire in the export list
+    // that nothing at all would notice.
+    expect(result.reason).toBe(rankRefusal('Story', 'Task'));
   });
 
   /**

@@ -16,6 +16,147 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — **PR OPEN on `exec/50-p43-refusal-exports`: ruling P43, 7.245 CLOSED. Branch RENAMED to the name the ruling gives it.**
+
+## I VIOLATED THE RULING THAT AUTHORISED THIS BRANCH, AND MEASURED THE FAILURE AS IF IT WERE THE DESIGN
+
+**Ruling P43** (`docs/lanes/controller-state.md:91`) says in bold: un-literal the client sites **"a
+literal ALONGSIDE the import, never instead"**, and names its acceptance test — *"the exported
+constant's value → **both** the witness and the client case redden, each at its own sentence."*
+
+I replaced the literals **with** the builder calls, measured **SERVER RED / CLIENT GREEN**, and wrote
+that up as the intended division of labour — in a commit whose message opens *"The ruling was given"*.
+That is the condition the ruling named as the failure, reported as the design.
+
+**Root cause, stated because the next reader needs it more than the fix:** my dispatch arrived
+truncated, I inferred the task from its file list, and **I never opened `controller-state.md` — the
+file my own previous handoff tells the next reader to read first, in a block I wrote.** The same rule
+was also already in `fixture-witnesses.test.ts:47`, in a file this branch edits; the server half
+honoured it and the client half did not. *An inferred task is not a read task. Read the ruling, even
+when the file list makes the work obvious.*
+
+**Fixed as P43 specifies, and measured:** all three client sites carry the literal again, each pinned
+to its builder by a case that runs (**7.249a–e**). **M15 — P43's own excluding mutation — now reddens
+BOTH halves:** server `1 failed | 24 passed` (7.238), client `3 failed | 39 passed` (7.249a, 7.249c,
+7.249d), each at its own sentence.
+
+## FOUR MORE FROM THE SAME REVIEW, ALL CORRECT
+
+| # | what was wrong | now |
+|---|---|---|
+| 2 | *"no test anywhere would notice a mis-wired export except 7.238's new line"* — **false**, and my own 7.245 disposition said so six lines away | the typecheck kills it: **`TC=2`, three `TS2554`** (M18). "CLIENT GREEN — 37 passed" measured vitest, which strips types and never typechecks |
+| 3 | **the mutation I chose was the one the typecheck kills.** The one that evades everything is a SAME-ARITY swap — `rankRefusal` and `fieldKindRefusal` are both `(string,string)=>string` | 7.240 now carries the builder comparison too. **M17: `TC=0`, zero `TS2554`, and RED anyway.** Before the fix round nothing in the repo caught it |
+| 4 | 7.239's docblock still said the export does not exist, **in the file whose import list now names it** | corrected in place, saying what was stale — the 7.245 defect class appearing inside its own fix |
+| 5 | *"THREE DIFFERENT WORDINGS"* — it is **two**, across three files; the first two are byte-identical | corrected in the source docblock, the catalogue and Features.md. The count contradicted the causal mechanism I wrote beside it |
+
+Also corrected: the index said *"and five more"* where it re-exports ten modules, and claimed all three
+files named a source where the third claimed none.
+
+## FOR THE SILENT-WRONG-ANSWER LIST — a new one, and it nearly shipped a syntax error
+
+**The proxy summary printed `PASS (6) FAIL (0)` for a run in which TWO WHOLE FILES failed to transform
+and never executed.** Six assertions really did pass; two suites never started, so they contributed no
+failures to count. **Only `EXIT=1` betrayed it.** A reader trusting the summary line — the line the
+proxy exists to produce — would have concluded the run was clean. *A count of failures is not a count
+of what ran.*
+
+---
+
+# ↓ LANE A — the first draft of this branch (`exec/49-refusal-words`). **Its position line and its
+# "server red / client green is the division of labour" reasoning are SUPERSEDED by the block above;**
+# the export itself, the two-producer finding and the carried items are unchanged and still live.
+
+# LANE A — **PR OPEN on `exec/49-refusal-words`: 7.245 CLOSED, the refusal vocabulary exported.**
+
+**The ruling asked for at 7.245 was given, and this is that change plus what fell out of making it.**
+`packages/rule-engine/src/index.ts` now re-exports `REFUSALS` and the eight refusal-sentence builders
+from `checks/refusals.ts`. **One source file, four test files, two catalogue files.** New cases
+**7.249–7.253**; **7.245 flipped ❌ → ✅ in place**, its original wording kept because the reasoning is
+what made the case for the change.
+
+**§7 next free after this branch: `7.254`.** §12 unchanged — used through `12.328`, next free `12.329`.
+
+## THE FINDING SHARPENED, and it corrects my own #219 wording
+
+I called the parent-terminal constant in two `app-core` files **"a fabrication"**. It is more specific:
+**two producers say that refusal in different words**, and the fixtures carried a HYBRID neither emits.
+
+| producer | sentence |
+|---|---|
+| the ENGINE, `rule-engine/src/checks/refusals.ts:197` | `"<title>" is finished (<state>). <remedy>` |
+| the CLIENT's own pre-check, `app-core/src/precheck.ts:268` | `<title> is in a terminal state; it must reopen because it is acquiring live work.` |
+| what three fixtures carried | `Parent "Registrations" is Done; it must reopen because it is acquiring live work.` |
+
+An invented head welded to the pre-check's tail. **Assembled from two real producers into a sentence
+that is neither**, which is why it read as plausible to three separate authors and to me.
+`reopen-flow.test.tsx` is the file that already knew the two differ — it keeps a correct
+`INSTANT_PARENT_TERMINAL_REASON` beside the wrong `SERVER_` one, and that is what made the hybrid
+legible once someone looked.
+
+**A THIRD copy existed and #219 did not find it** (`data-source.test.ts:31`, a third wording again),
+because #219's sweep searched for the string the first two carried. **Same mode as 7.246: a search for
+a known wrong string cannot find a DIFFERENT wrong string for the same slot.** `hierarchy.rank`'s
+reason was wrong the same way in two more files — `'A task cannot sit under a sub-task.'` where the
+engine builds `"X" cannot go under "Y": a ticket's parent must be a bigger kind of work.`
+
+## WHAT THE EXPORT DOES NOT BUY — written at the export, in the catalogue, and at every site
+
+**It does not make a client test a witness.** Reword a builder and an importing fixture moves with it
+in silence. **The reword is caught by 7.238/7.239 holding a LITERAL over a real round trip, and by
+nothing else.** The import removes a class of lie; it does not add a check. Measured, not asserted:
+**M12 and M13 are SERVER RED / CLIENT GREEN** — the witness reddens, all 37 client tests pass.
+
+`refuse()` and `ACCEPT` are deliberately **not** exported: they are how a CHECK constructs a verdict,
+and handing consumers a way to mint a `Refusal` that looks engine-made would re-introduce the exact
+failure this export ends, through the same door.
+
+## THE PREDICTION I GOT WRONG, and it was my own rule
+
+**M14** (the index re-exporting the wrong function under the right name) was predicted **SERVER RED and
+CLIENT RED**. The client was **GREEN, 37 passed**. Obvious in hindsight and written three paragraphs
+above it: an importing fixture feeds the builder's output to a fake and reads it back, so both sides
+move together whatever the builder returns. **The prediction contradicted the property the case exists
+to document, one line after documenting it.** Third time in this series a *which-side-goes-red*
+prediction has erred toward over-claiming. What the client-green really shows: **nothing in the repo
+would notice a mis-wired export except 7.238's new line**, which is why that line is there.
+
+## CARRIED, WITH OWNERS — the table from the previous block, amended
+
+**7.245 is CLOSED.** Still open, unchanged: **7.243** (web notifications gateway — Lane F) · **7.244**
+(the contest round trip — Plan 10 / Lanes B–D) · **7.246** (the migration vocabulary — Plan 8) ·
+**7.247** (`'state-machine'`, one severity lower on purpose) · **7.248** (one `sync-client` mirror —
+Lane B). **Two new:**
+
+- **7.252 ❌ THE SAME GAP ONE LEVEL DOWN.** `rule-engine/src/rules/*.ts` builds all seven transition-rule
+  reasons as inline templates at the `reason:` key, and `app-core/src/precheck.ts:268` does the same for
+  the client's own parent-terminal sentence. 7.249's export cannot reach any of them. **Measured rather
+  than assumed: the two client transcriptions of those sentences (`precheck.test.ts:119`,
+  `inbox/fixtures.ts:49`) are byte-ACCURATE**, so this is a structural exposure and not a live defect —
+  the distinction 7.247 exists to keep. *Owner: whoever next touches `rule-engine/src/rules/` or
+  `app-core/src/precheck.ts`. A source change, therefore a ruling.*
+- **7.253 ❌** `apps/web/test/data-source-gateway.test.ts:243,259` truncate the server's
+  `migration.unmapped-state` sentence — the dropped clause (`Every occupied state needs one.`) is the
+  half that tells an admin what to do. Graded below 7.250: the gateway passes `reason` through opaquely
+  and nothing branches on it. Not correctable by an import — same wall as 7.246. *Owner: whoever owns
+  the web authoring gateway's fixtures.*
+
+## THE MIRROR REMAINDER — unchanged by this branch
+
+This pass was a source/export closure, not a mirror conversion, so the count in the block below stands:
+**of the inventory's 21 `BUILDABLE=YES` rows — 2 discharged, 7 still open and buildable from a server
+test, 3 not mirrors at all, 7 needing another surface, 2 another owner's.** The seven open ones are
+named by symbol there, and **four are one theme: the CLIENT-AS-PRODUCER direction**, which no witness
+covers.
+
+> **WHERE THE NEXT INSTRUCTION COMES FROM, and it is not this file.** The Monday queue and the serial
+> procedure are **the top block of `docs/lanes/controller-state.md`.**
+
+---
+
+# ↓ LANE A — the post-#219 idle block. **Its position line is SUPERSEDED by the block above;** its
+# merged-PR table, its id blocks, its recounted mirror remainder and its three minted rules remain the
+# live reference and are not repeated above.
+
 # LANE A — **IDLE. NOTHING IN FLIGHT. #219 IS MERGED as `bb94dc5`. Awaiting re-tasking.**
 
 **Written for a reader with none of my context.** Two terms, because everything below turns on them.
