@@ -10,30 +10,24 @@ only what is written here.
 
 ---
 
-## LIVE ANCHORS — verified 2026-09-06, re-verify before trusting
+## LIVE ANCHORS — measured 2026-09-06 after the #126 relaunch. RE-VERIFY BEFORE TRUSTING.
 
 | anchor | value | how verified |
 |---|---|---|
-| branch | `exec/20-plan10-t13-t15` | `git branch --show-current` |
-| HEAD | `cd584dd` (T14 + its fix round) | `git rev-parse HEAD` |
-| `origin/main` | `fc5cf0d` — **T13 + P34 MERGED as #117**, verified by content (case 12.220 and `syncErrorNotice` both present on main), not by report | `git rev-parse origin/main`; `git show origin/main:<file>` |
-| ahead of `origin/main` | **4** (blocker doc, T14, backfill case, fix round) | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git rev-parse origin/<branch>` vs `git rev-parse HEAD` |
-| tree | clean | `git status --short` (empty) |
-| node | v22.22.2 | `node -v` after `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` |
-| install | `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0 | `/tmp/laneB-install.log` |
-| domain+ui built | `pnpm turbo run build --filter=@gisik-nokma/domain --filter=@gisik-nokma/ui` → `2 successful, 2 total` | `/tmp/laneB-build.log` |
+| branch | `exec/26-closure5-catchup` | `git branch --show-current` |
+| cut from | originally `origin/main` = `c7c2b8e` (the #126 merge); **REBASED TWICE** — onto `fdd3bad` (closure 2b #137 + Plan 11 T7/T8 #136) and onto **`4f748d9`** (controller docs only) | `git rebase origin/main`, exit 0 both times |
+| HEAD | **`9762cda`** — pushed; PR **#139** open, MERGEABLE, held for the controller's merge | `git rev-parse HEAD`; `git rev-parse origin/exec/26-closure5-catchup` matches |
+| ahead of `origin/main` | **8** | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES — `git branch --contains 9762cda` prints `exec/26-closure5-catchup`** | `git branch --contains HEAD` — empty output would mean orphaned |
+| tree | clean (`git status --short` empty) | `git status --short` |
+| node | v22.22.2 | `node -v` after `source ~/.nvm/nvm.sh && nvm use 22` |
+| gate | **`GATE_EXIT=0` at the PUSHED head `9762cda`** · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 1m34.064s · node v22.22.2 · zero `Unsupported engine` · `check:env` exit 0 on its own line · `pg_isready` exit 0 · orphan reap by `ppid=1` empty. **3333 tests / 10 packages**, enumerated: domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 64 · app-core 1092 · mobile 20 · desktop 5 · web 136 · server 1055. *Re-run at the pushed head rather than carried over from `10b3249` on the argument that the intervening commits were docs — a gate is a fact about a tree. Identical composition (1m25.68s there).* **This branch adds 14 `it` blocks**: server 13 (12.277-12.282 + 12.291 at the filter, 12.284-12.286 at the route, 12.275/12.276/12.289 on the rig), sync-client 1 (12.287). | one backgrounded invocation under the lock |
 
-**GATE RECOUNTED AT `0b1b515` BY THIS LANE.** `pnpm turbo run build test typecheck --force
---concurrency=2`, node v22.22.2, **GATE_EXIT=0**, `Tasks: 24 successful, 24 total`,
-`Cached: 0 cached, 24 total`, `1m23.463s`, **zero** `Unsupported engine` lines, zero failures.
-
-**3210 tests across 8 packages** — ui 37 · domain 464 · editor 178 · rule-engine 282 · sync-client 63 ·
-app-core 1075 · web 136 · server 975. Enumerated per package and summed, NOT taken from a count:
-`grep -c` on the same pattern answered **19** for what enumeration shows is **8** distinct lines each
-appearing once. That is the wrong-COUNT silent failure mode this machine has on record, and it is why
-the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**, which is exactly the
-29 `it(` blocks this branch adds (5 + 13 + 8 + 3). The delta reconciles.
+**⚠️ BRANCH-NUMBER COLLISION, flagged by Lane A and NOT resolved by either of us.** Lane A's branch is
+`exec/26-provenance-block` and this one is `exec/26-closure5-catchup` — two `exec/26-*` branches. Not a
+git conflict (different refs), but ambiguous in the ledger and in PR titles, which is one level up from
+the `12.156` id collision that cost a day. Lane A pushed first and declined to rename unilaterally;
+**the controller decides who renumbers.** Neither lane should assume the other did.
 
 ---
 
@@ -41,13 +35,35 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 
 | # | task | state |
 |---|---|---|
-| 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **DONE. PR #126 open**, head `cd584dd`. Rig suite **7 passed**; full gate under the lock **24/24, 0 cached, 3225 tests / 8 packages** (server 979→986). Fable review returned: no Critical, three Important — all fixed and each pinned by a case that fails specifically. |
-| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | **DONE.** Six scenarios, cases 12.267–12.274, Fable review returned 1 Critical + 2 Important, **all corrected**. In #126 with T14. *(old status below)* **WAS: IN PROGRESS** — Fable author writing `scenarios.test.ts` against a 16-item verified correction list. **S4's central premise is FALSE** (see below); the author is instructed to write it against what the product does and say so, not to bend the rig. |
-| 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
+| 1 | T13 — app-core contested-claim UX, reopen pair, skew badge, status bar | **DONE, MERGED** (#117) |
+| 2 | T14 — dual-client harness rig | **DONE, MERGED** (#126) |
+| 3 | T15 — scenarios S1–S6 | **DONE, MERGED** (#126) |
+| 4 | **CLOSURE 5 — ruling P37, both halves** | **BUILT AND MEASURED.** Two commits on this branch; catalogue in the same change set. See the section below. |
+| 5 | **CLOSURE 5b — controller-assigned 2026-09-06, AFTER #139 merges and BEFORE T18.** Three items closure 5 recorded rather than fixed, now owned: **(a) 12.283** — widening because the READER's reach grew (`membership.granted` / `project.member_added`); same P37 shape, the trigger is the membership event itself, deliver what the new reach admits, excluding fixture as before. **(b) 12.288** — the engine calls `reconcile` on every reconnect/catch-up completion (the moment its cursor is current is the moment its holdings can be stale), measured by a scenario that narrows while offline and asserts removal after reconnect with NO manual call. **(c) 6.102's guest side** — close through the same client-presented path IF it is an application of the same rule; **if it needs a NEW rule, escalate before building.** Plus, as 5b's first commit if cheap: make the dual-client rig call the REAL reconcile route through `inject()` instead of restating its rule in-process. **Use ids 12.290+.** | NEXT |
+| 6 | T18 — `Features.md` §12 + `test-cases/12` final shape | **NEXT, and STILL HELD.** Plan lines 7471–7629. **Precondition unchanged: it cannot be complete while what it catalogues is still moving.** Lane A's closure 2b, closure 4 and the HELD pair (ids 12.240–12.259) were still landing in §12 when closure 5 was written. **Re-measure §12 against `origin/main` at the moment T18 starts**; if Lane A's §12 writes have not landed, tell the controller and HOLD rather than catalogue a moving target — the controller decides whether T18 waits or closes with Lane A's items named as "landing under Lane A". |
 
-**In flight: T13's PR, awaiting controller merge.** **One ruling is pending** (see OPEN RULINGS below)
-— it does not block T14, and this lane proceeds to T14 rather than waiting.
+**⚠️ THIS LANE'S §12 BLOCK (12.260–12.289) IS EXHAUSTED. The controller ALLOCATED 12.290–12.319 to
+this lane on 2026-09-06** (next free 12.320, on request only). Do not mint from the header's maximum.
+
+**⚠️ AND THE RECOUNT ITSELF WAS WRONG-METHOD — read this before running the control.** `test-cases/12`
+carries ids in TWO styles: `- 12.274 🚫 …` and `- **12.240** ✅ …` (Lane A's closure-2b cases).
+`grep -o '^- 12\.[0-9]*'` — the pattern a lane naturally writes, and the one this lane used — matches
+215 and **silently misses 4**. The true figure at this sha is **221 ids (217 plain + 4 bold), max 12.291, zero duplicates, nothing above this lane's 12.319**.
+The number being wrong is the smaller half: **the control exists to catch a BLOCK COLLISION and in that
+form it cannot see one against a bold-style id**, so two lanes could both recount, both read "zero
+duplicates", and both be wrong — the exact double-mint this file has paid for twice. Use, and print both
+per-style counts beside the total as the positive control:
+```
+grep -oE '^- (\*\*)?12\.[0-9]+' test-cases/12-offline-sync-apps.md | sed -E 's/^- (\*\*)?//' | sort -t. -k2 -n
+```
+Now written into `test-cases/12`'s own header so the next lane copies a working control rather than
+writing its own. *Reported to the controller as a method finding, not as a defect in this branch.*
+
+**A third silent-empty mode fired during the same rebase check, and it is already on this machine's
+record:** `git show <sha> -- <file> | grep "^+"` returned **0 matches** on a diff that visibly contains
+added lines — the markers come back INDENTED (`  +- **12.240**`). Closure 2b's survival across the
+rebase was therefore verified against the FILE (`grep -- "\*\*12.240\*\*"`, four for four), never
+against a diff.
 
 ---
 
@@ -315,44 +331,148 @@ where the intermediate state matters (measured benign for S1/S2, **not measured 
 `snapshotPass()` then create a client and call `ds.query.getTicket` (product defect M3) ·
 `engine.settled()` deadlocks while offline.
 
-## ⭐ NEXT TASK: CLOSURE 5 — RULING P37 (2026-09-06). READ THIS BEFORE ANYTHING ELSE.
+## ✅ CLOSURE 5 — BUILT. What it is, and the four mutations that measure it
 
-**Owner: THIS LANE. Sequenced AFTER #126 merges and BEFORE T18.** The controller restarts this session
-at that boundary with closure 5 and T18 in the override. **Do not start it before #126 merges.**
+**Two commits**, catalogue in the same change set. Ruling P37's constraints were followed, not
+redesigned around; where a constraint's wording turned out narrower than the gap, the extra is
+RECORDED with an owner rather than built.
 
-**What it is: "the copy nobody gives back and the copy nobody takes away" — two halves of one gap.**
-- **12.274, the GRANT side.** There is NO backfill-on-grant in the product. A client whose cursor moved
-  past a narrowing never gets the ticket's history back when it is re-widened. Measured twice: one
-  unrelated visible commit between narrow and widen → cursor 4→7 past narrow(5) and contest(6), client
-  holds 2 events where the server holds 4, **permanent, no resync path**.
-- **6.104's purge half, the NARROW side.** A member un-shared by a plain `visibility.set` keeps the
-  stale copy until a full resync.
+### The grant half — `apps/server/src/visibility/grant-backfill.ts` (new), wired into `visibleEventsFor`
 
-**P37's DESIGN CONSTRAINTS — these are constraints, not a design; measure within them:**
-1. **Grant side:** the trigger is the visibility EVENT ITSELF, never a reconstructed prior audience
-   (6.82/6.94 stand). On a widening, the server delivers that ticket's full history — or a per-ticket
-   snapshot in the bootstrap's own shape, whichever the replica already folds — to every viewer in the
-   NEW audience, cursor notwithstanding. Over-delivery to a viewer who already held it is acceptable
-   **iff replay is idempotent — MEASURE that, do not assume it.** A viewer NOT in the new audience gets
-   nothing: that is the excluding fixture. **Mutate the audience check to permit and confirm red.**
-2. **Narrow side:** the server NEVER initiates a purge for an entity a device may never have held —
-   that is P23 and it is not reopened. So the purge is **CLIENT-PRESENTED**: the client names the ids
-   it holds (on catch-up or a reconcile door) and the server answers only about ids the client named,
-   "no longer yours" for those outside the current audience. **Excluding fixtures: the answer must
-   never contain an id the client did not present (mutate to enumerate → red), and presenting an id
-   never held yields nothing beyond "not yours"** — the same register as `{kind:'restricted', id}`.
-   This resolves "cannot distinguish lost from never-had" in the SAFE direction: **the client's own
-   holding is the relationship.**
-3. **The 12.274 probe becomes the GREEN case** (`replicasEqual` true after narrow → other → widen).
-   6.104's residual flips 🚫 → ✅ **only when a narrowed ticket is actually removed by the
-   client-presented path** — never by an assertion bolted onto a scenario that is still divergent.
-4. **P30 holds.** Closure 1's snapshot invalidation and P36's provenance block are untouched. **If
-   either half needs a NEW visibility rule rather than an application of `canSee` /
-   `resolveEffectiveRole`, ESCALATE BEFORE BUILDING.**
+A visibility-changing event on a ticket the reader may see NOW hands back that ticket's pre-cursor
+history — and every INHERITING DESCENDANT's. Triggers: `visibility.set` and `ticket.reparented`.
 
-**Collision to manage:** Lane A's closure 4 (P36) touches `sync-routes.ts`'s bootstrap payload; this
-lane touches the CATCH-UP path. **Announce the file list to Lane A (`gisik-nokma-exec-06`) before
-starting; whoever lands second rebases.**
+**The safety argument is an asymmetry, not a check, and it is the thing to re-read before touching this.**
+No before-image is consulted or reconstructed (6.82/6.94 hold, and the per-event purge walk stays struck).
+A NARROWING is invisible to the viewer it narrowed away, so `visibleEventsFor`'s own `canSee` never
+yields it to them and it never becomes their trigger. **A widening self-selects; a narrowing
+self-excludes.** That is why a trigger this coarse is legal.
+
+**The subtree walk is `reResolveSubtree`'s own traversal, read-only** — the projection restores the
+resolution invariant over exactly the set whose audience the event changed, so "whose row did it change"
+and "whose history is owed" are one question asked the same way. It reads `parent_id`/`own_mode`
+(structure), never re-derives the RULE; `canSee` still decides every audience question. `visited` guards
+a `parent_id` cycle for case 6.58's reason.
+
+### The narrow half — `apps/server/src/sync/reconcile-route.ts` (new) + `SyncTransport`/`SyncEngine`
+
+`POST /v1/sync/reconcile`: the CLIENT names the ids it holds, the server answers only about those, in the
+`{kind:'restricted', id}` register. **Existence is never consulted** — a handler that omitted ids it had
+no row for would make presence-vs-absence the oracle, which is "lost vs never-had" closed in the content
+and reopened in the SHAPE. `canSee` already answers unknown and invisible identically and says so; this
+door is the second reader depending on that sentence.
+
+**`SyncTransport` grew a fourth method** (P17's class). Controller approved with an enumeration rule.
+
+### THE FOUR MUTATIONS — results, which are the measurement, not the intent
+
+| mutation | result |
+|---|---|
+| `GRANT_BACKFILL_TRIGGERS` → `[]` | `5 failed \| 1 passed`. **Not "alone", and it should not be** — emptying it removes the mechanism. The SURVIVOR (12.277) is the finding: exclusion is the caller's `canSee`, not this list. |
+| `grantBackfillFor`'s own `canSee` → permits | `1 failed \| 5 passed` — **12.280 ALONE.** Edit confirmed present before the run, so: killed guard, not a mutation that never fired. |
+| reconcile route enumerates `proj_visibility` | `2 failed \| 10 passed` — 12.285 + 12.286. **12.284 stayed GREEN, which is why 12.285 exists.** |
+| engine drops `chunk.includes(item.id)` | `1 failed \| 63 passed` — **12.287 ALONE.** |
+
+### ⚠️ THE BRANCH REVIEW — 8 raised, 6 SURVIVED refutation. ONE IS OPEN AND ESCALATED.
+
+Fable reviewer + one Fable refuter per finding, each briefed to default to refuted. Two were refuted
+(a `canSee` timing side-channel that is pre-existing and reachable at a door with a weaker gate; a
+comment enumerating "both consumers" that is complete for what it names).
+
+**✅ RULED — P37.1 (2026-09-06). (2)+(1) landed in #139; the real fix is closure 5b item (d).**
+
+**The backfill is an ATOMIC, NON-PROGRESSING BURST.** Before this branch every envelope the hub sent
+advanced a cursor, so a drain cut short resumed where it stopped. A backfill inverts that by
+construction: **every backfilled envelope is `≤ afterSeq`, so none moves any cursor**, and the only one
+that does — the trigger — is yielded AFTER the whole subtree's history. `hub.ts`'s `send` closes the
+socket 1013 `slow-consumer` above 1 MB buffered and `detach`es; no `caught-up` is sent, so the engine
+(which persists its cursor ONLY in `onCaughtUp`) never advances, and app-core's `lastSeq = Math.max(…)`
+cannot move on envelopes below its own `afterSeq`. **The client reconnects at the same cursor, is handed
+the identical burst, and is closed again — permanently and silently.** `needsBootstrap` refuses to
+re-bootstrap over a local baseline, so there is no client-side escape. Second half, independent of the
+wedge: **a cost amplifier the docblock's "bounded to once per subscriber per trigger" does not bound** —
+`readEntityEvents` runs with the default `afterSeq = 0`, and `check-permission.ts` does not refuse a
+`visibility.set` that sets the mode a ticket already has, so one member can re-issue it and make the
+server re-walk and re-stream a whole subtree to every subscriber, per commit.
+
+**THE CHEAP FIX IS UNSAFE AND A RESTART MUST NOT REACH FOR IT.** Yielding the trigger FIRST (so the
+cursor advances before the burst) breaks `ticket.reparented`: it IS folded, so a client that never held
+the ticket replays a transition with no `ticket.created` and `applyTicketEvent` throws — the engine's
+terminal stall, a worse failure than the one it fixes, and it looks like a one-line win.
+
+**What landed under P37.1:** `GRANT_BACKFILL_MAX_TICKETS = 200`, breadth-first so the trigger ticket and
+the shallowest descendants survive, plus case **12.290** (❌, the wedge, mechanism and the unsafe
+one-line repair both spelled out, owner 5b) and case **12.291** (✅, the cap, over-cap fixture, EXACTLY
+the cap rather than at-most). Measured: `12.291` reddens **ALONE** when the cap is removed
+(`1 failed | 6 passed`).
+
+**What the cap does NOT bound, and the case says so:** a single ticket with a very long history. One
+ticket over the wire is one ticket whatever its event count, so the reachable burst is narrowed, not
+closed.
+
+**CLOSURE 5b GAINED ITEM (d) — the real fix, and it is a DESIGN, not just an owner.** Make the grant
+side PULL-shaped and client-presented, the same principle as the narrow half: the hub pushes a bounded
+NOTICE (the trigger plus the ids it newly admits — not history), and the client, which already knows its
+own holdings, pulls each ticket it does not hold through the per-ticket bootstrap door BEFORE applying
+the trigger, persisting each as it lands. *(If no server route exists for that door yet, it is 5b(d)'s
+first artefact — the rig's `bootstrapTicket` restates it.)* Consequences, each to be MEASURED: a
+cut-short session resumes by pulling what it lacks (no wedge, no per-subscriber server state); a
+repeated no-op `visibility.set` costs a client that already holds the subtree nothing, so the amplifier
+is bounded by holdings rather than by trust in `check-permission`; and the refold hazard closes as
+"bootstrap-before-apply on any event for an entity not held", which is the rule a replica needs for
+`ReplicaGapError` anyway. Excluding fixtures carry over: a viewer not in the new audience gets no notice
+(mutate → red); the notice never names an id outside the viewer's audience (mutate to enumerate → red).
+**12.290 flips ❌ → ✅ only when a slow-consumer close MID-PULL is followed by convergence on reconnect.**
+If the notice must carry more than ids and the trigger, ESCALATE.
+
+**FIVE MINORS, ALL FIXED (commit `aa50e04`).** The one to read: **12.277's positive control was
+VACUOUS** — `JSON.stringify(forInsider).toContain(ticket)` passed because the *narrowing event itself*
+carries the ticket id in `entity.id` and `payload.ticketId`, so it would have passed against an empty
+`grantBackfillFor`. A check passing for a reason unrelated to the property it names, **in the very case
+written to demonstrate that discipline.** Now asserted by the pre-cursor event's **id**. Also: an
+`audienceDependents` docblock claiming a rowless ticket "yields the empty set" (it yields itself, and
+the "saves the work" clause was false too); a wrong case citation (12.281 → **12.283**); a 12.287
+comment calling a fresh ULID "a ticket the device holds"; and **"end to end" on 12.289 in three places**
+— the rig restates the route's rule rather than calling it, so no case runs client and real route
+together.
+
+### TWO LESSONS THAT COST A ROUND EACH — both will recur
+
+1. **`git checkout HEAD -- <path>` DOES NOT RESTORE AN UNTRACKED FILE.** It fails with *"pathspec did not
+   match any file(s) known to git"* — one line, easy to skim past in a background log. The first run of
+   the `canSee` mutation therefore executed with the TRIGGER mutation still applied, and its result was
+   confounded and discarded. **This lane's own state file predicted this exact failure** (T13's section:
+   "`git checkout --` does NOT restore these files — they were untracked when the mutations ran") and it
+   happened anyway, because the prediction was about T13's files and the reflex did not transfer.
+   **The fix is to COMMIT BEFORE MUTATING, not to remember.** Both later mutation rounds did, and both
+   restored clean and were verified by READING the file back.
+2. **A grep for an interface's name does NOT enumerate its implementors.**
+   `grep -rn 'SyncTransport|createHttpTransport' --include='*.ts' --include='*.tsx' apps packages` found
+   FOUR. `pnpm turbo run typecheck` found a FIFTH: an inline object literal at
+   `packages/app-core/test/replica/replica-data-source.test.ts:486` with no `: SyncTransport` annotation,
+   structurally typed by inference, invisible to any textual search for the type name. **The compiler is
+   the enumerator; the grep is a hint.** Reported to the controller, which had asked for exactly this
+   enumeration — the rule it gave was right and the tool the rule implies is not.
+
+### WHAT CLOSURE 5 DID NOT CLOSE — recorded with owners, not fixed
+
+- **Case 12.283** — visibility that widens because the READER's reach grew (`membership.granted`,
+  `project.member_added`) rather than the ticket's. Identical pre-cursor gap; P37 scopes closure 5 to
+  "the visibility event itself". Named in `GRANT_BACKFILL_TRIGGERS`' own docblock so the module's
+  existence cannot be read as covering it. *Owner: WS catch-up/purge protocol, no task.*
+- **Case 12.288** — nothing calls `reconcile` on a schedule. When a device should reconcile is a product
+  decision with a cost (one request per 100 tickets held) and no plan states it. *Owner: unassigned.*
+  Sibling: the engine presents `replica.listTickets`, so a ticket held only as unfolded events with no
+  local `tickets` row is not presented.
+- **Case 6.102's GUEST side** — the same reconcile primitive, unmeasured for a guest.
+
+### LANE A's HEADS-UP, carried because it expires this lane's assertions
+
+After closure 4 lands, a snapshot row carries a provenance block and the invalidation pass CARRIES IT
+FORWARD rather than recomputing. It is ADDITIVE (P36 constraint b), but **an exact `toEqual` on a
+snapshot row or a bootstrap body will redden, and that is a real expiry rather than a defect.** Lane A
+confirmed it prefers a SIBLING block over widening `TicketState.transitions[]`, so 12.260's full
+`TicketState` equality is safe. Lane A also confirmed it adds/wraps/constructs NO `SyncTransport`.
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 

@@ -146,6 +146,7 @@ const idleTransport: SyncTransport = {
   bootstrap: () => Promise.reject(new Error('offline')),
   sync: () => Promise.reject(new Error('offline')),
   openStream: () => ({ close: () => undefined }),
+  reconcile: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -489,6 +490,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           handlers = h;
           return { close: () => undefined };
         },
+        reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });

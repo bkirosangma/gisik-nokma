@@ -20,11 +20,40 @@ export type StreamHandlers = {
 
 export type StreamHandle = { close(): void };
 
+/**
+ * One id this device presented that it may no longer hold.
+ *
+ * The `{ kind: 'restricted', id }` register the product already uses for "this
+ * is not yours and nothing further travels" (`ParentRef` at the read door). It
+ * asserts LESS here than it does there: at the read door the arm means the
+ * parent exists, and on this door it means only that the answer to `canSee` was
+ * no — the server never consults existence, so a fabricated id comes back
+ * identical to a genuine loss. That is deliberate and is the reason the door is
+ * safe; `apps/server/src/sync/reconcile-route.ts` carries the argument.
+ */
+export type ReconcileRestriction = { kind: 'restricted'; id: string };
+
+export type ReconcileAnswer = { workspaceId: string; restricted: ReconcileRestriction[] };
+
 export type SyncTransport = {
   bootstrap(workspaceId: string): Promise<BootstrapResponse>;
   /** `POST /v1/sync`. The server answers index-aligned with the request array. */
   sync(events: SubmittedEvent[]): Promise<SyncEventResult[]>;
   openStream(workspaceId: string, afterSeq: number, handlers: StreamHandlers): StreamHandle;
+  /**
+   * `POST /v1/sync/reconcile` — closure 5's NARROW half (ruling P37).
+   *
+   * The client names the ids it holds; the server answers ONLY about those.
+   * The direction is the whole design: a server-initiated purge would name an
+   * entity to a device that may never have held it, which is the disclosure
+   * that cost the per-event purge walk its life (cases 6.100, 6.101, and P23's
+   * disposition, not reopened). Here the device's own holding is the
+   * relationship, so nothing in the answer is news to its recipient.
+   *
+   * `heldIds` is bounded by the server at 1..100 (`MAX_BATCH_SIZE`,
+   * `apps/server/src/routes/events.ts`); `SyncEngine.reconcile` chunks to it.
+   */
+  reconcile(workspaceId: string, heldIds: string[]): Promise<ReconcileAnswer>;
 };
 
 export type SyncStatus = 'offline' | 'connecting' | 'catching-up' | 'live';
@@ -125,6 +154,22 @@ export type SyncEngine = {
    * failure. Errors are swallowed here for that reason.
    */
   onItem(cb: (item: SyncItem) => void): () => void;
+  /**
+   * Ask the server which of the tickets this replica holds are no longer this
+   * user's, and delete those — closure 5's NARROW half, case 6.104's residual.
+   *
+   * Resolves to what was asked and what went, so a caller can tell "nothing was
+   * stale" from "nothing was asked". Those are different facts and a bare void
+   * return would hide the second inside the first.
+   *
+   * Deliberately NOT wired into `start()` or the reconnect path. When a device
+   * should reconcile — every reconnect, on a timer, on the user pulling to
+   * refresh — is a product decision with a cost attached (one request per 100
+   * tickets held), and no plan states it. **Owner: unassigned; case 12.288.**
+   * The primitive is here and correct; nothing calls it on a schedule yet, and
+   * a reader should not infer a schedule from its existence.
+   */
+  reconcile(workspaceId: string): Promise<{ presented: number; purged: string[] }>;
 };
 
 function messageOf(err: unknown): string {
@@ -191,6 +236,21 @@ function messageOf(err: unknown): string {
  *   `not-a-member` should end the retry loop is a judgement about a membership
  *   that may be restored, and no view can take it. **Owner: unassigned.**
  */
+/**
+ * The server's `heldIds` bound, restated.
+ *
+ * `MAX_BATCH_SIZE = 100` lives in `apps/server/src/routes/events.ts` and this
+ * package cannot import from the server, so the number is duplicated — the same
+ * duplication, with the same citation, that `app-core`'s
+ * `online-data-source.ts` already carries for the same constant. **Nothing
+ * checks that the two agree.** Raising the server's bound without raising this
+ * one only wastes requests; LOWERING the server's bound without lowering this
+ * one makes every reconcile fail its schema, loudly, at the first call. The
+ * loud direction is the dangerous one being loud, which is why this is
+ * acceptable rather than merely tolerated.
+ */
+const RECONCILE_CHUNK_SIZE = 100;
+
 export function createSyncEngine(deps: {
   replica: Replica;
   outbox: Outbox;
@@ -580,6 +640,28 @@ export function createSyncEngine(deps: {
       return () => {
         itemListeners.delete(cb);
       };
+    },
+
+    async reconcile(ws) {
+      const held = (await replica.listTickets(ws)).map((t) => t.ticketId);
+      const purged: string[] = [];
+      for (let i = 0; i < held.length; i += RECONCILE_CHUNK_SIZE) {
+        const chunk = held.slice(i, i + RECONCILE_CHUNK_SIZE);
+        const answer = await transport.reconcile(ws, chunk);
+        for (const item of answer.restricted) {
+          // THE CLIENT'S OWN HALF of "the answer contains only ids I presented".
+          // The server cannot name anything else — its reply is built by walking
+          // the request — but this device does not need to trust that to be safe,
+          // and a purge is destructive and local. Without this line a wrong or
+          // hostile answer deletes tickets this user still holds legitimately.
+          // Case 12.287 hands the engine an answer naming an unpresented id and
+          // requires that nothing extra goes.
+          if (!chunk.includes(item.id)) continue;
+          await replica.purgeEntity(item.id);
+          purged.push(item.id);
+        }
+      }
+      return { presented: held.length, purged };
     },
   };
   return engine;

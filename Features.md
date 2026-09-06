@@ -1441,16 +1441,44 @@ survived a whole task.)*
   replica. The stale copy that remains is the accepted under-purge residual of case 6.104 — **recorded,
   and deliberately not pinned by a test**, because 6.104's owner is Plan 10 and an assertion would be a
   test that closing the gap must break.
-- ⚙️ **A re-widened ticket does not come back if the client read anything else meanwhile** — found by
-  the Task 15 review and reproduced independently. The sync cursor is the highest sequence DELIVERED,
-  so any visible event committed while a ticket is narrowed carries the cursor past the narrowing;
-  re-widening then delivers only itself and the earlier rows are never re-sent. There is no
-  backfill-on-grant in the product. Measured: one unrelated commit between narrowing and re-widening
-  leaves the client holding two events where the server holds four, **permanently — no purge, no
-  backfill, no resync path.** It is the sibling of case 6.104 on the other side of one gap: 6.104 is
-  the stale copy nobody takes away, this is the fresh copy nobody gives back. Recorded as case 12.274,
-  owner Plan 10, no task. *The scenario that appeared to prove convergence only did so because its
-  workspace was quiet in between; that is now said at the scenario and in the case.*
+- ✅ **A re-widened ticket comes back even if the client read something else meanwhile — backfill on
+  newly granted visibility** *(this bullet was ⚙️ and described the DEFECT; closure 5 closed it)* — when
+  an event widens a ticket's audience, the catch-up filter hands that ticket's pre-cursor history, and
+  every inheriting descendant's, to everyone in the NEW audience, cursor notwithstanding. The trigger is
+  the visibility event itself and never a reconstructed prior audience — there is no before-image to
+  reconstruct and re-deriving one is banned — and what makes that coarse trigger safe is an asymmetry
+  rather than a check: a narrowing is invisible to the person it narrowed away, so it never becomes their
+  trigger. A widening self-selects; a narrowing self-excludes. Over-delivery to someone who already held
+  the ticket is harmless because replay is idempotent, which is measured rather than assumed.
+  *The defect it replaces, kept because it is what the tests measure:* the sync cursor is the highest
+  sequence DELIVERED, so one unrelated commit between a narrowing and a re-widening left the client
+  holding two events where the server held four, permanently, with no purge, no backfill and no resync
+  path. Cases 12.274-12.283. `apps/server/src/visibility/grant-backfill.ts`
+- ✅ **`POST /v1/sync/reconcile` — the client names what it holds and the server says what is no longer
+  theirs** *(closure 5's other half; it closes case 6.104, the stale copy nobody takes away)* — a member
+  un-shared by a plain visibility change used to keep the copy until a full resync, because a
+  server-initiated purge would name an entity to a device that may never have held it. This inverts the
+  direction instead: the device presents its ids, the server answers only about those, and existence is
+  never consulted — a fabricated id comes back exactly as a genuine loss does, so the reply's SHAPE
+  carries no oracle either. The engine deletes only what it itself presented, because a purge is
+  destructive and local and this device does not need to trust the server to be safe from it. Nothing
+  calls it on a schedule yet; when a device should reconcile is a product decision no plan states.
+  Cases 12.284-12.289. `apps/server/src/sync/reconcile-route.ts`, `packages/sync-client/src/engine/sync-engine.ts`
+- ⚙️ **The backfill is an ATOMIC burst, and a large one can wedge a subscriber — disclosed, capped, not
+  closed** *(ruling P37.1)* — every backfilled envelope sits at or below the client's cursor, so none of
+  them advances it, and the only one that does arrives last. A slow-consumer close before that point
+  leaves the client reconnecting into the identical burst for ever, because the cursor is persisted only
+  on catch-up and a fresh bootstrap is refused over an existing local baseline. An interim cap bounds the
+  WALK at 200 tickets — breadth-first, so the trigger ticket and the shallowest descendants survive — and
+  it is explicitly not a bound on a single ticket's history. **The one-line repair of sending the trigger
+  first is unsafe and the code says so**: `ticket.reparented` is folded, so a client that never held the
+  ticket would replay a transition with no creation event and stall its engine. Case 12.290 owns the
+  residual, 12.291 pins the cap. `apps/server/src/visibility/grant-backfill.ts`
+- ⚙️ **Still open on the same surface, named rather than left to be inferred** — visibility that widens
+  because the READER's reach grew (`membership.granted`, `project.member_added`) rather than the ticket's
+  carries the identical pre-cursor gap and is out of ruling P37's scope (case 12.283); and case 6.102's
+  guest side of the reconcile is the same primitive, unmeasured for a guest. *Owner of both: the WS
+  catch-up/purge protocol, unassigned to any task.*
 - ⚙️ **A contest filed against a ticket that never came to exist reaches nobody** — surfaced by the
   reopen scenario and asserted as product behaviour: `canSee` is false for a ticket with no
   `proj_visibility` row, so the child's `claim.contested` is streamed to no one. The claimant's only

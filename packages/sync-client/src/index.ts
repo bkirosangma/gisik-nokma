@@ -33,6 +33,8 @@ export type { EnqueueResult, Outbox, OutboxItem, PendingTicket, SyncEventResult 
 export { createSyncEngine } from './engine/sync-engine.js';
 export type {
   ApplyFailure,
+  ReconcileAnswer,
+  ReconcileRestriction,
   StreamHandle,
   StreamHandlers,
   SyncEngine,

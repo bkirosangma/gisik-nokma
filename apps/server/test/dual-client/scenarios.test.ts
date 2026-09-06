@@ -512,23 +512,26 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
    * - **Viewers see it.** A, still listed, receives the `visibility.set` and
    *   the contest as ledger history.
    * - **Re-widening re-delivers HERE — and that is a property of this
-   *   scenario's shape, NOT of the product.** Once A puts the ticket back on
-   *   `'project'` mode, B drains the narrowing, the contest and the widening in
-   *   order and the replicas converge exactly. **This works only because B's
-   *   cursor is still BELOW the narrowing.** The cursor is the highest
-   *   `workspaceSeq` DELIVERED (`rig.ts`'s `syncDown`, mirroring `hub.ts`), so
-   *   any later visible event in the workspace carries it past the invisible
-   *   rows, and re-widening then delivers only the widening. **There is no
-   *   backfill-on-grant anywhere in the product** — `visible-events-for.ts`
-   *   says so in terms: that is "Plan 10's job, on top of this primitive", and
-   *   it has not been built.
+   *   scenario's shape AND, since closure 5, of the product.** Once A puts the
+   *   ticket back on `'project'` mode, B drains the narrowing, the contest and
+   *   the widening in order and the replicas converge exactly.
    *
-   *   MEASURED (case 12.274): insert ONE unrelated visible commit between the
-   *   narrow and the widen and B's cursor goes 4 → 7, past narrow(5) and
-   *   contest(6); after widening B holds 2 events where A holds 4, B never
-   *   receives the narrowing or the contest, and **the divergence is permanent
-   *   — no purge, no backfill, no resync path.** The one-commit shape is the
-   *   ordinary case; the shape asserted below is the quiet one.
+   *   **WHAT THIS PARAGRAPH USED TO SAY, and why the correction is worth
+   *   keeping:** it read "this works ONLY because B's cursor is still BELOW the
+   *   narrowing", and that was true when written. The cursor is the highest
+   *   `workspaceSeq` DELIVERED (`rig.ts`'s `syncDown`, mirroring `hub.ts`), so
+   *   any later visible event carried it past the invisible rows and
+   *   re-widening delivered only the widening — measured as case 12.274, a
+   *   permanent divergence with no purge, no backfill and no resync path.
+   *   Ruling P37 assigned that gap and `visibility/grant-backfill.ts` closes
+   *   it: a widening now hands back the ticket's pre-cursor history to everyone
+   *   in the new audience, cursor notwithstanding.
+   *
+   *   So THIS scenario's convergence no longer depends on its own quietness,
+   *   and the case that proves the difference is **12.275**, which runs the
+   *   noisy shape — one unrelated visible commit between narrow and widen — and
+   *   asserts B's cursor really did pass the narrowing before converging.
+   *   Nothing below changed; only the reason it holds did.
    *
    * What this scenario does NOT prove: that the retained copy is ever purged
    * without a re-widening. It is not — that is case 6.104, recorded, owner
