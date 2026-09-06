@@ -361,6 +361,21 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
+  // TIMEOUT, RAISED DELIBERATELY — 120s against this file's 30s default.
+  //
+  // This case moves ~50 MiB through the parser (two bodies of ATTACHMENT_MAX_BYTES
+  // and one byte more), which is 5.4s on an idle machine and the slowest test in
+  // the suite by an order of magnitude. On 2026-09-06 it hit the 30s default and
+  // failed while five parallel lanes shared one 16 GB box — a TIMEOUT under
+  // contention, not a defect: the assertions it makes are about sizes and status
+  // codes, and neither depends on how long the box took.
+  //
+  // Raised rather than skipped, and rather than shrunk. Skipping it would remove
+  // the ONLY comparison anywhere between what ships and 26_214_400. Shrinking the
+  // bodies would destroy the boundary pair below, which is the entire reason this
+  // test replaced an earlier one-sided version that a `?? 1_048_576` fallback
+  // passed green. The cost of the raise is that a genuine hang here takes 120s to
+  // report instead of 30s; the cost of the alternatives is a claim nothing checks.
   it('the shipped ceiling is 25 MiB, and a route with no maxBytes uses exactly that number', async () => {
     // Two separate claims, because pinning only the first leaves
     // `deps.maxBytes ?? SOMETHING_ELSE` free to ship. The constant is a Global
@@ -420,7 +435,7 @@ describe('POST /v1/attachments', () => {
     } finally {
       await defaulted.close();
     }
-  });
+  }, 120_000);
 
   it('planted defect: a ticketId truncated by the field-size cap is refused, not acted on', async () => {
     // `fieldSize: 256` does not error when a field value is too long — busboy

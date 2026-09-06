@@ -1,8 +1,10 @@
 import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
-// The shim, not `../alerts/error-alerter.js`, until Task 3 merges — see
-// `./error-alerter-shim.ts`'s header.
-import { alerterFromConfig } from './error-alerter-shim.js';
+// Task 3 has merged and the shim is deleted. `alerterFromConfig` treats ONLY a
+// strict `null` as "no alerter", so the `|| null` at the call site below stays
+// load-bearing: `.env.example` ships ALERT_WEBHOOK_URL empty and `??` would
+// hand that empty string to WebhookErrorAlerter.
+import { alerterFromConfig } from '../alerts/error-alerter.js';
 import { exportLedger } from './export-ledger.js';
 import { s3SinkFromEnv } from './object-sink.js';
 import { dumpDatabaseToSink } from './pg-dump.js';

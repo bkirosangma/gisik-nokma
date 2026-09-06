@@ -4,6 +4,8 @@ import { buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
+import type { ObjectStore } from '../../src/attachments/object-store.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import type { Queryable } from '../../src/db/queryable.js';
@@ -78,6 +80,20 @@ export type BuildTestAppOverrides = {
    * is the only way the route's server-fault path executes at all.
    */
   pool?: Queryable;
+  /**
+   * `AppDeps.store` — where `POST /v1/attachments` puts the bytes.
+   *
+   * Defaults to `createObjectStoreFromEnv({})`, which is a `LocalDiskStore`
+   * rooted at the relative path `var/attachments`. That default is fine for
+   * every caller that never uploads anything (the constructor touches no
+   * filesystem; every `fs` call is inside `put`/`getStream`/`delete`) and is
+   * exactly WRONG for one that does: a completed upload would write into the
+   * repository working tree, which is not gitignored, and leave it there for
+   * the next run and the next `git status`. So a test that actually uploads
+   * passes a `LocalDiskStore` over an `mkdtemp` directory it removes itself —
+   * `attachments-wired.test.ts` is the one that does.
+   */
+  store?: ObjectStore;
 };
 
 /**
@@ -133,6 +149,10 @@ export function buildTestApp(
       // passing `undefined` here is what lets it.
       now: overrides.now,
       stream: overrides.stream,
+      // Defaulted HERE rather than left to `buildApp`, because `AppDeps.store`
+      // is required and deliberately so — see its docblock. This helper owns
+      // the cheap honest default for the ~sixty test files that never upload.
+      store: overrides.store ?? createObjectStoreFromEnv({}),
     },
     overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
   );

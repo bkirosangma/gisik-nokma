@@ -5,6 +5,7 @@ import { buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import { createIngestService, type ClientIngest, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -117,6 +118,9 @@ async function signedInApp(ingest: IngestService = ingestService()) {
     auth,
     serverAppend: (events) => ingest.ingestBatch(events),
     webOrigin: 'http://localhost:3001',
+    // Required on `AppDeps`, and free here: a `LocalDiskStore` constructor
+    // touches no filesystem, and nothing in this file uploads anything.
+    store: createObjectStoreFromEnv({}),
   });
   phoneCounter += 1;
   const user = await signInWithPhone(app, otp, `+9197000${String(phoneCounter).padStart(5, '0')}`);

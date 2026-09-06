@@ -908,7 +908,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   content-type, unidentifiable bytes are refused without ever falling back to the extension, and the
   allow-list is closed: a real file outside it is still refused. Every embeddable-image mime is a subset
   of the uploadable allow-list, by test. `apps/server/src/attachments/attachment-repo.ts`, `content-hash.ts`, `filename.ts`, `sniff.ts`
-- ⚙️ **`POST /v1/attachments` and `GET /v1/attachments/:id` — built and tested, NOT reachable on the server this repo boots.**
+- ✅ **`POST /v1/attachments` and `GET /v1/attachments/:id` — built, tested, and REGISTERED on the server this repo boots.**
   The route handlers are complete: upload answers `201 {attachmentId, url, mime, filename, size, sha256}`
   built from the server's own sniffed and hashed truth (never the client's claim about its file), refuses
   a session-less request 401, a malformed one 400, an oversize one 413 (the shipped ceiling is exactly
@@ -916,20 +916,30 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   BYTE-IDENTICAL to a nonexistent ticket; download streams the exact stored bytes under `canSee`, inline
   for images and as a sanitized-filename attachment otherwise, and answers that SAME 404 for an unshared
   guest, a nonexistent id, and metadata recorded with no bytes behind it — three different truths, one
-  frozen body, so nothing about which of the three happened leaks. **But `registerAttachmentRoutes` is
-  never called from `apps/server/src/app.ts`'s composition root** — every test that exercises these
-  routes calls it directly against a bare `Fastify()` instance; the real server this repo boots (`apps/server/src/index.ts` → `buildApp`) registers every OTHER route module and not this one, so today
-  no client can reach either endpoint on a running server. Recorded here rather than fixed: wiring the
-  composition root is outside this task's scope, and no task in this plan's text claims it (`test-cases/09-editor-attachments.md`'s case 9.59 carries the same finding, with the sweep that established it).
-  `apps/server/src/routes/attachments.ts`
+  frozen body, so nothing about which of the three happened leaks. `apps/server/src/app.ts` registers
+  both through `app.register(registerAttachmentRoutes, …)`, and `AppDeps.store` — required, like every
+  other field but `now`/`stream` — carries the `ObjectStore` the pair writes to, built at the one boot
+  path from `createObjectStoreFromEnv(process.env)`. **Until this landed the routes were reachable from
+  nothing**, and the reason it survived so long is worth keeping: both attachment suites mount a bare
+  `Fastify()` and register the routes BY HAND, so both were green against an empty composition root.
+  `apps/server/test/routes/attachments-wired.test.ts` is the test that can fail on it — it registers
+  nothing, goes through `buildApp`, and asserts the `attachments` ROW rather than the 201.
+  `apps/server/src/routes/attachments.ts`, `apps/server/src/app.ts`
 - ⚙️ **The server-gate seam is wired into the one composition root** — `apps/server/src/index.ts` is the
   ONE composition root that calls `buildServerGates()` and hands the result into `createIngestService`,
-  which is the narrower and true claim this bullet exists to draw: unlike the two attachment routes above
-  — which are NOT registered on `apps/server/src/app.ts`'s composition root and so unreachable on the
-  server this repo boots — the gate seam IS wired at the one composition root this repo has, even though
-  that composition root itself is never started (`apps/server/src/index.ts`'s own comment records that
-  nothing boots it, and there is no `start` script, Dockerfile, or deployment target anywhere in the
-  repo, so "wired" here does not mean "live in production"; no production exists to be live in). Most
+  which is the narrower and true claim this bullet exists to draw: the gate seam is wired at
+  `apps/server/src/index.ts`, NOT at `apps/server/src/app.ts` where every route module is registered
+  — two different composition roots, and a reader who checks only the second finds no gates at all.
+  (This bullet used to draw the contrast against the two attachment routes above, which were then
+  registered at neither. They are now registered at `app.ts`, so that contrast is gone and the plain
+  claim is what is left.) The seam is wired even though that composition root is never started in production
+  (`pnpm dev` boots it; `apps/server` has no `start` script. The claim that once stood here — no
+  `start` script, Dockerfile or deployment target *anywhere in the repo* — was wrong in one half from
+  the day it was written, since `apps/web/package.json` has carried a `start` script since earlier than
+  the sentence, and is wrong in the other half as of Plan 11: `apps/server/Dockerfile` and
+  `apps/web/Dockerfile` now exist and both build. What remains true is the part that matters here —
+  **nothing has been deployed to a live host** — so "wired" still does not mean "exercised in
+  production"). Most
   other call sites that build an ingest service leave `gates` out entirely and get the seam's default
   `[]` and no gating at all — but three of this task's own test suites deliberately pass
   `gates: buildServerGates()` to exercise the seam directly (`test/gates/gate-seam.test.ts`,
@@ -1180,16 +1190,19 @@ survived a whole task.)*
   which recomputes a snapshot at a seq that already has a row and collides on the snapshots primary
   key. Neither is a correctness knob — a server that never writes a snapshot answers with exactly the
   same state, only slower. `apps/server/src/config.ts`, `.env.example`
-- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — because the shutdown path the
-  plan named does not exist** — `apps/server/src/index.ts` has no SIGTERM handler, no `pool.end()` and
-  no `app.close()`. Rather than invent a signal handler (Plan 11 owns the boot path) or leave an
-  unstoppable timer, `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
+- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — and the shutdown that fires it
+  now exists** — `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
   registered BEFORE `app.listen` because fastify 5 throws `FST_ERR_INSTANCE_ALREADY_LISTENING` on an
   `addHook` after start. It is not registered inside `buildApp` with the routes: `buildApp` is called
   by around sixty test files, and a five-minute timer in each of them could fire mid-test and write
-  snapshots into a fixture nothing expects them in. Today nothing calls `app.close()`, so the writer
-  runs for the life of the dev process — which costs nothing, the interval is `unref`'d — and it stops
-  by itself on the day a real shutdown lands. `apps/server/src/index.ts`
+  snapshots into a fixture nothing expects them in. **This bullet used to end "today nothing calls
+  `app.close()` … it stops by itself on the day a real shutdown lands", and asserted that
+  `apps/server/src/index.ts` had no SIGTERM handler, no `pool.end()` and no `app.close()`. All of that
+  is now false**: the graceful-shutdown bullet in §13 is that day — `installShutdownHandlers` awaits
+  `app.close()` on SIGTERM/SIGINT, which runs this hook, and only then ends the pool. The deferral cost
+  nothing: not one line of this registration changed when the shutdown landed. What is unchanged is the
+  `pnpm dev` case — a process nobody signals still runs the writer for its whole life, which costs
+  nothing because the interval is `unref`'d. `apps/server/src/index.ts`
 - ⚙️ **One assembled test server** — `buildTestApp(db)` builds the real app, real auth, real ingest and
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
@@ -1628,12 +1641,36 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 ## 13. Deployment & dogfooding
 
 *(Plan 11's own Task 16 normally opens this section, held until Tasks 1–15 merge. It is opened early
-here, by Tasks 7, 8, 9, 10, 14 and 15 (landed independently, across multiple lanes) — what follows is
-ONLY those tasks' additions; everything else Plan 11 produces (config surface, CORS/rate limiting,
-alerting, SMTP, Dockerfiles, the dev compose stack, backups, the restore drill, E2E against the compose
-stack, the runbook) is still `❌`/unwritten here and arrives with whichever task lands it — do not infer
-completion of Plan 11 as a whole from this section's presence.)*
+here, by Tasks 1–12, 14 and 15 (landed independently, across multiple lanes) — what follows is ONLY
+those tasks' additions; everything else Plan 11 produces (E2E against the compose stack, and the
+operator runbook itself — several files reference "the runbook" as a document to be written. The
+runbook is **Task 16**, and its gate is NOT cleared: Task 16 is held until Tasks 1–15 have merged, and
+Task 13 — the compose-stack E2E named two clauses above — has not landed. An earlier draft of this
+sentence named Task 11 as "the task that gates it"; Task 11 is Backups, and the error read as
+"unblocked" to anyone skimming) is still `❌`/unwritten here and arrives
+with whichever task lands it — do not infer completion of Plan 11 as a whole from this section's
+presence. (Backups and the restore drill — Tasks 11–12 — have landed; see their bullets below.) Tasks
+1–6's entries below were catalogued retroactively, in one pass at the seam-1 PR rather than in each
+task's own change set — see the note at the top of `test-cases/13-deployment-dogfooding.md`.)*
 
+- ⚙️ **Graceful shutdown on SIGTERM / SIGINT** — `installShutdownHandlers(app, pool)` is installed by
+  the one non-test boot path BEFORE `app.listen`, and runs `app.close()` (bounded 5 s) → `pool.end()`
+  (bounded 2 s), then lets the event loop drain to exit 0; a whole-process watchdog exits 1 at 8 s if
+  something still holds the loop. The bounds are sized under `docker stop`'s 10 s default, the smallest
+  grace period this image meets in the wild. **The defect it closes is a PID-1 one, measured against
+  the built image, not reasoned about**: `apps/server/Dockerfile`'s entrypoint `exec`s node, so node is
+  PID 1, and PID 1 has no default signal dispositions — with no handler installed, SIGTERM was
+  **ignored** and every deploy ended in SIGKILL after the grace period (`docker stop -t 3`: 3197 ms
+  ignored vs 172 ms handled), severing in-flight requests and leaving the snapshot writer's interval,
+  the stream hub's sockets, the notification fan-out's subscription and the pool all unreleased. A
+  second signal is logged and dropped (`pool.end()` twice throws). Process-level `unhandledRejection` /
+  `uncaughtException` handlers are deliberately NOT installed for the life of the process — they
+  suppress Node's own crash — with ONE narrow exception, installed only for the duration of a shutdown
+  and removed after it: avvio runs `onClose` hooks synchronously, so a hook that throws
+  **synchronously** never rejects `app.close()`'s promise and is not catchable there; measured without
+  the exception, that fault skipped `pool.end()` entirely and exited 1 in 12 ms — a graceful stop
+  reported to the orchestrator as a crash. `apps/server/src/shutdown.ts`, called from
+  `apps/server/src/index.ts`
 - ⚙️ **Seed plumbing** — `seedUlid(namespace, key)` mints a deterministic, `ULID_REGEX`-valid id from a SHA-256 digest, so re-running a seed regenerates identical event ids and a re-run can recognise its own prior work rather than duplicating it. (The recognition is a ledger lookup BEFORE submission, not the plan text's `duplicate-event-id` refusal — measured in Task 9: the permission gate and the rule engine both answer before `insertEvent` ever reaches the primary key, so that refusal is unreachable for most seed events at either door.) `plainTextDoc(text)` builds a literal-text ProseMirror doc, one paragraph per line, by delegating each line to the domain's own single-paragraph `plainTextToDoc` rather than duplicating its paragraph-shape logic. `findUserIdByEmail` looks a person up in better-auth's `"user"` table by email — seeds never invent people. `apps/server/src/seed/{seed-ulid,doc-text,users}.ts`
 - ⚙️ **`checkErrandTemplate` — the executable pin on the errand-with-waits template, and Ruling P29's tripwire** — verifies Plan 8's `ERRAND_WITH_WAITS_TEMPLATE` can structurally carry the Convenience Corner tracker board before any seed event is built: every tracker state the seed maps to is present and reachable from the initial state in exactly one transition (no fabricated intermediate history), `waiting` carries `blocked: true`, every door into `done` is guarded by `require-comment`, and — the tripwire — every one-hop transition the seed relies on carries **zero** rules, because the seed submits a bare `ticket.transitioned` with no comment or evidence and any rule there would make the real engine refuse the seed's own event at ingest. This last check is what reddens if a copy of the template ever grows a rule on one of the two paths (`later`→`waiting`, `next`→`waiting`) that Ruling P29 deliberately leaves rule-free — a test pins `adviseWorkflowDef`'s two `rule-bypassable` advisories on the real template by identity, proves a single-edge "fix" genuinely silences one advisory while `checkErrandTemplate` still reddens, and proves guarding both edges clears the advisory panel to zero while `checkErrandTemplate` still refuses it. `workflowFromTemplate` clones a template into a live, published-shape definition at version 1. `apps/server/src/seed/templates.ts`
 - ⚙️ **Convenience Corner seed mapping — frozen record in, events out, nothing invented** — `readCcBoard` reads the frozen `reference/convenience-corner-tracker/board.data.js` snapshot read-only through a `vm` sandbox and refuses (naming the path) a file that does not define `window.CC_TRACKER` with the expected shape. `buildErrandEvents` maps one tracker item to its full ticket event sequence: `ticket.created`, a literal-text `description`, an optional `counterparty` custom field, an origin-dated `startDate` claim (built-in field, `{date, note?}` shape) only when the record itself dates it, a `dueDate` claim derived from `needed_week` by the tracker generator's own published week arithmetic with the derivation named in the claim's note, and at most one `ticket.transitioned` (payload key `to`) mapping the tracker's `later/next/in-progress/blocked` states onto the template's `later/next/in-progress/waiting`. Refuses — never guesses or fabricates — on a `done` item (checked by both the state string and the done flag, so the two disagreeing can never slip a completed item through as open) and on any unmapped tracker state. Every event id is a `seedUlid` derived from the item's own tracker id, so two builds of the same item are identical and a re-snapshot cannot collide event ids across items. `apps/server/src/seed/{cc-board,cc-map}.ts`
@@ -1745,10 +1782,20 @@ completion of Plan 11 as a whole from this section's presence.)*
   naming this path (case 13.20).
   `apps/server/src/ops/{object-sink,fetch-backup}.ts`, `apps/server/package.json`'s `ops:fetch-backup`
   script
-- ⚙️ **`error-alerter-shim.ts` — a named placeholder, not a second implementation** — Task 3's real
+- ⚙️ **~~`error-alerter-shim.ts` — a named placeholder, not a second implementation~~ RETIRED AND
+  DELETED in this PR, exactly as its own header instructed.** Task 3 landed here (seam 1), so
+  `src/ops/schedule.ts` and `src/ops/backup-daemon-main.ts` now import `../alerts/error-alerter.js`
+  directly and the shim file is gone. The swap was safe by type identity, not by hope: the real module
+  exports `type ErrorAlerter = { notify(context, error): Promise<void> }` and
+  `alerterFromConfig(alertWebhookUrl: string | null): ErrorAlerter` — the exact pair the shim mirrored.
+  The never-silent property does NOT come back with it and never did: it lives in `startBackupDaemon`'s
+  own catch (cases 13.25–13.27), deliberately moved out of the shim before the swap, because the real
+  `WebhookErrorAlerter` POSTs without logging and `NoopErrorAlerter.notify()` is empty. **The sentence
+  below is struck through rather than deleted because it was the reason the shim was correct to write,
+  and a reader who finds the shim referenced elsewhere needs it.** ~~Task 3's real
   `apps/server/src/alerts/error-alerter.ts` is unmerged, so this file exports the same two names
   (`ErrorAlerter`, `alerterFromConfig`) with the same shapes, logs every failure as structured JSON to
-  stderr regardless, and posts best-effort to `ALERT_WEBHOOK_URL` — catching and logging a send failure
+  stderr regardless, and posts best-effort to `ALERT_WEBHOOK_URL` — catching and logging a send failure~~
   rather than letting the failure to report a failure become a second failure. Writing `src/alerts/`
   here would have landed a competing implementation the moment Task 3 merges; the file's header says so
   and names the one-line change (delete it, repoint two imports) that retires it. That change really is
@@ -1805,3 +1852,118 @@ completion of Plan 11 as a whole from this section's presence.)*
   happy path — into a green skip. The trade is disclosed: a machine with no libpq at all now reddens
   here where it used to skip. The guard cases need only bash and are ungated, so they run everywhere.
   `scripts/restore.sh`, `apps/server/test/ops/restore-drill.test.ts`, `deploy/do/README.md`
+- ⚙️ **Deployment config surface, CA-aware pool, versioned `/healthz` (Task 1)** — `loadConfig` grows
+  nine deployment knobs (`WEB_ORIGIN`, `TRUST_PROXY`, `RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_EVENTS_MAX`,
+  `RATE_LIMIT_WINDOW_SEC`, `ALERT_WEBHOOK_URL`, `SMTP_URL`, `MAGIC_LINK_FROM`, `DATABASE_CA_CERT`) plus a
+  tenth not in the plan, `DEPLOY_SHA`, every one refusing loudly by name via `ConfigError`.
+  `WEB_ORIGIN` shipped **required, with no default** — a deviation from the plan's optional
+  `string | null` — because it is the host of every invitation link. `httpUrl()`/`smtpUrl()` close a
+  real bug: `z.string().url()` accepts `localhost:3001` (the WHATWG parser reads `localhost:` as a
+  scheme), which would have minted unfollowable links. `createPool(databaseUrl, tls)` strips six `ssl*`
+  query parameters before attaching an explicit `ssl: { ca: caCert }`, because `pg` otherwise
+  `Object.assign`s the parsed connection string over the caller's `ssl` option — every DigitalOcean
+  managed-Postgres URL carries `?sslmode=require` and would silently discard a configured CA under the
+  unmodified library behaviour. `/healthz` answers `{ status, sha }` — **not `{ ..., version }`** as the
+  plan specified — on both its 200 and 503 branches (Ruling P33), `sha` from `DEPLOY_SHA` defaulting to
+  `'dev'`. **Two defects were found and deliberately left open, recorded rather than fixed:** an
+  `options=` query parameter still clobbers the pool's timezone startup parameter through the same
+  `Object.assign` (asserted as present, not hidden); and `sslcert`/`sslkey`/`sslrootcert` cause `pg` to
+  `readFileSync` at client construction, turning a missing file into an `ENOENT` at pool creation — this
+  one has no test at all. `apps/server/src/config.ts`, `apps/server/src/db.ts`, `apps/server/src/app.ts`
+- ⚙️ **CORS, three rate-limit buckets, and an HTTP-Origin (CSRF) check (Task 2)** — `httpOriginRefused()`
+  refuses a `POST` to one of seven `HTTP_ORIGIN_PROTECTED_ROUTES` only when the request carries a
+  `Cookie` header (an ambient credential) and `Origin` does not match normalized `WEB_ORIGIN`; matched
+  against the route **pattern** (`request.routeOptions.url`), not the raw URL, so a query string cannot
+  buy a bypass. `makeFixedWindowLimiter`/`rateLimitKeyFor` key rate limiting on the **rightmost**
+  `X-Forwarded-For` entry, not `request.ip` — the plan did not specify a keying strategy, and the obvious
+  one (leftmost, under `trustProxy: true`) is attacker-choosable; this was caught and fixed before
+  shipping. Three independent buckets — `authMax`, `eventsMax`, and an **`inviteMax` not in the plan's
+  two-bucket design**, added because invite-issuance mints a credential per request and had no bucket
+  under either of the plan's two; `POST /v1/attachments`, previously unlimited, now shares the `events`
+  budget. `webOrigin: null` turns off CORS **and** the CSRF check together, by design — no independent
+  switch. Three routes (`/v1/workspaces`, the ticket-type migrate route, mark-notification-read) were
+  found missing from an initial "exhaustive" protected-route list by forging a request at every
+  non-GET route in the assembled table, not by re-reading the list; the suite now asserts set-equality
+  between the protected-route table and the production list so that drift reddens. **Not covered:**
+  `rateLimitKeyFor` has no standalone unit test, only indirect HTTP-integration coverage; whether
+  `apps/web`'s proxy actually forwards `Origin` on same-origin requests is undemonstrated in this repo.
+  `apps/server/src/http/http-origin.ts`, `apps/server/src/http/rate-limit.ts`, `apps/server/src/app.ts`
+- ⚙️ **Error alerting hook on 5xx, contained against its own failure modes (Task 3)** — `setErrorHandler`
+  lets sub-500 errors pass through unchanged; a 5xx is logged, alerted via `alertWithoutWaiting` with the
+  request URL redacted (`redactInviteToken`, reused from the invites module, so an unspent invitation
+  token never lands in a chat webhook), and answered with the fixed `INTERNAL_ERROR_BODY` — **not** the
+  plan's `{ error: 'internal_error' }` shape. `alertWithoutWaiting` exists because the plan's own wiring
+  snippet (`void alerter.notify(...)`, no try, no catch) would let a promise rejection float and end the
+  process on default Node settings — "the monitoring hook becoming the outage" — so it carries both a
+  `try` (for a synchronous throw) and a `.catch` (for a rejection), proven by a real
+  `process.on('unhandledRejection', …)` collector asserting nothing escapes either way, and it never
+  waits for the alert to settle before the response is sent. `WebhookErrorAlerter` POSTs `{ text }` with
+  a 5s `AbortSignal` timeout and swallows its own failures. **Deliberately NOT built, against the plan's
+  Step 3:** process-level `unhandledRejection`/`uncaughtException` handlers — installing them would
+  suppress Node's own crash-and-restart behaviour; the one narrow exception (active only during a
+  shutdown, for a synchronously-throwing close hook) is a later, separate commit
+  (`installShutdownHandlers`, above). **`/healthz`'s 503 branch deliberately never reaches this
+  alerter** — the database-down case, named in prose as exactly the failure an on-call webhook exists
+  for — and nothing here coalesces repeated failures into one page. Neither boundary is guarded by a
+  test; both are asserted only in source comments. **This is the real implementation Lane C's
+  `error-alerter-shim.ts` bullet (above) was written against as still-unmerged** — it has since landed on
+  this branch, so that shim is now retirable by the one-line change its own file header already names
+  (delete it, repoint two imports). `apps/server/src/alerts/error-alerter.ts`,
+  `apps/server/src/app.ts`, `apps/server/src/index.ts`
+- ⚙️ **SMTP magic-link sender, and phone/OTP sign-in refused rather than logged (Task 4)** —
+  `SmtpMagicLinkSender` sends a real, **plain-text-only** magic-link email via nodemailer (subject
+  `MAGIC_LINK_SUBJECT`), constructed with explicit 10s connect / 10s greeting / 20s socket timeouts —
+  nodemailer's defaults (2 min / 30 s / 10 min) would hold a sign-in HTTP request open for minutes
+  against an unreachable mail host, since sending is awaited inline; measured with a real TCP listener
+  that accepts and never speaks, asserting rejection bounded both above and below the configured
+  timeout. `NullOtpSender` **refuses** every OTP send with a 501 (`PHONE_SIGN_IN_UNAVAILABLE`) —
+  a bigger, security-relevant deviation from the plan, which asked for `OtpSender` to stay wired to the
+  dev-only `LogOtpSender` (silently logging codes) in production; `selectOtpSender()` is asserted to
+  never return `LogOtpSender`. `selectMagicLinkSender`/`selectOtpSender` (`select-senders.ts`, not in
+  the plan at all) extract the choice into pure, config-only functions so it is unit-testable outside
+  `main()`, which opens a Postgres pool on its first line. Verified over the real mounted route
+  (`app.inject` against `/api/auth/phone-number/send-otp`): the 501 body is exactly `{code, message}`
+  with nothing extra, and the identical request against `LogOtpSender` (a positive control) still
+  succeeds, ruling out a broken route as the explanation for the 501. **Not covered:** whether
+  `requireTLS` should be forced on the SMTP transport (deliberately left off, to keep working against
+  Mailpit's plaintext `smtp://`); that a refused OTP request still leaves an expiring verification row
+  in better-auth's own storage (documented as an accepted side effect, not tested).
+  `apps/server/src/auth/{smtp-magic-link-sender,otp-sender,select-senders}.ts`
+- ⚙️ **Server and web Dockerfiles (Task 5)** — `apps/server/Dockerfile`: multi-stage `node:22-alpine`,
+  `pnpm deploy --prod` then **`rm -rf /out/src /out/test`** before the runtime `COPY` (not in the plan's
+  snippet — `pnpm deploy --prod` prunes devDependencies but not the package's own source files, absent a
+  `files` field), migrations run inline in the `ENTRYPOINT` shell string rather than the plan's separate
+  `docker-entrypoint.sh`, which was never created. `apps/web/Dockerfile`: `output: 'standalone'`, an
+  empty `public/` created at build time (the app ships none). A build-arg defect shipped and was fixed
+  the same day: the plan's `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` have zero readers anywhere in
+  `apps/`/`packages/`, and an unset `SERVER_ORIGIN` bakes `http://localhost:3000` into
+  `routes-manifest.json` at build time, routing the proxy at itself instead of the server; replaced with
+  `SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, the names the web app actually reads (regression coverage
+  for this specific bug lives in Task 6's compose contract, below, not here). **Manually observed, not
+  automated:** both images build (server ~607 MB, web ~241 MB standalone); the server image run with no
+  database prints "applying migrations…" then dies `ECONNREFUSED`. **Neither image has been run against
+  a real Postgres, and `node apps/web/server.js` has never answered a request** — no automated test
+  builds or runs either Dockerfile. `apps/server/Dockerfile`, `apps/web/Dockerfile`,
+  `apps/web/next.config.ts`, root `.dockerignore`
+- ⚙️ **Dev stack (`docker-compose.dev.yml`) checked against the real config loaders, not eyeballed
+  (Task 6)** — six services (`postgres`, `minio`, `minio-init`, `mailpit`, `server`, `web`) under an
+  explicit project `name: gisik-nokma-dev`. A load-bearing bug shipped and was fixed the same day: the
+  first version and the root `docker-compose.yml` both resolved to the same (directory-inferred) Compose
+  project name and both declared a service literally named `postgres`, so bringing either stack up
+  **destroyed the other's containers** — directly contradicting the commit's own "the two stacks are now
+  co-runnable" claim. The suite calls the **real** `loadConfig()` and `createObjectStoreFromEnv()`
+  against the parsed `server` service env and asserts neither throws and the store resolves to
+  `S3ObjectStore` (not the local-disk fallback) — upgraded from a `toBeTruthy()` key-presence check
+  after review showed that passed against a malformed `DATABASE_URL`, a schemeless `BETTER_AUTH_URL`,
+  and a mismatched bucket name. Object-store vars are `OBJECT_STORE_S3_*`, not the plan's bare `S3_*` —
+  nothing reads the plan's names (0 hits against a positive control of 22 for the correct ones); the
+  "no bare `S3_*` keys" check runs through an `envOf()` helper that normalizes both Compose environment
+  syntaxes, because list-form `Object.keys()` yielding `'0','1','2'` made an earlier version of that
+  exact check pass vacuously against a file that still had three. Postgres is published on 54330, not
+  the plan's 54329 (the live shared cross-lane test Postgres) — asserted both ways, since a
+  negative-only check would pass if the ports block vanished entirely. `scripts/check-env-example.mjs`
+  was reused, **not created by this task** — it already existed from an earlier lane's work. **The
+  suite's own docblock is explicit: this is not the Task 6 acceptance.** The acceptance is a request
+  travelling through the web container's proxy and being answered by the server, live — nothing
+  automated brings the stack up and makes that round trip; it is a hand-run case. `docker-compose.dev.yml`,
+  `apps/server/test/deploy/compose-dev-contract.test.ts`

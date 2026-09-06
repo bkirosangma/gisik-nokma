@@ -5,6 +5,7 @@ import { buildApp } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import type { CommittedEventListener, IngestService } from '../../src/ingest/ingest-service.js';
 import { createNotificationFanout, type CanSeeFn } from '../../src/notifications/fanout.js';
 import { listNotifications } from '../../src/notifications/store.js';
@@ -819,11 +820,13 @@ describe('resilience', () => {
  * The wiring, pinned.
  *
  * Task 5 Step 7's own check is "typecheck and run the suite", which CANNOT fail
- * if the listener is never subscribed — the same shape as the dead
- * `registerAttachmentRoutes`, documented at `src/index.ts:36-49`, where a
- * correctly-written module was reachable from nothing and every test still
- * passed. So this asserts the subscription exists, and that what it is handed
- * actually produces a row.
+ * if the listener is never subscribed — the same shape as the once-dead
+ * `registerAttachmentRoutes`, where a correctly-written module was reachable
+ * from nothing and every test still passed. (That one has since been wired:
+ * `src/app.ts` registers it and `test/routes/attachments-wired.test.ts` is the
+ * test that can fail on it. The shape it illustrates is what this note is
+ * about, and it is unchanged by the fix.) So this asserts the subscription
+ * exists, and that what it is handed actually produces a row.
  *
  * It also carries the fire-and-forget property the silence ruling leans on:
  * `buildApp` registers a listener whose return value it does not await, so no
@@ -864,6 +867,9 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
       }),
       serverAppend: async () => [],
       webOrigin: 'http://localhost:3001',
+      // Required on `AppDeps`, and free here: a `LocalDiskStore` constructor
+      // touches no filesystem, and nothing in this file uploads anything.
+      store: createObjectStoreFromEnv({}),
     });
 
     // Two subscribers: Plan 5's stream hub and this plan's notification fan-out.

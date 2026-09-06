@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import pg from 'pg';
+import type { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/config.js';
+import { createPool } from '../src/db.js';
 
 const VALID_ENV = {
   DATABASE_URL: 'postgres://gisik:gisik@localhost:54329/gisik_nokma',
@@ -25,6 +28,18 @@ describe('loadConfig', () => {
       webOrigin: 'http://localhost:3001',
       snapshotIntervalMs: 300000,
       snapshotMinEvents: 20,
+      // Plan 11 Task 1's nine. Listed here, in the exact-shape assertion,
+      // because that is the guard that fails when a field is ADDED without
+      // anyone deciding it should exist — a per-field `expect` would not.
+      trustProxy: false,
+      rateLimitAuthMax: 10,
+      rateLimitEventsMax: 120,
+      rateLimitWindowSec: 60,
+      alertWebhookUrl: null,
+      smtpUrl: null,
+      magicLinkFrom: 'sign-in@gisik-nokma.local',
+      databaseCaCert: null,
+      deploySha: 'dev',
     });
   });
 
@@ -152,28 +167,62 @@ describe('loadConfig', () => {
   });
 
   /**
-   * The refusal, and the exact bound of it — MEASURED rather than assumed.
+   * The refusal, and the exact bound of it — MEASURED rather than assumed, and
+   * the bound MOVED by Plan 11 Task 1.
    *
-   * `z.string().url()` delegates to the WHATWG URL parser, which accepts
-   * anything with a scheme. `'localhost:3001'` therefore PASSES: the parser
-   * reads `localhost:` as the scheme and `3001` as the path. That is not a
-   * mistake this test papers over; it is stated, because an invitation link
-   * built on it would read `localhost:3001/invite/<token>` and go nowhere, and
-   * a reader who assumed `.url()` meant "an http(s) origin" would be wrong.
+   * WHAT THIS TEST USED TO SAY. `z.string().url()` delegates to the WHATWG URL
+   * parser, which asks only for a scheme, so `'localhost:3001'` PASSED it: the
+   * parser reads `localhost:` as the scheme and `3001` as the path. This file
+   * recorded that as a deliberate, measured absence — *"Absence, owner Plan 11:
+   * neither variable is constrained to an http(s) scheme with a host"* — with
+   * an assertion PINNING the laxness, so that a reader could not mistake
+   * `.url()` for "an http(s) origin".
    *
-   * `BETTER_AUTH_URL` above has had exactly the same bound since Task 2.
-   * *Absence, owner Plan 11: neither variable is constrained to an http(s)
-   * scheme with a host and no path.*
+   * WHAT IT SAYS NOW. Plan 11 owned the absence and closed it (test case
+   * 6.124). A `WEB_ORIGIN` of `localhost:3001` mints invitation links reading
+   * `localhost:3001/invite/<token>` — a URL nobody can follow, with a
+   * single-use credential already spent on it. A server whose invitation host
+   * is malformed must not start, so the pinning assertion is INVERTED here
+   * rather than deleted: the line that proved the hole now proves it is shut.
    */
-  it('planted defect: a WEB_ORIGIN with no scheme at all is refused with the variable named', () => {
+  it('planted defect: a WEB_ORIGIN without an http(s) scheme and a host is refused with the variable named', () => {
     expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'not a url' })).toThrowError(
       'invalid server configuration — check: WEB_ORIGIN',
     );
     expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: '' })).toThrowError(
       'invalid server configuration — check: WEB_ORIGIN',
     );
-    // The bound, stated: a scheme is all `.url()` asks for.
-    expect(loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'localhost:3001' }).webOrigin).toBe('localhost:3001');
+    // The bound that moved. `localhost:3001` parses as a URL and is refused
+    // anyway; the same string with a scheme in front of it is accepted.
+    expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'localhost:3001' })).toThrowError(
+      'invalid server configuration — check: WEB_ORIGIN',
+    );
+    expect(loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'http://localhost:3001' }).webOrigin).toBe(
+      'http://localhost:3001',
+    );
+    expect(loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'https://pm.artsourced.in' }).webOrigin).toBe(
+      'https://pm.artsourced.in',
+    );
+    // A scheme that is neither http nor https parses fine and is still refused:
+    // `.url()` alone would have taken this.
+    expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'file:///etc/passwd' })).toThrowError(
+      'invalid server configuration — check: WEB_ORIGIN',
+    );
+  });
+
+  /**
+   * The same bound on `BETTER_AUTH_URL`, which has carried it since Plan 4
+   * Task 2 and is the origin better-auth signs magic links and OAuth
+   * `redirect_uri`s from. Its own test, not an extra assertion in the one
+   * above, so a regression names which variable came loose.
+   */
+  it('planted defect: a BETTER_AUTH_URL without an http(s) scheme and a host is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, BETTER_AUTH_URL: 'localhost:3000' })).toThrowError(
+      'invalid server configuration — check: BETTER_AUTH_URL',
+    );
+    expect(loadConfig({ ...VALID_ENV, BETTER_AUTH_URL: 'https://pm-api.artsourced.in' }).betterAuthUrl).toBe(
+      'https://pm-api.artsourced.in',
+    );
   });
 
   /**
@@ -190,7 +239,8 @@ describe('loadConfig', () => {
    */
   it('the values documented in .env.example actually satisfy the schema', () => {
     const path = fileURLToPath(new URL('../../../.env.example', import.meta.url));
-    const documented = parseEnvExample(readFileSync(path, 'utf8'));
+    const raw = readFileSync(path, 'utf8');
+    const documented = parseEnvExample(raw);
 
     // Guard against the check going quiet: if the parser stops finding the live
     // variables, this test would pass on an empty object and prove nothing.
@@ -204,12 +254,339 @@ describe('loadConfig', () => {
       'WEB_ORIGIN',
       'SNAPSHOT_INTERVAL_MS',
       'SNAPSHOT_MIN_EVENTS',
+      // Plan 11 Task 1's variables that carry a VALUE in .env.example.
+      'TRUST_PROXY',
+      'RATE_LIMIT_AUTH_MAX',
+      'RATE_LIMIT_EVENTS_MAX',
+      'RATE_LIMIT_WINDOW_SEC',
+      'SMTP_URL',
+      'MAGIC_LINK_FROM',
+      'DEPLOY_SHA',
     ]) {
       expect(documented, `.env.example should document ${key}`).toHaveProperty(key);
     }
 
+    // `ALERT_WEBHOOK_URL` and `DATABASE_CA_CERT` are documented EMPTY on
+    // purpose — empty is their meaningful production-optional value — and
+    // `parseEnvExample` drops empty values, so they can never appear in
+    // `documented` and the loop above cannot cover them. Asserted against the
+    // raw file instead, which is the only place the fact lives. Without this,
+    // deleting either line from `.env.example` would be invisible here.
+    for (const key of ['ALERT_WEBHOOK_URL', 'DATABASE_CA_CERT']) {
+      expect(raw, `.env.example should document ${key}`).toMatch(new RegExp(`^${key}=`, 'm'));
+    }
+
     expect(() => loadConfig(documented)).not.toThrow();
     expect(loadConfig(documented).betterAuthSecret.length).toBeGreaterThanOrEqual(32);
+  });
+});
+
+/**
+ * Plan 11 Task 1 — the deployment knobs. Nine variables `.env.example` had
+ * documented ahead of their reader; this is the reader arriving.
+ *
+ * The DEFAULTS are asserted by the exact-shape `toEqual` at the top of this
+ * file rather than repeated here, because that assertion is the one that also
+ * fails when a field appears without anyone deciding it should. What lives
+ * below is what that assertion cannot say: that overrides are read, and that
+ * every one of these refuses a malformed value by NAME instead of coercing it.
+ */
+describe('loadConfig — the deployment surface', () => {
+  it('reads every deployment knob when the environment sets one', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      TRUST_PROXY: 'true',
+      RATE_LIMIT_AUTH_MAX: '60',
+      RATE_LIMIT_EVENTS_MAX: '600',
+      RATE_LIMIT_WINDOW_SEC: '30',
+      ALERT_WEBHOOK_URL: 'https://hooks.example/T/B',
+      SMTP_URL: 'smtp://mailpit:1025',
+      MAGIC_LINK_FROM: 'hello@gisik.example',
+      DATABASE_CA_CERT: '-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----',
+      DEPLOY_SHA: '9a5275c',
+    });
+    expect(config.trustProxy).toBe(true);
+    expect(config.rateLimitAuthMax).toBe(60);
+    expect(config.rateLimitEventsMax).toBe(600);
+    expect(config.rateLimitWindowSec).toBe(30);
+    expect(config.alertWebhookUrl).toBe('https://hooks.example/T/B');
+    expect(config.smtpUrl).toBe('smtp://mailpit:1025');
+    expect(config.magicLinkFrom).toBe('hello@gisik.example');
+    expect(config.databaseCaCert).toContain('BEGIN CERTIFICATE');
+    expect(config.deploySha).toBe('9a5275c');
+  });
+
+  /**
+   * An empty string is what a hosting platform hands a process for a variable
+   * its spec declares without a value — `ALERT_WEBHOOK_URL=` is exactly how
+   * `.env.example` documents "no webhook". If `''` were read as a VALUE, every
+   * one of these would refuse an ordinary deploy. Asserted for all nine at
+   * once because the mistake, if it is made, is made in one helper.
+   */
+  it('reads an empty string as UNSET, not as a malformed value — that is what a deploy spec hands over', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      TRUST_PROXY: '',
+      RATE_LIMIT_AUTH_MAX: '',
+      RATE_LIMIT_EVENTS_MAX: '',
+      RATE_LIMIT_WINDOW_SEC: '',
+      ALERT_WEBHOOK_URL: '',
+      SMTP_URL: '',
+      MAGIC_LINK_FROM: '',
+      DATABASE_CA_CERT: '',
+      DEPLOY_SHA: '',
+    });
+    expect(config.trustProxy).toBe(false);
+    expect(config.rateLimitAuthMax).toBe(10);
+    expect(config.rateLimitEventsMax).toBe(120);
+    expect(config.rateLimitWindowSec).toBe(60);
+    expect(config.alertWebhookUrl).toBeNull();
+    expect(config.smtpUrl).toBeNull();
+    expect(config.magicLinkFrom).toBe('sign-in@gisik-nokma.local');
+    expect(config.databaseCaCert).toBeNull();
+    expect(config.deploySha).toBe('dev');
+  });
+
+  /**
+   * `z.coerce.boolean()` is JS truthiness: it turns ANY non-empty string into
+   * `true`, including the string `'false'` — the one spelling an operator is
+   * most likely to write for "off". So the schema uses an enum, and this test
+   * is the proof, not the docblock: `'false'` must come back false, and `'yes'`
+   * must be refused rather than silently accepted as on.
+   *
+   * It matters because trusting `X-Forwarded-*` from an untrusted hop lets a
+   * caller choose its own source IP, and the rate limiter and the audit trail
+   * both believe it.
+   */
+  it("planted defect: TRUST_PROXY takes only 'true'/'false' — 'false' is FALSE, and 'yes' is refused by name", () => {
+    expect(loadConfig({ ...VALID_ENV, TRUST_PROXY: 'false' }).trustProxy).toBe(false);
+    expect(loadConfig({ ...VALID_ENV, TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+    expect(() => loadConfig({ ...VALID_ENV, TRUST_PROXY: 'yes' })).toThrowError(ConfigError);
+    expect(() => loadConfig({ ...VALID_ENV, TRUST_PROXY: 'yes' })).toThrowError(
+      'invalid server configuration — check: TRUST_PROXY',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, TRUST_PROXY: '1' })).toThrowError(
+      'invalid server configuration — check: TRUST_PROXY',
+    );
+  });
+
+  /**
+   * Each of the three named separately, because "a rate limit is refused" is
+   * satisfied by one of them working. A zero max refuses every request on the
+   * limited routes; a zero window is a division by zero in any limiter that
+   * computes a rate.
+   */
+  it('planted defect: a non-integer or non-positive rate limit is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_AUTH_MAX: 'lots' })).toThrowError(ConfigError);
+    expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_AUTH_MAX: 'lots' })).toThrowError(
+      'invalid server configuration — check: RATE_LIMIT_AUTH_MAX',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_AUTH_MAX: '0' })).toThrowError(
+      'invalid server configuration — check: RATE_LIMIT_AUTH_MAX',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_EVENTS_MAX: '-1' })).toThrowError(
+      'invalid server configuration — check: RATE_LIMIT_EVENTS_MAX',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_WINDOW_SEC: '2.5' })).toThrowError(
+      'invalid server configuration — check: RATE_LIMIT_WINDOW_SEC',
+    );
+  });
+
+  /**
+   * The four value-shaped optionals. Each is a string that LOOKS configured
+   * and fails somewhere far from here: a webhook that never posts, a transport
+   * that throws while a user waits for a sign-in link, a From address the
+   * server rejects at send, a CA that produces an opaque TLS handshake error
+   * on the first query. Boot-time refusal naming the variable is cheaper than
+   * every one of those.
+   */
+  it('planted defect: a malformed ALERT_WEBHOOK_URL, SMTP_URL, MAGIC_LINK_FROM or DATABASE_CA_CERT is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, ALERT_WEBHOOK_URL: 'hooks.example/T/B' })).toThrowError(
+      'invalid server configuration — check: ALERT_WEBHOOK_URL',
+    );
+    // A URL by the parser's standards, and still not a webhook.
+    expect(() => loadConfig({ ...VALID_ENV, ALERT_WEBHOOK_URL: 'smtp://localhost:1025' })).toThrowError(
+      'invalid server configuration — check: ALERT_WEBHOOK_URL',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, SMTP_URL: 'localhost:1025' })).toThrowError(
+      'invalid server configuration — check: SMTP_URL',
+    );
+    // The mirror of the case above: an http URL is not an SMTP transport.
+    expect(() => loadConfig({ ...VALID_ENV, SMTP_URL: 'http://localhost:1025' })).toThrowError(
+      'invalid server configuration — check: SMTP_URL',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, MAGIC_LINK_FROM: 'sign-in-at-example' })).toThrowError(
+      'invalid server configuration — check: MAGIC_LINK_FROM',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, DATABASE_CA_CERT: 'not-a-certificate' })).toThrowError(
+      'invalid server configuration — check: DATABASE_CA_CERT',
+    );
+  });
+});
+
+/**
+ * `createPool`'s TLS parameter (Plan 11 Task 1). It lives in this file rather
+ * than beside the pool because what it proves is a CONFIG fact — that
+ * `DATABASE_CA_CERT` reaches the driver — and because these two assertions and
+ * the schema they depend on should redden together.
+ *
+ * Neither test opens a connection: `new pg.Pool()` stores its options and
+ * connects lazily, on the first `query`/`connect`, which is why this stays in
+ * the database-free half of the suite. `new pg.Client()` is likewise inert —
+ * it computes its connection parameters in the constructor and connects only
+ * on `connect()`.
+ *
+ * ## Why these read `connectionParameters` and not `pool.options`
+ *
+ * `pool.options` is the object HANDED to the constructor. It is not what a
+ * client connects with: `pg` applies the parsed connection string ON TOP of it
+ * (pg 8.23.0, lib/connection-parameters.js:60,
+ * `Object.assign({}, config, parse(config.connectionString))`), so a URL
+ * carrying any of `ssl`, `sslmode`, `sslnegotiation`, `sslcert`, `sslkey` or
+ * `sslrootcert` REPLACES the caller's `ssl` outright.
+ *
+ * An earlier version of these tests asserted `pool.options.ssl.ca` against a
+ * URL with no query string. It passed while the CA was being discarded for
+ * every managed-Postgres URL in existence — every one of them ends in
+ * `?sslmode=require` — because it asked the wrong object a question whose
+ * answer could not change. Reading `connectionParameters` is the whole point:
+ * it is the value the driver actually uses.
+ */
+describe('createPool TLS', () => {
+  const URL_ = 'postgres://gisik:gisik@localhost:54329/gisik_nokma';
+  // The shape every managed provider hands out; DigitalOcean's ends exactly so.
+  const MANAGED_URL = 'postgres://doadmin:sEcr%2Bet@db-pg-blr1.k.db.ondigitalocean.com:25060/defaultdb?sslmode=require';
+
+  /**
+   * What the driver will really connect with, as opposed to what it was handed.
+   *
+   * `connectionParameters` is a genuine property of a `pg.Client` — the
+   * constructor assigns it (pg 8.23.0, lib/client.js:54) — but `@types/pg`
+   * 8.23.1 does not declare it, so it can only be reached through a cast. The
+   * cast asserts as little as it can get away with: just the fields these
+   * tests read, and `ssl` as `unknown` because its shape is the very thing
+   * under test and a friendlier type here would be a claim, not a check.
+   */
+  interface EffectiveConnection {
+    ssl: unknown;
+    options?: string;
+    user?: string;
+    password?: string;
+    database?: string;
+    host?: string;
+    port?: number;
+    application_name?: string;
+  }
+
+  const connectionFor = (config: pg.ClientConfig): EffectiveConnection =>
+    (new pg.Client(config) as unknown as { connectionParameters: EffectiveConnection })
+      .connectionParameters;
+
+  const effective = (pool: Pool): EffectiveConnection => connectionFor(pool.options);
+
+  it('carries the CA into the connection the driver actually makes', async () => {
+    const pool = createPool(URL_, { caCert: 'PEM' });
+    expect((effective(pool).ssl as { ca: string }).ca).toBe('PEM');
+    // The timezone startup parameter must SURVIVE the addition — `ssl` sits
+    // beside it, and an edit that replaced the object would be silent
+    // otherwise (every stored timestamptz is unchanged; only what an ad-hoc
+    // query PRINTS would quietly move off India time).
+    expect(effective(pool).options).toBe('-c timezone=Asia/Kolkata');
+    await pool.end();
+  });
+
+  it('carries the CA even when the URL carries an sslmode — the managed-Postgres case', async () => {
+    const pool = createPool(MANAGED_URL, { caCert: 'PEM' });
+    // Before the ssl parameters were stripped this was `{}`: the parsed
+    // connection string overwrote `ssl: { ca }` and the CA never reached the
+    // driver. This is the regression pin — it fails on the code that shipped.
+    expect((effective(pool).ssl as { ca: string }).ca).toBe('PEM');
+    expect(effective(pool).options).toBe('-c timezone=Asia/Kolkata');
+    await pool.end();
+  });
+
+  it('changes nothing but ssl when it rewrites the URL', async () => {
+    // Stripping query parameters re-serializes the URL, so everything that
+    // identifies the database has to be shown to survive it — a rewrite that
+    // dropped a password character would fail as an auth error at T15, far
+    // from here.
+    const before = connectionFor({ connectionString: MANAGED_URL });
+    const pool = createPool(MANAGED_URL, { caCert: 'PEM' });
+    const after = effective(pool);
+    expect({
+      user: after.user,
+      password: after.password,
+      database: after.database,
+      host: after.host,
+      port: after.port,
+    }).toEqual({
+      user: before.user,
+      password: before.password,
+      database: before.database,
+      host: before.host,
+      port: before.port,
+    });
+    // Spelled out as a literal too, so this cannot pass by both sides being
+    // equally wrong: the `%2B` is a real plus in the password.
+    expect(after.password).toBe('sEcr+et');
+    expect(after.host).toBe('db-pg-blr1.k.db.ondigitalocean.com');
+    expect(after.port).toBe(25060);
+    expect(after.database).toBe('defaultdb');
+    await pool.end();
+  });
+
+  it('keeps the non-ssl query parameters, decoded value for decoded value', async () => {
+    // `URLSearchParams` re-serialization writes a space as `+`. The parser that
+    // reads the query string decodes `+` back to a space, so the DECODED value
+    // is unchanged — asserted here rather than assumed, because if that ever
+    // stops holding, a startup parameter changes meaning silently.
+    const url = `${MANAGED_URL}&application_name=gisik%20server&options=-c%20statement_timeout%3D5000`;
+    const pool = createPool(url, { caCert: 'PEM' });
+    const after = effective(pool);
+    expect(after.application_name).toBe('gisik server');
+    // The URL's own `options` wins over the pool's timezone — pg applies the
+    // connection string on top. Asserted as the measured fact it is, so this
+    // test tells the truth about what a DATABASE_URL can do rather than
+    // implying the timezone is safe from it.
+    expect(after.options).toBe('-c statement_timeout=5000');
+    await pool.end();
+  });
+
+  it('accepts a connection string a URL parser would reject, when it carries no ssl', async () => {
+    // A bare socket path is a valid pg connection string — pg reads it as the
+    // host — and `new URL()` throws TypeError on it. Rewriting is therefore
+    // gated on an ssl parameter actually being present, so this reaches the
+    // driver untouched with the CA attached rather than dying at boot.
+    const pool = createPool('/var/run/postgresql', { caCert: 'PEM' });
+    expect(pool.options.connectionString).toBe('/var/run/postgresql');
+    expect((effective(pool).ssl as { ca: string }).ca).toBe('PEM');
+    expect(effective(pool).host).toBe('/var/run/postgresql');
+    await pool.end();
+  });
+
+  it('refuses, by name, a URL it cannot rewrite but must', () => {
+    // Carries an ssl parameter AND cannot be parsed: passing it through would
+    // silently hand ssl back to the connection string and drop the CA, which is
+    // the whole defect. It raises instead, naming both variables.
+    expect(() => createPool('/var/run/postgresql?sslmode=require', { caCert: 'PEM' })).toThrow(
+      /DATABASE_URL carries an ssl query parameter.*DATABASE_CA_CERT/s,
+    );
+  });
+
+  it('leaves ssl unset and the URL untouched without a CA', async () => {
+    const pool = createPool(URL_);
+    expect(pool.options.ssl).toBeUndefined();
+    expect(pool.options.options).toBe('-c timezone=Asia/Kolkata');
+    await pool.end();
+  });
+
+  it('does not rewrite the URL when there is no CA to protect', async () => {
+    // The no-CA path must be byte-identical to what every other call site had
+    // before this parameter existed, so the URL's own ssl config still decides.
+    const pool = createPool(MANAGED_URL);
+    expect(pool.options.connectionString).toBe(MANAGED_URL);
+    expect(effective(pool).ssl).toEqual({});
+    await pool.end();
   });
 });
 

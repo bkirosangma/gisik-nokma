@@ -235,7 +235,7 @@ exit 0 — a changed number a reader diffing against the pre-Task-11 run would o
 - ✅ **13.21 — `s3TargetFromEnv` refuses with EVERY missing variable named in one error — the bucket under its caller-supplied name, and the endpoint and region among them — and resolves exactly what the environment says with no default in the way.** Each of the five is dropped in turn and the error must name it; a two-variable environment must produce `backup object storage needs: BACKUP_S3_BUCKET, OBJECT_STORE_S3_ENDPOINT, OBJECT_STORE_S3_REGION` (all three, not just the first); an empty string counts as missing, not as a value; and the built client's resolved endpoint, region and `forcePathStyle` are asserted against what was passed in. The requirement set is deliberately STRICTER than `attachments/store-config.ts`'s — see 13.35 for the measurement that made it so. `apps/server/test/ops/object-sink.test.ts`
 - ✅ **13.22 — `s3SinkFromEnv` uploads to the bucket named by `bucketVar` and never to the attachment bucket.** Asserted against an environment that holds BOTH bucket names, so a swap would be visible rather than a matter of the attachment name being absent. Key and content type are asserted too. The streaming half is still by construction (`@aws-sdk/lib-storage`'s `Upload`), not by a test. `apps/server/test/ops/object-sink.test.ts`
 - ❌ **13.23 — `fetch-backup` writes one object to a local file and refuses a key that came back with no body.** No automated test yet. `apps/server/src/ops/fetch-backup.ts`
-- ❌ **13.24 — `alerterFromConfig` logs every failure to stderr with or without a webhook, and a rejecting or unreachable webhook is logged and swallowed rather than thrown.** No automated test yet, and deliberately so: the file is a shim retired when Task 3's real `alerts/error-alerter.ts` merges, and a test pinned to the shim's path would have to be moved with it. **This is no longer load-bearing**: the never-silent property is pinned at 13.25 against `startBackupDaemon`, which is the file that survives the swap. `apps/server/src/ops/error-alerter-shim.ts`
+- 🚫 **13.24 — RETIRED WITH ITS SUBJECT. The shim is deleted; the case is not renumbered.** This case described `error-alerter-shim.ts`, which Lane C wrote as a stand-in and whose header scheduled its own deletion for whenever Task 3 landed. Task 3 landed in this PR (seam 1), so the shim is gone and its two importers — `src/ops/schedule.ts` and `src/ops/backup-daemon-main.ts` — now import `../alerts/error-alerter.js` directly. The swap was a type-identity check, not a hope: the real module exports `type ErrorAlerter = { notify(context: string, error: unknown): Promise<void> }` and `alerterFromConfig(alertWebhookUrl: string | null): ErrorAlerter`, which is exactly the pair the shim mirrored. **The behaviour this case asserted does not transfer**, and that is the point of retiring it rather than repointing it: the shim logged to stderr itself, whereas the real `WebhookErrorAlerter` POSTs without logging and `NoopErrorAlerter.notify()` is empty. Nothing is lost, because the never-silent property was deliberately moved out of the shim before the swap and is pinned at **13.25** against `startBackupDaemon`'s own catch — the file that survives. The real module's own coverage is catalogued with Task 3 in the seam-1 retroactive section below. `apps/server/src/alerts/error-alerter.ts`
 - ✅ **13.25 — a failing backup job is written to stderr BY THE DAEMON, as structured JSON, AND handed to the alerter.** The alerter is deliberately not the only witness asserted: Task 3's real `NoopErrorAlerter.notify()` is an empty async function, its `WebhookErrorAlerter` POSTs without logging, and `.env.example:99` ships `ALERT_WEBHOOK_URL` empty — so the DEFAULT deployment gets the silent one. Had the stderr line stayed in `error-alerter-shim.ts` (a file whose own header schedules its deletion, promising "nothing else should need to change"), performing that retirement would have made every backup failure completely silent. Asserted by parsing the logged line and matching `{level, job: 'pg-dump', error}`, not by counting calls. `apps/server/test/ops/schedule.test.ts`
 - ✅ **13.26 — the daemon re-arms after a failure: the next night runs the job again, and not one millisecond early.** A scheduler that runs once and stops is indistinguishable from a working one for twenty-four hours, which is why this is asserted in three steps — fires at 21:00, still once at 20:59:59.999 the next day, twice at 21:00. Fake timers with `advanceTimersByTimeAsync`, since the re-arm happens in a `.finally()` after an async catch and the sync variant would assert against a timer that does not exist yet. `apps/server/test/ops/schedule.test.ts`
 - ✅ **13.27 — an alerter that THROWS is logged and swallowed; it does not take the daemon down or skip the re-arm.** Failing to report a failure must not become a second failure. Asserted by the `backup alerter failed` line plus a second job run on the next occurrence. `apps/server/test/ops/schedule.test.ts`
@@ -365,3 +365,318 @@ that caused it. Scratch database names come from `randomUUID()`, the generator `
 uses, not `Date.now()` evaluated once at module load — two runs in the same millisecond (plausible across this
 multi-worktree lane setup) collided, and the loser's `afterAll` then issued `DROP DATABASE ... WITH (FORCE)`
 against the winner's live database mid-drill. `apps/server/test/ops/restore-drill.test.ts`
+## Graceful shutdown (Task 5b — Lane E block, 13.101–13.200)
+
+**First IDs minted from Lane E's block.** The T1/T5 retroactive catalogue that
+`docs/lanes/executor-state-E.md` says starts "from 13.101" continues from 13.105 instead — these landed
+first and are never renumbered. (The Plan 11 Tasks 1–6 retroactive section further down this file mints
+13.105–13.168 against this same block; **the block's next free id, after both sections, is `13.168`.**)
+
+*(Every case boots a REAL process and delivers a REAL signal with `child.kill()`. Cases 13.101–13.103
+spawn `src/index.ts` itself — the one non-test boot path — so deleting the `installShutdownHandlers` call
+site reddens all three. 13.104 spawns `test/fixtures/sync-throw-close-hook.ts`, which imports the same
+shutdown module and hands it a deliberately broken app, because a synchronous throw from inside avvio's
+close chain is not reachable from outside the process. The children are **not PID 1**, so what the
+container measurement showed — an unhandled SIGTERM is IGNORED — is not what these reproduce; under a
+normal parent node's default disposition applies, so a missing handler kills the child BY SIGNAL instead.
+Still a specific red, just for the neighbouring reason.)*
+
+- 13.101 ✅ SIGTERM: the real boot path exits `{code: 0, signal: null}` inside 3 s with `signal received`
+  → `http server closed` → `database pool closed` → `complete` in that order, and the pino `pid` on the
+  first line equals `child.pid` — the process signalled is the one that installed the handler, not a CLI
+  shim. Positive control: the child is asserted to hold ≥ 1 backend against the throwaway database before
+  the signal (and 0 before boot), so `pool.end()` is load-bearing rather than a marker that cannot
+  fail — `shutdown.test.ts`
+- 13.102 ✅ SIGINT: identical sequence and exit code — `shutdown.test.ts`
+- 13.103 ✅ a second signal is logged and dropped (exactly one `signal received`, exactly one `already in
+  progress`), a hung `app.close()` is bounded (`app.close() did not finish within 5000ms`) and does NOT
+  skip `pool.end()`, and the process still stops — the stalled socket holds the loop so the 8 s watchdog
+  exits 1 rather than hanging for the platform to SIGKILL. The second signal is driven off the OBSERVED
+  begin marker, not a back-to-back pair POSIX could collapse into one delivery — `shutdown.test.ts`
+- 13.104 ✅ a close hook that throws **synchronously** does not skip `pool.end()`. avvio runs close hooks
+  synchronously from the http server's own `'close'` callback, so the throw is an uncaughtException and
+  never rejects `app.close()`'s promise — the per-step `catch` cannot see it. Measured before the fix:
+  the sequence stopped after `signal received`, the pool was never ended, nothing logged `complete`, exit
+  1 at 12 ms. Now: the throw is absorbed for the shutdown window only, the hooks queued behind the
+  throwing one still run, the 5 s bound moves the sequence on, the pool closes, `complete` logs, and the
+  process exits 0 at ~5010 ms — both timing edges asserted, since under 5 s would mean `app.close()`
+  resolved after all and 8 s or more would mean the watchdog fired instead of the loop draining —
+  `shutdown.test.ts`, `test/fixtures/sync-throw-close-hook.ts`
+
+## Plan 11 Tasks 1–6 — cases written retroactively at the seam-1 PR
+
+**These cases were NOT written in each task's own change set.** Tasks 1–6 shipped across separate
+commits on this branch (`012c8cc`, `d691461`, `c31988a`, `b189bf7`, `e42e10a`+`4d16c2f`, `6251aac`)
+without a `Features.md`/`test-cases` entry apiece; this section catalogues all six in one pass, at the
+seam-1 PR, from two inventory reports that opened each commit's diff and every test file's assertions
+directly. That counts as "the same change set" only because seam 1 ships as a single PR — this is a
+disclosed deviation from the usual same-change-set rule, not a hidden one. IDs minted from Lane E's
+block (`13.101–13.200`), continuing after the graceful-shutdown section's `13.104`; the block's next
+free id after this section is `13.169`.
+
+**Note for Task 9 (`13.90`):** that case is `❌ pending the dev compose stack`, owned by Lane D. Task 6
+below lands `docker-compose.dev.yml`, so `13.90`'s precondition is now satisfied — **it is not flipped
+here**, since satisfying the precondition is not the same as a real test run against the stack, and the
+case belongs to Lane D's block. Lane D should re-run `seed:cc` against the now-real dev stack and flip
+`13.90` itself.
+
+### Config surface, CA-aware pool, `/healthz` (Task 1)
+
+- 13.105 ✅ nine deployment env vars, plus `DEPLOY_SHA`, each parsed and each refused by name when
+  malformed — `config.test.ts`
+- 13.106 ✅ an empty string reads as UNSET and falls back to the documented default — for the eight
+  OPTIONAL knobs plus `DEPLOY_SHA`, which is a different nine from 13.105's. **`WEB_ORIGIN` is
+  explicitly NOT among them and behaves the opposite way**: `WEB_ORIGIN: ''` THROWS
+  `invalid server configuration — check: WEB_ORIGIN` (`config.test.ts:191`). That is the deviation
+  Task 1's bullet defends — it is required with no default precisely so an empty value cannot mint an
+  unfollowable invitation link — so an "inconsistency fix" giving it a default would reintroduce the
+  defect. An earlier wording of this case said "any of the nine", which named `WEB_ORIGIN` among them
+  and was false — `config.test.ts`
+- 13.107 ✅ planted defect: `TRUST_PROXY` accepts only the literal `'true'`/`'false'`; `'yes'` and `'1'`
+  are refused by name rather than coerced by truthiness — `config.test.ts`
+- 13.108 ✅ planted defect: a rate-limit var that is non-integer, zero, negative, or fractional is
+  refused by its own name — `config.test.ts`
+- 13.109 ✅ `ALERT_WEBHOOK_URL` and `SMTP_URL` are scheme-discriminated against each other (an http URL
+  rejected as SMTP and vice versa), not just "any string fails" — `config.test.ts`
+- 13.110 ✅ the regression pin: a CA cert reaches the real driver through a `?sslmode=require`
+  managed-Postgres-shaped URL — this fails on the code that shipped before the fix — `config.test.ts`
+- 13.111 ✅ rewriting the connection string for TLS preserves user/password/host/port/database
+  byte-for-byte, including a literal `+` in a password surviving `%2B` round-trip — `config.test.ts`
+- 13.112 🟡 known-and-accepted, asserted rather than hidden: an `options=` query parameter still
+  clobbers the pool's timezone startup parameter through the same `Object.assign` that motivated the CA
+  fix — not fixed, the test pins the current (wrong) behaviour so a silent change is visible —
+  `config.test.ts`
+- 13.113 ✅ an unparseable connection string that also carries an ssl parameter is refused by name,
+  rather than silently discarding the CA — `config.test.ts`
+- 13.114 ✅ `/healthz` answers the exact shape `{ status, sha }` — not `{ ..., version }` — on both the
+  200 and 503 branches, `toEqual` not partial matching, `sha` sourced from a handed `DEPLOY_SHA` —
+  `app.test.ts`
+- 13.115 ❌ `sslcert`/`sslkey`/`sslrootcert` causing `pg` to `readFileSync` at client construction (a
+  missing file becomes an `ENOENT` at pool creation, not a clean config refusal) — no test exercises
+  this; recorded only in the commit message and the `db.ts` docblock
+
+### CORS, rate limiting, HTTP-Origin (CSRF) check (Task 2)
+
+- 13.116 ✅ set-equality drift guard: every protected route has a row in the suite and every row in the
+  suite is a protected route in production — a genuine set comparison, not a subset check —
+  `security-middleware.test.ts`
+- 13.117 ✅ each of the 7 protected routes: a forged `Origin` on a cookie-carrying `POST` is refused
+  `403 { error: 'forbidden_origin' }` AND the route handler never ran — `security-middleware.test.ts`
+- 13.118 ✅ each of the 7 protected routes: a cookie-carrying mutation with NO `Origin` header at all is
+  also refused (require, not merely validate) — `security-middleware.test.ts`
+- 13.119 ✅ each of the 7 protected routes: the correctly-configured `WEB_ORIGIN` is let through —
+  `security-middleware.test.ts`
+- 13.120 ✅ a query string does not buy a CSRF bypass — `/v1/events?x=1` is refused identically to
+  `/v1/events`, pinning the `routeOptions.url`-vs-`raw.url` fix — `security-middleware.test.ts`
+- 13.121 ✅ the regression pin: a caller-prepended `X-Forwarded-For` entry does NOT buy a fresh
+  rate-limit bucket — a chain with varying left / constant right entries is refused on requests 2–4,
+  which reddens under leftmost-keying and passes only under rightmost-keying —
+  `security-middleware.test.ts`
+- 13.122 ✅ two genuinely different clients behind the same proxy still get their own buckets — the
+  inverse of 13.121, so keying can't be satisfied by treating everyone as one client —
+  `security-middleware.test.ts`
+- 13.123 ✅ `POST /v1/attachments` is charged to the shared `events` bucket, not left unlimited —
+  spending the attachments budget also refuses a subsequent `/v1/events` call —
+  `security-middleware.test.ts`
+- 13.124 ✅ CORS answers preflight for the configured origin with both the allow-origin and
+  allow-credentials headers; a foreign origin gets no allow header at all; and CORS is not the CSRF
+  control — a foreign-origin `POST` is still refused `403` even though CORS is on —
+  `security-middleware.test.ts`
+- 13.125 ✅ `makeFixedWindowLimiter` unit coverage: max-then-refuse with bounded retry hints, key
+  independence, window reset proven by a clock argument (not `sleep`), a retry-after floor of 1ms even
+  in the last millisecond of a window, and refusal repeating rather than resetting on the next call —
+  `rate-limit.test.ts`
+- 13.126 ❌ `rateLimitKeyFor` (the rightmost-XFF-entry keying itself — comma-splitting, array-vs-string
+  header handling) has no standalone unit test; it is only exercised indirectly through the HTTP
+  integration cases above, so a change hitting a header shape those cases don't cover (a trailing comma,
+  an all-whitespace entry) would not be caught by a fast unit-level run
+- 13.127 ❌ whether `apps/web`'s proxy actually forwards the `Origin` header on same-origin requests —
+  stated in the module docblock as not measured in this repository; named as "the first thing to check"
+  if the web client starts answering `403 forbidden_origin`
+
+*(Not a numbered case, named for completeness: `POST /v1/invites/:token/accept` and
+`PUT /v1/me/preferences` are cookie-authenticatable mutations deliberately excluded from the protected
+set, owners named as future plans in the docblock. No case asserts they are unprotected — the 13.116
+drift guard fires only on a mismatch with the production route list, so it would not catch someone
+silently adding CSRF protection to either route any more than it would catch its removal.)*
+
+### Error alerting hook on 5xx (Task 3)
+
+- 13.128 🟡 `WebhookErrorAlerter` POSTs `{ text }` with the right headers, and an `AbortSignal` is
+  wired into the request. **The 5-second VALUE is not asserted and this case must not claim it was:**
+  the test checks `signal instanceof AbortSignal` only. Measured, not inferred — raising
+  `WEBHOOK_TIMEOUT_MS` from `5_000` to `500_000` leaves the suite 16/16 green. Downgraded from `✅` to
+  `🟡` by the verification pass that ran that mutation; the first wording said "an `AbortSignal`-based
+  5s timeout wired through", which reads as coverage of the deadline itself. Open: a dead webhook could
+  be widened to hold a socket for minutes with nothing reddening — `error-alerter.test.ts`
+- 13.129 ✅ `alertWithoutWaiting` contains a SYNCHRONOUS throw from `notify` — it does not propagate out
+  of `alertWithoutWaiting` itself — `error-alerter.test.ts`
+- 13.130 ✅ `alertWithoutWaiting` contains a REJECTING `notify` — a real `process.on('unhandledRejection',
+  …)` collector asserts nothing escapes the process, a genuine behavioural check rather than an inference
+  from the absence of a thrown error — `error-alerter.test.ts`
+- 13.131 ✅ `alertWithoutWaiting` does not wait for the alerter — a releasable gate (not an unresolvable
+  promise, which would make "not settled yet" trivially true) proves the response returns before the
+  alert settles, and releasing the gate is the positive control proving `notify` really was invoked —
+  `error-alerter.test.ts`
+- 13.132 ✅ the 5xx handler answers the exact `INTERNAL_ERROR_BODY` shape (`toEqual`) and the response
+  body does not contain the thrown error's message or a real path — a leak check, not a status-code-only
+  check — `error-alerter.test.ts`
+- 13.133 ✅ the alert context carries the REDACTED url — asserted to literally equal
+  `'GET /v1/invites/[redacted]/explode'`, confirming the redaction exactly rather than merely "doesn't
+  contain the token" — `error-alerter.test.ts`
+- 13.134 ✅ planted defect: a 400 from a schema refusal is the door working — zero alert contexts are
+  recorded, confirming sub-500s never page — `error-alerter.test.ts`
+- 13.135 ✅ planted defect: an alerter that THROWS or REJECTS still leaves the response exactly `500` +
+  `INTERNAL_ERROR_BODY`, and (for the reject case) the escaped-unhandled-rejections collector is still
+  empty — `error-alerter.test.ts`
+- 13.136 ✅ planted defect: an alerter that HANGS does not hold the response — the 500 is already
+  answered while the alert's `settled` flag is still `false`, and only flips after `release()`, a genuine
+  ordering assertion (response-before-alert-settles) — `error-alerter.test.ts`
+- 13.137 ✅ with NO alerter configured, nothing reaches the network — `globalThis.fetch` is replaced
+  BEFORE `buildTestApp()` is called, closing the install-then-build ordering bug (`WebhookErrorAlerter`
+  captures `fetch` as a default parameter at construction) a reviewer caught in an earlier, guard-that-
+  cannot-fail version of this exact test — `error-alerter.test.ts`
+- 13.138 ❌ the claim that `/healthz`'s 503 branch never reaches this alerter (the one 5xx an operator
+  most needs paged) — stated only in prose in two files; nothing would go red if that routing were
+  silently changed to alert on it
+- 13.139 ❌ no coalescing or rate-limiting of the alert channel itself — a repeat-failure storm pages the
+  same webhook every time, by design, and is unbuilt and untested
+
+### SMTP magic-link sender, OTP sign-in refused (Task 4)
+
+- 13.140 ✅ `SmtpMagicLinkSender` composes one message to the address, from the configured sender —
+  envelope AND raw `From:`/`To:`/`Subject:` headers checked via full MIME composition (`streamTransport`),
+  not a spy on `sendMail`'s call args — `smtp-magic-link-sender.test.ts`
+- 13.141 ✅ the link survives quoted-printable transfer encoding byte-for-byte and stands alone on its
+  own decoded line, using a >76-char URL specifically so the encoding is actually exercised —
+  `smtp-magic-link-sender.test.ts`
+- 13.142 ✅ the email is plain-text only — asserted `Content-Type: text/plain`,
+  `Content-Transfer-Encoding: quoted-printable`, and the raw message explicitly does NOT contain
+  `multipart/` or `text/html` — `smtp-magic-link-sender.test.ts`
+- 13.143 ✅ negative control: constructing the sender alone sends nothing —
+  `smtp-magic-link-sender.test.ts`
+- 13.144 ✅ an unreachable mail host that never speaks (a real TCP listener that accepts and never sends
+  a banner) is given up on in seconds, not the nodemailer-default minutes — the **greeting** timeout
+  specifically, `ETIMEDOUT`, elapsed time asserted bounded both above and below so an instant/no-op
+  rejection cannot pass — `smtp-magic-link-sender.test.ts`
+- 13.145 ✅ `selectMagicLinkSender` picks the SMTP sender when `SMTP_URL` is configured and the log
+  sender otherwise, both directions — `select-senders.test.ts`
+- 13.146 ✅ `selectOtpSender()` NEVER returns `LogOtpSender` on the production path — asserted
+  `toBeInstanceOf(NullOtpSender)` and explicitly `not.toBeInstanceOf(LogOtpSender)` —
+  `select-senders.test.ts`
+- 13.147 ✅ `NullOtpSender` holds no transcript of issued codes — structural check (`'sent' in sender ===
+  false`, empty own-keys), not a behavioural count after a send — `select-senders.test.ts`
+- 13.148 ✅ over the real mounted route (`app.inject` against `/api/auth/phone-number/send-otp`), the
+  refusal is `501` with `body.code === PHONE_SIGN_IN_UNAVAILABLE`, `body.message` mentioning email, and
+  `Object.keys(body).sort()` equal to exactly `['code','message']` — guards against a future field
+  leaking anything extra — `null-otp-sender.test.ts`
+- 13.149 ✅ the refusal never answers with the string `'code sent'` — `null-otp-sender.test.ts`
+- 13.150 ✅ positive control: the identical request against `LogOtpSender` succeeds `200` +
+  `'code sent'` — the control that makes 13.148's 501 meaningful by ruling out a broken route/mount as
+  the explanation — `null-otp-sender.test.ts`
+- 13.151 ❌ whether `requireTLS` should be forced on the SMTP transport — deliberately left off to keep
+  working against Mailpit's plaintext `smtp://`; no test asserts TLS behaviour either way
+- 13.152 ❌ a refused OTP request still leaves an expiring verification row in better-auth's own storage
+  — documented in the docblock as a known, accepted side effect; would require inspecting better-auth's
+  internal tables and is not asserted by any test here
+
+### Server and web Dockerfiles (Task 5)
+
+*(🧪 here means a `docker build` run by hand and recorded in commit `e42e10a`'s message — it has not been
+re-run by anything since, automated or otherwise.)*
+
+- 13.153 🧪 the server image builds and, run with no database, prints "applying migrations…" then dies
+  `ECONNREFUSED` — manually observed against a real build (exit 0, ~607 MB), recorded in the commit
+  message, not automated; never run against a real Postgres
+- 13.154 🧪 the web image builds standalone and the resulting artifact contains `.next/standalone`'s
+  `server.js` and `.next/static` — manually observed (exit 0, ~241 MB), recorded in the commit message;
+  `node apps/web/server.js` has never actually answered a request, by anyone, at any point in this
+  branch's history
+- 13.155 ❌ no automated test builds or runs either Dockerfile — confirmed by grep: `apps/server/test`
+  and `apps/web` have no hits for `Dockerfile`/`docker` outside the dev-compose-stack tests below, which
+  test the compose YAML, not an image build
+- 13.156 ❌ the build-arg defect itself (before the fix): the plan's `NEXT_PUBLIC_API_URL`/
+  `NEXT_PUBLIC_WS_URL` have zero readers in `apps/`/`packages/` (measured with a grep, not assumed), and
+  the commit message for the fix (`4d16c2f`) documents that an unset `SERVER_ORIGIN` bakes
+  `http://localhost:3000` into `routes-manifest.json` at build time. **The earlier rationale here was
+  wrong about its own source** — it called this "recorded reasoning, not an inspection of a built
+  manifest", while commit `4d16c2f` says the opposite in its own words ("proven from this repo's own
+  build output"), and applying that invented standard would have forced 13.153/13.154 down to `❌` too,
+  since those rest on the same kind of commit-recorded measurement. The marker stays `❌` for the honest
+  reason instead: this catalogue entry describes the defect as it existed BEFORE the fix, and nothing
+  reproduces the pre-fix state on demand. The post-fix behaviour IS measured, at 13.167. Automated regression coverage for the FIXED names living correctly in the compose file is
+  Task 6's 13.162/13.163 below; no test in this repo reproduces the original defect end-to-end against a
+  real image build
+
+### Dev stack (`docker-compose.dev.yml`) checked against real config loaders (Task 6)
+
+- 13.157 ✅ anti-vacuity guard: all 6 expected compose service names actually parse out of the YAML,
+  guarding against a parser silently returning `{}` — `compose-dev-contract.test.ts`
+- 13.158 ✅ project isolation: the dev stack declares a `name:`, and it is truthy and differs from the
+  root compose file's (undefined) name — `compose-dev-contract.test.ts`
+- 13.159 ✅ the server service's parsed env satisfies the REAL `loadConfig()` (not a mock) without
+  throwing — `compose-dev-contract.test.ts`
+- 13.160 ✅ the server service's parsed env satisfies the REAL `createObjectStoreFromEnv()` without
+  throwing, and resolves to `S3ObjectStore` specifically, not the local-disk fallback — upgraded from a
+  `toBeTruthy()` key-presence check after a review showed that passed even against a malformed
+  `DATABASE_URL`, a schemeless `BETTER_AUTH_URL`, and a mismatched bucket name —
+  `compose-dev-contract.test.ts`
+- 13.161 ✅ object-store wiring: `OBJECT_STORE === 's3'`, `OBJECT_STORE_S3_FORCE_PATH_STYLE === 'true'`,
+  the endpoint contains `'minio'`, the bucket name matches the one actually created by the `minio-init`
+  entrypoint (parsed by regex out of the real entrypoint string, not hand-copied), and no bare `S3_*` keys
+  survive — checked through an `envOf()` helper that normalizes both Compose environment syntaxes,
+  because list-form `Object.keys()` yielding `'0','1','2'` made an earlier version of the "no bare keys"
+  check pass vacuously against a file that still had three — `compose-dev-contract.test.ts`
+- 13.162 ✅ web build-args: `SERVER_ORIGIN` is present as a **build arg** (not runtime env), contains
+  `'server'`, and explicitly does NOT contain `'localhost'` — the direct regression test for the
+  routes-manifest bug named in 13.156 — `compose-dev-contract.test.ts`
+- 13.163 ✅ web build-args: `NEXT_PUBLIC_SERVER_URL` is present, and neither of the plan's dead names
+  (`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`) appear anywhere — `compose-dev-contract.test.ts`
+- 13.164 ✅ Postgres port: `54329` (the live shared cross-lane test Postgres) is NOT in the published
+  ports, and `54330` IS — a two-sided check, since a negative-only assertion would pass if the ports
+  block were deleted entirely or moved to a third port while `.env.example` still claimed 54330 —
+  `compose-dev-contract.test.ts`
+- 13.165 🟡 the load-bearing bug this whole deviation chain was about: the first version of this file and
+  the root `docker-compose.yml` resolved to the same directory-inferred project name and both declared a
+  service literally named `postgres`, so bringing either stack up destroyed the other's containers —
+  directly contradicting the landing commit's own "the two stacks are now co-runnable" claim. Fixed the
+  same day by adding the explicit `name:` covered structurally by 13.158; no test actually brings both
+  stacks up together and confirms neither is destroyed, so this is `🟡` on the fix's structural proxy, not
+  a reproduction of the original collision
+- 13.166 🧪 the MinIO healthcheck (`curl -f http://localhost:9000/minio/health/live` against the pinned
+  tag) returns healthy. **Upgraded from `❌` to `🧪` by an actual run** — the catalogue pass was right to
+  refuse the comment as evidence, and the run has since happened. `docker compose ps` reported
+  `minio ... (healthy)` on a live stack; the chain is self-witnessing beyond that, because `minio-init`
+  is gated on `condition: service_healthy` and `server` on `minio-init`'s
+  `condition: service_completed_successfully`, so a healthcheck that never went healthy could not have
+  produced a healthy `server`. `curl` is confirmed present in the pinned image
+  (`docker run --rm --entrypoint sh minio/minio:RELEASE.2024-11-07T00-52-20Z -c 'command -v curl'` →
+  `/usr/bin/curl`), so the check is not silently a no-op. Still `🧪` and not `✅`: nothing in the gate
+  runs it
+- 13.167 🧪 **TASK 6'S ACCEPTANCE, RUN.** A request through the WEB container's proxy is answered by the
+  SERVER. `docker compose -f docker-compose.dev.yml up -d --build` reached a healthy server, then
+  `GET http://localhost:3001/v1/me/work` (the web container's published port; `/v1/*` is rewritten by
+  `next.config.ts` to `$SERVER_ORIGIN`) returned **HTTP 401, `content-type: application/json`, body
+  `{"error":"unauthenticated"}`**. A 401 is the PASS: the question is who answered, not whether the
+  caller was authorised, and only Fastify produces that body. Direct control the same run:
+  `GET :3000/healthz` → `200 {"status":"ok","sha":"dev"}`.
+  **The discriminator was written down BEFORE the run** so the result could not be reinterpreted
+  afterwards, and the case is `🧪` rather than `✅` because nothing in the gate brings a stack up.
+- 13.168 🧪 **the negative control for 13.167 — the acceptance can fail, and its real failure mode is not
+  the one that was predicted.** With `SERVER_ORIGIN` reverted to the pre-fix `http://localhost:3000` and
+  the web image rebuilt, the same request returned **HTTP 500 after a 30-second stall**, body
+  `Internal Server Error`, while the server stayed healthy on :3000 and the web container still served
+  its own pages (`GET :3001/` → 307). The web container's log names the cause:
+  `Failed to proxy http://localhost:3000/v1/me/work [Error: connect EADDRNOTAVAIL 127.0.0.1:3000 -
+  Local (0.0.0.0:0)]`, then `[Error: socket hang up] { code: 'ECONNRESET' }`.
+  **The prediction — written into the compose file, the contract test and commit `4d16c2f` before any
+  measurement — was that Next would proxy back into itself and answer its own 404. That is false.** It
+  attempts the hop, cannot connect, and 500s slowly. The measured symptom is worse than the predicted
+  one and much harder to spot: every healthcheck stays green, the web tier serves pages, and only the
+  proxied path fails. Recorded because the first pass through this acceptance nearly skipped the control
+  on the grounds that the positive run had already passed — **a matcher never watched failing is not a
+  measurement**, and the branch that would have fired here (`HTML`) never did
+
+*(`scripts/check-env-example.mjs` was reused by Task 6, not created by it — it already existed from an
+earlier lane's work (`git log` shows it first at `b641a28`, unchanged in the Task 4–6 diffs inspected). No
+case above credits Task 6 with authoring it; flagging this so a future edit doesn't misattribute it.)*

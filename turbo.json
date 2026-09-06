@@ -1,5 +1,36 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // globalEnv is a CACHE-CORRECTNESS list, not a documentation list: a variable
+  // that changes what `build`/`test`/`typecheck` PRODUCE must be here, or turbo
+  // will serve a hit computed under a different environment. This lane's gate
+  // runs --force and would never see such a hit; T14's CI job persists the
+  // cache, which is where it would show up.
+  //
+  // PLAN 11 TASK 1 added nine variables to apps/server/src/config.ts and NONE
+  // of them belongs here. The reason is the same for all nine and it is a
+  // measured one, not a judgement: their only reader is
+  // `loadConfig(process.env)` in apps/server/src/index.ts, the boot path, which
+  // no turbo task invokes. Every test that exercises them passes an explicit
+  // object to loadConfig, and `apps/server/test/config.test.ts` reads
+  // `.env.example` as a FILE. Swept over apps/, packages/ and scripts/ for each
+  // name: the only occurrence outside config.ts and .env.example is a prose
+  // mention of `RATE_LIMIT_*` in a docblock.
+  //
+  //   TRUST_PROXY, RATE_LIMIT_AUTH_MAX, RATE_LIMIT_EVENTS_MAX,
+  //   RATE_LIMIT_WINDOW_SEC, ALERT_WEBHOOK_URL, SMTP_URL, MAGIC_LINK_FROM,
+  //   DATABASE_CA_CERT, DEPLOY_SHA
+  //     — no build, test or typecheck reads any of them from the environment,
+  //       so listing them would add nine spurious cache misses and no coverage.
+  //
+  // DEPLOY_SHA deserves its own sentence because it is the one that could look
+  // like it belongs: it is a build-identity variable, and those usually are
+  // baked in. Here it is not — /healthz reads it at RUNTIME from the config the
+  // process booted with, so it changes no artifact. If a later task ever bakes
+  // it into a bundle (the NEXT_PUBLIC_ pattern two lines below), it must move
+  // into this list in the same change, and turbo 2's default envMode:strict is
+  // what makes that necessary rather than optional — an undeclared variable
+  // reaches such a task as `undefined`, which for DEPLOY_SHA silently becomes
+  // the 'dev' default instead of failing.
   "globalEnv": [
     "DATABASE_URL",
     "TEST_DATABASE_ADMIN_URL",

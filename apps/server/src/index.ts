@@ -1,25 +1,31 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
+import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
+import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
-import { LogMagicLinkSender } from './auth/magic-link-sender.js';
-import { LogOtpSender } from './auth/otp-sender.js';
+import { selectMagicLinkSender, selectOtpSender } from './auth/select-senders.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
+import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
-  const pool = createPool(config.databaseUrl);
+  // The CA for managed Postgres, when one is configured. Local runs set nothing
+  // and the pool is byte-for-byte what it was.
+  const pool = createPool(config.databaseUrl, { caCert: config.databaseCaCert });
   const projections = buildProjectionRegistry();
   // `gates` switches on the server-owned refusals: an embedded attachment must
   // be this ticket's own image, and named evidence must exist on this ticket.
   // This is the only NON-TEST site that passes them, and
   // `test/gates/gate-seam.test.ts` pins what `buildServerGates()` covers.
   //
-  // Two corrections to what this comment used to say, both found by review:
+  // Two corrections to what this comment used to say, both found by review —
+  // and, third, the consequence neither sentence drew, which has since been
+  // fixed rather than only recorded:
   //
   // 1. It claimed "every test suite" leaves `gates` out and gets the ungated
   //    default. **Three do not.** `test/gates/gate-seam.test.ts`,
@@ -29,25 +35,44 @@ async function main(): Promise<void> {
   //    copied from here into a `Features.md` bullet before anyone checked it.
   //
   // 2. It said "nothing boots this composition root". **`pnpm dev` boots it**
-  //    (`tsx src/index.ts`). What is true is narrower and worth stating
-  //    precisely: there is no `start` script, no Dockerfile and no deployment
-  //    target, so there is no PRODUCTION for these gates to be real in. "Wired
-  //    at the one composition root the repo has" is the honest claim.
+  //    (`tsx src/index.ts`). Its replacement claim — "there is no `start`
+  //    script, no Dockerfile and no deployment target" — has now been overtaken
+  //    TWICE, and both halves are worth stating precisely rather than quietly
+  //    deleting.
   //
-  // AND THE CONSEQUENCE NEITHER SENTENCE DREW, which is the part that matters:
-  // `buildApp` does not call `registerAttachmentRoutes` — swept, and the only
-  // occurrence in `src/` is its own definition at `routes/attachments.ts:211`,
-  // against a positive control where `registerEventRoutes` resolves to its real
-  // call site at `app.ts:204`. So on the server this repo actually starts, the
-  // `attachments` table can never gain a row, because the only writer is the
-  // POST handler in that unregistered module. `image-embed-gate`'s
-  // `attachment.embed-unknown` branch fires whenever an embedded attachmentId
-  // has no row for the ticket — so **every inline image would be refused**, and
-  // the refusal would be correct about the rule and useless as a product.
-  // Recorded, not fixed: registering those routes is not in Plan 7's task text,
-  // and turning an editor plan into a deployment change is not this step's call.
-  // **Owner: Plan 11's deployment work** — which owns the boot path, the
-  // `start` script and the deployment target this all waits on.
+  //    The `start` half was **already false when it was written**: `apps/web`
+  //    has carried `"start": "next start -p 3001"` since before this comment
+  //    landed (`git log -S` puts the script at an earlier commit than the
+  //    sentence). What was true, and is what the sentence meant, is that
+  //    `apps/server` has no `start` script — it still does not.
+  //
+  //    The Dockerfile half is false as of THIS lane: `apps/server/Dockerfile`
+  //    and `apps/web/Dockerfile` exist and both build. So the honest claim is
+  //    now narrower again: there is a way to package this server, and there is
+  //    still **no deployment** — nothing has been applied to a live host, by
+  //    deliberate scope. These gates are real in an image nobody has run in
+  //    production yet.
+  //
+  // 3. THE CONSEQUENCE NEITHER SENTENCE DREW — **now FIXED, and recorded here
+  //    because the defect is the useful part.** `buildApp` did not call
+  //    `registerAttachmentRoutes`: swept, and the only occurrence in `src/` was
+  //    its own definition, against a positive control where
+  //    `registerEventRoutes` resolved to a real call site. So on the server this
+  //    repo starts, the `attachments` table could never gain a row — the only
+  //    writer is the POST handler in that module — and `image-embed-gate`'s
+  //    `attachment.embed-unknown` branch fires whenever an embedded
+  //    attachmentId has no row for its ticket, so **every inline image was
+  //    refused**, correctly about the rule and uselessly as a product.
+  //
+  //    Plan 11 (this lane) owned it as deployment work and did it:
+  //    `app.ts` now registers both attachment routes, `AppDeps.store` carries
+  //    the `ObjectStore` they need, and it is built from `OBJECT_STORE*` right
+  //    below. What made the gap survive so long is the shape worth remembering:
+  //    the two attachment suites mount a bare `Fastify()` and register the
+  //    routes BY HAND, so both were green with the composition root empty. The
+  //    test that can actually fail on it is
+  //    `test/routes/attachments-wired.test.ts`, which registers nothing and
+  //    goes through `buildApp`.
   const ingest = createIngestService({
     pool,
     evaluate: evaluateEvent,
@@ -56,23 +81,27 @@ async function main(): Promise<void> {
   });
   const auth = createAuth({
     pool,
-    // The senders that exist, and neither is deployable.
+    // The senders, chosen by `select-senders.ts` and by nothing here.
     //
-    // `LogOtpSender` does two things a production process must not. It writes
-    // every one-time code to the process log, so anyone with log access can sign
-    // in as anyone. And it accumulates every code it has ever issued in an
-    // unbounded in-process array (`otp-sender.ts`'s `sent`) — memory that grows
-    // for the life of the process, and a heap dump that discloses the lot. The
-    // array exists so a test can read the code that was issued; nothing on this
-    // path ever reads it.
+    // Both decisions used to be inline at this spot, which made them decisions
+    // no test could reach: `main()` opens a pool on its first line, so nothing
+    // in the suite could observe that the production OTP sender had quietly
+    // become the one that logs codes again. They are pure functions of config
+    // now, and `test/auth/select-senders.test.ts` fails if either flips.
     //
-    // Real delivery through a DLT-registered SMS provider and an email transport
-    // is the deployment errand Plan 4 names and does not do. Both are behind an
-    // interface, so the swap is one line each and touches nothing else — and
-    // both faults leave with the implementation, because neither is in the
-    // interface.
-    otpSender: new LogOtpSender(),
-    magicLinkSender: new LogMagicLinkSender(),
+    // What changed here, and it is the errand Plan 4 recorded and left open:
+    // this line used to read `new LogOtpSender()`. That sender wrote every
+    // one-time code to the process log AND kept every code it ever issued in an
+    // unbounded in-process array, on the path a real deployment runs. Both are
+    // gone from production because the class is gone from production —
+    // `selectOtpSender()` returns a `NullOtpSender`, which holds no state and
+    // refuses with a 501 a client can render, because there is no
+    // DLT-registered SMS channel for it to be honest about.
+    otpSender: selectOtpSender(),
+    // `SMTP_URL` set means real mail (Mailpit in dev-compose, any SMTP provider
+    // in production — the vendor stays out of this repository); unset keeps the
+    // log sender, which is the dev path and not a degraded server.
+    magicLinkSender: selectMagicLinkSender(config),
     // Both come from validated configuration, not from `process.env` with a
     // fallback: a server that silently signs sessions with a secret checked into
     // the repository is worse than a server that will not start.
@@ -90,8 +119,77 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
+      // Where attachment bytes land, decided by `OBJECT_STORE` and nothing
+      // else: local disk in dev, S3-compatible where one is configured.
+      // `createObjectStoreFromEnv` is the ONE seam that reads those names, so
+      // no other file needs an `if (env.OBJECT_STORE === …)`; this is its only
+      // non-test call site. No new variable is introduced here — every name it
+      // reads is already documented in `.env.example` and already checked by
+      // `scripts/check-env-example.mjs`.
+      store: createObjectStoreFromEnv(process.env),
     },
-    { logLevel: config.logLevel },
+    {
+      logLevel: config.logLevel,
+      // The one non-test boot path, so the one place the deploy sha reaches
+      // `/healthz`. Everything else gets the `'dev'` default, which is honest
+      // about what it is.
+      deploySha: config.deploySha,
+      // The one non-test boot path, so the one place errors that reach
+      // Fastify's error handler actually phone somewhere (Plan 11 Task 3).
+      // NOT every 5xx: `/healthz` answers its own 503 without throwing and so
+      // pages nobody — the boundary and its reason are recorded at that route
+      // in `app.ts`. `ALERT_WEBHOOK_URL` unset yields a
+      // `NoopErrorAlerter`, which is the dev default and not a degraded server;
+      // the error is in the structured log either way.
+      //
+      // PROCESS-LEVEL handlers (`unhandledRejection`, `uncaughtException`) are
+      // NOT installed here, against the plan text: registering them suppresses
+      // Node's own crash, so a bug that today kills the process would instead
+      // leave it listening in an unknown state. This comment used to defer them
+      // to "the SIGTERM/shutdown errand this file still owes". **That errand has
+      // landed** — `installShutdownHandlers`, called below and living in
+      // `shutdown.ts` — and it declined them on the same merits rather than
+      // passing the deferral on again, so the deferral is closed, not
+      // outstanding. The one narrow exception is an `uncaughtException`
+      // listener that exists only WHILE a shutdown is running, for a close hook
+      // that throws synchronously; the reason it does not reopen this decision
+      // is argued where it is installed.
+      alerter: alerterFromConfig(config.alertWebhookUrl),
+      // The one non-test boot path, so the one place the security surface is
+      // ON (Plan 11 Task 2). Absent everywhere else, which is the contract
+      // `SecurityOptions` states: the controls are opt-in so that around sixty
+      // test files keep the throughput they were written against.
+      security: {
+        // Feeds BOTH the CORS allow-list and the HTTP-`Origin` check the CSRF
+        // ruling requires on cookie-authenticated product mutations. It is the
+        // same value that hosts every invitation link this server mints, which
+        // is the point: there is one web client, and one origin it lives at.
+        webOrigin: config.webOrigin,
+        rateLimit: {
+          authMax: config.rateLimitAuthMax,
+          eventsMax: config.rateLimitEventsMax,
+          // NO NEW ENVIRONMENT VARIABLE, deliberately. The invite bucket takes
+          // the AUTH budget (10/min by default), not the events one (120/min),
+          // because minting an invitation is the same KIND of scarce act as
+          // asking for a sign-in code: each one produces a credential that
+          // reaches a person's inbox and grants membership when spent. 120 a
+          // minute is a batch-ingest budget and would be no bound at all here.
+          // It is a separate LIMITER over the same number, so invite issuance
+          // and sign-in cannot spend each other's window. The day this wants
+          // its own knob, `RATE_LIMIT_INVITE_MAX` lands on this line and on
+          // `.env.example`, and nothing else moves.
+          inviteMax: config.rateLimitAuthMax,
+          windowSec: config.rateLimitWindowSec,
+        },
+        // Without this, `request.ip` behind App Platform's router is the ROUTER
+        // for every client, so all of them share one bucket and the limiter
+        // becomes a shared outage. `config.trustProxy` is the deployment saying
+        // there is a trusted proxy in front; the default is `false` because
+        // believing `X-Forwarded-For` from an untrusted hop lets a caller pick
+        // its own source address and mint unlimited buckets.
+        trustProxy: config.trustProxy,
+      },
+    },
   );
   // The snapshot writer (Plan 10 Task 5), and THREE deliberate departures from
   // what the plan text said to do here. Each is a place the repo disagreed with
@@ -116,18 +214,23 @@ async function main(): Promise<void> {
   //    pass is one whole interval away — so starting before listen costs
   //    nothing.
   //
-  // 3. **Stopped on Fastify's `onClose`, because the shutdown path the plan
-  //    named DOES NOT EXIST.** The plan says to "call `stopSnapshots()` in the
-  //    shutdown path beside the existing pool/app close calls". There is no
-  //    SIGTERM handler in this file, no `pool.end()` and no `app.close()` — this
-  //    process runs until it is killed. Inventing a signal handler here would be
-  //    turning a snapshot task into a deployment change, and **Plan 11 owns the
-  //    boot path** (see the `attachments` note above, which defers to it for the
-  //    same reason). So the stop function is hung on the hook Fastify already
-  //    provides: today nothing calls `app.close()` and the writer runs for the
-  //    life of the dev process — which is correct, an unref'd interval holds
-  //    nothing open — and on the day Plan 11 adds a real shutdown, the writer
-  //    stops without anyone having to remember it exists.
+  // 3. **Stopped on Fastify's `onClose` — and that day has now arrived.** The
+  //    plan said to "call `stopSnapshots()` in the shutdown path beside the
+  //    existing pool/app close calls", and when this was written there was no
+  //    such path: no SIGTERM handler, no `pool.end()`, no `app.close()`. The
+  //    stop function was hung on the hook Fastify already provides, with the
+  //    note that "on the day Plan 11 adds a real shutdown, the writer stops
+  //    without anyone having to remember it exists". **This file now installs
+  //    that shutdown** (`installShutdownHandlers`, called below and defined in
+  //    `shutdown.ts`), so the hook below is no longer a hook nothing calls: it
+  //    awaits `app.close()` on SIGTERM/SIGINT, which fires this hook alongside
+  //    the two `app.ts` registers, and only then ends the pool. The deferral was the
+  //    right call and it cost nothing: not one line of this registration
+  //    changed when the shutdown landed.
+  //
+  //    What is unchanged: the writer still runs for the life of a `pnpm dev`
+  //    process that is never signalled, which is correct — an unref'd interval
+  //    holds nothing open.
   const stopSnapshots = startSnapshotWriter(pool, {
     intervalMs: config.snapshotIntervalMs,
     minEvents: config.snapshotMinEvents,
@@ -139,10 +242,21 @@ async function main(): Promise<void> {
     stopSnapshots();
   });
 
+  // BEFORE `listen`, so there is no window in which this process is alive and
+  // ignoring SIGTERM — on PID 1 that window is not a race with a default
+  // disposition, it is a window with NO disposition at all. See `shutdown.ts`
+  // for the measurement and the bounds.
+  installShutdownHandlers(app, pool);
+
   await app.listen({ port: config.port, host: config.host });
 }
 
 main().catch((error: unknown) => {
+  // A signal that arrives while `app.listen` is still in flight can reject that
+  // await — `app.close()` from the shutdown path is one way it happens. Exiting
+  // 1 there would report a clean, requested stop as a crash, so the shutdown
+  // path keeps the exit it already owns.
+  if (isShuttingDown()) return;
   console.error(error);
   process.exit(1);
 });

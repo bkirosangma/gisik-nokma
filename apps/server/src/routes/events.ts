@@ -29,48 +29,52 @@ export const MAX_BATCH_SIZE = 100;
  * the preHandler as a PARAMETER rather than reading it off a module: the route
  * cannot be assembled without one.
  *
- * ## HTTP-Origin on this route: no, and now by decision rather than by omission
+ * ## HTTP-Origin on this route: YES, since Plan 11 Task 2 — and this section
+ * used to say the opposite
  *
  * **"HTTP-Origin" here is the browser `Origin` HEADER — CSRF. It is unrelated
- * to `EventEnvelope.origin`, the provenance enum the ingest gate reads.** The
- * two meet in this task and nowhere else; conflating them is how someone writes
- * a header check and believes the envelope forgery window is closed.
+ * to `EventEnvelope.origin`, the provenance enum the ingest gate reads
+ * (directly above).** The two meet on this route and nowhere else; conflating
+ * them is how someone writes a header check and believes the envelope forgery
+ * window is closed.
  *
  * better-auth's `originCheckMiddleware` binds `/api/auth/*` and nothing else:
  * `validateOrigin` returns immediately when there is no `ctx.request`, and
  * `makeRequireSession` calls `auth.api.getSession({ headers })` — a direct API
  * call with no request object. So a cookie-authenticated `POST /v1/events` with
- * no `Origin` reaches this handler, and it always has. The coordination doc
- * (§7) left the question open in as many words: *"Whoever adds the guard should
- * decide deliberately whether to require an `Origin` on product routes too;
- * today the answer is no, by omission rather than by decision."* This is that
- * decision, and the answer is still no:
+ * a forged `Origin` reached this handler and answered **200**, and it always
+ * had. Task 5 recorded that, declined the fix as out of its scope, and named
+ * *"Plan 11's deployment hardening"* as an owner. **This is that owner
+ * arriving.** `app.ts` now registers the check; `http/http-origin.ts` carries
+ * the rule, the ruling it discharges, and the routes it covers.
  *
- * - A cross-site browser POST never carries the cookie in the first place —
- *   `SameSite=Lax` withholds it — so the request arrives unauthenticated and
- *   meets `requireSession`'s 401. An `Origin` requirement refuses the same
- *   requests one step earlier.
- * - The residual §7 actually names — a NON-browser client replaying a stolen
- *   cookie — sets any header it likes, `Origin` included. An `Origin`
- *   requirement does not touch it.
+ * **What CHANGED THE ANSWER, and it is a fact rather than a preference.** The
+ * declined version rested on one argument: *"a cross-site browser POST never
+ * carries the cookie in the first place — `SameSite=Lax` withholds it."* That
+ * is false for this deployment, and the CSRF ruling (2026-08-31) calls it the
+ * most certain of its three findings. The product is `pm.artsourced.in` and
+ * this API is `pm-api.artsourced.in`: two sibling subdomains of one registrable
+ * domain, `artsourced.in`. `SameSite` is scoped to the REGISTRABLE domain, so
+ * those two are same-site — and they HAVE to be, because the session cookie
+ * must reach this API for the web client to work at all. The relaxation that
+ * removes the protection is load-bearing for the product. Everything else on
+ * that zone inherits it. **`Lax` was never going to protect this deployment**,
+ * and no hosting change rescues it short of moving the API to a different
+ * registrable domain.
  *
- * So the mechanism is `SameSite=Lax`, and the two things that make that a
- * position rather than a hope are both now explicit: the attribute is SET in
- * `../auth/auth.ts` (`advanced.defaultCookieAttributes.sameSite`) instead of
- * inherited from a library default, and its emitted value is pinned whole by
- * `test/auth/sign-in-flows.test.ts`. That pin is also what forbids a `Domain`
- * attribute, which would hand the session cookie to every subdomain of the
- * zone.
+ * So the HTTP-Origin check is not defence-in-depth here; it is the only
+ * defence. `SameSite=Lax` remains SET rather than inherited
+ * (`../auth/auth.ts`, `advanced.defaultCookieAttributes.sameSite`) with its
+ * emitted value pinned whole by `test/auth/sign-in-flows.test.ts` — the pin
+ * that also forbids a `Domain` attribute — and it still does real work against
+ * any origin OUTSIDE `artsourced.in`. It simply does none against a sibling.
  *
- * **RECORDED, not fixed:** this is one mechanism where a defended route would
- * have two, and it is a browser behaviour rather than a server check. Requiring
- * a trusted `Origin` on cookie-carrying product requests — better-auth's own
- * half-one rule, applied here — is real defence-in-depth against a future
- * `SameSite` regression, and it is out of Task 5's scope because it CHANGES
- * what the door accepts. *Owner: Plan 4 Task 13, which builds the rest of the
- * product HTTP surface, or Plan 11's deployment hardening, whichever is first.*
- * It needs `trustedOrigins`/`WEB_ORIGIN` (Task 14) to be meaningful anyway:
- * until the web app's origin is known, there is nothing to trust.
+ * **Scope, which is what makes it free.** The check fires only on requests that
+ * carry a `Cookie` header — an AMBIENT credential the browser attaches whether
+ * the page meant it or not. A bearer-authenticated caller sends no cookie, has
+ * nothing ambient to forge, and is untouched: every mobile and desktop client,
+ * and every test in this repository (`test/helpers/session.ts` says why it
+ * signs in with a bearer token, at length).
  */
 export function registerEventRoutes(
   app: FastifyInstance,

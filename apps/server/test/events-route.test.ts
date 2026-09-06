@@ -4,6 +4,7 @@ import { buildApp } from '../src/app.js';
 import { createAuth } from '../src/auth/auth.js';
 import { LogMagicLinkSender } from '../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../src/auth/otp-sender.js';
+import { createObjectStoreFromEnv } from '../src/attachments/store-config.js';
 import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
@@ -52,6 +53,9 @@ function buildServer() {
     auth,
     serverAppend: (events) => ingest.ingestBatch(events),
     webOrigin: 'http://localhost:3001',
+    // Required on `AppDeps`, and free here: a `LocalDiskStore` constructor
+    // touches no filesystem, and nothing in this file uploads anything.
+    store: createObjectStoreFromEnv({}),
   }), otp };
 }
 
@@ -254,6 +258,7 @@ describe('POST /v1/events', () => {
       auth,
       serverAppend: (events) => brokenIngest.ingestBatch(events),
       webOrigin: 'http://localhost:3001',
+      store: createObjectStoreFromEnv({}),
     });
     // Signed in, because the door now refuses an anonymous caller at 401 and a
     // 401 would satisfy nothing this test asserts — it is about what the door
@@ -286,7 +291,10 @@ describe('GET /healthz against the real database', () => {
     const server = app();
     const response = await server.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok' });
+    // `sha: 'dev'` — Plan 11 Task 1. `buildTestApp` wires no deploy sha, and
+    // the default is deliberately a word rather than a blank so an un-wired
+    // build reads as "not a deploy" instead of as an answered question.
+    expect(response.json()).toEqual({ status: 'ok', sha: 'dev' });
     await server.close();
   });
 });

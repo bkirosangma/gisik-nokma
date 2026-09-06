@@ -6,6 +6,7 @@ import { createAuth, type Auth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { registerAuthRoutes } from '../../src/auth/routes.js';
+import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -71,6 +72,9 @@ function buildServer(baseUrl: string): {
     auth,
     serverAppend: (events) => ingest.ingestBatch(events),
     webOrigin: 'http://localhost:3001',
+    // Required on `AppDeps`, and free here: a `LocalDiskStore` constructor
+    // touches no filesystem, and nothing in this file uploads anything.
+    store: createObjectStoreFromEnv({}),
   }), otp: otpSender, magic: magicLinkSender };
 }
 
