@@ -466,7 +466,18 @@ export async function createHarness(): Promise<Harness> {
      * (there is no stream to end).
      */
     async function drainPendingPulls(): Promise<void> {
-      for (const ticketId of await replica.listPendingPulls(workspaceId)) {
+      // DESTRUCTURED, and the shape is the whole point: ruling P37.2 changed
+      // `listPendingPulls` from `string[]` to `{ id, headSeq }[]` and this
+      // mirrored drain kept iterating it as ids. The object then travelled as a
+      // ticket id into `bootstrapTicket` AND into `clearPendingPull`, whose
+      // filter compares `t.id !== ticketId` — an object never equals a string,
+      // so nothing was ever cleared and the second drain below re-pulled every
+      // id. That is what 12.275/12.276/12.316 caught: not a wrong id, a
+      // DUPLICATE one. `typecheck` catches it too (two TS2345 at this line and
+      // the next); nothing had run it since P37.2, which is the real lesson.
+      // The rig's own docblock says this mirror is FORCED rather than chosen —
+      // and a forced mirror is a thing that drifts.
+      for (const { id: ticketId } of await replica.listPendingPulls(workspaceId)) {
         try {
           await replica.loadTicketBootstrap(await transport.bootstrapTicket(workspaceId, ticketId));
           await replica.clearPendingPull(workspaceId, ticketId);
