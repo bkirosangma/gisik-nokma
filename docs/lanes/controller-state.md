@@ -55,6 +55,110 @@ next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
 
+### ✅ OWNER AUTHORISATION 2026-09-06 ~15:20 IST — "authority granted for merging" — CI WAIVED UNTIL BILLING IS FIXED
+
+The owner answered the escalation below with **"authority granted for merging"**, read as option (b): **a PR merges on its own machinery (the lane's review verdict and its local forced gate at the PR's head) plus the controller's forced gate at the merged `main`, with the independent CI run WAIVED while Actions is blocked by billing.** Everything else stands: never merge without the lane's gate at the exact head; never merge with a review outstanding; the same-change-set rule; the ledger promotion needs a local `check:tasks`. **Every merge made under this waiver is marked "(CI waived, owner 15:20)" in this file and in the ledger row; when Actions returns, the first green run on `main` is the retroactive independent check, and the controller reads its JOB STEPS.** Under the waiver at 15:20: #201 (this file) and #203 (C — review clean after three rounds, gate 30/30 at `9d37936`) are mergeable; #202 (B) waits for its review verdict; #204 (A) owes five mutations and a gate; #205 (E) owes its re-gate at `cf824df` and the §13 catalogue in the same change set.
+
+### ⛔⛔ CI IS DOWN — GITHUB ACTIONS BILLING BLOCK, since ~14:42 IST (found 14:55). OWNER ACTION REQUIRED (escalated 15:04); waiver granted 15:20 — see above
+
+Every Actions job on this account now fails BEFORE its first step, no runner assigned, with the check-run
+annotation **"The job was not started because recent account payments have failed or your spending limit
+needs to be increased. Please check the 'Billing & plans' section in your settings."** Read from two runs:
+#201's `scope` job (both attempts, zero steps) and the run on `main` at `c5dfdcd` (14:42 IST, which failed
+mid-checkout as the block landed). The last green run was #196's at 14:35. **This is the owner's billing,
+not the code and not a GitHub outage.** Under the standing autonomy rule ("passed its machinery AND an
+independent CI run green") **no PR — code or docs — can merge until the owner raises the spending limit or
+fixes the payment.** This block itself therefore lives on the branch `docs/pre-halt-1450` (PR #201), NOT
+on `main`; **a restarted controller reads it with `git show origin/docs/pre-halt-1450:docs/lanes/controller-state.md`.**
+All five lanes told at 14:57: push handoffs, open PRs for the record with "CI red-at-start is the billing
+block" in the body, HOLD. **Owner's options, for the owner to choose:** (a) fix billing — everything
+resumes unchanged; (b) authorise merging on the lanes' local forced gates plus the controller's forced gate
+at the merged main, CI waived until billing is fixed — a rule change the controller will not make alone.
+
+**Positions at 15:02 (every lane pushed; the halt is minutes away, meters ~80%):**
+- **B — PR #202 OPEN** at `f525183` (`exec/43-sync-surface-fixes`, rebased onto `c5dfdcd`): 12.328 ✅ (four
+  ping/pong sites and two test arms deleted; the owner-rule docblock at both `webSocketFactory ??` lines;
+  **12.361 🚫 carries the WebSocket-implementation residual under its own marker**), 12.327 ✅ (the
+  discriminant un-literalled and pinned by `TS2322` with its control), 12.13 ✅ (12.363 — deleting
+  `attachment.added` reddens it alone), 12.16 ✅ (12.364 reads `listEntityEvents`, not the aggregate — the
+  constant-0 mutation now also reddens 12.305/12.313 since closure 5b, so "whole suite green" had aged out
+  inside the catalogue quoting it); 12.360–12.364 (max 12.364; next block 12.380 on request); gate at the
+  head 30/30 · 0 cached · 3612 / 283 · node 22 · `check:env` 0 · `check-case-ids` 0; every mutation
+  predicted-vs-measured. **HELD for its opus review, dispatched 14:41, still running** — a silent
+  completion after the halt is NO review. Three method notes for every lane: *a file holding uncommitted
+  work cannot be a mutation site* (the restore IS `git checkout HEAD`); *read `GATE_EXIT=` from the
+  wrapper's own stdout, never from a log path you chose* — B nearly reported a STALE `/tmp/laneB-gate.log`
+  from an earlier session as its own green gate, caught only because the per-package counts were LOWER on
+  a branch that only adds tests; *`[ -d .git/rebase-merge ]` is always false in a worktree* (`.git` is a
+  file) — use `git rev-parse --git-path rebase-merge`.
+- **C — pushed `d5ea37a`** (`exec/34-plan11-scheduler-errands`): the two scheduler errands, workflow clean
+  after three rounds and re-verified, rebased onto `fb5e4c2`, full locked gate 30/30 · 0 cached · server
+  1320 \| 5; a stale-`node_modules` false regression after the rebase (39 files red for three missing
+  packages from seam 1 — reinstall after every rebase) diagnosed, not recorded as a defect. **§13 block
+  13.201–13.240 ALLOCATED to C at 15:01** (its 1–40 exhausted; the PENDING BLOCK cases mint from 13.201;
+  next block 13.241 on request). PR opening as this is written.
+- **E — pushed `1772056`** (`exec/43-plan11-t13`; carries #193's two commits, which drop out at merge):
+  **T13 GREEN AGAINST THE REAL STACK — 3 passed**, sign-in through the real auth door, seed "0 committed,
+  123 present, 23 errand tickets, guest configured". **P42 DONE at `3dd9c9f`, all four items:** `WEB_ORIGIN`
+  appended (never substituted) to `trustedOrigins`; `webOrigin` REQUIRED on `AuthDeps` so typecheck named
+  all 15 call sites; fixture `test/auth/trusted-origins.test.ts` 5 passed; mutations — delete the fix → the
+  WEB_ORIGIN acceptance reddens ALONE (the production defect reproduced), trust-every-origin → TWO reddens
+  (E's same-origin case carries its own permissiveness bound; more constraint than predicted, flagged);
+  the header-less 200 is 🚫 with Better Auth's own source cited (`validateFormCsrf` returns unvalidated
+  without `Sec-Fetch-*`; `validateOrigin` gates on a cookie — CSRF needs an ambient credential);
+  `.env.example`/`app.yaml` say what `WEB_ORIGIN` means for auth. **`deploy/do/app.yaml` HAD THE SAME
+  DEFECT WAITING** (`pm.artsourced.in` vs `pm-api.artsourced.in`) — production sign-in would have 403'd.
+  Also: the stale-image trap is globalSetup's assertion (`up -d` without `--build` → 500 after 30 s while
+  `ps` says healthy); **node's `fetch` is not curl** (node presents `Sec-Fetch-*`, so the CSRF check
+  force-validates; curl falls through unchecked — a curl probe cannot stand in for the client on this
+  surface); E's own error message hid the cause (403 without body) and, fixed, named a 429 from its own T2
+  limiter next run; **the guest spec was wrong and the product right** — the accountant's project list is
+  EMPTY by P38 (guest, explicit per-ticket visibility, no `project.member_added`), seen from a browser for
+  the first time. **Carried with owner Plan 6 / visibility: a guest has NO NAVIGATION to the tickets
+  explicitly shared with them** — explicit per-ticket visibility exists and is unreachable from the UI.
+  Lane C reviewed the `ci.yml` e2e hunk (teardown carries the presence guard). NOT done: the full gate
+  (running now under v3.3 with `GATE_REPO` set — the first real exercise of #193's de-hardcoding), the §13
+  catalogue from 13.169, Features.md §13, the PR (told 14:59 to open it for the record), T16.
+- **A — pushed `6d35b1a`** (`exec/44-next-cluster`): the eight invite/refusal witnesses 7.230–7.237 BUILT and
+  green (20/20 in the file, typecheck clean), §7 next 7.238, **NO MUTATION RUN yet — every case stays
+  marked unmutated rather than ✅**; four corrections came WITH the implementation (7.231 unbuildable as
+  specified — `createHttpClient` turns a GET 404 into `null` before the gateway sees a body; 7.235's
+  vacuity hole guarded; an unfailable self-comparison removed from 7.234, the third such in this lane's
+  work; a candidate divergence retracted); reviewer dispatched 14:49 with a 15:20 time box.
+- **A (15:05) — PR #204 OPEN** at `cff9905` for the record: 20/20 green, typecheck clean, `check-case-ids` 0, **ONE kill only** (7.230 — `role:'member'` for `invite.role` reddens it alone; minted at *guest* because against a *member* invitation the gateway's `?? 'member'` default is indistinguishable from reading the wire); 7.231's plant REFUSED by the one-match guard; **7.233's attempt was INVALID and looked like a kill** — `EXIT=1` with `PASS (0) FAIL (0) skipped (20)`, because `beforeAll` founds the shared workspace by reading `workspaceId` out of the same 201 the mutation broke: *a mutation that breaks the fixture's own setup turns the run GREY, and grey reads as red from the exit code alone* — the second grey one in this lane; 7.232/7.234–7.237 unmutated and marked so; no full gate at the head (a peer held the lock through A's window); one disclosed deviation — the 7.233 single-file run happened outside the lock while a peer held it (pools 0, no contention; A's to fix). Reviewer time-boxed to 15:20; a later verdict is labelled unproven.
+- **E (15:08) — PR #205 OPEN** at `1772056` (T13 + P42), WITH a real gate: **30/30 · 0 cached · 3603 passed \| 5 skipped / 283 files · node v22.22.2 · `check:env` 0 · `check-case-ids` 0 (1474 ids, max 13.168) · E2E 3 passed against the running stack**; the gate ran under v3.3 with `GATE_REPO` set (#193's de-hardcoding, first real exercise — worked); E checked the log's mtime against the clock before reading it. Owed before merge, same change set: the §13 catalogue from 13.169 and Features.md §13 bullets. **Merge → promote 11/13.** Then T16.
+- **C (15:06) — PR #203 frozen at `9d37936`** (+ docs-only `308af4b`): 13.201–13.203 minted in the new block, both §13 header paragraphs updated, `check-case-ids` 0 (1545 ids, max 13.203).
+- **A (15:12) — #204 now at `5028376`**, reviewer landed 14:57 INSIDE the window (A checked `date` rather than the subagent's self-reported "~15:10" — **a subagent's own clock is not evidence**; one that survives the limit can still misreport when it finished): verdict **no assertion that cannot fail** — first clean result on that axis in three rounds; one real overclaim fixed (7.236 called the ROLE GATE's sentence "the engine's" in two places while three others were right); two disclosures with owners (`mintRaw`'s origin on both sides of its own assertion; 7.237's exact count would redden for an unnamed reason if `ADMIN_ONLY_TYPES` were removed). Still owed before merge: five mutations (7.232/7.234–7.237), corrected 7.231/7.233 plants, one full uncached gate.
+- **E (15:16) — #205 REBASED to `cf824df`** (both inherited #193 commits dropped as already-upstream, zero conflicts, 32 files, zero gate-lock files) **and CORRECTED against itself:** the gate reported at `1772056` was a true statement about E's WORKING TREE and a false one about the BRANCH — `apps/server/src/auth/auth-dev.ts` (the second production `createAuth` caller, which the P42 commit made require `webOrigin`) was edited but never staged, because the explicit-path list came from memory rather than from `git status`; typecheck and the 30/30 gate both read the held tree; the pushed tree had a type error CI would have caught first, and CI was down. Fixed in its own commit; **re-gate running at `cf824df`; the 1772056 numbers are NOT carried forward** and the PR body is being edited to say OWED. **Standing rule for every lane, from this:** *stage explicit paths, but DERIVE the list from `git status --porcelain`, never from memory, and diff HEAD against the working tree once before every push* — a gate is a fact about a tree, and the tree a lane holds is not the tree that ships, now measured from both directions (a stale worktree reading as current this morning; a held edit missing from the push this afternoon).
+- **D — DONE, holding.**
+
+### ⛔ PRE-HALT POSITIONS, 14:50 — session meters 75–78% at 14:46, RESET 17:20 IST; every lane told at 14:38 to push its handoff by 15:10 and dispatch nothing after 15:00 that cannot finish by 15:25
+
+| what | value at 14:50 |
+|---|---|
+| `main` | **`c5dfdcd`** — **#196 (Lane D: a REAL socket-cutting fixture for 12.290 — `socket-cut.test.ts`, a real `buildApp` on a real `listen()` so a real HTTP upgrade happens, `bufferedAmount` shadowed on the live socket so `hub.ts`'s UNMODIFIED close path fires a real 1013 over real TCP; hub/routes/engine/replica byte-identical; TWO cuts needed — `visible-events-for.ts` scopes `backfilled` per drain and a `reach-granted` carries no cursor, so a cut before the trigger just reconnects into a regenerated notice; mutations (a) exactly as predicted, (b) bit harder and says so; review CLEAN; twelve green at `7c9ba94`; **12.290 🟡 → ✅ on measured convergence**, 12.340–12.343; `c5dfdcd`, 14:42)** |
+| ledger | **175/177 (98.9%)** at `c5dfdcd`, `CHECK_EXIT=0` — remaining **11/13, 11/16** (Lane E) |
+| last forced gate | **`c5dfdcd`** — lock v3.3 (pid 79131, waited 15 s), install 0, rebuild 0, `check:env` 0: **`GATE_EXIT=0` · 30/30 · 0 cached · 2m20s · node v22.22.2 · 3609 tests / 283 files** (server 1296 \| 5 skipped — matches D's 1296). Zero orphans. Swap 85% after |
+| open PRs | **none** |
+| lock · pools | free after the gate; 0 pools at 14:45 |
+
+**Every lane's position at 14:48, measured from its worktree and `origin` (`ListAgents` names: A `gisik-nokma-exec-f3` · B `lane2-plan4-a2` · C `lane3-plan7-8-34` · D `lane4-periphery-2d` · E `lane5-plan11-c9`):**
+
+| lane | branch · head | pushed? | state | first action after the reset |
+|---|---|---|---|---|
+| **A** | `exec/44-next-cluster` · `cf3e41c` (+2 dirty lines: an opus implementer mid-flight on the eight invite/refusal witnesses, dispatched 14:36, ONE subagent) | yes at `cf3e41c` (its first commit corrects the stale "no full gate" header that merged with #198) | building the invite/refusal cluster under the one-subagent rule; will checkpoint "WIP, unreviewed, mutations not run" if the implementer is still running at 15:05 | continue: verify, mutations under the lock, opus reviewer, rebase, gate, PR; §7 from 7.230 |
+| **B** | `exec/43-sync-surface-fixes` · origin `20e89db` ("position at 14:47 — four items landed"), local `6e965d3`, tree clean | yes | the four sync-surface items are LANDED on the branch per its own handoff; PR not yet open | rebase past `c5dfdcd` (§12 moved: 12.340–12.343, 12.290 ✅), recount, gate, open the PR, report |
+| **C** | `exec/34-plan11-scheduler-errands` · local `d5ea37a`, tree clean, **NOT on origin at 14:48** | **NO — told at 14:38 to push by 15:10** | scheduler errands: implement/review workflow was running; rebase past seam 1 (schedule.ts conflict: keep E's import, add C's scheduler) owed | push first if the halt caught it; then rebase, gate, PR |
+| **D** | `exec/40-socket-cut-fixture` · `7c9ba94` → MERGED #196 | n/a | **DONE; HOLDING through the halt by instruction** | relaunch with a new override — candidates: the six borderline fixture rows (`helpers/seed.ts`, `flows/`), `seed:dev`'s runtime coverage (E's ❌-with-owner line) |
+| **E** | `exec/43-plan11-t13` · local `3dd9c9f` (+2 dirty), **NOT on origin at 14:48** | **NO — told at 14:38 to push by 15:10, `docker compose down` before the window** | T13: second Playwright config, global-setup gated on the proxy hop, Mailpit exactly-one, P42's `trustedOrigins` commit owed, specs unrun past globalSetup until P42 lands; the CI e2e hunk to C first; §13 from 13.169 | push first if the halt caught it; then P42's commit + fixture, run the specs against the real stack, report |
+
+**If this controller is halted with the lanes:** the Monitor task dies with the session (re-arm `ctl-watch.sh`);
+`gate.sh` (v3.3, captured form) and both scripts are in this session's scratchpad `75988d28-…`; the memory
+advisory (fan-out cap while the lock is held) and the frozen-head rule stand; **`gh pr list --author @me`
+cannot distinguish lanes — every lane pushes under one account; filter by `headRefName`** (Lane A's catch);
+**the machine-local hook does not refuse a piped GATE script** (owner's to extend). Rulings P35–P42 are all
+on `main`. Next controller-state refresh at ~15:10 with the pushed heads, if the meter allows.
+
 ### RULING P42 (2026-09-06 14:32, controller as ruling tier) — the compose stack cannot sign in: `WEB_ORIGIN` joins `trustedOrigins`, in T13's PR, one commit, with its excluding fixture
 
 **Found by Lane E with a real browser against the shipped UI in the compose stack, not with curl:** `POST
