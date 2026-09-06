@@ -16,7 +16,27 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# 🟢 SUNDAY 2026-09-06 ~23:55 IST — **CLAUSE A ROUND 3 DONE. `exec/60-clauseA-3` is STAGED, NOT YET A PR — it stacks on #239, which is still open.** Nothing in flight, no subagent, no ruling outstanding.
+# 🔵 MONDAY 2026-09-07 00:10 IST — **CLAUSE A IS COMPLETE. The sweep is finished; the remaining surfaces came back CLEAN.** `exec/60-clauseA-3` staged (not a PR — #239 still open). Nothing in flight, no subagent, **weekly reset is 06:30 today, ~6h away.**
+
+## CLAUSE A — FINAL RESULT. Eight probes. Do not re-run this sweep.
+
+| probe | result |
+|---|---|
+| `app-core/src/precheck.ts` :375 / :345 | **candidate → 7.256** |
+| workflow-version rule, 3 sites | **candidate → 7.257** |
+| `isEmbeddableImageMime` | **closed exemplar** (one definition, both sides import) → 7.258 (a) |
+| `sniff.ts` ALLOWED_ATTACHMENT_MIME | **closed exemplar** (deliberate duplication + falsifiable witness) → 7.258 (b) |
+| `FOLDING_TICKET_TYPES` | **minor candidate → 7.259** |
+| `app-core/src/submit.ts` | **NOT a finding** — already pinned by `app-core/test/submit.test.ts:101` |
+| `sync-client/src/replica/sync-item.ts` | **NOT a NEW finding** — self-declared mirror, already owned in-source AND catalogued at **6.96 ❌** |
+| `sync-client/src/engine/sync-engine.ts` · `packages/ui/src/tokens.ts` | **CLEAN.** sync-engine's nearest neighbours are its own package and its own tests — no cross-boundary duplicate. `packages/ui` scores only **0.43–0.46**, against its own tests, and its duplication hazard is ALREADY guarded: `token-discipline.test.ts` proves no colour literal is written outside `tokens.ts` |
+
+**Yield: 3 candidate rows, 2 closed exemplars, 1 already-owned, 2 clean.** Rounds 2 and 3 each returned more
+counter-examples than candidates. **Read that as the client packages being in better shape than the pass assumed
+— not as the pass failing.** `app-core/src/{cache,cache-feed}.ts` (96 + 38 lines) are the only surfaces not
+probed, and are too small to be worth a round.
+
+# 🟢 SUPERSEDED — SUNDAY 2026-09-06 ~23:55 IST — **CLAUSE A ROUND 3 DONE. `exec/60-clauseA-3` is STAGED, NOT YET A PR — it stacks on #239, which is still open.** Nothing in flight, no subagent, no ruling outstanding.
 
 | what | value |
 |---|---|
