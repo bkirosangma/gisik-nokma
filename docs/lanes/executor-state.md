@@ -16,6 +16,67 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~03:20 IST — **THREE BRANCHES IN FLIGHT: #244 (§05), #245 (§06), and `exec/65` (§03) STAGED, NOT YET A PR.** Nothing running, no subagent. Weekly reset ~3h away.
+
+| branch | state | section |
+|---|---|---|
+| `exec/63-s05-backfill` | **PR #244 OPEN** | §05 **67 → 17** |
+| `exec/64-s06-backfill` | **PR #245 OPEN** | §06 **63 → 37** |
+| **`exec/65-s03-backfill`** | **pushed, NO PR** — stacked on `exec/64` | §03 **45 → 30** |
+
+Gate at `d693ce0`: **`GATE_EXIT=0` · 30/30 · 0 cached · 3666 \| 5 (3671) / 285** — fifteenth identical run ·
+`check:env` 0 · `check:citations` 0 (ratchet holds everywhere) · zero orphans.
+
+## ⚠ MERGE ORDER — read before merging anything
+
+- **#244 and #245 are BOTH off `main`** and change **adjacent lines** of `scripts/fixtures/check-case-citations-baseline.json` (§05's key and §06's). **Whichever merges SECOND needs a CHERRY-PICK onto the new `main`, not a rebase** — the shape #237 and #240 hit.
+- **`exec/65` is STACKED on `exec/64`** deliberately, so its baseline edits are linear rather than a third pairwise conflict. **Merge #245 first, then cherry-pick `exec/65`'s two commits** (`e409201`, `d693ce0`).
+- **I did not open a PR for `exec/65`** — three simultaneous stacked PRs would be worse for the merger than one held branch.
+
+## Session totals — the backfill is most of the way done
+
+| § | start | now | remaining shape |
+|---|---|---|---|
+| §09 | 219 uncited | **0** | done |
+| §10 | 66 | **0** | done |
+| §11 | — | **0** | already done |
+| §13 | 153 | **72** | 72 name no test — reader job |
+| §07 | 78 | **36** | 36 name no test — reader job |
+| §05 | 67 | **17** | scattered 1–4 across ten files |
+| §06 | 63 | **37** | can-see 4, engine-context 4, then singletons |
+| §03 | 45 | **30** | parse-event 3, events-route 3, stream/mappers 2 each |
+| §04 | 45 | 45 | **untouched** — only 16 named, 29 no-file |
+| §12 | 78 | 78 | **untouched** — only **2** named, 76 reader-job |
+
+**Repo-wide once all three land: roughly 815 → ~300 uncited**, from Sunday morning.
+
+## THE RULES THIS BACKFILL EARNED — carry these, not just the counts
+
+1. **A row appearing in a file's candidate list is not evidence that file asserts it.** The list is built from
+   filename mentions, and rows mention files as the pin of record, as a second pin, or as where a sibling lives.
+   **Read the row's LEADING claim; cite the test that asserts THAT.** — **five deferrals, five confirmed later**
+   (7.72 · 13.45–13.47 · 5.40 · 6.107 · 6.79).
+2. **Rows often name their own covering test in their prose.** Where they do, the placement is the catalogue's,
+   not yours. Read to the end of the row first.
+3. **Never let a docblock imply one test proves a whole row.** Four honest shapes: on a `describe` when the
+   clauses are one test apiece · stacked when one test carries several ids *and the catalogue says so* · on the
+   primary clause naming where the rest live · on the named control when the row is a mutation RECORD.
+4. **A mutation RECORD is not an assertion** (6.78, 6.80, and §13's kin). It needs the specific control it names.
+5. **Two files can share a base name** — `doc-text.test.ts` exists in `packages/domain` (`docToPlainText`) and
+   `apps/server/test/seed` (`plainTextDoc`, the inverse). **A bare filename in a row is not an address.**
+6. **Make a private counting instrument agree with the CHECKER before believing it.** Mine missed marker-first
+   ids (27 in §13) and then range-form ids (`- **3.89–3.94** ✅`, 50 in §03) — two separate silent undercounts.
+7. **Run the control, READ it, then write the prose in a SEPARATE step.** Four wrong line counts came from
+   composing the message in the same tool call as the control, so the number was always a prediction.
+
+## NEXT
+
+1. Merge #244, then #245, then cherry-pick `exec/65` and open its PR.
+2. Remaining named work: §06 37 · §03 30 · §05 tail 17 · §04's 16. **§12 is 2.**
+3. **OPEN ASKS (seventh time):** a subagent for the ~100 named rows left; **§12's block `12.380–12.399`
+   allocated but NOT cleared**; and **which of #244/#245 merges first**, so I rebuild the other.
+
+
 # 🟣 MONDAY 2026-09-07 ~02:55 IST — **§06: 63 → 37 uncited (4 batches). PR opening. §05's PR #244 STILL OPEN.** Weekly reset ~3.5h away. Nothing in flight, no subagent.
 
 | what | value |
