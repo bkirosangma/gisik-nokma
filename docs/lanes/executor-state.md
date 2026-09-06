@@ -16,7 +16,158 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR OPEN on `exec/48-refusal-vocabulary`: the TRANSCRIBED REFUSAL VOCABULARY. Nothing else in flight.**
+# LANE A — **IDLE. NOTHING IN FLIGHT. #219 IS MERGED as `bb94dc5`. Awaiting re-tasking.**
+
+**Written for a reader with none of my context.** Two terms, because everything below turns on them.
+A **witness** runs the SHIPPED client code against the SHIPPED server route in one process
+(`app.inject()` plus the real mapper or gateway imported from `@gisik-nokma/app-core`), so a rename on
+either side reddens. A **mirror** is a fixture that models a producer's output but was written by the
+same hand as its consumer, so the two agree by construction and no drift between them can ever be
+caught. Lane A's standing job is converting mirrors into witnesses. Every witness lives in
+`apps/server/test/integration/fixture-witnesses.test.ts`.
+
+> **WHERE THE NEXT INSTRUCTION COMES FROM, and it is not this file.** The Monday queue and the serial
+> procedure are **the top block of `docs/lanes/controller-state.md`**. Read that first. This file tells
+> you where Lane A stopped; that one tells you what happens next.
+
+## POSITION
+
+**Nothing is in flight.** No Lane A branch is open, no PR is awaiting merge, no subagent is running, and
+the worktree `/Users/kiro/my_projects/gisik-nokma-exec` has no uncommitted Lane A work.
+
+**Everything Lane A has produced is on `main`.** Verified with `git branch -r --contains` (empty output
+would mean orphaned — `git cat-file` passes on reflog-only commits and will lie to you); all five below
+are REACHABLE from `origin/main`:
+
+| PR | merge sha | what it was |
+|---|---|---|
+| **#187** | **`e33c429`** | the Lane F pass: the 157-fixture mirror inventory, and `fixture-witnesses.test.ts` created — the harness every later witness uses (7.220, 7.221, 12.323–12.325) |
+| **#198** | **`d5b8bfd`** | the MAPPER cluster — eight `app-core` mapper entry points against real `/v1` bodies (7.222–7.229) |
+| **#204** | **`ebba353`** | the INVITE/REFUSAL surface — eight witnesses, eight mutation kills (7.230–7.237) |
+| **#211** | **`9d2a0b2`** | handoff only (docs), after #204 |
+| **#219** | **`bb94dc5`** | the TRANSCRIBED REFUSAL VOCABULARY — five witnesses, six catalogue rows, twelve mutation kills (7.238–7.248) |
+
+*(Earlier Lane A closures, all merged and all demoted in this file below: #125 `7bb93cc`, #128
+`e407bf5`, #137 `c25d7fe`, #141 `c8268e1`, #143 `5abb71e`, #150 `b4e2f14`, #169 `aa17046`, #176
+`2d2bc5c`, #181 `3e6d606`.)*
+
+## ID BLOCKS — recounted on `main` at `bb94dc5`, not carried forward
+
+- **§7 (`test-cases/07-api-realtime-search.md`): highest id in use `7.248`. NEXT FREE `7.249`.**
+- **§12 (`test-cases/12-offline-sync-apps.md`): Lane A's block is `12.320–12.339`, used through
+  `12.328`. NEXT FREE `12.329`.** (`12.329` and `12.339` do appear in that file as PROSE — "next free
+  12.329", "the block 12.320–12.339" — and are not defined cases. Counting them as used is the mistake
+  to avoid; `node scripts/check-case-ids.mjs` is the arbiter and it exits 0 at this sha.)
+- §6 — A's block is `180+`, untouched by any of the five PRs above.
+
+## THE ADDRESSABLE-MIRROR REMAINDER — recounted, and the carried number was wrong
+
+**The inventory (#187) classified 157 fixtures: 76 MIRROR, 29 WITNESSED, 52 N.A. Of the 76 MIRRORs, 21
+carry `BUILDABLE HERE = YES`.** Those 21 are the "addressable" set every earlier handoff was counting,
+and the arithmetic in the #204 handoff ("29 minus 8 = 21, of which four are not addressable and one is
+discharged") was internally inconsistent — it subtracted the same rows twice. Recounted here row by row
+against the inventory table in this file, the 21 close exactly:
+
+**FIRST, A STALE COLUMN, because it will mislead you.** The inventory's `BUILDABLE HERE` flag was
+judged **before `fixture-witnesses.test.ts` existed**. Sixteen-plus rows flagged **NO — "apps/server
+integration lane"** were discharged by #198 and #204 precisely because #187 built that lane. **Do not
+use the YES/NO column to plan work; use the owner column and the list below.**
+
+### Discharged by a witness (2 of the 21)
+
+| row | discharged by |
+|---|---|
+| `packages/app-core/test/online/online-data-source.test.ts:535` — the `/v1/me/workspaces` directory body | **7.237** (`mapWorkspaceRefs` over the real route, non-empty `projects`) |
+| `packages/app-core/test/flows/guarded-child-event.test.ts:19` — `parentTerminalRefusal` / `PARENT_TERMINAL_REASON` | **7.238 / 7.239** |
+
+### STILL OPEN and buildable from a server test (7 of the 21) — this is the next cluster
+
+**Four of the seven are one theme, and it is the sharpest gap left: the CLIENT-AS-PRODUCER direction.**
+Every witness built so far runs server → client. Nothing runs client → server — the bytes `app-core`
+writes and a real route parses. A rename there is caught by nothing.
+
+| symbol / site | why it is still a mirror |
+|---|---|
+| `app-core/test/online/mappers.test.ts:632` | the filter-spec INBOUND document, against `filterSpecSchema` — schema-driven sweep |
+| `app-core/test/online/mappers.test.ts:650` | **app-core is the PRODUCER, the server route the consumer** — `PUT /v1/me/preferences` |
+| `app-core/test/online/mappers.test.ts:720` | the same reverse direction through `filterSpecSchema` |
+| `app-core/test/online/online-data-source.test.ts:423` | BOTH directions of `/v1/me/preferences`; 7.227 witnessed the GET on an EMPTY document only |
+| `apps/server/test/helpers/seed.ts:364` — `insertTicketHead` | addressable, but the producer is the ticket REDUCER, not a route: different witness shape, high blast radius across ~20 files |
+| `apps/server/test/notifications/fanout.test.ts:49` | notification fan-out recipients; 12.325 witnessed the notifications CURSOR, not the fan-out |
+| `apps/server/test/routes/attachments-download.test.ts:1` | the attachments download body |
+
+### NOT a mirror at all, with the reason (3 of the 21) — do not "fix" these
+
+| symbol | why |
+|---|---|
+| `app-core/test/helpers/seed.ts:17` — `WF_ERRAND` | builds a DOMAIN `WorkflowDef`; the domain owns the type, so there is no external producer to disagree with. Its real defect is different: `id: 'wf-errand'` is a non-ULID production cannot mint — **fixture-realism, not a mirror** |
+| `app-core/test/helpers/seed.ts:106` — `ticketStateSeed` | same reason: domain type, domain-owned |
+| `apps/server/test/helpers/seed.ts:80` — `applyAll` | applies 4 of the registry's 12 projections. Fixing it is a structural change to a helper ~20 files share, not a round trip. Owner: a dedicated cleanup |
+
+### Needs a surface `apps/server` cannot reach (7 of the 21) — not cheaper later, simply not buildable here
+
+`packages/editor/test/attachment-paste.test.ts:8` · `evidence-picker.test.tsx:88` ·
+`google-picker.test.ts:238` · `ticket-editor-slot.test.tsx:23` · `ticket-editor.test.tsx:13` — the
+editor group, all needing a real Google Picker/Drive. `apps/server/test/helpers/drive-reference.ts:40`
+— real Drive. `apps/mobile/src/editor/editor-web-view.test.ts:27` — a real device runtime.
+**Taking any of them would mean softening an assertion to fit, which is the one thing this pass
+refuses.**
+
+### Another owner's (2 of the 21)
+
+`app-core/test/online/stream.test.ts:163` — **Lane B**. ·
+`packages/editor/test/ticket-editor-slot.test.tsx:83` — **Plan 6a Task 12 / case 9.61**.
+
+**2 + 7 + 3 + 7 + 2 = 21.** The remainder for Lane A specifically is the **seven** in the second table.
+
+## CARRIED ITEMS, EACH WITH AN OWNER — recorded, never closed by softening an assertion
+
+These are §7 catalogue rows on `main`, all ❌, all written at `test-cases/07-api-realtime-search.md`:
+
+| case | what is not done, and who owns it |
+|---|---|
+| **7.243** | `apps/web/test/notifications-gateway.test.ts` scripts bodies its own comment calls *"the SERVER's, copied from the routes that serve"*. `apps/server` has no dependency on `apps/web` and must not gain one, so the web gateway cannot be driven from a server test. The PRODUCER end is pinned by 12.325; the web CONSUMER is unwitnessed. **Owner: Lane F — a web-side harness that can `inject()` the real route.** |
+| **7.244** | the `contest.already-resolved` round trip. Two independent blockers, neither effort: a contest can only be OPENED with envelope-origin `'server'`, which `checkRolePermission` (`apps/server/src/permissions/check-permission.ts:403`) refuses from every client by design; and `contests.ts` builds the refusal FROM `CONTEST_RULES.alreadyResolved`, so asserting against that constant is a self-comparison. The client half IS un-literalled; the server producer is pinned at `apps/server/test/engine-context.test.ts`. **Owner: whoever builds the sync-side contest surface (Plan 10 / Lanes B–D).** |
+| **7.245** | **THE EXPORT GAP.** `packages/rule-engine/src/checks/refusals.ts` holds `REFUSALS`, `rankRefusal`, `parentTerminalRefusal` and the rest; `src/index.ts` does not re-export it and `package.json` exposes only `.` and `./fixtures`, so no consumer can import the producer's refusal WORDS. Two of the three `hierarchy.*` RULE names are worse — bare literals at their `refuse()` call sites, members of no constant at all. *The bytes ARE reachable* through `./fixtures` (`loadFixtures()`, and `fixtures/created-under-terminal-parent.json` carries the ADD-arm sentence verbatim); the ergonomic import of the FUNCTION is what is missing. **A one-line source change, therefore a ruling and not Lane A's to take. Owner: whoever next touches `rule-engine/src/index.ts`.** *(This is the single highest-value buildable item left, and it is blocked only on a ruling.)* |
+| **7.246** | **THE REFUTATION.** `app-core/test/workflow-builder/events.test.ts:160,172` pin `'ticket.unknown-state'` as a migration refusal rule. The real route answers `migration.unknown-target-state` (`MIGRATION_RULES`, `apps/server/src/routes/builder-reads.ts:444`, route at `:693`, witnessed at 7.241). **Not correctable by an import** — `MIGRATION_RULES` lives in `apps/server` and `app-core` neither does nor should depend on it, so where that vocabulary belongs is a product decision. **Owner: whoever owns the workflow-builder gateway's refusal vocabulary (Plan 8 / the client pre-check vocabulary).** |
+| **7.247** | `app-core/test/online/mappers.test.ts:958,1116` use `'state-machine'` as a contest's `rule`; no producer emits it (swept across all `src` trees with a fabricated control). **Deliberately filed ONE SEVERITY BELOW 7.246**: `mapMyWork`/`mapAttention` carry a contest's `rule` opaquely and nothing branches on it, so this pins no discriminant — fixture-realism, not a dead discriminant. **Owner: whoever owns `mappers.test.ts`'s contest fixtures.** |
+| **7.248** | `packages/sync-client/test/replica.test.ts:307` (planted in `contestOf`, read back at `:353`) is a `restrict-to` mirror. **This row originally named five sites and review reduced it to one:** `precheck.test.ts:284` takes its value from the REAL engine — form (1) against a running producer, and un-literalling it would CREATE a self-comparison; `outbox.test.ts:206,357` are `applyResult` INPUTS, never asserted. **Owner: Lane B, for `replica.test.ts:307` alone.** |
+
+**One more, not a case:** `packages/app-core/test/views/reopen-flow.test.tsx` was corrected in #219
+although it was NOT in the scoped row table — it carried the identical fabricated constant as its twin,
+and fixing only one would have left the repo holding two constants for one sentence with different
+values. **Flagged for the controller as a scope call; one string, one revert if it disagrees.**
+
+## THE THREE RULES THIS LANE MINTED THAT OUTLIVE ITS CLUSTERS
+
+1. **Where a producer BUILDS its refusal from an exported constant, asserting the wire value against
+   that same constant is a self-comparison through one module and CANNOT FAIL.** Measured, not argued:
+   #219's M7 re-run with the literal deleted, leaving only the constant assertion, passed **25/25**
+   under a mutation that corrupts the constant. Two forms are not blind — the wire value against a
+   LITERAL (in a witness, the observed bytes of a producer that ran), and against a SECOND,
+   INDEPENDENTLY-OWNED constant. Carry a literal ALONGSIDE any producer constant, never instead of one.
+2. **A sweep for the fixture's OWN string cannot find a producer that uses a DIFFERENT string for the
+   same slot.** This is a NEW silent-wrong-answer mode and belongs on the machine's list. It returns
+   neither an error nor an empty result about the right question — it returns a **well-formed empty
+   result about the WRONG question**, and nothing inside the run can show it. The six previously
+   recorded modes are all a search that failed to look; this one looked correctly at the wrong thing.
+   It is how 7.246 was scoped as "no producer exists" with a valid fabricated-name control.
+3. **A blast radius smaller than the mutation's reach is a fact about the CASES, not about the code.**
+   #219's `M4 kills 7.239 alone` — where M4 mutates a template BOTH refusal arms build from — was
+   logged as a clean radius of 1 and was actually naming a hole: 7.238 asserted no `reason` at all. It
+   took a reviewer to read it that way. After the fix M4 kills both, and that delta is the fix's own
+   evidence. **When a mutation reaches two producers and kills one case, look at the cases.**
+
+Also carried, mechanically: **keep the KEY and corrupt the VALUE** (a renamed key dies in
+`asString`/`asRecord` before any assertion runs and measures the parse, not the property); and
+**rebuild `rule-engine` UNCONDITIONALLY after every mutation apply AND every restore** — a conditional
+rebuild left a stale `dist` and produced a false blast radius of 2 in #219, reported rather than
+trimmed.
+
+---
+# ↓ LANE A — #219 (the transcribed refusal vocabulary) RECORD. **MERGED as `bb94dc5`.**
+# **Its position line said "PR OPEN … Nothing else in flight" and is SUPERSEDED by the block above;**
+# its five witnesses, twelve mutation kills, six catalogue rows and the review round remain live.
 
 **Five witnesses (7.238–7.242), six catalogue rows (7.243–7.248), two fabricated constants corrected,
 one handed finding REFUTED.** Branch cut from `9d2a0b2`; rebased past the seven commits `main` gained
@@ -225,7 +376,10 @@ engine's refusal — it models nothing the engine emits; (b) the "LIVE FINDING" 
 `'ticket.unknown-state'` has no producer — it has one under a different name
 (`migration.unknown-target-state`), and the sweep that missed it was well-formed.
 
-# LANE A — **IDLE. #204 IS MERGED as `ebba353`. Nothing is in flight. Awaiting re-tasking.**
+# ↓ LANE A — the #204 position block. **#204 MERGED as `ebba353`; this block is SUPERSEDED.**
+# Its "IDLE / awaiting re-tasking" line is spent, and its "NEXT CLUSTER" scoping was BUILT as #219
+# (`bb94dc5`) — two of that scoping’s conclusions were disproved in the building, and the correction
+# is at the top of this file, not here. Kept for its reasoning.
 
 **The invite/refusal cluster is closed.** 7.230–7.237 are on `main`: eight witnesses, **eight mutation
 kills**, one full uncached gate (30/30, 0 cached, 3,652 tests / 284 files, `check:env` 0,
@@ -1140,7 +1294,8 @@ client code against a real route. A witness written anywhere else is not a witne
 # ↓ PREVIOUS LANE A BLOCK — `IDLE after #176`. Its POSITION is superseded by the block
 # above; its ids, its carried-items table and its two findings remain live.
 
-# LANE A — **IDLE. #176 IS MERGED as `2d2bc5c`. Nothing is in flight. Awaiting re-tasking.**
+# ↓ LANE A — the #176 position block. **#176 MERGED as `2d2bc5c`; this block is SUPERSEDED.**
+# Its ids and carried-items table were consumed by #187 (`e33c429`) and later. Kept for method.
 
 > **Read this line before anything below it.** `exec/37-c2-cursor` is MERGED and gone; every claim in
 > the sections below about it being "open", "held", "outstanding" or "running" was true when written
@@ -1518,7 +1673,8 @@ block — ask, do not derive.** §7 next free **7.220**.
 §12 block 12.240–12.259 is **EXHAUSTED** — ask the controller for a new block. §7 next free **7.220** (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
 Never edit `docs/lanes/task-ledger.tsv`. Never merge my own PR. Never commit to `main`.
 
-# LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
+# ↓ LANE A — `exec/31-mywork-residuals`. **MERGED as #169 `aa17046`; "PR OPEN, AWAITING CONTROLLER
+# MERGE" is SUPERSEDED.** Kept for its findings.
 
 > **Shas in narrative prose are facts about when they were written.** Verify with
 > `git branch --contains` — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits
@@ -4578,7 +4734,9 @@ assertion.
 
 ---
 
-# LANE A — 2026-09-06, CLOSURE 2 REVIEWED. TWENTY SURVIVING FINDINGS, TWO CRITICAL. THIS SECTION SUPERSEDES EVERYTHING ABOVE.
+# ↓ LANE A — closure 2’s review record. **MERGED as #125 `7bb93cc`.** Its heading claimed to
+# "SUPERSEDE EVERYTHING ABOVE" and no longer does: it is HISTORY, and the live position is the top
+# block of this file. Kept for its twenty findings.
 
 **Position:** `exec/19-serving-gaps`, rebased `--onto origin/main 631582e` after #109 merged. Four
 commits. **Verify the head with `git branch -r --contains` before trusting any sha written here.**
@@ -4707,7 +4865,7 @@ limitation rather than quietly widening it.
 
 ---
 
-# LANE A — CLOSURE 2 IS DONE AND IN PR #125. THIS IS THE CURRENT POSITION.
+# ↓ LANE A — closure 2. **MERGED as #125 `7bb93cc`; "THIS IS THE CURRENT POSITION" is SUPERSEDED.**
 
 **PR #125** (`exec/19-serving-gaps`), gate GREEN at `182d097`: 24/24, `0 cached`, 3,229 tests / 240
 files, node v22.22.2 (spawn-probed), `GATE_EXIT=0`. Awaiting controller merge. **#109 merged as
@@ -4749,7 +4907,7 @@ files, node v22.22.2 (spawn-probed), `GATE_EXIT=0`. Awaiting controller merge. *
 
 ---
 
-# LANE A — CLOSURE 3 IS IN PR #128. CURRENT POSITION, 2026-09-06.
+# ↓ LANE A — closure 3. **MERGED as #128 `e407bf5`; "CURRENT POSITION" is SUPERSEDED.**
 
 | item | state |
 |---|---|
@@ -4888,7 +5046,8 @@ queue.** "Keep going on closure 2b" was an aside, not a re-order.
 
 ---
 
-# LANE A — CLOSURE 4 IS BUILT; ONLY P36's TWO-PART FIXTURE REMAINS. 2026-09-06.
+# ↓ LANE A — closure 4. **MERGED as #141 `c8268e1`; "ONLY P36’s TWO-PART FIXTURE REMAINS" is
+# SUPERSEDED.** (Closure 2b landed alongside it as #137 `c25d7fe`.)
 
 **Branch `exec/26-provenance-block`** (worktree `gisik-nokma-lanes/laneA-closure4`), off `origin/main`.
 **Stack it on #137 (closure 2b) when that squashes**, then rebase past it as with #128.
@@ -4936,7 +5095,8 @@ wraps and constructs no transport. `sync-routes.ts` is shared too: they add a re
 
 ---
 
-# LANE A — BOTH PRs OPEN AND GREEN. RESTART POINT, 2026-09-06.
+# ↓ LANE A — the two-PR restart point. **BOTH MERGED: #141 `c8268e1` (closure 4) and #150
+# `b4e2f14` (the HELD pair). "RESTART POINT" is SUPERSEDED.**
 
 | PR | branch | head | state |
 |---|---|---|---|
