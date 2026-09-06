@@ -9,6 +9,29 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ⛔ REVIEWED: **NO — OWED**. #205 IS NOT MERGE-READY. Read this before anything else.
+
+**No independent review has run on this branch.** This lane dispatched **zero subagents for the whole
+session**, and the override required an **opus reviewer for T13** and — once ruling P42 pulled a Plan 4
+auth change into the branch — for that change too. The implementer half ran; the reviewer half did not.
+Green gates, a green E2E and a filled catalogue are **not** a substitute: every one of them was produced
+by the same party that wrote the code, which is the exact arrangement the two-session topology exists to
+break.
+
+**FIRST ACT after the 17:20 reset, BEFORE T16** (controller, held through the halt):
+
+1. Dispatch **ONE opus reviewer over the whole branch** — the two specs and the second Playwright config;
+   the `trustedOrigins` change with its fixture; and **the catalogue's fourteen ✅ against the tests they
+   actually name**, since a ✅ written by the author of the test is a claim, not a check.
+2. Fix what it finds. 3. **Re-gate.** 4. Report. Only then does #205 merge under the owner's waiver, with
+   the controller's forced gate at merged `main` as the backstop, and **11/13** promotes.
+
+**The waiver covers the missing CI run. It does NOT cover the missing review.** Do not read "gate green,
+catalogue in, PR mergeable" as done — the one check that has never run on this work is the one that is not
+mine to perform.
+
+---
+
 # ▶ T13 IS COMPLETE — catalogue in, gate green at the head. PR #205. (this block first on restart)
 
 **Everything T13 owed is in.** The §13 catalogue and the `Features.md` §13 bullets landed in this change
