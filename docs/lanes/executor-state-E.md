@@ -9,6 +9,35 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ⚠ HEAD MOVED TWICE AFTER PR #205 WAS OPENED — read this before trusting the block below
+
+**The gate reported in PR #205 (30/30, 3603 passed, at `1772056`) DOES NOT COVER THE CURRENT HEAD.**
+Two things happened after it:
+
+1. **`apps/server/src/auth/auth-dev.ts` was missing from the P42 commit, so the pushed head did not
+   compile.** `webOrigin` became REQUIRED on `AuthDeps`; the P42 commit staged explicit paths and missed
+   the second production caller. The edit was in my working tree the whole time — which is precisely why
+   nothing complained: the typecheck and the full gate both read the tree I was HOLDING, and the tree I
+   PUSHED was short by that file. **The gate was a true statement about my tree and a false one about the
+   branch.** Found in the post-PR durability check, by `git status --porcelain`, which named it the moment
+   I asked. Fixed; server typecheck exit 0 at a tree that now equals the head.
+   *The rule earned twice now, from both directions: a gate is a fact about a TREE, and the tree a lane
+   holds is not the tree that ships.*
+2. **Rebased onto `origin/main` `c5dfdcd`** (#193 merged). Both inherited gate-lock commits DROPPED —
+   "patch contents already upstream" — zero conflicts.
+
+| anchor | value |
+|---|---|
+| HEAD | **`3a47b966f737348d94a010de7bf42c48a0d6418e`** (was `1772056`) |
+| base | `origin/main` = `c5dfdcd` |
+| commits | 5: `0057317` T13 harness · `ca009d8` **P42 auth fix** · `7cfd0fa` T13 green + ci.yml · `0391418` handoff · `3a47b96` the auth-dev fix |
+| diff scope | **32 files**, all in the T13/P42 set; **zero** gate-lock files (verified with `git diff --name-only origin/main...HEAD`) |
+| gate | **OWED at this head.** The `1772056` run is superseded — `auth-dev.ts` is a real code change it never saw. |
+| PR | **#205**, open, no CI run possible (account billing block) |
+
+**Still owed before merge, unchanged:** the full gate at THIS head, the §13 catalogue from **13.169**,
+the `Features.md` §13 bullets. The DDL / restore-scratch-DB written decision remains **T16's**.
+
 # ▶ SEAM 3 — LIVE STATE at `f22e8b4`, branch `exec/43-plan11-t13` (this block first on restart)
 
 **T13 IS WRITTEN AND RUNS GREEN AGAINST THE REAL STACK: 3 passed, exit 0.** Not yet gated, not yet
