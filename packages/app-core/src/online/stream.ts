@@ -136,7 +136,11 @@ export function parseFrame(data: unknown): ServerStreamFrame | PingFrame | null 
  * guessed at. Dropping a server error is not free — it is a message the user
  * does not see — and the alternative was worse: to surface it this client would
  * have to invent a code the type does not admit, which is the same class of
- * fabrication `mapListView` refuses a truncated page for. The day the server
+ * fabrication `mapListView` used to refuse a truncated page for — that mapper
+ * is now `mapListPage` and ruling P41 moved the refusal one level up into
+ * `getTickets`'s paging loop, so the ANALOGY still holds and the present tense
+ * did not (corrected in place per ruling P40: a false sentence a maintainer
+ * reasons from is worse than a missing one). The day the server
  * grows a fourth code, `STREAM_ERROR_CODES` is the single place that changes and
  * this function follows it automatically.
  */

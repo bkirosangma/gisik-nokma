@@ -48,12 +48,19 @@ function recordingFetch(answers: Record<string, unknown>) {
  * one forever and a loop that ignored the cursor would still "assemble two
  * pages" out of the same rows.
  */
-function pagingFetch(pages: readonly { ticketIds: readonly string[]; nextCursor: string | null }[]) {
+function pagingFetch(pages: readonly { ticketIds: readonly string[] }[]) {
   const urls: string[] = [];
   const fetchImpl = async (input: string) => {
     urls.push(input);
+    // KEYSET, matching the shipped route rather than a protocol invented here.
+    // `routes/list.ts` binds `t.ticket_id > $n` and emits the LAST TICKET ID of
+    // the page as `nextCursor`. An earlier draft of this helper used the page
+    // INDEX, which made every case below internally consistent with a contract
+    // no server implements — the failure this series is named for. 7.220 proves
+    // the real route against the real mapper; this keeps the fake honest.
     const cursor = new URL(input, 'http://x').searchParams.get('cursor');
-    const index = cursor === null ? 0 : Number(cursor);
+    const index =
+      cursor === null ? 0 : pages.findIndex((page) => page.ticketIds.at(-1) === cursor) + 1;
     const page = pages[index];
     if (page === undefined) {
       return { ok: false, status: 404, json: async () => undefined } as Response;
@@ -71,7 +78,9 @@ function pagingFetch(pages: readonly { ticketIds: readonly string[]; nextCursor:
             cards: page.ticketIds.map((ticketId) => listCard(ticketId)),
           },
         ],
-        nextCursor: page.nextCursor,
+        // Emitted exactly as the route does: the last id of the page, and null
+        // on the final page rather than whenever the page came back full.
+        nextCursor: index === pages.length - 1 ? null : (page.ticketIds.at(-1) ?? null),
       }),
     } as Response;
   };
@@ -652,8 +661,8 @@ describe('3.140 getTicketTypes reads the route that shipped', () => {
 describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
   it('12.257 assembles a two-page project: both pages, disjoint, and complete together', async () => {
     const { fetchImpl, urls } = pagingFetch([
-      { ticketIds: ['t1', 't2'], nextCursor: '1' },
-      { ticketIds: ['t3', 't4'], nextCursor: null },
+      { ticketIds: ['t1', 't2'] },
+      { ticketIds: ['t3', 't4'] },
     ]);
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const view = await source.query.getTickets(PROJECT, {}, 'flat');
@@ -672,7 +681,9 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // would satisfy every assertion above.
     expect(urls).toHaveLength(2);
     expect(urls[0]).not.toContain('cursor=');
-    expect(urls[1]).toContain('cursor=1');
+    // The cursor is the LAST ID OF PAGE ONE, which is what the shipped route
+    // emits and consumes — not an index this test made up.
+    expect(urls[1]).toContain('cursor=t2');
     // The filter and grouping survive paging — a second page requested without
     // them would silently be a different query against the same accumulator.
     expect(urls[1]).toContain('groupBy=flat');
@@ -684,7 +695,6 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // returning them would be the C2 defect one bound further out.
     const pages = Array.from({ length: LIST_PAGE_CAP + 1 }, (_unused, index) => ({
       ticketIds: [`t${index}`],
-      nextCursor: String(index + 1),
     }));
     const { fetchImpl, urls } = pagingFetch(pages);
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
@@ -714,7 +724,7 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // The control that keeps the two cases above from being satisfied by a
     // source that always pages: the ordinary small project must not pay a
     // second round trip, and its cursor is null on the first answer.
-    const { fetchImpl, urls } = pagingFetch([{ ticketIds: ['t1'], nextCursor: null }]);
+    const { fetchImpl, urls } = pagingFetch([{ ticketIds: ['t1'] }]);
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const view = await source.query.getTickets(PROJECT, {}, 'flat');
     expect(view.rows.map((row) => row.ticketId)).toEqual(['t1']);

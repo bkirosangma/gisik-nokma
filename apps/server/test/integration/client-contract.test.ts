@@ -16,7 +16,7 @@ import { buildTestApp } from '../helpers/app.js';
 // `no-http-in-views.test.ts` enforces a seam between views and HTTP code, and
 // the mappers live behind it — so this import uses the door the package already
 // provides instead of widening its root surface for a test.
-import { mapTicketRead } from '@gisik-nokma/app-core/online';
+import { mapListPage, mapTicketRead } from '@gisik-nokma/app-core/online';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { fakeSocket } from '../helpers/stream-socket.js';
@@ -1699,5 +1699,73 @@ describe('the stream union — RECONCILED: the client now has a member for every
     expect(caughtUp).toBeDefined();
     const last = events[events.length - 1] as { envelope: { workspaceSeq: number } };
     expect((caughtUp as { seq: number }).seq).toBe(last.envelope.workspaceSeq);
+  });
+
+  /**
+   * 7.220 — THE PAGING PROTOCOL AGAINST THE REAL ROUTE (ruling P41, Door B).
+   *
+   * `getTickets` now pages to exhaustion, and every case proving that lives in
+   * `packages/app-core` against a FAKE fetch. A fake proves the loop is
+   * internally consistent with whatever protocol the fake implements — and an
+   * earlier draft of that helper implemented the cursor as a PAGE INDEX, which
+   * no server does. **That is this series' signature failure stated exactly: a
+   * mocked contract is the thing that excuses the server from existing.**
+   *
+   * So this case runs the REAL mapper over the REAL route, twice, and carries
+   * the server's own cursor between the two requests. It proves the three
+   * things no fixture can: that `/v1/projects/:id/tickets` ACCEPTS `cursor` on
+   * this path, that the value `mapListPage` hands back is the value the route
+   * RESOLVES, and that it ADVANCES rather than re-serving page one.
+   *
+   * `limit=1` rather than 51 seeded tickets: the route pages at `limit + 1` and
+   * emits the last id of the page, so the protocol is identical at any size and
+   * two tickets are enough to have a boundary. (`listQueryString` never sends
+   * `limit`, so the shipped loop always runs at `DEFAULT_LIMIT`; this asks the
+   * route directly for the same reason 7.213 does — the mapper is the unit
+   * under test, not the query builder.)
+   */
+  it('7.220 the REAL route pages and the REAL mapper carries its cursor — two requests, disjoint', async () => {
+    const first = await app.inject({
+      method: 'GET',
+      url: `/v1/projects/${projectId}/tickets?groupBy=flat&limit=1`,
+      headers: owner.headers,
+    });
+    expect(first.statusCode).toBe(200);
+
+    // THE ROUND TRIP, not a key-set assertion: `mapListPage` executes against
+    // the real bytes, so a rename on either side fails here with the mapper's
+    // own message naming the field.
+    const pageOne = mapListPage(first.json());
+
+    // The precondition, asserted rather than assumed. If the fixture project
+    // held one ticket the cursor would be null and every assertion below would
+    // be vacuous while passing — the exact shape this file found at 7.207.
+    expect(pageOne.nextCursor, 'the fixture project must hold more than one ticket').not.toBeNull();
+    expect(pageOne.rows).toHaveLength(1);
+
+    // The cursor is the LAST ID OF THE PAGE — the route's own contract
+    // (`t.ticket_id > $n`, `nextCursor` = last row of the page). Pinning the
+    // VALUE, not just its presence, is what makes the fake's keyset semantics
+    // a claim about this server rather than about the fake.
+    expect(pageOne.nextCursor).toBe(pageOne.rows[0]?.ticketId);
+
+    const second = await app.inject({
+      method: 'GET',
+      url: `/v1/projects/${projectId}/tickets?groupBy=flat&limit=1&cursor=${encodeURIComponent(pageOne.nextCursor ?? '')}`,
+      headers: owner.headers,
+    });
+    expect(second.statusCode).toBe(200);
+    const pageTwo = mapListPage(second.json());
+
+    // IT ADVANCED. A route that ignored the cursor would answer page one again
+    // and this is the line that catches it — the single most important
+    // assertion in the case, because a silently-ignored cursor makes the
+    // shipped loop spin until it hits the cap and then REFUSE a project that
+    // is perfectly small.
+    expect(pageTwo.rows).toHaveLength(1);
+    expect(pageTwo.rows[0]?.ticketId).not.toBe(pageOne.rows[0]?.ticketId);
+    // And forward, in the route's own ordering, so "different" cannot be
+    // satisfied by an arbitrary reshuffle.
+    expect(pageTwo.rows[0]?.ticketId.localeCompare(pageOne.rows[0]?.ticketId ?? '')).toBeGreaterThan(0);
   });
 });
