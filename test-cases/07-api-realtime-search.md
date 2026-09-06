@@ -15,13 +15,13 @@ are stable; the arithmetic over them is not.
 
 **Reserved-block disposition — reconciled by Task 16 (2026-09-02).** Task 16 reserved 7.1–7.45 with fixed meanings, one per task it closes. Tasks 3–15 landed first and claimed the ones they covered. The rest are accounted for here, because a reserved id that is simply MISSING cannot be told apart from one that was forgotten:
 
-- **7.1, 7.2 — written by this task.** `docToPlainText` (Plan 5 Task 1) shipped `packages/domain/test/doc-text.test.ts` and was cited by NO `test-cases/` file at all — the one genuine cataloguing hole this sweep found. Its `Features.md` bullet sits in §3 and STAYS there, on the precedent §3 already records for Plan 6's and Plan 10's pulled-forward bullets; its cases are 7.1, 7.2 and 7.159 here.
+- **Ids 7.1 and 7.2 were written by this task.** `docToPlainText` (Plan 5 Task 1) shipped `packages/domain/test/doc-text.test.ts` and was cited by NO `test-cases/` file at all — the one genuine cataloguing hole this sweep found. Its `Features.md` bullet sits in §3 and STAYS there, on the precedent §3 already records for Plan 6's and Plan 10's pulled-forward bullets; its cases are 7.1, 7.2 and 7.159 here.
 - **7.5** → absorbed into **7.18**, which executes the hostile FilterSpec end-to-end against the live route and checks `proj_tickets` and `events` afterwards.
 - **7.6** → absorbed into **7.55–7.57**. **7.7** → absorbed into **7.58**.
 - **7.9, 7.10** → absorbed into **7.64–7.70**.
 - **7.33** → absorbed into **7.144–7.156**, the stream route end to end.
 - **7.34 — DEAD BY AMENDMENT, with the evidence stated.** It was reserved for an `it.fails` pin of the per-entity-seq resume defect. Plan 1's `workspace_seq` landed and fixed it, so the pin flipped to a passing `it`: case **7.154**, which asserts a brand-new entity's per-entity `seq` is 1 while its `workspaceSeq` is past the cursor. `grep -rn 'it\.fails' apps packages` returns nothing anywhere in the tree, so there is no pinned failure left for 7.34 to name.
-- **7.35 — written by this task**, as the 🚫 it was reserved to be.
+- **Id 7.35 was written by this task**, as the 🚫 it was reserved to be.
 - **7.41** → absorbed into **7.19** (the epic RANK, never the id `'epic'`).
 - **7.43** → absorbed into **7.138**.
 

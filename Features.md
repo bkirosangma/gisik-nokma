@@ -1498,8 +1498,33 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 
 ## 13. Deployment & dogfooding
 
-*(Plan 11. This section is a stub carrying only the entries below (Tasks 7-8) — most of Plan 11 is not yet built. Claimed per `test-cases/README.md`'s numbering table; whoever lands the rest of the plan appends in their own tasks' subsections rather than renumbering.)*
+*(Plan 11. This section is normally opened by Plan 11 Task 16's catalogue pass, held until Tasks 1–15
+merge. It is opened early here, by Tasks 7, 8 and 14 (landed independently, same day) — what follows is
+ONLY those tasks' additions; everything else Plan 11 produces (config surface, CORS/rate limiting,
+alerting, SMTP, Dockerfiles, the dev compose stack, backups, the restore drill, the deploy spec, E2E
+against the compose stack, the runbook) is still `❌`/unwritten here and arrives with whichever task
+lands it — do not infer completion of Plan 11 as a whole from this section's presence.)*
 
 - ⚙️ **Seed plumbing** — `seedUlid(namespace, key)` mints a deterministic, `ULID_REGEX`-valid id from a SHA-256 digest, so re-running a seed regenerates identical event ids and the ledger's duplicate-event-id refusal makes re-runs no-ops rather than duplicates. `plainTextDoc(text)` builds a literal-text ProseMirror doc, one paragraph per line, by delegating each line to the domain's own single-paragraph `plainTextToDoc` rather than duplicating its paragraph-shape logic. `findUserIdByEmail` looks a person up in better-auth's `"user"` table by email — seeds never invent people. `apps/server/src/seed/{seed-ulid,doc-text,users}.ts`
 - ⚙️ **`checkErrandTemplate` — the executable pin on the errand-with-waits template, and Ruling P29's tripwire** — verifies Plan 8's `ERRAND_WITH_WAITS_TEMPLATE` can structurally carry the Convenience Corner tracker board before any seed event is built: every tracker state the seed maps to is present and reachable from the initial state in exactly one transition (no fabricated intermediate history), `waiting` carries `blocked: true`, every door into `done` is guarded by `require-comment`, and — the tripwire — every one-hop transition the seed relies on carries **zero** rules, because the seed submits a bare `ticket.transitioned` with no comment or evidence and any rule there would make the real engine refuse the seed's own event at ingest. This last check is what reddens if a copy of the template ever grows a rule on one of the two paths (`later`→`waiting`, `next`→`waiting`) that Ruling P29 deliberately leaves rule-free — a test pins `adviseWorkflowDef`'s two `rule-bypassable` advisories on the real template by identity, proves a single-edge "fix" genuinely silences one advisory while `checkErrandTemplate` still reddens, and proves guarding both edges clears the advisory panel to zero while `checkErrandTemplate` still refuses it. `workflowFromTemplate` clones a template into a live, published-shape definition at version 1. `apps/server/src/seed/templates.ts`
 - ⚙️ **Convenience Corner seed mapping — frozen record in, events out, nothing invented** — `readCcBoard` reads the frozen `reference/convenience-corner-tracker/board.data.js` snapshot read-only through a `vm` sandbox and refuses (naming the path) a file that does not define `window.CC_TRACKER` with the expected shape. `buildErrandEvents` maps one tracker item to its full ticket event sequence: `ticket.created`, a literal-text `description`, an optional `counterparty` custom field, an origin-dated `startDate` claim (built-in field, `{date, note?}` shape) only when the record itself dates it, a `dueDate` claim derived from `needed_week` by the tracker generator's own published week arithmetic with the derivation named in the claim's note, and at most one `ticket.transitioned` (payload key `to`) mapping the tracker's `later/next/in-progress/blocked` states onto the template's `later/next/in-progress/waiting`. Refuses — never guesses or fabricates — on a `done` item (checked by both the state string and the done flag, so the two disagreeing can never slip a completed item through as open) and on any unmapped tracker state. Every event id is a `seedUlid` derived from the item's own tracker id, so two builds of the same item are identical and a re-snapshot cannot collide event ids across items. `apps/server/src/seed/{cc-board,cc-map}.ts`
+- ⚙️ **CI pipeline split and server-suite sharding** — the single `gate` job became eight: `scope` (the
+  docs-only/full-gate decision, unchanged), `check-env` (also runs the skipIf-coverage trip-wire, below),
+  `check-tasks` (the task-ledger gate, wired as its own job for the first time — previously absent from CI
+  entirely, so a ledger-only PR's green verified nothing about the ledger), `build`, `typecheck`,
+  `server-tests` (the 90-file server suite sharded 4-way via vitest's own `--shard`), `other-tests` (every
+  other package), and `e2e` (checks for Plan 11 Task 13's one known artifact, `docker-compose.dev.yml`,
+  but does NOT attempt to run anything even once it exists — see the case below for why). A `gate` job
+  still fans all of them in as the one check name the auto-merge precondition reads, tolerating a
+  dependency's `skipped` (the docs-only case) but not any other non-success result.
+  `.github/workflows/ci.yml`
+- ⚙️ **Silent-skip guard for gated test suites, plus a coverage trip-wire for where it doesn't reach** —
+  `check-no-silent-skips.mjs` reads a shard's vitest JSON report and fails if any file using `.skipIf(`
+  contributed zero passed-or-failed tests — the case where a runtime guard (a missing binary, a missing
+  env var, or a guarded loop over an empty fixture list) eats an entire suite while the run still exits 0.
+  It is wired into `server-tests` only; `check-skipif-coverage.mjs` closes the gap that leaves open — it
+  fails the (cheap, no-build) `check-env` job if any `.skipIf(` usage appears outside `apps/server/test/`,
+  the one place the guard actually runs, converting an uncovered guard into a loud CI failure rather than
+  a silent one. Wired ahead of its first real trigger: no file in this repo uses `.skipIf(` yet; Plan 11
+  Tasks 11/12 will add one around the restore-drill suite. `scripts/check-no-silent-skips.mjs`,
+  `scripts/check-skipif-coverage.mjs`
