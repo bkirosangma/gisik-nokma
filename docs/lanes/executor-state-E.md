@@ -15,12 +15,12 @@ off `main`.
 |---|---|
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
-| merge-base with `origin/main` | `1394396` — **REBASED 2026-09-06**, was `1e372e3` |
-| HEAD at last refresh | `0d9e24c` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | **14**, 0 behind |
+| merge-base with `origin/main` | `1b72900` — rebased twice (was `1e372e3`, then `1394396`) |
+| HEAD at last refresh | `f342c87` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | **21**, 0 behind |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | **GREEN at the REBASED sha**: `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **248 files / 3285 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers |
+| gate composition | GREEN pre-rebase at `805b39c`: `EXIT=0`, `Tasks: 30/30`, `0 cached`, **250 files / 3341 tests**, `CHECK_ENV_EXIT=0`. Re-gating at `f342c87` now — main gained 11 commits incl. C's 8-job `ci.yml`, so the number WILL move and must be recounted, not carried |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -96,9 +96,9 @@ main as part of P33.
 | — | `.nvmrc` = 22, `engine-strict=true` in `.npmrc` | **DONE — `f621a8c`** |
 | T5 | Dockerfiles + `node-pg-migrate` → `dependencies` + Lane B's two devDeps | **DONE — `a30496f`.** Both images BUILT: server 607 MB, web 241 MB |
 | — | 25 MiB ceiling test timeout (controller-assigned) | **DONE — `bb174fe`** |
-| T1 | config surface + `/healthz` **deploy SHA** (P33) + strict URL validation | **IN FLIGHT** — opus impl → opus review |
-| T2 | CORS + rate limiting (**HTTP-Origin**) + invite-mint bucket | not started |
-| T3 | error alerting hook | not started |
+| T1 | config surface + `/healthz` **deploy SHA** (P33) + strict URL validation | **DONE** — CA-discard Critical fixed |
+| T2 | CORS + 3 rate-limit buckets + **HTTP-Origin** + invite-mint bucket | **DONE — `805b39c`** (rebased). Critical fixed: `trustProxy` made the limiter key attacker-chosen |
+| T3 | error alerting hook | **NEXT** |
 | T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | not started |
 | T5b | SIGTERM / shutdown path (inherited errand #2) | not started |
 | T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
@@ -1016,3 +1016,67 @@ bold 1, markerFirst 2, union 4 = sum 4, and the mid-sentence `13.99` correctly *
 13.44). So the zeros are absence, established rather than assumed.
 
 **PR-body obligation:** state these counts — per style, max, duplicates — for every section touched.
+
+---
+
+# T2 — landed. The limiter was switched OFF by its own configuration flag
+
+## The Critical, measured three times (reviewer, me, then the mutation)
+
+**`trustProxy: true` made the rate-limit key ATTACKER-CHOSEN.** In this Fastify it means `request.ip` is
+the **LEFTMOST** `X-Forwarded-For` entry — the one the caller writes. Six `POST /v1/events` from one
+caller at `eventsMax: 1`, varying only that entry:
+
+```
+varying the leftmost XFF   401,401,401,401,401,401   never limited
+unforged control           401,429,429,429,429,429   limited from the 2nd
+```
+
+**Every request minted a fresh bucket.** The limiter was not weakened by that setting — it was switched
+**off** by it, with one header. **Both `trustProxy` tests that existed were blind**, because each sent a
+ONE-ENTRY chain, and with one entry every keying strategy agrees.
+
+**Fix: key on the RIGHTMOST entry** (`rateLimitKeyFor` in `src/http/rate-limit.ts`). A proxy appends its
+observation to the right, so the last entry is what the nearest trusted proxy wrote about the connection
+it actually accepted, and it is the only entry a caller cannot choose. **Correct whether App Platform
+appends OR replaces** — which matters, because which it does is NOT established here and the fix must not
+depend on the answer.
+
+**The comment that made it invisible is corrected.** It argued one derivation must serve every consumer
+and a second would be free to disagree. **The disagreement is the point:** a log wants the address the
+deployment configured Fastify to believe; a limiter key must be unforgeable.
+
+## Three cookie-authenticated mutations were outside the protected set
+
+`POST /v1/workspaces`, `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate` and
+`POST /v1/me/notifications/:id/read` — all cookie-authenticatable writes — sat outside BOTH the set and
+the suite, **under a docblock stating the exclusions were enumerated.** Found by printing the assembled
+route table and injecting a forged request at EVERY non-GET route; **re-reading a list already believed
+complete cannot find that.**
+
+**The fix is not the three entries.** The suite now asserts **set-equality in BOTH directions** between
+its own table and the shipped set — a missing row is an unprotected route with no test, an extra row is a
+test asserting a protection that no longer ships, either is red.
+
+## Mutations
+
+| mutation | result |
+|---|---|
+| key on the leftmost entry (the shipped defect) | 1 failed — the new XFF test, `expected [401,401,401] to deeply equal [429,429,429]`, nothing else |
+| drop a route from `HTTP_ORIGIN_PROTECTED_ROUTES` | 3 failed — the drift guard **and** that route's two rows |
+
+## Also
+
+`/v1/attachments` was in **no bucket at all** — the most byte-expensive write the server takes, bounded by
+nothing — now charged to `events:` with the trade named and tested on both halves. An enumerated exclusion
+pointed at `PUT /v1/preferences`, which **404s**; the live path is `PUT /v1/me/preferences`.
+
+**Counts, measured two ways:** `rate-limit.test.ts` **5**, `security-middleware.test.ts` **51**, total 56.
+Source `it(` count is 33 and reconciles because three `it.each(PROTECTED)` lines expand to 7 rows each
+(33 − 3 + 21 = 51).
+
+## Route patterns are proven, not assumed
+
+The `it.each` table injects a forged `Origin` at all seven routes and each returns **403** — which is what
+confirms the pattern strings actually match Fastify's `routeOptions.url`. A pattern that did not match
+would make the check **silently not fire**, and no test asserting only "the route works" would notice.
