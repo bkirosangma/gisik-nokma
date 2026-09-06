@@ -16,7 +16,74 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# 🚨 EMERGENCY HANDOFF, SUNDAY 2026-09-06 ~21:40 IST — SESSION METER AT **97%** (resets 22:20). #230 IS MERGED. RULING A+C RECEIVED. **A §09 SUBAGENT WAS IN FLIGHT WHEN THIS WAS WRITTEN AND ITS EDITS ARE UNCOMMITTED AND UNVERIFIED — READ THE TREE, DO NOT TRUST THIS PARAGRAPH.**
+# 🔴 READ THIS FIRST — SUNDAY 2026-09-06 ~21:55 IST. §09 BATCH 1 LANDED (98 cited, pushed, gate running). **AND: A VERIFICATION METHOD I USED ALL SESSION WAS BROKEN. IT AFFECTS THE MERGED #230. DETAIL BELOW — READ IT BEFORE YOU VERIFY ANYTHING.**
+
+| what | value |
+|---|---|
+| `main` | `1bc6e014` (#230 merged) |
+| my branch | **`exec/53-cite-section-09`**, head **`97d7451`**, pushed, worktree clean. Its base `3edd02e` IS #230's merged head, so **rebasing onto `main` leaves exactly ONE commit: the §09 batch-1 commit.** No PR opened yet |
+| §09 | **98 cited / 121 uncited / 219** (was 0/219). Baseline set to **121** |
+| §05 | tightened **68 → 67**, deliberately — see below; it is the ratchet working, not a stray |
+| `check:citations` | **0** — 1529 checked, **879 cited / 650 uncited**, ratchet holds exactly on every file |
+| gate | RUNNING at `97d7451` when this was written. **If no gate line was ever added below, IT DID NOT FINISH — re-run it; do not assume green** |
+
+## 🔴 THE BROKEN INSTRUMENT — the most important thing on this page
+
+**I verified "comments only" with `git diff | grep "^+"`. Under the rtk proxy that is always empty.** The proxy
+reformats `git diff` into a stat header, a `--- Changes ---` banner, and hunk lines **indented two spaces**, so an
+added line arrives as `␣␣+␣␣/**`. Measured: **`git diff | grep -c "^+"` → `0`** against a **31 KB** diff carrying
+**294 additions**.
+
+**Every "no non-comment lines" result I reported from that pipeline this session was a well-formed zero from a
+broken instrument — including the one in the now-merged #230.**
+
+**How it was caught, because the lesson is in the mechanism:** a *second* question (why did §05 move?) came back
+*"no numeric tokens at all in the added lines"* — impossible for docblocks that read `9.36 —`. The absurd answer
+to the second question exposed the first. **My positive control had tested the FILTER, on a `printf`, and never
+the SOURCE.** It proved the instrument worked; it never proved it was pointed at the question. That distinction is
+already written in this repo's rules, and I still walked into it.
+
+**The replacement, and use it instead of `git diff | grep`:** `git show <sha>:<file>` against the other version
+through Python `difflib`, **asserting the added-line count matches `git diff --numstat` before believing anything
+else it says.** That count-match is the control that actually binds.
+
+**Re-verified with it, both claims TRUE and the original evidence WORTHLESS:**
+- §09 (this branch): 294 added / 294 expected · **0 non-comment · 0 removed**.
+- **§10, retrospectively, at the merged `a69b64d`:** 200 added / 200 expected · the only non-comment add and only
+  removal are the baseline entry `66 → 0`. **No defect reached `main`** — but the method could not have found one.
+
+**Also on the same list:** `sed -E 's/(.{400}).*/\1…/'` dies with *"maximum repetition exceeds 255"*, and a
+`grep` piped into a `sed` that errors can leave you reading a truncated result as a complete one.
+
+## Why §05 moved 68 → 67, and why it is CORRECT
+
+`9.57`'s docblock names case **5.26**. That is not a stray: **§09's own row for 9.57 says** the test lives in
+`packages/domain/test/ticket-events.test.ts` and is *"already catalogued as case 5.26, whose text covers the
+identical behaviour"*, and the test does assert it. The ratchet spotted a genuinely newly-cited id. **Tighten,
+don't suppress** — but always check which id moved and read the row, because the same signal is what an
+ACCIDENTAL cross-section citation would produce, and that one is worse than an uncited row.
+
+## The dead subagent recovered 98 citations
+
+Batch 1 died on the session limit. **Its final progress note said it was *starting* `attachment-list-item.test.tsx`;
+the tree showed it had finished that and eleven more — 17 files, +294.** *Treat a failed dispatch as UNVERIFIED,
+not EMPTY* is worth 98 citations here. Read the tree before re-dispatching anything.
+
+## NEXT, in order (ruling A+C already given — do not re-ask)
+
+1. **Open the PR for `exec/53-cite-section-09`** if the gate finished green (rebase onto `main` first; it reduces
+   to one commit). If the gate did not finish, re-run it before opening.
+2. **§09 batch 2** — the **113 rows naming `apps/server/`**, same method, one subagent. Then set the §09 baseline
+   to the new real count.
+3. **Mutation-test §09 before calling any zero evidence** — use **`9.11`**, a real prefix of the live
+   `9.115`–`9.118`; removing its sole citation must redden naming `9.11` and only `9.11`.
+4. **Then (A)**, the approved semble hunt: ranked candidates as rows with **named owners, not fixes**. First row
+   already evidenced: `packages/app-core/src/precheck.ts:375` ↔ `rule-engine`, 0.61–0.67, no import, no call.
+
+**§09 mapping, already measured — do not re-derive:** 219 ✅ rows, 218 naming a full test path in parentheses,
+41 files; split **98 `packages/editor/` · 113 `apps/server/` · 7 `packages/domain/`**.
+
+# 🚨 SUPERSEDED — emergency handoff, SUNDAY 2026-09-06 ~21:40 IST — SESSION METER AT **97%** (resets 22:20). #230 IS MERGED. RULING A+C RECEIVED. **A §09 SUBAGENT WAS IN FLIGHT WHEN THIS WAS WRITTEN AND ITS EDITS ARE UNCOMMITTED AND UNVERIFIED — READ THE TREE, DO NOT TRUST THIS PARAGRAPH.**
 
 **READ THIS BLOCK FIRST; the 21:30 block below it is still true but was written before the merge and the ruling.**
 
