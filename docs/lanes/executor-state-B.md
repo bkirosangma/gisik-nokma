@@ -24,7 +24,7 @@ only what is written here.
 | build | after the rebase: `pnpm install --frozen-lockfile` + `pnpm turbo run build --concurrency=1` → **exit 0** | one invocation |
 | typecheck | **`pnpm turbo run typecheck --concurrency=1` → exit 0, 16/16** at every commit boundary | direct runs, not the gate |
 | §12 recount | at `8e45ef7`: **plain 217 + bold 10 = 227 = union, zero duplicates, max `12.291`** — union equals the SUM, which is the signal that no id style is being missed | the union-vs-sum control below |
-| gate | **`GATE_EXIT=0` at `ed455ae`** · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · node **v22.22.2** (the script printed it; note turbo's own error lines resolve pnpm from `v24.11.1`'s bin — report both) · `pg_isready` accepting · lock **v3.2**, acquired and released clean. **3385 tests / 263 files**, enumerated: domain 464 · ui 37 · rule-engine 282 · editor 178 · sync-client 80 · app-core 1093 · server 1090 · desktop 5 · web 136 · mobile 20. *It took THREE runs: run 1 red on app-core's published-union completeness case (missing fixture); run 2 red on that case again for the missing `parseFrame` branch, then on `apps/server`'s cross-package `CLIENT_STREAM_TYPES` pin — both union consumers no type error could find.* **MUST BE RE-RUN at the final sha** — this lane's own #139 record says a gate carried across intervening docs commits is not a gate. | one backgrounded invocation under the lock |
+| gate | **`GATE_EXIT=0` at `29d963c`** (re-run at the PR head after the controller-ruling commits; identical composition to the `ed455ae` run) · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · node **v22.22.2** (the script printed it; note turbo's own error lines resolve pnpm from `v24.11.1`'s bin — report both) · `pg_isready` accepting · lock **v3.2**, acquired and released clean. **3385 tests / 263 files**, enumerated: domain 464 · ui 37 · rule-engine 282 · editor 178 · sync-client 80 · app-core 1093 · server 1090 · desktop 5 · web 136 · mobile 20. *It took THREE runs: run 1 red on app-core's published-union completeness case (missing fixture); run 2 red on that case again for the missing `parseFrame` branch, then on `apps/server`'s cross-package `CLIENT_STREAM_TYPES` pin — both union consumers no type error could find.* **MUST BE RE-RUN at the final sha** — this lane's own #139 record says a gate carried across intervening docs commits is not a gate. | one backgrounded invocation under the lock |
 
 **§12 ids: this lane holds 12.290–12.319. 12.290 (the wedge, ❌) and 12.291 (the cap) were consumed by
 #139 — MINT FROM 12.292.** Ask the controller before 12.320. Use the union-vs-sum control (below); the
@@ -334,6 +334,25 @@ hazard requires it — and that is before any reconcile in the same catch-up.
   local v1). Reachable through `loadBootstrap` too; not introduced here. *Owner: unassigned.*
 - **The 200 cap now bounds a cost dimension it was not chosen for** — the client's pull fan-out. *That
   200 is the right number for it is NOT established.* *Owner: unassigned.*
+
+## T18's PRECONDITION, measured 2026-09-06 rather than assumed — READ BEFORE STARTING IT
+
+**T18 cannot be complete while what it catalogues is still moving**, and at this writing §12 is.
+Measured against `origin/main`: Lane A has used **12.240–12.249** of its allocated block
+**12.240–12.259** — ten ids still free, so Lane A may write more §12 cases. Lane B's own block is
+12.290–12.319, of which 12.290–12.308 are in use after closure 5b.
+
+**So when T18 starts: re-measure §12 against `origin/main` AT THAT MOMENT with the union-vs-sum
+control** (per-style counts printed as the positive control; `union < sum` is the machine-readable
+signal a style is being missed). If Lane A's remaining §12 writes have not landed, **tell the
+controller and HOLD** rather than cataloguing a moving target — the controller decides whether T18
+waits or closes with Lane A's items named as "landing under Lane A". That instruction is the override's,
+not this lane's invention.
+
+*Also outstanding for §12's scope notes at T18, per the controller's 2026-09-06 ruling: "a typecheck is
+NOT a sweep for a wire union" goes in beside closure 3's "the compiler is the enumerator for
+interfaces" — the fourth arm's EIGHT consumers, six type errors (including `hub.ts`'s `if/else` that
+would have handled a notice AS a revocation) and two silent readers caught only by source-text cases.*
 
 ## THE CASE-ID CONTROL — copy this, do not write your own
 
