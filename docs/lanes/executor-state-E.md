@@ -1134,3 +1134,43 @@ The relayed findings list still says T11's alerter is missing. **T3 (in flight) 
 import path T11's daemon is written against; T3 was briefed to match that shape so C inherits it.
 **If C reaches T11 before T3 merges it must inject a local alerter shape and swap on rebase, NOT create
 `src/alerts/` itself** — otherwise there will be two.
+
+---
+
+# ⚠️ PROCESS DEFECT, MINE — never `git add -A` while a subagent is writing
+
+**What happened:** the re-task commit used `git add -A` while T3's implementer was mid-task. It swept up
+`apps/server/test/alerts/error-alerter.test.ts` — 304 lines of the agent's **in-flight** work — into a
+docs-only commit. The module it imports (`src/alerts/error-alerter.ts`) was still untracked, so **HEAD
+carried a test that could not run**: a fresh checkout of that sha fails `apps/server` at import with
+`Cannot find module '../../src/alerts/error-alerter.js'`.
+
+**Found by T3's REVIEWER, not by me**, while checking whether the report's "four files, all uncommitted"
+was accurate. Three were. It also correctly noted this **qualifies the gate claim**: the gate ran against
+a working tree that had the module, not against the committed tree.
+
+**Fixed** by `git reset --soft HEAD~1`, unstaging the test file, and recommitting docs only —
+`reset --soft` leaves the working tree alone, so the running fix agent was undisturbed (verified: the file
+was still 11,837 bytes on disk afterwards). Force-pushed; HEAD is self-consistent again.
+
+**The rule, from now on: stage EXPLICIT PATHS.** `git add -A` and `git add .` are unsafe in this lane by
+construction, because a subagent is almost always writing to the tree. Every commit here should name its
+files, and the `git status --short` printed before each commit is the check — **the files listed must be
+exactly the files intended, not merely a superset that looks plausible.**
+
+# T3's review — two Criticals, BOTH guards that cannot fire
+
+1. **"No alerter configured" was asserted, never exercised.** The test asserted only `statusCode` and the
+   body, which are **identical under every possible default**. Proven by mutation: swapping the default
+   for a live network alerter (`new WebhookErrorAlerter('https://hooks.invalid/x')`) left **all 16 tests
+   passing**. The fix is to observe the ABSENCE of a call — swap `globalThis.fetch` for a recorder and
+   assert `toEqual([])`, the rows, not a count.
+2. **The hang guard was a tautology.** `expect(settled).toBe(false)` on a promise that can never settle
+   passes **with the code under test deleted** — verified by replacing the call with `void alerter;` and
+   watching it still pass. The fix is a resolvable deferred: assert `false` when the response is read,
+   then resolve and assert `true`.
+
+**And an Important that is a genuine product gap:** `/healthz` catches its own database failure and
+returns 503 **without throwing**, so `setErrorHandler` never runs and **the one 5xx an operator most needs
+paged — the database being unreachable — alerts nobody**, while the module's own prose says "5xx failures
+phone somewhere" three times without stating the boundary.
