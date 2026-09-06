@@ -2037,12 +2037,46 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   unpresented id — its reply is built by walking the request — but a purge is destructive and LOCAL, and
   this device does not need to trust a remote party in order to be safe from it. Vacuity excluded: the
   replica is asserted to hold both tickets before the reconcile.
-- 12.288 🚫 **Nothing calls `reconcile` on a schedule, and that is recorded rather than implied.** When a
-  device should reconcile — every reconnect, on a timer, on pull-to-refresh — is a product decision with a
-  cost attached (one request per 100 tickets held) and no plan states it. The primitive is built,
-  correct and unscheduled. *Owner: unassigned.* **Its sibling, same owner:** the engine presents
-  `replica.listTickets`, so a ticket held only as unfolded events with no local `tickets` row is not
-  presented and therefore not reconciled.
+- 12.288 ✅ **The reconcile SCHEDULE — CLOSED by closure 5b(b).** *(Was 🚫: "nothing calls `reconcile` on
+  a schedule; when a device should is a product decision with a cost and no plan states it".)* The engine
+  calls it on every catch-up completion, with **no `engine.reconcile()` call anywhere in the test** — the
+  moment a device's cursor is current is the moment its HOLDINGS may be stale, because a narrowing sends
+  the losing device nothing at all (6.104). **The tempting cheaper trigger is unsound and is refused in
+  the source:** gating on "the catch-up delivered something" would skip the zero-frame catch-up, which is
+  precisely the case reconcile exists for. So the bound is TIME, not activity — `reconnectDelayMs` is a
+  fixed 2000 with no growth or jitter and the hub sends one `caught-up` per subscription
+  unconditionally, so a flapping socket would otherwise reconcile every two seconds for ever at
+  `ceil(held / 100)` requests each. Asserts the restricted ticket is purged and the OTHER one still
+  folds, so this is a targeted purge and not an emptied store. *Its scheduling mutation reddens 12.288
+  AND 12.307 — a case bounding the interval must observe the interval's first firing, so no honest 12.307
+  leaves it alone; a second discriminating mutation (skip the purge) reddens 12.288 and 12.287 instead.
+  Both recorded as measurements rather than as an "alone" nobody saw.*
+- 12.305 ✅ **A notice pulls exactly the ids the device does NOT hold.** The held ticket is asserted
+  readable first — the non-vacuity control — then the pull list is asserted EXACTLY, so an id already held
+  costing a pull would redden. This is ruling P37.1's "a repeated no-op `visibility.set` costs a holding
+  client nothing" measured on the client side. The cursor is asserted unmoved: the pull door writes none.
+  *Dropping the holdings filter in `replica.ts`'s `reach-granted` arm reddens this case ALONE.*
+- 12.306 ✅ **A failing pull does not stall the engine, stays owed, and the next catch-up retries it.**
+  The most important case in the set: `stalled` is a one-way latch cleared only by `start()`, which
+  mobile never calls again, so a transient network failure that reached `stall()` would brick the device
+  until the process restarts. Asserts `lastApplyFailure()` null, the chain still alive (a later
+  transition folds), the id still owed — then a working transport on the next catch-up converges.
+  *Rethrowing inside the drain's catch reddens 12.306 and 12.308.*
+- 12.307 ✅ **Two catch-ups in quick succession produce ONE reconcile.** Time is controlled honestly:
+  `vi.useFakeTimers({ toFake: ['Date'] })` — `Date` only, `setTimeout` left real — and the base instant
+  is captured from the REAL clock first, because sinon's default epoch is 0 and would compute a negative
+  age, passing for the opposite reason. The second half advances 61 s and requires a second reconcile, so
+  the case pins the interval in both directions. Cursor 10 is the control that the second catch-up ran
+  at all. *Both `true ||`-ing the guard and reducing it to once-per-process redden this case ALONE, in
+  opposite directions.*
+- 12.308 ✅ **A pull that never settles is abandoned rather than parking the apply chain for ever.**
+  Written rather than skipped. `net/http-transport.ts` calls bare `fetch` with no `AbortSignal` anywhere
+  in the file and `applyChain` is strictly serial, so without a timeout the chain simply stops: status
+  stuck at `live`, `stalled` false, `settled()` never resolving, nothing surfaced — a SILENT brick traded
+  for the loud one. Asserts not-drained at `PULL_TIMEOUT_MS - 1` and drained at `+1`, the id still owed,
+  and no apply failure. *Dropping `withTimeout` reddens this case ALONE — as a 7 ms assertion, not a
+  runner timeout, so the case DETECTS the hang rather than surviving it. The author's own prediction said
+  "vitest timeout" and is corrected here against the measurement.*
 - 12.289 ✅ **6.104's residual actually closes, by the CLIENT-PRESENTED path.** *(Not "end to end" — that word was here until the branch review measured it. The rig's transport RESTATES the route's rule in-process rather than calling it, the same way it restates `bootstrapTicket`; the ROUTE is covered by 12.284-12.286 through `app.inject`. **No single case runs the client and the real route together**, so a drift between them is caught by nothing until closure 5b points the rig at `inject()`.)* The residual is
   witnessed first — after a narrowing B still holds the ticket, its history and its searchable title, and
   no tombstone ever arrived — then `engine.reconcile` removes it: `getTicket` null, `listEntityEvents`
