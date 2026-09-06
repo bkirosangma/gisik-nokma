@@ -169,6 +169,9 @@ describe('stateProvenanceFor', () => {
     });
   });
 
+  /**
+   * 7.15 — planted defect: after two transitions by different actors the card carries the LAST claim — the actor is the later one and both clocks are that claim’s.
+   */
   it('PLANTED DEFECT: after two transitions by different actors the card carries the LAST claim — actor and both clocks', async () => {
     const ticketId = newUlid();
     await applyCommitted(db.pool, [
@@ -234,6 +237,9 @@ describe('stateProvenanceFor', () => {
     expect(map.get(plain)?.cause).toBeNull();
   });
 
+  /**
+   * 7.74 — `stateProvenanceFor` is TOTAL over its input: an unknown id is absent from the map rather than mapped to an invented anonymous claim, asserted beside a real id that is present.
+   */
   it('is total over its input: an unknown id is simply absent, beside a known one that is present', async () => {
     const ghost = newUlid();
     const map = await stateProvenanceFor(db.pool, [ghost, world.epicId]);
@@ -254,6 +260,9 @@ describe('stateProvenanceFor', () => {
   });
 });
 
+/**
+ * 7.75 — both clauses of the row live in this block: `latestWorkflowDefs` is workspace-scoped (another workspace holding the same workflow id is answered nothing) and `blockedStateKeys` derives the blocked set from amendment 9’s flag alone.
+ */
 describe('latestWorkflowDefs / blockedStateKeys', () => {
   it('answers the latest def per id and derives the blocked set from the flag alone', async () => {
     const unknown = newUlid();
@@ -336,6 +345,9 @@ describe('assembleTicketCards', () => {
     expect(task?.rollup).toBeNull();
   });
 
+  /**
+   * 7.76 — `TicketCard.dueDate` has three states that do not collapse into one another: claimed, cleared by somebody, and never claimed.
+   */
   it('the due date has three states and none of them is the others: claimed, cleared by somebody, never claimed', async () => {
     const claimedId = newUlid();
     const clearedId = newUlid();
@@ -401,6 +413,9 @@ describe('assembleTicketCards', () => {
     expect(byId.get(virginId)?.dueDate).toEqual({ state: 'never-claimed' });
   });
 
+  /**
+   * 7.77 — the rollup counts terminal children the viewer CANNOT see and names the restriction beside them, rather than silently narrowing the denominator.
+   */
   it('the rollup counts terminal children the viewer CANNOT see and names the restriction beside them', async () => {
     const parent = newUlid();
     const doneVisible = newUlid();
@@ -486,6 +501,9 @@ describe('assembleTicketCards', () => {
     });
   });
 
+  /**
+   * 7.78 — case 6.83 MEASURED rather than argued: `proj_visibility` and `proj_rollups` do not enumerate the same children, so the counts must come from ONE of them.
+   */
   it('MEASURES case 6.83: proj_visibility and proj_rollups do not enumerate the same children, so the counts come from ONE of them', async () => {
     // Workspace B, with its own workflow and type, so a `ticket.created` there
     // is one proj_tickets accepts.
@@ -565,6 +583,9 @@ describe('assembleTicketCards', () => {
     expect((await getRollup(db.pool, world.workspaceId, parent))?.totalChildren).toBe(1);
   });
 
+  /**
+   * 7.79 — the assembler refuses to invent: a row with no creating event and a row with no title claim both throw rather than emitting a blank.
+   */
   it('refuses to invent: a row with no creating event and a row with no title claim both throw rather than emitting a blank', async () => {
     const [real] = await fetchTicketRows(db.pool, [world.epicId]);
     expect(real).toBeDefined();
