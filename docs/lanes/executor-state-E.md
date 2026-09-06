@@ -9,28 +9,53 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
-# ⛔ REVIEWED: **NO — OWED**. #205 IS NOT MERGE-READY. Read this before anything else.
+# ✅ REVIEWED: **YES** — one opus reviewer, Critical + 5 Important fixed, re-gated. #205 ready.
 
-**No independent review has run on this branch.** This lane dispatched **zero subagents for the whole
-session**, and the override required an **opus reviewer for T13** and — once ruling P42 pulled a Plan 4
-auth change into the branch — for that change too. The implementer half ran; the reviewer half did not.
-Green gates, a green E2E and a filled catalogue are **not** a substitute: every one of them was produced
-by the same party that wrote the code, which is the exact arrangement the two-session topology exists to
-break.
+**The review found a Critical that I had already flagged as my least-confident claim, and it was worse
+than I thought.** The `POST /v1/events` probe in `smoke.spec.ts` **never reached the door it named**:
+`/v1/events` is in `HTTP_ORIGIN_PROTECTED_ROUTES`, `httpOriginRefused` ends
+`input.origin !== input.expectedOrigin`, and Playwright's `page.request` sends **no Origin header**
+(measured) — so the POST was refused **403 by an `onRequest` hook before routing**, `requireSession`
+never ran, and both assertions (`not.toBe(401)`, `toBeLessThan(500)`) passed on that 403. **"It is
+authenticated" had no failure mode at all** — an expired or forged cookie gave the same answer.
 
-**FIRST ACT after the 17:20 reset, BEFORE T16** (controller, held through the halt):
+Fixed and verified: the Origin a browser sends, a real `newUlid()`, `actorId` from the browser's OWN
+session, **200 exactly**, a parsed body with one `results` entry that is not `malformed-envelope`, and
+**the other side of the line** — the same POST from a session-less context must answer 401. The server
+named the last gap itself ("malformed at actorId: Required"). **Three specs green.**
 
-1. Dispatch **ONE opus reviewer over the whole branch** — the two specs and the second Playwright config;
-   the `trustedOrigins` change with its fixture; and **the catalogue's fourteen ✅ against the tests they
-   actually name**, since a ✅ written by the author of the test is a claim, not a check.
-2. Fix what it finds. 3. **Re-gate.** 4. Report. Only then does #205 merge under the owner's waiver, with
-   the controller's forced gate at merged `main` as the backstop, and **11/13** promotes.
+| finding | disposition |
+|---|---|
+| **C1** probe could not fail | FIXED, re-run green, 13.174 rewritten to say what it now proves |
+| **I1** "off the gate" false in 2 of 3 senses | RESTATED in the config docblock, `Features.md` and 13.177 — off `turbo run test` (twice over), ON `turbo run typecheck` (wanted), ON CI's `gate` (the point of T13) |
+| **I2** `webOrigin` un-normalised | FIXED — `normalizeOrigin`; a trailing slash would have reinstated the 403. Case **13.188** |
+| **I3** wildcard reachable via config | FIXED — throws at assembly; `auth.ts` had asserted "never a wildcard" as a property nothing enforced. Case **13.189** |
+| **I4** CI presence gate = green-by-absence | FIXED — gate removed; absence now fails loudly |
+| **I5** 13.170 / 13.187 ✅ with no check | DOWNGRADED to 🧪 |
+| Minors | mailpit guard settles before deciding · `fileURLToPath` · verify refuses 4xx · 13.186's inverted line attributions · two no-op-click comments |
 
-**The waiver covers the missing CI run. It does NOT cover the missing review.** Do not read "gate green,
-catalogue in, PR mergeable" as done — the one check that has never run on this work is the one that is not
-mine to perform.
+**Reviewer's own least-confident call was I3** (would an operator ever write a `*`); I fixed it anyway
+because the guard is one line and the comment already claimed it.
 
----
+| anchor | value |
+|---|---|
+| gated content head | **`8b6e9b6`** — the handoff commit sits on top; read the head with `git rev-parse HEAD`, never from this table |
+| base | `origin/main` = `a224d5f` |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 2m5.701s · node v22.22.2 · 285 files / 3654 passed / 5 skipped · Unsupported engine 0 · no orphans** |
+| `check:env` | **`CHECK_ENV_EXIT=0`** (separate from the gate) |
+| `check-case-ids` | **exit 0**, highest 13.203 (separate CI step) |
+| E2E | **3 passed**, exit 0, against the rebuilt stack |
+| §13 | used through **13.189. Next free: 13.190.** |
+| CI | still **none** — account billing block |
+
+**A re-gate WAS owed** and was decided, not assumed: the non-docs delta against the previously gated
+content head `0e7ee2f` was **8 files** (my six fixes plus `fixture-witnesses.test.ts` arriving from main).
+
+## Still owed: T16 only
+
+The runbook, §13's and `test-cases/13`'s final shape, and the verifier's **DDL / restore-scratch-DB
+written decision**, which remains T16's and undischarged. Re-measure T16's catalogue precondition against
+`origin/main` rather than assuming it.
 
 # ▶ T13 IS COMPLETE — catalogue in, gate green at the head. PR #205. (this block first on restart)
 
