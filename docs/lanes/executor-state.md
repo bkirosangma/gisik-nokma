@@ -16,6 +16,43 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~00:35 IST — **§07 BACKFILL STARTED BY HAND: 78 → 63 uncited in two per-file batches. Clause A COMPLETE (below). `exec/60` staged, still not a PR — #239 remains open.**
+
+| what | value |
+|---|---|
+| `main` | `998044d` · **#239 still OPEN** — merge it, then cherry-pick this branch's commits onto `main` (a rebase conflicts; #237 proved that) |
+| branch | **`exec/60-clauseA-3`**, pushed. Commits: `25421b9` (7.259) · `629c6c3` (§07 batch 1) · `482e108` (§07 batch 2) · + handoff |
+| **§07** | **171 cited / 63 uncited / 234** (was 155/78). Baseline **63** |
+| repo-wide | **1016 cited / 514 uncited** (was 815 uncited this morning) |
+| gate | batch 1 green at `629c6c3`: `GATE_EXIT=0` · 30/30 · 0 cached · **3666 \| 5 (3671) / 285**, seventh identical run. Batch 2's gate was running when this was written — **if no result is recorded below, RE-RUN IT** |
+
+## Why this was done by hand, and why that is the CHEAP option here
+
+**Authorization:** the override's §1(c) — *"take it as small per-file PRs when nothing else is queued"*. Nothing
+else was queued, and by-hand needs **no dispatch**, so no controller clearance was required. **§09 and §10 were
+the named first targets and both are closed**, so §07 is next by the same instruction.
+
+**Do not "optimise" this into a subagent without doing the arithmetic.** A dispatch costs **45,877 tokens before
+it does anything** (measured). These two batches were 15 citations total; by hand they cost a fraction of one
+dispatch floor. **The subagent is the cheap option at ~100 rows, not at ~10.** §13's 153 rows IS subagent work;
+a 7-row file is not.
+
+## The two batches, and the row I refused to cite
+
+- **Batch 1 — `compile-filter.test.ts`, 8 rows** (7.4, 7.46–7.49, 7.51–7.53). Mutation: removing `7.52` → `EXIT=1`, §07 `163/71`, `7.52` named; restored.
+- **Batch 2 — `ticket-cards.test.ts`, 7 rows** (7.15, 7.74–7.79). Predicted 63 before running; measured 63.
+- **REFUSED: `7.72`.** It names `compile-filter.test.ts` among its files, so it landed in batch 1's candidate set, but the row is about **`tsvector` under `verify-projections`** and nothing in that file asserts it. **Citing it would have satisfied the checker while pointing at a test that does not assert the case — the exact failure the convention exists to prevent.** It stays uncited. *Whoever takes it next: look in the verify-projections / `projections/search.test.ts` area, not in compile-filter.*
+- **Two rows cited on ONE HALF of a two-file claim**, each docblock naming which half: `7.49`'s compile-filter half is the SQLSTATE 22021 behaviour past the door (door-refusal half is in `packages/domain/test/filter-spec.test.ts`); `7.53`'s is the `contains: ''` presence predicate (`eq: ''` half likewise in domain).
+- **`7.75` cited on the `describe`, not an `it`** — the row makes two claims asserted by two different tests in one block, so citing either `it` would have claimed one test proves both.
+
+## §07's remaining 63, measured
+
+**42 of the original 78 named a test file; 36 did not.** After these two batches the largest remaining named
+clusters are `visible-where.test.ts` (6), `filter-spec.test.ts` (5), `projections/search.test.ts` (5),
+`workspace-settings.test.ts` (4), `doc-text.test.ts` (3). **The 36 that name no test file are the hard tail —
+`7.163`–`7.174` and neighbours — and they need a reader, not a transcriber.**
+
+
 # 🔵 MONDAY 2026-09-07 00:10 IST — **CLAUSE A IS COMPLETE. The sweep is finished; the remaining surfaces came back CLEAN.** `exec/60-clauseA-3` staged (not a PR — #239 still open). Nothing in flight, no subagent, **weekly reset is 06:30 today, ~6h away.**
 
 ## CLAUSE A — FINAL RESULT. Eight probes. Do not re-run this sweep.
