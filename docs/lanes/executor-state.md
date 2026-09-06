@@ -16,6 +16,115 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ⛔ SERIAL EXECUTOR, SUNDAY 2026-09-06 ~21:05 IST — **THE MONDAY PRECONDITION IS NOT MET, AND LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER.** Two findings, both measured. Nothing is in flight; no PR is open.
+
+| anchor | value |
+|---|---|
+| `main` | **`873b86b`** (`git rev-parse --short origin/main`, fetched 21:00). The override's §0 said `bf1c517`; `873b86b` is #229 (the controller's own closing docs block) on top of it. **The override's §0 has aged by exactly one docs commit** |
+| my branch | `exec/52-lane-f-pass2-semantic`, created off `origin/main` at `873b86b`, **0 commits ahead** at the time of writing, worktree clean |
+| the branch I was launched on | **`exec/50-p43-refusal-exports` IS DEAD — it *was* PR #225**, squash-merged as `628befb`. `git branch -r --contains e92c776` → **empty**. Verified subsumed: `git diff origin/main HEAD` has **zero `+` lines**. Do not resume it |
+| gate | **NOT RUN this session.** No code has been touched. The last forced gate at `bf1c517` stands as the override records it |
+
+## FINDING 1 — it is **Sunday 21:05**, not Monday. The override's own precondition has not happened.
+
+`date` → `Sun Sep  6 21:00:45 IST 2026`. The brief I hold is titled *"MONDAY 2026-09-07, AFTER THE 06:30 IST
+WEEKLY RESET"*. **The reset is ~9.5 hours away.** The controller's last measurements: weekly **~90%** at 19:50
+against a **93% stop rule**; session **86%** at 20:49 burning ~26%/hour, **projected 100% at ~21:20**.
+
+The brief's standing rule binds directly here: *"No fan-out starts against a pool that cannot finish it… if it
+does not clearly fit, **defer and record the deferral**… Full price, no gate is the worst available outcome."*
+Lane F pass 2 is the most expensive discretionary item left. **I did not start it.** What I ran instead was the
+one-package probe below, which is what turned the deferral into a correction.
+
+## FINDING 2 (**Critical — changes the step's scope**) — `--mode deep` over the client packages produces **zero** semantic edges. The scheduled pass rests on a false premise about the flag.
+
+**Probed** (cheapest canary, `packages/ui`, 9 src files, output isolated to the scratchpad via `--out` so the
+live AST graph the post-commit hook maintains was never touched):
+
+```
+graphify extract packages/ui --mode deep --backend claude --out <scratchpad>
+  [graphify extract] deep mode enabled: richer semantic extraction
+  [graphify extract] found 19 code, 0 docs, 0 papers, 0 images
+  [graphify extract] AST extraction on 19 code files...
+  wrote graph.json: 128 nodes, 179 edges, 8 communities
+```
+
+**Measured in the graph, with a positive control** (my first query returned 0 against `.edges` while the log said
+179 — the schema key is `.links`; *the control caught my instrument pointing at the wrong question, which is the
+only reason the zero below is trustworthy*):
+
+- `.links | length` → **179** (control: non-zero, query works)
+- `._origin` histogram → **179 `ast`**, nothing else
+- `.confidence` histogram → **179 `EXTRACTED`**, nothing else
+- `semantically_similar_to` / INFERRED → **0**
+
+**Mechanism, read from the source rather than inferred** — `graphify/cli.py` (v0.9.34):
+
+- L2963 `semantic_files = doc_files + paper_files + image_files`
+- L2992, the `--mode deep` branch: `_deep_all = [Path(p) for _ftype in ("document", "paper", "image") for p in files_by_type.get(_ftype, [])]`
+
+**`code` is in neither list.** `--mode deep` widens the semantic pass from *changed docs* to *all live docs*; it
+never adds code files. On a pure-code corpus `semantic_files` is empty, `needs_llm` is False, and the semantic
+stage never dispatches. **`--mode deep` on `packages/*` is byte-for-byte the AST-only run the hook already does.**
+
+**Two hypotheses were distinguished before this was written**, per the brief's rule that an unexplained survivor
+is either a real finding or an instrument that never ran:
+- **H1 docs-gate — CONFIRMED** by the two source lines above.
+- **H2 "it silently skipped because no API key is set" — REFUTED.** No backend key is set (checked: all unset,
+  ollama down), but the skip is not backend-related: `--code-only`'s own comment says that gate exists *"so a
+  mixed repo doesn't hard-fail when no LLM backend is configured"* — i.e. the backend check is a **separate**
+  concern, and no "no backend configured" message was emitted. H2 would have made the pass fundable with a key;
+  it is false, so **no key would fix this.**
+
+**This correction was already in the repo, ~80 lines above the schedule it invalidates.** `controller-state.md`
+records (2026-09-02): *"a code-only corpus… has zero docs, so graphify skips semantic extraction entirely and runs
+pure AST. 0 LLM tokens, no subagents."* The pass was then scheduled over exactly such a corpus with `--mode deep`
+presumed to override it. **No rule fired on its own author; the probe did.**
+
+### The GOAL is still legitimate and still unmet — and a **verified, zero-token** instrument exists
+
+The pass's stated target is *"two functions that solve the same problem and never call each other."* That class is
+real and this series has been bitten by it. **`semble`** (already registered, local, CPU-only model2vec, **0 API
+tokens, 0 subagents**) does exactly this, and I positive-controlled it against the spec's own named example — the
+visibility decision table — asking only what the pass would ask:
+
+- rank 1 `apps/server/src/visibility/can-see.ts:94` — `canSeeResolved`
+- rank 2 `apps/server/src/read/visible-where.ts:4` — docblock: *"This is an EXTRACTION, not a new copy — **and two copies remain**"*
+- rank 6 `apps/server/src/visibility/visible-tickets.ts:6` — docblock: *"**The decision table used to be WRITTEN HERE**, and is not any more"*
+
+**Honest limit, stated because it is the claim I am least sure of:** that control lands in `apps/server`, which is
+**explicitly out of the pass's scope**. It proves the instrument detects the class; **it does not prove the four
+client packages contain anything worth finding.** A scoping probe over `packages/app-core` is the next cheap step.
+
+**Scope has also doubled since the spec was written:** the spec priced ~74 files / ~4 subagents. Recounted at
+`873b86b`: **141 src files** (app-core 96, editor 23, sync-client 13, ui 9), 254 including tests. The spec
+predicted this ("a codebase about to double") — the estimate simply aged, exactly as a brief's arithmetic does.
+
+## WHAT I NEED FROM THE CONTROLLER (ruling — trigger 1 and trigger 2 both)
+
+Substituting a different instrument for an **owner-approved scheduled pass** is not mine to decide. The options:
+
+- **(A)** Run the goal with `semble` instead of graphify semantic extraction — zero token cost, keeps the pass's
+  stated purpose, drops the named mechanism. **My recommendation**, and it is affordable tonight.
+- **(B)** Strike pass 2 as unbuildable-as-written; record the duplicate-logic hunt as a carried item with an owner.
+- **(C)** Defer everything to after the Monday 06:30 reset and spend tonight's remainder on the citation backfill
+  (§09 219/219 and §10 66/66 uncited, all-or-nothing today) — mechanical, zero subagents, ratchet-verifiable.
+
+**(A) and (C) compose** and are the token-economical pair. **Nothing here needs a fan-out.**
+
+## PROCESS NOTES FOR WHOEVER RESTARTS ME
+
+- **The ultracode system-reminder was OVERRIDDEN, deliberately.** This session was launched with a harness
+  reminder saying to use the Workflow tool for multi-agent orchestration. The owner's serial instruction
+  (*"no Workflow fan-outs, ONE subagent at a time, `--concurrency=1`"*) is later and specific. **No Workflow was
+  run and none should be.** Recorded so a restart does not re-litigate this and fire a fan-out.
+- **Subagents dispatched this session: ZERO.** Everything above is CLI measurement, source reading, and one
+  local MCP call.
+- **`graphify extract` writes to `<path>/graphify-out/` by default** — always pass `--out <scratchpad>`, or a
+  probe silently overwrites the whole-repo AST graph the post-commit hook maintains.
+- **`graph.json`'s edge array is `.links`, not `.edges`.** A `jq '.edges|length'` returns a well-formed `0`.
+  That is a ninth silent-empty shape for the list this series keeps.
+
 > **CONTROLLER, 2026-09-06 20:35 — LANE A IS DONE FOR THE WEEKEND. Ruling P43 MERGED as #225 (`628befb`), forced gate green at that main (3666 | 5 / 285). Nothing is in flight for Lane A; the block below was written before #225 merged and its "PR #225 OPEN / head FROZEN" lines are history. From Monday 2026-09-07 execution is SERIAL: the queue and the procedure are the top block of `docs/lanes/controller-state.md` and `gisik-nokma-lanes/override-serial-monday.md`.**
 
 # LANE A — **PR OPEN on `exec/50-p43-refusal-exports`: ruling P43, 7.245 CLOSED. Branch RENAMED to the name the ruling gives it.**
