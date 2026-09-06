@@ -9,7 +9,116 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
-# ✅ SEAM 1 IS DONE AND PR #190 IS OPEN — READ THIS BLOCK FIRST ON RESTART
+# ▶ SEAM 3 — LIVE STATE, branch `exec/42-plan11-seam3` (this block first on restart)
+
+**Position: T13 not started. First commit on the branch is GATE LOCK v3.3, and it carries a correction
+to the controller's prescribed fix.** Seam 1 merged as `935f5d6` (#190); T1–T6 promoted by #191; the
+controller's anchors landed as #192. Nothing below is adopted from prose — every figure was measured on
+this branch at the sha named.
+
+| anchor | value |
+|---|---|
+| branch | `exec/42-plan11-seam3`, cut from `origin/main` |
+| HEAD | `c1df783` (gate lock v3.3) — **verify with `git branch --contains`, never `cat-file`** |
+| position | **1 ahead / 0 behind** `origin/main` (`0364208`) at the moment of writing |
+| tree | clean |
+| toolchain | `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `turbo run build --force --concurrency=1` → **exit 0, 10/10 tasks, 0 cached, 52.3 s, node v22.22.2** |
+| §13 | Lane E block 13.101–13.200; **consumed through 13.168. Next free: 13.169.** Recounted at this sha from the file: 128 case lines, max `13.168`. (`grep -oE "13\.[0-9]+"` returns `13.201` — that is the *prose* naming the next block, not a case. Count `^- 13\.` only.) |
+| gate | NOT yet run on this branch — the only commit is docs/reference. |
+
+## ⚠ THE CONTROLLER'S PRESCRIBED v3.3 FIX DOES NOT FIX THE BUG — measured, and two lanes have adopted it
+
+The controller's ruling (13:58) prescribes `-v fork=$BASHPID` **inline in the awk argument list**, and
+records that **Lane A and Lane C have patched their copies with it**. On this machine that form leaves
+the defect in place.
+
+**Why:** bash expands an argument in the child it forks for `awk`, so `fork` receives **awk's** pid — and
+awk is already excluded by `comm`. The command-substitution subshell, which is the process that actually
+matches, stays counted. One run, both values visible at once:
+
+    awk sees: self=97902 parent=97899 fork=97905
+      pid=97903   ==self:0 ==parent:0 ==fork:0     <- the subshell. Counted. fork named 97905, not it.
+
+**What works:** capture `$BASHPID` with a plain assignment executed by the substitution subshell *before*
+any pipeline fork — `local fork=$BASHPID`, then `-v fork="$fork"`.
+
+**Control record** (Lane D's live gate-shaped peer 87594 present throughout, so the true count is 1 and
+never 0; positive control is a gate-shaped SLEEPER, never a copy of the instrument):
+
+| condition | inline (prescribed) | captured (landed) |
+|---|---|---|
+| baseline, one live peer | 2 | **1** |
+| + one sleeper | 3 | **2** |
+| sleeper reaped | 2 | **1** |
+
+The inline form is the captured form **plus one, always**.
+
+**The fair framing, and why the captured form is what to adopt regardless:** bash *may* exec the last
+pipeline element in place of the subshell, and on a machine where it does, no bash process carrying the
+argv survives and the inline form would read 0 — which may be what the controller measured. The captured
+form is correct under **both** behaviours: if the subshell persists it is excluded by pid; if it is
+replaced by awk it is excluded by `comm`. So this is not "the controller measured wrong" — it is that the
+inline form's correctness depends on a bash optimisation nobody is checking for, and here it does not hold.
+
+**Action for peers: Lane A and Lane C should re-measure their patched copies** with a sleeper control
+before trusting their reclaim path. Blast radius is unchanged and fails SAFE — `pg` is read only by the
+empty-lock reclaim's idle guard, so the cost is a lock that wedges rather than one wrongly stolen.
+
+**Also landed in the same commit:** `REPO=` was hard-coded to *this* worktree in BOTH `gate.sh` and
+`locked-test.sh`. Lanes copy these FILES, so a peer gated Lane E's tree and read Lane E's `check:env`
+exit believing it was its own (Lane B). Now `${GATE_REPO:-$PWD}` behind a guard that exits 3 by name.
+`-e`, not `-d`: a worktree's `.git` is a FILE (`file -b .git` → `ASCII text`, verified). The relative
+form the override suggested was rejected — from `docs/lanes/gate-lock/` it resolves to `docs/`, and it
+breaks outright for the scratchpad copies lanes actually run.
+
+## T13 — measured before starting, and TWO override claims did not survive
+
+**1. The override says "seed via `seed:dev` … case 13.90 flips only if T13 ran it." Both halves are wrong.**
+Read at this sha: `13.90` is **`seed:cc`**, not `seed:dev` — *"CLI smoke: `seed:cc` against the dev stack
+reports `23 errand tickets, guest NOT configured`"* — and it sits in **Lane D's** block (13.41–13.100).
+This lane's own seam-1 note already ruled it: *"Lane D should re-run `seed:cc` … and flip `13.90` itself."*
+
+**The scenarios settle which seed, and they leave no choice.** The visibility spec needs the accountant as
+a `guest` with explicit per-ticket visibility and the names *Convenience Corner* / *Shop operations* /
+*D-U-N-S number* / *HSN digit count*. Only `seed-convenience-corner.ts` produces those (`guestConfigured`,
+`visibility.*` on exactly the items naming the accountant). `seed-dev-workspace.ts` has **no guest at all**,
+so the visibility spec is **unbuildable** on it. → **T13 seeds via `seed:cc`.** It produces 13.90's
+evidence; the case stays Lane D's to flip.
+
+**2. `seed:dev` cannot be run the plan's way.** Its own docblock: *"run from a repo checkout — the plan
+documents in `docs/superpowers/plans/` are not in the container image."* So the plan's
+`docker compose exec -T server node dist/seed/…` cannot work for it; it must run host-side with
+`DATABASE_URL` → `localhost:54330`. Giving `seed:dev` its first runtime coverage is therefore a separate
+❌-with-owner line in this lane's block, **not** a scenario dependency.
+
+**3. The `webServer` collision — decided.** `apps/web/playwright.config.ts` has `testDir: './e2e'` AND
+`webServer: {command: 'pnpm dev', url: 'http://localhost:3001', reuseExistingServer: true}`. Extending
+`apps/web/e2e` under **that config** means Playwright either starts a dev server on 3001 (colliding with
+the compose web container) or `reuseExistingServer` silently adopts whatever is on 3001 — which is the
+stray-process failure this lane already recorded, built into the harness. The controller's default
+(extend `apps/web/e2e`) is kept, but **not under one config**: a second config in `apps/web` with **no
+`webServer`**, its own testDir and its own script. That is the "deliberate way" the existing docblock asks
+for. Structural guard to re-run after the edit: `turbo run test --dry=json` was **8 tasks** at pre-flight
+and must still be 8 — the new script must not be named `test` and must not be a turbo task.
+
+**4. Still true, re-measured at this sha:** `docker` is **24.0.6** and available. The compose stack is
+**down** right now. `docker-compose.dev.yml` exists (project `gisik-nokma-dev`, Postgres **54330**, web
+`3001:3000`, server `3000`, Mailpit 8025/1025, MinIO 9000/9001) — so CI's `e2e` job today takes its
+**file-present** branch and reports **green while running nothing**. Green-by-absence has become
+green-by-presence; T13 must replace it and keep a visibly-`skipped`-with-printed-reason path.
+
+## Carried, undischarged
+
+- **The verifier's DDL / restore-scratch-DB written decision is T16's** (coordination 1607–1611). Neither
+  a DDL credential nor a recorded decision exists in `deploy/do/`. Still carried.
+- **12.258** — what the web shell renders when `getTickets` throws past the 2000-row cap. T13's or a web
+  render test's; T13 must say which.
+- **`SERVING_GAPS` carries `search` alone** — re-measure before relying on it; it changed three times in
+  one evening. Any scenario touching search meets a refusal: **recorded, never softened.**
+- **Trap, case 3.51:** a pinned ticket renders TWICE with the same `ticket-card-${id}`; Playwright strict
+  mode throws. Pick an unpinned ticket or scope to a region. **Never** make the id unique to suit a test.
+
+# ~~SEAM 1 IS DONE AND PR #190 IS OPEN~~ — SUPERSEDED: #190 MERGED as `935f5d6`. Kept for its four lessons.
 
 **Position: HOLDING for the controller's merge. Do NOT start T13 or T16 on this branch.**
 The controller merges #190, then relaunches this lane onto seam 3 from a NEW branch via
