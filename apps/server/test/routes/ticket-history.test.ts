@@ -187,6 +187,9 @@ async function memberWithTicket(): Promise<{
 }
 
 describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', () => {
+  /**
+   * 5.19 — the history endpoint serves the ledger filtered to ONE ticket, in seq order. The row’s other clause — excluding a claim filed against a different entity KIND under the same id — is the test below.
+   */
   it('serves this ticket claims and no others, in seq order', async () => {
     // The claims are BUILT 2, 3, 4 (testEnvelope mints seq in build order) and
     // STORED 4, 3, 2, so heap order is 1, 4, 3, 2. That is NOT enough to
@@ -310,6 +313,9 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', (
     expect(event?.clientTime).not.toBe(event?.serverTime);
   });
 
+  /**
+   * 5.25 — a claim submitted at `+05:30` reads back as the equivalent `…Z` instant, with the two clocks still one second apart: the instant survives, the spelling is normalised.
+   */
   it('a claim submitted at +05:30 reads back as the equivalent Z instant, the two clocks still one second apart', async () => {
     // 2026-08-20T14:30:00+05:30 IS 2026-08-20T09:00:00Z. Both clocks are
     // timestamptz (owner decision 2026-08-20), so the offset the device typed
@@ -338,6 +344,9 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', (
     ).toBe(1000);
   });
 
+  /**
+   * 5.73 — the history door agrees EVENT FOR EVENT with the workspace-scoped `/events` door over the same ticket — two routes reading one ledger.
+   */
   it('agrees event for event with the workspace-scoped /events door over the same ticket', async () => {
     // The two routes are different contracts over the same rows, and the SELECT
     // is deliberately NOT shared between them (see the route docblock: shared
@@ -361,6 +370,9 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', (
   });
 });
 
+/**
+ * 5.71 — cited on the block: the row’s three clauses are its three tests — an invisible ticket’s history is byte-identical to a nonexistent one’s, a ticket in another workspace is the same 404, and no session answers the generic 401.
+ */
 describe('GET /v1/tickets/:id/history — invisible is nonexistent', () => {
   it('the history of a ticket a viewer may not see is byte-identical to the history of one that never existed', async () => {
     // The existence oracle Plan 4 Task 8 closed at the neighbouring route, held
@@ -440,6 +452,9 @@ describe('GET /v1/tickets/:id/history — invisible is nonexistent', () => {
   });
 });
 
+/**
+ * 5.72 — cited on the block: the paging edges the row states are pinned across these tests — `afterSeq` moves the page, `limit` shrinks it, and an `afterSeq` past the end is an empty page rather than a refusal.
+ */
 describe('GET /v1/tickets/:id/history — paging, and what happens at the edges', () => {
   /** A visible ticket with claims at seq 1..4. */
   async function pagedTicket(): Promise<{ headers: { authorization: string }; ticketId: string }> {
@@ -528,6 +543,9 @@ describe('GET /v1/tickets/:id/history — paging, and what happens at the edges'
   });
 });
 
+/**
+ * 5.74 — `parsePaging`’s bounds asserted at the UNIT rather than through HTTP: no query defaults to the whole history from the start, and an over-large limit is clamped rather than passed through.
+ */
 describe('parsePaging — the bounds HTTP cannot see', () => {
   it('defaults to the whole history from the start', () => {
     expect(parsePaging({})).toEqual({ afterSeq: 0, limit: DEFAULT_LIMIT });
