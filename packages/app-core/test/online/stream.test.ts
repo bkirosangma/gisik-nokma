@@ -507,7 +507,18 @@ describe('parseFrame against the published schema', () => {
     // could not find — the other five were type errors. A runtime completeness
     // guard is what catches a wire member that typechecks everywhere and is
     // simply never exercised, which is the shape a new frame arrives in.
-    'reach-granted': { type: 'reach-granted', workspaceId: WORKSPACE_ID, ticketIds: [newUlid(), newUlid()] },
+    'reach-granted': {
+      type: 'reach-granted',
+      workspaceId: WORKSPACE_ID,
+      // `{id, headSeq}` since ruling P37.2 — an id-only notice could not tell a
+      // COMPLETE local copy from a stale partial one. `headSeq` is `>= 1` in
+      // the published schema, so a fixture carrying 0 is refused here, which is
+      // the check working rather than a fixture detail.
+      tickets: [
+        { id: newUlid(), headSeq: 4 },
+        { id: newUlid(), headSeq: 9 },
+      ],
+    },
     'caught-up': { type: 'caught-up', workspaceId: WORKSPACE_ID, seq: 4 },
     error: {
       type: 'error',
