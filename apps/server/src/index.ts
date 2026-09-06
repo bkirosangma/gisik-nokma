@@ -1,4 +1,5 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
+import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
 import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
@@ -129,6 +130,22 @@ async function main(): Promise<void> {
       // `/healthz`. Everything else gets the `'dev'` default, which is honest
       // about what it is.
       deploySha: config.deploySha,
+      // The one non-test boot path, so the one place errors that reach
+      // Fastify's error handler actually phone somewhere (Plan 11 Task 3).
+      // NOT every 5xx: `/healthz` answers its own 503 without throwing and so
+      // pages nobody — the boundary and its reason are recorded at that route
+      // in `app.ts`. `ALERT_WEBHOOK_URL` unset yields a
+      // `NoopErrorAlerter`, which is the dev default and not a degraded server;
+      // the error is in the structured log either way.
+      //
+      // PROCESS-LEVEL handlers (`unhandledRejection`, `uncaughtException`) are
+      // NOT installed here, against the plan text — see the deviation recorded
+      // beside the snapshot writer's shutdown note below: registering them
+      // suppresses Node's own crash, so a bug that today kills the process
+      // would instead leave it listening in an unknown state. That belongs with
+      // the SIGTERM/shutdown errand this file still owes, not with an alerting
+      // hook.
+      alerter: alerterFromConfig(config.alertWebhookUrl),
       // The one non-test boot path, so the one place the security surface is
       // ON (Plan 11 Task 2). Absent everywhere else, which is the contract
       // `SecurityOptions` states: the controls are opt-in so that around sixty

@@ -5,6 +5,7 @@ import type { Pool } from 'pg';
 import { FORBIDDEN_ORIGIN_BODY, httpOriginRefused, normalizeOrigin } from './http/http-origin.js';
 import { makeFixedWindowLimiter, rateLimitKeyFor } from './http/rate-limit.js';
 import type { Auth } from './auth/auth.js';
+import { NoopErrorAlerter, alertWithoutWaiting, type ErrorAlerter } from './alerts/error-alerter.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
@@ -254,6 +255,13 @@ export function buildApp(
     logStream?: NodeJS.WritableStream;
     deploySha?: string;
     security?: SecurityOptions;
+    /**
+     * Where 5xx failures phone (Plan 11 Task 3). Absent means a
+     * `NoopErrorAlerter` — no webhook, no network, and NOT a degraded server:
+     * `index.ts` builds one from `ALERT_WEBHOOK_URL` and every other caller,
+     * this suite's sixty-odd apps included, gets silence.
+     */
+    alerter?: ErrorAlerter;
   } = {},
 ): FastifyInstance {
   const app = Fastify({
@@ -320,12 +328,34 @@ export function buildApp(
   // SQL fragments, constraint and table names — so it is replaced by a fixed
   // structured body. The operator gets the detail through the log; the caller
   // gets the truth that this request did not complete, and nothing else.
+  //
+  // A 5xx also PAGES, and a sub-500 deliberately does not. A schema refusal and
+  // an `unauthenticated` are the door working; paging on them is how an alerting
+  // channel gets muted, and a muted channel is worse than none because it still
+  // looks like coverage.
+  //
+  // Read "a 5xx that REACHES THIS HANDLER". A 5xx sent by a route that catches
+  // its own failure never arrives here and so never pages; `/healthz` below is
+  // that case, and the only one in this file. The reason it stays that way is
+  // recorded at that route.
+  const alerter = options.alerter ?? new NoopErrorAlerter();
   app.setErrorHandler((error: FastifyError, request, reply) => {
     const statusCode = error.statusCode ?? INTERNAL_ERROR_BODY.statusCode;
     if (statusCode < 500) {
       return reply.status(statusCode).send(error);
     }
     request.log.error({ err: error }, 'unhandled error');
+    // FIRE-AND-FORGET, through the containment helper — never a bare `notify`.
+    // No response, and no response's TIMING, may depend on whether an alert was
+    // delivered, and an alerter that throws, rejects or hangs must leave this
+    // 500 exactly as it is. See `alerts/error-alerter.ts` for why one `catch` is
+    // not enough, and why this does not copy the fan-out's bare `void` below.
+    //
+    // The context carries the same REDACTED url the request logger uses: with
+    // `request.url` verbatim, a 5xx anywhere under `/v1/invites/:token` would
+    // post an unspent invitation CREDENTIAL to a chat channel, where it outlives
+    // the incident in everyone's scrollback.
+    alertWithoutWaiting(alerter, `${request.method} ${redactInviteToken(request.url)}`, error);
     return reply.status(INTERNAL_ERROR_BODY.statusCode).send(INTERNAL_ERROR_BODY);
   });
 
@@ -577,6 +607,20 @@ export function buildApp(
       await deps.db.query('SELECT 1');
       return { status: 'ok', sha };
     } catch {
+      // THIS 503 DOES NOT PAGE, and the boundary is stated here rather than
+      // only in `alerts/error-alerter.ts` because this is the route that
+      // violates the general claim. The catch returns instead of rethrowing, so
+      // `setErrorHandler` above never runs and `alertWithoutWaiting` is never
+      // called: a deployment whose database has gone away answers 503 to the
+      // load balancer and sends nothing to the webhook.
+      //
+      // That is a decision, not an omission. Task 3's alerting has no
+      // coalescing, and a load balancer probes on a fixed cadence — alerting
+      // from here would post one webhook per probe for the whole outage, until
+      // the receiver rate-limits and drops the message that mattered. The
+      // database-down case belongs with the process-level handlers `index.ts`
+      // defers to the shutdown errand, which can fire once. Whoever adds
+      // coalescing should revisit this line together with that errand.
       return reply.status(503).send({ status: 'unavailable', sha });
     }
   });
