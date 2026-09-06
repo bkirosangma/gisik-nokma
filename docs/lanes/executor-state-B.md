@@ -12,6 +12,38 @@ only what is written here.
 
 ---
 
+## ⏸ POSITION AT THE 10:05 SESSION HALT — READ THIS FIRST
+
+**PR #161 is OPEN and HELD at `e52673e`.** It is NOT clear to merge. The fix round
+following the Fable branch review is nearly complete; what remains is enumerated at the bottom of this
+block. A resumed session finishes those, re-gates, and reports the head to the controller.
+
+| anchor | value |
+|---|---|
+| branch | `exec/29-closure5b-reach`, pushed at every commit |
+| HEAD | **`e52673e`** — P37.3 landed |
+| rebase owed | onto **`aa17046`** (#169 Lane A getMyWork residuals) — also #167 (`5ca3be1`, Lane D sweeps). Expect `test-cases/12` and `Features.md` hunks, KEEP BOTH, and re-run `pnpm install` |
+| node | v22.22.2 (`source ~/.nvm/nvm.sh && nvm use 22`) — the machine default is v24 and gives a FALSE RED of ~14 better-sqlite3 failures |
+| last full gate | **RED at `f814db3`** on one app-core fixture, since FIXED (`ticketIds` → `tickets`); **no green full gate exists after P37.2/P37.3** |
+| sync-client | **85/85 green** at `e52673e` |
+| server subset | 72/72 green across the six affected files, at the pre-P37.3 tree |
+
+### WHAT IS OUTSTANDING, in order
+
+1. **P37.3 has NO excluding fixtures yet.** The controller required two, both directions, each alone:
+   **(i)** the revoked-project sequence — after ONE 404 the id is gone and no request is issued on any
+   later catch-up (mutate the drop away → red: a request per catch-up, for ever); **(ii)** the RACE — a
+   second notice for the same id arriving between the pull's issue and its 404 → the id stays pending and
+   the next catch-up pulls it (mutate the drop to UNCONDITIONAL → red). Ids: mint from **12.317**.
+   Say at the case that "may not see" and "never existed" stay indistinguishable to the device, and that
+   this is why the drop is keyed to the notice rather than to the status code.
+2. **Two handed-over `headSeq` mutations, derived but NOT run**, on `replica.ts`'s
+   `if ((await localHeadSeq(storage, id)) < headSeq)`: **never below** → predicted 7 red (12.305, 12.306,
+   12.308, 12.309, 12.311, 12.312, 12.313; only 12.310 survives); **always pull** (the `<=` off-by-one) →
+   predicted **12.305 and 12.313**, the only two notices carrying an equal-boundary id. **Run them in a
+   QUIET WINDOW under the lock with nothing else touching the tree** — see the contamination record.
+3. Rebase onto `aa17046`, `pnpm install`, rebuild, **full gate**, report the head to the controller.
+
 ## LIVE ANCHORS — measured 2026-09-06 after the #139 merge and the closure-5b relaunch. RE-VERIFY BEFORE TRUSTING.
 
 | anchor | value | how verified |
