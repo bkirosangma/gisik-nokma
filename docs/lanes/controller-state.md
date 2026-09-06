@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`9024bb5`** — twenty-seven merges this context; since `542a468`: #149 (anchors) · **#141** (Lane A closure 4 under P36 + its carry-forward amendment, `c8268e1`, eleven jobs green at `09c03d3`, opus replacement verdict applied) · **#151** (Ruling P39 + Lane A's four sentences, `9024bb5`). Every `gh pr merge` exit read from `$?` on its own line |
-| ledger | **`CHECK_EXIT=0` · 164/177 (92.7%)** · claimed 0 · in-flight 0 · todo 13 · Plan 10 **17/18** (T18 held) · Plan 11 **5/16** (T7, T8, T14, T15 done + T1–T5/A0 landed on Lane E's branch, unmerged; T9/T10 D, T11/T12 C, T13/T16 E) |
+| `main` | **`e0c8294`** — thirty-one merges this context; since `9024bb5`: #152 · #153 (lock v3) · #155 (lock v3.1 + errand split) · **#154** (Lane D Plan 11 T9+T10, the seed runners through the REAL client ingest door, `de88248`, eleven jobs green at `7b10cb1`, re-gated under v3) · **#156** (11/9 + 11/10 promoted, `e0c8294`). Every `gh pr merge` exit read from `$?` on its own line |
+| ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (T7–T10, T14, T15 done; T1–T5/A0 on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E) |
 | last forced gate | **`c8268e1`** (code-identical to `9024bb5`) — ONE backgrounded invocation under the lock (acquired 08:04:19, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m34.3s · node v22.22.2** · zero `Unsupported engine` · **3340 tests / 256 files** — server **1058** (+2), app-core **1093** (+1), sync-client **67** (+3 — closure 4's client half, which had ZERO tests before 12.246–12.249), the rest unchanged. **Matches Lane A's 3340 at `09c03d3`.** *(Previous: `56cd091` 3334.)* |
-| open PRs | **#150 only** (Lane A, the HELD pair under P38, `3272728` — **CONFLICTING after #141 on `Features.md`, and its run went RED on `typecheck` + one server shard once #141 sat under the merge ref: a SEMANTIC conflict with closure 4, not the text hunk**; A is reading the failing job's steps, rebasing onto `c8268e1`, re-gating; merge at the reported head on its eleven-job green, **then restart A (ctx 77%) — override staged: `getMyWork`'s three residuals under P39, C2's close, the owed ❌ cases**). Expected next: Lane B closure 5b (rebase target `c8268e1` sent); Lane C T11+T12; Lane D T9+T10; Lane E seam 1 (T3 in flight). |
+| open PRs | **#150 only** (Lane A, the HELD pair under P38, rebased and RE-GATED at `063f6af` — 30/30 · 0 cached · **3344 tests** under lock v3; eleven-job run on its last job; **merge on its gate, then restart A (ctx 77%) — override staged**). **The earlier red was NOT a semantic conflict with closure 4** — it was A's own required `projectNames` against A's own fixture, surfaced only when the branch was first type-checked against a tree with both, because **A's local check was an ad-hoc `tsc --noEmit -p tsconfig.json` (src only) while the gate runs `tsc -p tsconfig.typecheck.json` (src + test)** — every "typecheck clean" on that branch had been a claim about a smaller thing. *Run the package's own `typecheck` script; an ad-hoc `tsc -p` is a different tool wearing the same name.* Expected next: Lane B closure 5b (`exec/29-closure5b-reach`); Lane C T11+T12 (workflow running, then the two scheduler errands as a follow-up PR); Lane D the two retention sweeps (`exec/32-plan11-retention-sweeps`, restarted 08:27, session `lane4-periphery-84`); Lane E seam 1 (T1–T3 landed, T4 staged, then shutdown, T6; 29 ahead at `5744489`, rebased onto `de88248`; then T13, T16). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -335,6 +335,34 @@ peers=$(ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID '{ c=$2; sub(/.
 ```
 Positive-controlled by E: a real `locked-test.sh` run reports `peers=3`. Sent to all five lanes 08:25; the
 controller's `gate.sh` is on v3.1.
+
+**v3.2 (08:30) — v3.1's term had TWO more defects, found by Lane E watching the matcher fire against real
+processes rather than reading it.** (a) `gate.sh` as a regex wants exactly one character between "gate"
+and "sh", so it cannot match a script named `gate19.sh` — measured with Lane A's gate live at pid 80157:
+broadened form 2, narrow form 0; every lane whose script is not literally `gate.sh` was invisible to the
+idle check. (b) Matching the whole `$0` makes the matcher match its own caller, because the awk program
+contains the names and the tool wraps commands in more than one shell level — `$PPID` does not cover it.
+E's first strict form reported **0 against two live gate-shaped processes**; it was caught only by refusing
+a vacuous positive control when the real gate had happened to finish. **The final form matches a path
+TOKEN in argv, with both controls green in one instant** (a real gate-shaped process plus a shell merely
+mentioning the names → 1; nothing → 0):
+```
+peers=$(ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID '
+  { c = $2; sub(/.*\//, "", c); hit = 0
+    for (i = 3; i <= NF; i++)
+      if ($i ~ /(^|\/)(gate[^\/]*|locked-test[^\/]*)\.sh$/) hit = 1 }
+  (c == "bash" || c == "sh" || c == "zsh") && hit && $1 != self && $1 != parent { n++ }
+  END { print n + 0 }')
+```
+Name gate scripts `gate*.sh` or `locked-test*.sh` so peers can see them. **Reference copy on Lane E's
+branch at `e814f49`: `docs/lanes/gate-lock/{locked-test.sh,gate.sh,sweep-test-dbs.sh,README.md}`** — copy the
+form, not the file (paths inside are per-worktree). **Interoperation confirmed live, not simulated:** the
+controller's v3 gate held the lock as a regular file containing pid 80157 and E's independently written v3
+script WAITED rather than reclaiming — two implementations, one protocol, the property v2 lacked. **Lane
+A's caveat, measured:** `peers=0` is not instantaneously reliable — a previous tool call's shell can
+linger as a sibling carrying the script text, neither self nor parent — which is why the reclaim also
+needs 10 minutes and zero vitest workers; never sample it once for any other purpose. Sent to all five
+lanes 08:30; the controller's `gate.sh` is on v3.2.
 
 **Rules:** (1) `$$` is the process that survives the whole gate — one script, one `run_in_background`
 invocation, never a subshell, pipeline or `nohup … &` (Lane D's earlier near-miss); (2) the ONLY stale
