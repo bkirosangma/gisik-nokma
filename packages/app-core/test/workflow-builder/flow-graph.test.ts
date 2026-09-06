@@ -80,6 +80,9 @@ describe('toFlowGraph', () => {
   });
 });
 
+/**
+ * 10.5 — a connect gesture becomes a transition; any-state maps to '*'; the any-state node accepts no inbound.
+ */
 describe('connectionToTransition', () => {
   it('strips prefixes and turns the any-state node into "*"', () => {
     expect(connectionToTransition({ source: 's:todo', target: 's:doing' })).toEqual({ from: 'todo', to: 'doing' });

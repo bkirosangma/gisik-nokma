@@ -26,6 +26,9 @@ const def: WorkflowDef = {
 };
 
 describe('layoutDraft', () => {
+  /**
+   * 10.9 — auto-layout layers by distance from the start state; orphans parked; never crashes on a dangling start.
+   */
   it('layers states by distance from the initial state', () => {
     const positions = layoutDraft(def);
     expect(positions['todo']).toEqual({ x: COLUMN_WIDTH, y: 80 });

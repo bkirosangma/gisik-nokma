@@ -102,6 +102,9 @@ function draftDroppingTriageAndReview(workflowId: string): DraftStore {
 }
 
 describe('PublishControls gating', () => {
+  /**
+   * 10.30 — publish disabled while any issue stands, naming why.
+   */
   it('disables publish while the draft is invalid, naming why', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     store.actions.setStateCategory('done', 'active');
@@ -120,6 +123,9 @@ describe('PublishControls gating', () => {
   // The planted defect that makes the advisory tier a guarantee rather than a
   // convention (design decision 9). If anyone ever folds adviseWorkflowDef into
   // selectCanPublish, this is the test that goes red.
+  /**
+   * 10.56 — an advisory does not gate publish — the button stays enabled and the publish commits.
+   */
   it('an advisory does not gate publish — the button stays enabled and the publish commits', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -224,6 +230,8 @@ describe('PublishControls — clean publish', () => {
    * `def.version` included. So a draft whose `def` carries a version its `base` does not is
    * a state the public store API accepts, not an impossible one.
    * Base 2 + 1 = 3; the def reading would say 100.
+   *
+   * 10.31 — version bumps from the published base; fresh drafts publish v1.
    */
   it('bumps from the PUBLISHED base version, not from the draft def', async () => {
     const user = userEvent.setup();
@@ -245,6 +253,9 @@ describe('PublishControls — clean publish', () => {
 });
 
 describe('PublishControls — the state-mapping dialog', () => {
+  /**
+   * 10.32 — the mapping dialog lists every stranded state with in-flight counts; confirm gated on full mapping.
+   */
   it('lists every stranded state with its in-flight count and requires a target for each', async () => {
     const user = userEvent.setup();
     const workflowId = newUlid();
@@ -411,6 +422,8 @@ describe('PublishControls — the state-mapping dialog', () => {
    * into a blocker passed the suite. So the mapping is now PICKED under the
    * failure, the confirm asserted to re-enable, clicked, and the submitted
    * stateMapping read back.
+   *
+   * 10.33 — a count-read failure says "unavailable" and still demands the mapping.
    */
   it('says so when the count read fails, and still demands the mapping — then publishes', async () => {
     const user = userEvent.setup();
@@ -484,6 +497,9 @@ describe('StateMappingDialog — the count line degrades honestly', () => {
 });
 
 describe('PublishControls — server results rendered honestly', () => {
+  /**
+   * 10.34 — workflow-state-mapping refusal rendered verbatim.
+   */
   it('renders a stranded-state refusal verbatim (planted defect: mapping-less publish)', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -498,6 +514,9 @@ describe('PublishControls — server results rendered honestly', () => {
     expect(screen.getByText('rule: workflow-state-mapping')).toBeInTheDocument();
   });
 
+  /**
+   * 10.35 — workflow-version (stale publish) refusal rendered verbatim.
+   */
   it('renders a stale-version refusal verbatim (someone published while we edited)', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -511,6 +530,9 @@ describe('PublishControls — server results rendered honestly', () => {
     expect(screen.getByText('rule: workflow-version')).toBeInTheDocument();
   });
 
+  /**
+   * 10.36 — invalid envelope result rendered verbatim.
+   */
   it('renders an invalid-envelope result verbatim', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));

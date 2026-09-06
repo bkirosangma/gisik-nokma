@@ -76,6 +76,9 @@ describe('event builders', () => {
     expect(parsed.ok).toBe(true);
   });
 
+  /**
+   * 10.42 — the create flow emits ticket-type.defined with a fresh entity ulid.
+   */
   it('ticket-type.defined mints a fresh entity ulid and carries the def as payload', () => {
     const def: TicketTypeDef = {
       id: newUlid(),

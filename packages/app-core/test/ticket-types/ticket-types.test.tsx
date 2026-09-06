@@ -49,6 +49,9 @@ function renderEditor(
 }
 
 describe('TicketTypeListScreen', () => {
+  /**
+   * 10.41 — list with rank, field count, Built-in badges.
+   */
   it('lists types with rank, field count and a Built-in badge on the seeds', async () => {
     const user = userEvent.setup();
     const custom: TicketTypeDef = {
@@ -163,6 +166,9 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     );
   });
 
+  /**
+   * 10.43 — select field without options: schema refusal in zod's own words; save blocked.
+   */
   it('surfaces the schema refusal for a select field without options and blocks saving', async () => {
     const user = userEvent.setup();
     renderEditor(null);
@@ -193,6 +199,9 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
 });
 
 describe('TicketTypeEditorScreen — built-ins and refusals', () => {
+  /**
+   * 10.45 — built-in ranks locked in the UI with the reason named.
+   */
   it('locks the rank of a built-in type and says why', async () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'epic')!);
     const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
@@ -200,6 +209,9 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     expect(screen.getByText('Built-in type — its place in the hierarchy is fixed.')).toBeInTheDocument();
   });
 
+  /**
+   * 10.46 — server refusal on save rendered verbatim.
+   */
   it('renders a server refusal verbatim (planted defect: non-admin ingest)', async () => {
     const user = userEvent.setup();
     const reason = 'Only a workspace owner or admin can do this. Your role is member.';
@@ -264,6 +276,9 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(within(notice).queryByText(/^0 /)).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.60 — rebinding a type to a different workflow follows the SAVED binding and opens only when it actually changed.
+   */
   it('the notice appears only when the binding actually changed', async () => {
     const user = userEvent.setup();
     renderEditor(task, { ...bothWorkflows, typePopulation: { task: { [kanbanPublished.id]: 14 } } });

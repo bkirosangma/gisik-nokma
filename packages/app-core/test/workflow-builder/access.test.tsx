@@ -89,6 +89,9 @@ function valueControls(): HTMLElement[] {
 }
 
 describe('read-only workflow views for non-admins', () => {
+  /**
+   * 10.47 — non-admins: banner, disabled fields, no publish/save/add anywhere.
+   */
   it('the builder screen shows the banner, disables the name field, and offers no publish', async () => {
     renderBuilder(memberSession);
     expect(await screen.findByText(BANNER)).toBeInTheDocument();
@@ -433,6 +436,9 @@ describe('the bulk migration — the one irreversible call — is unreachable fo
 });
 
 describe('the server, not the UI, is the enforcer', () => {
+  /**
+   * 10.48 — planted defect: permission.role refusal rendered character for character.
+   */
   it('renders a permission.role refusal verbatim (planted defect: the gate is down but the server still refuses)', async () => {
     const user = userEvent.setup();
     const reason = 'Only a workspace owner or admin can do this. Your role is member.';

@@ -103,6 +103,9 @@ describe('anchorIssues', () => {
     expect(anchorOf(unenterable, 'rdu-unenterable-state')).toEqual({ kind: 'transition', index: 1 });
   });
 
+  /**
+   * 10.55 — the rdu-bypassable advisory anchors to the transition carrying the rule, and is absent when there is nothing to say.
+   */
   it('the rdu-bypassable advisory anchors to the transition carrying the rule', () => {
     const fastTrack = base();
     fastTrack.transitions = [
@@ -250,6 +253,12 @@ describe('anchorIssues', () => {
     ]);
   });
 
+  /**
+   * 10.29 — issues anchor per code: every issue from a many-defect def gets
+   * some anchor. (This case's other two halves — click-to-select and a dry
+   * queue degrading to canvas — are validation.test.tsx's anchoring describe
+   * block and the test just above this one.)
+   */
   it('every issue from a many-defect def gets some anchor', () => {
     const def = base();
     def.initialStateId = 'gone';
