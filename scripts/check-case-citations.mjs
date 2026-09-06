@@ -19,8 +19,10 @@
  * claims it by name -- the same honest limit `check-runbook-commands.mjs`
  * states for itself.
  *
- * WHY A RATCHET. Measured at this script's own first run: 1029 checked ids,
- * 632 uncited. Citing 632 existing tests is a backfill project, not a script
+ * WHY A RATCHET. Measured at this script's own first correct run (after a
+ * review round fixed a range-line extraction bug and a version-string
+ * false-positive in isCited -- see both functions' docblocks): 1525 checked
+ * ids, 815 uncited. Citing 815 existing tests is a backfill project, not a script
  * PR. So this checks a per-file BASELINE (scripts/fixtures/check-case-
  * citations-baseline.json) that may only ever equal reality exactly:
  *   - actual uncited > baseline -- something got WORSE (a citing test was
@@ -59,29 +61,46 @@ const FIXTURE_PATH = join(REPO_ROOT, 'scripts/fixtures/check-case-citations-fixt
 //
 // Anchored at the line head, exactly like check-case-ids.mjs's own ID_LINE --
 // a case id is never read from prose, which routinely cross-cites other ids
-// in explanatory text. Extended past that script's own regex to also capture
-// what comes immediately AFTER the id, because this repo's status marker
-// appears on EITHER side of it depending on which era wrote the line:
-// leading (`- ✅ **13.201 — ...`, `- 🧪 **13.1 — ...`) or trailing
-// (`- 13.41 ✅ ...`, `- **12.240** ✅ ...`). Group 1: an optional leading
-// marker token. Group 2/4: 0-2 asterisks bracketing the id. Group 3: the id.
-// Group 5: the token immediately following, after any run of spaces (a
-// trailing marker sits one space after the id: `- 90.1 ✅ ...`) OR touching
-// it directly (a malformed id's dot-digit tail touches with NO space at
-// all: `- 90.5.1 ...` -- `\s*` matching zero characters is exactly what
-// keeps that tail visible in group 5 rather than swallowed).
-const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+)(\*{0,2})\s*(\S*)/;
+// in explanatory text. HEAD only matches the marker/bold prefix and the
+// FIRST id; everything after it (a range, a status marker, malformed
+// trailing digits) is parsed separately in `extractCheckedIds` below,
+// because those three shapes can't be told apart by one regex without
+// making it unreadable. Group 1: an optional leading marker token
+// (`- ✅ **13.201 — ...`, `- 🧪 **13.1 — ...`). Group 2: 0-2 leading
+// asterisks. Group 3: the first id.
+const ID_HEAD = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+)/;
 const STATUS_MARKERS = new Set(['✅', '🧪', '🟡', '❌', '🚫']);
 
 /**
- * Every checked (✅) id in `text`, plus every line that LOOKED like a case
- * line but carried a malformed id -- reported rather than silently
- * misparsed. The single malformed shape this guards: `13.2.1` is not an
- * N.M id, but `(\d+\.\d+)` greedily matches its first two segments ("13.2")
- * and would silently misfile a three-part number as a real, shorter id if
- * nothing looked at what follows. A real id's next token is either absent,
- * a status marker, or ordinary prose -- never `.` immediately followed by a
- * digit.
+ * Every checked (✅) id in `text` -- expanding RANGE lines to every id they
+ * cover -- plus every line that LOOKED like a case line but carried a
+ * malformed id, reported rather than silently misparsed.
+ *
+ * THREE shapes have to be told apart in what follows the first id, and
+ * getting this wrong is exactly the "check that cannot fail" class this
+ * whole series keeps finding:
+ *
+ *  1. RANGE: `- **3.89–3.94** ✅ ...` -- ids 3.89 THROUGH 3.94 are each
+ *     independently checked by the cited test(s); dropping the range
+ *     silently exempted every id but the range's own leader from the
+ *     citation ratchet entirely (found by review: 10 range lines in
+ *     `03-foundation-ledger.md` alone hide 50 checked ids, all real and
+ *     all, at review time, actually cited -- the check would have reported
+ *     a false "0 uncited" for every one of them, forever, while `check-
+ *     case-ids.mjs`'s own extractor DOES count them). The en-dash sits
+ *     directly against both numbers, no spaces, matching every real
+ *     instance measured.
+ *  2. MALFORMED: `13.2.1` is not an N.M id, but `(\d+\.\d+)` in `ID_HEAD`
+ *     greedily matches its first two segments ("13.2") -- a three-part
+ *     number would silently misfile as a real, shorter id if nothing
+ *     looked at what immediately follows (no range dash, `.` then a digit
+ *     with no space between).
+ *  3. ORDINARY: a single id, optionally closed by `**`, then either
+ *     nothing, a status marker, or unrelated prose.
+ *
+ * A real id's tail is checked in that order -- range before malformed,
+ * because a range's second number also starts with a digit and must not be
+ * mistaken for a malformed continuation of the first.
  */
 export function extractCheckedIds(text) {
   const ids = [];
@@ -89,19 +108,40 @@ export function extractCheckedIds(text) {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    const m = line.match(ID_LINE);
-    if (!m) continue;
-    const [, leadingMarker, , id, , nextToken] = m;
-    if (/^\.\d/.test(nextToken ?? '')) {
+    const head = line.match(ID_HEAD);
+    if (!head) continue;
+    const [, leadingMarker, leadingAsterisks, startId] = head;
+    const rest = line.slice(head[0].length);
+
+    const range = rest.match(/^–(\d+\.\d+)(\*{0,2})\s*(\S*)/);
+    let nextToken;
+    let idsOnLine;
+    if (range) {
+      const [, endId, , token] = range;
+      nextToken = token;
+      const [startSection, startNum] = startId.split('.').map(Number);
+      const [endSection, endNum] = endId.split('.').map(Number);
+      if (startSection !== endSection || endNum < startNum) {
+        malformed.push({ line: i + 1, raw: line.trim() });
+        continue;
+      }
+      idsOnLine = [];
+      for (let n = startNum; n <= endNum; n += 1) idsOnLine.push(`${startSection}.${n}`);
+    } else if (/^\.\d/.test(rest)) {
       malformed.push({ line: i + 1, raw: line.trim() });
       continue;
+    } else {
+      const ordinary = rest.match(/^(\*{0,2})\s*(\S*)/);
+      nextToken = ordinary ? ordinary[2] : '';
+      idsOnLine = [startId];
     }
+
     const status = STATUS_MARKERS.has(leadingMarker)
       ? leadingMarker
       : STATUS_MARKERS.has(nextToken)
         ? nextToken
         : null;
-    if (status === '✅') ids.push(id);
+    if (status === '✅') ids.push(...idsOnLine);
   }
   return { ids, malformed };
 }
@@ -118,7 +158,13 @@ function isTestPath(relPath) {
   if (relPath.includes('/node_modules/')) return false;
   if (/(^|\/)test\//.test(relPath)) return true;
   if (/\.test\.tsx?$/.test(relPath)) return true;
-  if (/^apps\/web\/e2e[^/]*\/.*\.spec\.ts$/.test(relPath)) return true;
+  // The whole e2e/e2e-stack directory, not only its *.spec.ts files -- a
+  // `test/` directory counts every file under it (helpers included, on the
+  // reasoning that a citation can live in a shared fixture comment); an e2e
+  // directory is the same kind of test-scoped tree and review found the
+  // narrower *.spec.ts-only rule silently excluded its own helpers
+  // (apps/web/e2e-stack/helpers/*.ts, global-setup.ts).
+  if (/^apps\/web\/e2e[^/]*\//.test(relPath)) return true;
   return false;
 }
 
@@ -160,14 +206,25 @@ function buildCorpus() {
 
 /**
  * A bare substring match, boundary-guarded so `13.201` cannot be satisfied
- * by `13.2010` or `113.201`. This is the documented limit from the top of
- * this file: it cannot tell a real cross-reference from a coincidental
- * decimal literal, only that the exact digit sequence appears with no digit
- * or dot touching either side.
+ * by `13.2010`, `113.201`, or a THIRD number segment (`3.25.76`, a zod
+ * version string that genuinely appears in test files that pin dependency
+ * versions in their own assertions or descriptions). The trailing guard
+ * checks for a digit AND for `.` immediately followed by a digit -- found
+ * by review: without the second half, bumping zod/tiptap/fastify in a
+ * routine dependency update would silently satisfy ids `3.25`/`3.30`/`5.12`
+ * via version strings alone, so DELETING the real citation for one of those
+ * ids would not redden the check, and a LATER version bump could make an
+ * already-correct citation start looking present for the wrong reason.
+ * `.` immediately followed by NON-digit (a sentence-ending "case 5.18.")
+ * still matches -- only a further digit after the dot is excluded. This is
+ * the documented limit from the top of this file: it cannot tell a real
+ * cross-reference from a coincidental decimal literal, only that the exact
+ * digit sequence appears with no digit touching either side and no further
+ * numeric segment extending it on either end.
  */
 export function isCited(id, corpusText) {
   const escaped = id.replace('.', '\\.');
-  const re = new RegExp(`(?<![\\d.])${escaped}(?!\\d)`);
+  const re = new RegExp(`(?<![\\d.])${escaped}(?!\\d)(?!\\.\\d)`);
   return re.test(corpusText);
 }
 
@@ -221,34 +278,53 @@ const FIXTURE_TEXT = readFileSync(FIXTURE_PATH, 'utf8');
 const extracted = extractCheckedIds(FIXTURE_TEXT);
 const selfTestFailures = [];
 
-const EXPECTED_CHECKED = ['90.1', '90.2', '90.3', '90.4'].sort();
+const EXPECTED_CHECKED = ['90.1', '90.2', '90.3', '90.4', '90.6', '90.7', '90.8'].sort();
 if (JSON.stringify([...extracted.ids].sort()) !== JSON.stringify(EXPECTED_CHECKED)) {
   selfTestFailures.push(
     `extraction: expected checked ids ${JSON.stringify(EXPECTED_CHECKED)}, got ${JSON.stringify([...extracted.ids].sort())} -- ` +
-      'a status-marker style (bare/bold/marker-first) is not firing, or a non-✅/prose/absorbed line leaked in',
+      'a status-marker style (bare/bold/marker-first/range) is not firing, or a non-✅/prose/absorbed line leaked in',
   );
 }
-if (extracted.malformed.length !== 1 || !extracted.malformed[0].raw.includes('90.5.1')) {
+const malformedRaw = extracted.malformed.map((m) => m.raw);
+if (
+  extracted.malformed.length !== 2 ||
+  !malformedRaw.some((r) => r.includes('90.5.1')) ||
+  !malformedRaw.some((r) => r.includes('90.30–91.2'))
+) {
   selfTestFailures.push(
-    `malformed-id guard: expected exactly one malformed line naming 90.5.1, got ${JSON.stringify(extracted.malformed)}`,
+    `malformed-id guard: expected exactly two malformed lines (90.5.1, a 90.30-91.2 cross-section ` +
+      `range), got ${JSON.stringify(extracted.malformed)}`,
   );
 }
 
 // Citation matching: a real comment citation, a real test-name citation, an
-// absent id, and the near-miss (99.9990 must not satisfy 99.999). Deliberately
-// NOT a real case id anywhere in this repo, so a reader never has to wonder
-// whether the number means something.
+// absent id, the near-miss (99.9990 must not satisfy 99.999), and a THIRD
+// numeric segment extending the id the way a dependency version string does
+// (found by review: "zod 3.25.76" was satisfying id 3.25 with no real
+// citation anywhere) -- a trailing sentence period with no digit after it
+// must still count, or the fix would over-correct and break the ordinary
+// "case 5.18." shape real prose actually uses. All deliberately NOT real
+// case ids anywhere in this repo, so a reader never has to wonder whether
+// the number means something.
 const CITED_CORPUS = [
   '// case 90.1 is covered here, in a comment',
   "it('90.2 the thing it proves', () => {})",
   'const nearMiss = 90.10; // must not satisfy 90.1 above via prefix match',
+  'the fix landed for case 90.40. so did the test',
 ].join('\n');
 if (!isCited('90.1', CITED_CORPUS)) selfTestFailures.push('isCited: a comment citation was not detected');
 if (!isCited('90.2', CITED_CORPUS)) selfTestFailures.push('isCited: a test-name citation was not detected');
 if (isCited('90.3', CITED_CORPUS)) selfTestFailures.push('isCited: a false positive -- 90.3 is not in the corpus at all');
+if (!isCited('90.40', CITED_CORPUS)) {
+  selfTestFailures.push('isCited: a sentence-ending "90.40." (period, no following digit) was wrongly rejected');
+}
 const NEAR_MISS_ONLY = 'const x = 99.9990;';
 if (isCited('99.999', NEAR_MISS_ONLY)) {
   selfTestFailures.push('isCited: 99.999 matched inside 99.9990 -- the digit-boundary guard is not firing');
+}
+const VERSION_STRING_ONLY = 'devDependency "some-lib": "90.50.3"';
+if (isCited('90.50', VERSION_STRING_ONLY)) {
+  selfTestFailures.push('isCited: 90.50 matched inside the version string 90.50.3 -- the third-segment guard is not firing');
 }
 
 // Ratchet: an increase (deleted citing test / new uncited case) must fail
@@ -285,9 +361,10 @@ if (selfTestFailures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `check-case-citations: self-test passed (4 checked ids extracted across bare/bold/marker-first ` +
-    `styles, 1 malformed id caught, non-✅/absorbed/prose lines excluded, citation matching and the ` +
-    `ratchet's four shapes all fired correctly)`,
+  `check-case-citations: self-test passed (7 checked ids extracted across bare/bold/marker-first/range ` +
+    `styles, 2 malformed lines caught (a truncated three-part id, a cross-section range), ` +
+    `non-✅/absorbed/prose lines excluded, citation matching -- including the version-string and ` +
+    `sentence-period edge cases -- and the ratchet's four shapes all fired correctly)`,
 );
 
 // ----------------------------------------------------------------- real sweep

@@ -1,12 +1,110 @@
-# Lane C — executor state (Plan 11 scheduler errands: `ops:sweep-orphans` + notification-sweep scheduling)
+# Lane C — executor state
 
 **This file is Lane C's restart surface, and nobody else's.** `executor-state.md` is Lane A's,
 `executor-state-B.md`/`-D.md`/`-E.md` belong to their own lanes — never edit them. A Lane C session
-relaunched from the controller's override recovers only what is written here.
+relaunched from the controller's override recovers only what is written here. Newest section first;
+older sections kept below as history, not deleted.
 
 > **Shas in narrative prose below are facts about when they were written.** Verify with
 > `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
 > commits and will lie to you.
+
+---
+
+## ⏩ LANE F PASS 1 — the test-cases <-> test citation check, 2026-09-06 ~20:20 IST
+
+**Owner context:** the owner started the Monday serial queue tonight with the remaining weekly quota
+(~14% at dispatch); Lane C and Lane A only, B/D/E stay released. This is a Lane F pass (repo-wide sweep,
+not tied to a specific plan task), assigned directly by the controller with an explicit measure-first
+instruction.
+
+**Branch:** `exec/51-case-citation-check`, cut from `origin/main` at `bf40c5c` ("PLAN SERIES COMPLETE —
+177/177"). One commit, `bf8056b`. Working tree clean at time of writing.
+
+**What it does:** `scripts/check-case-citations.mjs` closes the gap the coordination doc named by hand
+(2026-08-31): no test in the repo cited a catalogue `✅` case id, so a case could survive the deletion of
+its own covering test. Every checked id in `test-cases/*.md` must now be cited — as a test name or
+comment — somewhere under a test/e2e directory, checked by its own ungated CI job (mirrors
+`check-runbook`'s fix for the identical docs-only-skip hazard).
+
+**Measured before choosing a mode, reported to the controller before building anything real:** first pass
+(a throwaway script) said 632/1029 uncited — WRONG, that tool's regex missed the "bold id + trailing ✅"
+style entirely (`- **3.1** ✅ ...`), which is the dominant style in several files. The real script found
+1470/663/807 — corrected and reported before proceeding, still too large to backfill in one PR, so it
+runs as a RATCHET: `scripts/fixtures/check-case-citations-baseline.json` commits one per-file
+uncited-count ceiling that must equal reality EXACTLY (not just bound it) — an increase is a regression
+(citing test deleted, or new `✅` shipped uncited); a ceiling higher than reality is ALSO a failure
+(stale, must be tightened). Per-file, not summed, so one file's regression cannot hide behind another's
+improvement.
+
+**ONE opus reviewer found a real CRITICAL and a real IMPORTANT in that "1470" figure itself**, both
+fixed before this PR opened — the final, correct numbers are **1525 checked ids, 710 cited, 815
+uncited**:
+- **CRITICAL**: range-form `✅` lines (`- **3.89–3.94** ✅ ...`, the real shape `03-foundation-ledger.md`
+  uses ten times) were extracted as ONLY their leading id, with the other ids in the range silently
+  dropped — not reported as malformed, just gone, contradicting the extractor's own docblock. 50 real,
+  already-cited ids across one file were invisible to the ratchet entirely (would have reported "0
+  uncited" for all of them forever, even if every citing test were deleted). Reviewer proved it with a
+  paired mutation (delete real citations for 8 range ids in `visibility-editor.test.tsx` → check stayed
+  green, `03`'s count unchanged; delete a citation for a COUNTED id as a positive control → check
+  correctly reddened). I reproduced the same property myself after the fix, independently. Fixed:
+  `extractCheckedIds` now parses range/malformed/ordinary as three distinct shapes and expands a valid
+  range to every id in it; a cross-section range is reported malformed instead.
+- **IMPORTANT**: `isCited`'s boundary guard blocked a following digit but not a following `.digit`, so
+  dependency version strings (`"zod 3.25.76"`, `"@tiptap/core@3.30.5"`, `"fastify 5.12.1"`) satisfied
+  ids `3.25`/`3.30`/`5.12` with no real citation anywhere — a routine dependency bump could flip a
+  genuinely-deleted citation to look present. Fixed: also exclude a following `.digit`, while still
+  accepting a genuine sentence-ending period (`case 5.18.`).
+- Both fixes are now covered by the self-test itself (a range + a cross-section-malformed range in the
+  fixture; a version-string and a sentence-period case in the citation-matching assertions), not just
+  fixed and left uncovered.
+- Three Minor findings also fixed: this file's own stale 1029/632 docblock numbers (now 1525/815,
+  post-fix); a "152 of 160" arithmetic slip (159, not 160 — since corrected again to 153/160 by adding
+  case 13.209 for the IMPORTANT fix above); `apps/web/e2e-stack/` helper files (global-setup.ts,
+  helpers/*.ts) were excluded from the citation corpus while `test/` helpers were included — widened so
+  the whole e2e/e2e-stack directory counts, not just its `*.spec.ts` files.
+
+**Verification, real not just self-tested:**
+- Self-test passes against a planted fixture covering every real id-line shape (bare/bold/marker-first/
+  RANGE), a malformed-id guard (a truncated three-part id AND a cross-section range), the version-string
+  and sentence-period citation-matching edge cases, and the ratchet's four shapes — all via
+  fixture/synthetic inputs.
+- **Reproduced against REAL files, twice**: (1) removed both real citations of case 11.1
+  (`calendar-model.test.ts`'s `describe`, `claim-labels.test.ts`'s `it`) — `11-calendar-notifications.md`
+  moved from 0 to 1 uncited against a baseline of 0, check failed naming `11.1`, restored and re-verified
+  clean; (2) reproduced the reviewer's own range-deletion mutation against `visibility-editor.test.tsx`
+  post-fix — `03`'s uncited count correctly rose from 45 to 51, restored and re-verified clean.
+- Full local gate (run BEFORE the review round, on code the review round did not touch — scripts/*.mjs
+  and docs are not turbo build/test/typecheck inputs): `GATE_EXIT=0`, 30/30 tasks, 0 cached, 2m17s, node
+  `v22.22.2`. `@gisik-nokma/server`: 128 files / 1351 tests (1346 passed, 5 skipped, pre-existing).
+- Four checks run individually, each on its own line: `pnpm check:env` clean; `node scripts/check-
+  case-ids.mjs` — 1609 unique ids, highest 13.209, no duplicates; `pnpm check:citations` — ratchet holds
+  exactly on every file; `pnpm check:runbook` — 14/14 references resolve.
+- `actionlint .github/workflows/ci.yml` — exit 0 (checked again after the fix round).
+
+**A real self-correction worth carrying forward, separate from the reviewer's findings:** the five new
+catalogue cases this errand adds (13.204, 13.205, 13.207, 13.208, 13.209) are themselves currently
+uncited, and I initially planned to just bump the baseline to absorb that. Caught myself: this script
+(like its `check-case-ids.mjs` and `check-runbook-commands.mjs` siblings — confirmed by grep, neither
+has one) has no companion `.test.ts` file, and the citation corpus is test/e2e directories only, by
+explicit spec — so there genuinely is no test file these cases could cite without unilaterally widening
+that scope. Recorded as its own named structural gap in `test-cases/13-deployment-dogfooding.md`'s new
+section rather than silently folded into ordinary backfill debt. Case 13.206 (the real-file 11.1
+mutation) is marked `🧪`, not `✅`, on purpose — a one-time hand-verified reproduction, not a standing
+automated test, so it does not enter the citation ratchet at all.
+
+**Backfill (815 pre-existing uncited cases) is carried, not attempted, with a named owner per file** in
+`test-cases/13-deployment-dogfooding.md`'s new "Lane F Pass 1" section: `09-editor-attachments.md` (219
+uncited, 0 cited — this lane's own prior work is a large share, first claim if this lane runs again),
+`10-workflow-builder.md` (66 uncited); `05/06/04/03` mostly uncited with small existing precedent;
+`07/12` already majority-cited, minority remains; `13` itself carries 153 of 160 uncited.
+`11-calendar-notifications.md` needs no owner — fully cited today (0 of 147) and stays that way
+structurally if new cases there are cited when written.
+
+**Collisions respected, not touched:** `packages/rule-engine/src/index.ts`, client test sites,
+`fixture-witnesses.test.ts`, `test-cases/07`, `Features.md` §7 — all Lane A's. Diff scope confirmed via
+`git diff --stat origin/main...HEAD`: only `scripts/`, `.github/workflows/ci.yml`, `package.json`,
+`Features.md`, `test-cases/` changed. No behaviour change to `apps/`/`packages/` source.
 
 ---
 

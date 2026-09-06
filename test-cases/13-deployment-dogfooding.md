@@ -18,8 +18,8 @@ that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane
 C takes Plan 11 T11 + T12 (backups, restore drill) after #146" — Tasks 11 [13.9–13.39] and 12) · **Lane
 D 13.41–13.100** (Tasks 7, 8) · **Lane E 13.101–13.200** (the rest of Plan 11: seam 1, Task 13, Task 16;
 NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201–13.240**, allocated
-2026-09-06 once `13.1–13.40` was confirmed exhausted — minted at **13.201–13.208** so far (13.201–13.203
-the scheduler-generalisation errand, 13.204–13.208 Lane F Pass 1's citation check; **13.209–13.240 remain
+2026-09-06 once `13.1–13.40` was confirmed exhausted — minted at **13.201–13.209** so far (13.201–13.203
+the scheduler-generalisation errand, 13.204–13.209 Lane F Pass 1's citation check; **13.210–13.240 remain
 free in this block**). **The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
 its assigned block and does not derive the next free id from this file — recount the MAXIMUM in use
 against `origin/main` at every rebase as the control, but never mint from it.
@@ -31,7 +31,7 @@ inside the block at 13.7–13.8; Tasks 11–12 too, at 13.9+, after the 07:50 re
 from Lane E) · Lane D `13.41–13.100` (Tasks 7–8 below, at 13.41–13.76; Tasks 9–10 continue inside the
 block) · Lane E `13.101–13.200` (seam 1, Task 13, Task 16) · Lane C `13.201–13.240` (the scheduler
 generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted; Lane F Pass 1's citation check,
-13.204–13.208). Next BLOCK starts at `13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
+13.204–13.209). Next BLOCK starts at `13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
 the controller for another rather than borrowing a neighbour's.**
 
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
@@ -971,8 +971,11 @@ can be deleted and its case keeps its checkmark. `scripts/check-case-citations.m
 job, `pnpm check:citations`.
 
 **Measured before choosing a mode, per the owner's instruction, because the honest number decides the
-shape:** 1470 checked ids repo-wide, 663 cited (the id string appears somewhere under a test/e2e
-directory), 807 not. Too large to backfill in this errand, so the check runs as a RATCHET rather than a
+shape:** 1525 checked ids repo-wide, 710 cited (the id string appears somewhere under a test/e2e
+directory), 815 not (a first pass, before an opus review round, under-measured this at 1470/663/807 —
+a real extraction bug silently dropped every range-form `✅` line, e.g. `- **3.89–3.94** ✅ ...`, from
+the check entirely; case 13.204 below is the fixed claim). Too large to backfill in this errand, so the
+check runs as a RATCHET rather than a
 hard requirement: `scripts/fixtures/check-case-citations-baseline.json` commits one uncited-count ceiling
 per `test-cases/NN-*.md` file, and the check requires the CURRENT real count to equal that ceiling
 exactly — not merely be under it. An exact-match ratchet, not an upper bound, on purpose: a ceiling
@@ -982,16 +985,34 @@ repo-wide sum means a real regression on one bucket cannot hide behind unrelated
 - 13.204 ✅ every id-line shape this repo's `test-cases/` files actually use is extracted correctly, and
   every non-checked shape is correctly left alone — a self-test fixture
   (`scripts/fixtures/check-case-citations-fixture.md`) plants one of each: bare-trailing (`- 90.1 ✅
-  ...`), bold-trailing (`- **90.2** ✅ ...`), marker-first bold (`- ✅ **90.3 — ...`) and marker-first bare
-  (`- ✅ 90.4 ...`) as the four ids that MUST be extracted; four lines using every other real status
-  marker (🧪/❌/🟡/🚫), a renumbering ("absorbed into") line, and a mid-sentence prose citation as lines
-  that must NOT be. Run before this errand's own three-line self-test summary printed and asserted
-  against these exact four ids. `scripts/check-case-citations.mjs`
+  ...`), bold-trailing (`- **90.2** ✅ ...`), marker-first bold (`- ✅ **90.3 — ...`), marker-first bare
+  (`- ✅ 90.4 ...`), and a RANGE (`- **90.6–90.8** ✅ ...`, expanding to three ids) as the seven ids that
+  MUST be extracted; four lines using every other real status marker (🧪/❌/🟡/🚫), a renumbering
+  ("absorbed into") line, and a mid-sentence prose citation as lines that must NOT be. **The range shape
+  was NOT in the original fixture, and its absence was a real, live bug an opus review round found**:
+  `- **3.89–3.94** ✅ ...` (the actual shape `03-foundation-ledger.md` uses ten times) extracted only the
+  leading id and silently discarded the other five per line — not reported as malformed, just gone — so
+  50 real, already-cited `✅` ids across that one file were invisible to the ratchet from the day this
+  check shipped until the fix. Range extraction is now covered by this same self-test, and a
+  cross-section range (`90.30–91.2`, which cannot be a real range) is asserted malformed rather than
+  silently expanded or truncated. Run before this errand's own sweep, printed and asserted against these
+  exact ids. `scripts/check-case-citations.mjs`
 - 13.205 ✅ a malformed id is reported, never silently misfiled: `13.2.1` is not an N.M id, but the
   extraction regex's `(\d+\.\d+)` greedily matches its first two segments ("13.2") — without a guard, a
   three-part number would silently become a shorter real-looking id rather than what it actually is,
   which is a typo. The fixture plants `90.5.1` and the self-test asserts it is reported as malformed and
   contributes to neither the checked-id list nor any uncited count. `scripts/check-case-citations.mjs`
+- 13.209 ✅ a citation match requires the id to be the WHOLE number, not a prefix of a longer decimal —
+  **found live, by review, not planted in advance**: `isCited` originally excluded only a following
+  digit, so a dependency version string like `"zod 3.25.76"` satisfied id `3.25` with no real citation
+  anywhere, and `3.30`/`5.12` were satisfied the same way by `@tiptap/core@3.30.5` and `fastify 5.12.1`
+  in real test files. The provable consequence: a routine dependency bump could flip a genuinely-deleted
+  citation to look present, or an unrelated version-string coincidence could mask a real regression —
+  either way the check's own failure message ("a citing test was likely deleted") would be actively
+  wrong. Fixed by also excluding a further digit immediately after a following `.`; a genuine
+  sentence-ending citation (`case 5.18.`, period then non-digit) still matches, asserted as its own
+  self-test case so the fix cannot later over-correct into rejecting ordinary prose.
+  `scripts/check-case-citations.mjs`
 - 13.206 🧪 deleting the LAST test that cites a checked case reddens the check, naming the exact case —
   reproduced against real files, not only the self-test's synthetic fixtures. Case 11.1 is cited in
   exactly two places (`calendar-model.test.ts`'s `describe`, `claim-labels.test.ts`'s `it`); with both
@@ -1020,12 +1041,14 @@ repo-wide sum means a real regression on one bucket cannot hide behind unrelated
 **Backfill is real, per-file work — carried, not attempted here, owner named per file rather than one
 vague "whoever":** `09-editor-attachments.md` (219 uncited, 0 cited — this lane's own attachment/backup
 work is a large share of it, so first claim if this lane runs again) and `10-workflow-builder.md` (66
-uncited, 0 cited) have never had a single citation attempted; `05-tickets-hierarchy.md` (67 of 73
+uncited, 0 cited) have never had a single citation attempted; `05-tickets-hierarchy.md` (68 of 73
 uncited), `06-auth-visibility.md` (63 of 111), `04-workflow-engine.md` (45 of 52) and
-`03-foundation-ledger.md` (43 of 104) are mostly uncited with a small existing precedent to extend;
-`07-api-realtime-search.md` (78 of 229) and `12-offline-sync-apps.md` (78 of 314) are already
-majority-cited and need the remaining minority closed; `13-deployment-dogfooding.md` carries 152 of 160
-uncited, up from 148 by this section's own four ✅ cases (13.204, 13.205, 13.207, 13.208) — **NOT cited,
+`03-foundation-ledger.md` (45 of 154 — total corrected from an earlier 104 by the range-extraction fix
+above, which recovers 50 real ids this file always had) are mostly uncited with a small existing
+precedent to extend; `07-api-realtime-search.md` (78 of 229) and `12-offline-sync-apps.md` (78 of 314)
+are already majority-cited and need the remaining minority closed; `13-deployment-dogfooding.md` carries
+153 of 160 uncited, up from 148 by this section's own five ✅ cases (13.204, 13.205, 13.207, 13.208,
+13.209) — **NOT cited,
 by an honest structural gap rather than neglect**: `check-case-citations.mjs`, like its siblings
 `check-case-ids.mjs` and `check-runbook-commands.mjs`, is a self-testing script with no companion
 `.test.ts` file (checked: neither of those two siblings has one either, confirmed by grep), and the
