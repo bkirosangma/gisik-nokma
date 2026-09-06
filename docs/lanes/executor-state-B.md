@@ -30,6 +30,55 @@ excluding fixtures.
 | `Features.md` §12 bullets | **87** | see the extractor note below — the obvious range is wrong |
 | position | override item 1 of 4 not yet started; the docs refresh is this commit | — |
 
+### ▶ POSITION AT 14:47 — all four items COMMITTED and MUTATION-MEASURED; gate in flight; PR not yet opened
+
+| anchor | value | how verified |
+|---|---|---|
+| branch · HEAD | `exec/43-sync-surface-fixes` · **`250f02b`** (8 commits on top of `8d6b756`) | `git rev-parse HEAD` |
+| base | **`8d6b756`** (#193) — REACHABLE, `git branch --contains` names `main` | not `git cat-file` |
+| tree | clean; every mutation restored and verified BY READING plus an empty `git diff` | stated either way |
+| dist | `app-core`, `sync-client` and `domain` REBUILT after their mutations — no mutated `dist` left for Lane D's rebase | `grep` for the mutant marker in `dist/` after each restore |
+| `check-case-ids` | **`EXIT=0`**, 1524 unique, union == sum, +5 (12.360–12.364). **Its own step, NOT part of `check:env`** | `node scripts/check-case-ids.mjs` |
+| §12 | max **`12.364`**; Lane B's block `12.360–12.379` used through `12.364`; header's next-free bumped to `12.380` | recounted at this sha, line-head shape |
+| full gate | **IN FLIGHT** — lock acquired 14:40:36 pid 62853, after waiting out Lane C's holder. **Do not read `/tmp/laneB-gate.log` until the wrapper prints `GATE_EXIT=`** (see the trap below) | — |
+| PR | **NOT OPENED YET.** Head is therefore NOT frozen | — |
+
+**What landed, one commit each, each with its mutation measured after the commit:**
+
+| item | case | mutation | measured |
+|---|---|---|---|
+| 1 | **12.328 ✅** (was ❌) — four production ping/pong sites deleted; owner-rule docblocks at both `webSocketFactory` defaults; **12.360 ✅** and **12.361 🚫** minted | restore the pong arm in `stream.ts` (BOTH halves — a send arm alone is unreachable once `parseFrame` answers null) | **1 failed / 26 passed, 12.360 alone**, `expected […(2)] to deeply equal [Array(1)]` |
+| 1 | same, sync-client half | restore the pong arm in `http-transport.ts` | **1 failed / 28 passed, 12.167 alone**, `expected ['subscribe','pong'] to deeply equal ['subscribe']` |
+| 2 | **12.327 ✅** (was ❌) — the literal replaced by `parseEvent`'s own answer; `outbox.ts`'s standing measurement repriced; **12.362 ✅** minted | change all five `'malformed-envelope'` sites in `parse-event.ts` | **12.362 alone within `sync-route.test.ts` (1/16)**; repo-wide over every file that mentions the code: domain **6 failed / 28**, other four server files **0 / 40**, sync-client **0 / 29** |
+| 3 | **12.13 ✅** (was 🟡) — **12.363 ✅** minted | delete `'attachment.added'` from `BOOTSTRAP_BACKFILL_TYPES` | **1 failed / 103 passed over `test/sync/` + `test/dual-client/` (15 files) — 12.363 alone** |
+| 4 | **12.16 ✅** (was 🟡) — **12.364 ✅** minted | `env.workspaceSeq` → `0` in `insertEnvelope` | **3 failed / 85 passed across sync-client (8 files, 88 tests)** — 12.364 plus 12.305/12.313 through `ticketHeadSeq`'s aggregate |
+
+### THREE THINGS THIS BRANCH PAID FOR — all three are method, not content
+
+1. **`git checkout HEAD -- <path>` restored two files that carried UNCOMMITTED work, and destroyed it.**
+   Item 2's whole source change vanished mid-measurement. Commit-then-mutate is not a style rule: the
+   restore *is* `git checkout HEAD`, so **a file holding uncommitted work cannot be a mutation site.**
+2. **A STALE LOG AT A PATH I CHOSE READ AS MY OWN RESULT.** `/tmp/laneB-gate.log` still held a complete,
+   green run from an earlier Lane B session — `GATE_EXIT=0`, 30/30 — and it was read and nearly reported
+   while my gate was still waiting on Lane C's lock. It was caught only because the per-package numbers
+   were LOWER than main's last gate on a branch that only adds tests (sync-client 7 files/64 tests, where
+   a direct run of the same package gives 8/88). **The log path is not the run.** Read `GATE_EXIT=` from
+   the WRAPPER's own stdout, and check the log carries this run's `LOCK ACQUIRED` timestamp.
+3. **A carried finding aged out of true inside the catalogue that quoted it forward.** 12.16 said the
+   constant-0 mutation "leaves the whole suite green". True when Plan 10 Task 9 recorded it; false since
+   closure 5b landed the pull door — *my own change*, and I did not notice then either. Re-measured
+   rather than repeated.
+
+### CARRIED, WITH OWNERS — not fixed here
+
+- **12.361 🚫** — the owner rule at both `webSocketFactory` defaults is a docblock and no test can hold it:
+  the failing case needs a `ws` dependency no client package has. *Owner if a client shell ever adopts
+  `ws`: whoever adds that dependency.* The 12.328(b) grep is the tripwire, and it is a human one.
+- **`outbox.ts`'s `SyncEventResult` move** — still open, eight files, and **now zero fixture cost**.
+- **Lane D** (`exec/40-socket-cut-fixture`) holds `apps/server/test/dual-client/socket-cut.test.ts` only;
+  file lists exchanged in both directions, no import of mine changes signature except `parseFrame`'s
+  return type (app-core, which D does not import). Whoever lands second rebases.
+
 ### THE FOUR ITEMS, and the shape each has to have
 
 One PR, each item its own commit, **commit then mutate**, mutation confirmed present before the run,
