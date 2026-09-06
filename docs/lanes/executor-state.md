@@ -48,7 +48,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 3. **§09 batch 2** — the ~113 rows naming `apps/server/`. Same method, one subagent.
 4. **Then (A)** — the semble duplicate-logic hunt, rows with named owners.
 
-**§09's mapping is already measured, so nobody需 re-derive it:** 219 ✅ rows, **218 of them name their covering
+**§09's mapping is already measured, so nobody need re-derive it:** 219 ✅ rows, **218 of them name their covering
 test as a FULL PATH in parentheses at the end of the row** (e.g. ``(`packages/editor/test/schema.test.ts`)``),
 across 41 distinct test files. Split: **98 rows `packages/editor/`, 113 `apps/server/`, 7 `packages/domain/`.**
 *(Caution recorded: my first tally of this used a bare-filename pattern and returned 8 — a well-formed wrong
