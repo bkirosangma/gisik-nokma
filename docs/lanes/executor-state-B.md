@@ -31,6 +31,28 @@ ahead of it; nothing was lost — its tree was clean and its head is on `origin/
 | case-id control | at `632ad04`: `CHECK_EXIT=0` · bare 856 + bold 468 + marker-first 8 = **sum 1332 == union 1332**, zero duplicates, highest `13.100`, 10 files | `node scripts/check-case-ids.mjs` |
 | import style | `sync-engine.test.ts` imports `../src/replica/replica.js` and `../src/engine/sync-engine.js` — **relative, so a `src` mutation IS visible under bare vitest** (a by-package-name import would have resolved through a stale `dist` and returned a well-formed zero) | `sed -n '1,15p'` of the test file |
 
+### ✅ MEASURED 12:49 IST at `bc45bba` — all four match prediction, and the pair DISCRIMINATES
+
+One locked quiet window (lock free on entry, zero live vitest pools). Denominator is the whole
+`sync-client` package, 8 files / 87 tests. Baseline `87 passed (87)` **before and after** every mutation;
+every restore left `dirty-src-files=0`; every edit was grep-confirmed PRESENT before its run.
+
+| mutation | site | predicted | MEASURED |
+|---|---|---|---|
+| never drop (the `TicketPullNotFound` arm's drop deleted) | `sync-engine.ts` | 12.317 alone | **12.317 ALONE**, `1 failed \| 86 passed` |
+| always drop (the `headSeq` guard deleted) | `replica.ts` | 12.318 alone | **12.318 ALONE**, `1 failed \| 86 passed` |
+| never below (`< headSeq` neutered to `false`) | `replica.ts` | **7 at derivation, 9 at this tree** | **9** — 12.305, 12.306, 12.308, 12.309, 12.311, 12.312, 12.313, 12.317, 12.318; **12.310 SURVIVES** as predicted |
+| always pull (`<` → `<=`) | `replica.ts` | 12.305 + 12.313 | **12.305 + 12.313**, `2 failed \| 85 passed` |
+
+Items 1 and 2 of the outstanding list below are therefore DONE. **Do not re-run them.** What remains is the
+rebase, the gate and the report.
+
+⚠️ **The lock reference script `locked-test.sh` hard-codes `CWD=/…/lane5-plan11` (Lane E's root)** — the
+README says the paths inside are per-worktree and it means it. The sweep was unaffected because the
+mutation script used absolute paths to THIS worktree, verified after the run by both trees being clean.
+**But the `CHECK_ENV_EXIT=0` that wrapper prints is a fact about Lane E's tree, not this one**, and must not
+be reported as this lane's. Run `pnpm check:env` from this root, on its own line, in the gate.
+
 ### WHAT IS OUTSTANDING, in order
 
 1. **P37.3's two excluding fixtures, ids 12.317 and 12.318** — both directions, each alone.

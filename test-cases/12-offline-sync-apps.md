@@ -2300,3 +2300,28 @@ property — that omission is the design, because a case that reddened under bot
 **Recorded with an owner, not fixed (outside these fixtures' scope):** a pull abandoned by `withTimeout` that
 later rejects with `TicketPullNotFound` produces an **unhandled rejection** nobody catches — `Promise.race`
 has settled, and `net/http-transport.ts` calls bare `fetch` with no `AbortSignal`. Owner: Plan 6 / sync-client.
+
+**Mutations run for P37.3 — measured 2026-09-06 12:49 IST at `bc45bba`, in ONE locked quiet window (lock
+free on entry, zero live vitest pools, nothing else touching the tree).** The denominator is the WHOLE
+`sync-client` package, 8 files / 87 tests, so "alone" is a claim about the package and not about one file.
+Baseline `87 passed (87)` **before and after** every mutation; each restore left `dirty-src-files=0`; each
+edit was confirmed PRESENT by grep before its run, because a mutation that fails nothing is an
+unconstrained path only if it actually fired.
+
+| mutation | site | predicted | MEASURED |
+|---|---|---|---|
+| **never drop** — the `TicketPullNotFound` arm's drop deleted | `sync-engine.ts` | 12.317 alone | **12.317 ALONE**, `1 failed \| 86 passed` |
+| **always drop** — the `headSeq` guard deleted, drop unconditional | `replica.ts` | 12.318 alone | **12.318 ALONE**, `1 failed \| 86 passed` |
+| **never below** — `localHeadSeq(...) < headSeq` neutered to `false` | `replica.ts` | **7 at derivation, 9 at this tree** | **9**: 12.305, 12.306, 12.308, 12.309, 12.311, 12.312, 12.313, **12.317, 12.318** — and **12.310 SURVIVES**, as predicted |
+| **always pull** — the off-by-one, `<` becomes `<=` | `replica.ts` | 12.305 + 12.313 | **12.305 + 12.313**, `2 failed \| 85 passed` |
+
+**The pair discriminates, which is the result worth having:** never-drop reddens 12.317 and 12.318 passes;
+always-drop reddens 12.318 and 12.317 passes. Each fixture kills its own mutant and is blind to the other's,
+so neither is measuring the other twice.
+
+*The two `headSeq` mutations were derived by a previous session and handed over unrun, and their prediction
+of **7** was made BEFORE 12.317/12.318 existed. Both new fixtures route their initial entry through that same
+comparison, so the honest prediction at this tree is **9** — reported here as three numbers
+(predicted-at-derivation, predicted-at-this-tree, measured) rather than one, because otherwise a correct
+measurement reads as a finding. The `<=` prediction is unchanged at either tree: an unheld id satisfies
+`0 < h` and `0 <= h` alike, so neither new case can see that mutant.*
