@@ -55,7 +55,11 @@ next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
 
-### ⛔⛔ CI IS DOWN — GITHUB ACTIONS BILLING BLOCK, since ~14:42 IST (found 14:55). OWNER ACTION REQUIRED; NOTHING MERGES UNTIL IT IS FIXED
+### ✅ OWNER AUTHORISATION 2026-09-06 ~15:20 IST — "authority granted for merging" — CI WAIVED UNTIL BILLING IS FIXED
+
+The owner answered the escalation below with **"authority granted for merging"**, read as option (b): **a PR merges on its own machinery (the lane's review verdict and its local forced gate at the PR's head) plus the controller's forced gate at the merged `main`, with the independent CI run WAIVED while Actions is blocked by billing.** Everything else stands: never merge without the lane's gate at the exact head; never merge with a review outstanding; the same-change-set rule; the ledger promotion needs a local `check:tasks`. **Every merge made under this waiver is marked "(CI waived, owner 15:20)" in this file and in the ledger row; when Actions returns, the first green run on `main` is the retroactive independent check, and the controller reads its JOB STEPS.** Under the waiver at 15:20: #201 (this file) and #203 (C — review clean after three rounds, gate 30/30 at `9d37936`) are mergeable; #202 (B) waits for its review verdict; #204 (A) owes five mutations and a gate; #205 (E) owes its re-gate at `cf824df` and the §13 catalogue in the same change set.
+
+### ⛔⛔ CI IS DOWN — GITHUB ACTIONS BILLING BLOCK, since ~14:42 IST (found 14:55). OWNER ACTION REQUIRED (escalated 15:04); waiver granted 15:20 — see above
 
 Every Actions job on this account now fails BEFORE its first step, no runner assigned, with the check-run
 annotation **"The job was not started because recent account payments have failed or your spending limit
