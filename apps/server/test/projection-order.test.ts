@@ -60,6 +60,11 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
+  /**
+   * 5.55 — the registry’s own pins admit `proj_ticket_types` at coordination §8 position 3, an INSERT above `proj_projects`.
+   * 5.57 — and `proj_tickets` at position 5, an INSERT into the MIDDLE of the array between `proj_projects` and `proj_memberships`.
+   * 5.63 — and `proj_rollups` at position 6, directly after `proj_tickets` and still ABOVE `proj_memberships`. One assertion of the whole pinned order carries all three rows.
+   */
   it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested, workspace settings, search', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
