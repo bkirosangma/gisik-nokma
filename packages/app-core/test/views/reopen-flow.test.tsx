@@ -325,12 +325,17 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // Non-vacuity, so this is a fact about `getTicket` and not about an empty
     // register: the methods that DO still refuse are named, and one of them
     // carries a real absence.
-    // Three, and it read four until rulings P32/P38 served `getMyWorkspaces`.
-    // The closure-2 commit that wrote this list said in as many words that it
-    // was SCHEDULED TO EXPIRE and named the step that would expire it; this is
-    // that expiry arriving, which is the check working rather than breaking.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['getAttention', 'getMyWork', 'search']);
-    expect((SERVING_GAPS['getMyWork'] ?? []).length).toBeGreaterThan(0);
+    // ONE, and it has read four, then three, then this. Each previous spelling
+    // said in as many words that it was SCHEDULED TO EXPIRE and named what
+    // would expire it; rulings P39 and P40 served `getMyWork` and
+    // `getAttention`, so this is that expiry arriving again — the check working
+    // rather than breaking. It will expire once more only if `search` is ever
+    // served, which needs `routes/search.ts` to stop destroying which column
+    // matched inside the query.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
+    // Non-vacuity carrier, now `search`: without this, an empty register would
+    // satisfy the line above and this control would pass by measuring nothing.
+    expect((SERVING_GAPS['search'] ?? []).length).toBeGreaterThan(0);
   });
 
   it('T13.4k a workflow with no non-terminal move out of its terminal state offers no reopen, and says so', async () => {

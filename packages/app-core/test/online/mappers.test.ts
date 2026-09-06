@@ -802,44 +802,6 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
       },
       fields: ['SearchHit.matchedIn'],
     },
-    {
-      method: 'getMyWork',
-      call: () => {
-        const body: MyWorkResponse = {
-          workspaceId: 'w',
-          groups: { open: [serverCard()], active: [], terminal: [] },
-          // REQUIRED since rulings P32/P38, and empty here on purpose: this
-          // fixture exists to observe the REFUSAL, and an empty map is the
-          // honest shape for a viewer told no project names. Filling it would
-          // make the case about the names rather than about the three absences
-          // that still refuse.
-          projectNames: {},
-        };
-        return mapMyWork(body);
-      },
-      fields: [
-        // `WorkItem.projectName` was here until rulings P32/P38 served it —
-        // the my-work route now carries a `projectNames` map for the projects
-        // this viewer may be told the name of. The method still refuses, for
-        // the three below.
-        'WorkItem.stateName',
-        'ContestedClaim.title',
-        'ContestedClaim.claim.serverTime',
-      ],
-    },
-    {
-      method: 'getAttention',
-      call: () => {
-        const body: AttentionResponse = {
-          workspaceId: 'w',
-          generatedAt: '2026-09-02T10:00:00.000Z',
-          settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
-          items: [],
-        };
-        return mapAttention(body);
-      },
-      fields: ["AttentionItem kind 'contested' — its title"],
-    },
   ];
 
   for (const { method, call, fields } of REFUSALS) {
@@ -875,62 +837,315 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
   }
 
   /**
-   * 3.41 — the two contested refusals name `/v1/contests`, which SHIPPED.
+   * 12.250 — `mapMyWork` ANSWERS, and this is what replaced case 3.41.
    *
-   * The refusals used to blame `/v1/me/work` and `routes/attention.ts` for not
-   * reading `proj_contested`. Both sentences were true and both sent a fixer to a
-   * file that owes nothing: `GET /v1/contests` is registered in `app.ts` today, so
-   * the rows are a client-side join away and what actually blocks the join is one
-   * missing field on the contest row (plus, for `ContestedClaim`, an instant that
-   * was never recorded because the claim was refused).
+   * 3.41 asserted that the two contested refusals blamed `/v1/contests` rather
+   * than the routes that owed nothing. Both refusals are gone (P39 removed the
+   * field; P40 moved the door), so the case is REPLACED rather than deleted: a
+   * removed refusal leaves nothing that would notice the day this mapper is
+   * rewritten to invent a `stateName` or a `serverTime` again.
    *
-   * This case is the client half. The server half — that `/v1/contests` really
-   * does not carry these keys — is 7.208 in
-   * `apps/server/test/integration/client-contract.test.ts`, which is the only
-   * place a real body exists.
+   * The fixture is typed `MyWorkResponse`, so a server field renamed or dropped
+   * fails `typecheck` here rather than disagreeing with a comment.
    */
-  it('3.41 the contested refusals point at /v1/contests, not at the routes that owe nothing', () => {
-    const contested = [
-      ...(SERVING_GAPS['getMyWork'] ?? []),
-      ...(SERVING_GAPS['getAttention'] ?? []),
-    ].filter((absence) => absence.wireRoute === '/v1/contests');
-    expect(contested.map((absence) => absence.field)).toEqual([
-      'ContestedClaim.title',
-      'ContestedClaim.claim.serverTime',
-      "AttentionItem kind 'contested' — its title",
+  it('12.250 mapMyWork flattens the three server groups in order and reads both sibling maps', () => {
+    const other = '01J9GPRJ00000000000000000B';
+    const body: MyWorkResponse = {
+      workspaceId: 'w',
+      groups: {
+        // `stateCategory` is overridden per group because it is the key the
+        // server BUCKETS by (`bucketFor` reads it off the card), so a card in
+        // `open` carrying 'active' is a body the route cannot emit. Stated here
+        // because the first draft of this fixture did exactly that and the
+        // assertion below caught it.
+        open: [serverCard({ ticketId: 'tkt-open', stateCategory: 'open' })],
+        active: [serverCard({ ticketId: 'tkt-active', stateCategory: 'active' })],
+        terminal: [
+          serverCard({ ticketId: 'tkt-done', projectId: other, stateCategory: 'terminal' }),
+        ],
+      },
+      projectNames: { '01J9GPRJ000000000000000000': 'Accounts' },
+      stateNames: { 'tkt-open': 'To do', 'tkt-active': 'Doing', 'tkt-done': 'Done' },
+      contested: [],
+    };
+    const view = mapMyWork(body, new Map());
+
+    // Concatenated open → active → terminal. Every card the server sent becomes
+    // exactly one item, and the ORDER is asserted rather than the length: a
+    // length check passes for a mapper that emitted the same group three times.
+    expect(view.assigned.map((item) => item.ticketId)).toEqual([
+      'tkt-open',
+      'tkt-active',
+      'tkt-done',
     ]);
-    expect(contested.map((absence) => absence.wireKey)).toEqual([
-      'title',
-      'serverTime',
-      'title',
+    // The state name comes from the map keyed by TICKET id — not from the
+    // card's `stateId`, which is `doing` on all three. If the mapper fell back
+    // to the state id these would all read 'doing'.
+    expect(view.assigned.map((item) => item.stateName)).toEqual(['To do', 'Doing', 'Done']);
+    expect(view.assigned.map((item) => item.stateId)).toEqual(['doing', 'doing', 'doing']);
+    // The category survives, which is what lets a client rebuild the server's
+    // buckets without a second read.
+    expect(view.assigned.map((item) => item.stateCategory)).toEqual([
+      'open',
+      'active',
+      'terminal',
     ]);
-    // Control, same run: the OTHER two my-work absences are genuinely about
-    // `/v1/me/work`, so "points at /v1/contests" is a distinction this filter can
-    // actually draw rather than a list that swallowed everything.
-    expect(
-      (SERVING_GAPS['getMyWork'] ?? [])
-        .filter((absence) => absence.wireRoute === '/v1/me/work')
-        .map((absence) => absence.field),
-    ).toEqual(['WorkItem.stateName']);
-    // And no refusal still says the shipped read does not exist.
-    for (const absence of contested) {
-      expect(absence.because, absence.field).not.toMatch(/never reads it|never reads proj_contested/);
-    }
-    // The two `title` gaps name the route that would close them; the
-    // `serverTime` gap names why NO route can — the claim was refused, so it was
-    // never stamped. Those are two different kinds of absence and the reasons say
-    // so rather than sharing one sentence.
-    expect(contested[0]?.because).toContain('/v1/contests');
-    expect(contested[2]?.because).toContain('/v1/contests');
-    expect(contested[1]?.because).toContain('never committed');
+    // `inTransit` is a structural emptiness and not a read that came back
+    // empty: an online-only shell has no outbox.
+    expect(view.inTransit).toEqual([]);
   });
 
-  it('3.39 the register covers exactly the THREE blocked methods', () => {
-    // Four until rulings P32/P38 served `getMyWorkspaces`, six until P25
-    // clause 1 served `getTickets` and `getTicket`. The number in this title
-    // has now been wrong twice by being right when written, which is why the
-    // absences below are asserted INDIVIDUALLY rather than trusted to a count.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['getAttention', 'getMyWork', 'search']);
+  /**
+   * 12.251 — THE EXCLUSION, and the two map misses do NOT mean the same thing.
+   *
+   * This is the half a permitted-case suite would miss. A `projectNames` miss is
+   * the visibility rule applying (P32/P38) and must degrade to `null` with the
+   * id kept; a `stateNames` miss is a malformed body and must REFUSE, because
+   * the route documents that map as total and `WorkItem.stateName` is required.
+   * A mapper that treated both the same way would either blank a legal name or
+   * put a slug where a name goes, and only one case can tell those apart.
+   */
+  it('12.251 a withheld project NAME degrades to null with the id kept; a missing state name refuses', () => {
+    const withheld = '01J9GPRJ00000000000000000C';
+    const base: MyWorkResponse = {
+      workspaceId: 'w',
+      groups: {
+        open: [serverCard({ ticketId: 'tkt-1' }), serverCard({ ticketId: 'tkt-2', projectId: withheld })],
+        active: [],
+        terminal: [],
+      },
+      projectNames: { '01J9GPRJ000000000000000000': 'Accounts' },
+      stateNames: { 'tkt-1': 'To do', 'tkt-2': 'To do' },
+      contested: [],
+    };
+    const view = mapMyWork(base, new Map());
+    // Named for the project in the map...
+    expect(view.assigned[0]?.projectName).toBe('Accounts');
+    // ...and id-only for the one withheld — the id is still there, so the item
+    // renders rather than vanishing. Positive control in the same run: the
+    // FIRST item proves a name can arrive at all, so `null` here is the rule
+    // applying and not a mapper that never reads the map.
+    expect(view.assigned[1]?.projectName).toBeNull();
+    expect(view.assigned[1]?.projectId).toBe(withheld);
+
+    // The other miss is not a rule. Same body, one state name removed.
+    const missing: MyWorkResponse = { ...base, stateNames: { 'tkt-1': 'To do' } };
+    expect(() => mapMyWork(missing, new Map())).toThrow(MappingError);
+    // And it names the key it wanted, so a reader is sent to the map and not to
+    // the card.
+    expect(() => mapMyWork(missing, new Map())).toThrow(/stateNames\.tkt-2/);
+  });
+
+  /**
+   * 12.252 — a contested claim maps, and it has NO `serverTime` to map.
+   *
+   * Ruling P39 did not find the instant; it removed the field. The strongest
+   * available assertion is therefore about what the mapper does NOT produce —
+   * the excluding fixture P39 named: the mapper never populates anything called
+   * `serverTime` for a contested claim, and a mutation that copies
+   * `contestedAt` into one must redden this.
+   */
+  it('12.252 mapMyWork maps a contested claim with both recorded instants and no serverTime', () => {
+    const body: MyWorkResponse = {
+      workspaceId: 'w',
+      groups: { open: [], active: [], terminal: [] },
+      projectNames: {},
+      stateNames: {},
+      contested: [
+        {
+          ticketId: 'tkt-9',
+          title: 'File the GST return',
+          rule: 'state-machine',
+          reason: 'no transition from done to doing',
+          claim: {
+            actorId: ANSELMA,
+            clientTime: '2026-08-19T09:58:12.000Z',
+            contestedAt: '2026-08-19T10:00:00.000Z',
+          },
+        },
+        // The withheld half, in the same body: a contest whose ticket this
+        // viewer may no longer see keeps its row and loses only its title.
+        {
+          ticketId: 'tkt-10',
+          title: null,
+          rule: 'visibility',
+          reason: 'the ticket left this audience',
+          claim: {
+            actorId: ANSELMA,
+            clientTime: '2026-08-19T09:59:00.000Z',
+            contestedAt: '2026-08-19T10:01:00.000Z',
+          },
+        },
+      ],
+    };
+    const view = mapMyWork(body, new Map());
+    expect(view.contested[0]?.claim).toEqual({
+      actorId: ANSELMA,
+      clientTime: '2026-08-19T09:58:12.000Z',
+      contestedAt: '2026-08-19T10:00:00.000Z',
+    });
+    // `toEqual` above already forbids extra keys, but the property is stated
+    // separately so the FAILURE names it: a claim shaped like a ClaimProvenance
+    // is the defect, and `serverTime` is the member that would make it one.
+    expect(Object.keys(view.contested[0]?.claim ?? {}).sort()).toEqual([
+      'actorId',
+      'clientTime',
+      'contestedAt',
+    ]);
+    expect(view.contested[0]?.claim).not.toHaveProperty('serverTime');
+    // The title register, both halves in one run.
+    expect(view.contested[0]?.title).toBe('File the GST return');
+    expect(view.contested[1]?.title).toBeNull();
+    expect(view.contested[1]?.ticketId).toBe('tkt-10');
+  });
+
+  /**
+   * 12.253 — `mapAttention` maps the three SHIPPED kinds, each with the claim
+   * the item is actually about.
+   *
+   * The `due-soon` arm is the one that can go wrong quietly: `card.stateProvenance`
+   * is present on every arm, so a mapper that reached for it everywhere would
+   * produce a perfectly well-formed strip that attributes a DEADLINE to whoever
+   * last transitioned the ticket. The two provenances are given different
+   * actors and different instants in this fixture precisely so that substitution
+   * cannot pass.
+   */
+  it('12.253 mapAttention maps blocked/stale/due-soon, and due-soon carries the DUE claim', () => {
+    const BHUPEN = '01J9GUSB000000000000000000';
+    const card = serverCard({
+      dueDate: {
+        state: 'claimed',
+        claim: {
+          date: '2026-08-25',
+          actorId: BHUPEN,
+          clientTime: '2026-08-20T04:00:00.000Z',
+          serverTime: '2026-08-20T04:00:01.000Z',
+        },
+      },
+    });
+    const body: AttentionResponse = {
+      workspaceId: 'w',
+      generatedAt: '2026-09-02T10:00:00.000Z',
+      settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+      items: [
+        { kind: 'blocked', card, stateName: 'Waiting', reason: 'In "Waiting" — a blocked state.' },
+        {
+          kind: 'stale',
+          card,
+          enteredStateAt: '2026-08-19T10:00:00.000Z',
+          daysInFlight: 14,
+          thresholdDays: 7,
+          reason: 'In an active state since 2026-08-19 — past the 7-day staleness threshold.',
+        },
+        {
+          kind: 'due-soon',
+          card,
+          due: {
+            date: '2026-08-25',
+            actorId: BHUPEN,
+            clientTime: '2026-08-20T04:00:00.000Z',
+            serverTime: '2026-08-20T04:00:01.000Z',
+          },
+          windowDays: 7,
+          reason: 'Needed by 2026-08-25 — due within 7 days.',
+        },
+      ],
+    };
+    const items = mapAttention(body, { contests: [] }, new Map());
+    expect(items.map((item) => item.kind)).toEqual(['blocked', 'stale', 'due-soon']);
+    // Flattened off the nested card, not invented.
+    expect(items.map((item) => item.title)).toEqual([
+      'File the GST return',
+      'File the GST return',
+      'File the GST return',
+    ]);
+    // The route's own sentence, verbatim — this client does not paraphrase a
+    // reason composed from workspace settings it does not hold.
+    expect(items[0]?.reason).toBe('In "Waiting" — a blocked state.');
+    // The claim per kind. blocked/stale are about the STATE...
+    expect(items[0]?.claim?.actorId).toBe(ANSELMA);
+    expect(items[1]?.claim?.actorId).toBe(ANSELMA);
+    // ...and due-soon is about the DUE DATE, by a different actor at a
+    // different instant, so the substitution is visible if it is ever made.
+    expect(items[2]?.claim?.actorId).toBe(BHUPEN);
+    expect(items[2]?.claim?.serverTime).toBe('2026-08-20T04:00:01.000Z');
+
+    // A fourth wire arm is REFUSED, never skipped: silently dropping it would
+    // shorten a strip whose emptiness the user reads as an answer.
+    expect(() =>
+      mapAttention(
+        { ...body, items: [{ ...body.items[0], kind: 'invented' }] },
+        { contests: [] },
+        new Map(),
+      ),
+    ).toThrow(MappingError);
+  });
+
+  /**
+   * 12.254 — the FOURTH kind is the join, and it carries `claim: null`.
+   *
+   * `AttentionItem.claim` is `ClaimProvenance | null`, so a contested claim
+   * having no server instant costs the item its provenance line rather than
+   * making the item unformable — which is exactly the difference from
+   * `ContestedClaim.claim`, non-nullable, which needed a type of its own. Both
+   * halves are asserted in one run so "null" here is the type working and not a
+   * mapper that fills nothing.
+   */
+  it('12.254 mapAttention appends contested items from /v1/contests with a null claim', () => {
+    const body: AttentionResponse = {
+      workspaceId: 'w',
+      generatedAt: '2026-09-02T10:00:00.000Z',
+      settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+      items: [
+        {
+          kind: 'blocked',
+          card: serverCard(),
+          stateName: 'Waiting',
+          reason: 'In "Waiting" — a blocked state.',
+        },
+      ],
+    };
+    const items = mapAttention(
+      body,
+      {
+        contests: [
+          {
+            ticketId: 'tkt-9',
+            title: 'Chase the licence renewal',
+            projectId: '01J9GPRJ000000000000000000',
+            rule: 'state-machine',
+            reason: 'no transition from done to doing',
+          },
+        ],
+      },
+      new Map(),
+    );
+    // The swept kind survives and the joined one is appended — the strip is the
+    // union, not one or the other.
+    expect(items.map((item) => item.kind)).toEqual(['blocked', 'contested']);
+    const contested = items[1];
+    // The two fields that used to make this kind unformable, both off the
+    // contest row itself rather than a second route.
+    expect(contested?.title).toBe('Chase the licence renewal');
+    expect(contested?.projectId).toBe('01J9GPRJ000000000000000000');
+    expect(contested?.reason).toBe('no transition from done to doing');
+    // Null, and the blocked item in the same run proves a claim can arrive.
+    expect(contested?.claim).toBeNull();
+    expect(items[0]?.claim).not.toBeNull();
+  });
+
+  it('3.39 the register covers exactly ONE blocked method, and it is the only DATA gap', () => {
+    // Six under P25 clause 1, four after it served `getTickets`/`getTicket`,
+    // three after P32/P38 served `getMyWorkspaces`, ONE now that P39 and P40
+    // have served `getMyWork` and `getAttention`. The number in this title has
+    // been wrong three times by being right when written, which is why the
+    // membership below is asserted INDIVIDUALLY rather than trusted to a count.
+    //
+    // `search` is last because it is the only gap of the six that a join could
+    // never close: `routes/search.ts` destroys which column matched inside the
+    // query, so `SearchHit.matchedIn` is absent from the SERVER'S OWN answer
+    // rather than merely unread by this client.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
     // Positive control on the sort above: the methods NOT here are the ones this
     // source answers. `getBoard` is the one P25 clause 1 unblocked first;
     // `getTickets` and `getTicket` are the two it unblocked in this change set,
@@ -944,6 +1159,11 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     // stops refusing must leave a trace, or the only record it ever refused is
     // a shorter array.
     expect(SERVING_GAPS['getMyWorkspaces']).toBeUndefined();
+    // The two this change set unblocked, pinned ABSENT for the same reason: a
+    // refusal that stops refusing must leave a trace, or the only record it ever
+    // refused is a shorter array.
+    expect(SERVING_GAPS['getMyWork']).toBeUndefined();
+    expect(SERVING_GAPS['getAttention']).toBeUndefined();
   });
 });
 /**

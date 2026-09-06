@@ -1,5 +1,10 @@
 import { newUlid, type SubmittedEvent, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
-import type { BoardCard, ClaimProvenance, ListRow } from '../../src/view-types.js';
+import type {
+  BoardCard,
+  ClaimProvenance,
+  ContestedClaimProvenance,
+  ListRow,
+} from '../../src/view-types.js';
 
 export const WS = '01J9GWS0000000000000000000';
 export const PROJECT = '01J9GPRJ000000000000000000';
@@ -34,6 +39,30 @@ export function claim(overrides: Partial<ClaimProvenance> = {}): ClaimProvenance
     actorName: 'Anselma Marak',
     clientTime: '2026-08-19T09:58:12.000Z',
     serverTime: '2026-08-19T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+/**
+ * A REFUSED claim's provenance (ruling P39) — deliberately not `claim()`.
+ *
+ * `ContestedClaimProvenance` is not a `ClaimProvenance`: no `actorName`, because
+ * nothing resolves a refused claim's actor through the roster, and no
+ * `serverTime`, because the claim was refused at the door and never stamped.
+ * `contestedAt` is the CONTEST event's instant, which is a different event's
+ * clock and is named for that.
+ *
+ * A separate helper rather than an override of `claim()` on purpose: sharing one
+ * would let a fixture hand a `serverTime` to a shape that must not have one, and
+ * the whole point of the type is that the two are not interchangeable.
+ */
+export function contestedClaim(
+  overrides: Partial<ContestedClaimProvenance> = {},
+): ContestedClaimProvenance {
+  return {
+    actorId: 'user_anselma',
+    clientTime: '2026-08-19T09:58:12.000Z',
+    contestedAt: '2026-08-19T10:00:00.000Z',
     ...overrides,
   };
 }

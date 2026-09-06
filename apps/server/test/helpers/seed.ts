@@ -4,6 +4,7 @@ import { membershipsProjection } from '../../src/projections/proj-memberships.js
 import { projInvites } from '../../src/projections/proj-invites.js';
 import { projProjects } from '../../src/projections/proj-projects.js';
 import { projVisibility } from '../../src/projections/proj-visibility.js';
+import { workflowsProjection } from '../../src/projections/workflows.js';
 import { testEnvelope } from './envelope.js';
 import { appendTestEvent } from './ledger.js';
 
@@ -55,6 +56,26 @@ import { appendTestEvent } from './ledger.js';
  * `proj_contested` to every seeded event in twenty test files — a behaviour
  * change to fixtures this task has no business making. Owner: whoever next
  * touches this helper, or a dedicated cleanup.*
+ */
+/**
+ * **FOUR of the registry's projections, and the name does not say so.** Projects,
+ * memberships, invites, visibility — and nothing else.
+ *
+ * A projection ignores the event types it does not handle, so four silent
+ * no-ops are indistinguishable from four successful applications: hand this a
+ * `workflow.defined` and it goes NOWHERE and reports nothing. That cost a gate
+ * round — `seedWorkflowDef()` below was written, imported and called, had no
+ * effect, and the throw it was meant to prevent fired again with the fixture
+ * looking correct.
+ *
+ * **It is NOT widened, and the reason was measured rather than predicted.**
+ * Adding the workflows projection here looked like a no-op "because nothing
+ * else passes a workflow event". Untrue: `test/visibility/visible-events-for.ts`
+ * case 6.91 passes a `workflow.defined` with a STUB payload — it asks which
+ * events reach a guest and never wanted the definition projected — and the real
+ * projection parses that payload and throws. Widening this helper broke a case
+ * that had every right to pass. So the seeder below applies the ONE projection
+ * it needs to its OWN event, and this list stays four.
  */
 export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promise<void> {
   const client = await pool.connect();
@@ -307,7 +328,27 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
   }
 }
 
-/** The fixture world's workflow: no `workflow.defined` is seeded here, so nothing names one. */
+/**
+ * The fixture world's workflow. `seedTicket` writes `proj_tickets` rows naming
+ * `wf-seed@1` and **does not publish a definition for it** — a shortcut that was
+ * invisible while nothing read a ticket's state NAME off these rows.
+ *
+ * It is visible now. `readMyWork` serves `stateNames` (ruling P40's change set)
+ * and throws, exactly as `assembleListCards` already did, when a ticket names a
+ * definition `proj_workflows` does not hold — which is not a state the product
+ * path can reach, because the door refuses a `ticket.created` whose type names
+ * an unpublished workflow. So the throw is right and the FIXTURE is the
+ * incoherent thing.
+ *
+ * `seedWorkflowDef()` below is the opt-in fix, and it is opt-in deliberately:
+ * `seedTicket` is used by twenty-three test files and ten of them read
+ * `proj_workflows`, so making every seeded world publish a definition would
+ * change what those files count. **Owner for the general fix: whoever next
+ * needs a state name over a `seedTicket` world** — at that point the choice is
+ * to publish here for everyone and re-measure the ten, or keep opting in.
+ * `verify-projections` diffs projections against a ledger replay, so any fix
+ * must go through an EVENT and never a direct `proj_workflows` insert.
+ */
 const SEED_WORKFLOW_ID = 'wf-seed';
 const SEED_WORKFLOW_VERSION = 1;
 const SEED_STATE_ID = 'todo';
@@ -365,6 +406,62 @@ async function insertTicketHead(
  * A claim where the two DISAGREE is Task 9's refusal to make; the projection
  * keys on the entity regardless (`proj-visibility.ts`).
  */
+/**
+ * `workflow.defined` for the workflow `seedTicket`'s rows already name, so a
+ * fixture world can answer a ticket's state NAME.
+ *
+ * Version 1 with the three states `SEED_STATE_ID` sits in the first of, so a
+ * ticket seeded before or after it resolves the same way. Published as an EVENT
+ * rather than inserted, because `verify-projections` rebuilds every projection
+ * from the ledger and diffs it against the live table: a row with no event
+ * behind it fails that comparison.
+ *
+ * Idempotent in practice — `proj_workflows` is `ON CONFLICT (workflow_id,
+ * version) DO NOTHING` — but call it once per world; a second call appends a
+ * second identical event to the ledger.
+ */
+export async function seedWorkflowDef(
+  pool: Pool,
+  workspaceId: string,
+  actorId: string = SEED_ACTOR,
+): Promise<void> {
+  const env = testEnvelope({
+    workspaceId,
+    entity: { kind: 'workflow', id: SEED_WORKFLOW_ID },
+    type: 'workflow.defined',
+    payload: {
+      id: SEED_WORKFLOW_ID,
+      version: SEED_WORKFLOW_VERSION,
+      name: 'Seed flow',
+      initialStateId: SEED_STATE_ID,
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'doing', name: 'Doing', category: 'active' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [
+        { from: '*', to: 'todo', rules: [] },
+        { from: '*', to: 'doing', rules: [] },
+        { from: '*', to: 'done', rules: [] },
+      ],
+    },
+    actorId,
+  });
+  // The event is APPENDED as well as projected, so the world stays one a replay
+  // could rebuild — the principle this file's own docblock states. It applies
+  // the ONE projection it needs rather than going through `applyAll` (which
+  // does not carry it) or the full registry (whose ticket projection would
+  // forward-fold every row in the workspace to this version, which is the
+  // behaviour case 7.210 turns on).
+  await appendTestEvent(pool, env);
+  const client = await pool.connect();
+  try {
+    await workflowsProjection.apply(env, client);
+  } finally {
+    client.release();
+  }
+}
+
 export function setVisibilityEnv(
   workspaceId: string,
   ticketId: string,

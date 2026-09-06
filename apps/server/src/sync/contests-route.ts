@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { FieldClaim } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from '../visibility/can-see.js';
 
@@ -7,6 +8,41 @@ export type ContestView = {
   originalEventId: string;
   workspaceId: string;
   ticketId: string;
+  /**
+   * The contested ticket's CURRENT title, joined from `proj_tickets`.
+   *
+   * This is the field two client refusals waited on — `ContestedClaim.title` on
+   * My Work and the attention strip's `'contested'` item — and both named this
+   * route as their owner for the same reason: `proj_contested` already stores
+   * `ticket_id`, so the ticket the row names is one join away, and no other
+   * `/v1` route answers a ticket's current title given only a ticket id.
+   *
+   * **Serving it discloses nothing this route was not already disclosing.** Its
+   * own rule is "a contest is exactly as visible as its ticket, never more", and
+   * every row here has already passed `canSee` for the ticket the title belongs
+   * to. A viewer who may read the contest may read the ticket, and a viewer who
+   * may not gets no row at all — so the title travels with a row whose audience
+   * is the ticket's own.
+   */
+  title: string;
+  /**
+   * The contested ticket's project, joined from the same `proj_tickets` row as
+   * the title.
+   *
+   * It closes the attention strip's `projectId`, which was previously reachable
+   * only through `GET /v1/workspaces/:workspaceId/tickets` — a SECOND route that
+   * resolves its set through `listVisibleTickets` while this one filters through
+   * `canSee`, with nothing anywhere asserting the two answer the same set. That
+   * made it "a second join with a caveat" (`mappers.ts`' own words). Off this
+   * row there is no caveat: same row, same tenancy, same `canSee` gate that
+   * already admitted the contest.
+   *
+   * The ID only, never the NAME. Rulings P32/P38 make a project's name the
+   * disclosure and its id not one — an admin already receives project ids they
+   * are not a member of through `TicketCard.projectId` — so this discloses
+   * nothing the ticket surface does not.
+   */
+  projectId: string;
   claimantId: string;
   rule: string;
   reason: string;
@@ -24,6 +60,14 @@ type ContestRow = {
   original_event_id: string;
   workspace_id: string;
   ticket_id: string;
+  /**
+   * `proj_tickets.fields` for the ticket this contest names, or `null` when
+   * there is no such row — the LEFT JOIN's absence value, resolved by
+   * `titleOf` below.
+   */
+  ticket_fields: Record<string, FieldClaim> | null;
+  /** `proj_tickets.project_id`, or `null` when the LEFT JOIN found no row. */
+  ticket_project_id: string | null;
   claimant_id: string;
   rule: string;
   reason: string;
@@ -36,12 +80,74 @@ type ContestRow = {
   resolved_at: Date | null;
 };
 
+/**
+ * The contested ticket's current title, out of the joined `proj_tickets.fields`.
+ *
+ * The throw discipline is `assembleTicketCards`' `titleOf`, restated here rather
+ * than shared because that one is private to the card assembler and takes a
+ * `ProjTicketRow` this route never builds. Both absences are projection/ledger
+ * disagreements and neither has an honest value:
+ *
+ * - **No joined row at all** → throw. The LEFT JOIN is a LEFT join precisely so
+ *   this is reachable and loud: an INNER JOIN would have DROPPED the contest,
+ *   turning a data disagreement into a silently shorter list, which is the
+ *   failure this series keeps finding. It is only reachable for a row that has
+ *   ALREADY passed `canSee` — a ticket with no `proj_visibility` row answers
+ *   false and never gets here — so this is a visible contest whose ticket has no
+ *   `proj_tickets` row, not the ordinary invisible case.
+ * - **No title claim, or one whose value is not a string** → throw. Every
+ *   `ticket.created` writes `fields.title` and the door refuses a non-string
+ *   (`checkTicketFieldSet`), so either means the row did not come through it.
+ *
+ * `''` is refused for the reason `ticket-cards.ts` gives: it sits exactly where
+ * a real title goes, and a client renders it as one.
+ */
+function titleOf(row: ContestRow): string {
+  if (row.ticket_fields === null) {
+    throw new Error(
+      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canSee, so its ticket is visible and the two projections disagree`,
+    );
+  }
+  const claim = row.ticket_fields['title'];
+  if (claim === undefined) {
+    throw new Error(
+      `GET /v1/contests: no title claim on ticket ${row.ticket_id} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
+    );
+  }
+  if (typeof claim.value !== 'string') {
+    throw new Error(
+      `GET /v1/contests: the title claim on ticket ${row.ticket_id} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+    );
+  }
+  return claim.value;
+}
+
+/**
+ * The contested ticket's project id, out of the same joined row as the title.
+ *
+ * Separate from `titleOf` and throwing its own message rather than sharing one:
+ * a null here and a null there mean the same disagreement, but a shared throw
+ * would name only one of the two fields and send a reader to the wrong column.
+ * Reachable only for a contest that has ALREADY passed `canSee`, for the reason
+ * `titleOf` states.
+ */
+function projectIdOf(row: ContestRow): string {
+  if (row.ticket_project_id === null) {
+    throw new Error(
+      `GET /v1/contests: contest ${row.contested_event_id} names ticket ${row.ticket_id}, which has no proj_tickets row — the contest passed canSee, so its ticket is visible and the two projections disagree`,
+    );
+  }
+  return row.ticket_project_id;
+}
+
 function toView(row: ContestRow): ContestView {
   return {
     contestedEventId: row.contested_event_id,
     originalEventId: row.original_event_id,
     workspaceId: row.workspace_id,
     ticketId: row.ticket_id,
+    title: titleOf(row),
+    projectId: projectIdOf(row),
     claimantId: row.claimant_id,
     rule: row.rule,
     reason: row.reason,
@@ -137,22 +243,38 @@ export function registerContestsRoute(
     },
     async (request) => {
       const { workspaceId, ticketId, claimantId, open } = request.query;
-      const clauses = ['workspace_id = $1'];
+      const clauses = ['c.workspace_id = $1'];
       const params: unknown[] = [workspaceId];
       if (ticketId !== undefined) {
         params.push(ticketId);
-        clauses.push(`ticket_id = $${params.length}`);
+        clauses.push(`c.ticket_id = $${params.length}`);
       }
       if (claimantId !== undefined) {
         params.push(claimantId);
-        clauses.push(`claimant_id = $${params.length}`);
+        clauses.push(`c.claimant_id = $${params.length}`);
       }
       if (open === 'true') {
-        clauses.push('NOT resolved');
+        clauses.push('NOT c.resolved');
       }
+      // The title join, and every clause above is qualified `c.` for it. LEFT,
+      // not INNER: an inner join would drop a contest whose ticket row is
+      // missing, which is a data disagreement answered with a shorter list
+      // instead of a loud failure — `titleOf` throws on the null instead.
+      //
+      // The join is on `(ticket_id, workspace_id)` and not on `ticket_id`
+      // alone. `proj_contested` has no foreign key into `proj_tickets` and
+      // cannot have one, so nothing in the schema stops a ticket id from
+      // appearing under two workspaces; matching on the id alone would let a
+      // neighbouring tenancy's row supply the title. The workspace clause on
+      // `c` narrows the contests, and this one keeps the JOIN inside the same
+      // tenancy rather than trusting that it already is.
       const { rows } = await deps.pool.query<ContestRow>(
-        `SELECT * FROM proj_contested WHERE ${clauses.join(' AND ')}
-         ORDER BY contested_at, contested_event_id`,
+        `SELECT c.*, t.fields AS ticket_fields, t.project_id AS ticket_project_id
+           FROM proj_contested c
+           LEFT JOIN proj_tickets t
+             ON t.ticket_id = c.ticket_id AND t.workspace_id = c.workspace_id
+          WHERE ${clauses.join(' AND ')}
+          ORDER BY c.contested_at, c.contested_event_id`,
         params,
       );
 

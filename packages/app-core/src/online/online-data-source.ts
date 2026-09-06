@@ -227,11 +227,51 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       return mapSearchHits(await http.get(`/v1/search?${params.toString()}`));
     },
 
-    getMyWork: async (workspaceId) =>
-      mapMyWork(await http.get(`/v1/me/work?workspaceId=${workspaceId}`)),
+    /**
+     * ONE read plus the roster, because ruling P40 put the contested claims on
+     * this route's own body. The alternative — joining `/v1/contests` here —
+     * cannot be written: that route's `claimantId` is caller-supplied and this
+     * source has no viewer id to supply (`getMyWork(workspaceId)` carries none,
+     * P30 forbids widening `data-source.ts`, and the web shell builds this
+     * source while its session is still pending), so an unfiltered read would
+     * render every contest this viewer may SEE as their own.
+     *
+     * The roster is for `stateProvenance` — a `ClaimProvenance` names its actor
+     * — and is fetched the same way `getBoard` fetches it, uncached, so a
+     * revoked member stops being named. It does NOT feed the contested rows:
+     * `ContestedClaimProvenance` has no `actorName` (ruling P39).
+     */
+    getMyWork: async (workspaceId) => {
+      const [raw, roster] = await Promise.all([
+        http.get(`/v1/me/work?workspaceId=${workspaceId}`),
+        workspaceRoster(workspaceId),
+      ]);
+      return mapMyWork(raw, roster);
+    },
 
-    getAttention: async (workspaceId) =>
-      mapAttention(await http.get(`/v1/workspaces/${workspaceId}/attention`)),
+    /**
+     * TWO reads, and the join is the fourth item kind.
+     *
+     * `/v1/workspaces/:ws/attention` computes the three server-swept kinds;
+     * `/v1/contests?workspaceId=&open=true` carries the contested ones, which
+     * that sweep does not produce. Both are scoped to the same population — the
+     * attention route filters by `visibleTicketsWhere` and the contests route
+     * per row by `canSee`, neither by assignment — so the strip stays "everything
+     * visible here that needs attention" with the fourth kind included rather
+     * than silently missing.
+     *
+     * `open=true` because a settled contest needs no attention. It is the one
+     * value that parameter accepts (`open=false` is a 400 by design), so this is
+     * the filter applied, not a filter omitted.
+     */
+    getAttention: async (workspaceId) => {
+      const [raw, contests, roster] = await Promise.all([
+        http.get(`/v1/workspaces/${workspaceId}/attention`),
+        http.get(`/v1/contests?workspaceId=${workspaceId}&open=true`),
+        workspaceRoster(workspaceId),
+      ]);
+      return mapAttention(raw, contests, roster);
+    },
 
     /**
      * The 404 is re-raised, for the same reason `getBoard`'s is and one more

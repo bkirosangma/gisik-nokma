@@ -109,6 +109,53 @@ export function renderContestedClaimText(payload: ClaimContestedPayload): string
   );
 }
 
+/**
+ * The attribution line for a contested claim on a surface that holds the
+ * SUMMARY rather than the envelope — the My Work row (`ContestedClaim`) and the
+ * attention strip.
+ *
+ * ## A sibling of `renderContestedClaimText`, not a change to it (ruling P39)
+ *
+ * P39 said to extend this module rather than replace that function, and the
+ * reason is above its own signature: its output goes into a comment body on
+ * "convert to comment", and a comment body lives in an append-only table
+ * forever. Re-wording it would re-word nothing already written and every future
+ * one — two spellings of one sentence in the ledger, distinguishable only by
+ * date. So the treatment is extended and the existing text is untouched.
+ *
+ * ## Two instants, both named for what they are
+ *
+ * A contested claim has no server instant of its own — it was refused at the
+ * door and never stamped — so this line shows the two instants that ARE
+ * recorded and labels each:
+ *
+ * - `clientTime` is the claimant's DEVICE clock, exactly as
+ *   `renderContestedClaimText` prints it. It is marked "by their clock" because
+ *   it is the one moment this product shows that no server vouches for.
+ * - `contestedAt` is the SERVER's instant for the `claim.contested` event —
+ *   when the refusal was filed, which is a real recorded fact about a real
+ *   event, and is never presented as when the claim was made.
+ *
+ * Both go through `formatIstInstant`, so a moment is printed one way across the
+ * server, the web client, the desktop client and the offline replica.
+ *
+ * The actor is rendered by RAW ID. `ContestedClaimProvenance` carries no
+ * `actorName`: nothing resolves a refused claim's actor through the member
+ * roster, and `ClaimProvenance` documents the raw id as the fallback for a null
+ * name in any case — so this is that fallback, made the only path rather than a
+ * branch that could never be taken.
+ */
+export function renderContestedClaimAttribution(claim: {
+  actorId: string;
+  clientTime: string;
+  contestedAt: string;
+}): string {
+  return (
+    `claimed by ${claim.actorId} at ${formatIstInstant(claim.clientTime)} by their clock — ` +
+    `refused ${formatIstInstant(claim.contestedAt)}`
+  );
+}
+
 /** Minimal ProseMirror doc for plain text (amendment 12: bodies are PM JSON). */
 export function plainTextToDoc(text: string): Record<string, unknown> {
   return {

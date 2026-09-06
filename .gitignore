@@ -40,3 +40,8 @@ var/
 # directory and never match a nested app.
 **/src-tauri/target/
 **/src-tauri/gen/
+
+# Gate runs write here (lock protocol v3.2). A build artefact, never a commit:
+# `git add -A` swept it into two commits on exec/31 before this line existed.
+gate.log
+gate*.log

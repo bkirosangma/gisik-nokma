@@ -169,12 +169,70 @@ export type WorkItem = {
   dueDate: { date: string; claim: ClaimProvenance } | null;
 };
 
+/**
+ * What a refused claim honestly has (ruling P39).
+ *
+ * **This is deliberately NOT a `ClaimProvenance`, and the difference is the one
+ * fact a contest is about.** `ClaimProvenance` requires both clocks because a
+ * committed claim HAS both: the device said when it made the claim, and the
+ * server stamped when it accepted it. A contested claim was refused at the door,
+ * so it was never committed and never stamped — `SubmittedEvent` is
+ * `Omit<EventEnvelope, 'serverTime' | 'seq'>` by construction — and **no row in
+ * this system records a server instant for the claim itself.**
+ *
+ * So there is no `serverTime` member at all. The two alternatives were both
+ * refused in writing:
+ *
+ * - **Copying `contestedAt` into it** would attribute one event's instant to
+ *   another — the CONTEST event's stamp presented as the claim's. That is the
+ *   same move refused on the snapshot's state provenance (ruling P36's option
+ *   3), and it is the one that would pass a gate.
+ * - **A bare `serverTime?` on `ClaimProvenance`** would make every consumer of a
+ *   REAL claim's provenance handle an absence that can never occur there, and
+ *   the type would stop saying which shapes have a server instant and which
+ *   cannot have one.
+ *
+ * `contestedAt` is carried under its own name — the server's instant for the
+ * CONTEST, which is a real recorded fact about a real event — so a renderer can
+ * say when the refusal was filed without any reader mistaking it for when the
+ * claim was made. *If a consumer needs a server instant for a contested claim,
+ * that consumer is wrong about what a contested claim is.*
+ *
+ * No `actorName`: unlike `ClaimProvenance`, nothing here is resolved through the
+ * member roster. `renderContestedClaimText` already renders this shape's facts
+ * from the raw `actorId`, which is the fallback `ClaimProvenance` documents for
+ * a null name anyway.
+ */
+export type ContestedClaimProvenance = {
+  actorId: string;
+  /** The claimant's DEVICE instant, recorded on the refused envelope. */
+  clientTime: string;
+  /** The SERVER's instant for the `claim.contested` event — when the refusal was filed. */
+  contestedAt: string;
+};
+
 export type ContestedClaim = {
   ticketId: string;
-  title: string;
+  /**
+   * `null` when this viewer may no longer see the contested TICKET (ruling P40,
+   * constraint b) — they still have `ticketId`, so the row renders id-only
+   * rather than vanishing.
+   *
+   * A contest outlives the visibility of its ticket. The claim is this viewer's
+   * own, so the refusal is always theirs to see; whether they may still read the
+   * ticket is a separate question, answered by `canSee` at read time, and it can
+   * have changed since the claim was refused. Losing the row would lose the
+   * record of their own claim; inventing a title would be the disclosure.
+   *
+   * Nullable rather than absent, the same register as `WorkItem.projectName`:
+   * "no title for you" is a fact the renderer must act on, and an optional key
+   * would let a mapper that simply forgot the field look identical to the rule
+   * applying.
+   */
+  title: string | null;
   rule: string;
   reason: string;
-  claim: ClaimProvenance;
+  claim: ContestedClaimProvenance;
 };
 
 export type MyWorkView = {

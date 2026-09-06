@@ -247,13 +247,25 @@ export type AssignmentProvenance = {
  * ## Why this is a separate type and not five fields on `TicketCard`
  *
  * `TicketCard` is shared by the board, search, My Work and the attention strip.
- * Adding these there would put `stateName` on `GET /v1/me/work`, whose
- * `WorkItem.stateName` gap is a DATA gap with a different answer (a My Work card
- * names no workflow version to read a name from, and the ticket is not fetched
- * with its project's workflow defs in hand) and is with the owner. A field
- * addition that closes a gap on one surface and half-closes a differently-shaped
- * one on four others is the "implemented on ONE DOOR of a set" defect run
- * backwards. So the list route widens its OWN card and nothing else moves.
+ * A field addition that closes a gap on one surface and half-closes a
+ * differently-shaped one on four others is the "implemented on ONE DOOR of a
+ * set" defect run backwards. So the list route widens its OWN card and nothing
+ * else moves.
+ *
+ * **This paragraph used to give a second reason and that reason was FALSE**, so
+ * it is corrected in place rather than deleted — it was read to decide what not
+ * to touch. It said `GET /v1/me/work` could not serve a state name because "a My
+ * Work card names no workflow version to read a name from, and the ticket is not
+ * fetched with its project's workflow defs in hand". The first clause is true of
+ * the CARD and beside the point: the version is on the ROW, not the card
+ * (`ProjTicketRow.workflow_version`, whose own docblock says it is carried there
+ * precisely so no card field is derived from it). The second clause was wrong —
+ * `readMyWork` selects `PROJ_TICKET_COLUMNS`, which has named
+ * `t.workflow_id, t.workflow_version` all along, so the route held the pair the
+ * whole time and only the by-version definition read was missing. That read is
+ * one `foldedWorkflowDefs` call, and `MyWorkResponse.stateNames` now makes it as
+ * a sibling MAP — so the argument above for keeping the field off `TicketCard`
+ * still holds, and nothing else moved after all.
  *
  * ## Field by field, what each value means
  *
@@ -324,6 +336,92 @@ export type MyWorkResponse = {
    * this visibility decision on four routes that never asked the question.
    */
   projectNames: Record<string, string>;
+  /**
+   * `ticketId` → the name of the state that card is in, **in the definition the
+   * ticket is folded to** — `(workflow_id, workflow_version)` off the ticket's
+   * own row, never the latest published one. Reading the latest would be
+   * `BoardGroup.workflowVersion`'s lie in miniature: a name from a vocabulary
+   * this ticket was never folded into.
+   *
+   * Keyed by `ticketId` and not by state id, because a state id is unique only
+   * within one workflow AND one version: two cards in this answer may name the
+   * same `stateId` under different workflows, or under different versions of one
+   * workflow, and mean different states. `TicketCard` carries `workflowId` but
+   * NOT the version it is folded to (that stays on `ProjTicketRow`, for the
+   * reason stated there), so `ticketId` is the only key the client can look a
+   * card up by without the route disclosing a second vocabulary.
+   *
+   * TOTAL over the cards in `groups`: every card has an entry, and the route
+   * throws rather than omitting one. An absent entry would be a card whose state
+   * has no name, and the client's `WorkItem.stateName` is required — so the
+   * honest failure is here, where the projection and the ledger can be named as
+   * disagreeing, not at a client falling back to the state id and rendering a
+   * slug where a name goes.
+   *
+   * A map beside the groups for the same reason `projectNames` is one:
+   * `TicketCard` is shared by the board, the list, search and attention, and
+   * `ListCard` already widens its OWN card for this exact field so nothing else
+   * moves. Additive, so a client that ignores it is unaffected.
+   */
+  stateNames: Record<string, string>;
+  /**
+   * This viewer's OWN open contested claims (ruling P40).
+   *
+   * The additive key the docblock on `routes/my-work.ts` reserved — "the shape
+   * here nests the cards under `groups` precisely so that key can arrive beside
+   * it without reshaping anything a client already parses". It arrives beside
+   * them, and nothing above it moved.
+   *
+   * **Why HERE and not left to `GET /v1/contests`**, which is shipped,
+   * `canSee`-gated and queryable by `claimantId`: because "MY contested claims"
+   * is a VIEWER-scoped read, and the viewer is a fact only the server holds.
+   * `/v1/contests`' `claimantId` is caller-supplied, and the online client
+   * cannot supply its own — `getMyWork(workspaceId)` carries no viewer id, P30
+   * forbids widening `data-source.ts`, and the web shell builds its data source
+   * before the session resolves. A client reading `/v1/contests` unfiltered
+   * would render every contest it may SEE as the viewer's own, which is not a
+   * degraded answer but a wrong one. `proj_contested`'s
+   * `(workspace_id, claimant_id)` index exists for exactly this path and its
+   * migration comment says so.
+   *
+   * Open contests only (`NOT resolved`): a settled contest is not outstanding
+   * work, and the resolutions have their own surface.
+   */
+  contested: ContestedClaimView[];
+};
+
+/**
+ * One of the viewer's own refused claims, as `GET /v1/me/work` serves it.
+ *
+ * ## `title` is nullable, and that is ruling P40's constraint (b)
+ *
+ * A contest outlives the visibility of the ticket it is about. The viewer made
+ * this claim, so the CONTEST is theirs to see; whether they may still see the
+ * TICKET is a separate question answered by `canSee` at read time, and it can
+ * have changed since the claim was refused. So the title is served iff the
+ * viewer can see the ticket NOW, and is `null` otherwise — the same
+ * existence-without-title register as `WorkItem.projectName` under P32/P38: the
+ * `ticketId` is always present, so the row renders id-only rather than
+ * vanishing or blank.
+ *
+ * Nullable rather than absent, for the reason that register always gives: "no
+ * title for you" is a fact the renderer must be able to act on, and an optional
+ * key would let a route that simply forgot the field look the same as the rule
+ * applying.
+ */
+export type ContestedClaimView = {
+  ticketId: string;
+  title: string | null;
+  rule: string;
+  reason: string;
+  /**
+   * What a REFUSED claim honestly has (ruling P39). There is no `serverTime`
+   * member: the claim was refused at the door, never committed and never
+   * stamped, so no row in this system records a server instant for it.
+   * `contestedAt` is the CONTEST event's own instant — when the refusal was
+   * filed — and is named for that rather than spent as the claim's.
+   */
+  claim: { actorId: string; clientTime: string; contestedAt: string };
 };
 
 export type AttentionItem =

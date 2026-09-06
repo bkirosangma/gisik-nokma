@@ -2,11 +2,11 @@ import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
+import { ServingGapError, SERVING_GAPS, mapMyWork } from '../../src/online/mappers.js';
 import type { MyWorkView, WorkItem } from '../../src/view-types.js';
 import { MyWork, useMyWork } from '../../src/views/my-work.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
-import { WS, claim } from '../helpers/seed.js';
+import { WS, claim, contestedClaim } from '../helpers/seed.js';
 
 const GST: WorkItem = {
   ticketId: 't1',
@@ -30,7 +30,7 @@ const VIEW: MyWorkView = {
       title: 'Bank mandate',
       rule: 'restrict-to',
       reason: 'Only the assignee may perform this transition.',
-      claim: claim(),
+      claim: contestedClaim(),
     },
   ],
 };
@@ -80,7 +80,19 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     expect(
       within(contested).getByText('Only the assignee may perform this transition.'),
     ).toBeInTheDocument();
-    expect(within(contested).getByText('claimed by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
+    // Ruling P39. This asserted 'claimed by Anselma Marak on 19 Aug 2026', and
+    // BOTH of those facts were ones a refused claim cannot carry: there is no
+    // `actorName` to resolve and no `serverTime` to date it by. The line now
+    // names the actor by raw id and labels BOTH recorded instants — the
+    // claimant's device clock, and the server's stamp on the CONTEST — so a
+    // reader cannot mistake the second for when the claim was made.
+    expect(
+      within(contested).getByText(/claimed by user_anselma at .* by their clock — refused /),
+    ).toBeInTheDocument();
+    // The excluding half, in the same run: no rendered text dates this claim by
+    // a server instant it never had. `contestedClaim()` carries no `serverTime`
+    // at all, so a renderer reaching for one prints `undefined` here.
+    expect(within(contested).queryByText(/undefined/)).not.toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: the contested reason is the engine’s, not a paraphrase — and the rule is named beside it', () => {
@@ -97,7 +109,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
           title: 'Bank mandate',
           rule: 'four-eyes',
           reason: 'The person who requested this may not also approve it.',
-          claim: claim(),
+          claim: contestedClaim(),
         },
       ],
     };
@@ -150,18 +162,42 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     ).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: and the serving-gap register says the same — `contested` is a gap, `inTransit` is not', () => {
-    const absences = SERVING_GAPS['getMyWork'] ?? [];
-    const register = absences.map((absence) => `${absence.field} :: ${absence.because}`).join('\n');
-    expect(absences.length).toBeGreaterThan(0);
-    expect(register).toContain('ContestedClaim.title');
-    expect(register).toContain('ContestedClaim.claim.serverTime');
-    // The whole point: no absence in the register is about `inTransit`. If one
-    // ever appears, the empty state above stops being structural truth and this
-    // fails, naming the register.
+  it('PLANTED DEFECT: `contested` is SERVED now and `inTransit` is still not a gap — the asymmetry survives its own reason', () => {
+    // This case used to read `getMyWork`'s absences and assert that `contested`
+    // was among them while `inTransit` was not. Rulings P39 and P40 served
+    // `contested`, so half its subject is gone — and the property it existed for
+    // is the OTHER half, which is why it is re-aimed rather than deleted.
+    //
+    // The asymmetry was never about which of the two was harder. `contested`
+    // rows exist in `proj_contested`, so `[]` there would have been a claim
+    // about the world; `inTransit` is the replica's outbox and an online-only
+    // client HAS none, so `[]` there is a fact about this client. The first
+    // stopped being a gap the moment a route served it. The second cannot
+    // become one by being served, because there is nothing to serve.
+    expect(SERVING_GAPS['getMyWork']).toBeUndefined();
+    // Which makes the empty state above STRUCTURAL and not a read that came
+    // back empty — now provable directly rather than by the register's silence:
+    // the mapper returns `[]` for any body at all.
+    expect(mapMyWork(
+      {
+        workspaceId: WS,
+        groups: { open: [], active: [], terminal: [] },
+        projectNames: {},
+        stateNames: {},
+        contested: [],
+      },
+      new Map(),
+    ).inTransit).toEqual([]);
+    // And no absence ANYWHERE in the register is about `inTransit` — widened
+    // from `getMyWork`'s own list, which no longer exists, to the whole
+    // register, which is the stronger form of the same claim.
+    const register = Object.entries(SERVING_GAPS)
+      .flatMap(([method, absences]) => absences.map((a) => `${method}: ${a.field} :: ${a.because}`))
+      .join('\n');
+    expect(register.length, 'the register must be non-empty or this proves nothing').toBeGreaterThan(0);
     expect(
-      absences.map((absence) => absence.field).join(' | '),
-      `no getMyWork absence may be about inTransit — it is structurally empty for an online-only client:\n${register}`,
+      register,
+      'no absence may be about inTransit — it is structurally empty for an online-only client',
     ).not.toContain('inTransit');
   });
 
@@ -352,9 +388,23 @@ describe('3.60 useMyWork — a refusal is an error, never three empty sections',
   }
 
   it('PLANTED DEFECT: the serving gap surfaces and the view never renders "assigned:0"', async () => {
+    // CONSTRUCTED, not read off the register — `getMyWork` does not refuse any
+    // more (rulings P39/P40), and a `ServingGapError` built over an empty
+    // lookup would still carry the message prefix asserted below while
+    // measuring a refusal about nothing. Same move as `reopen-flow.test.tsx`'s
+    // T13.4h-control. What is under test is the HOOK: a refusal surfaces as an
+    // error and `data` never becomes `[]`.
     const source = createFakeDataSource({
       getMyWork: async () => {
-        throw new ServingGapError('getMyWork', SERVING_GAPS['getMyWork'] ?? []);
+        throw new ServingGapError('getMyWork', [
+          {
+            field: 'ContestedClaim.title',
+            wireKey: 'title',
+            wireRoute: '/v1/contests',
+            because: 'a hand-built absence standing in for a refusal this method no longer makes',
+            owner: 'this test',
+          },
+        ]);
       },
     });
     render(<Harness source={source} />);

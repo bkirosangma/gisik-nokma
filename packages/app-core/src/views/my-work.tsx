@@ -1,3 +1,4 @@
+import { renderContestedClaimAttribution } from '@gisik-nokma/domain';
 import { Card, Chip } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
@@ -120,8 +121,21 @@ function ContestedCard({
       </button>
       <Chip tone="contested">{contested.rule}</Chip>
       <p className="gn-my-work__reason">{contested.reason}</p>
+      {/*
+        Ruling P39. This line used to read `claimed by <name> on
+        <serverTime>`, and BOTH halves were claims this row cannot make. There
+        is no `actorName` — nothing resolves a refused claim's actor through
+        the member roster — and there is no `serverTime` at all: the claim was
+        refused at the door, so no server ever stamped it. The old text showed
+        a moment that did not exist for this claim, which is the one thing a
+        contest banner must not do.
+
+        The domain renders it now, beside `renderContestedClaimText` and for
+        the same reason that function exists: one vocabulary for a contested
+        claim, and both instants labelled for what they actually are.
+      */}
       <span className="gn-my-work__claim">
-        {`claimed by ${actorLabel(contested.claim.actorId, contested.claim.actorName)} on ${formatDate(contested.claim.serverTime)}`}
+        {renderContestedClaimAttribution(contested.claim)}
       </span>
     </Card>
   );

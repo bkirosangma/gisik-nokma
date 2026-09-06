@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HttpError } from '@gisik-nokma/app-core/online';
+import { HttpError, ServingGapError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
 import { EXPIRED_SESSION_COPY, isExpiredSession } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -57,8 +57,42 @@ afterEach(() => {
 
 describe('a refused read is rendered as the refusal, never as a spinner or an empty list', () => {
   it('My Work: both reads refuse, and both refusals are on the page instead of "Loading…"', async () => {
+    // **The two refusals are CONSTRUCTED here now, and that is a change.** This
+    // case used to take them from `stubServices({})`, which read them off
+    // `SERVING_GAPS` — correct while `getMyWork` and `getAttention` refused,
+    // and impossible once rulings P39 and P40 served both. The property under
+    // test is the PAGE's: a refused read reaches the screen as the refusal's
+    // own words, never as a spinner and never as an empty strip. That is true
+    // of any `ServingGapError` and does not need these two methods to still
+    // make one — the same move `reopen-flow.test.tsx`'s T13.4h-control made
+    // when P25 clause 1 served `getTicket`.
+    //
+    // The absences below are shaped like the ones that really stood here, so
+    // the assertions further down still read against realistic text.
+    const gap = (method: string, field: string, wireRoute: string) =>
+      () =>
+        Promise.reject(
+          new ServingGapError(method, [
+            {
+              field,
+              wireKey: 'title',
+              wireRoute,
+              because: 'a hand-built absence standing in for a refusal this method no longer makes',
+              owner: 'this test',
+            },
+          ]),
+        );
     render(
-      <Providers services={stubServices({})}>
+      <Providers
+        services={stubServices({
+          getMyWork: gap('getMyWork', 'WorkItem.stateName', '/v1/me/work'),
+          getAttention: gap(
+            'getAttention',
+            "AttentionItem kind 'contested' — its title",
+            '/v1/contests',
+          ),
+        })}
+      >
         <MyWorkPage />
       </Providers>,
     );
@@ -73,12 +107,12 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       expect.stringContaining('My Work cannot be shown yet.'),
     ]);
     expect(texts[0]).toContain("AttentionItem kind 'contested' — its title");
-    // `WorkItem.stateName`, and it named `WorkItem.projectName` until rulings
-    // P32/P38 served that field. `getMyWork` still refuses — on three absences
-    // now rather than four — so this case's PROPERTY is unchanged: the refusal
-    // reaches the page as a refusal, naming a real unserved field. The field it
-    // names had to move because the old one is no longer unserved, which is the
-    // register staying honest rather than the case being weakened.
+    // `WorkItem.stateName`. It named `WorkItem.projectName` until P32/P38, then
+    // this, and now neither field is unserved at all — which is why the
+    // absences are constructed above rather than read from the register. The
+    // case's PROPERTY has survived every one of those moves unchanged: whatever
+    // a read refuses over, the refusal reaches the page as words a person can
+    // act on, and the spinner and the empty strip do not.
     expect(texts[1]).toContain('WorkItem.stateName');
 
     // The half that makes the two above a test: neither falsehood is also here.

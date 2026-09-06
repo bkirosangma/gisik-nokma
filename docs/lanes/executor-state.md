@@ -16,6 +16,191 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
+
+> **Shas in narrative prose are facts about when they were written.** Verify with
+> `git branch --contains` — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits
+> and hands back pre-rebase content while looking like it worked.
+
+## ANCHORS — measured 2026-09-06 ~09:15 IST, recounted at the sha below
+
+| what | value |
+|---|---|
+| branch | `exec/31-mywork-residuals`, cut from `origin/main` `b4e2f14` (the HELD pair, #150) |
+| merge-base | `b4e2f14` — verified with `git merge-base origin/main HEAD` |
+| HEAD | `1b441ae` |
+| ahead | **7** commits (see `git log origin/main..HEAD`); first four: `eb2e056` (serving) → `724e51f` (client tests) → `1b441ae` (server tests + catalogue) → `62cd517` (the three fixtures the GATE caught) |
+| tree | clean |
+| node | **v22.22.2** — every figure below was measured under it |
+
+## WHAT THIS BRANCH DOES
+
+Closes **four** client refusals. `getMyWork` refused over three facts and `getAttention` over one;
+`SERVING_GAPS` now carries **`search` alone**, which is the only DATA gap of the original six — the one
+no join can close, because `routes/search.ts` destroys which column matched inside its own query.
+
+1. **`WorkItem.stateName`** — served as `MyWorkResponse.stateNames`, a `ticketId` → name map beside
+   `groups` (the landed `projectNames` pattern), read via `foldedWorkflowDefs` by
+   `(workflow_id, workflow_version)` with `assembleListCards`' exact throw discipline. **NOT**
+   `routes/attention.ts`'s `stateNameOf`, which reads the LATEST def and falls back to the state id —
+   right for a `reason` sentence, and the workflowVersion lie in a field a client renders as a name.
+2. **`ContestedClaim.title`** — `GET /v1/contests` serves `title` AND `projectId` from ONE
+   tenancy-scoped `LEFT JOIN` on `(ticket_id, workspace_id)`. LEFT, so a missing ticket row throws
+   instead of shortening the list; both columns, because `proj_contested` has no FK.
+3. **`ContestedClaim.claim.serverTime`** — ruling P39: the field is DELETED, not found.
+   `ContestedClaimProvenance {actorId, clientTime, contestedAt}`.
+4. **`MyWorkView.contested`** — ruling P40 (asked for and received mid-task): `/v1/me/work` serves it,
+   claimant from the session, title re-gated by `canSee` at read time and `null` when it fails.
+
+## RULING P40 — REQUESTED AND RECEIVED THIS TASK
+
+Two landed documents contradicted each other and the client could not break the tie.
+`mappers.ts` said `/v1/me/work` "does not serve contests and NEVER WILL"; `routes/my-work.ts` said
+"Plan 10 extends `MyWorkResponse` with an ADDITIVE `contested` key … the shape here nests the cards
+under `groups` PRECISELY SO THAT KEY CAN ARRIVE BESIDE IT". **Door B ruled.** Both false sentences are
+corrected IN PLACE (a false sentence a maintainer reasons from is worse than a missing one).
+
+`getAttention` needed no ruling and was split off: `routes/attention.ts` scopes by
+`visibleTicketsWhere` and never by assignment, so the strip's population and the `canSee`-gated
+contests are the same set, and the fourth kind is a client-side join.
+
+## THE FINDING THAT OUTLIVES THIS BRANCH — 7.210 was never a missing fixture
+
+`projections/tickets.ts` handles `workflow.defined` by selecting `workflow_version < target.version`
+and folding those rows UP — a monotone max-join, documented there as such. **So publishing a version
+moves every ticket in that workspace to it, and `folded` and `latest` agree on the product path by
+construction.** The neighbouring workspace cannot separate them either; both reads are
+workspace-scoped. That is why 7.210's folded-versus-latest note survived every attempt to constrain it,
+and why a scenario-shaped case would pass against `latestWorkflowDefs` too. 7.214 therefore writes the
+row back to v1 **by hand and says so**; 7.215 asserts the fold, so if it ever stops holding, a real
+scenario becomes writable. Recorded at 7.210 in `test-cases/07`.
+
+## MUTATIONS — every one run, every output read
+
+| mutation | reddens |
+|---|---|
+| `foldedWorkflowDefs` → `latestWorkflowDefs` (`routes/my-work.ts`) | **7.214 alone** |
+| drop the `canSee` gate on the contested title | **7.217 alone** |
+| `/v1/contests` title → echo the ticket id | **7.208 alone** |
+| mapper copies `contestedAt` into a `serverTime` | **12.252 alone** |
+| `c.claimant_id = $2` → `<>` | **7.216 AND 7.217** — the pair sharing that fixture; overlap RECORDED, not engineered away |
+
+**Two earlier attempts at the claimant mutation reddened TWENTY cases and identified nothing.**
+Removing the predicate leaves `$2` unbound; the tautology form (`OR $2 IS NULL`) leaves it untypeable.
+Postgres refuses to plan either, so every request 500s. *A mutation whose blast radius is the whole
+route is not evidence about the case it was aimed at.* Both are recorded at 7.216.
+
+## A CHECK THAT COULD NOT FAIL, FOUND WHILE UPDATING IT
+
+`client-contract.test.ts` 7.207 asserted `body.items.every(item => item.kind !== 'contested')` against
+a strip that has always answered `{items: []}` in that fixture — vacuously true, passing without
+observing an item. Found by adding a non-vacuity line, which failed. Replaced rather than propped up:
+`test/routes/attention.test.ts` already asserts exact id sets for all three kinds against real
+fixtures. **The same shape was found TWICE more on the client** — `attention-strip.test.tsx` and
+`my-work.test.tsx` each built a `ServingGapError` from a register lookup that now misses and falls
+back to `[]`; the error still carries the asserted message prefix, so both went on PASSING while
+measuring a refusal about nothing. Both now construct their own absence (the T13.4h-control
+precedent), and both siblings invert to pin the fact that licenses it.
+
+## THREE FIXTURES THE GATE CAUGHT THAT THE TOUCHED FILES COULD NOT
+
+Running only the four files I had edited showed 49/49 green. **The full gate found eighty-eight more
+failures in three fixtures.** None was a defect in the change; all three are worth knowing.
+
+1. **`seedTicket` writes `proj_tickets` rows naming `wf-seed@1` and never publishes that definition**
+   — its own comment says so. Invisible while nothing read a state NAME off those rows. Serving
+   `stateNames` made `readMyWork` throw, exactly as `assembleListCards` always has. **The throw is
+   right and the fixture is the incoherent thing**: the door refuses a `ticket.created` whose type
+   names an unpublished workflow, so such a row is not a state the product can reach. Added
+   `seedWorkflowDef()` — **opt-in**, because 23 files use `seedTicket` and 10 read `proj_workflows`,
+   and any general fix must go through an EVENT (never a direct insert) or `verify-projections`,
+   which diffs projections against a ledger replay, breaks. Owner recorded at the helper.
+2. **`real-door-round-trip` pins the my-work body with an exact `toEqual`** and reddened when the body
+   grew two keys — the assertion working. Both added INSIDE the `toEqual`.
+3. **Eighty-six web tests died on ONE line.** `stub-services.ts` builds refusing reads with
+   `refuse(method)`, which THROWS when the gap it names leaves the register — so both served methods
+   took every file importing that helper down at module load. Same mechanism that fired when P32/P38
+   served `getMyWorkspaces`, and both get the same treatment (`unstubbed(...)`, never `[]`).
+
+**The lesson for the next task: running the files you edited is not the gate.** The three fixtures
+were reachable only from files I had no reason to open.
+
+### A fourth round, and it was my own unmeasured claim
+
+`applyAll` in `test/helpers/seed.ts` applies **four** of the registry's projections — projects,
+memberships, invites, visibility — and its NAME does not say so. A projection ignores event types it
+does not handle, so **four silent no-ops are indistinguishable from four successful applications**: my
+`seedWorkflowDef()` was written, imported, called, and had NO EFFECT, and the throw it was meant to
+prevent fired again on the next gate with the fixture looking correct.
+
+I then widened `applyAll` with the workflows projection and wrote that it was "a no-op for every
+caller that existed before it, since nothing else passes a workflow event here". **That was a
+prediction wearing the clothes of a measurement, and the next gate falsified it in one run:**
+`test/visibility/visible-events-for.test.ts` case 6.91 hands `applyAll` a `workflow.defined` with a
+STUB payload — it asks which events reach a guest and never wanted the definition projected — and the
+real projection parses that payload and throws.
+
+Reverted. The seeder now applies the ONE projection it needs to its OWN event: not `applyAll` (which
+does not carry it) and not the full registry (whose ticket projection would forward-fold every row in
+the workspace, the exact behaviour 7.210 turns on, making the fixture useless a second way).
+**Anything you are about to call a no-op across 23 files is a claim to measure, not to assert.**
+
+## TWO CORRECTIONS TO THE OVERRIDE — measured, accepted by the controller
+
+- **"the replica source's refusal on this field flips to served" — it never had one.**
+  `MY_WORK_ABSENCES` in `replica-data-source.ts` has exactly two entries, `WorkItem.projectName` and
+  `ContestedClaim.title`, both still valid locally. The replica's `getMyWork` KEEPS refusing and **no
+  replica file changes on this branch.**
+- **"if `getAttention` already serves it after closure 2" — it did not.** One absence entry, the same
+  missing title. Hence the shared-door build.
+
+## IDS — recounted at HEAD with the three-style control
+
+`node scripts/check-case-ids.mjs` → **exit 0**; bare 836, bold 473, marker-first 8, **sum 1317, union
+1317** (union == sum, so no style is being missed). §12 block 12.240–12.259 used through **12.254**
+(12.250–12.254 minted here); §7 next free **7.219** (7.214–7.218 minted here). §6 NOT needed — I did
+not take 6.180+.
+
+## STILL CARRIED, NOT MINE TO BUILD
+
+- **7.211's dangling-`parent_id` branch has no fixture and survives its own mutation.** Untouched here.
+- **The local replica schema has no migration path** (`migrateLocal` is `CREATE TABLE IF NOT EXISTS`
+  only; `LOCAL_SCHEMA_VERSION` is written and never read). Owner: the first change that must ALTER
+  rather than CREATE. **Do not build a migration framework unprompted.**
+- **`BoardCard.cause` narrowed rather than served on the snapshot-bounded path** — ❌ case owed, owner
+  P36. NOT done here.
+- **Closure 2's two carried fixture items: 7.210 (now EXPLAINED above, see `test-cases/07`) and
+  7.211.**
+
+## NEXT, IN ORDER — nothing below has started
+
+1. **C2's proper close** — a cursor on `TicketListView` (one type, N consumers, one seam; closure 3's
+   guardrails: consume the real type, declare no parallel one). Its own PR.
+2. **The owed ❌ cases under P36** — `BoardCard.cause` narrowed on the snapshot-bounded path (build or
+   catalogue with the reason); 7.211's dangling-`parent_id` fixture.
+3. **Report and STOP** — the controller re-tasks.
+
+## MECHANICS THAT COST ME TIME
+
+- **The gate lock script must be named `gate*.sh` or `locked-test*.sh`** or v3.2's peers matcher cannot
+  see it. Mine is `/tmp/gate31.sh`.
+- **`rtk proxy "<cmd>"` is required to see vitest assertion detail** — the bare proxy collapses a run
+  to one `PASS (n) FAIL (m)` line with no failure names.
+- **A `PreToolUse` hook refuses any test/build run piped into `head`**, including a `grep … | head`
+  over a LOG FILE in the same compound command. Use `tail`, or a bare `grep`.
+- **A python heredoc and a build in ONE blocked invocation both fail to run.** I lost a round assuming
+  the edit had landed because the earlier call had printed `ok`.
+
+---
+
+> # ⛔ EVERYTHING BELOW THIS LINE IS OLDER LANE-A AND SERIAL-EXECUTOR HISTORY.
+> **The next heading says "STEP 14 — PLAN 9 IS COMPLETE". That is a position from an earlier
+> topology and it is NOT where you are.** The block ABOVE is the live state. Everything below is
+> kept for its METHOD, which was expensive to learn, and never for its position: its "next" lines,
+> its shas and its counts were facts about the moments they were written. Nothing below was deleted
+> when this block was added, deliberately — an earlier version of this file was very nearly
+> overwritten wholesale, which would have thrown away every lesson in it to save a scroll.
+
 ## WHERE I AM: **STEP 14 — PLAN 9 IS COMPLETE. T1–T15 ALL COMMITTED. Merged `origin/main`
 `421db9f`. NEXT: the single opus whole-branch review, then the PR. The controller merges.**
 
