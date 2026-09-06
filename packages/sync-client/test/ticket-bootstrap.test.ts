@@ -139,6 +139,11 @@ function ticketBootstrapOf(overrides: Partial<TicketBootstrap> = {}): TicketBoot
   };
 }
 
+/** One owed ticket, as ruling P37.2 shapes it. */
+const owed = (id: string, headSeq: number) => ({ id, headSeq });
+/** The ids of an owed list, sorted — the shape most assertions here want. */
+const idsOwed = (ts: readonly { id: string }[]): string[] => ts.map((t) => t.id).sort();
+
 const tempDirs: string[] = [];
 
 /** A replica on a REAL FILE, so "survives a restart" is a restart and not a metaphor. */
@@ -238,24 +243,31 @@ describe('12.295–12.296 the pending-pull set is durable and workspace-scoped',
   it('12.295 survives a process restart — a fresh replica over the same file still owes the ids', async () => {
     const { storage, reopen } = fileStorage();
     const replica = await seededReplica(storage);
-    await replica.addPendingPulls(WS, [TICKET, HELD_TICKET]);
-    expect((await replica.listPendingPulls(WS)).sort()).toEqual([TICKET, HELD_TICKET].sort());
+    await replica.addPendingPulls(WS, [owed(TICKET, 4), owed(HELD_TICKET, 7)]);
+    expect(idsOwed(await replica.listPendingPulls(WS))).toEqual([TICKET, HELD_TICKET].sort());
 
     // A NEW replica over the SAME file — no shared JS object between them, so
     // an in-memory set would answer empty here and this is the mutation the
-    // case is written against.
+    // case is written against. The `headSeq` survives too, and it must: it is
+    // what a 404's keyed drop compares against (P37.3).
     const restarted = await createReplica({ storage: reopen() });
-    expect((await restarted.listPendingPulls(WS)).sort()).toEqual([TICKET, HELD_TICKET].sort());
+    expect(idsOwed(await restarted.listPendingPulls(WS))).toEqual([TICKET, HELD_TICKET].sort());
+    expect((await restarted.listPendingPulls(WS)).find((t) => t.id === TICKET)?.headSeq).toBe(4);
 
     await restarted.clearPendingPull(WS, TICKET);
-    expect(await restarted.listPendingPulls(WS)).toEqual([HELD_TICKET]);
+    expect(idsOwed(await restarted.listPendingPulls(WS))).toEqual([HELD_TICKET]);
   });
 
   it('12.296 a re-recorded id does not duplicate, and an unknown workspace owes nothing', async () => {
     const replica = await seededReplica();
-    await replica.addPendingPulls(WS, [TICKET]);
-    await replica.addPendingPulls(WS, [TICKET, HELD_TICKET]);
-    expect((await replica.listPendingPulls(WS)).sort()).toEqual([TICKET, HELD_TICKET].sort());
+    await replica.addPendingPulls(WS, [owed(TICKET, 4)]);
+    await replica.addPendingPulls(WS, [owed(TICKET, 11), owed(HELD_TICKET, 7)]);
+    expect(idsOwed(await replica.listPendingPulls(WS))).toEqual([TICKET, HELD_TICKET].sort());
+    // A LATER notice SUPERSEDES an earlier one for the same id, and the
+    // overwrite is load-bearing rather than tidy: P37.3's keyed drop compares
+    // against this value, so an entry stuck at a stale `headSeq` would be
+    // dropped by a 404 that a newer notice had already answered.
+    expect((await replica.listPendingPulls(WS)).find((t) => t.id === TICKET)?.headSeq).toBe(11);
     // Scoped by workspace exactly as `cursor:` is — one storage file can hold
     // more than one, and a notice for one must not be owed by the other.
     expect(await replica.listPendingPulls(OTHER_WS)).toEqual([]);
@@ -263,13 +275,13 @@ describe('12.295–12.296 the pending-pull set is durable and workspace-scoped',
 
   it('12.297 a workspace-wide revocation forgets what the device was owed; a project-scoped one does not', async () => {
     const replica = await seededReplica();
-    await replica.addPendingPulls(WS, [TICKET, HELD_TICKET]);
+    await replica.addPendingPulls(WS, [owed(TICKET, 4), owed(HELD_TICKET, 7)]);
 
     await replica.revokeScope({ kind: 'scope-revoked', workspaceId: WS, projectId: PROJECT });
     // Membership stands, so the owed ids stand: this is the control that proves
     // the next assertion is about the WORKSPACE arm and not about revocation
     // generally.
-    expect((await replica.listPendingPulls(WS)).sort()).toEqual([TICKET, HELD_TICKET].sort());
+    expect(idsOwed(await replica.listPendingPulls(WS))).toEqual([TICKET, HELD_TICKET].sort());
 
     await replica.revokeScope({ kind: 'scope-revoked', workspaceId: WS });
     // Left behind, these would have a removed device asking for ids in a

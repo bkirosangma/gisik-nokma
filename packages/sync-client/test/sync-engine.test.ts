@@ -1350,7 +1350,7 @@ describe('12.305-12.308 the per-ticket pull door (closure 5b(d), ruling P37.1)',
     expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: owed }]);
     expect(await replica.getTicket(owed)).toBeNull();
     // The id is STILL OWED — the whole recovery depends on this row surviving.
-    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    expect((await replica.listPendingPulls(WS)).map((t) => t.id)).toEqual([owed]);
     // And nothing latched. `status()` is the one that would read `offline` on a
     // stall, and `lastApplyFailure()` the one a shell would render.
     expect(engine.lastApplyFailure()).toBeNull();
@@ -1470,7 +1470,7 @@ describe('12.305-12.308 the per-ticket pull door (closure 5b(d), ruling P37.1)',
     // Abandoned, not cleared: the same conservative reading a rejected pull
     // gets, and for a stronger reason — a request that never answered says
     // nothing at all about whether the ticket is still this device's.
-    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    expect((await replica.listPendingPulls(WS)).map((t) => t.id)).toEqual([owed]);
     expect(await replica.getTicket(owed)).toBeNull();
     // The abandonment is not a fold failure and must not read as one.
     expect(engine.lastApplyFailure()).toBeNull();
@@ -1795,7 +1795,7 @@ describe('12.309-12.310 the refold hazard, and the narrowness of the swallow (cl
     });
     await engine.settled();
     expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: owed }]);
-    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    expect((await replica.listPendingPulls(WS)).map((t) => t.id)).toEqual([owed]);
     // NOTHING WAS RECONCILED, and that is a property rather than an incidental
     // zero. Ruling P37.2(c) deleted the reconcile from the notice arm — a
     // notice only names ids the viewer can see NOW and reconcile only answers
@@ -1815,7 +1815,7 @@ describe('12.309-12.310 the refold hazard, and the narrowness of the swallow (cl
     expect(engine.lastApplyFailure()).toBeNull();
     expect(engine.status()).toBe('catching-up');
     expect(await replica.getTicket(owed)).toBeNull();
-    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    expect((await replica.listPendingPulls(WS)).map((t) => t.id)).toEqual([owed]);
 
     // POSITIVE CONTROL, same run: the chain is alive. A stalled engine returns
     // from `applyOne` at its first line and this transition never lands.

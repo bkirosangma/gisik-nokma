@@ -11,6 +11,7 @@ import {
   type EventEnvelope,
   type LedgerEvent,
   type PublishedWorkflowDef,
+  type ReachGrantedTicket,
   type SubmittedEvent,
   type TicketState,
   type TicketStateDeps,
@@ -123,12 +124,30 @@ export type Replica = {
    * touching the workspace cursor. Ruling P37.1 / closure 5b(d).
    */
   loadTicketBootstrap(data: TicketBootstrap): Promise<void>;
-  /** Ticket ids this device has been told it may now read but has not pulled yet. */
-  listPendingPulls(workspaceId: string): Promise<string[]>;
-  /** Record ids as owed. Idempotent, and a re-record does not duplicate. */
-  addPendingPulls(workspaceId: string, ticketIds: readonly string[]): Promise<void>;
-  /** Forget one owed id — called only after its pull has actually landed. */
+  /** Tickets this device has been told it may now read but has not pulled yet. */
+  listPendingPulls(workspaceId: string): Promise<ReachGrantedTicket[]>;
+  /**
+   * Record tickets as owed. Idempotent; a re-record for the same id UPDATES its
+   * `headSeq`, because a later notice supersedes an earlier one — which is what
+   * makes `dropPendingPullIfUnchanged` able to tell a stale 404 from a fresh
+   * grant (ruling P37.3).
+   */
+  addPendingPulls(workspaceId: string, tickets: readonly ReachGrantedTicket[]): Promise<void>;
+  /** Forget one owed ticket — called only after its pull has actually landed. */
   clearPendingPull(workspaceId: string, ticketId: string): Promise<void>;
+  /**
+   * Forget one owed ticket ONLY IF no newer notice has re-named it since —
+   * ruling P37.3, and the whole of what makes dropping on a 404 safe.
+   *
+   * The device cannot tell "may not see" from "never existed": the route answers
+   * both with 404, deliberately, so that presence-versus-absence is not an
+   * oracle. So the drop is keyed to the NOTICE rather than to the status code.
+   * Every re-widening emits a fresh notice naming the id with a higher
+   * `headSeq`, so a notice arriving between a pull's issue and its 404 has
+   * already replaced the recorded value — the entry stays and the next catch-up
+   * fetches it. A 404 is never the last word; the next notice is.
+   */
+  dropPendingPullIfUnchanged(workspaceId: string, ticketId: string, headSeq: number): Promise<void>;
   /** `{ applied: false }` means a duplicate event id was ignored — delivery is at-least-once. */
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
@@ -689,12 +708,18 @@ function pendingPullsKey(workspaceId: string): string {
  * a parse failure would then brick a client over a value nothing but this file
  * writes.
  */
-function parsePendingPulls(value: unknown): string[] {
+function parsePendingPulls(value: unknown): ReachGrantedTicket[] {
   if (typeof value !== 'string') return [];
   try {
     const parsed: unknown = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((id): id is string => typeof id === 'string');
+    return parsed.filter(
+      (t): t is ReachGrantedTicket =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof (t as { id?: unknown }).id === 'string' &&
+        Number.isInteger((t as { headSeq?: unknown }).headSeq),
+    );
   } catch {
     return [];
   }
@@ -936,19 +961,21 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       return parsePendingPulls(rows[0]?.['value']);
     },
 
-    async addPendingPulls(workspaceId, ticketIds) {
-      if (ticketIds.length === 0) return;
+    async addPendingPulls(workspaceId, tickets) {
+      if (tickets.length === 0) return;
       await storage.transaction(async (tx) => {
-        // Read-modify-write INSIDE the transaction. Two notices in one drain
-        // are applied one after another on the engine's serial chain, but the
-        // set is public API and a shell may add to it too; a read outside the
-        // transaction would lose one writer's ids to the other's write.
+        // Read-modify-write INSIDE the transaction. Two notices in one drain are
+        // applied one after another on the engine's serial chain, but the set is
+        // public API and a shell may add to it too; a read outside the
+        // transaction would lose one writer's entries to the other's write.
         const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
-        const held = new Set(parsePendingPulls(rows[0]?.['value']));
-        for (const id of ticketIds) held.add(id);
+        const held = new Map(parsePendingPulls(rows[0]?.['value']).map((t) => [t.id, t.headSeq]));
+        // A later notice SUPERSEDES an earlier one for the same id, and that
+        // overwrite is load-bearing: it is what a 404's drop compares against.
+        for (const t of tickets) held.set(t.id, t.headSeq);
         await tx.run(
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          [pendingPullsKey(workspaceId), JSON.stringify([...held])],
+          [pendingPullsKey(workspaceId), JSON.stringify([...held].map(([id, headSeq]) => ({ id, headSeq })))],
         );
       });
     },
@@ -956,10 +983,28 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     async clearPendingPull(workspaceId, ticketId) {
       await storage.transaction(async (tx) => {
         const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
-        const held = parsePendingPulls(rows[0]?.['value']).filter((id) => id !== ticketId);
+        const held = parsePendingPulls(rows[0]?.['value']).filter((t) => t.id !== ticketId);
         await tx.run(
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
           [pendingPullsKey(workspaceId), JSON.stringify(held)],
+        );
+      });
+    },
+
+    async dropPendingPullIfUnchanged(workspaceId, ticketId, headSeq) {
+      await storage.transaction(async (tx) => {
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+        const held = parsePendingPulls(rows[0]?.['value']);
+        const current = held.find((t) => t.id === ticketId);
+        // A NEWER notice has re-named it since the pull was issued, so the 404
+        // answered a question that is no longer the one being asked. Keep it.
+        if (current === undefined || current.headSeq !== headSeq) return;
+        await tx.run(
+          'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [
+            pendingPullsKey(workspaceId),
+            JSON.stringify(held.filter((t) => t.id !== ticketId)),
+          ],
         );
       });
     },
@@ -1228,7 +1273,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         // therefore treated as NOT held, so it is pulled again. That is
         // over-delivery, and over-delivery is the side this door is allowed to
         // err on: `loadTicketBootstrap` is idempotent by event id.
-        const missing: string[] = [];
+        const missing: ReachGrantedTicket[] = [];
         for (const { id, headSeq } of instruction.tickets) {
           // THE COMPARISON RULING P37.2 ADDED, and the reason the obvious test
           // is not enough. "Do I hold this ticket" cannot distinguish a
@@ -1245,7 +1290,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           // and not a reason to re-fetch. Pulling on `<` alone is also what
           // keeps the amplifier bound — a client already current on the subtree
           // fetches nothing, which is case 12.276.
-          if ((await localHeadSeq(storage, id)) < headSeq) missing.push(id);
+          if ((await localHeadSeq(storage, id)) < headSeq) missing.push({ id, headSeq });
         }
         await replica.addPendingPulls(instruction.workspaceId, missing);
         return { applied: true };

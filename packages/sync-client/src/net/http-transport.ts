@@ -1,5 +1,6 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse, TicketBootstrap } from '../replica/replica.js';
+import { TicketPullNotFound } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -169,6 +170,10 @@ export function createHttpTransport(opts: {
       // existence oracle `reconcile-route.ts` exists to deny. The engine's drain
       // treats every rejection alike — the id stays pending and the next
       // catch-up retries.
+      // 404 is TYPED rather than generic — ruling P37.3. The drain must be able
+      // to tell "nothing travels" from a network failure without matching on a
+      // message string, and only this implementor speaks HTTP at all.
+      if (res.status === 404) throw new TicketPullNotFound(ticketId);
       if (!res.ok) throw new Error(`bootstrapTicket failed: ${res.status}`);
       return (await res.json()) as TicketBootstrap;
     },

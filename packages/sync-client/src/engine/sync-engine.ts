@@ -74,6 +74,30 @@ export type SyncTransport = {
 export type SyncStatus = 'offline' | 'connecting' | 'catching-up' | 'live';
 
 /**
+ * The per-ticket pull door answered "nothing travels" — ruling P37.3.
+ *
+ * A TYPE rather than a status code or a message match, because every
+ * `SyncTransport` implementor has to be able to raise it and only one of them
+ * speaks HTTP. The rig raises it from its own `canSee` refusal; the HTTP
+ * transport raises it on a 404.
+ *
+ * **What it does NOT mean is the point.** The route answers 404 identically for
+ * a ticket the caller may not see and one that never existed — deliberately, so
+ * that presence-versus-absence is not an oracle — so this carries no
+ * information about which. That is exactly why the drop it triggers is keyed to
+ * the NOTICE that issued the pull rather than to this error: see
+ * `Replica.dropPendingPullIfUnchanged`.
+ */
+export class TicketPullNotFound extends Error {
+  readonly ticketId: string;
+  constructor(ticketId: string) {
+    super(`bootstrapTicket: nothing travels for ${ticketId}`);
+    this.name = 'TicketPullNotFound';
+    this.ticketId = ticketId;
+  }
+}
+
+/**
  * A frame this replica could not fold.
  *
  * SEPARATE FROM `lastError()` ON PURPOSE, and the separation is the point. The
@@ -457,7 +481,7 @@ export function createSyncEngine(deps: {
    */
   async function drainPendingPulls(ws: string): Promise<void> {
     if (stopped || stalled || streamEnded) return;
-    for (const ticketId of await replica.listPendingPulls(ws)) {
+    for (const { id: ticketId, headSeq } of await replica.listPendingPulls(ws)) {
       if (stopped || stalled || streamEnded) return;
       try {
         // Bounded HERE and not in the transport — see `PULL_TIMEOUT_MS`. A
@@ -467,16 +491,20 @@ export function createSyncEngine(deps: {
         const payload = await withTimeout(transport.bootstrapTicket(ws, ticketId));
         await replica.loadTicketBootstrap(payload);
         await replica.clearPendingPull(ws, ticketId);
-      } catch {
-        // Deliberately silent, and deliberately WITHOUT clearing the id. See
-        // the docblock: the next catch-up retries. A 404 is left pending along
-        // with a network failure, which is the conservative reading — the
-        // server answers 404 identically for "may not see" and "never existed",
-        // so this device cannot tell a race (visibility narrowed again between
-        // the notice and the pull) from a phantom, and an id that is genuinely
-        // gone costs one request per catch-up rather than a wrong deletion.
-        // *Owner: unassigned; an attempt counter would bound it and needs a
-        // durable home this engine has no dependency on.*
+      } catch (err) {
+        // RULING P37.3. "Nothing travels" drops the entry — but only if no
+        // newer notice has re-named it since this pull was issued, which is
+        // what `headSeq` keys. Without this, a revoked project left one request
+        // per catch-up for ever; with an UNCONDITIONAL drop, a re-widening
+        // racing the pull would be discarded. The device still cannot tell "may
+        // not see" from "never existed" and does not need to: the next notice
+        // is the recovery path, not the status code.
+        if (err instanceof TicketPullNotFound) {
+          await replica.dropPendingPullIfUnchanged(ws, ticketId, headSeq);
+        }
+        // Every OTHER failure is deliberately silent and deliberately does NOT
+        // clear the id: a network wobble is not an answer, and the next
+        // catch-up retries.
       }
     }
   }
@@ -515,7 +543,10 @@ export function createSyncEngine(deps: {
     if (isSyncInstruction(item)) return false;
     if (item.entity.kind !== 'ticket') return false;
     if ((await replica.getTicket(item.entity.id)) !== null) return false;
-    await replica.addPendingPulls(item.workspaceId, [item.entity.id]);
+    // Keyed by the failing event's own `workspaceSeq` — the server's position
+    // for this ticket as far as this device can know it. That is what a later
+    // notice must exceed to supersede this entry (P37.3).
+    await replica.addPendingPulls(item.workspaceId, [{ id: item.entity.id, headSeq: item.workspaceSeq }]);
     // Drain immediately rather than waiting for the next catch-up: `onCaughtUp`
     // fires once per SUBSCRIPTION (`hub.ts`'s `caughtUpSent`), so "the next
     // catch-up" can be the next reconnect, which may be hours away.
