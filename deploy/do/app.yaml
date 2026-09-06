@@ -139,8 +139,12 @@ services:
       - key: OBJECT_STORE_S3_SECRET_ACCESS_KEY
         type: SECRET
       # Backup daemon's own bucket name (Plan 11); documented in
-      # .env.example, not yet read by any shipped code on the sha this file
-      # was written against (Task 11 hasn't landed).
+      # .env.example and, since Task 11 landed, read by
+      # apps/server/src/ops/object-sink.ts -- but only from the `backup`
+      # worker below, which is the component that runs that code. Kept on the
+      # `server` component too so `pnpm --filter @gisik-nokma/server
+      # ops:backup-once` and ops:fetch-backup work from a console session on
+      # the API box during a restore.
       - key: BACKUP_S3_BUCKET
         value: gisik-nokma-backups
 
@@ -177,10 +181,12 @@ workers:
       repo: bkirosangma/gisik-nokma
       branch: main
       deploy_on_push: true
-    # Path per Plan 11 Task 11's own naming; unverified against shipped code
-    # on the sha this file was written against (Task 11 hasn't landed) --
-    # confirm the compiled entry path when Task 11 ships before relying on
-    # this worker definition.
+    # CONFIRMED 2026-09-06, when Task 11 landed: apps/server/tsconfig.json sets
+    # rootDir "src", outDir "dist", include ["src"], so
+    # src/ops/backup-daemon-main.ts emits to dist/ops/backup-daemon-main.js --
+    # exactly the path below. Checked against a clean run of both
+    # `tsc -p tsconfig.json --noEmit` and `tsc -p tsconfig.typecheck.json
+    # --noEmit`. Recorded here so the next reader does not redo it.
     run_command: node dist/ops/backup-daemon-main.js
     instance_size_slug: basic-xxs
     instance_count: 1
@@ -197,12 +203,35 @@ workers:
         value: Asia/Kolkata
       - key: ALERT_WEBHOOK_URL
         type: SECRET
-      # UNRESOLVED (Task 11's to settle, not this task's): whether the
-      # backup daemon shares the app's OBJECT_STORE_S3_* credentials or
-      # gets its own. .env.example documents only BACKUP_S3_BUCKET (a
-      # bucket name) -- no separate credential variables exist yet. Reusing
-      # the app's pair is this file's working assumption; change it here
-      # when Task 11 decides otherwise.
+      # SETTLED by Task 11 (2026-09-06): the backup daemon SHARES the app's
+      # OBJECT_STORE_S3_* pair and takes only its BUCKET from a separate
+      # variable, so a backup can never land in the attachment bucket by
+      # accident. apps/server/src/ops/object-sink.ts reads exactly these
+      # names.
+      #
+      # ALL FIVE ARE REQUIRED HERE, not just the credential pair. The earlier
+      # revision of this block set only the two secrets plus the bucket, and
+      # that was measured to be a silent wrong-cloud failure: with no
+      # endpoint the SDK resolves Amazon's, and with no region it used to
+      # default 'us-east-1', so the worker built a client for
+      # https://s3.us-east-1.amazonaws.com/gisik-nokma-backups and would have
+      # posted these Spaces credentials at AWS on the first night. Dev hides
+      # it completely, because .env.example sets endpoint and region for
+      # MinIO. s3TargetFromEnv now REFUSES to boot without the endpoint and
+      # the region, naming them -- stricter than the attachment store's own
+      # createObjectStoreFromEnv, deliberately, because a backup destination
+      # has no local-disk fallback to degrade to.
+      #
+      # Same endpoint and region as the `server` component above (one Spaces
+      # account, BLR1, two buckets), and path-style is 'false' for the same
+      # reason it is there: Spaces wants subdomain-style addressing;
+      # path-style is MinIO's shape, for local dev.
+      - key: OBJECT_STORE_S3_ENDPOINT
+        value: https://blr1.digitaloceanspaces.com
+      - key: OBJECT_STORE_S3_REGION
+        value: blr1
+      - key: OBJECT_STORE_S3_FORCE_PATH_STYLE
+        value: "false"
       - key: OBJECT_STORE_S3_ACCESS_KEY_ID
         type: SECRET
       - key: OBJECT_STORE_S3_SECRET_ACCESS_KEY

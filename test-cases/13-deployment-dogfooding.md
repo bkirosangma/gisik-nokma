@@ -205,7 +205,10 @@ id either way.
 **BLOCK NEARLY EXHAUSTED — the controller needs to know.** Task 11 alone consumed `13.9–13.39`, leaving
 exactly `13.40` free in Lane C's `13.1–13.40`. **Task 12 (the restore drill) cannot be catalogued inside
 this block and must be given another** — asked for, per the rule at the head of this file, never borrowed
-from Lane D's or Lane E's.
+from Lane D's or Lane E's. **RESOLVED, provisionally, by the "The restore drill (Task 12)" section at the
+foot of this file:** `13.40` is spent there on the guard pair, and Task 12's remaining cases are written out
+in full under `PENDING BLOCK` headings with **no ids minted**, awaiting `13.201`. Nothing is borrowed and
+nothing is renumbered; the ask still stands.
 
 **ONE GATE SCRIPT WAS AMENDED, disclosed here rather than only in its own comment:**
 `scripts/check-env-example.mjs` — Task 14's env-contract gate — gained `PGPASSWORD` in its `IGNORE` set,
@@ -249,3 +252,61 @@ exit 0 — a changed number a reader diffing against the pre-Task-11 run would o
 - ✅ **13.37 — the REAL sink's `discard` deletes the key from the backup bucket, and does so idempotently.** 13.30 proves `dumpDatabaseToSink` ASKS the sink to discard; its `CaptureSink` only records the request, so on its own "a failed dump leaves no object behind" would rest on a fake that cannot leave one. This is the other half: against `aws-sdk-client-mock`, `discard` issues exactly one `DeleteObjectCommand` with the backup bucket and the given key, and discarding a key nothing was written to is not an error. What is still NOT covered by any test: the `abort()` branch, which stops an in-flight multipart upload from completing — it needs a real multipart in flight, which the mock does not produce. `apps/server/test/ops/object-sink.test.ts`
 - 🧪 **13.38 — `--once` runs BOTH jobs whatever the other does, reports both outcomes, and exits non-zero if either failed.** The plan text ordered these `await jobs.runPgDump(); await jobs.runLedgerExport();`, so a dump failure short-circuited the export — and the export is the artifact this codebase calls sufficient while the dump is merely convenient, at the exact moment (`--once` is the runbook's manual backup) someone is reaching for it because something is already wrong. Reproduced 2026-09-06 against the live Postgres with a deliberately dead sink endpoint (`http://127.0.0.1:1`, `AWS_MAX_ATTEMPTS=1`): the shipped order printed **two** error lines — `relation "events" does not exist` (the export, which ran first) and `connect ECONNREFUSED 127.0.0.1:1` (the dump) — and exited 1. The old order, restored temporarily for the contrast, printed **one** line (`connect ECONNREFUSED`) and exited 1: the export never ran at all. `apps/server/src/ops/backup-daemon-main.ts`
 - ❌ **13.39 — `backup-daemon-main.ts` has no automated coverage.** 13.38 exercises the `--once` exit contract by hand; the daemon branch (schedule wiring, the `SIGTERM` handler that stops the daemon and ends the pool) is exercised by nothing. Recorded rather than left implicit, because this is the same gap a review caught one file over for `startBackupDaemon` — an entry point whose semantics this change set altered should not read as covered by the cases above it. `apps/server/src/ops/backup-daemon-main.ts`
+
+## The restore drill (Task 12)
+
+**LANE C'S BLOCK IS NOW EXHAUSTED — `13.40` is the last id in `13.1–13.40` and this section spends it.**
+The warning at the head of this file predicted exactly this: Task 11 consumed `13.9–13.39`, leaving one.
+Task 12 produced more than one case worth cataloguing, so **the remaining cases below are written in full
+and deliberately carry NO id**, under `PENDING BLOCK` headings. They get ids in one pass once the
+controller allocates the next block (`13.201`, allocated on request only) — asked for, per the rule at
+the head of this file, never borrowed from Lane D's `13.41–13.100` or Lane E's `13.101–13.200`, and never
+sub-numbered: `check-case-ids.mjs`'s `ID_LINE` captures `(\d+\.\d+)`, so a `13.40.1` would be extracted as
+`13.40` and reported as a duplicate, while a `13.40a` would not match at all and become invisible.
+
+- ✅ **13.40 — `restore.sh` refuses a target whose database name is not a scratch database, and lets a scratch-named one through.** The guard is the entire point of the script and the plan's own draft test never executed the script at all — it called `pg_dump`/`pg_restore` directly, so the guard would have shipped as a runbook safety control nothing had ever run. Both halves are asserted against the real file through `bash`: with a file that EXISTS in hand (so the non-zero exit cannot be the `-f` check wearing the guard's clothes), a target named `gisik_nokma_live_no_such_db` exits 1 with `refusing` and the offending name in stderr and nothing on stdout; the same invocation with one word changed (`gisik_scratch_no_such_db`) gets PAST the guard and fails at the NEXT check instead (`no such dump file`), which is what distinguishes a name test from a blanket refusal that would satisfy the first assertion while rejecting every restore an operator ever attempts. Bundled here rather than split, the way 13.35 bundles its planted-defect half, because the block has one id left. `--force-live` overriding the guard, and the usage text carrying the version rule in both directions (exit 2), are asserted in the same ungated describe. **UNGATED on purpose**: these cases need only `bash`, and behind the round-trip gate below they would go dark on exactly the machines where a restore target gets mistyped by hand. `apps/server/test/ops/restore-drill.test.ts`, `scripts/restore.sh`
+
+**PENDING BLOCK — the round trip.** A seeded database is dumped with `pg_dump --format=custom`, restored
+into a bare scratch database, and the restore is accepted only when the restored `events` count equals the
+count measured in the SOURCE (with a `> 0` floor) **and** `verifyProjections` is clean **and** the restored
+ledger still rejects an `UPDATE` with `append-only`. The count check is not decoration and its necessity was
+measured, not argued: with the restore run `--schema-only`, the verify-clean case **still passed** against an
+empty database while the count case failed `expected +0 to be 21` — an empty structure verifies clean in both
+EXCEPT directions, so the plan's own verify-only acceptance could never have proven a restore restored
+anything. The `append-only` case failed in that same probe too (`promise resolved Result{ command: 'UPDATE' }
+instead of rejecting`), because `events_no_update_no_delete` is `FOR EACH ROW` and an UPDATE over an empty
+table never fires it — a second, independent witness that rows crossed. Twenty-one is the real seeded count:
+three `workspace.created` submissions, each deriving a workflow, four ticket types and an owner membership,
+the same surprise 13.13 records. `apps/server/test/ops/restore-drill.test.ts`
+
+**PENDING BLOCK — planted defect: drift in a restored projection is caught, table named.** An unbounded
+`UPDATE proj_entity_heads SET head_event_type = 'tampered'` against the restored database makes
+`verifyProjections` report `clean: false` with `proj_entity_heads` among the named tables. Runs LAST in the
+file because the corruption is irreversible: anything asserting clean after it would fail.
+`apps/server/test/ops/restore-drill.test.ts`
+
+**PENDING BLOCK — `restore.sh`'s HAPPY path is executed, and the database is asked what arrived.** The drill
+above proves the round trip but never runs the script; this runs `bash scripts/restore.sh <real dump> <second
+scratch database>`, asserts exit 0, the `restored '<file>' into '<db>'` line, and that the printed next step
+names `verify:projections` (the script must point at the gate, not declare itself done) — then opens a pool on
+that database and reads the row count back. A SECOND scratch database, created and dropped inside the suite,
+so it never contends with the planted-drift case's corruption.
+
+**PENDING BLOCK — KNOWN, MEASURED, AND COVERED BY NO AUTOMATED TEST: the pg client/server version boundary,
+in both directions.** A `pg_restore` older than the `pg_dump` that wrote the archive refuses it outright
+(format version), and a `pg_restore` NEWER than the target server sends settings the server rejects.
+The second direction is not theoretical — it is what this workstation does: Homebrew carries only libpq
+**18.4** and the compose Postgres is `postgres:16-alpine` (server **16.15**), so `pg_restore` 18.4's opening
+`SET transaction_timeout = 0` (a PG17+ parameter) draws `unrecognized configuration parameter
+"transaction_timeout"`, `errors ignored on restore: 1`, and a **non-zero exit even though every table and row
+landed**. `restore.sh` propagating that non-zero exit is correct, so the suite does not paper over it: the
+round-trip describe gates on **client major ≤ server major**, not merely on the binaries existing, and skips
+with a stderr line naming both majors rather than reddening (the 13.36 failure shape, one cause over). CI runs
+it — `ci.yml` pins `postgres:16-alpine` beside `postgresql-client-16`, "pinned to the server's major version"
+— and that pin, not this suite, is what keeps the matched pair honest. The drill half was nonetheless executed
+green by hand on a matched pair (a throwaway `postgres:18-alpine` on port 54399, client 18.4 / server 18.6:
+`Tests 9 passed (9)`); the committed default remains 54329. **Consequence to disclose:**
+`check-no-silent-skips.mjs` fails a file contributing ZERO passed-or-failed tests, and the ungated guard cases
+mean this file always contributes passes — so that gate can no longer see the round-trip half going dark in
+CI. 13.3 already establishes that partial skips pass by design; the real control here is `ci.yml`'s version
+pin. `scripts/restore.sh`, `deploy/do/README.md`, `apps/server/test/ops/restore-drill.test.ts`

@@ -1673,3 +1673,32 @@ completion of Plan 11 as a whole from this section's presence.)*
   swapping in Task 3's logging-free `WebhookErrorAlerter` or empty `NoopErrorAlerter` cannot make a
   backup failure silent.
   `apps/server/src/ops/error-alerter-shim.ts`
+- ⚙️ **The restore drill — `restore.sh`'s scratch-only guard, and the automated proof that a restored
+  database still verifies (Task 12)** — `scripts/restore.sh <dump-file> <target-database-url>
+  [--force-live]` runs `pg_restore --no-owner --no-privileges` and then prints the `verify:projections`
+  command, because **a restore is not done until the freshness gate is clean** — the script deliberately
+  does not claim success on its own. Its guard reads the database name out of the target URL and
+  **refuses any name not containing `scratch`, `restore` or `drill`** unless `--force-live` is passed:
+  restoring over a live database is a deliberate act, not a typo away. The guard runs BEFORE the
+  dump-file existence check, so a mistyped target is answered with the target, not sent looking for a
+  file. `apps/server/test/ops/restore-drill.test.ts` dumps a seeded database, restores into a bare
+  scratch database and accepts the restore only when **the row count crossed** (the restored `events`
+  count matches the count measured in the source, with a `> 0` floor) **and** `verifyProjections` is
+  clean **and** the restored ledger still refuses an UPDATE; a planted-drift case corrupts
+  `proj_entity_heads` and requires the gate to name that table. The count check is not decoration:
+  measured by restoring `--schema-only`, the verify-clean case still PASSED against an empty database
+  while the count case failed `expected +0 to be 21` — an empty structure verifies clean, so verify
+  alone could never have proven a restore restored anything. The script itself is executed by the suite
+  rather than described by it — refusal, the same invocation one word different in the name getting past
+  the guard, `--force-live`, the usage text, and a real happy-path restore into a second scratch database
+  whose row count is then read back from the database.
+  **Version rule, and the one thing here NO automated test covers:** the `pg_restore` used must be at
+  least as new as the `pg_dump` that produced the archive AND no newer than the target server's major
+  version. Measured 2026-09-06: `pg_restore` 18.4 opens every restore with `SET transaction_timeout = 0`
+  (PG17+), which a 16 server rejects — the data lands and the exit code is still non-zero. The suite's
+  round-trip half therefore gates on client-major ≤ server-major, not merely on the binaries existing,
+  and skips loudly (naming both majors) on a skewed workstation rather than reddening; CI runs it on the
+  matched pair `ci.yml` already pins (`postgres:16-alpine` + `postgresql-client-16`). The guard cases
+  need only bash and are ungated, so they run everywhere. The rule is stated in `restore.sh`'s usage text
+  and in `deploy/do/README.md`.
+  `scripts/restore.sh`, `apps/server/test/ops/restore-drill.test.ts`, `deploy/do/README.md`
