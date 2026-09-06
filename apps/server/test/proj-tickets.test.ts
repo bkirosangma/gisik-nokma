@@ -415,6 +415,9 @@ describe('proj_tickets', () => {
    *   another workspace             → unknown-parent (the guard fires when it
    *                                                   should — the control)
    */
+  /**
+   * 5.56 — `rowToTicketState` repopulates the two `TicketState` fields no column hands back: `workspaceId`, which has a column but is not in the primary key, and `kind`.
+   */
   it('rowToTicketState repopulates the two TicketState fields no column carries', async () => {
     await applyAll(asLedger(SEED));
 
@@ -495,6 +498,9 @@ describe('proj_tickets', () => {
    * four guarded assertions red. Removing the skip entirely reddens
    * `check-role-permission.test.ts` instead. Neither mutation is visible
    * without both halves.
+   */
+  /**
+   * 5.58 — registering `proj_tickets` makes a missing refusal reachable, and the projection takes the SAFE branch by name: an event the door leaves unguarded is skipped for a ticket that never existed, while a door-guarded one still throws.
    */
   it('an event the door leaves unguarded is skipped for a ticket that never existed, while a door-guarded one still throws', async () => {
     await applyAll(asLedger(SEED));
@@ -581,6 +587,9 @@ describe('proj_tickets', () => {
 
   // A ticket pins the workflow it was created under — owner decision 2026-08-26.
 
+  /**
+   * 5.32 — re-pointing a ticket type at a different workflow leaves EXISTING tickets on the workflow they were created under, while new tickets of that type get the new one.
+   */
   it('re-pointing a type at a different workflow leaves existing tickets on the old one, while new tickets of that type get the new one', async () => {
     // ONE ledger, not two: asLedger numbers workspaceSeq from 1 each call, and
     // this projection resolves definitions AS OF that number.
@@ -620,6 +629,9 @@ describe('proj_tickets', () => {
    * ticket.workflow_rebound before it reaches a projection`, blaming the door
    * for the loader's omission.
    */
+  /**
+   * 5.33 — `ticket.workflow_rebound` moves the one ticket it names onto the target workflow at the named state, stamping the target’s version and category, and leaves its sibling behind.
+   */
   it('a rebound moves the one ticket it names onto the target workflow, and leaves its sibling behind', async () => {
     await applyAll(
       asLedger([
@@ -654,6 +666,9 @@ describe('proj_tickets', () => {
 
   // Refresh on publish — owner decision 2026-08-26, design decision 10.
 
+  /**
+   * 5.27 — a workflow version that RE-CATEGORISES a state refreshes every ticket standing in it, in the publishing transaction: nobody moved the ticket, the workflow changed what the state means.
+   */
   it('a v2 that re-categorises a state refreshes every ticket standing in it, in the publishing transaction', async () => {
     await applyAll(
       asLedger([
@@ -677,6 +692,9 @@ describe('proj_tickets', () => {
     });
   });
 
+  /**
+   * 5.28 — a workflow version that DROPS a state folds each affected ticket’s `state_id` forward through the `stateMapping` instead of throwing, and leaves the transition log alone.
+   */
   it('a v2 that drops a state folds state_id through the stateMapping rather than throwing, and leaves the transition log alone', async () => {
     await applyAll(
       asLedger([
@@ -718,6 +736,9 @@ describe('proj_tickets', () => {
    * The chain is still real work — `doing` is mapped to `todo` by v2 and `todo`
    * to `triage` by v3, so the ticket that transitioned under v1 arrives at
    * `triage` by two mappings applied in order, not by one.
+   */
+  /**
+   * 5.59 — a THIRD published version folds every ticket forward one publish at a time, so no row is ever two versions behind. The intermediate-version cache half of the row is the planted test below.
    */
   it('a third published version folds every ticket one publish at a time, so no row is ever two versions behind', async () => {
     const drafts = [
@@ -843,6 +864,10 @@ describe('proj_tickets', () => {
    * through proj_tickets after `beforeEach` has truncated the proj_workflows
    * and proj_ticket_types rows they need. The assertion on the ledger's length
    * below is what says so out loud if that ever changes.
+   */
+  /**
+   * 5.15 — `proj_tickets` reproduces exactly on a PROJECTION-OUTER rebuild: that projection alone is reset and the ledger replayed in canonical order, with `proj_workflows` and `proj_ticket_types` left standing at their newest state. Deliberately not "reset everything and replay", under which `proj_workflows` would be rebuilt alongside and happen to hold the right version at every point. This is the test 5.15’s own row names.
+   * 5.29 — the planted defect on the same test: with a v2 published after transitions, resolving definitions as "latest" instead of AS OF the event makes the rebuild unreproducible.
    */
   it('planted defect: a v2 dropping a state is unrebuildable unless definitions resolve AS OF the event — projection-outer replay reproduces the table exactly', async () => {
     const ledger = asLedger([
