@@ -538,6 +538,44 @@ not only untracked ones; the sweep's "restored (want 1): 0" line caught it); and
 baseline was already red before any mutation and the later reds nearly read as the mutation working —
 the paired-mutation rule's other half.
 
+### Lane A's `getMyWork` residuals in flight (`exec/31-mywork-residuals` at `2ac8470`, gate re-running) — five lessons and a helper whose name lies
+
+- **A mutation whose blast radius is the whole route is not evidence about the case it was aimed at.** Two
+  attempts at "drop the claimant filter" reddened TWENTY cases and identified nothing — removing the
+  predicate leaves `$2` unbound and the tautology form (`OR $2 IS NULL`) leaves it untypeable; Postgres
+  refuses to PLAN either, every request 500s, and the target case reddens for a reason unrelated to its
+  property. The semantic inversion `c.claimant_id <> $2` reddens 7.216 and 7.217 and nothing else.
+  **A mutation has to keep the program RUNNING to be a measurement.**
+- **A diagnostic wrapper can break the thing it is diagnosing:** a try/catch probe around the failing
+  function produced 17/17 failures and zero diagnostic output — the wrapper was the fault, and "17 failed"
+  read as data would have sent the lane chasing a defect that did not exist.
+- **`applyAll` in `apps/server/test/helpers/seed.ts` applies FOUR of the registry's projections**
+  (projects, memberships, invites, visibility) — a projection ignores event types it does not handle, so
+  an event outside that set is a SILENT no-op, indistinguishable from a successful apply; the fixture
+  looks seeded and the failure reads as the code under test. **A helper named `applyAll` that applies four
+  projections is a name that lies, in the direction that costs most.** Now five (workflow defs),
+  ENUMERATED rather than widened to the whole registry (the ticket projection would forward-fold rows
+  callers never asked to fold). Every lane told; C confirmed T11/T12 seeds through `ingestBatch` with the
+  full registry instead.
+- **`seedTicket` writes `proj_tickets` rows naming `wf-seed@1` and never publishes that definition** —
+  invisible until something read a state NAME off those rows; serving `stateNames` made `readMyWork`
+  throw exactly as `assembleListCards` always has (the throw is right; the fixture was incoherent). Fixed
+  opt-in — 23 files use `seedTicket`, 10 read `proj_workflows`.
+- **86 web tests died on ONE line, the third time:** `stub-services.ts` builds refusing reads with
+  `refuse(method)`, which THROWS when the gap it names leaves the register — the self-expiring gap
+  working (P25 clause 3); same treatment as when P32/P38 served `getMyWorkspaces` (`unstubbed(...)`, never
+  `[]`). **Three checks that could not fail, one shape:** `client-contract` 7.207 asserted
+  `items.every(kind !== 'contested')` against a strip that has always answered `{items: []}` in that
+  fixture; `attention-strip.test.tsx` and `my-work.test.tsx` each built a `ServingGapError` from a register
+  lookup that now misses and falls back to `[]` — the error still carries the asserted message prefix, so
+  both went on PASSING while measuring a refusal about nothing. All three replaced; the two client ones
+  construct their own absence and their siblings invert.
+Lane A's mutation sweeps complied with both worktree rules before they were stated: five mutations run
+SERIALLY inside one lock acquisition, from a written list, nothing else touching the tree, restored with
+`git checkout HEAD -- <path>` and verified by READING the region plus an empty `git status --porcelain`.
+Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
+3,285 lines of lessons and stopped.
+
 ### RULING P40 (2026-09-06 08:45, controller as ruling tier) — `/v1/me/work` serves the viewer's OWN contested claims (Door B); mappers.ts's "never will" was wrong and is corrected in place
 
 **Lane A found two landed docblocks contradicting each other** on which door serves `MyWorkView.contested`
