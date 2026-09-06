@@ -40,7 +40,8 @@ type PingFrame = { type: 'ping' };
  * ## Why this is hand-rolled and does NOT call `serverStreamFrameSchema`
  *
  * `@gisik-nokma/domain` publishes `serverStreamFrameSchema`, a zod discriminated
- * union over all five frames, and it was written for exactly this consumer. It is
+ * union over every published frame — FIVE when this was written, SIX since closure 5b added
+ * `reach-granted` — and it was written for exactly this consumer. It is
  * used HERE as the test's oracle rather than as this function's implementation,
  * for three measured reasons:
  *
@@ -63,7 +64,9 @@ type PingFrame = { type: 'ping' };
  *    import above is a TYPE import and is erased.
  *
  * What the test does instead: it feeds `serverStreamFrameSchema`-valid fixtures of
- * all five frames through `parseFrame` and asserts each survives. The relationship
+ * every published frame through `parseFrame` and asserts each survives — which is
+ * what caught `reach-granted` being dropped here in silence, twice: first for a
+ * missing fixture, then for a missing branch. The relationship
  * pinned is one-directional and deliberate — **everything the published schema
  * accepts, this parser accepts** — and this parser is additionally permissive
  * about id shape, which is what reason 1 argues for.

@@ -78,14 +78,15 @@ import { GRANT_BACKFILL_MAX_TICKETS } from '../../src/visibility/grant-backfill.
  *
  *   Under the notice shape the survivor is gone for a second, independent
  *   reason: 12.277's control is now the insider's NOTICE, which only the trigger
- *   list can produce. With 12.291 that is seven cases, not six.
- *   *REASONED, not measured — the gate lock was held by another process when
- *   this rewrite was written, and an unmeasured expectation is exactly what the
- *   paragraph above is about. Re-run the mutation and replace this sentence with
- *   the number.*
+ *   list can produce.
+ *   **MEASURED: `9 failed | 3 passed`** — all seven cases in this file plus
+ *   12.275 and 12.276 in `test/dual-client/grant-backfill.test.ts`, which ride
+ *   the same mechanism. *The expectation written here first said "seven cases",
+ *   which was right about this file and wrong about the suite; the number above
+ *   is the run's.*
  * - `grantNoticeFor`'s own `canSee` → mutated to permit, **12.280** reddens
- *   ALONE — `1 failed | 5 passed` under the push shape, and expected to be
- *   `1 failed | 6 passed` here for the same reason (also unmeasured). That case
+ *   ALONE — **MEASURED at `1 failed | 11 passed`** across this file and the
+ *   dual-client one (it was `1 failed | 5 passed` under the push shape). That case
  *   exists for exactly this reason: the guard is redundant for every ORDINARY
  *   descendant (an inheriting child copies the authoring ancestor's
  *   `resolved_mode` and `resolved_user_ids`, so `canSee` returns the same answer

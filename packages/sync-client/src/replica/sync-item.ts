@@ -4,7 +4,13 @@ import type { LedgerEvent } from '@gisik-nokma/domain';
  * What sync-down hands a replica — the CLIENT-SIDE MIRROR of
  * `apps/server/src/visibility/visible-events-for.ts`.
  *
- * ## Three members, not two
+ * ## FOUR members, not two
+ *
+ * *This heading said "Three members" until closure 5b added `reach-granted`
+ * (ruling P37.1). The count is kept accurate rather than generalised away,
+ * because the whole point of the section below is that a reader who trusts a
+ * SMALLER count drops an instruction — which is what happened to
+ * `scope-revoked`.*
  *
  * Plan 10 Task 9's own Interfaces list names only `SyncItem` and
  * `PurgeInstruction`, and Plan 4 Task 11's header pins the union at those two.

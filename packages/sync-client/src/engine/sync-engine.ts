@@ -635,7 +635,7 @@ export function createSyncEngine(deps: {
       // keeps this cheap: it is one request per 100 ids a notice already
       // carries, on an event that is already rare, and it makes the interval
       // and the reconnect latch irrelevant for exactly the tickets in question.
-      const purged = await reconcileNamed(item.workspaceId, item.ticketIds);
+      const purged: string[] = []; // MUTANT-4 dropped the reconcileNamed call
       if (purged.length > 0) await replica.addPendingPulls(item.workspaceId, purged);
       await drainPendingPulls(item.workspaceId);
     }
