@@ -191,6 +191,45 @@ a slow-consumer close mid-pull is followed by measured convergence.
 
 ---
 
+## FOUR THINGS CLOSURE 5b LEARNED THE HARD WAY — all four will recur
+
+1. **`git add -A` WITH SUBAGENTS RUNNING COMMITS THEIR WORK-IN-PROGRESS UNDER YOUR MESSAGE.** Two
+   commits on this branch (`6edf5db`, `f307299`) carry hunks of test files an agent was mid-rewrite on,
+   under messages describing something else entirely. Nothing was lost and nothing was corrupted, but on
+   a branch where the commit message IS the record, a commit that misdescribes itself is a defect.
+   **Stage explicit paths whenever an agent is writing.** The history was not rewritten to fix it —
+   rebasing under running writers trades a cosmetic problem for a real one — so a later commit says what
+   happened instead.
+
+2. **`grep -c "it("` IS NOT A CASE COUNT, and the wrong number was load-bearing before it was caught.**
+   It counts every occurrence of that substring. `reconcile-route.test.ts` was recorded as having
+   "eight cases"; it has THREE. That figure was the arithmetic in the argument for extracting
+   `reconcileHeldIds` instead of pointing the rig at `inject()` — an inflated coverage count made the
+   existing HTTP tests look like more of a reason than they were. The conclusion survived the
+   correction; the number did not, and it had already reached two source docblocks and this file.
+   **What caught it was the RUNNER's own line** (`Tests 10 passed`), not any review. Count `it` blocks
+   with `grep -nE "^\s*it\("`, or better, read the runner's number.
+
+3. **THE COMPILER IS THE ENUMERATOR, twice more, and both times the grep would have been wrong.**
+   Adding a fourth arm to `SyncItem` / `ServerStreamFrame` located **five** consumers — the transport's
+   `TS2344` exhaustiveness assertion, `replica.applyInstruction`'s `TS2366` no-default switch,
+   `app-core`'s `replica-data-source` (`TS2339`), and two test helpers — plus `hub.ts`, which was the
+   dangerous one: its `if/else` read *"purge, otherwise scope-revoked"*, so a new instruction would have
+   been handled AS A REVOCATION, which detaches the subscription and tells the replica to empty itself.
+   What saved it was an accident of field names. It is a `switch` with no `default` now.
+   Adding a fifth method to `SyncTransport` located **seven** implementors, five needing changes —
+   including `packages/app-core/test/replica/replica-data-source.test.ts:486`, the inline literal with no
+   type annotation that #139 already recorded as invisible to any textual search.
+
+4. **GATE LOCK v3.1** (controller, 2026-09-06). The directory form is superseded: it had an empty-pid
+   window in which a live holder was indistinguishable from a corpse, and two lanes measured a live
+   holder being robbed. v3 is an `O_EXCL` FILE written in one atomic step; **v3.1 fixes one defective
+   line in v3** — its idle check used `pgrep -fl 'gate.sh|locked-test.sh' | grep -vc`, which counts
+   LINES, and a Claude session's argv is its whole multi-line brief, so once any brief quoted a script
+   name the count could never reach zero. Same class as `pgrep -f vitest`, one turn later. This lane's
+   working copy of the v3.1 script is in the session scratchpad and has been exercised once
+   (acquire → drain → run → clean release).
+
 ## THE CASE-ID CONTROL — copy this, do not write your own
 
 `test-cases/12` carries ids in three styles across the repo (`- 12.274 🚫`, `- **12.240** ✅`,
