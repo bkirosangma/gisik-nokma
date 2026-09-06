@@ -1004,13 +1004,26 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(**Plan 10, Tasks 4–7 and 9–17, plus closures 1–5b** — the LIFTED §11 closer, the contested-claims read
-path, the snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with
-its local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, app-core's
-offline/sync UX surfaces, the dual-client harness rig, the six scripted divergence scenarios, the
-`apps/desktop` Tauri shell and the `apps/mobile` Expo shell — and the rulings applied to this bucket's
-surface afterwards. **Task 18 is this banner and `test-cases/12`'s header**; it owns §12's final shape
-and the reconciliation the notes below record.*
+*(**Plan 10, Tasks 4–7 and 9–17, plus closures 1–5b, plus the Lane F passes that write §12** — the
+LIFTED §11 closer, the contested-claims read path, the snapshot writer, the replica bootstrap, the sync
+ingress, the local replica, the outbox with its local pre-check, the sync engine with its HTTP/WS
+transport, the replica `DataSource`, app-core's offline/sync UX surfaces, the dual-client harness rig,
+the six scripted divergence scenarios, the `apps/desktop` Tauri shell and the `apps/mobile` Expo shell —
+and the rulings and cross-lane passes applied to this bucket's surface afterwards. **Task 18 is this
+banner and `test-cases/12`'s header**; it owns §12's final shape and the reconciliation the notes below
+record.*
+
+***This enumeration names CATEGORIES, not entries, and that is deliberate.** An earlier draft of it
+listed Plan 10's tasks and the closures by name and was falsified within the hour by the first thing
+that was neither — Lane A's fixture-mirror inventory (#187), a Lane F pass. **A banner that enumerates
+by name is falsified by the next merge; one that enumerates by category with a self-naming rule is
+not.** So the rule, and it is the load-bearing sentence of this paragraph: **every bullet added here
+under a category rather than a Plan 10 task NAMES ITSELF and its PR in its own text** — the
+fixture-mirror inventory does, and so must the socket-cutting fixture, the post-Task-18 sync fixes, and
+whatever follows. A reader reconciles this section by reading its bullets, never by trusting a list up
+here to have kept pace. This clause exists because the paragraph written to end incomplete enumerations
+in §12 was itself incomplete three times: the "still absent" app shells, Task 3's stream cursor, and
+then this.*
 
 ***Where the rest of Plan 10 is catalogued, measured rather than assumed.** Four of this plan's tasks are
 NOT here and should not be moved here. **Tasks 1–2's** shared vocabulary: `formatIstInstant`,
