@@ -11,6 +11,43 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⏩ CONTROLLER RESUMED 2026-09-06 17:23 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `131b283` (17:26)
+
+**The 17:20 `/clear` worked as designed.** The fresh context read this file top-down (the 12:26 block's
+anchors, its RESET 17:20 dispatch section, P42), then A's and E's handoff heads from their OWN branches,
+then measured before touching anything. The 12:26 block below remains true history; **its "RESET 17:20"
+section is the dispatch record this block confirms — every lane was observed acting on it.**
+
+### Anchors — re-measured 17:26 IST
+
+| what | value |
+|---|---|
+| `main` | **`131b283`** (#208, the RESET 17:20 block); the primary checkout equal to it |
+| ledger | **`CHECK_EXIT=0` · 175/177 (98.9%)** at `131b283` under node v22.22.2 — a first run under node 24 exited 1 on `engines.node` BEFORE the script ran (`nvm use 22` first, always; the exit code alone looks like a ledger failure). Plan 11 **14/16**; remaining **11/13 (#205), 11/16** |
+| open PRs | **#204** (A, `exec/44-next-cluster` @ `5028376`, MERGEABLE) · **#205** (E, `exec/43-plan11-t13` @ `96e1c91`, MERGEABLE) — heads unchanged since the dispatch |
+| CI | **STILL billing-blocked** at `131b283`: `gate` and `scope` fail before their first step with the "recent account payments have failed" annotation, every other job skipped. The owner's waiver (15:20) stands |
+| last forced gate | **`cd0844c`** (15:00–15:08, 3639 / 284) — no code has merged since; `5e3a9d5` and `131b283` are docs-only |
+| watch | the Monitor `bw9fyoz9c` (`ctl-watch.sh`, 120 s poll) **SURVIVED the clear again** — first event at 17:24:32 (`MAIN MOVED 5e3a9d5 -> 131b283`); not re-armed. `gate.sh` (v3.3, captured form) and `ctl-watch.sh` copied into THIS session's scratchpad **`ac2d892c-…`**, `gate.sh`'s `S=` re-pointed there; the `75988d28-…` copies are the previous context's |
+| lock · machine | `/tmp/gisik-gate.lock` held by pid 98936 since 17:24 (A's full gate); 0 pools at 17:26 (pre-drain), 0 orphans; swap **4.17 of 5 GB (81%)**; 4 docker containers (E's stack is down; the owner's) |
+| session meters | **20% at 17:24 on every pane**, reset 22:20 IST; weekly 78%. Lane contexts A 63% · B 42% · C 40% · D 41% · E 39% |
+
+### The five lanes at 17:25 — OBSERVED acting on the 17:21 dispatches (pane captures; `ListAgents`: A shell, B/D/E busy, C idle)
+
+| lane | session · branch | observed |
+|---|---|---|
+| **A** | `gisik-nokma-exec-f3` · `exec/44-next-cluster` | **seven mutations run inside ONE lock acquisition, every prediction matched** (7.234's blast radius of 2 predicted, not discovered); every red an `AssertionError` from the case's own `expect` — none a `MappingError` shape gate, none grey (disguises #14/#15 answered in practice); rule minted into the catalogue: *where a mutation could die at a shape gate, keep the key and corrupt the value — a renamed key dies in `asString`/`asRecord` before any assertion runs and measures the parse, not the property.* Full gate RUNNING under the lock; then ONE push + report |
+| **B** | `lane2-plan4-a2` · `exec/46-reach-granted-wire` (not on origin yet) | `parseFrame` found deeply witnessed — the gap is the transport only; the wire case GREEN; docs + commit done; now the state file, then gate and an opus review, one at a time |
+| **C** | `lane3-plan7-8-34` | HOLDING, acknowledged 17:21; will treat a fired nudger line as noise and say so |
+| **D** | `lane4-periphery-2d` · `exec/45-ping-hazard` (not on origin yet) | oriented, build green, verifying 12.344 is free in its block before dispatching its one subagent |
+| **E** | `lane5-plan11-c9` · `exec/43-plan11-t13` @ `96e1c91` | **ONE opus reviewer over the whole branch (37 files) dispatched**; tree deliberately untouched while it reads. Queued: fix → re-gate at the content head → rebase (3 behind, all docs-only) → re-run the non-docs-delta test to decide whether the re-gate covers the final head → report |
+
+**Controller's next actions, in order:** A's report → its gate at the EXACT pushed head + the 14:57 reviewer
+verdict (clean at `5028376`; anything the mutation round changed beyond the plants needs saying) → merge #204
+under the waiver → forced gate at merged `main` (no ledger row). E's report → the reviewer's verdict + the
+re-gate at the exact head → merge #205 → forced gate → **promote 11/13** → E onto T16. Then B's and D's small
+PRs on their reports (review + gate each, files disjoint). C stays held until #204 and #205 land. Four lanes
+will gate serially behind one lock; a lane that waits is not stalled.
+
 ## ⏩ CONTROLLER RESUMED 2026-09-06 12:26 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `8d6b756` (14:20; earlier at `592b34c` 14:10, `e33c429` 13:50, `2f18f3f` 13:25, `ea34c09` 12:53, `3e6d606` 12:38)
 
 **The 12:25 `/clear` worked as designed.** The fresh context read this file top-down (the 12:25 block, then
