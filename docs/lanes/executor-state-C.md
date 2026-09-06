@@ -11,6 +11,71 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
+## ⛔ CORRECTION, WRITTEN AFTER THE CHECKPOINT ABOVE: `cf5b3c5` CARRIES AN UNRESOLVED CRITICAL — DO NOT TRUST "REVIEWED"
+
+**The background workflow (`ww599joaw` / `wf_b926b912-c39`) was NOT killed by the session-limit window — it
+ran to completion and its result arrived after the checkpoint below was already written and pushed.** That
+result revealed a real bug in this session's own orchestration script: after one fix round, it re-reviewed
+T11's code, got `needs_fix` a SECOND time (one Critical, three Important survived), and then proceeded to
+run the commit step UNCONDITIONALLY anyway — the script only gated the fix-loop on the FIRST review's
+verdict, not the LAST one. **`cf5b3c5` therefore shipped with defects its own review process had already
+found and never fixed.** Anything below this block that says T11 is "reviewed" or "clean" describes what
+this session believed BEFORE this arrived, not the true state. Treat `cf5b3c5` as unreviewed until the fix
+below is independently re-verified.
+
+**CRITICAL, unresolved as of this write:** the backup worker cannot boot as deployed.
+`apps/server/src/ops/backup-daemon-main.ts`'s `main()` calls `loadConfig(process.env)`
+(`apps/server/src/config.ts`), which requires `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` and `WEB_ORIGIN` with
+no defaults. The backup worker's env block in `deploy/do/app.yaml` sets none of those three — reproduced
+under `env -i` with that literal env block: exit 1, `invalid server configuration — check: BETTER_AUTH_URL,
+BETTER_AUTH_SECRET, WEB_ORIGIN`, before the sink, pool, or alerter are even constructed. This breaks the DO
+worker AND the `pnpm --filter @gisik-nokma/server run ops:backup-once` manual runbook path identically — no
+nightly dump, no weekly export, no alert, because `alerterFromConfig` is never reached. A silent no-op at
+the deployment layer, not a code bug that shows up in a normal test run (none of T11's own tests boot the
+daemon under the worker's real env block — that gap is itself worth naming for whoever writes the next
+"boots under X" check).
+
+**Three Important, also unresolved as of this write:**
+1. `msUntilNextUtc` (`schedule.ts`) has no validation on its `dayOfWeek` parameter, and
+   `backup-daemon-main.ts` passes `Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0')` straight through.
+   `getUTCDay()` only returns 0-6, so `7`, `-1`, or a non-numeric string (→ `NaN`) make the function's
+   while-loop condition permanently true — spins forever, synchronously, BEFORE the daemon logs anything.
+   Reproduced for all three, killed at 8s each.
+2. `pg-dump.ts`'s spawn-failure path (pg_dump missing/off PATH — the child process's `error` event) leaves
+   a **zero-byte object uploaded at the dump's normal dated key**, because the sink was already handed the
+   (now-erroring) stdout stream and the existing cleanup (`stdout.destroy()` + `sink.discard(key)`) only
+   runs on the `exitCode !== 0` branch, never on the spawn-error branch. Reproduced: put completed at 0
+   bytes, `discarded = []`. This is the exact hazard a sibling test case (13.30) already exists to close —
+   but only for the non-zero-exit half, not this one.
+3. `error-alerter-shim.ts` (the temporary placeholder for Plan 11 Task 3's real
+   `apps/server/src/alerts/error-alerter.ts`, on unmerged `origin/exec/23-plan11`) claims retiring it is a
+   one-line import swap with nothing else to change. False in two ways: (a) the shim's `notify` is typed
+   `void | Promise<void>`; the real one is exactly `Promise<void>`. (b) the real `alerterFromConfig`
+   treats only a STRICT `null` as "no alerter"; `backup-daemon-main.ts` calls it with
+   `process.env.ALERT_WEBHOOK_URL ?? null`, which leaves an EMPTY STRING as an empty string (not null) —
+   and `.env.example` ships `ALERT_WEBHOOK_URL=` empty by default, with the worker's own env block
+   declaring it a `SECRET` that DigitalOcean can resolve to empty. Retiring the shim as documented would
+   silently start POSTing to `fetch('')` and throwing on every failure in the default deployment.
+
+**The process lesson, in the controller's words, recorded here verbatim because it generalizes past this
+session:** *"an orchestration script that proceeds to commit regardless of the second review's verdict is a
+check that cannot fail, in orchestration form — every fix→re-review loop gates on the LAST verdict, not the
+first."* Any future Workflow-tool script in this project with a fix→re-review loop must check the loop's
+own exit condition against whichever review ran LAST, not assume one round is enough and commit
+unconditionally afterward.
+
+**T12 is NOT affected — it is genuinely clean.** Its own fix→re-review loop (same script, same bug
+class, but the SECOND review happened to return `pass`) landed a real `pass` verdict with only three
+disclosed Minors, committed at `91b3b81`. No reason to distrust T12's commit.
+
+**A fix round for T11's four findings is being dispatched now** (script:
+`t11-critical-fix.js` in this session's scratchpad),as a NEW commit on top of `91b3b81` — `cf5b3c5` is
+already pushed to `origin/exec/30-plan11-backups` and will not be rewritten. **If a session-limit halt
+catches this fix round mid-flight, this correction (pushed alongside this commit) is what protects the
+branch from being read as done when it is not.**
+
+---
+
 ## WHY THIS CHECKPOINT EXISTS
 
 The controller warned at 09:40 that the account-wide session meter read 87% and every pane was projected
