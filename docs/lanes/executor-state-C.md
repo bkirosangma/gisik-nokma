@@ -13,6 +13,14 @@ older sections kept below as history, not deleted.
 
 ## ⏩ LANE F PASS 1 — the test-cases <-> test citation check, 2026-09-06 ~20:20 IST
 
+**PR #227 OPEN at head `afa8945`** (`exec/51-case-citation-check` → `main`). Includes the review
+round's fixes (see below). Pushed by the 21:15 controller deadline with margin (~20:43). CI will show
+red-at-start — GitHub Actions billing outage, per the controller, unrelated to this branch; the PR body
+says so. **Not pushing again without a fresh instruction** — head frozen at `afa8945` pending
+controller review/merge. If the session ends before merge: this branch is complete, gate-verified
+(before the fix round, on code the fix round didn't touch) and check-verified (after), ready to merge
+as-is.
+
 **Owner context:** the owner started the Monday serial queue tonight with the remaining weekly quota
 (~14% at dispatch); Lane C and Lane A only, B/D/E stay released. This is a Lane F pass (repo-wide sweep,
 not tied to a specific plan task), assigned directly by the controller with an explicit measure-first
