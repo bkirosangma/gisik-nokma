@@ -9,6 +9,81 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ▶ SEAM 3 — LIVE STATE at `f22e8b4`, branch `exec/43-plan11-t13` (this block first on restart)
+
+**T13 IS WRITTEN AND RUNS GREEN AGAINST THE REAL STACK: 3 passed, exit 0.** Not yet gated, not yet
+catalogued, no PR. §13 still consumed through 13.168 — **next free 13.169** (recounted from the file:
+128 case lines, max 13.168; `grep -oE "13\.[0-9]+"` also returns `13.201`, which is the PROSE naming
+the next block — count `^- 13\.` only).
+
+| anchor | value |
+|---|---|
+| branch | `exec/43-plan11-t13`, pushed, cut from `exec/42-plan11-seam3` (which is PR #193, merging) |
+| HEAD | `f22e8b497f3a6e0bd6c6ebf98791f82bda9f7208` — verify with `git branch -r --contains`, never `cat-file` |
+| commits | `c1df783` gate-lock v3.3 · `1276427` handoff · `ff524ba` T13 harness · `3dd9c9f` **P42 auth fix** · `f22e8b4` T13 green + ci.yml |
+| E2E | `pnpm --filter @gisik-nokma/web run test:e2e:stack` → **3 passed, exit 0**, against the compose stack |
+| server typecheck | `tsc -p tsconfig.typecheck.json` exit 0 after the 15 `createAuth` call sites were updated |
+| fixture | `test/auth/trusted-origins.test.ts` **5 passed**; both mutations run (below) |
+| NOT DONE | the §13 catalogue (from 13.169), `Features.md` §13 bullets, the **full gate**, the PR, T16 |
+
+## What T13 found, in order, each measured
+
+1. **The stale-image trap — the check-that-cannot-fail in compose's costume.** `up -d` WITHOUT `--build`
+   reuses an image built before `SERVER_ORIGIN` landed; that image proxies `/v1/*` at itself.
+   `GET :3001/v1/me/workspaces` → **500 after 30.014 s**. After `--build` → **401
+   `{"error":"unauthenticated"}` in 0.059 s**. `docker compose ps` reported **every container healthy in
+   BOTH states.** globalSetup's stack assertion is built on exactly this pair.
+2. **Sign-in was BROKEN in the stack — 403 `INVALID_ORIGIN`, "Invalid origin" rendered on the page.**
+   Ruling **P42** → fixed in `3dd9c9f`. `trustedOrigins` held only `baseURL`'s origin, which no browser
+   sends. **`deploy/do/app.yaml` has the same condition waiting** (`WEB_ORIGIN=pm.artsourced.in` vs
+   `BETTER_AUTH_URL=pm-api.artsourced.in`). Mutations: delete the fix → 4 pass / 1 fail, the WEB_ORIGIN
+   acceptance ALONE (`expected 403 to be 200`); trust every origin → 3 pass / **2** fail (P42 predicted
+   one — the same-origin case carries its own permissiveness assertion, so both permissiveness bounds
+   redden: more constraint than predicted, not less).
+3. **Node's `fetch` is not curl.** Same request: curl 200, node 403 `MISSING_OR_NULL_ORIGIN`. Node
+   presents `Sec-Fetch-*`, so `validateFormCsrf` force-validates and an absent Origin is a refusal;
+   curl sends none and falls through unchecked. **A curl probe cannot stand in for the client here.**
+4. **My own error message hid a cause.** It printed `answered 403` with no body, which cannot separate
+   INVALID_ORIGIN (the product defect) from MISSING_OR_NULL_ORIGIN (my missing header). Fixed, and it
+   immediately named a 429 from my own T2 rate limiter on the next run.
+5. **The guest spec was wrong and the PRODUCT was right.** It expected the accountant to reach "Shop
+   operations"; that project is not on their page at all. The seed makes them a WORKSPACE member with
+   role `guest` plus explicit visibility on four TICKETS and never emits `project.member_added` —
+   `eff.projects` comes from that event and nowhere else. Empty project list = ruling **P38**'s partial
+   workspace, seen from a browser for the first time.
+
+## Two override claims that did not survive, and one figure of the controller's
+
+- **13.90 is `seed:cc`, not `seed:dev`, and is in LANE D's block** — accepted by the controller.
+- **`seed:dev` cannot run the plan's way**: it reads `docs/superpowers/plans`, and that directory is
+  **absent** from the image (measured), while `reference/` **IS present** — so `seed:cc` runs
+  in-container exactly as the plan wrote, and T13 uses it.
+- **`turbo run test --dry=json` is 16 tasks / 10 `#test` / 0 e2e**, not the pre-flight's "8". Re-measure
+  after any package.json edit; that is the structural guard keeping the browser off the gate.
+
+## Carried, with owners — none fixed here
+
+- **A guest has NO NAVIGATION to the four errands explicitly shared with them**: the only path to a
+  ticket is through a project they cannot see. Explicit per-ticket visibility exists and is unreachable
+  from the UI. Owner: Plan 6 / visibility. **Not softened, not fixed.**
+- **The verifier's DDL / restore-scratch-DB written decision is still T16's** and still undischarged.
+- **12.258** — what the shell renders when `getTickets` throws past the 2000-row cap. T13 does not cover
+  it; say so at the case.
+- **OPTIONS is unmounted on the auth catch-all**, so a genuinely cross-origin deployment still needs the
+  preflight answered — `sign-in-flows.test.ts` already pins it as a known gap. Trusting the origin is
+  necessary, not sufficient.
+- **The E2E is close to the auth rate limit**: 2 user creations + 3 sign-ins per run. A re-run inside the
+  window meets 429. Restarting the server clears the in-memory bucket.
+
+## The next session picks up here
+
+1. `pnpm turbo run build test typecheck --force --concurrency=1` — the FULL gate has never run on this
+   branch. The P42 commit touched 15 test files; a green targeted run is not a green gate.
+2. §13 catalogue from **13.169** + `Features.md` §13 bullets (T13, the E2E; the auth fix; the
+   stale-image case; the header-less inversion as **🚫** with the vendor citation
+   `origin-check.mjs:131,137,141,152,96,101,108`).
+3. The PR, then **T16**.
+
 # ▶ SEAM 3 — LIVE STATE, branch `exec/42-plan11-seam3` (this block first on restart)
 
 **Position: T13 not started. First commit on the branch is GATE LOCK v3.3, and it carries a correction
