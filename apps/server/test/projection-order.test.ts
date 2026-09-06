@@ -60,6 +60,9 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
+  /**
+   * 6.79 — `proj_projects` INSERTS at its coordination §8 position (fourth) rather than being appended: it is the first registrant to EXERCISE the insert-at-your-position rule instead of stating it. This is the DB-free pin of record the row names; `entity-heads.test.ts` is the second pin, which goes silent when Postgres is down.
+   */
   it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested, workspace settings, search', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
