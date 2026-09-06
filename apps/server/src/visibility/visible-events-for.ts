@@ -224,7 +224,9 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
     case 'membership':
     case 'project':
       // The roster: who is in the workspace, who is on which project. Both
-      // kinds carry a LOSS branch naming a user, and both go to non-guests.
+      // kinds carry a LOSS branch naming a user AND, since closure 5b, a GAIN
+      // branch naming one — the loss branches purge, the gain branches yield a
+      // `reach-granted` notice (case 12.283). Both go to non-guests.
       return 'roster';
     case 'workspace':
       return 'workspace';
