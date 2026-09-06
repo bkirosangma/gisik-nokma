@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`cc42d01`** — nineteen merges this context; since `fdd3bad`: #140 · #142 (P37.1, P38) · **#143** (Lane A case 7.213, the mapper round trip, `5abb71e`) · **#134** (Lane C Plan 11 T14, the eight-job `ci.yml` with the blocking `check-case-ids` gate, `3571d38`, merged after reading every job's steps on run 33995268917) · **#144** (11/14 promoted, `cc42d01`). Every `gh pr merge` exit read from `$?` on its own line |
+| `main` | **`1b72900`** — twenty-one merges this context; since `cc42d01`: #145 (this file, the outage record) · **#139** (Lane B closure 5 under P37 + P37.1's cap and cases, `1b72900`, merged on the eleven-job workflow green at `c2d0c52` = `9762cda` + one docs file, delta verified). Every `gh pr merge` exit read from `$?` on its own line |
 | ledger | **`CHECK_EXIT=0` · 163/177 (92.1%)** · claimed 0 · in-flight 0 · todo 14 · Plan 10 **17/18** (T18 held) · Plan 11 **4/16** (T7, T8, T14 done; T5 landed on Lane E's branch, unmerged) |
-| last forced gate | **`3571d38`** (code-identical to `cc42d01`) — ONE backgrounded invocation under the lock (acquired 07:30:55, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m34.5s · node v22.22.2** · zero `Unsupported engine` · **3320 tests / 253 files** — server **1043** (+1 = 7.213), app-core 1092, the rest unchanged. *(Previous: `a1252bc` 3319.)* **CI itself changed at `3571d38`:** every PR now runs the eleven-job workflow (scope · check-env with `check-skipif-coverage` and `check-case-ids` · check-tasks · build → typecheck / server-tests ×4 / other-tests · e2e detect-only · gate fan-in); a docs-only PR shows every substantive job `skipped` and `check-tasks` RUN — read job steps, never the fan-in alone. |
-| open PRs | **#139** (Lane B closure 5 + P37.1's cap and cases, head `c2d0c52` = `9762cda` + one docs file (+6/−6, verified); gate at `9762cda` 30/30 · 0 cached · **3333 tests · server 1055**; running the new workflow at the head; **merges on its gate, then B restarts onto closure 5b with (d) — override staged**) · **#141** (Lane A closure 4, `badfce9` gate green; **the Fable review DIED on Fable's own session limit at ~03:5x with zero findings; an opus replacement reviewer was dispatched and its verdict is ACCEPTED as the verdict** — proportionality: opus is the standard tier, Fable the preference; HELD until A reports it applied and rebases past `cc42d01`). Expected next: Lane C T15 (`exec/28-plan11-do-spec`, restarted 07:31 with its WIP checkpoint `2df7cf5` to cherry-pick); Lane D T9+T10 (workflow relaunched after the reset); Lane E seam 1 (T2's fix round died on the limit; the lane is finishing it by hand — trustProxy attacker-chosen rate-limit key confirmed Critical, fix in design); Lane A the HELD pair under P38 (`exec/27-held-pair`, building). |
+| last forced gate | **`1b72900`** — ONE backgrounded invocation under the lock (**the protocol RECLAIMED a stale empty-pid lock after 60 s** — a holder died between `mkdir` and `echo`, Lane E's refinement paying out — then acquired 07:43:09, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m34.6s · node v22.22.2** · zero `Unsupported engine` · **3334 tests / 256 files** — server **1056** (+13 = closure 5's 12 + 1), sync-client **64** (+1), the rest unchanged. **Corroborated twice**: Lane C's 3334 at `cf186df` (T15 adds no vitest cases) and Lane E's 3408 − 74 (its own branch's A0 2 + T1 16 + T2 56) = 3334. *(Previous: `3571d38` 3320.)* |
+| open PRs | **#146** (Lane C Plan 11 T15, `cf186df`, rebased past #139 and RE-GATED after the rebase — the lane noticed its first green no longer described the rebased tree; 30/30 · 0 cached · 3334; `deploy/do/{app.yaml,README.md}`, `scripts/check-db-timezone.mjs`, root `check:db-tz` + `pg` devDep cleared with Lane E; env names cross-checked against E's unmerged `config.ts`; "not applied to any live app"; eleven-job run in progress — **merge on its gate, promote 11/15, restart C onto T11+T12, override staged**) · **#141** (Lane A closure 4, CONFLICTING after #139 on `sync-routes.ts` as predicted; A rebases and pushes with the opus verdict applied; merge at that head). Expected next: Lane B closure 5b (`exec/29-closure5b-reach`, restarted 07:38, (d) with its three artefacts in the override); Lane D T9+T10 (workflow relaunched after the reset); Lane E seam 1 (**T2 DONE** at `f342c87`, 3408 tests on its branch; T3 → T4 → shutdown → T6, then T13, T16); Lane A the HELD pair under P38. |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -198,6 +198,21 @@ omission and what runs the dual-client suite instead (the sharded `server-tests`
 time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.skipIf(`-coverage
 trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
 version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
+
+### Re-task 07:50 — Lane C takes Plan 11 **T11 + T12** (backups, restore drill) after #146; Lane E's queue is seam 1 → T13 → T16
+
+Lane E's file map named T11/T12 hand-off-able (`apps/server/src/ops/*`, `scripts/restore.sh`, tests,
+manifest script lines, `object-store.ts`); E measured before releasing them that nothing of its own sits
+under `src/ops/` or touches `object-store.ts` (positive control: its `src/http/` query returned 2 commits).
+C's override carries E's seven pre-flight findings verbatim — the object-store key regex that refuses both
+of T11's formats (a security control with a planted-defect test; **if widened, `..` must stay
+unrepresentable and the test must assert it**), `pg_dump` keg-only at 18.4 against a 16.15 server (the
+ARCHIVE version is what `pg_restore` must read), the two acceptance assertions that cannot fail for the
+reason their names imply, `restore.sh` never executed by any test, `verifyProjections` at `src/tools/`,
+the alerter that T3 will export as **`ErrorAlerter` / `alerterFromConfig`** (C injects a local shape with
+those names and swaps on rebase — never a second `src/alerts/`), scratch databases only. Manifest script
+lines: C announces to E and D before pushing; keep both. Lane sessions after the 07:3x restarts:
+C `lane3-plan7-8-13`, B (restarted 07:38, name per `ListAgents`).
 
 ### ⛔ THE 06:40 SESSION-LIMIT WINDOW TOOK EVERY LANE AND THIS CONTROLLER DOWN FOR ~3.5 HOURS (03:5x → ~07:20 IST)
 
