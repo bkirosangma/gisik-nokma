@@ -576,6 +576,34 @@ SERIALLY inside one lock acquisition, from a written list, nothing else touching
 Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
 3,285 lines of lessons and stopped.
 
+### RULING P41 (2026-09-06 09:48, controller as ruling tier) — C2's proper close is Door B: the online source pages to COMPLETENESS; a bare cursor on the view type is refused
+
+**Lane A escalated before building — the override's own tie-break fired.** Three measurements at
+`aa17046`: `FilterSpec` (`view-types.ts:70-81`) has ten optional fields and no position;
+`listQueryString(filter, grouping)` builds the whole query string; `DataSourceQuery.getTickets(projectId,
+filter, grouping)` (`data-source.ts:135`) takes no cursor. So a cursor on the RETURN type says "there is
+more" and no caller can ask for the next page. **Bigger:** `views/list-model.ts:9-31` licenses
+client-side grouping ONLY because `TicketListView` is the complete row set, and
+`test/views/list-model.test.ts:53-71` enforces that as a TYPE tripwire (`paginationTripwire`, whose
+docblock records that adding `nextCursor` fails typecheck with TS2322) — a decision point whose own text
+says it must be retaken, never silently inverted. A bare cursor would delete the tripwire and invert the
+grouping decision in one commit while leaving no consumer able to page: sections would read "Doing (3)"
+on a project holding forty. **Doors:** A — widen `DataSourceQuery.getTickets` with a cursor (breaks P30
+for that signature; partial-page rendering becomes product behaviour); B — a paging loop in the online
+source, the closure `mappers.ts:1156` names itself (view type unchanged, tripwire intact, grouping stays
+licensed, P30 untouched; cost: round trips); C — a cursor inside `FilterSpec` (refused: `FilterSpec` is
+embedded in `SavedFilter`, so a cursor becomes a persisted saved-filter field).
+**RULING: B, bounded and loud.** The online source pages through the server's cursor until exhausted and
+hands the view the complete set — the only door that makes the completeness claim TRUE again rather than
+expressible-and-unactionable; A is a product decision (the owner's), not a closure's. The loop carries a
+documented page cap (start at 40 × `DEFAULT_LIMIT` 50 = 2000 rows — a disclosed assumption, since no
+ticket count per project has been measured; owner named at the case) and a LOUD refusal beyond it in the
+`ServingGapError` register — self-expiring, never a silent truncation (a silently truncated set is C2 one
+bound further out). Excluding fixtures, alone: a two-page project assembles both pages, disjoint and
+complete together (loop stops after page one → red); one page beyond the cap refuses loudly (cap removed
+→ red); the existing C2 refusal case flips to served. The replica source already holds the full set
+locally and needs no change — stated at the case.
+
 ### PRE-HALT POSITIONS, 09:45 — every lane's head is PUSHED; read each from its BRANCH, not from `main`
 
 | lane | session | branch · head | state | first action after the reset |
