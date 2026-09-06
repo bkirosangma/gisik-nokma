@@ -16,25 +16,29 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR #204 IS OPEN on `exec/44-next-cluster` @ `cfc76aa`. REVIEWED. ONE MUTATION KILL of eight. NO GATE.**
+# LANE A — **PR #204 COMPLETE: eight witnesses, EIGHT KILLS, GATE GREEN.** `exec/44-next-cluster`
 
-**https://github.com/bkirosangma/gisik-nokma/pull/204** — cannot merge: **CI is down account-wide since
-~14:42 on the owner's billing**, so no PR can show an independent run green. Not this branch; nothing
-re-run to chase it.
+**FULL UNCACHED GATE, GREEN**, lock v3.3 captured form, acquired 17:24:07:
+`GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `0 cached, 30 total` · `--force --concurrency=1` ·
+2m3.722s · node **v22.22.2** · `Unsupported engine` 0 · failures section EMPTY · no orphaned workers ·
+**3,652 tests / 284 files** (3,647 passed, 5 skipped).
+`pnpm check:env` → **`CHECK_ENV_EXIT=0`** · `node scripts/check-case-ids.mjs` → **exit 0**, 1,562 ids.
+Two separate commands.
 
-**What is proven:** 7.230–7.237 green (**20 passed / 0 failed**), typecheck clean, node v22.22.2,
-`check-case-ids` 0, zero orphaned workers. **Reviewed by an opus reviewer that found NO assertion
-which cannot fail** — the first clean result on that axis in three rounds.
+**Everything owed on #204 is now discharged:** eight witnesses, eight kills, one full uncached gate.
+The only thing still blocking merge is the account-wide CI billing outage, which is not this branch.
 
-**What is NOT proven, and must not be read as ✅:**
-- **Only 7.230 has a mutation kill.** 7.231's plant refused (three ambiguous sites — the guard
-  working). **7.233's mutation was INVALID: `EXIT=1` with `PASS (0) FAIL (0) skipped (20)`** — nothing
-  ran, because `beforeAll` founds the shared workspace from that same 201. `EXIT=1` looked exactly
-  like a kill. **7.232/7.234/7.235/7.236/7.237 have NO mutation.**
-- **NO FULL GATE at this head.** A peer's forced gate held the lock through the window.
+**All seven owed mutations ran inside ONE lock acquisition, each PREDICTED in writing first, and every
+prediction matched** — including 7.234's blast radius of 2. **Every red is an `AssertionError` from an
+`expect` in the case itself; not one is a `MappingError` shape gate and not one is grey.**
 
-**OWED NEXT SESSION, in order:** the five missing mutations (inside a lock acquisition), a corrected
-7.231/7.233 plant, and one full uncached gate.
+**The two earlier failures are what taught the design.** 7.231's first plant refused on three ambiguous
+sites (the guard working); its replacement anchors on unique surrounding text. 7.233's first mutation
+renamed the founding 201's key and produced **`EXIT=1` with 20 SKIPPED** — `beforeAll` reads that key,
+so the fixture's own setup broke and nothing ran; its replacement leaves the seed intact and corrupts a
+value only 7.233 reads. **The rule now written into the catalogue: where a mutation could die at a shape
+gate, keep the KEY and corrupt the VALUE** (7.232, 7.233, 7.237), because a renamed key dies in
+`asString`/`asRecord` before any assertion runs and measures the parse, not the property.
 
 **Disclosed:** the 7.233 attempt ran a test file while a peer held the lock — zero pools, no
 contention, but the protocol says otherwise and that is mine to fix.
