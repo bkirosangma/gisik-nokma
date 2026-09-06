@@ -58,12 +58,12 @@ export default function WorkspacesPage() {
       ) : (
         <ul className="gn-workspace-list">
           {workspaces.map((workspace) => (
-            <li key={workspace.id}>
+            <li key={workspace.id} data-testid={`workspace-card-${workspace.id}`}>
               <Card>
                 <h2>{workspace.name}</h2>
                 <ul>
                   {workspace.projects.map((project) => (
-                    <li key={project.id}>
+                    <li key={project.id} data-testid={`project-card-${project.id}`}>
                       <Link href={`/w/${workspace.id}/p/${project.id}`}>{project.name}</Link>
                     </li>
                   ))}

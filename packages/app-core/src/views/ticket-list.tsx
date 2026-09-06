@@ -260,7 +260,11 @@ function ListTable({
       id: 'title',
       header: 'Title',
       cell: (node) => (
-        <span className="gn-list__title-cell" style={{ paddingLeft: `${node.depth * 1.1}rem` }}>
+        <span
+          className="gn-list__title-cell"
+          data-testid={`ticket-card-${node.row.ticketId}`}
+          style={{ paddingLeft: `${node.depth * 1.1}rem` }}
+        >
           {node.hasChildren ? (
             <button
               type="button"

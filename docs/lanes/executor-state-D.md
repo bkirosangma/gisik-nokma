@@ -1,207 +1,153 @@
 # Lane D — executor state
 
-**This file is Lane D's restart surface.** Rewritten for THIS work (Plan 11's two RETENTION
-SWEEPS — `invite_tokens`, case 6.131, and `user_preferences` for revoked members) on branch
-`exec/32-plan11-retention-sweeps`, cut from `origin/main` at `de88248` (this lane's own T9+T10,
-PR #154) on 2026-09-06, per the controller's relaunch at the #154 fixed point (§13 override) and
-the later re-task (#155/#157: D takes the two retention errands, C the two scheduler errands).
-**Do not re-implement T7/T8/T9/T10/T17 — all merged, all promoted (11/7, 11/8, 11/9, 11/10).**
+**This file is Lane D's restart surface.** Rewritten for THIS work (the four entity-keyed
+`data-testid` hooks for Plan 11 T13's E2E: `workspace-card-${workspaceId}`,
+`project-card-${projectId}`, `board-column-${stateId}`, `ticket-card-${ticketId}`) on branch
+`exec/36-e2e-testids`, cut from `origin/main` at `2d90a03` on 2026-09-06, per the controller's
+relaunch at the fixed point after PR #167 (this lane's own retention sweeps, `5ca3be1`) merged.
+**Do not re-implement T7/T8/T9/T10/T17 or the two retention sweeps — all merged, all promoted.**
 
 > Shas below are facts about when this file was written. Verify with `git branch --contains` —
 > empty means orphaned. `git cat-file`/`git show` pass on orphaned shas and will lie.
 
 ## 1. Where things stand right now
 
-- **Worktree**: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch
-  `exec/32-plan11-retention-sweeps`, head `4e88f25`, rebased onto `origin/main` at `4dd9779`.
-- **PR #167 is OPEN**: https://github.com/bkirosangma/gisik-nokma/pull/167. Pushed, not merged.
-  Gate green at `4e88f25`: 30/30 tasks, 0 cached, exit 0, node v22.22.2, server 107 files/1094
-  tests, 0 "Unsupported engine", `check:env` exit 0, no orphaned vitest workers.
-- **The branch was cut once, stopped mid-flight, and re-cut once — read this before assuming
-  the git history says what you expect.** The branch was originally cut from `origin/main` at
-  `c86c4b5`. A controller message ([`gisik-nokma-0d`], 2026-09-06 ~08:5x) reported that PR #150
-  had concurrently minted §6 case ids **6.138–6.142** — the same block this task's dispatch had
-  been told to use — between this branch's cut and the workflow's launch. The workflow had
-  written **nothing to disk yet** (verified: `git status --short` was clean) when the message
-  arrived, so it was stopped (`TaskStop`) rather than let mint-then-renumber, the branch was
-  rebased onto the then-current `origin/main`, §6 was recounted independently (confirmed max
-  **6.142**, matching the controller's own figure), and the workflow was relaunched with the
-  corrected reservation (**mint from 6.143, block 6.143–6.159**). The final work mints
-  **6.143–6.149**, entirely inside the corrected block. **Lesson for whoever restarts this
-  lane next: a case-id block reservation is a fact about a moment, not a standing grant — recount
-  at the sha you are actually minting against, every time, regardless of what an earlier message
-  in this same task said.**
+- **PR #173 IS OPEN**: https://github.com/bkirosangma/gisik-nokma/pull/173. Pushed, not merged.
+  Branch `exec/36-e2e-testids`, head `d8b3a3b`, rebased onto `origin/main` at `aa0318a` (a clean
+  rebase — the two intervening `main` commits touched only `docs/lanes/controller-state.md`).
+  Commits: `f9157e7` (the four source hooks), `0180c22` (the four render tests, cases 3.153–3.156,
+  mutation-verified by hand — see §3), `fd6bddd` (`Features.md` line + catalogue entries, header
+  recounted 3.152→3.156), `d8b3a3b` (this handoff).
+- **Full gate GREEN**, background task `bk2tnuzpe`, log at `/tmp/laneD-gate.log`, under Lane E's
+  v3.2 gate-lock reference (copied from `origin/exec/23-plan11:docs/lanes/gate-lock/` — that path
+  does NOT exist on `main`), adapted only for `REPO=.../lane4-periphery`: **`GATE_EXIT=0`,
+  `Tasks: 30 successful, 30 total`, `Cached: 0 cached, 30 total`, `1m35.089s`, node v22.22.2, 0
+  "Unsupported engine", `CHECK_ENV_EXIT=0`, no orphaned vitest workers.** Per-package totals: ui
+  37/4, domain 464/27, rule-engine 282/12, editor 178/15, sync-client 67/7, app-core 1097/68, web
+  138/18, mobile 20/3, server 1099/108, desktop 5/2 — **3387 tests / 264 files**, zero failures.
+  This ran BEFORE the rebase onto `aa0318a`; the rebase only moved a docs file neither this task
+  nor the gate touches, so re-running was not needed and was not done — named rather than assumed.
+- **Session-limit context**: the controller reported the account-wide meter at 87% at 09:40 IST,
+  forecasting a halt around 10:05 until the 12:20 reset. Per its explicit instruction this task
+  was done as small direct commits rather than a Workflow fan-out, so a halt at any point loses
+  nothing already pushed.
 
-## 2. What was built (the two P33 retention errands)
+## 2. What was built, and where
 
-Dispatched as a Workflow: one opus implementer (high effort) built both tools + tests +
-catalogue in one pass (deliberately NOT split into two parallel agents — both errands touch the
-same three shared files, `package.json`/`Features.md`/`test-cases/06-auth-visibility.md`, and
-running them concurrently would have raced on those the way [[lane4-periphery/gate-lock-v3]]-class
-incidents raced on shared state); one opus reviewer (high effort) re-ran everything independently
-rather than trusting the implementer's report; one opus fix round, since the review found two
-Important findings. No Fable at any stage, per the standing model ruling.
+Four `data-testid` hooks, house style `field-${fieldId}` / `mapping-row-${state.id}` /
+`state-node-${data.stateId}` (id on the entity's own row/container; interaction still goes through
+role/accessible-name — the testid is disambiguation only, never a second click surface):
 
-- **`sweepInviteTokens`** (`apps/server/src/tools/sweep-invite-tokens.ts`, closes **case 6.131**)
-  — one parenthesised SQL predicate fragment (`SWEEPABLE_INVITE_TOKENS`), interpolated unchanged
-  into both a dry-run `SELECT` and a live `DELETE ... RETURNING`, so the two cannot describe
-  different things. Catches lapsed (`expires_at <= now()`) AND revoked-but-not-yet-expired
-  invitations (an `EXISTS` against `proj_invites.status = 'revoked'`) — the revoked half is what
-  case 6.131 actually names; an expiry-only sweep would leave a withdrawn workspace's credential
-  live for the rest of its fortnight. `'accepted'` is deliberately absent: acceptance already
-  deletes its own row atomically (`consumeInviteToken`), so an accepted invitation has no row
-  left for this sweep to find, and adding the status would be a branch no fixture could reach.
-- **`sweepUserPreferences`** (`apps/server/src/tools/sweep-user-preferences.ts`, new — no
-  existing case; closes coordination doc finding **6c**, `docs/superpowers/plans/2026-08-20-00-
-  series-coordination.md:5495-5502`) — retains a revoked member's `user_preferences` row for
-  **`REVOKED_MEMBER_PREFERENCE_RETENTION_MS`** (30 days, documented as a default-under-uncertainty
-  constant in the exact `INVITE_TOKEN_TTL_MS` style; *owner: product owner, to confirm or
-  replace*) after their last `membership.revoked`, then deletes it. Four steps, each load-
-  bearing and each documented in the source: (1) current membership is decided ONLY by
-  `resolveEffectiveRole` — **ruling P22**, binding, never a direct `proj_memberships` SELECT,
-  because a project-scope roster row survives revocation and a bare read would report a departed
-  person as current; (2) the window's START is read from the **ledger**
-  (`max(server_time)` over the membership entity's `membership.revoked` events), because
-  revocation DELETES the workspace-scope projection row rather than marking it, so no column
-  anywhere holds the instant; (3) a non-member with NO revocation event in the ledger is
-  RETAINED and reported distinctly (`noRevocationEvidence`) rather than silently skipped — fail
-  closed, same discipline as `invite_tokens.expires_at` being `NOT NULL`; (4) the DELETE itself
-  re-states the membership guard (`AND NOT EXISTS (... proj_memberships ... scope_kind =
-  'workspace')`), because steps 1–3 are three separate un-transacted round-trips and a
-  `membership.granted` committing mid-sweep would otherwise destroy a now-current member's
-  unrecoverable row (`user_preferences` is authored state; nothing rebuilds it).
-- Both: `now`/predicate are inputs, never computed inside the pure sweep function (only each
-  tool's `main()` reads a real clock); `--dry-run` is a plain `process.argv.includes` check, not
-  the repo's one general flag-value parser (`cli-seed-convenience-corner.ts`'s `argValue`, which
-  has a known bug consuming a following flag as a value — deliberately not reused here since
-  neither sweep needs a flag VALUE); CLI shape mirrors `sweep-notifications.ts` exactly
-  (`process.env['DATABASE_URL']` directly, no `loadConfig`, `createPool`, exit(2) if absent).
-  `apps/server/package.json` gained `"sweep:invite-tokens"` and `"sweep:user-preferences"`,
-  both `tsx src/tools/....ts`.
-- **Deliberately not built**: any scheduling surface. Per case 6.131's own original text and
-  this task's split with Lane C (the controller's 08:25 re-task): C owns the scheduler
-  (`src/ops/schedule.ts`, for T11) and the two SCHEDULER-needing errands
-  (`ops:sweep-orphans`, scheduling `sweep-notifications.ts`); D owns these two DELETE-shaped
-  tools, invoked by whatever scheduler exists. Neither CLI `main()` is exercised by any test —
-  matching the identical, pre-existing gap in the sibling `sweep-notifications.ts` and
-  `verify-projections.ts` tools, named with an owner in case 6.145 rather than left implied.
+- **`workspace-card-${workspaceId}`** and **`project-card-${projectId}`** — both on
+  `apps/web/app/workspaces/page.tsx`, on the `<li>` wrapping each workspace's `<Card>` and the
+  `<li>` wrapping each project `<Link>` inside it, respectively.
+- **`board-column-${stateId}`** — `packages/app-core/src/views/board.tsx`, on the column
+  `<section role="region" aria-label={column.name}>`.
+- **`ticket-card-${ticketId}`** — on BOTH surfaces that render a ticket: `board.tsx`'s
+  `<li className="gn-board__card-slot">` (the card slot wrapping `BoardCardView`), and
+  `ticket-list.tsx`'s `<span className="gn-list__title-cell">` inside `ListTable`'s title-column
+  `cell` (kept in `ticket-list.tsx`, not the generic `@gisik-nokma/ui` `Table` component, to avoid
+  widening a shared component none of the four ids needed).
 
-## 3. The review round, and what it actually found — read before trusting the P22 wiring blindly
+**Deliberately NOT added** (per the override brief, verified by Lane E and not re-checked here):
+the seven ids that already work by accessible name (`auth-email-input`, `auth-magic-link-submit`,
+`ticket-create-button`, `ticket-title-input`, `ticket-create-submit`, `transition-comment-input`,
+`transition-confirm`), and the four tied to T13's own scenario design
+(`transition-option-${stateId}`, `transition-refusal`, `transition-refusal-reason`, `not-found`).
 
-The review's brief specifically asked it to hunt two failure shapes: **"the sweep touched a live
-row"** (not found, in code or under mutation, for either tool) and **"the excluding fixture is a
-no-op against the real defect"** (found, once, for the preferences sweep — see below). Two
-Important findings, both fixed in the same PR before merge:
+## 3. Verification done, and what it found
 
-1. **The P22 check was compliant in the shipped code but UNTESTED against the one state where it
-   matters.** The original excluding fixture (a member re-granted inside the window) is built
-   entirely from workspace-scope facts, so substituting the exact case-6.137 bug shape (a bare,
-   unfiltered `SELECT role FROM proj_memberships`) for `resolveEffectiveRole` left the whole file
-   green — the sanctioned reader and the forbidden one agreed on every state the fixture built.
-   Fixed by adding a fixture where a revoked member's **project-scope roster row survives** (built
-   through the real ledger — `grant` → `project.member_added` via a NEW helper,
-   `attachToProjectThroughLedger`, deliberately not `seedMember(..., [{projectId}])`, which would
-   re-apply the projection without appending the ledger event) — this is the one state the two
-   readers disagree on, and it now reddens the mutation. **Case 6.148.**
-2. **The preferences DELETE had no membership condition of its own** — it re-stated only the
-   primary key, so a `membership.granted` committing between step 1 (the `resolveEffectiveRole`
-   read) and step 4 (the DELETE) would silently destroy a now-current member's unrecoverable row.
-   Fixed with the `NOT EXISTS (... scope_kind = 'workspace')` guard described above. **Case
-   6.149.** The guard is stated in the source as a write-safety measure, NOT a second answer to
-   the P22 membership question — `resolveEffectiveRole` is still the only decider of who is a
-   *candidate*; the guard only stops the *act* from outliving the decision.
+- **Render tests, one per hook**, in `packages/app-core/test/views/board.test.tsx` (3.155, 3.156's
+  board half), `packages/app-core/test/views/ticket-list.test.tsx` (3.156's list half), and the new
+  `apps/web/test/workspaces-cards.test.tsx` (3.153, 3.154). Each asserts the id is present keyed by
+  the real entity id AND that two siblings carry two different ids (the excluding half).
+- **Mutation-verified BY HAND, not by a subagent** (task was small enough to do directly, per the
+  controller's small-commits instruction): for each of the three touched source files, made a
+  local copy (`sha256sum`), substituted a CONSTANT string for the interpolated testid, ran the
+  narrow test file, confirmed it reddened EXACTLY the case(s) naming that file (board: 2/2 red —
+  3.155 and 3.156 share the file; ticket-list: 1/1 red; workspaces page: 2/2 red — 3.153 and 3.154
+  share the file), then restored from the saved copy and confirmed `sha256sum` matched before
+  committing. No mutation was ever live in a file at commit time.
+- **Caveat found and recorded rather than smoothed over** (test-cases 3.156, and in the commit
+  message): a row in *Recently assigned* renders TWICE — once pinned, once in its section —
+  carrying the SAME `ticket-card-${ticketId}` both times (this is `ticket-list.tsx`'s existing,
+  correct pin-is-a-surface-not-a-filter behaviour, case 3.51 — not a defect introduced here). The
+  list-half render test therefore fixtures on two rows neither of which is assigned to `'me'`
+  (avoiding `ROWS`' own `t2`, which IS pinned). **T13's own Playwright scenario needs the same
+  awareness**: `getByTestId('ticket-card-<id>')` is ambiguous for a ticket that is both pinned and
+  in the list at the same time; scope the query to one `role="region"` section, or avoid picking a
+  scenario ticket that would be pinned.
+- **Full narrow suites green, unlocked** (per the override: app-core/web-only changes run
+  unlocked with `--maxWorkers=2`): `pnpm --filter @gisik-nokma/app-core exec vitest run
+  --maxWorkers=2` → 68 files / 1097 tests, 0 failures. `pnpm --filter @gisik-nokma/web exec vitest
+  run --maxWorkers=2` → 18 files / 138 tests, 0 failures.
+- **Typecheck clean via turbo** (never bare `tsc` — the stale-dist trap this lane's own prior
+  session named): `pnpm turbo run typecheck --filter=@gisik-nokma/app-core
+  --filter=@gisik-nokma/web` → 7/7 tasks, 3 cached, exit 0.
+- **NOT YET DONE at the time this was written: the full cross-workspace gate** (server included).
+  In flight as background task `bk2tnuzpe` — see §1. Its result must be read from
+  `/tmp/laneD-gate.log` (Tasks/Cached/Time line, vitest totals, `Unsupported engine` count,
+  `check:env` line) before the PR is opened or reported as green — never inferred from "it was
+  launched."
 
-One Minor finding (the invite predicate's top-level `OR` was unparenthesized, safe today only
-because it happens to be the entire WHERE clause in both callers) was also fixed while the file
-was open. Both Important fixes were verified by planting the exact surviving mutant the review
-found, confirming it now reddens the new fixture and nothing else, then restoring by byte copy
-and sha256 (both new files are untracked at review time, so `git diff` could not vouch for them —
-checksums were the only verifiable restore signal until the final commit).
+## 4. Case-id catalogue
 
-## 4. Case-id catalogue — the collision that was caught before any file existed
+**§3, not §6 or a new bucket.** `test-cases/README.md` names `03-foundation-ledger.md` as the
+**permanent home of all of Plan 6's web-client core** (the founding screen, the invite page, the
+board, the list — cases 3.1–3.144 and onward), including the exact page and views this task
+touches (`workspaces/page.tsx` already owns 3.124–3.128; `board.tsx`/`ticket-list.tsx` already own
+3.112–3.114, 3.146, 3.152). A new §6 or §8 bucket for these four hooks would have been the wrong
+home — §8 was considered and explicitly refused for this exact reason on 2026-09-02 (see
+`Features.md`'s own note at its §3 web-client bullets).
 
-**Reserved block: 6.143–6.159** (assigned by the controller after PR #150 landed 6.138–6.142
-concurrently with this branch's cut — see §1 above for the full story). This PR used
-**6.143–6.149** (7 ids: one per falsifiable claim in the two sweeps' design, including the two
-fixtures the review round's findings drove). **6.131 amended in place** (❌→✅; its own owner
-line already named "Plan 11" as the closer, so it was amended rather than re-minted, following
-the file's established convention — see how 6.50 was amended for the pattern this follows).
+Recounted with `node scripts/check-case-ids.mjs` before minting (max 3.152, matching the file's
+own header) and after (1328 unique ids, up from 1324 by exactly 4, zero duplicates, highest
+unaffected at 13.100). **Minted 3.153–3.156**, one per hook: 3.153 workspace-card, 3.154
+project-card, 3.155 board-column, 3.156 ticket-card (both surfaces, one case — matching the
+file's own convention of one id covering a property proven in more than one test file, e.g.
+3.9, 3.116–3.117).
 
-Recounted with the file's own positive-controlled method (`node scripts/check-case-ids.mjs` +
-a direct grep cross-check: total `^- ` lines vs. distinct `6\.[0-9]+`-at-line-start matches, zero
-unmatched, zero duplicates) at three points: before the corrected dispatch (137 lines, max
-6.142 — matching the controller's stated fork point), after the implementer's pass (142 lines,
-max 6.147), and after the fix round (144 lines, max 6.149, repo-wide unique-id count 1314). The
-file's own running "highest id in use" sentence near the top was updated to the true post-edit
-count, not incremented from the stale number it found (PR #150 had minted 6.138–6.142 without
-touching that sentence — already stale before this round touched it, named as such in the new
-prose rather than silently corrected).
+## 5. Left undone / open questions, named rather than glossed
 
-## 5. Left unfixed, deliberately, named rather than glossed
+- **No Playwright test consumes these four ids yet.** That is T13's job, not this task's — the
+  override brief is explicit that this task is the hooks only. The pinned-row ambiguity (§3) is
+  the one thing T13 needs handed to it explicitly.
+- **`packages/ui`'s generic `Table` component was deliberately NOT touched** — the list's
+  `ticket-card` id lives on a `<span>` inside the title cell rather than on the `<tr>` `Table`
+  renders, to avoid widening a shared component (used well beyond ticket lists) for a need only
+  one caller has. Named as a design choice in case a future task wants per-row testids on `Table`
+  itself for a different reason.
+- **No ledger row for this task** — the override brief states it explicitly ("a T13 pre-requisite,
+  closed by name"), so `docs/lanes/task-ledger.tsv` is untouched, correctly.
 
-- **Neither CLI's `main()` is exercised by any test** (the `DATABASE_URL`-absent `exit(2)` path,
-  `createPool`, the `--dry-run` argv read, both `format*Report` functions) — inspection only,
-  matching the identical pre-existing gap in `sweep-notifications.ts` and `verify-projections.ts`.
-  Named in case 6.145 with an owner: whoever gives these tools a scheduling surface.
-- **The scheduling surface itself.** Out of scope by the P33 split with Lane C; these are the
-  DELETE, safe at any moment and safe twice, per case 6.131's own original text.
-- **CORRECTION, struck rather than left standing:** an earlier version of this section reported
-  two `projectNames`-on-`MyWorkResponse` typecheck errors (`src/routes/my-work.ts(152,33)`,
-  `test/read/visible-projects.test.ts(123,17)`) as pre-existing on `main` from PR #150. **That was
-  wrong, and the controller caught it.** `main`'s forced gate at `b4e2f14` (which includes #150)
-  ran all ten typecheck tasks green with 0 cached, and #150's own CI run was green. What actually
-  happened: the workflow's review/fix rounds ran `pnpm --filter @gisik-nokma/server run
-  typecheck` directly (the ad-hoc-tsc trap Lane A recorded the same morning — invoking the
-  package script in isolation rather than through `pnpm turbo run typecheck`, which is what keeps
-  a workspace dependency's `dist/` in step with the source it was typechecked against) against a
-  tree whose `dist/` for at least one workspace dependency predated the rebase past #150, so the
-  two-error reproduction "proved" nothing about `main` — it reproduced a stale-build artifact of
-  this lane's own working tree. Verified by this session: `pnpm turbo run typecheck --force`
-  (16/16 tasks, 0 cached) is clean, `@gisik-nokma/server:typecheck` included. **Never record a
-  build/typecheck red as a fact about `main` without a `--force` rebuild first** — the same
-  discipline this branch's own tests already apply to a stale `dist/` under bare `vitest`.
+## 6. The gate lock
 
-## 6. The gate lock — GATE LOCK v3.2, and the mutation-contamination rule from PR #166
-
-Used the reference implementation at `docs/lanes/gate-lock/` (Lane E's branch `exec/23-plan11` at
-`e814f49`), copied into this session's scratchpad and adapted only for `REPO=`. That copy already
-implements the v3.2 token-matcher form (a controller message describing "v3.2" arrived mid-task;
-the pulled reference already matched it — no further edit needed). Do the same on a restart:
-pull the reference rather than hand-roll the regex, adapt only the `REPO` line.
-
-**New standing rule, from the controller (PR #166, paid for by Lane B): never commit a shared
-source file while a subagent/workflow is mutation-testing it in the same worktree** — explicit-
-path staging does NOT protect against this; Lane B's incident had a mutant ride into a commit
-despite it. This task's mutation rounds (both the review's and the fix's) ran entirely INSIDE
-the Workflow's own agents, which had all fully terminated (`status: completed`, `agents_done: 3`,
-`agents_error: 0`) before this session did ANY `git add`/`git commit` — verified after the fact
-by re-reading both committed source files for mutation markers (none) and confirming their byte
-counts matched the working tree exactly (8124 and 12494 bytes, both files, HEAD vs. disk). If
-resumed mid-task with a mutation round still active, do NOT commit until it (and everything it
-spawned) has fully returned — checking a task's own `status` field is not optional.
+Copied Lane E's v3.2 reference (`docs/lanes/gate-lock/README.md`, `gate.sh`, `locked-test.sh`,
+`sweep-test-dbs.sh`) from `origin/exec/23-plan11` (NOT `main` — that path does not exist there) into
+this session's scratchpad, renamed the wrapper `gateD.sh`, adapted only the `REPO=` line in both
+`gateD.sh` and `locked-test.sh` to `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`. Do
+the same on a restart rather than hand-rolling the regex — pull the reference, adapt only `REPO=`.
+This task's own changes (app-core, web) do not touch `apps/server`, so the narrow suites above ran
+UNLOCKED with `--maxWorkers=2`, per the override's own instruction; only the final full gate
+(§1/§3) takes the lock.
 
 ## 7. Reporting
 
-Reported to `gisik-nokma-0d` (controller) at each step: initial dispatch, the case-id collision
-catch + relaunch, and the PR opening. Head sha `4e88f25`, `Tasks: 30 successful, 30 total`,
-`Cached: 0 cached, 30 total`, server 107 files/1094 tests, node v22.22.2, `check:env` exit 0 on
-its own line, zero orphaned vitest workers. Honest gap disclosed in the same message: the sweeps
-ran only against throwaway `gisik_test_*` databases under the lock; nothing was scheduled, and
-scheduling is Lane C's per the P33 split.
+Reporting to `gisik-nokma-0d` (tmux `gisik:0` fallback) in the same turn this file was finalised:
+PR #173, head `d8b3a3b`, `Tasks: 30 successful, 30 total`, `Cached: 0 cached, 30 total`, 3387
+tests / 264 files, node v22.22.2, `CHECK_ENV_EXIT=0` on its own line, zero orphaned vitest
+workers, the four ids with their files (§2), every mutation's output verbatim (§3), and the
+pinned-row caveat named explicitly for T13.
 
-## 8. Remaining steps, in order (mid-execution at time of writing)
+## 8. Remaining steps, in order
 
-1. ~~Dispatch the two sweeps~~ — done, implement → review → fix, all opus, no Fable.
-2. ~~Catch and correct the case-id collision before any file existed~~ — done (§1).
-3. ~~Verify the diff and both new source files directly~~ — done: read both tool files in full,
-   confirmed P22 compliance and the shared-predicate discipline by inspection, not by trusting
-   either subagent's report.
-4. ~~Run the full gate myself, at the rebased head~~ — done, 30/30, exit 0, server 1094/1094.
-5. ~~Commit, rebase onto latest `origin/main` again (it moved twice more during this task), push,
-   open the PR~~ — done. **PR #167.**
-6. ~~Rewrite this handoff~~ — this write.
-7. **Commit and push this handoff on the same branch, so it travels with PR #167.**
-8. **Report the PR to the controller** — with head sha, `Tasks:` line, test count, node version,
-   `0 cached`, `check:env` on its own line, every mutation's output, and the honest sentence about
-   what was not verified.
+1. ~~Cut branch, build, locate components~~ — done.
+2. ~~Add the four source hooks~~ — done, commit `f9157e7`, pushed.
+3. ~~Write and mutation-verify one render test per hook~~ — done, commit `0180c22`, pushed.
+4. ~~Catalogue: Features.md line, test-cases 3.153–3.156~~ — done, commit `fd6bddd`, pushed.
+5. ~~Narrow suites (app-core, web) unlocked, typecheck via turbo~~ — done, both green.
+6. ~~Full gate under the v3.2 lock~~ — done, `GATE_EXIT=0`, 30/30, 3387 tests / 264 files.
+7. ~~Rebase onto `origin/main` (it moved by one docs-only commit), re-push, open the PR~~ — done,
+   **PR #173**.
+8. **Report the PR to the controller.** — this handoff's commit is that report's evidence trail.
 9. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**

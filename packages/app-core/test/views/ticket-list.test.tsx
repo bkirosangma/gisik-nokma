@@ -769,3 +769,24 @@ describe('3.146 useTicketList — a refusal is an error, never an empty list', (
     expect(screen.getByTestId('rows')).not.toHaveTextContent('rows:0');
   });
 });
+
+/**
+ * 3.156 (list half) — the same `ticket-card-${ticketId}` hook board.test.tsx
+ * pins for the board, on the list's title cell. Disambiguation only: the row
+ * still opens through its own accessible "Open" button, scoped inside the
+ * testid rather than replaced by it.
+ */
+describe('TicketList — entity-keyed data-testid hooks (Plan 11 T13)', () => {
+  it('3.156 keys each row by its own ticketId, distinguishing two siblings', () => {
+    // epicA and t3 — neither is assigned to 'me', so neither renders a
+    // second time in the "Recently assigned" pin (t2 does, which would make
+    // `getByTestId('ticket-card-t2')` ambiguous — the pin is a second
+    // rendering of the same row, not a second entity).
+    render(<ControlledList rows={ROWS} initial={chose([], 'flat')} />);
+    const epicCard = screen.getByTestId('ticket-card-epicA');
+    const t3Card = screen.getByTestId('ticket-card-t3');
+    expect(epicCard).not.toBe(t3Card);
+    expect(within(epicCard).getByText('Registrations')).toBeInTheDocument();
+    expect(within(t3Card).getByText('Chase the vendor')).toBeInTheDocument();
+  });
+});
