@@ -16,7 +16,67 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — `exec/37-c2-cursor`. **PR #176 OPEN AND HELD on the opus verdict. Gate green 30/30, 0 cached, 3,387 tests.**
+# LANE A — **IDLE. #176 IS MERGED as `2d2bc5c`. Nothing is in flight. Awaiting re-tasking.**
+
+> **Read this line before anything below it.** `exec/37-c2-cursor` is MERGED and gone; every claim in
+> the sections below about it being "open", "held", "outstanding" or "running" was true when written
+> and is now FALSE. They are kept for their method and their findings, not their position.
+
+**All three override items are closed and on `main`:** C2 via ruling P41 Door B, 7.211's third branch
+as 7.219, and `BoardCard.cause` catalogued as 12.255. **Do not re-implement any of them.**
+
+**Verified at the merge:** `git log origin/main` → `2d2bc5c`; all **12** CI jobs green (it is twelve,
+not eleven — there is a `gate` job beside the four `server-tests` shards); final local gate forced and
+uncached at `c8936dc` → `GATE_EXIT=0`, 30/30 tasks, **0 cached**, **3,388 tests passed, 0 failed**;
+`check:env` 0; `check-case-ids` 0 at **1,334 ids, union == sum**. Node **v22.22.2**.
+
+## IDS AS THEY STAND — recount before minting, never derive from this line alone
+
+- **§12: Lane A holds `12.320–12.339`, used through `12.322`.** The old block 12.240–12.259 is
+  exhausted. Lane B holds 12.290–12.319. Next block **12.340, controller-allocated ON REQUEST.**
+- **§7 next free: `7.221`** (7.219 and 7.220 minted and merged).
+- §6: 6.180+ on request, untouched.
+
+## STILL CARRIED, WITH OWNERS — none of these is mine to build unprompted
+
+| item | owner |
+|---|---|
+| **12.321** refetch cancellation in `use-live-query.ts` — `getTickets` is now N requests under a hook that reloads per stream event with no cancellation. Mitigated 4× (`limit=200`), not solved. | whoever measures walk duration against real stream event rate |
+| **12.322** the cap is a CLIFF — filter hardcoded `{}`, three of four project tabs go to `ShellRefusal` past 2000 tickets. Throwing stays right; a graceful path is missing. | the list surface's product design |
+| **12.258** what the web shell RENDERS when `getTickets` throws past the cap — asserted the throw, never the page | Task 13's E2E, or a web render test |
+| **12.255** `BoardCard.cause` on the snapshot-bounded path | ruling P36 — needs the snapshot block to carry a domain type `sync-client` does not know |
+| the local replica schema has no migration path (`migrateLocal` is CREATE-only) | the first change that must ALTER rather than CREATE |
+
+**7.210 is DISCHARGED — do not reopen it.** `projections/tickets.ts` forward-folds on
+`workflow.defined`, so `folded` and `latest` agree on the product path by construction.
+
+## THE TWO FINDINGS FROM THIS BRANCH WORTH CARRYING FORWARD
+
+1. **A green gate and four green cases did not catch that my own fixture lied.** `pagingFetch`
+   implemented the list cursor as a PAGE INDEX; the route is keyset (`t.ticket_id > $n`, `nextCursor`
+   = the page's last id). 30/30 tasks and 3,387 tests were green over a protocol I had authored
+   myself. Nothing red could have pointed at it — the loop was correct and protocol-agnostic; only
+   the EVIDENCE was wrong. Closed by making the fake keyset and by **7.220**, a real round trip.
+   **Smell test, askable before any test runs: did I write the fixture's protocol and its consumer in
+   the same sitting? If yes it is a mirror, not a witness.** Generalised for Lane F as: *any fixture
+   whose protocol was authored alongside its consumer.*
+2. **A bound asserted on one side of its line.** My three paging cases covered the cap, and two of my
+   own mutations killed them — so it looked covered. The opus reviewer ran a mutant I had not
+   imagined (`page >= CAP - 1`) and **all three stayed green** while the largest legitimate project
+   refused. **A cap is a claim about BOTH sides: the largest input that works and the smallest that
+   fails.** Closed as 12.320. Corollary: my own mutation set is drawn from my own model of the code,
+   so it cannot find the case I failed to imagine.
+
+## AND ONE MISTAKE, RECORDED SO IT IS NOT REPEATED
+
+**`git checkout HEAD -- <path>` on an UNCOMMITTED file deletes the work, not the mutation.** I
+mutated the paging loop before committing it; HEAD predated the loop, so the restore wiped it and it
+had to be rewritten. **Commit, then mutate** — and when a file holds uncommitted work, revert a
+mutation by removing the inserted lines, never by checkout.
+
+---
+
+# ↓ HISTORICAL — `exec/37-c2-cursor` narrative, kept for method, WRONG about position
 
 > Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
 > — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
