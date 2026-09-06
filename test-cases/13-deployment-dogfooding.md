@@ -82,32 +82,33 @@ below it is ordinary `vitest` coverage and uses `✅` throughout.
   this branch today (verifying the bug was real, not hypothetical); the job's own logic change was
   verified by reading, not by a real Actions run — confirm from the PR's own CI run once Task 13 lands
   that this job does not silently start running the mock smoke. `.github/workflows/ci.yml` (`e2e` job)
-- ❌ **13.7 — the deploy spec's object-storage and web-client env var names match what code actually
-  reads, not the plan's original draft.** Lands with Task 15's PR — `deploy/do/app.yaml` is not on this
-  branch yet. Verified in draft (`pnpm check:env` passes unchanged after `deploy/do/app.yaml` was
-  written using `OBJECT_STORE`, `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_REGION`,
+- 🧪 **13.7 — the deploy spec's object-storage and web-client env var names match what code actually
+  reads, not the plan's original draft.** `deploy/do/app.yaml` is on this branch (Task 15's own PR).
+  Verified: `pnpm check:env` passes unchanged (exit 0, 47 documented / 26 referenced) with
+  `deploy/do/app.yaml` written using `OBJECT_STORE`, `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_REGION`,
   `OBJECT_STORE_S3_BUCKET`, `OBJECT_STORE_S3_ACCESS_KEY_ID`, `OBJECT_STORE_S3_SECRET_ACCESS_KEY`,
   `OBJECT_STORE_S3_FORCE_PATH_STYLE` (confirmed by `check:env`'s own output as the names
   `apps/server/src/attachments/store-config.ts` destructures) and `SERVER_ORIGIN`/
   `NEXT_PUBLIC_SERVER_URL` (confirmed as the names `apps/web/next.config.ts` and
   `apps/web/src/providers.tsx` actually read) — not the plan's original `S3_*` /
   `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL`, none of which any shipped code reads; independently
-  re-verified by a sonnet review agent, one comment-precision nit fixed) — Task 15's own PR flips this
-  to `🧪` once `deploy/do/app.yaml` actually lands. `deploy/do/app.yaml`
-- ❌ **13.8 — the database-timezone check is genuinely falsifiable, against the failure mode that
-  actually would have hidden a broken deployment.** Lands with Task 15's PR —
-  `scripts/check-db-timezone.mjs` is not on this branch yet. Verified in draft: reproduced against a
-  throwaway database explicitly `ALTER`ed to `UTC` (exit 1, names the wrong zone and the fix). The first
-  attempt to prove this — pointing the check at the shared dev Postgres's own admin `postgres` database,
-  expecting it to fail because nothing had `ALTER`ed it — instead PASSED, because
-  `docker-compose.yml`'s `-c timezone=Asia/Kolkata` sets the timezone at the **cluster** level, so every
-  database on that server (the admin one included) already answers `Asia/Kolkata` with no per-database
-  `ALTER` anywhere — exactly the trap the plan's own suggested falsifiability demo (pointing at "the dev
-  compose Postgres has not been altered yet") would have fallen into, independently confirmed by a
-  cross-lane review as a real bug in the plan text, not this file. The corrected demo (a database
-  explicitly forced to `UTC`, overriding the cluster default) is what actually falsifies the check.
-  Task 15's own PR flips this to `🧪` once `check-db-timezone.mjs` actually lands.
-  `scripts/check-db-timezone.mjs`
+  re-verified by a sonnet review agent (one comment-precision nit fixed) and, on this restart, against
+  Lane E's own unmerged `origin/exec/23-plan11` at `f7c9b0f`, whose landed `config.ts` implements
+  `DEPLOY_SHA`, `TRUST_PROXY`, `RATE_LIMIT_*`, `ALERT_WEBHOOK_URL`, `SMTP_URL`, `MAGIC_LINK_FROM` and
+  `DATABASE_CA_CERT` under the exact names this spec already uses. `deploy/do/app.yaml`
+- 🧪 **13.8 — the database-timezone check is genuinely falsifiable, against the failure mode that
+  actually would have hidden a broken deployment.** `scripts/check-db-timezone.mjs` is on this branch
+  (Task 15's own PR). Verified: reproduced against a throwaway database explicitly `ALTER`ed to `UTC`
+  (exit 1, names the wrong zone and the fix), and on this restart re-run against the shared dev Postgres
+  at `localhost:54329` (exit 0, prints `database timezone: Asia/Kolkata`). The first attempt to prove
+  this — pointing the check at the shared dev Postgres's own admin `postgres` database, expecting it to
+  fail because nothing had `ALTER`ed it — instead PASSED, because `docker-compose.yml`'s `-c
+  timezone=Asia/Kolkata` sets the timezone at the **cluster** level, so every database on that server
+  (the admin one included) already answers `Asia/Kolkata` with no per-database `ALTER` anywhere — exactly
+  the trap the plan's own suggested falsifiability demo (pointing at "the dev compose Postgres has not
+  been altered yet") would have fallen into, independently confirmed by a cross-lane review as a real bug
+  in the plan text, not this file. The corrected demo (a database explicitly forced to `UTC`, overriding
+  the cluster default) is what actually falsifies the check. `scripts/check-db-timezone.mjs`
 
 ## Seed plumbing (Task 7)
 - 13.41 ✅ `seedUlid` is a valid, `ULID_REGEX`-matching id — `seed-ulid.test.ts`

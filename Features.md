@@ -1526,12 +1526,11 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 
 ## 13. Deployment & dogfooding
 
-*(Plan 11. This section is normally opened by Plan 11 Task 16's catalogue pass, held until Tasks 1–15
-merge. It is opened early here, by Tasks 7, 8 and 14 (landed independently, same day) — what follows is
-ONLY those tasks' additions; everything else Plan 11 produces (config surface, CORS/rate limiting,
-alerting, SMTP, Dockerfiles, the dev compose stack, backups, the restore drill, the deploy spec, E2E
-against the compose stack, the runbook) is still `❌`/unwritten here and arrives with whichever task
-lands it — do not infer completion of Plan 11 as a whole from this section's presence.)*
+merge. It is opened early here, by Tasks 7, 8, 14 and 15 (landed independently, same day) — what
+follows is ONLY those tasks' additions; everything else Plan 11 produces (config surface, CORS/rate
+limiting, alerting, SMTP, Dockerfiles, the dev compose stack, backups, the restore drill, E2E against
+the compose stack, the runbook) is still `❌`/unwritten here and arrives with whichever task lands it —
+do not infer completion of Plan 11 as a whole from this section's presence.)*
 
 - ⚙️ **Seed plumbing** — `seedUlid(namespace, key)` mints a deterministic, `ULID_REGEX`-valid id from a SHA-256 digest, so re-running a seed regenerates identical event ids and the ledger's duplicate-event-id refusal makes re-runs no-ops rather than duplicates. `plainTextDoc(text)` builds a literal-text ProseMirror doc, one paragraph per line, by delegating each line to the domain's own single-paragraph `plainTextToDoc` rather than duplicating its paragraph-shape logic. `findUserIdByEmail` looks a person up in better-auth's `"user"` table by email — seeds never invent people. `apps/server/src/seed/{seed-ulid,doc-text,users}.ts`
 - ⚙️ **`checkErrandTemplate` — the executable pin on the errand-with-waits template, and Ruling P29's tripwire** — verifies Plan 8's `ERRAND_WITH_WAITS_TEMPLATE` can structurally carry the Convenience Corner tracker board before any seed event is built: every tracker state the seed maps to is present and reachable from the initial state in exactly one transition (no fabricated intermediate history), `waiting` carries `blocked: true`, every door into `done` is guarded by `require-comment`, and — the tripwire — every one-hop transition the seed relies on carries **zero** rules, because the seed submits a bare `ticket.transitioned` with no comment or evidence and any rule there would make the real engine refuse the seed's own event at ingest. This last check is what reddens if a copy of the template ever grows a rule on one of the two paths (`later`→`waiting`, `next`→`waiting`) that Ruling P29 deliberately leaves rule-free — a test pins `adviseWorkflowDef`'s two `rule-bypassable` advisories on the real template by identity, proves a single-edge "fix" genuinely silences one advisory while `checkErrandTemplate` still reddens, and proves guarding both edges clears the advisory panel to zero while `checkErrandTemplate` still refuses it. `workflowFromTemplate` clones a template into a live, published-shape definition at version 1. `apps/server/src/seed/templates.ts`
@@ -1556,3 +1555,27 @@ lands it — do not infer completion of Plan 11 as a whole from this section's p
   a silent one. Wired ahead of its first real trigger: no file in this repo uses `.skipIf(` yet; Plan 11
   Tasks 11/12 will add one around the restore-drill suite. `scripts/check-no-silent-skips.mjs`,
   `scripts/check-skipif-coverage.mjs`
+- ⚙️ **DigitalOcean deploy spec (file only, not applied)** — `deploy/do/app.yaml`: server, web and a
+  backup worker on DigitalOcean App Platform (region `blr`), managed Postgres attached, object storage
+  and backup env vars named against the ACTUAL schema (`OBJECT_STORE_S3_*`, not the plan's original
+  `S3_*` draft, which nothing reads; `SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, not the plan's
+  `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`, which nothing reads either), two sibling domains
+  (`pm.artsourced.in`, `pm-api.artsourced.in`) routed by `ingress.rules`. `DEPLOY_SHA` is deliberately
+  ABSENT rather than set to a placeholder — `/healthz` will serve it verbatim on both its 200 and 503
+  branches once Lane E's work lands, but a static spec can't keep it current per-deploy, and an explicit
+  `dev` value would read as a real one; the actual gap (a CI step that patches it and calls
+  `doctl apps update`) is named in `deploy/do/README.md` as living in `ci.yml` (Task 14) but not built —
+  itself a live-deploy action, out of scope for both tasks. `README.md` also documents provisioning by
+  hand and names a `sslmode=require`-vs-`verify-full` downgrade risk found in cross-lane review (DO's
+  connection string can't be rewritten by this file; the fix, if any, belongs wherever `pg`'s major
+  version gets decided). Nothing in this bullet has been run against a live DigitalOcean account.
+  `deploy/do/app.yaml`, `deploy/do/README.md`
+- ⚙️ **Deployed-database timezone assertion** — `scripts/check-db-timezone.mjs` connects with a bare
+  `pg.Client` that sets no startup options and issues no `SET TIME ZONE`, so a pass proves the
+  **database's own default** is `Asia/Kolkata`, not merely that the app pool asked for it (which a
+  connection pooler can silently drop). Verified falsifiable against a throwaway database explicitly
+  `ALTER`ed to `UTC` before being trusted — the shared dev Postgres's cluster-wide `-c
+  timezone=Asia/Kolkata` GUC makes every ordinary database (including the admin `postgres` db) answer
+  IST regardless of any per-database `ALTER`, which is exactly the unfalsifiable-demo trap the plan's own
+  suggested proof text would have fallen into. `scripts/check-db-timezone.mjs`, root `package.json`'s
+  `check:db-tz` script
