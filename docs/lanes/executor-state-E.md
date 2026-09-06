@@ -1364,3 +1364,38 @@ so a refused request still leaves an expiring verification row. It discloses not
 
 `requireTLS: true` would break an `smtp://` Mailpit dev deployment — **the exact configuration
 `selectMagicLinkSender` exists to serve**. Recorded, not silently dropped.
+
+---
+
+# ⚠️ NEVER COMMIT A FILE A SUBAGENT IS MUTATION-TESTING (controller rule, #166)
+
+Lane B paid for this: it staged **by explicit path** — this lane's own recorded "never `git add -A`" rule
+— **and it made no difference**, because the contaminated file was one it had every reason to stage. A
+subagent's mutant (a call replaced by an empty array) rode into the commit, so the run that *"proved"* a
+design point had the thing under test **disabled**.
+
+**T4's commit was checked against this and is CLEAN**, four ways:
+
+| mutation | committed state |
+|---|---|
+| M3 — `selectOtpSender()` → `new LogOtpSender()` | `return new NullOtpSender();` ✅ |
+| M1 — `from` → `'MUTANT-from@elsewhere.invalid'` | 0 occurrences of `MUTANT`/`elsewhere.invalid` (positive control: `NullOtpSender` found in 3 files) ✅ |
+| M-A — transporter reverted to nodemailer defaults | `SMTP_TIMEOUTS_MS` present, `createTransport({url, ...SMTP_TIMEOUTS_MS})` ✅ |
+| — | worktree clean, 0 changed files |
+
+## The invariant that actually protected it was TEMPORAL, not path-based
+
+**Explicit-path staging is not the protection** — B proves that. What protected T4 is that **this lane
+commits only AFTER the workflow's completion notification arrives**, never during. The mutation window and
+the commit window are disjoint in time.
+
+**Both rules are needed and they guard different things:** explicit paths stop an *unrelated* in-flight
+file being swept in (the `git add -A` failure); the temporal rule stops a *related* file being captured
+mid-mutation (Lane B's failure). Neither subsumes the other.
+
+**Live application, right now:** the shutdown workflow is mutating `apps/server/src/index.ts`.
+**Nothing touching `index.ts` may be committed until its completion notification arrives.** Committing
+`docs/lanes/executor-state-E.md` is safe — no agent mutates it.
+
+**Restore-and-verify form:** `git checkout HEAD -- <path>`, then **read the file for the marker**.
+Never a shell `diff`, which has returned a false "identical" on this machine.
