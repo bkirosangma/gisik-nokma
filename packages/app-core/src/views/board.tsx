@@ -90,6 +90,7 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
                 key={column.stateId}
                 role="region"
                 aria-label={column.name}
+                data-testid={`board-column-${column.stateId}`}
                 className={
                   column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column'
                 }
@@ -100,7 +101,11 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
                 </header>
                 <ul className="gn-board__cards">
                   {column.cards.map((card) => (
-                    <li key={card.ticketId} className="gn-board__card-slot">
+                    <li
+                      key={card.ticketId}
+                      className="gn-board__card-slot"
+                      data-testid={`ticket-card-${card.ticketId}`}
+                    >
                       <BoardCardView
                         card={card}
                         stateName={column.name}
