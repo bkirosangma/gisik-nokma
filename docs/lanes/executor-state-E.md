@@ -9,6 +9,64 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ✅ SEAM 1 IS DONE AND PR #190 IS OPEN — READ THIS BLOCK FIRST ON RESTART
+
+**Position: HOLDING for the controller's merge. Do NOT start T13 or T16 on this branch.**
+The controller merges #190, then relaunches this lane onto seam 3 from a NEW branch via
+`override-laneE-next.md`. The DDL / scratch-DB written decision is **T16's and is carried, not
+discharged**.
+
+| anchor | value |
+|---|---|
+| PR | **#190**, OPEN, MERGEABLE, base `main` |
+| HEAD | **`a5c80341c27bf5246d1f87082854d6d52a59459a`** — reachable on `origin/exec/23-plan11` (`git branch -r --contains`, not `cat-file`) |
+| position | **44 ahead / 0 behind** `origin/main` (`e46813a`) at the moment of writing |
+| tree | clean |
+| gate | **at `a5c8034` itself**: `EXIT=0` · 30/30 · 0 cached · 1m57.156s · node v22.22.2 / pnpm 9.15.0 · **282 files / 3598 passed + 5 skipped** · `Unsupported engine` 0 · `CHECK_ENV_EXIT=0` · `check-case-ids` exit 0, **1467 ids, highest 13.168** · no orphaned workers |
+| §13 | Lane E block 13.101–13.200; **13.101–13.168 consumed. Next free: 13.169.** |
+
+**Four rebases this session** — `5fca89e` → `81a7e44` → `2f18f3f` → `e33c429`. Only the second
+conflicted (`test-cases/13`, Lane C's block vs this lane's; both kept, nothing renumbered).
+
+## THE FOUR THINGS THIS SESSION GOT WRONG, and how each was caught
+
+None was caught by re-reading. Every one was caught by a number or a control refusing to agree.
+
+1. **`git rev-list --left-right` reads backwards from the natural guess.** LEFT is *behind*. I
+   committed a handoff with the columns inverted. Caught because the rebase announced 40 commits
+   against a branch the table called 25 ahead and the arithmetic would not close. **Use the two-dot
+   forms.**
+2. **A stale baseline carried across a rebase.** I measured 1344 case ids, rebased (which brought
+   Lane C's), then passed 1344 into a subagent dispatch as the baseline. Real figure was 1376. The
+   verifier caught it. Same shape as #1: *a number true at one moment, reused at another.*
+3. **A predicted mechanism written down as if measured.** I claimed a broken `SERVER_ORIGIN` makes
+   Next answer its own 404, and put that in the compose file, the contract test AND a commit message
+   before running anything. It is false: Next fails to connect (`EADDRNOTAVAIL`) and returns **500
+   after a 30-second stall**. Caught only by a negative control I nearly skipped *because the
+   positive run had already passed.*
+4. **A green `vitest run` is not a green typecheck.** The compose suite was 17/17 while
+   `tsc -p tsconfig.typecheck.json` failed on it (`noUncheckedIndexedAccess` on `split(':')[0]`).
+   vitest does not typecheck what it runs. **Never treat a targeted vitest run as pre-gate evidence.**
+
+## Process mistake worth not repeating
+
+I launched a tree-mutating experiment (the negative control rewrites `docker-compose.dev.yml`) while
+subagents were reading the tree. The standing rule names only the commit direction — "never commit a
+shared file while a subagent mutates it". **The read direction is the same hazard.** No contamination
+resulted (checked with a real positive control), but that was luck, not design.
+
+## Open, with owners — none blocks the merge
+
+- **`peer_gates()` counts its own `$( )` subshell** (`docs/lanes/gate-lock/README.md`, full entry
+  there). Reclaim path can never fire → an abandoned lock wedges every lane. Candidate fix written,
+  **NOT adopted**: positive control never fired. Owner: Lane E, escalated to the controller.
+- **13.128 is `🟡`**: the 5 s webhook timeout value is not asserted (raising it to 500_000 leaves the
+  suite green). Owner: whoever next touches `error-alerter.ts`.
+- **13.90's precondition is now met** (T6 landed the compose stack) but the case is NOT flipped —
+  it is Lane D's and needs a real run.
+- **Three `NEXT_PUBLIC_GOOGLE_*` build args have zero readers**, recorded at `apps/web/Dockerfile`,
+  not deleted. Owner: whoever wires the Drive picker into `apps/web` (Plan 7 surface).
+
 ## Anchors — re-measured 2026-09-06 by the RELAUNCHED session, AFTER the 4th rebase, at `4d16c2f`
 
 > **The previous version of this table had `ahead` and `behind` SWAPPED, and the commit message that
