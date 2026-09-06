@@ -65,6 +65,9 @@ function vis(
   return { workspaceId: 'ws', projectId, resolvedMode, resolvedUserIds };
 }
 
+/**
+ * 6.62 — cited on the block: the decision table enumerated BY PATH and pure — a non-member in all three modes including one that names them, a guest carrying only explicit lists, a member across workspace/project/explicit, an admin with no bypass, the owner reading everything, and the project-admin flag as management rather than reading.
+ */
 describe('canSeeResolved — the decision table, exactly', () => {
   it('a non-member sees nothing at all, in every mode including one that names them', () => {
     expect(canSeeResolved(eff(null), 'u', vis('workspace'))).toBe(false);
@@ -103,6 +106,9 @@ describe('canSeeResolved — the decision table, exactly', () => {
     expect(canSeeResolved(eff('admin'), 'u', vis('explicit', ['u']))).toBe(true);
   });
 
+  /**
+   * 6.39 — the OWNER reads everything in the workspace, including an explicit list naming only other people. The row’s other half — that an ADMIN gets no such bypass and is not thereby blinded either — is the test above.
+   */
   it('the OWNER reads everything in the workspace — disclosed, not hidden', () => {
     expect(canSeeResolved(eff('owner'), 'u', vis('workspace'))).toBe(true);
     // On no project at all, and named by nobody: everything here comes from the
@@ -189,6 +195,10 @@ describe('canSee — against the real projections', () => {
     expect(await canSee(db.pool, listed, child)).toBe(true);
   });
 
+  /**
+   * 6.59 — the ruling made FALSIFIABLE: a member on a project, revoked from the workspace, resolves nothing in ANY mode.
+   * 6.148 — the P22 fixture on the same test: the revoked person’s PROJECT-scope roster row is still standing and they are swept anyway. That standing row is the one state in which a wrong implementation would still answer yes.
+   */
   it('THE RULING: a revoked member resolves nothing in ANY mode, though their project-scope row is still standing', async () => {
     const ws = newUlid();
     const prj = newUlid();
@@ -246,6 +256,9 @@ describe('canSee — against the real projections', () => {
     expect(await canSee(db.pool, user, explicitMode)).toBe(false);
   });
 
+  /**
+   * 6.60 — a visibility answer is scoped to ONE workspace. `canSee` takes no `workspaceId`: it resolves the role in the TICKET’s workspace, never in one the viewer happens to own.
+   */
   it('a role is resolved in the TICKET’s workspace, not in one the viewer happens to own', async () => {
     const wsMine = newUlid();
     const wsTheirs = newUlid();
