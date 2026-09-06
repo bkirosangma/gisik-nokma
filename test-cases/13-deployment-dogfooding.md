@@ -210,8 +210,11 @@ exactly `13.40` free in Lane C's `13.1–13.40`. **Task 12 (the restore drill) c
 this block and must be given another** — asked for, per the rule at the head of this file, never borrowed
 from Lane D's or Lane E's. **RESOLVED, provisionally, by the "The restore drill (Task 12)" section at the
 foot of this file:** `13.40` is spent there on the guard pair, and Task 12's remaining cases are written out
-in full under `PENDING BLOCK` headings with **no ids minted**, awaiting `13.201`. Nothing is borrowed and
-nothing is renumbered; the ask still stands.
+in full under `PENDING BLOCK` headings with **no ids minted**. **`13.201` itself is no longer free** — the
+controller's allocated block (`13.201–13.240`) was consumed starting there by the LATER scheduler-
+generalisation errand (minted at `13.201–13.203`, see "The scheduler generalisation..." section further
+down), so these entries are still awaiting one of the block's remaining free ids (`13.204` on) rather than
+`13.201` specifically. Nothing is borrowed and nothing is renumbered; the ask still stands.
 
 **ONE GATE SCRIPT WAS AMENDED, disclosed here rather than only in its own comment:**
 `scripts/check-env-example.mjs` — Task 14's env-contract gate — gained `PGPASSWORD` in its `IGNORE` set,
@@ -261,11 +264,14 @@ exit 0 — a changed number a reader diffing against the pre-Task-11 run would o
 **LANE C'S BLOCK IS NOW EXHAUSTED — `13.40` is the last id in `13.1–13.40` and this section spends it.**
 The warning at the head of this file predicted exactly this: Task 11 consumed `13.9–13.39`, leaving one.
 Task 12 produced more than one case worth cataloguing, so **the remaining cases below are written in full
-and deliberately carry NO id**, under `PENDING BLOCK` headings. They get ids in one pass once the
-controller allocates the next block (`13.201`, allocated on request only) — asked for, per the rule at
-the head of this file, never borrowed from Lane D's `13.41–13.100` or Lane E's `13.101–13.200`, and never
-sub-numbered: `check-case-ids.mjs`'s `ID_LINE` captures `(\d+\.\d+)`, so a `13.40.1` would be extracted as
-`13.40` and reported as a duplicate, while a `13.40a` would not match at all and become invisible.
+and deliberately carry NO id**, under `PENDING BLOCK` headings. **The controller HAS since allocated Lane
+C a block — `13.201–13.240` — but `13.201–13.203` of it were already spent by the LATER scheduler-
+generalisation errand** (see "The scheduler generalisation..." section further down this file), which
+reached the controller's allocation first. These entries still need one id each from what remains of that
+block (`13.204` on) or a further one if it also runs out — asked for, per the rule at the head of this
+file, never borrowed from Lane D's `13.41–13.100` or Lane E's `13.101–13.200`, and never sub-numbered:
+`check-case-ids.mjs`'s `ID_LINE` captures `(\d+\.\d+)`, so a `13.40.1` would be extracted as `13.40` and
+reported as a duplicate, while a `13.40a` would not match at all and become invisible.
 
 - ✅ **13.40 — `restore.sh` refuses a target whose database name is not a scratch database, and lets a scratch-named one through.** The guard is the entire point of the script and the plan's own draft test never executed the script at all — it called `pg_dump`/`pg_restore` directly, so the guard would have shipped as a runbook safety control nothing had ever run. Both halves are asserted against the real file through `bash`: with a file that EXISTS in hand (so the non-zero exit cannot be the `-f` check wearing the guard's clothes), a target named `gisik_nokma_live_no_such_db` exits 1 with `refusing` and the offending name in stderr and nothing on stdout; the same invocation with one word changed (`gisik_scratch_no_such_db`) gets PAST the guard and fails at the NEXT check instead (`no such dump file`), which is what distinguishes a name test from a blanket refusal that would satisfy the first assertion while rejecting every restore an operator ever attempts. Bundled here rather than split, the way 13.35 bundles its planted-defect half, because the block has one id left. `--force-live` overriding the guard, and the usage text carrying the version rule in both directions (exit 2), are asserted in the same ungated describe. **UNGATED on purpose**: these cases need only `bash`, and behind the round-trip gate below they would go dark on exactly the machines where a restore target gets mistyped by hand. `apps/server/test/ops/restore-drill.test.ts`, `scripts/restore.sh`
 
