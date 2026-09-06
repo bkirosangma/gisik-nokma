@@ -1,4 +1,5 @@
 import { execSync, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,8 +36,34 @@ const ADMIN_URL =
 const RESTORE_SH = fileURLToPath(new URL('../../../../scripts/restore.sh', import.meta.url));
 
 /**
- * `pg_restore (PostgreSQL) 18.4` -> 18. Null when either binary is absent, so
- * this doubles as the both-binaries-present probe.
+ * A probe either ANSWERED with a major version or could not answer at all —
+ * and the two outcomes must not collapse into one `null`.
+ *
+ * They did, in the first cut of this file, and the consequence is the whole
+ * reason for this type: `null` meant BOTH "the client is newer than the server,
+ * so skip honestly" and "psql is missing / Postgres is unreachable / the service
+ * was not ready yet". The second is a broken environment, and it silently took
+ * the entire round trip — the row-count assertion, `verifyProjections`, and the
+ * only execution of `restore.sh`'s happy path — off the board while the run
+ * still exited 0. `check-no-silent-skips.mjs` cannot see that either: the four
+ * ungated guard cases below always contribute passes, and that script only flags
+ * a `.skipIf(`-bearing file contributing ZERO passed-or-failed tests (its
+ * `ran.length === 0` test). So a transient readiness blip in CI would have
+ * turned Task 12's entire substance into a green skip nothing downstream could
+ * detect.
+ *
+ * Skew is a SKIP (the pair genuinely cannot do the work). An unanswered probe is
+ * a FAILURE, asserted by an always-running test below.
+ */
+type VersionProbe = { kind: 'ok'; major: number } | { kind: 'unavailable'; detail: string };
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * `pg_restore (PostgreSQL) 18.4` -> 18, and it doubles as the
+ * both-binaries-present probe.
  *
  * The regex is ANCHORED to pg_restore's own line on purpose. A bare
  * `/(\d+)\.\d+/` against the combined output returns the FIRST match — pg_dump's
@@ -45,14 +72,27 @@ const RESTORE_SH = fileURLToPath(new URL('../../../../scripts/restore.sh', impor
  * exists for: one with a pg_dump and a pg_restore from different installs.
  * pg_restore is the binary whose major must not exceed the server's.
  */
-function clientMajor(): number | null {
+function clientMajor(): VersionProbe {
+  let version: string;
   try {
-    const version = execSync('pg_dump --version && pg_restore --version', { encoding: 'utf8' });
-    const match = /pg_restore \(PostgreSQL\) (\d+)/.exec(version);
-    return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
-  } catch {
-    return null;
+    version = execSync('pg_dump --version && pg_restore --version', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    return {
+      kind: 'unavailable',
+      detail: `pg_dump/pg_restore could not be run (is libpq on PATH? this file prepends ${LIBPQ_BIN}): ${messageOf(error)}`,
+    };
   }
+  const match = /pg_restore \(PostgreSQL\) (\d+)/.exec(version);
+  if (match?.[1] === undefined) {
+    return {
+      kind: 'unavailable',
+      detail: `no pg_restore major version in the output of --version: ${JSON.stringify(version.trim())}`,
+    };
+  }
+  return { kind: 'ok', major: Number.parseInt(match[1], 10) };
 }
 
 /**
@@ -60,20 +100,43 @@ function clientMajor(): number | null {
  * through `PGPASSWORD` and never into argv — `splitDatabaseUrl`'s whole reason
  * for existing (case 13.31), and every process on this host can read another's
  * argv. Synchronous on purpose: `describe.skipIf` cannot await a pool query.
+ *
+ * Each failure mode is reported as itself. The `dsn` quoted back in a detail
+ * line has already had its password stripped by `splitDatabaseUrl`, so putting
+ * it in a test report is safe.
  */
-function serverMajor(): number | null {
+function serverMajor(): VersionProbe {
   const { dsn, password } = splitDatabaseUrl(ADMIN_URL);
   const probe = spawnSync('psql', ['--no-psqlrc', '--tuples-only', '--no-align', '--command', 'show server_version_num', dsn], {
     encoding: 'utf8',
     env: { ...process.env, ...(password === undefined ? {} : { PGPASSWORD: password }) },
   });
-  if (probe.status !== 0) return null;
+  if (probe.error !== undefined) {
+    return { kind: 'unavailable', detail: `psql could not be spawned: ${messageOf(probe.error)}` };
+  }
+  if (probe.status !== 0) {
+    return {
+      kind: 'unavailable',
+      detail: `psql exited ${probe.status ?? 'on a signal'} against ${dsn}: ${(probe.stderr ?? '').trim().slice(-300)}`,
+    };
+  }
   const num = Number.parseInt((probe.stdout ?? '').trim(), 10);
-  return Number.isFinite(num) ? Math.floor(num / 10_000) : null;
+  if (!Number.isFinite(num)) {
+    return {
+      kind: 'unavailable',
+      detail: `psql answered something that is not a server_version_num: ${JSON.stringify((probe.stdout ?? '').trim())}`,
+    };
+  }
+  return { kind: 'ok', major: Math.floor(num / 10_000) };
 }
 
-const CLIENT_MAJOR = clientMajor();
-const SERVER_MAJOR = serverMajor();
+const CLIENT = clientMajor();
+const SERVER = serverMajor();
+
+/** Every probe that could not answer, in the words it failed with. Empty is the only acceptable value. */
+const PROBE_FAILURES: string[] = [CLIENT, SERVER].flatMap((probe) =>
+  probe.kind === 'unavailable' ? [probe.detail] : [],
+);
 
 /**
  * The gate is NOT merely "are the binaries installed" — that gate passes on a
@@ -92,16 +155,55 @@ const SERVER_MAJOR = serverMajor();
  * CI runs a MATCHED pair — `.github/workflows/ci.yml` pins `postgres:16-alpine`
  * beside `postgresql-client-16` ("pinned to the server's major version") — so
  * this block executes there. It skips on a skewed workstation, loudly.
+ *
+ * Note the asymmetry with `SKEWED` below: skew is now the ONLY reason this block
+ * is allowed to skip. Both probes answering is a precondition, not a condition.
  */
 const DRILL_RUNNABLE =
-  CLIENT_MAJOR !== null && SERVER_MAJOR !== null && CLIENT_MAJOR <= SERVER_MAJOR;
+  CLIENT.kind === 'ok' && SERVER.kind === 'ok' && CLIENT.major <= SERVER.major;
 
-if (!DRILL_RUNNABLE) {
+// Only for skew. A probe that could not answer gets a RED test instead of a
+// warning nobody reads — saying it in both channels would say it twice, once in
+// the channel that cannot fail a build.
+if (CLIENT.kind === 'ok' && SERVER.kind === 'ok' && CLIENT.major > SERVER.major) {
   console.warn(
-    `restore-drill: the round-trip block is SKIPPED — pg client major ${CLIENT_MAJOR ?? 'absent'} vs server major ${SERVER_MAJOR ?? 'unreachable'}. ` +
+    `restore-drill: the round-trip block is SKIPPED — pg client major ${CLIENT.major} vs server major ${SERVER.major}. ` +
       'A pg_restore newer than the server emits settings the server rejects; install a client matching the server major to run it.',
   );
 }
+
+/**
+ * ALWAYS RUNS, and it is the counterweight to the `skipIf` below. The skip is
+ * only ever allowed to mean "this client and this server are a version pair that
+ * cannot do the work"; every other reason the probes might come back empty — no
+ * `psql`, no libpq on PATH, Postgres down, the service not ready yet, output
+ * this file cannot parse — is a broken environment, and a broken environment
+ * must redden the run rather than quietly delete five tests from it.
+ *
+ * Deliberately a test rather than a `throw` at module scope: a module-scope
+ * throw would take the four bash-only guard cases down with it, and those are
+ * the ones that must never go dark (they need no database, no dump, no libpq).
+ *
+ * KNOWN CONSEQUENCE, stated here rather than discovered later: a developer with
+ * no libpq at all — or on a machine where `/opt/homebrew/opt/libpq/bin` does not
+ * exist, an Intel mac or Linux — now gets a RED suite where they previously got
+ * a silent skip. That is the trade the finding asks for: this gate's failure
+ * mode was OPEN, and an open failure mode on the only test that ever executes a
+ * disaster-recovery script is worse than an install instruction.
+ */
+describe('the drill’s preconditions — the probes must not fail open', () => {
+  it('both version probes ANSWERED — an absent binary or an unreachable server is a FAILURE, never a skip', () => {
+    // The custom message is load-bearing, not decoration: `toEqual([])`'s own
+    // failure line reads `expected [ Array(1) ] to deeply equal []` and the JSON
+    // reporter carries only that line — MEASURED, not assumed. A test that goes
+    // red without naming which probe failed or why sends whoever reads the CI
+    // log back to guessing, which is most of what the old silent skip did.
+    expect(
+      PROBE_FAILURES,
+      `a pg version probe could not answer: ${PROBE_FAILURES.join(' ;; ')}`,
+    ).toEqual([]);
+  });
+});
 
 /** Runs `scripts/restore.sh` the way an operator would: through bash, on the same PATH. */
 function runRestoreScript(args: string[]): { status: number | null; stdout: string; stderr: string } {
@@ -200,7 +302,12 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
   let source: TestDatabase;
   let scratchUrl: string;
   let scratchPool: Pool;
-  let workDir: string;
+  // `| undefined` on purpose: `afterAll` runs even when `beforeAll` threw, and
+  // `rmSync(undefined, { force: true })` throws ERR_INVALID_ARG_TYPE — `force`
+  // suppresses ENOENT, not a bad argument type — which would then displace the
+  // real seeding or migration failure in the report. The dir is also created
+  // FIRST in `beforeAll` now, so this is belt as well as braces.
+  let workDir: string | undefined;
   let dumpFile: string;
   /**
    * How many rows the seed ACTUALLY committed, measured against the source
@@ -213,14 +320,27 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
    * equality.
    */
   let sourceEvents = 0;
-  const scratchName = `gisik_drill_${Date.now()}`;
+  // `randomUUID`, the same generator `test/helpers/db.ts` uses for exactly this
+  // — NOT `Date.now()`, which is evaluated once at module load and collides
+  // between two runs of this file against the same Postgres in the same
+  // millisecond (plausible in this multi-worktree lane setup, or on a re-run
+  // overlapping a slow previous one). The collision is worse than a red
+  // `CREATE DATABASE`: the losing run's `afterAll` issues `DROP DATABASE ...
+  // WITH (FORCE)` against the WINNER's live database, mid-drill.
+  const scratchName = `gisik_drill_${randomUUID().replaceAll('-', '')}`;
   // A SECOND scratch database, for the one test that runs `restore.sh` itself.
   // Separate on purpose: the planted-drift case below corrupts `scratchName`
   // permanently, and two tests fighting over one database is a false failure
   // waiting for a reordering.
-  const scriptScratchName = `gisik_drill_script_${Date.now()}`;
+  const scriptScratchName = `gisik_drill_script_${randomUUID().replaceAll('-', '')}`;
 
   beforeAll(async () => {
+    // The temp dir FIRST, before anything that can fail. `afterAll` runs even
+    // when `beforeAll` throws, and it must never be the thing that crashes and
+    // hides why the setup actually failed.
+    workDir = mkdtempSync(join(tmpdir(), 'gisik-drill-'));
+    dumpFile = join(workDir, 'drill.dump');
+
     source = await createTestDatabase();
     const ingest = createIngestService({
       pool: source.pool,
@@ -235,8 +355,6 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
     if (results.some((result) => result.status !== 'committed')) throw new Error('drill setup failed to seed');
     sourceEvents = await eventCount(source.pool);
 
-    workDir = mkdtempSync(join(tmpdir(), 'gisik-drill-'));
-    dumpFile = join(workDir, 'drill.dump');
     const dump = spawnSync('pg_dump', ['--format=custom', '--no-owner', '--file', dumpFile, source.url]);
     if (dump.status !== 0) throw new Error(`pg_dump failed: ${dump.stderr.toString()}`);
 
@@ -250,12 +368,35 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
     scratchPool = createPool(scratchUrl);
   }, 60_000);
 
+  /**
+   * Every teardown step runs even when an earlier one throws. As an unwrapped
+   * sequence, one rejected `withAdmin` — an admin connection blip, a session
+   * still attached to a scratch database — skipped `source.drop()` and stranded
+   * a fully migrated `gisik_test_<uuid>` on the SHARED test Postgres, plus the
+   * temp dir, for every later run to trip over. The first error is rethrown at
+   * the end so a failing teardown is still reported rather than swallowed.
+   */
   afterAll(async () => {
-    await scratchPool?.end();
-    await withAdmin(`DROP DATABASE IF EXISTS ${scratchName} WITH (FORCE)`);
-    await withAdmin(`DROP DATABASE IF EXISTS ${scriptScratchName} WITH (FORCE)`);
-    await source?.drop();
-    rmSync(workDir, { recursive: true, force: true });
+    const failures: unknown[] = [];
+    const attempt = async (step: () => Promise<void> | void): Promise<void> => {
+      try {
+        await step();
+      } catch (error) {
+        failures.push(error);
+      }
+    };
+    await attempt(async () => {
+      await scratchPool?.end();
+    });
+    await attempt(() => withAdmin(`DROP DATABASE IF EXISTS ${scratchName} WITH (FORCE)`));
+    await attempt(() => withAdmin(`DROP DATABASE IF EXISTS ${scriptScratchName} WITH (FORCE)`));
+    await attempt(async () => {
+      await source?.drop();
+    });
+    await attempt(() => {
+      if (workDir !== undefined) rmSync(workDir, { recursive: true, force: true });
+    });
+    if (failures.length > 0) throw failures[0];
   }, 60_000);
 
   /**
@@ -306,6 +447,25 @@ describe.skipIf(!DRILL_RUNNABLE)('the restore drill — disaster recovery throug
     expect(restored.status).toBe(0);
     expect(restored.stdout).toContain(`restored '${dumpFile}' into '${scriptScratchName}'`);
     expect(restored.stdout).toContain('verify:projections'); // it points at the gate, not at itself
+
+    // The version rule on the path that actually restores, not only in `usage()`
+    // — an operator who typed the command correctly never sees `usage`, and the
+    // correct invocation is exactly where the skew bites.
+    expect(restored.stderr).toContain('at least as new as the pg_dump');
+    expect(restored.stderr).toContain('NO NEWER than the target server');
+
+    // THE PASSWORD DOES NOT REACH THE TERMINAL. Asserted against the real
+    // credential this run is using rather than a literal, and in the `:<pw>@`
+    // userinfo form so it still discriminates on the default DSN where the
+    // username and password happen to be the same word. The exit 0 above is the
+    // other half of the pair: it says PGPASSWORD actually carried the
+    // credential, so this is a rerouting rather than a deletion.
+    const { dsn: safeDsn, password } = splitDatabaseUrl(scriptScratchUrl);
+    if (password !== undefined) expect(restored.stdout).not.toContain(`:${password}@`);
+    // And the DSN it prints is the same one `splitDatabaseUrl` would produce —
+    // the bash split and the TypeScript split agreeing on one URL, rather than
+    // each being separately plausible.
+    expect(restored.stdout).toContain(`DATABASE_URL='${safeDsn}'`);
 
     const pool = createPool(scriptScratchUrl);
     try {

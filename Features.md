@@ -1692,13 +1692,33 @@ completion of Plan 11 as a whole from this section's presence.)*
   rather than described by it — refusal, the same invocation one word different in the name getting past
   the guard, `--force-live`, the usage text, and a real happy-path restore into a second scratch database
   whose row count is then read back from the database.
+  **For a URL-shaped DSN, the password never reaches argv or the terminal.** `restore.sh` splits it in bash — the
+  same split `src/ops/pg-dump.ts`'s `splitDatabaseUrl` performs for the daemon (case 13.31), including
+  the percent-decode, so the two halves of the pair agree on one DSN — and hands the credential to libpq
+  through `PGPASSWORD`. `pg_restore` is invoked with a password-free URL, and the `verify:projections`
+  next-step line it prints is password-free too, with a note telling the operator to re-supply it. This
+  is an operator script run on the ops box during an incident, where argv is world-readable (`ps -ef`)
+  and terminal scrollback outlives the incident. Both halves are asserted, and the exit-0 restore beside
+  them is what shows the credential was REROUTED rather than merely deleted. **The stated limit:** a DSN
+  the split cannot parse — libpq's non-URL conninfo form, `host=... password=...` — falls through
+  untouched and keeps the old argv behaviour. That is the same fail-open-on-parse choice
+  `splitDatabaseUrl` makes, for the same reason (refusing would break a form the tool accepts), and it is
+  a real remaining exposure for anyone who restores with a conninfo string rather than a URL.
   **Version rule, and the one thing here NO automated test covers:** the `pg_restore` used must be at
   least as new as the `pg_dump` that produced the archive AND no newer than the target server's major
   version. Measured 2026-09-06: `pg_restore` 18.4 opens every restore with `SET transaction_timeout = 0`
-  (PG17+), which a 16 server rejects — the data lands and the exit code is still non-zero. The suite's
-  round-trip half therefore gates on client-major ≤ server-major, not merely on the binaries existing,
-  and skips loudly (naming both majors) on a skewed workstation rather than reddening; CI runs it on the
-  matched pair `ci.yml` already pins (`postgres:16-alpine` + `postgresql-client-16`). The guard cases
-  need only bash and are ungated, so they run everywhere. The rule is stated in `restore.sh`'s usage text
-  and in `deploy/do/README.md`.
+  (PG17+), which a 16 server rejects — the data lands and the exit code is still non-zero. The rule is
+  printed by `restore.sh` on the path that actually restores (not only by `usage()`, which an operator
+  who typed the command correctly never sees), and stated in `deploy/do/README.md`.
+  **Skew is the ONLY thing allowed to skip the round trip.** The suite gates on client-major ≤
+  server-major, not merely on the binaries existing, and skips loudly (naming both majors) on a skewed
+  workstation rather than reddening; CI runs it on the matched pair `ci.yml` already pins
+  (`postgres:16-alpine` + `postgresql-client-16`). Every OTHER reason a version probe might come back
+  empty — no `psql`, no libpq on `PATH`, Postgres down or not yet ready, unparseable output — is a
+  **failure**, asserted by an always-running precondition test that names the probe and quotes its error.
+  It has to be: the probes used to fail open, `check-no-silent-skips.mjs` cannot see a partially skipped
+  file (the four ungated guard cases always contribute passes), and a readiness blip in CI would
+  otherwise have turned the whole round trip — count, verify, and the only execution of `restore.sh`'s
+  happy path — into a green skip. The trade is disclosed: a machine with no libpq at all now reddens
+  here where it used to skip. The guard cases need only bash and are ungated, so they run everywhere.
   `scripts/restore.sh`, `apps/server/test/ops/restore-drill.test.ts`, `deploy/do/README.md`

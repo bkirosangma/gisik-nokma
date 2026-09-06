@@ -290,7 +290,20 @@ above proves the round trip but never runs the script; this runs `bash scripts/r
 scratch database>`, asserts exit 0, the `restored '<file>' into '<db>'` line, and that the printed next step
 names `verify:projections` (the script must point at the gate, not declare itself done) — then opens a pool on
 that database and reads the row count back. A SECOND scratch database, created and dropped inside the suite,
-so it never contends with the planted-drift case's corruption.
+so it never contends with the planted-drift case's corruption. The same case also asserts the two things
+`restore.sh` is only allowed to claim on this path: the **version rule on stderr** (both directions), because
+it used to live only inside `usage()` — which fires solely on `$# -lt 2`, so the operator who typed the command
+CORRECTLY, the one the skew is about to bite, was the one who never saw it; and that **the password is not in
+what the script printed** — asserted against the real credential of the run in the `:<password>@` userinfo
+form, so it still discriminates on the default DSN where username and password happen to be the same word, and
+that the printed DSN is byte-identical to what `splitDatabaseUrl` produces for the same URL (the bash split and
+the TypeScript split agreeing on one string, rather than each being separately plausible). Exit 0 beside those
+is the half that matters: it says `PGPASSWORD` actually carried the credential, so this is a rerouting and not
+a deletion. Verified by hand in both directions, 2026-09-06, against a throwaway `postgres:18-alpine` on 54398
+whose password was `dr@ll-P4ss` (supplied percent-encoded as `dr%40ll-P4ss`, which also exercises the decode):
+with the password in the DSN the script exited 0, three rows landed, and `grep -c` for BOTH the encoded and
+decoded literal over its stdout and stderr returned `0` and `0`; with the password stripped from the same DSN
+it exited 1 on `fe_sendauth: no password supplied` and the table never arrived.
 
 **PENDING BLOCK — KNOWN, MEASURED, AND COVERED BY NO AUTOMATED TEST: the pg client/server version boundary,
 in both directions.** A `pg_restore` older than the `pg_dump` that wrote the archive refuses it outright
@@ -304,9 +317,51 @@ round-trip describe gates on **client major ≤ server major**, not merely on th
 with a stderr line naming both majors rather than reddening (the 13.36 failure shape, one cause over). CI runs
 it — `ci.yml` pins `postgres:16-alpine` beside `postgresql-client-16`, "pinned to the server's major version"
 — and that pin, not this suite, is what keeps the matched pair honest. The drill half was nonetheless executed
-green by hand on a matched pair (a throwaway `postgres:18-alpine` on port 54399, client 18.4 / server 18.6:
-`Tests 9 passed (9)`); the committed default remains 54329. **Consequence to disclose:**
-`check-no-silent-skips.mjs` fails a file contributing ZERO passed-or-failed tests, and the ungated guard cases
-mean this file always contributes passes — so that gate can no longer see the round-trip half going dark in
-CI. 13.3 already establishes that partial skips pass by design; the real control here is `ci.yml`'s version
-pin. `scripts/restore.sh`, `deploy/do/README.md`, `apps/server/test/ops/restore-drill.test.ts`
+green by hand on a matched pair (a throwaway `postgres:18-alpine`, client 18.4 / server 18.6 — port 54399 on
+the first pass, re-run on 54398 after the fixes below: `10 passed (10)`); the committed default remains 54329.
+**Consequence, and what now controls it:** `check-no-silent-skips.mjs` fails a file contributing ZERO
+passed-or-failed tests, and the ungated guard cases mean this file always contributes passes — so that gate
+cannot see the round-trip half going dark, and 13.3 already establishes that partial skips pass by design.
+`ci.yml`'s pin is a partial control only: it asserts `pg_dump --version | grep ' 16\.'` and says nothing about
+`pg_restore` (the binary the gate actually reads) or about `psql` existing or connecting. The control that
+closes it is the precondition case below, inside this file, where the gate lives. **Extending the `ci.yml`
+pin to `pg_restore` and `psql` was considered and deliberately NOT done:** it could not be tested from here
+(Ubuntu resolves `psql` through the `postgresql-client-common` wrapper, and GitHub's runner images carry a
+preinstalled client of their own, so a `grep ' 16\.'` on `psql` might hard-fail every shard for reasons
+unrelated to this task), `ci.yml` is contested across lanes, and the earlier error message is all it would
+buy — a wrong-major `psql` still connects and still reports the server's version correctly, so the
+precondition case sees exactly what matters either way.
+`scripts/restore.sh`, `deploy/do/README.md`, `apps/server/test/ops/restore-drill.test.ts`
+
+**PENDING BLOCK — the version probes must not fail open: an unreachable server or an absent binary is a
+FAILURE, never a skip.** The first cut of this file collapsed both outcomes into one `null`, so "Postgres is
+down / not ready yet / `psql` is missing / the output did not parse" was indistinguishable from "this client
+and this server are a skewed pair", and both silently deleted all five round-trip cases — the row-count
+assertion, `verifyProjections`, and the ONLY execution of `restore.sh`'s happy path — from a run that still
+exited 0. Each probe now returns `{kind:'ok', major}` or `{kind:'unavailable', detail}`; only `ok` feeds the
+skip condition, and an always-running test asserts that NO probe came back `unavailable`, quoting the detail in
+a custom matcher message (measured, not assumed: `toEqual([])`'s own failure line reads
+`expected [ Array(1) ] to deeply equal []` and the JSON reporter carries only that line, so without the message
+the red test would not name which probe failed or why). Deliberately a test rather than a module-scope throw,
+which would take the four bash-only guard cases down with it. **Falsified in both directions, 2026-09-06:**
+with `TEST_DATABASE_ADMIN_URL` pointed at `localhost:1`, the pre-fix file (from `1c5df30`, run under a
+temporary name) reported `4 passed | 5 skipped`, **exit 0**; the fixed file reports `4 passed | 1 failed |
+5 skipped`, **exit 1**, with `a pg version probe could not answer: psql exited 2 against
+postgres://gisik@localhost:1/postgres: connection to server ... Connection refused` — note the quoted DSN
+carries no password, because it is the one `splitDatabaseUrl` already stripped. **Trade disclosed:** a
+developer with no libpq, or on a machine where `/opt/homebrew/opt/libpq/bin` does not exist (an Intel mac,
+Linux), now gets a RED suite here where they previously got a silent skip. That is the point — an open failure
+mode on the only test that ever executes a disaster-recovery script is worse than an install instruction.
+`apps/server/test/ops/restore-drill.test.ts`
+
+**PENDING BLOCK — the drill's teardown strands nothing, and cannot crash before the real cause is reported.**
+`afterAll` was an unwrapped sequence, so one rejected `withAdmin` (an admin blip, a session still attached)
+skipped `source.drop()` and left a fully migrated `gisik_test_<uuid>` on the SHARED test Postgres for every
+later run to trip over; each step is now wrapped and the first error rethrown at the end, so a failing teardown
+is still reported rather than swallowed. `workDir` is created FIRST in `beforeAll`, before anything that can
+throw, and is typed `string | undefined` and guarded at cleanup: `rmSync`'s `force` suppresses ENOENT, not
+`ERR_INVALID_ARG_TYPE`, so an undefined `workDir` used to crash the teardown and displace the seeding failure
+that caused it. Scratch database names come from `randomUUID()`, the generator `test/helpers/db.ts` already
+uses, not `Date.now()` evaluated once at module load — two runs in the same millisecond (plausible across this
+multi-worktree lane setup) collided, and the loser's `afterAll` then issued `DROP DATABASE ... WITH (FORCE)`
+against the winner's live database mid-drill. `apps/server/test/ops/restore-drill.test.ts`
