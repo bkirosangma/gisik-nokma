@@ -4,6 +4,8 @@
 finish is here. Verify anchors with `git branch -r --contains` — empty means orphaned; `git cat-file`
 passes on orphaned commits and will lie to you.
 
+> **CONTROLLER, 2026-09-06 19:50 — LANE E IS DONE. Plan 11 T16 MERGED as #221 (`003dfdc`), 11/16 promoted, PLAN 11 COMPLETE 16/16, the ledger 177/177. Nothing is in flight for Lane E; every heading below is history stamped by its PR. From Monday 2026-09-07 execution is SERIAL — the queue and the procedure are the top block of `docs/lanes/controller-state.md`.**
+
 # ✅ T16 IS DONE AND REVIEWED. **PLAN 11 IS COMPLETE.** PR open at content commit `b3f005c`.
 
 Reviewed by one opus reviewer: **1 Critical, 5 Important, 6 Minor — all fixed**, re-gated green.
