@@ -91,6 +91,9 @@ function findImageNode(editor: Editor): { attrs: Record<string, unknown> } | nul
 }
 
 describe('attachment paste/drop (layer 2)', () => {
+  /**
+   * 9.96 — an image file dropped or pasted uploads, then emits `attachment.added`, THEN inserts the image node with wrap `block` — that exact order, so a claim never outruns its own event.
+   */
   it('an image file uploads, emits attachment.added, THEN inserts the node with wrap block', async () => {
     const { editor, calls, hadImageNodeAtEventTime } = makeEditor();
     const file = new File([new Uint8Array(12)], 'shelf.png', { type: 'image/png' });
@@ -118,6 +121,9 @@ describe('attachment paste/drop (layer 2)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.97 — an `attachment.added` handler that throws is a failure too: no node is inserted, the in-flight upload chip ends, and the failure is reported through `onError` rather than silently swallowed.
+   */
   it('attachment.added handler throwing is a failure too: no node, chip ends, reported', async () => {
     const { editor, options } = makeEditor({
       onAttachmentAdded: vi.fn(async () => {
@@ -136,6 +142,9 @@ describe('attachment paste/drop (layer 2)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.98 — planted defect: a non-image file dropped or pasted NEVER becomes a node — it uploads and routes to the attachment list only, proving layer 2 of image-only embedding independent of layer 1's insert-command refusal.
+   */
   it('planted defect (layer 2): a non-image upload NEVER becomes a node — it goes to the list', async () => {
     const { editor, options, calls } = makeEditor({
       uploadAttachment: vi.fn(async () => {
@@ -153,6 +162,9 @@ describe('attachment paste/drop (layer 2)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.99 — failure cleanup: a refused upload reports through `onError`, ends its chip, and leaves the document untouched — no partial node, no orphaned chip.
+   */
   it('failure cleanup: a refused upload reports, ends the chip, and the doc is untouched', async () => {
     const { editor, options } = makeEditor({
       uploadAttachment: vi.fn(async () => {
@@ -171,6 +183,9 @@ describe('attachment paste/drop (layer 2)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.100 — `captureFiles` short-circuits to the host's own file-capture path when one is supplied — nothing uploads inside the extension itself on that branch.
+   */
   it('captureFiles short-circuits: the host takes the files, nothing uploads here', () => {
     const captureFiles = vi.fn(() => true);
     const { editor, options } = makeEditor({ captureFiles });
@@ -181,6 +196,9 @@ describe('attachment paste/drop (layer 2)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.101 — a paste event carrying no files is left alone for other paste handlers (mentions, links, formatting) to process.
+   */
   it('a paste with no files is left to other handlers', () => {
     const { editor } = makeEditor();
     // `someProp('handlePaste', ...)` probes every registered handlePaste in

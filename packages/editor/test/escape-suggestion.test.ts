@@ -53,6 +53,9 @@ const MARK_TRIGGERS: Trigger[] = [
 ];
 
 describe('escape suggestion — every reserved sequence, planted-defect style', () => {
+  /**
+   * 9.88 — every reserved autoformat sequence (13 block triggers, 6 mark triggers, 19 total, table-driven) applies its formatting AND surfaces the escape suggestion, and accepting via `undoInputRule` reverses the formatting and leaves the literal typed characters.
+   */
   it.each([...BLOCK_TRIGGERS, ...MARK_TRIGGERS])(
     '$label: formatting applies, the suggestion appears, accepting yields literal text',
     ({ typed, formatted }) => {
@@ -76,6 +79,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     },
   );
 
+  /**
+   * 9.89 — Backspace accepts through a real `keydown` (core's Backspace keymap routes it through `undoInputRule`), proven with a genuine event rather than the `keyboardShortcut` test helper.
+   */
   it('Backspace accepts (core keymap routes it through undoInputRule)', () => {
     // A real keydown, not `editor.commands.keyboardShortcut('Backspace')`:
     // that test-only helper replays the shortcut's captured transaction
@@ -99,6 +105,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     editor.destroy();
   });
 
+  /**
+   * 9.90 — clicking the chip accepts: the formatting is gone from the rendered HTML and the typed markup stands as literal text.
+   */
   it('clicking the chip accepts', () => {
     const editor = createTestEditor();
     typeText(editor, 'x **bold**');
@@ -111,6 +120,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     editor.destroy();
   });
 
+  /**
+   * 9.91 — Escape dismisses: the suggestion and the chip both disappear and the formatting stays applied.
+   */
   it('Escape dismisses: the formatting stays, the chip goes', () => {
     const editor = createTestEditor();
     typeText(editor, '# ');
@@ -122,6 +134,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     editor.destroy();
   });
 
+  /**
+   * 9.92 — continuing to type dismisses the suggestion the same way Escape does, and the formatting stays.
+   */
   it('continuing to type dismisses: the formatting stays', () => {
     const editor = createTestEditor();
     typeText(editor, '# ');
@@ -132,6 +147,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     editor.destroy();
   });
 
+  /**
+   * 9.93 — Escape with no active suggestion is not consumed — `handleKeyDown` returns `false`, leaving the key free for whatever else wants it.
+   */
   it('Escape without an active suggestion is not consumed', () => {
     const editor = createTestEditor();
     typeText(editor, 'plain');
@@ -141,6 +159,9 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
 });
 
 describe('non-triggers stay literal with no suggestion', () => {
+  /**
+   * 9.94 — three non-triggers stay literal with no suggestion offered at all: a markdown link `[text](url)`, a line containing pipe characters, and a bare URL — no `<a>` in the rendered HTML for any of them.
+   */
   it.each([
     { typed: 'see [the doc](http://x) now', literal: '[the doc](http://x)' },
     { typed: 'a | b | c', literal: 'a | b | c' },

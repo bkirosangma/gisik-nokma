@@ -29,6 +29,9 @@ describe('isEmbeddableImageMime', () => {
     }
   });
 
+  /**
+   * 9.35 — `isEmbeddableImageMime` has one definition of what may be embedded: the predicate reads the same `EMBEDDABLE_IMAGE_MIME` set this test asserts against, not a second copy.
+   */
   it('the set itself is what the predicate reads', () => {
     expect([...EMBEDDABLE_IMAGE_MIME].sort()).toEqual([
       'image/gif',

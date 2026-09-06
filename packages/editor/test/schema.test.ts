@@ -52,6 +52,9 @@ describe('document schema v1', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.37 — the node and mark vocabulary of the built extension list is pinned by SET equality, not containment, so an extension adding an unnamed node or mark fails here.
+   */
   it('exposes NOTHING the spec does not name — the vocabulary is closed', () => {
     const editor = createTestEditor();
     expect(Object.keys(editor.schema.nodes).sort()).toEqual([...SCHEMA_V1_NODES].sort());
@@ -59,6 +62,9 @@ describe('document schema v1', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.38 — `VersionedDocument` stamps `schemaVersion 1` into the serialized doc.
+   */
   it('stamps schemaVersion 1 into the serialized doc', () => {
     const editor = createTestEditor();
     const json = editor.getJSON() as { type: string; attrs?: { schemaVersion?: number } };
@@ -177,6 +183,9 @@ describe('document schema v1', () => {
     }
   });
 
+  /**
+   * 9.36 — `isDocJson` accepts a `{type:'doc'}` object and refuses everything else; `emptyDoc()` round-trips through it.
+   */
   it('emptyDoc is a paragraph-bearing doc and isDocJson agrees', () => {
     const doc = emptyDoc();
     expect(isDocJson(doc)).toBe(true);
@@ -226,6 +235,9 @@ describe('behavioural options that spec §2 constrains', () => {
     return editor;
   }
 
+  /**
+   * 9.41 — the link lever really is shut where it can be: no paste-to-link plugin is registered at all, verified against the resolved plugin list rather than the option's documentation.
+   */
   it('registers no paste-to-link plugin at all', () => {
     // Structural, not just a config read: the option is only meaningful
     // because Link pushes `handlePasteLink` into the plugin list when it is
@@ -300,6 +312,9 @@ describe('behavioural options that spec §2 constrains', () => {
    * it. When Task 5 closes this path, this test fails — and that failure is
    * the notification that the fix landed, which is exactly what it is for.
    * Flip the expectations then; do not delete the case.
+   */
+  /**
+   * 9.42 — CURRENT BEHAVIOUR, pinned as current and not as desired: a pasted URL becomes a link anyway, because no value of `markdownLinks` stops the link extension's plain-URL paste rule.
    */
   it('CURRENT BEHAVIOUR pending Task 5: a pasted URL becomes a link anyway', () => {
     const overSelection = selectAllOf('the portal');

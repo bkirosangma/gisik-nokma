@@ -18,16 +18,25 @@ const REFERENCE: DriveReference = {
 };
 
 describe('attachment kinds', () => {
+  /**
+   * 9.115 — `DRIVE_FILE_SCOPE` is exactly `https://www.googleapis.com/auth/drive.file` — the one non-sensitive per-file scope, pinned by value.
+   */
   it('requests exactly the per-file Drive scope', () => {
     expect(DRIVE_FILE_SCOPE).toBe('https://www.googleapis.com/auth/drive.file');
   });
 
+  /**
+   * 9.58 — `isDriveReference` and the evidence rule's reason string are pinned to each other, so the second cannot quietly stop meaning the first.
+   */
   it('pins the evidence refusal id and names the remedy in its reason', () => {
     expect(RULE_EVIDENCE_DRIVE_REFERENCE).toBe('attachment.evidence-drive-reference');
     expect(EVIDENCE_DRIVE_REFERENCE_REASON).toContain('cannot serve as evidence');
     expect(EVIDENCE_DRIVE_REFERENCE_REASON).toContain('Upload the file to this ticket');
   });
 
+  /**
+   * 9.116 — `isDriveReference` accepts a complete reference, with `iconLink` optional (present or absent both pass).
+   */
   it('accepts a complete reference, with iconLink optional', () => {
     expect(isDriveReference(REFERENCE)).toBe(true);
     expect(
@@ -38,6 +47,9 @@ describe('attachment kinds', () => {
     ).toBe(true);
   });
 
+  /**
+   * 9.117 — planted defect, eight sub-cases: `null`, a bare string, and six single-field corruptions all fail `isDriveReference`.
+   */
   it('planted defect: an incomplete or mistyped reference is not a reference', () => {
     for (const broken of [
       null,
@@ -71,6 +83,9 @@ describe('attachment kinds', () => {
  * key sets would still agree.
  */
 describe('the guard and the wire schema describe one concept', () => {
+  /**
+   * 9.118 — the structural guard and the wire schema (`attachmentDriveReferencePayload`) describe one concept, checked field-for-field.
+   */
   it('agrees with attachmentDriveReferencePayload field for field', () => {
     const complete: Required<DriveReference> = {
       ...REFERENCE,

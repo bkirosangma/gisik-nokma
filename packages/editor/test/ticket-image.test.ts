@@ -88,6 +88,9 @@ describe('image node', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.45 — an image node resolves its URL through `resolveAttachmentUrl` and stores only the `attachmentId`, so a document never hard-codes a server route.
+   */
   it('renders src via resolveAttachmentUrl and a BEM wrap class', () => {
     const editor = createTestEditor({ resolveAttachmentUrl: (id) => `/test-url/${id}` });
     editor.commands.insertTicketImage({
@@ -179,6 +182,9 @@ describe('image node', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.43 — `IMAGE_WRAP_MODES` is the one vocabulary of wrap values, and an unrecognised stored `wrap` is COERCED to `block` at the parse door rather than refused.
+   */
   it('coerces an unknown data-wrap to the default rather than storing it', () => {
     const editor = createTestEditor();
     editor.commands.setContent(`<img data-attachment-id="${IMG}" data-wrap="float-up">`);
@@ -186,6 +192,9 @@ describe('image node', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.44 — each image attribute serializes under exactly one name, pinning validation to the per-attribute `parseHTML` rather than the node-level `getAttrs`.
+   */
   it('serializes each attribute under exactly one name', () => {
     // The render half of the same defect: a duplicate, unvalidated spelling of
     // an attribute in the HTML is a second origin for the doc's own state.

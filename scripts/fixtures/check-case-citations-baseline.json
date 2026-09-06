@@ -1,10 +1,10 @@
 {
   "03-foundation-ledger.md": 45,
   "04-workflow-engine.md": 45,
-  "05-tickets-hierarchy.md": 68,
+  "05-tickets-hierarchy.md": 67,
   "06-auth-visibility.md": 63,
   "07-api-realtime-search.md": 78,
-  "09-editor-attachments.md": 219,
+  "09-editor-attachments.md": 121,
   "10-workflow-builder.md": 0,
   "11-calendar-notifications.md": 0,
   "12-offline-sync-apps.md": 78,
