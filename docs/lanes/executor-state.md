@@ -207,7 +207,21 @@ source text, not with a running producer** (the controller's sharpening, and it 
 | **12.323** | an unrecognised cursor yields 200 + empty page, never 404 | route refuses when the cursor matched nothing | **1 failed, 3 passed** — 12.323 alone, `expected 500 to be 200` |
 | **12.324** | the shipped `getTickets` loop returns the complete row set | route drops the last card of the page | **2 failed** — 12.324 on `length of 3 but got 2`, and 12.323's own non-vacuity precondition, which is the guard working |
 | **7.221** | the door's sentence reaches `FoundingError.serverMessage` | route sends `{error, detail}`, constant keeps `message` | **1 failed, 3 passed** — 7.221 alone, `expected null to be 'A workspace needs a name.'` |
-| **12.325** | `nextCursor` is the LAST id of the page | `store.ts:96` emits the FIRST row instead | **12.325 RED ALONE; `notifications.test.ts` 10 passed, 0 failed** |
+| **12.325** | `nextCursor` is the LAST id of the page | `store.ts:96` emits the FIRST row instead | **one run over BOTH files: 1 failed, 13 passed** — 12.325 red, `notifications.test.ts`'s ten green beside it |
+
+**All four re-verified AFTER the typecheck fix, not carried over.** The first gate came back
+`EXIT=2` on `@gisik-nokma/server#typecheck` — a conditional `payload` spread produced a union
+fastify's `inject` overloads refuse — while **every test in that run passed**. Reading the `EXIT=`
+line rather than the background wrapper's own status is what caught it; a gate whose tests are all
+green is not a green gate. The fix rebuilt `injectFetch` as two concrete branches, which also made the
+witness stronger: the client's own `JSON.stringify` output now reaches the route verbatim instead of
+being parsed and re-serialised by the harness, so the server parses the client's bytes.
+
+Because that fix changed the harness `7.221` and `12.324` run through, **their mutation results were
+stale and were re-measured rather than argued about.** 3b still kills 7.221 alone with the same
+message. 12.325 does not use `injectFetch` at all, and it was re-run anyway — in ONE invocation
+covering both files, which is the cleanest form of the claim: same run, same mutation, the existing
+suite green and the new case red.
 
 **12.325's mutation is the measurement this whole pass exists to produce:** the existing suite cannot
 see a broken keyset cursor and the new case can. It works because the case uses `limit=2`, where the
