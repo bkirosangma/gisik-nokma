@@ -16,7 +16,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PHASE 2 BUILT. Gate running. PR next.** on `exec/39-fixture-witnesses`
+# LANE A — **PR #187 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.** `exec/39-fixture-witnesses` @ `cf18d9e`
+
+**Gate at `cf18d9e`, forced and uncached under lock v3.2:** `GATE_EXIT=0` · `Tasks: 30 successful,
+30 total` · `0 cached, 30 total` · 1m57s · node **v22.22.2** · `Unsupported engine` 0 · failures
+section empty · no orphaned workers. **3,479 tests / 273 files** (3,474 passed, 5 skipped) — most of
+the delta against the last recorded gate is #161's merge; this branch adds 4 tests in 1 file.
+`pnpm check:env` → `CHECK_ENV_EXIT=0`. `node scripts/check-case-ids.mjs` → `CHECK_CASE_IDS_EXIT=0`,
+1,404 ids, union == sum. **Two separate commands; the first says nothing about the second.**
+
+**The FIRST gate on this branch was `EXIT=2`** (`server#typecheck`) with every test in it passing.
+A gate whose tests are all green is not a green gate — the `EXIT=` line is the one that decides, not
+the background wrapper's own status.
 
 > Rebased onto `origin/main` **`2f18f3f`** (#161 merged, my freeze lifted). Merge-base verified
 > REACHABLE with `git branch --contains` — `main` is in the output, so it is not orphaned.
