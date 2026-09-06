@@ -101,8 +101,17 @@ export function stubServices(
     // would render an invented blank picker and pass.
     getTicketTypes: unstubbed('getTicketTypes'),
     search: refuse('search'),
-    getMyWork: refuse('getMyWork'),
-    getAttention: refuse('getAttention'),
+    // UNSTUBBED since rulings P39 and P40 served them, and NOT `[]` — the same
+    // treatment `getMyWorkspaces` got above, for the same reason and by the
+    // same mechanism. `refuse()` THROWS when the gap it names disappears from
+    // the register, which is how a served method announces itself here instead
+    // of degrading quietly: these two lines took eighty-six tests down in one
+    // gate run, and that is the check working. `[]` or three empty groups would
+    // be this helper asserting the viewer has no work and nothing needs
+    // attention — claims about the world — and a page under test would render
+    // an invented blank and pass.
+    getMyWork: unstubbed('getMyWork'),
+    getAttention: unstubbed('getAttention'),
     getPreferences: async () => EMPTY_PREFERENCES,
     putPreferences: async () => undefined,
     ...overrides,

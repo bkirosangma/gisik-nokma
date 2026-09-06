@@ -3,7 +3,15 @@ import { newUlid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { visibleProjects } from '../../src/read/visible-projects.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { applyAll, seedGuest, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import {
+  applyAll,
+  seedGuest,
+  seedMember,
+  seedProject,
+  seedTicket,
+  seedWorkflowDef,
+  setVisibilityEnv,
+} from '../helpers/seed.js';
 import { readMyWork } from '../../src/routes/my-work.js';
 
 /**
@@ -107,7 +115,13 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
       ticketId: ticket,
       assigneeId: worker,
     });
-    await applyAll(db.pool, [setVisibilityEnv(ws, ticket, 'workspace')]);
+    // `seedTicket` writes a `proj_tickets` row naming `wf-seed@1` and does not
+    // publish that definition; `readMyWork` serves a state NAME now and throws
+    // when a ticket names a definition `proj_workflows` does not hold — the same
+    // throw `assembleListCards` has always made, and a state the product path
+    // cannot reach. So the definition is published here rather than the throw
+    // softened: a fallback would put a slug where a name goes.
+    await applyAll(db.pool, [seedWorkflowDef(ws), setVisibilityEnv(ws, ticket, 'workspace')]);
 
     const eff = await resolveEffectiveRole(db.pool, worker, ws);
     const view = await readMyWork(db.pool, eff, worker, ws);

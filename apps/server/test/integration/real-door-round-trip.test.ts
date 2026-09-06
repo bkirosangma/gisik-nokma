@@ -946,6 +946,20 @@ describe('GET /v1/me/work', () => {
       // carrying the viewer's whole visible set would disclose names through a
       // door nobody asked that question of.
       projectNames: { [projectId]: 'Shop floor' },
+      // `stateNames` since ruling P40's change set — the name of the state each
+      // card is IN, read from the definition its own row names. 'Doing' is
+      // `SIMPLE_KANBAN_TEMPLATE`'s name for `doing`, and nothing in this file
+      // typed either: the template went through the real founding door, so this
+      // entry is the round trip reaching the state VOCABULARY and not only the
+      // state id. Inside the exact `toEqual`, so a route that stopped serving
+      // it, or served the id instead, reddens here.
+      stateNames: { [childId]: 'Doing' },
+      // Empty, and it is a real answer rather than an unimplemented key: this
+      // world files no contests, so the viewer has no refused claims. Asserted
+      // as part of the exact `toEqual` because an absent key and an empty list
+      // are different claims on this surface — the same argument the
+      // `projects` key above makes one route over.
+      contested: [],
       groups: {
         open: [],
         active: [

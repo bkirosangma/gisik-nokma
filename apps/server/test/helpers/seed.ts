@@ -307,7 +307,27 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
   }
 }
 
-/** The fixture world's workflow: no `workflow.defined` is seeded here, so nothing names one. */
+/**
+ * The fixture world's workflow. `seedTicket` writes `proj_tickets` rows naming
+ * `wf-seed@1` and **does not publish a definition for it** — a shortcut that was
+ * invisible while nothing read a ticket's state NAME off these rows.
+ *
+ * It is visible now. `readMyWork` serves `stateNames` (ruling P40's change set)
+ * and throws, exactly as `assembleListCards` already did, when a ticket names a
+ * definition `proj_workflows` does not hold — which is not a state the product
+ * path can reach, because the door refuses a `ticket.created` whose type names
+ * an unpublished workflow. So the throw is right and the FIXTURE is the
+ * incoherent thing.
+ *
+ * `seedWorkflowDef()` below is the opt-in fix, and it is opt-in deliberately:
+ * `seedTicket` is used by twenty-three test files and ten of them read
+ * `proj_workflows`, so making every seeded world publish a definition would
+ * change what those files count. **Owner for the general fix: whoever next
+ * needs a state name over a `seedTicket` world** — at that point the choice is
+ * to publish here for everyone and re-measure the ten, or keep opting in.
+ * `verify-projections` diffs projections against a ledger replay, so any fix
+ * must go through an EVENT and never a direct `proj_workflows` insert.
+ */
 const SEED_WORKFLOW_ID = 'wf-seed';
 const SEED_WORKFLOW_VERSION = 1;
 const SEED_STATE_ID = 'todo';
@@ -365,6 +385,45 @@ async function insertTicketHead(
  * A claim where the two DISAGREE is Task 9's refusal to make; the projection
  * keys on the entity regardless (`proj-visibility.ts`).
  */
+/**
+ * `workflow.defined` for the workflow `seedTicket`'s rows already name, so a
+ * fixture world can answer a ticket's state NAME.
+ *
+ * Version 1 with the three states `SEED_STATE_ID` sits in the first of, so a
+ * ticket seeded before or after it resolves the same way. Published as an EVENT
+ * rather than inserted, because `verify-projections` rebuilds every projection
+ * from the ledger and diffs it against the live table: a row with no event
+ * behind it fails that comparison.
+ *
+ * Idempotent in practice — `proj_workflows` is `ON CONFLICT (workflow_id,
+ * version) DO NOTHING` — but call it once per world; a second call appends a
+ * second identical event to the ledger.
+ */
+export function seedWorkflowDef(workspaceId: string, actorId: string = SEED_ACTOR): LedgerEvent {
+  return testEnvelope({
+    workspaceId,
+    entity: { kind: 'workflow', id: SEED_WORKFLOW_ID },
+    type: 'workflow.defined',
+    payload: {
+      id: SEED_WORKFLOW_ID,
+      version: SEED_WORKFLOW_VERSION,
+      name: 'Seed flow',
+      initialStateId: SEED_STATE_ID,
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'doing', name: 'Doing', category: 'active' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [
+        { from: '*', to: 'todo', rules: [] },
+        { from: '*', to: 'doing', rules: [] },
+        { from: '*', to: 'done', rules: [] },
+      ],
+    },
+    actorId,
+  });
+}
+
 export function setVisibilityEnv(
   workspaceId: string,
   ticketId: string,
