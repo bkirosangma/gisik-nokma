@@ -16,14 +16,38 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# ⛔ SERIAL EXECUTOR, SUNDAY 2026-09-06 ~21:05 IST — **THE MONDAY PRECONDITION IS NOT MET, AND LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER.** Two findings, both measured. Nothing is in flight; no PR is open.
+# ⛔ SERIAL EXECUTOR, SUNDAY 2026-09-06 21:30 IST — **§10 BACKFILLED TO ZERO UNCITED (gate green, PR open); LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER (ruling pending); AND IT IS SUNDAY, NOT MONDAY.**
 
 | anchor | value |
 |---|---|
 | `main` | **`873b86b`** (`git rev-parse --short origin/main`, fetched 21:00). The override's §0 said `bf1c517`; `873b86b` is #229 (the controller's own closing docs block) on top of it. **The override's §0 has aged by exactly one docs commit** |
-| my branch | `exec/52-lane-f-pass2-semantic`, created off `origin/main` at `873b86b`, **0 commits ahead** at the time of writing, worktree clean |
+| my branch | `exec/52-lane-f-pass2-semantic` off `origin/main` at `873b86b`, **3 commits ahead**, head `a69b64d`, worktree clean. **PR open, head FROZEN until the controller says merged** |
 | the branch I was launched on | **`exec/50-p43-refusal-exports` IS DEAD — it *was* PR #225**, squash-merged as `628befb`. `git branch -r --contains e92c776` → **empty**. Verified subsumed: `git diff origin/main HEAD` has **zero `+` lines**. Do not resume it |
-| gate | **NOT RUN this session.** No code has been touched. The last forced gate at `bf1c517` stands as the override records it |
+| **gate at `a69b64d`** | lock v3.3, `--force --concurrency=1`, `GATE_REPO` set to this worktree: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m31s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed \| 5 skipped (3671) / 285 files** — **identical to the forced gate at `bf1c517`**, which is the prediction a comments-only change owes and the reason the count is evidence rather than decoration. `check:env` 0 · `check:citations` 0 (1529 ✅ / **780 cited / 749 uncited**, ratchet holds on every file) · `check-case-ids` 0 (1614, highest 13.209) · `check:runbook` 0. Zero orphaned workers |
+| ledger | 177/177 unchanged — the backfill has no ledger row |
+
+## DONE THIS SESSION — §10 citation backfill, 66 uncited → **0** (queue item (f)/the carried backfill, the one item needing no ruling)
+
+`10-workflow-builder.md` was one of the two all-or-nothing catalogue files. Now **66 cited / 0 uncited**; baseline
+tightened `66 → 0`, **no other file's entry touched**. Comments only — 18 files, +200/−1; **zero** non-comment
+added lines and **zero** removed lines outside the baseline JSON, checked independently of the implementer's
+report, with the checking filter itself positive-controlled.
+
+**The count was PROVEN, not counted.** `10.1` is a prefix of `10.10`–`10.19`, so a substring-matching checker
+would call §10 clean whether or not `10.1` was ever cited. Predicted, then measured: removing the sole `10.1`
+docblock → `EXIT=1`, *"65 cited / 1 uncited"*, naming **`10.1` and only `10.1`**. The checker does not
+substring-match; every citation is site-specific. Restored and verified **by reading the line back**, never a
+shell `diff`. Repo-wide `714 → 780` cited / `815 → 749` uncited — **Δ=66 exactly**, no other file moved by one id.
+
+Six rows carry a single citation for a row naming several tests (10.1, 9, 17, 29, 37, 59) — allowed, and named
+here rather than left to be discovered. 10.59 was read against its test; its docblock states the clause the test
+actually asserts, not the whole four-clause row.
+
+**Subagents this session: ONE** (sonnet, transcription class, per the model table). No Workflow, no fan-out.
+
+**NEXT, and it needs no ruling: §09** — `09-editor-attachments.md`, **219/219 uncited**, the other all-or-nothing
+file. Same method. It was NOT started concurrently with §10 because both would edit
+`scripts/fixtures/check-case-citations-baseline.json` and collide.
 
 ## FINDING 1 — it is **Sunday 21:05**, not Monday. The override's own precondition has not happened.
 
