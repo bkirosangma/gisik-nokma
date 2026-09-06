@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax`, and the repo already
 // settled this at packages/ui/test/components.test.tsx. The plan's Task 9
@@ -823,5 +823,33 @@ describe('3.112 an empty board says words, not nothing', () => {
     // real column set would delete the one thing the board is for.
     expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument();
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+  });
+});
+
+/**
+ * 3.155/3.156 — the two `data-testid` hooks Plan 11 T13's E2E needs to
+ * address one specific column or ticket among structurally identical
+ * siblings, house style `field-${fieldId}` (disambiguation only — every
+ * interaction still goes through role/accessible-name, never the testid
+ * itself).
+ */
+describe('Board — entity-keyed data-testid hooks (Plan 11 T13)', () => {
+  it('3.155 keys each column by its own stateId, one id per sibling', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    expect(screen.getByTestId('board-column-todo')).toBeInTheDocument();
+    expect(screen.getByTestId('board-column-doing')).toBeInTheDocument();
+    expect(screen.getByTestId('board-column-waiting')).toBeInTheDocument();
+    expect(screen.getByTestId('board-column-done')).toBeInTheDocument();
+  });
+
+  it('3.156 keys each card slot by its own ticketId, distinguishing two siblings', () => {
+    const GST = boardCardSeed({ ticketId: '01J9GTKA000000000000000001', title: 'File the GST return' });
+    const LICENCE = boardCardSeed({ ticketId: '01J9GTKA000000000000000002', title: 'Renew the trade licence' });
+    render(<Board board={errandBoard([GST, LICENCE])} onOpenTicket={() => {}} />);
+    const gstCard = screen.getByTestId('ticket-card-01J9GTKA000000000000000001');
+    const licenceCard = screen.getByTestId('ticket-card-01J9GTKA000000000000000002');
+    expect(gstCard).not.toBe(licenceCard);
+    expect(within(gstCard).getByText('File the GST return')).toBeInTheDocument();
+    expect(within(licenceCard).getByText('Renew the trade licence')).toBeInTheDocument();
   });
 });
