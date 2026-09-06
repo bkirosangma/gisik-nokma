@@ -657,6 +657,90 @@ describe('GET /v1/projects/:projectId/tickets — the five ListCard facts (P25 c
         .find((card) => card.ticketId === fixtures.hiddenEpicId)?.hasRestrictedParent,
     ).toBe(false);
   });
+
+  /**
+   * 7.219 — THE THIRD BRANCH, which 7.211 recorded as unconstrained and which
+   * survived its own mutation for as long as it had no fixture.
+   *
+   * `restrictedParentsFor` reports a child only when its parent is **known AND
+   * invisible** (`src/read/restricted-parents.ts`, the final loop). Deleting the
+   * `knownParents.has(...)` conjunct left all 74 cases in this file green,
+   * because every fixture parent has a `proj_visibility` row — so the branch
+   * that answers `false` for a parent the system has NO EVIDENCE FOR was
+   * asserted by nothing.
+   *
+   * It matters because the two `false`s mean opposite things. "A parent you may
+   * see" is a visibility answer; "a parent that is not there" is a refusal to
+   * invent one. Without the conjunct the second becomes `true` — the route would
+   * report a restricted parent for a ticket that does not exist, asserting the
+   * existence of a row the system cannot produce. That is an INVENTED existence
+   * leak, the exact inverse of the disclosed one `routes/tickets.ts` argues for
+   * at the same fork (case 6.9 resolves such a ticket as a ROOT).
+   *
+   * **The row is written by hand and this case says so**, the precedent 7.214
+   * set: the door refuses a `ticket.created` naming a parent with no row, so the
+   * product path cannot reach this state today and a scenario-shaped fixture
+   * would be a fiction. What is under test is the READER's contract — what
+   * `restrictedParentsFor` must answer if it ever meets such a row — and the
+   * projection is restored in `finally` so no sibling case inherits it.
+   */
+  it('7.219 a `parent_id` naming no `proj_visibility` row is NOT restricted — the branch that refuses to invent a parent', async () => {
+    const GHOST = 'tk_ghost_with_no_visibility_row';
+    const subject = read.world.sharedTaskId;
+
+    // The precondition, measured rather than assumed: the ghost really has no
+    // visibility row. If it ever had one this case would be asserting the
+    // ordinary visible-parent branch while claiming to assert this one.
+    const before = await db.pool.query('SELECT ticket_id FROM proj_visibility WHERE ticket_id = $1', [
+      GHOST,
+    ]);
+    expect(before.rows, 'the ghost parent has no proj_visibility row').toEqual([]);
+
+    const restore = await db.pool.query<{ parent_id: string | null }>(
+      'SELECT parent_id FROM proj_tickets WHERE ticket_id = $1',
+      [subject],
+    );
+    expect(restore.rows, 'the subject ticket exists to be re-parented').toHaveLength(1);
+
+    try {
+      const updated = await db.pool.query(
+        'UPDATE proj_tickets SET parent_id = $2 WHERE ticket_id = $1',
+        [subject, GHOST],
+      );
+      // The fixture TOOK. A silent zero-row update would make every assertion
+      // below a statement about an unparented root — passing for the wrong
+      // reason, which is this file's recurring failure mode.
+      expect(updated.rowCount, 'the dangling parent was actually written').toBe(1);
+
+      const forMember = await listOf('member', read.world.projectId, { limit: 200 });
+      const card = forMember.groups
+        .flatMap((group) => group.cards)
+        .find((entry) => entry.ticketId === subject);
+      expect(card, 'the re-parented ticket is still in the member’s page').toBeDefined();
+      // The card carries the dangling id — so the route SAW a parent and still
+      // answered false. Without this line, `false` could mean `parent_id` was
+      // null and the branch would be untested a second way.
+      expect(card?.parentId).toBe(GHOST);
+      expect(card?.hasRestrictedParent).toBe(false);
+
+      // The control that separates this branch from "the rule is off": in the
+      // SAME run, the known-and-invisible parent still answers true. A mutation
+      // that made `hasRestrictedParent` constantly false would satisfy the
+      // assertion above and fail here.
+      const epicPage = await listOf('member', fixtures.epicProjectId, { limit: 200 });
+      expect(
+        epicPage.groups
+          .flatMap((group) => group.cards)
+          .find((entry) => entry.ticketId === fixtures.visibleChildId)?.hasRestrictedParent,
+        'the known-and-invisible parent still answers true in this same run',
+      ).toBe(true);
+    } finally {
+      await db.pool.query('UPDATE proj_tickets SET parent_id = $2 WHERE ticket_id = $1', [
+        subject,
+        restore.rows[0]?.parent_id ?? null,
+      ]);
+    }
+  });
 });
 
 describe('GET /v1/projects/:projectId/tickets — hierarchy', () => {
