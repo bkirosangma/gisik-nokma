@@ -491,6 +491,35 @@ edit with no effect.
 8. The `TicketState`-fold `BoardCard.cause` ❌ case under P36, the 7.210/7.211 fixture items — with **Lane A**
    after `getMyWork`'s residuals, unless A runs out of runway; then F.
 
+### RULING P37.2 (2026-09-06 09:15, controller as ruling tier) — closure 5c's "reconcile the named ids" CANNOT work; the notice carries a head seq per id, and the client pulls iff its local copy is behind
+
+**Measured by Lane B rather than argued:** it built the minimal 5c exactly as ruled and wrote the
+12.274-shaped fixture (narrow → other → widen on ONE live socket, no reconnect, no manual reconcile) —
+**red with the fix in place; `b.pulls` is `[]`.** Structural, not a bug: a notice only ever names ids the
+reader can see NOW (`grant-backfill.ts:300` yields a candidate only `if (canSee(...))`), and reconcile
+returns an id as restricted only `if (!canSee(...))` (`reconcile-route.ts:140`) — **same function, same
+instant, complementary predicates; the intersection is empty by construction.** The stale partial copy is
+stale in its CONTENT; `canSee` answers about its AUDIENCE. Reconcile is the wrong instrument, not a
+mistimed one — the escalation clause in 5b's override ("if the notice must carry more than ids and the
+trigger, escalate") fired correctly.
+**RULING: the grant/reach notice carries, per named ticket, the server's current head seq for that ticket
+(`{id, headSeq}`); the client pulls iff its local max seq for that ticket is below `headSeq`, and skips
+when equal.** It discriminates a complete copy from a stale partial one, which `canSee` never can at any
+timing. Disclosure: an application, not a new rule — the notice already names only ids the viewer can see
+now, and a seq for such a ticket reveals nothing the pull would not deliver moments later. Bounded (one
+integer per id already in the notice), no per-subscriber server state; the amplifier bound holds (a fully
+up-to-date client pulls nothing — 12.276 stays the control). **Constraints:** 12.316 lands GREEN as the
+12.274-shaped case, with mutations both directions alone (comparison → "always equal" reddens 12.316;
+→ "always pull" reddens 12.276); `headSeq` is the ledger's own `workspaceSeq` of the ticket's latest
+event, read from the row the walk already touches — copied, never computed (P36's discipline);
+`reconcileNamed` is DELETED from the engine and the rig (dead code with a docblock is a false sentence
+waiting to be reasoned from); the reconnect-scheduled reconcile — the narrow half — stays. **Two process
+failures Lane B recorded against itself:** it mutated an UNCOMMITTED tracked file (`git checkout HEAD --
+rig.ts` reverted its own unlanded mirror — "commit before mutating" applies to tracked-but-dirty files,
+not only untracked ones; the sweep's "restored (want 1): 0" line caught it); and its first 12.316
+baseline was already red before any mutation and the later reds nearly read as the mutation working —
+the paired-mutation rule's other half.
+
 ### RULING P40 (2026-09-06 08:45, controller as ruling tier) — `/v1/me/work` serves the viewer's OWN contested claims (Door B); mappers.ts's "never will" was wrong and is corrected in place
 
 **Lane A found two landed docblocks contradicting each other** on which door serves `MyWorkView.contested`
