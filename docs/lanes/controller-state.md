@@ -419,12 +419,40 @@ mechanism firing benignly — the holder was still in its acquire loop.*
    copy because narrowings purge nothing (6.101 struck the walk; 6.104 is the disclosed residual). What
    closes it is BOTH halves in `onCaughtUp`'s order: reconcile purges, THEN the notice finds a ticket not
    held — the narrow half is a PRECONDITION of the grant half converging, now written into
-   `grant-backfill.ts`. **Residual, disclosed:** reconcile is bounded by a minimum interval, so a
-   narrow-and-re-widen inside that window leaves the stale copy unrepaired until the next reconcile —
-   12.274 at reduced width, bounded in time where it was permanent. **Owner: Lane F as "closure 5c:
-   reconcile-on-notice"** — candidate close: a grant notice naming a ticket the client already holds
-   triggers a reconcile of THAT id before the pull, making the interval irrelevant for exactly the
-   tickets the notice names.
+   `grant-backfill.ts`. **Residual — CORRECTED 08:58 by Lane B's own review: it is NOT bounded in time.**
+   The first report said reconcile runs on every catch-up completion and the residual was bounded by a
+   60 s interval; **`hub.ts:295` gates on `caughtUpSent`, a per-SUBSCRIPTION latch — reconcile runs once per
+   RECONNECT.** On a stable live socket a narrow-and-re-widen with no reconnect between them never
+   reconciles: **12.274 is the full defect there**, and 12.275 is green only because it calls reconcile by
+   hand. **Ruling (08:58): closure 5c's MINIMAL form — on a grant/reach notice, reconcile the NAMED ids the
+   client already holds before pulling the rest, so neither the interval nor the reconnect latch matters
+   for exactly the tickets the notice names — is folded into #161's fix round IF it is the notice handler
+   plus its 12.274-shaped fixture (narrow → other → widen on ONE live socket, no reconnect, no manual
+   reconcile → `replicasEqual`); otherwise it stays Lane F's.** Every "bounded in time" sentence on the
+   branch is being corrected.
+
+**#161 HELD AGAIN (08:58) — the Fable branch review found a CRITICAL in the branch's most confident claim,
+reproduced by Lane B by reading:** its docblock said *"the refold hazard closes as bootstrap-before-apply
+on any event for an entity not held"* — **no such rule existed.** `applyServerItem` refolds on ANY folding
+ticket event with no holdings guard (`replica.ts:954`); `refoldTicket` starts from `state = undefined`;
+`applyTicketEvent` throws "never created" (`ticket-state.ts:145`) → `stall()`, the one-way latch. The only
+bootstrap-before-apply built was for ids a notice named AND whose pull SUCCEEDED. Two sequences: (a) a
+transient pull failure → the id stays pending → the trigger `ticket.reparented` for that ticket arrives one
+link later → refold throws → STALL — the terminal stall the swallow was built to avoid, one link past where
+the author was looking; (b) deterministic: the 200-cap leaves ticket 201 unnamed, a later ordinary
+transition on it throws the same way, and `needsBootstrap` refuses to re-bootstrap over a local baseline —
+pre-existing in kind under closure 5's cap, WIDENED by 5b (`readerReachNoticeFor` caps a whole project or
+workspace where the old walk capped one subtree). **Fix under way, shape ruled:** make the rule real — a
+fold failure for a ticket-entity event whose ticket the replica does NOT hold records the id as owed and
+drains; a fold failure for a HELD ticket still stalls, loud; both halves get excluding fixtures (mutate the
+owed path away → the latch fires → red; mutate the held-ticket stall to swallow → red). Also in the round:
+`loadTicketBootstrap` applies definitions without `foldTicketsOntoVersion` (a client pulling across a
+workflow publish keeps stale categories until the NEXT publish); two stale docblocks; the hub's
+`reach-granted` arm had NO test. **Refuted under attack and kept:** the disclosure argument (every id
+passes `canSee` as-of-now per candidate; authored descendants pruned; guests resolve through the explicit
+list; the cycle guard terminates) and the notice-before-trigger ordering. *A claim true of the pull's own
+rejection and false of the chain behind it — the exact class this series punishes, in the lane that had
+just written that sentence about someone else.* The review cost ~378K subagent tokens.
 2. **12.290 (the wedge) stays 🟡, not ✅, and refusing the flip is the point:** the mechanism is gone, but
    the flip condition (a slow-consumer close MID-PULL followed by convergence) is unmeasurable here —
    **nothing in this repo can cut a socket** (the rig has none by construction; the engine's tests use a
