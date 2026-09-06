@@ -100,7 +100,7 @@ main as part of P33.
 | T2 | CORS + 3 rate-limit buckets + **HTTP-Origin** + invite-mint bucket | **DONE — `805b39c`** (rebased). Critical fixed: `trustProxy` made the limiter key attacker-chosen |
 | T3 | error alerting hook | **DONE — `b5ec53a`.** 2 Criticals, both guards that could not fire |
 | T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | **DONE.** 3 Importants, incl. a 2-minute sign-in hang |
-| T5b | SIGTERM / shutdown path (inherited errand #2) | **NEXT** — plan has no text for it; the 3197ms/172ms measurement is the spec |
+| T5b | SIGTERM / shutdown path (inherited errand #2) | **CHECKPOINTED PRE-REVIEW** — implementer complete + gate-verified by it; REVIEW ROUND NOT RUN (session window) |
 | T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
 
 **Seam 2 (PR 2) — T7 seed plumbing · T8 Convenience Corner mapping · T9 seed runner · T10 dev seed ·
@@ -1470,3 +1470,41 @@ fails **closed**, so an unapplied projection reddens that test rather than passi
 **Rebase target: `aa17046`** (or later), `pnpm install` after. **Deferred deliberately** — the shutdown
 workflow is mutating `index.ts` right now, and the standing rule is that nothing touching a file under
 mutation moves until its completion notification lands.
+
+---
+
+# ⛔ CHECKPOINT AHEAD OF THE 10:05 SESSION WINDOW — READ THIS FIRST ON RESTART
+
+**The shutdown path is committed but NOT REVIEWED.** Its implementer finished and ran its own gate; the
+**review round and any fix round did not run** — the account-wide session meter was at 87% at 09:40 with a
+halt forecast around 10:05 and a reset at 12:20, and a review that cannot finish is worse than one not
+started, because the branch would then carry a half-applied fix.
+
+**FIRST ACTION ON RESTART — do not skip and do not treat the code as reviewed:**
+
+1. **Run the review round for the shutdown path.** The dispatch is staged and reusable at
+   `scratchpad/t5b-workflow.js`; re-running it replays the implementer from cache and runs review+fix live
+   (`Workflow({scriptPath, resumeFromRunId: 'wf_8d8cd44c-120'})`). **The single most important check is
+   the one in that brief: DELETE the handler and re-run the test — if it still passes, the errand is not
+   closed and that is Critical.**
+2. **Then rebase onto `aa17046` or later** and `pnpm install`.
+3. **Then T6** — `docker-compose.dev.yml`, five services, Postgres on **54330** (NOT the plan's 54329,
+   which is the shared test Postgres), and the `OBJECT_STORE_S3_*` vs `S3_*` split that would otherwise
+   strand attachments on container-local disk.
+4. **Then the retroactive §13 catalogue** for T1 and T5 from **13.101**, and the seam-1 PR — whose body
+   owes the sentence that the retroactive catalogue counts as the same change set only because seam 1 is
+   one PR.
+
+**Safety checks done before this checkpoint**, because the standing rule forbids committing a file a
+subagent is mutating: no `MUTANT`/`MUTATION` marker in `index.ts` or `shutdown.test.ts` (positive control:
+`SIGTERM` appears 9× and 7× respectively), and the agent was running a gate, not a mutation, at the time.
+
+**What the implementer built** (its own gate green; totals not independently recounted by me):
+handlers for SIGTERM and SIGINT in the one non-test boot path, `app.close()` (bounded 5 s) → `pool.end()`
+(bounded 2 s) → exit, with a whole-process deadline at 8 s. The bounds are argued from `docker stop`'s
+**10 s default** as the binding constraint (Kubernetes 30 s, App Platform larger), leaving room to
+actually exit. `withDeadline` attaches a `.catch` to the abandoned promise because **`Promise.race` does
+not cancel the loser**, so a step rejecting after its deadline would otherwise surface as an
+`unhandledRejection` and kill the process mid-shutdown, skipping the steps after it. A `shutdownStarted`
+flag makes a second signal a no-op and stops a signal landing during `app.listen` from turning a clean
+stop into `exit(1)`.
