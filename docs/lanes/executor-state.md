@@ -16,6 +16,113 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — **LANE F FIXTURE-WITNESS PASS, PHASE 1 (INVENTORY) IN PROGRESS** on `exec/39-fixture-witnesses`
+
+> **Position, 2026-09-06 ~12:50 IST.** Branch cut from `origin/main` `3e6d606`. Tree clean at cut.
+> Phase 1 is READ-ONLY by the override: inventory → report to controller → **wait for a scope answer**
+> before building any witness. Nothing is being edited. No gate has been run on this branch and none is
+> owed yet — a docs-only inventory push does not need one.
+
+## ANCHORS — measured on this branch, not adopted
+
+| what | value |
+|---|---|
+| branch | `exec/39-fixture-witnesses`, cut from `origin/main` **`3e6d606`** (#181, Lane A's own handoff) |
+| merge-base | `3e6d606` — `git branch --contains 3e6d606` lists `main`, so REACHABLE, not orphaned |
+| node | **v22.22.2** |
+| install / rebuild / build | `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · `BUILD_EXIT=0`, **`0 cached, 10 total`**, 24.9s |
+| `check-case-ids` | **`CHECK_IDS_EXIT=0`** — 1,338 unique ids, union == sum, highest 13.100 |
+| open PRs at cut | **#161** (Lane B, closure 5b, `exec/29-closure5b-reach`, **CONFLICTING**) and **#183** (Lane C, Plan 11 T11+T12 backups, MERGEABLE) — #183 is NEW since the override was written |
+
+## IDS — recounted on this branch with the file's own two-style control
+
+- **§12: Lane A holds `12.320–12.339`, used through `12.322`. Next free for me: `12.323`.**
+  The three used ids are in **bold** style (`- **12.320** ✅ …`), which is exactly why the naive
+  `grep -o '^- 12\.[0-9]*'` reports the highest minted id as `12.291` and misses my whole block.
+  Both styles were run; they agree once the bold form is included.
+- **§7 next free: `7.221`** — two independent patterns agree that `7.220` is the highest in use.
+- §6: 6.180+ on request, still untouched.
+
+## PHASE 1 FINDINGS I MEASURED MYSELF, BEFORE ANY SUBAGENT REPORTED
+
+These were made directly, by reading the files, and do not depend on the fan-out.
+
+### 1. The client-against-real-server witness surface is ONE FILE, and #161 freezes it
+
+Verified three ways, each with a positive control:
+
+- `grep -rn "@gisik-nokma/app-core" apps/server/test` returns **two** real imports:
+  `integration/client-contract.test.ts:19` (`mapListPage`, `mapTicketRead`, via the `/online`
+  subpath) and `dual-client/rig.ts:31` (`createReplicaDataSource`). Positive control on the same
+  run: 98 files import `@gisik-nokma/domain`.
+- `apps/server/package.json:36` carries `"@gisik-nokma/app-core": "workspace:*"`, so the edge exists
+  and nothing is being hidden by a missing dependency.
+- A third sweep — files that both `inject(` a route and mention app-core — returned
+  `real-door-round-trip.test.ts` as well. **That is a false positive and I resolved it rather than
+  reporting it:** its only match is a PROSE comment at `:1016`. It imports no client code at all.
+
+**So `real-door-round-trip.test.ts` (53.5K, 21 cases) is a server→server witness — real write door to
+real read door — and is a witness for NO client fixture's protocol.** Anything citing it as one is
+citing the wrong file. **Both files that do execute client code are frozen by #161.**
+
+### 2. Eighteen of twenty mapper entry points have never seen a real server body
+
+`packages/app-core/test/online/mappers.test.ts` is 1,436 lines and exercises twenty entry points
+(`mapProvenance`, `mapRollup`, `mapActors`, `rosterByActorId`, `mapBoardView`, `boardWorkspaceId`,
+`mapHistory`, `mapWorkflowDef`, `mapTicketTypes`, `mapIngestResults`, `toClientFilterSpec`,
+`toServerFilterSpec`, `mapPreferences`, `toServerPreferences`, `mapWorkspaceRefs`, `mapListPage`,
+`mapTicketRead`, `mapSearchHits`, `mapMyWork`, `mapAttention`) **entirely against hand-authored
+literals** — it injects no route and builds no app; its only three mentions of the server are prose.
+`client-contract.test.ts` executes **two** of the twenty over a real body (`mapListPage` at 7.220,
+`mapTicketRead` at 7.213). `mapSearchHits` is `never` and N.A.
+
+**That is the generalisation of my own defect, with a number on it.** `pagingFetch` was one wrong
+protocol among seventeen unwitnessed ones; nothing structural distinguished it from its neighbours.
+
+### 3. `recordingFetch` is the central mirror, and it encodes two server-owned things at once
+
+`online-data-source.test.ts:29` — `recordingFetch(answers: Record<string, unknown>)` is a
+**path → body map** with ~20 call sites. It encodes (a) the URL PATH the client builds, and (b) the
+BODY shape served at it. Both belong to the server. A path the client gets wrong and a body the
+author invented are indistinguishable from correct ones inside this file, which is precisely the
+`pagingFetch` shape one level up: `pagingFetch` got the *semantics* of one field wrong; nothing here
+would catch a wrong *path*.
+
+### 4. `stub-services.ts` is mostly N.A., and its refusal half is genuinely witnessed — recorded so nobody spends on it
+
+`apps/web/test/helpers/stub-services.ts` fakes `DataSourceQuery`, which is **app-core's own type** —
+no external authority to disagree with, so N.A. under the rule. Its `refuse()` builds from the REAL
+`SERVING_GAPS` table and throws when a gap disappears, which is how two served reads announced
+themselves by taking eighty-six tests down. Its default for an un-stubbed read is reject-by-name, not
+`[]`. **This helper is not the problem.** The residual risk is in the per-test `overrides`, which are
+hand-built view values — weaker, because the view types are app-core's own.
+
+### 5. A live divergence, found by the consumer-keyed sweep — RECORDED WITH AN OWNER, NOT FIXED
+
+The server's error vocabulary is **mixed snake_case and kebab-case**:
+`error: 'not_found'` ×5, `'not_a_member'`, `'invalid_query'`, `'invalid_limit'`, `'invalid_filter'` ×6
+against `error: 'not-found'` ×1 (`apps/server/src/routes/attachments.ts:28`), `'payload-too-large'` ×2,
+`'bad-request'` ×2, `'unsupported-media-type'`.
+
+`attachments.ts` is the lone hyphen `not-found` where every other not-found route uses the underscore,
+and six assertions in `attachments-{download,upload}.test.ts` pin the hyphen form — so the tests agree
+with the code and neither is evidence about the other. **Latent today**: no client reads the string at
+all (`http.ts` carries `body` as `unknown`; `:110` gates on `response.status === 404` and the METHOD,
+never on the body), so nothing discriminates on it. It becomes load-bearing the first time a client
+does. **Owner: the server's route surface — Lane C or E, whoever next touches `attachments.ts`.**
+Not mine to fix: it is in `apps/server/src/`, which this lane may not touch at all.
+
+## WHAT I FOUND BY LOOKING, THAT CHANGES THE SHAPE OF PHASE 2
+
+The override anticipated a sibling file "until #161 merges". Finding 1 says that is not a
+convenience but the **only** available home: there is no unfrozen file in the repo that executes
+client code against a real route. A witness written anywhere else is not a witness.
+
+---
+
+# ↓ PREVIOUS LANE A BLOCK — `IDLE after #176`. Its POSITION is superseded by the block
+# above; its ids, its carried-items table and its two findings remain live.
+
 # LANE A — **IDLE. #176 IS MERGED as `2d2bc5c`. Nothing is in flight. Awaiting re-tasking.**
 
 > **Read this line before anything below it.** `exec/37-c2-cursor` is MERGED and gone; every claim in
