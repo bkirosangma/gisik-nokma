@@ -16,6 +16,41 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 SUNDAY 2026-09-06 ~23:55 IST — **CLAUSE A ROUND 3 DONE. `exec/60-clauseA-3` is STAGED, NOT YET A PR — it stacks on #239, which is still open.** Nothing in flight, no subagent, no ruling outstanding.
+
+| what | value |
+|---|---|
+| `main` | `998044d` |
+| **#239** | **OPEN** — `exec/59-clauseA-closure-patterns` (7.258). Merge that first |
+| **staged** | **`exec/60-clauseA-3`**, head `25421b9`, pushed, stacked on `fa954a3`. ONE commit: **7.259**, catalogue-only. **When #239 merges: cherry-pick `25421b9` onto `main` and open the PR** (a plain rebase will conflict — #239 squash-merges, same as #237 did) |
+| gate | **NOT owed for `exec/60`** — catalogue-only, no code touched. `check:citations` 0 (§07 156/78 unchanged, a ❌ row owes no citation) · `check-case-ids` 0 (**1620**) |
+| §7 | 7.254–7.259 minted. **Next free: 7.260** |
+
+## Clause A's full result — 6 probes, 2 candidates, 2 closed exemplars, 1 already-owned, 1 near-miss
+
+**The pass is essentially DONE for the client packages.** Stating the yield honestly matters more than the count:
+
+- **7.256 / 7.257** (merged, #237) — the two real candidates.
+- **7.258** (#239, open) — the closure-pattern reference, and the row that redirects the other two: **de-duplication is not automatically the fix.**
+- **7.259** (staged) — `FOLDING_TICKET_TYPES` declared twice as two aliases of one import. Small, and the row says so first.
+- **NOT a finding — `submit.ts`:** a real near-duplicate of `domain/src/submit.ts`, already pinned by `app-core/test/submit.test.ts:101`.
+- **NOT a NEW finding — the strongest mirror in the client packages is ALREADY OWNED.** `packages/sync-client/src/replica/sync-item.ts` declares itself *"the CLIENT-SIDE MIRROR of `apps/server/src/visibility/visible-events-for.ts`"*, explains why it cannot import (sync-client must not depend on `apps/server`), says exactly what IS compile-time enforced (`net/http-transport.ts` carries an exhaustiveness assertion on domain's `ServerStreamFrame`, verified by deletion → `TS2344`) and what is NOT (*"the shapes themselves … nothing fails if one side grows a field"*), and records the fix — move the types into `@gisik-nokma/domain` — with **`Owner: still open`**. It is also catalogued at **6.96 ❌**. **Minting a row for it would be duplicate bookkeeping.** This is the standard other mirrors should be held to.
+
+## ⚠ A NEAR-MISS worth more than 7.259 itself — the wrapped-comment FALSE POSITIVE
+
+A grep hit at `replica.ts:439` returned the half-sentence *"`TICKET_EVENT_TYPES` is exactly {`comment.added`, `attachment.added`}"* — which contradicts the constant's real **ten** entries and `sync-routes.ts:32`'s own *"ten of them"*. It looked like a documentation defect on a load-bearing constant.
+
+**It is correct.** The sentence **wraps across two comment lines** and its real subject is *the intersection of `BOOTSTRAP_BACKFILL_TYPES` and `TICKET_EVENT_TYPES`*.
+
+> This series already records that a wrapped comment gives grep a false NEGATIVE (the seventh silent-search shape). **The same wrapping gives a false POSITIVE when the matched half reads as a complete claim.** Never report a finding whose whole evidence is one grep hit inside a comment without reading the surrounding lines. Recorded at 7.259 as well as here.
+
+## NEXT — no ruling, no dispatch needed
+
+1. **Merge #239, then open `exec/60`'s PR** (cherry-pick onto `main`).
+2. **Clause A from 7.260 if continued** — remaining unprobed: `packages/ui` (9 src files), `app-core/src/{cache,cache-feed}.ts`, `sync-client/src/engine/sync-engine.ts` (995 lines). **Diminishing returns are visible**: rounds 2 and 3 each returned more counter-examples than candidates, which is evidence the client packages are in better shape than the pass assumed, not evidence the pass is failing.
+3. **Backfill targets** (uncited): §13 **153** · §07 78 · §12 78 · §05 67 · §06 63 · §03 45 · §04 45. **§12 needs a CONTROLLER-ALLOCATED BLOCK first.**
+
+
 # 🟢 SUNDAY 2026-09-06 ~23:45 IST — **CLAUSE A CONTINUED: 7.258 written, the pass's COUNTER-EXAMPLES. Gate green, PR open. Nothing in flight, no subagent, no ruling outstanding.**
 
 | what | value |
