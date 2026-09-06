@@ -994,6 +994,98 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
   });
 
   /**
+   * 12.365 — THE SIXTH FRAME, OFF THE SOCKET, THROUGH THE TRANSPORT'S OWN
+   * EXTRACTION.
+   *
+   * 12.167 above drives five frames and `ServerStreamFrame` has had SIX members
+   * since closure 5b added `reach-granted`. The missing one is not a
+   * bookkeeping gap: `http-transport.ts`'s `reach-granted` arm is **the only
+   * branch in this switch that reads fields out of a nested array**, and every
+   * `reach-granted` elsewhere in this file arrives PRE-PARSED as
+   * `{kind:'reach-granted', …}` through `script.handlers.onItem` — which is the
+   * engine's door, not the wire's, and skips this extraction entirely.
+   * Measured before writing this: `grep "type: 'reach-granted'"` over
+   * `packages` and `apps` returns no `sync-client` test at all, with the same
+   * shape finding `caught-up` three times in this file as its control.
+   *
+   * **What this does NOT close, because it was measured and found already
+   * closed:** `app-core`'s `parseFrame` has a deep witness — `stream.test.ts`'s
+   * `SCHEMA_FIXTURES` loop asserts `parseFrame(JSON.stringify(frame))` equals
+   * the frame, so both `{id, headSeq}` pairs survive there by deep equality.
+   * The carried item named "`parseFrame`/transport"; the transport is the half
+   * that was actually unwitnessed, and saying so is the point of measuring
+   * rather than adopting.
+   *
+   * The ids and `headSeq`s are DISTINCT and non-sequential on purpose. Equal
+   * values, or values equal to their array index, would let a transposition or
+   * an index-for-value substitution pass; `headSeq` in particular goes straight
+   * into the comparison that decides whether a ticket is pulled at all.
+   *
+   * *Mutation: drop `headSeq` from the transport's element predicate and emit
+   * `{id}` only, or rename the emitted key → red HERE alone. The measured
+   * count is at the case in `test-cases/12`.*
+   */
+  it('12.365 a `reach-granted` frame off the socket reaches onItem with its {id, headSeq} list intact', async () => {
+    const { transport, socketOf } = transportFixture();
+    const items: SyncItem[] = [];
+    const handle = transport.openStream(WS, 0, {
+      onItem: (item) => items.push(item),
+      onCaughtUp: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+    const socket = socketOf();
+    socket.onopen!({});
+    const send = (frame: unknown): void => socket.onmessage!({ data: JSON.stringify(frame) });
+
+    const behind = newUlid();
+    const alsoBehind = newUlid();
+    send({
+      type: 'reach-granted',
+      workspaceId: WS,
+      tickets: [
+        { id: behind, headSeq: 7 },
+        { id: alsoBehind, headSeq: 12 },
+      ],
+    });
+
+    // The whole item, by value: `kind` translated from `type`, the workspace
+    // taken from the SUBSCRIPTION rather than echoed from the frame, and both
+    // pairs carried through with their own numbers.
+    expect(items).toEqual([
+      {
+        kind: 'reach-granted',
+        workspaceId: WS,
+        tickets: [
+          { id: behind, headSeq: 7 },
+          { id: alsoBehind, headSeq: 12 },
+        ],
+      },
+    ]);
+
+    // The filter, in the same run, because it is the reason this arm reads
+    // fields at all: one junk element is DROPPED and the good one beside it
+    // still travels. Refusing the frame whole would discard the good id, which
+    // `http-transport.ts` argues against at the site.
+    const good = newUlid();
+    send({
+      type: 'reach-granted',
+      workspaceId: WS,
+      tickets: [{ id: good, headSeq: 3 }, { id: '', headSeq: 5 }, { id: newUlid(), headSeq: 1.5 }],
+    });
+    expect(items).toHaveLength(2);
+    expect(items[1]).toEqual({ kind: 'reach-granted', workspaceId: WS, tickets: [{ id: good, headSeq: 3 }] });
+
+    // And a notice for ANOTHER workspace is dropped — the cross-workspace guard
+    // at `:240` sits above this arm, so without this line the case would not
+    // distinguish "extracted correctly" from "extracted regardless of address".
+    send({ type: 'reach-granted', workspaceId: newUlid(), tickets: [{ id: newUlid(), headSeq: 99 }] });
+    expect(items).toHaveLength(2);
+
+    handle.close();
+  });
+
+  /**
    * 12.168 — WHAT THE PARSER REFUSES, AND WHY IT IS LENIENT EVERYWHERE ELSE.
    *
    * The same one-directional relationship `app-core/src/online/stream.ts`
