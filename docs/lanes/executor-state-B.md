@@ -1,4 +1,4 @@
-# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · **T18**)
+# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · T18 · **the sync-surface fixes**)
 
 **This file is Lane B's restart surface, and nobody else's.** `executor-state.md` is Lane A's — never
 edit it. A Lane B session relaunched from `dispatch-executor-serial.md` + the Lane B override recovers
@@ -11,7 +11,147 @@ only what is written here.
 
 ---
 
-## ▶ LIVE — Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
+## ▶ LIVE — the SYNC-SURFACE SOURCE PR (12.328 · 12.327 · 12.13 · 12.16), started 14:2x IST 2026-09-06
+
+**T18 IS DONE AND MERGED. Plan 10 is 18/18, COMPLETE.** Everything under the next heading is history.
+This lane is now on a small source PR turning four ❌/🟡 cases from the T18 round into fixes with
+excluding fixtures.
+
+| anchor | value | how verified |
+|---|---|---|
+| branch | `exec/43-sync-surface-fixes`, cut from `origin/main` | `git checkout -b … origin/main` |
+| base / HEAD at cut | **`8d6b756`** (#193, lock v3.3 + `REPO=`) — NOT `8373ae5`: `origin/main` moved twice between the fetch and the cut (#194 `f2ab4b2` promoting T18, then #193), and the branch was reset onto the newer tip **before** any commit rather than rebased after | `git rev-parse origin/main` twice, the second after a re-fetch; `git merge-base --is-ancestor 8373ae5 origin/main` → YES |
+| T18's final head | **`c2d2e3b`** — **squash-merged as `8373ae5` (#188)**, then promoted by **`f2ab4b2` (#194)**. `git branch -a --contains c2d2e3b` names only the stale local `exec/33-plan10-t18`; **it is NOT reachable from `main` or from `origin/*`** — a squash merge orphans its inputs, so every sha in the T18 narrative below is unreliable exactly as the banner warns. Positive control for the same command: `--contains 8373ae5` names `main`, four branches and `origin/main` | `git branch -a --contains`, both directions |
+| toolchain | node **v22.22.2**; `pnpm install --frozen-lockfile` **`INSTALL_EXIT=0`** · `pnpm rebuild better-sqlite3` **`REBUILD_EXIT=0`** · `pnpm turbo run build --force --concurrency=1` **`BUILD_EXIT=0`** | one shell invocation, each `$?` on its own line |
+| `check-case-ids` (repo-wide) | **`CHECK_CASE_IDS_EXIT=0`** — bare 1010 + bold 469 + marker-first 40 = **sum 1519 == union 1519**, highest `13.168`, 10 files. **A SEPARATE CI step, NOT part of `pnpm check:env`; its own line in every report** | `node scripts/check-case-ids.mjs` |
+| **§12 max, recounted** | **`12.328`** — line-head shape only. **`12.360` is in the file and is NOT a case**: it is the header's next-free-block pointer, and so are `12.329/12.339/12.340/12.359`. A whole-file `grep -oE '12\.[0-9]+'` returns `12.360` as the max and is wrong | line-head extraction, with a positive control that the same shape still finds `12.1` |
+| **my new §12 block** | **`12.360–12.379`**, allocated with this override; next free block `12.380` **on request**. Verified free as CASE ids (`^- \*{0,2}12\.3[67][0-9]` → empty). D holds `12.340–12.359`; A holds `12.320–12.339`, used through `12.328`. **My old block `12.290–12.319` is EXHAUSTED** | grep, stated either way |
+| §12 style | **bare is canonical** (ruled 13:43 on my request; T18 normalised all 19 bold heads, zero renumbered). Census at this HEAD: **bare 318 · bold 0 · marker-first 0; sum 318 == union 318** | §12-scoped, three styles, per-style counts printed as the control |
+| `Features.md` §12 bullets | **87** | see the extractor note below — the obvious range is wrong |
+| position | override item 1 of 4 not yet started; the docs refresh is this commit | — |
+
+### THE FOUR ITEMS, and the shape each has to have
+
+One PR, each item its own commit, **commit then mutate**, mutation confirmed present before the run,
+predicted vs measured, restore with `git checkout HEAD -- <path>` **verified by READING the file, never
+by shell `diff`** (which has returned a false "identical" on this machine).
+
+1. **12.328 — delete the dead TEXT ping/pong protocol.** Ruled 13:44: **no runtime measurement; the four
+   production sites are deletable on SOURCE evidence.** Lane A's three grep shapes **re-run at
+   `8d6b756`, not adopted**, all three reproducing: (a) `webSocketFactory` is injected by **three test
+   files only** (`sync-engine.test.ts:879`, `online-data-source.test.ts:556`, `stream.test.ts:80` and
+   `:426`); the production hits are the two default-application lines (`app-core/src/online/stream.ts:235`,
+   `sync-client/src/net/http-transport.ts:126`) plus **one pass-through** at
+   `online-data-source.ts:403`, which forwards a caller's option and injects nothing — that reading is the
+   load-bearing half of "no production site injects one"; (b) **only `apps/server` depends on `ws`**
+   (`ws@^8.18.0`, `@types/ws@^8.5.0`); no client package does, enumerated package.json by package.json
+   with the name printed beside each; (c) the four production ping/pong sites are `stream.ts:35` (the
+   `PingFrame` type), `:93` (the parse arm), `:282-283` (the send) and `http-transport.ts:201-202` (the
+   send), with two test arms agreeing (`stream.test.ts:354-355`, `sync-engine.test.ts:928-932`). The
+   server's `socket.ping()` at `stream/routes.ts:319` and `socket.on('pong')` at `:290` are **`ws`
+   protocol control frames**, a different mechanism the platform WebSocket answers below JavaScript.
+   **Deleting `PingFrame` narrows an EXPORTED signature**: `parseFrame` returns
+   `ServerStreamFrame | PingFrame | null` (`stream.ts:83`) and becomes `ServerStreamFrame | null`. Lane D
+   was told this in writing before I started. **The residual is an OWNER-RULE docblock at BOTH
+   default-application lines** — never inject a raw `ws` socket into `webSocketFactory`, because the seam
+   is injected and a Node shell that did would reopen this — citing 12.328. The case flips ❌ → ✅ **only**
+   for "no production site speaks the protocol"; **the owner-rule half is 🚫 with its reason**, because a
+   docblock is not a check.
+2. **12.327 — `'bad-envelope'`, a code no server emits.** The fixture is at
+   `packages/sync-client/test/sync-engine.test.ts:**625**` — **NOT `:547`**, which the ❌ text and the
+   controller record both name; `:547` today is inside 12.169's docblock. The file is the durable half of
+   that reference and `outbox.ts` says so in its own words, having watched the number move twice while it
+   was being written. The real union is `SyncInvalidCode = IngestErrorCode | 'actor-mismatch' |
+   'reserved-type'` (`sync-service.ts:29`) over `IngestErrorCode = EnvelopeErrorCode |
+   'duplicate-event-id'` (`ingest-result.ts:3`); the envelope arm is `'malformed-envelope'`
+   (`parse-event.ts:7`).
+   **⚠️ THE PART THAT IS NOT IN THE OVERRIDE, AND IT CHANGES THE CHANGE SET.**
+   `packages/sync-client/src/outbox/outbox.ts:36-62` uses this exact fixture as a **standing
+   measurement**: *"ONE sync-client test constructs an `invalid` result, and narrowing `code` would redden
+   it"*, priced at *"one fixture edit (pick a real code)"* and evidenced with `tsc` exit 2 and the literal
+   `TS2322: Type '"bad-envelope"' is not assignable to type 'IngestErrorCode'`. **Correcting the fixture
+   PAYS that cost**, so the bullet becomes false the moment I touch the test, and the docblock is part of
+   this commit rather than a follow-up. The docblock's conclusion — *the blocker is scope, not difficulty*
+   — survives; only the price changes. It never says "keep this string"; it prices changing it. This is
+   the same pointer-defect class the #188 review round charged me for three times.
+   **Which direction the witness constrains, stated because "reddens alone" has two readings:** the
+   property that actually broke is **fixture drift**, not server drift. Mutating the server's
+   `'malformed-envelope'` reddens siblings, so "alone" is unavailable in that direction and I will not
+   loosen an assertion to buy it — if I run it, I report the measured sibling count. The witness reads the
+   server's real answer at runtime and compares the client's literal to it, so that **mutating the
+   client's literal** reddens the new case alone, which is the direction that catches the next drift.
+3. **12.13 — `attachment.added` is a live member of `BOOTSTRAP_BACKFILL_TYPES`** (`sync-routes.ts:59`) and
+   deleting it leaves the whole server suite green. A bootstrap that must carry an `attachment.added` for
+   a held ticket, asserting it arrived. Server src + server test, so the dist trap below does not apply.
+4. **12.16 — a constant 0 written into `workspace_seq` leaves the suite green.** The mutation site is
+   `packages/sync-client/src/replica/replica.ts:269` (`env.workspaceSeq` in the INSERT parameter list);
+   the read-back is `:216` (`workspaceSeq: Number(row.workspace_seq)`). **The witness must assert on the
+   `:216` read path against the envelope's own value — copied, never computed (P36/P37.2) — and NOT
+   through `ticketHeadSeq`,** because `:689` is `SELECT MAX(workspace_seq)` and a constant 0 collapses it
+   too: a red arriving through headSeq cannot tell "the row stored the wrong seq" from "headSeq
+   collapsed", which is a mutation that does not identify its own site.
+   **IMPORT STYLE DECIDES WHETHER THIS MUTATION IS VISIBLE AT ALL — the highest silent-failure risk of the
+   four.** A case in `packages/sync-client/test/` importing `../src/*.js` sees the mutation; a case in
+   `apps/server/test/dual-client/` importing `@gisik-nokma/sync-client` **by package name resolves through
+   `./dist`** and shows a green run over unmutated code. It goes in the sync-client package. Rebuild after
+   restoring, or the next agent inherits a mutated `dist` — Lane D rebases onto this branch.
+
+### CARRIED FROM THE #188 REVIEW ROUND — the lesson, not the diff
+
+**The reviewer's headline was a clean negative: ZERO downgrades.** No ✅ whose stated property was
+unasserted anywhere, all seven 🟡s confirmed. What it found instead was the one costume that block was
+uniquely exposed to: **36 of T18's 44 lines carry no assertion of their own, so the POINTER is the
+deliverable**, and a `→ landed 12.NNN` naming an id that proves less than the line claims is a defect
+even when the line is true. **Eleven pointer defects. Three were flatly mine:**
+
+- **12.319 cited `12.228`** for the storage-conformance run. `12.228` is the `vi.fn()` fixture and imports
+  the suite zero times — a reader following that pointer would have concluded the one-storage-interface
+  claim rests on a mock. It is **`12.229`**.
+- **12.319 said "the header said"** of an arithmetic correction **it never made**: the count line still
+  read "the storage conformance suite's four" at the moment the prose claimed it had been fixed. Narrated,
+  not done — the same species as the three live falsehoods that branch removed, committed *inside* the
+  change set that removed them.
+- **12.31 cited a blank line** (`:275` for an assertion at `:274`).
+
+**Eight were under-cited. The worst is 12.23**, which pointed five clauses at "12.156+" where the range is
+`12.156` alone: reconnect, flush-order and transport-failure are `12.161`, `12.159`, `12.160`, so **four of
+five clauses would have survived broken with the cited range green**. `12.21`'s middle clause named no id
+at all; `12.8` pointed "exactly one contest" at the retried COMMITTED case, which contains no contest
+assertion (it is `12.105`). All eight were verified as they were applied; every one held.
+
+**Two (A) unfreezes were granted and both were spent**: one docs-only fix commit for the review round
+(head `3090c8b`), then a second when §12 gained an 87th bullet under Lane B — #187's fixture-mirror
+inventory — that the banner's enumeration did not admit.
+
+**The banner reshape, and the sentence that makes it safe.** §12's banner enumerating what is "still
+absent" had been one short **three times**: the app shells, Task 3's stream cursor, and then A's
+fixture-mirror inventory, which went stale **under** me — #187 landed the bullet while the banner sat on
+an unmerged branch, so the banner's own same-change-set rule had nothing to bite on. Naming the inventory
+would have fixed today and failed tomorrow (D's socket-cut fixture and this very PR both add §12 bullets).
+So the enumeration now names **CATEGORIES**, carrying the rule that makes that safe: *every bullet added
+under a category rather than a Plan 10 task names itself and its PR in its own text, and a reader
+reconciles the section by reading its bullets rather than trusting a list at the top to have kept pace.*
+Same move `test-cases/12`'s header made for ids: **the fix for a value that goes stale is not a better
+value, it is removing the reader's need to trust it.**
+
+### THE TWO MEASUREMENT NOTES THAT WILL BITE THE NEXT SESSION — both re-fired TODAY, in this file's own prep
+
+- **A broken extractor's zero reads exactly like a clean result.** T18's dangling-reference matcher
+  `landed \*\*?12\.` **requires** the literal asterisk and so could not match `**landed 12.156**`; it
+  reported zero references and was nearly believed. Only the count going *down* after adding references
+  exposed it. **A control downstream of a broken extractor validates the comparator, not the extraction.**
+  It fired again forty minutes later: `grep -oE '12\.[0-9]+'` over the whole `test-cases/12` returns
+  `12.360` as the maximum id, which is not a case at all — it is the header's next-free-block pointer.
+- **A denominator carried from a sha becomes a false property of the file.** "86 bullets" measured at
+  `2f18f3f` read as data loss at `e33c429` until it was re-measured at four shas. **And the obvious
+  extractor for it is wrong here:** `Features.md`'s sections are NOT in numeric order — §12 is at line
+  1005 and **§10 is at 1627**, so `awk '/^## 12\./,/^## 13\./'` swallows §10 and §11 and returns **115**.
+  The correct shape stops at the next `^## ` *whatever its number* and returns **87**, with §13 as the
+  positive control that the shape still finds bullets at all.
+
+---
+
+## ✅ (HISTORY — squash-merged as `8373ae5`, #188; promoted by `f2ab4b2`, #194) Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
 
 Closure 5b merged as **`2f18f3f`** (#161). T13 (#117), T14+T15 (#126), closure 5 (#139) and closure 5b are
 **all on `main`** — none of them is re-implemented here.
