@@ -115,6 +115,9 @@ describe('makeCommitted — the two counters, and which is which', () => {
     expect([next.seq, next.workspaceSeq]).toEqual([8, 10]);
   });
 
+  /**
+   * 7.60 — every `makeCommitted` event lands on its OWN instant by default, so a test can tell which event last wrote a row — one shared default instant is the masking hazard this removes.
+   */
   it('gives every event its own instant by default, so a test can tell WHICH event last wrote a row', () => {
     // `testEnvelope` rules on this hazard for the other fixture builder and the
     // reasoning transfers unchanged: one shared default instant makes an

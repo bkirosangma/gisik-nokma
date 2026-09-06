@@ -93,6 +93,9 @@ describe('SCENARIO_NOW is an instant, not a wall-clock reading', () => {
   });
 });
 
+/**
+ * 7.69 — `seedReadScenario` pinned by a contract test of its own before later tasks are built on it, in the shape 7.59 established for `makeCommitted`: the payload claims are EXECUTED through the real projections rather than asserted about the fixture.
+ */
 describe('seedReadScenario builds the world its docblock describes', () => {
   it('every ticket exists with the resolved audience the read tasks expect', async () => {
     const { rows } = await db.pool.query<{
