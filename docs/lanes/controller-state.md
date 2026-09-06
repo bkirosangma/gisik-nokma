@@ -493,12 +493,24 @@ edit with no effect.
 
 ### RULING P37.2 (2026-09-06 09:15, controller as ruling tier) — closure 5c's "reconcile the named ids" CANNOT work; the notice carries a head seq per id, and the client pulls iff its local copy is behind
 
-**Measured by Lane B rather than argued:** it built the minimal 5c exactly as ruled and wrote the
-12.274-shaped fixture (narrow → other → widen on ONE live socket, no reconnect, no manual reconcile) —
-**red with the fix in place; `b.pulls` is `[]`.** Structural, not a bug: a notice only ever names ids the
-reader can see NOW (`grant-backfill.ts:300` yields a candidate only `if (canSee(...))`), and reconcile
-returns an id as restricted only `if (!canSee(...))` (`reconcile-route.ts:140`) — **same function, same
-instant, complementary predicates; the intersection is empty by construction.** The stale partial copy is
+**A PROOF, not a measurement — CORRECTED 09:30 by Lane B against itself.** Lane B built the minimal 5c as
+ruled and wrote the 12.274-shaped fixture; it came back red with `b.pulls` empty, and that run was first
+reported as the measurement. **It was invalid:** a subagent mutation-testing `sync-engine.ts` in the same
+worktree had its MUTANT-4 (`const purged: string[] = []` replacing the `reconcileNamed` call) swept into
+commit `75657f2` — blobs verified: `9135059` 0 occurrences, `75657f2` 1, `1533e00` 1 — so the run behind
+the "the fixture proves it" commit executed on a tree where `reconcileNamed` was NEVER CALLED. `b.pulls`
+was empty because the reconcile was disabled, not because it was useless. The subagent found it and
+reported it unprompted. **What stands is checkable from two lines of source and no run:** a notice only
+ever names ids the reader can see NOW (`grant-backfill.ts:301` admits a candidate only `if (canSee(...))`),
+and reconcile marks an id restricted only `if (!canSee(...))` (`reconcile-route.ts:140`) — **same function,
+same db, same user, same instant: complementary predicates over one primitive; the intersection is empty
+by construction.** 12.316's case text becomes a derivation with the contamination disclosed; it cannot
+be re-measured because P37.2(c) deleted `reconcileNamed`, which is the right outcome. **The process rule
+Lane B already had was NOT enough:** it staged by explicit path, and the contamination was in a file it
+had every reason to stage. **The real rule: never commit a shared source file while another party is
+mutating it** — a mutation sweep runs in a quiet window under the lock with nothing else touching the
+tree, from a handed-over list; the third distinct way shared-worktree mutation produced a wrong answer
+today (the first two were `git checkout` restores). The stale partial copy is
 stale in its CONTENT; `canSee` answers about its AUDIENCE. Reconcile is the wrong instrument, not a
 mistimed one — the escalation clause in 5b's override ("if the notice must carry more than ids and the
 trigger, escalate") fired correctly.
