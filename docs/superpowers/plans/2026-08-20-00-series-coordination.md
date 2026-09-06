@@ -3334,6 +3334,52 @@ fixing. Everywhere else asserts through the authority or not at all. A clean neg
 the check ran rather than that nobody looked.
 
 
+### Verification-method rules (2026-09-06, serial executor) — two more, both found by their own author failing them
+
+Added on the controller's instruction, so they live in the authority rather than only in a handoff. **Both
+were caught in one session, and in both cases the CONCLUSION was right while the EVIDENCE was worthless** —
+which is the shape worth recognising, because a right answer arriving by a broken route feels exactly like a
+right answer.
+
+**5. `git diff | grep "^+"` IS ALWAYS EMPTY UNDER THE rtk PROXY, and a control that does not travel the same
+path certifies nothing.** The proxy reformats `git diff` into a `--stat` header, a `--- Changes ---` banner,
+and hunk lines **indented two spaces**, so an added line arrives as `␣␣+␣␣/**`. Measured: **`git diff | grep -c
+"^+"` → `0`** against a **31 KB** diff carrying **294 additions**. It underwrote three separate "comments only"
+and "branch is subsumed" claims in one session, **one of them inside an already-merged PR**; all three were
+re-checked and all three held, but none had been established. The third is the sharpest: *"`exec/50` is
+subsumed — zero `+` lines"* — **there were nine**, and `--stat` printed *"9 insertions"* directly beside the
+grep that said zero, a contradiction sitting in the same output and read by nobody.
+> **The rule this earns: a positive control must run through the SAME PATH as the measurement.** The control
+> used here fed a non-comment line through the filter with `printf`, watched it come back, and proved only
+> that the surviving stage worked — the corruption was upstream, in a stage the control never entered.
+> "A control was printed" is not a property of a run; "the control traversed the same path" is.
+**Use instead:** `git show <sha>:<file>` against the other version through Python `difflib`, **asserting the
+added-line count equals `git diff --numstat` before believing anything else it reports.** `--numstat` is safe
+on its own; it is not line-prefix parsing. **What actually exposed it** was an *impossible* answer to an
+unrelated second question — "no numeric tokens at all in the added lines", about docblocks reading `9.36 —`.
+**A null is deniable; an impossibility is not.** Where you can, ask the same pipeline something whose answer
+you already know to be non-empty, in the same invocation.
+
+**6. COMMIT FIRST, THEN MUTATE — `git checkout -- <file>` restores from HEAD, not from the pre-mutation working
+tree.** Mutation-testing a citation on **uncommitted** work and restoring that way reverted the file wholesale
+and **destroyed sixteen citations** that had not been committed yet (§09 fell `211 cited / 8 uncited` →
+`195 / 24`). The same command had been correct twice earlier the same day **because those mutations ran against
+committed work, so HEAD was the right restore point** — same command, different precondition, nothing in its
+appearance to tell the two cases apart. **A procedure that is correct only because of an unstated precondition
+breaks the first time that precondition quietly changes.** If uncommitted work must be mutated, copy the file
+aside and restore from the copy.
+> **And the half that generalises furthest: the restoration check SHOWED the damage and the author did not act
+> on it.** The standing rule says verify a restoration by reading the file — the read was done, and returned
+> `expect(ghost.statusCode).toBe(404);` where a docblock belonged. What caught the loss was the citation **count**
+> returning 195/24 against an expected 211/8. **Reading evidence is not checking it.** A verification step only
+> works when you know what the output MUST say before you look: the count had a prediction attached to it, the
+> line read was only an observation, and an observation cannot be contradicted.
+**Why recovery was cheap:** the damage was bounded to ids **9.192–9.207**, sixteen contiguous ids the catalogue
+assigns to that one file, mapping 1:1 in order onto its sixteen tests. **A catalogue that records which test
+covers which case is also a backup of work derived from it** — an argument for the citation convention that has
+nothing to do with the convention's stated purpose.
+
+
 ## Two findings about method, from Lane 2's T3 review (2026-08-28)
 
 Both are about *how* defects were caught rather than what they were, and both bind the controller harder

@@ -47,6 +47,9 @@ function imageNodeCount(editor: CoreEditor): number {
 }
 
 describe('a Drive reference never becomes an inline image (rule 3)', () => {
+  /**
+   * 9.140 — planted defect: picking a Drive PNG through the picker flow produces an `attachment.added` claim and inserts NO image node — a Drive pick is never a paste-and-embed.
+   */
   it('planted defect: picking a Drive PNG produces an attachment claim and NO image node', () => {
     const { editor } = makeEditor();
     const before = JSON.stringify(editor.getJSON());
@@ -89,6 +92,9 @@ describe('a Drive reference never becomes an inline image (rule 3)', () => {
    * runtime floor in the same edit. So this case is real evidence, but its
    * shared root should not be read as two floors that fail independently.
    */
+  /**
+   * 9.141 — planted defect: a `DriveReference` is not assignable to `insertTicketImage` — refused by TYPE at compile time, and refused at RUNTIME too if the type is forced past.
+   */
   it('planted defect: a Drive claim is not assignable to insertTicketImage — refused by TYPE, and if forced, refused at RUNTIME too', () => {
     const { editor } = makeEditor();
     const event = composeDriveReferenceAdded(toDriveReference(DRIVE_PNG, new Date('2026-08-20T10:00:00.000Z')));
@@ -106,6 +112,9 @@ describe('a Drive reference never becomes an inline image (rule 3)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.142 — planted defect: pasting a Drive share link (no file on the clipboard, just its URL as text) uploads nothing and embeds nothing.
+   */
   it('planted defect: pasting a Drive link (no file on the clipboard) uploads nothing and embeds nothing', () => {
     const { editor, calls } = makeEditor();
     // DEVIATION FROM THE PLAN TEXT: the plan's `getData: () => DRIVE_PNG.url`
@@ -135,6 +144,9 @@ describe('a Drive reference never becomes an inline image (rule 3)', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.143 — planted defect: the drive module cannot embed because it never imports the command that embeds — a static-import scan of `packages/editor/src/drive/`.
+   */
   it('planted defect: the drive module cannot embed, because it never imports the command that embeds', () => {
     // DEVIATION FROM THE PLAN TEXT: `new URL('../src/drive/', import.meta.url)`
     // is the pattern this codebase already found broken under Vitest — Vite
