@@ -8,6 +8,15 @@ import type { IngestService } from '../../src/ingest/ingest-service.js';
 import { buildContestedClaim } from '../../src/sync/contest-coherence.js';
 import { createStreamHub } from '../../src/stream/hub.js';
 import { buildTestApp } from '../helpers/app.js';
+// THE ONLY IMPORT IN THIS FILE THAT EXECUTES CLIENT CODE. Everything else here
+// reads `mappers.ts` as text or asserts key sets on a body, which is how a
+// client/server disagreement about a key's NAME survived every suite. The
+// `@gisik-nokma/app-core` devDependency this needs landed with #126.
+// The `./online` SUBPATH, not the package root. That subpath exists because
+// `no-http-in-views.test.ts` enforces a seam between views and HTTP code, and
+// the mappers live behind it — so this import uses the door the package already
+// provides instead of widening its root surface for a test.
+import { mapTicketRead } from '@gisik-nokma/app-core/online';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { fakeSocket } from '../helpers/stream-socket.js';
@@ -964,6 +973,68 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
 });
 
 describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
+  /**
+   * 7.213 — THE ROUND TRIP THIS FILE HAS NEVER DONE, and the hole BOTH of
+   * closure 2's Criticals came through.
+   *
+   * Everything else here reads `mappers.ts` as TEXT (`readFileSync`) or asserts
+   * key sets on a body. Nothing has ever EXECUTED a mapper against a real `/v1`
+   * response. So the two halves could agree about which keys exist and disagree
+   * about what they are called, and every suite stayed green: the single-read
+   * route returned `rollupFor`'s `RollupView` spelling (`total`/`terminal`/
+   * `uncategorized`) while the client's `mapRollup` reads `TicketRollup`'s, and
+   * every ticket WITH CHILDREN came back a `MappingError` while leaves mapped.
+   * 1033 of 1033 app-core tests passed with that defect live.
+   *
+   * A key-set assertion cannot catch it and neither can a text scan. Only
+   * running the real mapper over the real bytes can.
+   *
+   * THE TICKET IS DELIBERATELY THE PARENT. `ticketId` has a child (seeded
+   * above, "so the parent's rollup is non-NULL"), so this exercises the rollup
+   * branch — the one a `rollup: null` fixture skips, which is exactly how the
+   * defect survived its own unit tests.
+   */
+  it('7.213 the REAL mapper maps the REAL body — a ticket WITH CHILDREN, executed and not scanned', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${ticketId}`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+
+    // The precondition, asserted rather than assumed: a NULL rollup here would
+    // make this case skip the very branch it exists for and pass anyway.
+    expect(body['rollup'], 'the fixture parent must have a non-null rollup').not.toBeNull();
+
+    // THE ROUND TRIP. No try/catch: a `MappingError` fails the case with the
+    // mapper's own message, which names the exact field that disagreed —
+    // `ticket.rollup.uncategorizedChildren: expected a number` was what the
+    // spelling mismatch produced, and a caught-and-rethrown error would lose it.
+    const view = mapTicketRead(body);
+
+    // Enough of the mapped view to show it is the real ticket and not an empty
+    // shell the mapper happened to accept.
+    expect(view.title).toBe('Sweep the aisle');
+    expect(view.ticket.id).toBe(ticketId);
+    expect(view.stateProvenance.actorId).toBeTruthy();
+    expect(view.rollup).not.toBeNull();
+    expect(view.rollup?.totalChildren).toBe(1);
+
+    // AND THE CONTROL, in the same run: the CHILD is a leaf, so its rollup is
+    // null and it maps through the OTHER branch. Without it, "the parent maps"
+    // would also pass against a mapper that ignored the rollup entirely.
+    const childRes = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${childTicketId}`,
+      headers: owner.headers,
+    });
+    expect(childRes.statusCode).toBe(200);
+    const childView = mapTicketRead(childRes.json() as Record<string, unknown>);
+    expect(childView.rollup).toBeNull();
+    expect(childView.title).toBe('Wipe the shelf');
+  });
+
   it('7.203 SERVING GAPS CLOSED — the route now carries the title, the domain state and the provenance beside the visibility row', async () => {
     const res = await app.inject({
       method: 'GET',
