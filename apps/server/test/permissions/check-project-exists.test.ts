@@ -53,6 +53,9 @@ const gate = (env: ReturnType<typeof ticketCreated>, sessionUserId: string) =>
   checkPermission(env, { db: db.pool, sessionUserId });
 
 describe('checkProjectExists — the honest precondition', () => {
+  /**
+   * 6.29 — the planted defect the hole was actually reachable through: a membership granted on a `projectId` that was never founded no longer admits a ticket.
+   */
   it('planted defect: membership granted on a project nobody founded no longer admits a ticket', async () => {
     // THE reachable path, and the only one the coincidence never covered.
     // `project.member_added` accepts any ULID as a project scope without
@@ -88,6 +91,9 @@ describe('checkProjectExists — the honest precondition', () => {
     expect(await gate(ticketCreated(ws, projectId, user), user)).toBeNull();
   });
 
+  /**
+   * 6.30 — the ORDERING: a workspace member off the project, creating a ticket in a project that does not exist, is told the project does not exist — not that they are not on it.
+   */
   it('the ordering: a member off the project is told the project does not exist, not that they are not on it', async () => {
     // Both checks would fire here, and this pins which one wins. Mutation: move
     // checkProjectExists below checkVisibilityPermission in checkPermission and
@@ -204,6 +210,9 @@ describe('checkProjectExists — every event that NAMES a project, not only tick
     expect(await checkPermission(founding, { db: db.pool, sessionUserId: admin })).toBeNull();
   });
 
+  /**
+   * 6.28 — `projectExists` answers `false` for a REAL project id asked under a different workspace: project ids are not globally unique keys.
+   */
   it('a real project id borrowed from ANOTHER workspace is not found', async () => {
     // proj_projects is keyed by project id alone, so the workspace clause in
     // projectExists is the only thing standing here. Mutation: drop it and a
@@ -235,6 +244,9 @@ describe('checkProjectExists — every event that NAMES a project, not only tick
  * is what would notice: a real client sends "create the project, then put people
  * on it" as one call, and the second half would be refused for naming a project
  * that — from the gate's point of view — did not exist yet.
+ */
+/**
+ * 6.81 — a project founded EARLIER IN THE SAME BATCH is found by the check. Not a claim about this check so much as about ingest’s transaction shape: `project.created` followed by `project.member_added` commits in one `ingestClientBatch` call.
  */
 describe('a project founded EARLIER IN THE SAME BATCH is found by the check', () => {
   it('project.created followed by project.member_added commits in one ingestClientBatch call', async () => {
