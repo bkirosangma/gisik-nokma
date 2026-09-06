@@ -272,6 +272,49 @@ the narrowing event itself carries the ticket id, so it would have passed agains
 `grantBackfillFor`; now asserted by pre-cursor event id. A check passing for a reason unrelated to the
 property it names, in the case written to demonstrate that discipline.
 
+### RULING P39 (2026-09-06 08:05, controller as ruling tier) — `ContestedClaim.claim` is NOT a `ClaimProvenance`; it gets its own shape, with no `serverTime` member and no synthesis
+
+**Measured by Lane A on #150 before asking, after it had inherited "unservable by anyone" from the
+mapper's own `because` and caught itself citing an assertion as a measurement:** `SubmittedEvent =
+Omit<EventEnvelope, 'serverTime' | 'seq'>`, so the stored `original_event` carries the claimant's
+`clientTime` and **no server instant, by construction**; `proj_contested.contested_at` IS a recorded
+instant — but it is the CONTEST event's `serverTime` (when the server filed the refusal), not the claim's;
+`ClaimProvenance` requires both clocks. **So no row records a server instant for the refused claim
+itself** — the mirror image of P36, where the ledger row DID record the instant and the writer merely
+dropped it. Spending `contested_at` would attribute one event's instant to another: P36's option 3.
+**RULING:** neither the copied instant nor a bare optional. A bare `serverTime?` on `ClaimProvenance` would
+make every consumer of a REAL claim's provenance handle an absence that can never occur there — the type
+would stop saying which shapes have a server instant and which cannot. **`ContestedClaim.claim` becomes
+its own shape that tells the truth: `actorId`, `clientTime` (the device instant, recorded), `contestedAt`
+(the server's instant for the CONTEST event, named for what it is), and no `serverTime` member at all,
+because a refused claim never took effect.** View-type change in app-core; `data-source.ts` untouched
+(P30); the replica source's refusal on the field flips to served. Excluding fixture: the mapper never
+populates anything named `serverTime` for a contested claim (mutate to copy `contested_at` into one →
+red). `renderContestedClaimText` (in `@gisik-nokma/domain`, consumed by `contest-banner.tsx` and
+`contest-view-model.ts` — verified by Lane A, not named from memory) already prints `clientTime` as IST
+device time — extend it. *If a consumer needs a server instant for a contested claim, that consumer is
+wrong about what a contested claim is, and the case says so.* **Scope, so nobody reads more into it:** P39
+closes one of `getMyWork`'s three remaining absences; `WorkItem.stateName` and `ContestedClaim.title`
+must close too before the method stops refusing (`MAP_MY_WORK_ABSENCES`). `getMyWorkspaces` closing
+completely after the HELD pair is the exception, not the pattern.
+
+**Four sentences from Lane A's session, each paid for by a real defect, none specific to the code that
+taught it:**
+- *A guard that checks whether a value exists is not checking whether it is the right value* — and the
+  comment claiming to catch "drift" was the aggravating factor: it made the gap read as covered.
+- *An empty filter is not a neutral default; it is the one input under which a filter bug cannot show.*
+- *Nullable describes the VALUE; additive describes the CONSTRUCTOR.*
+- ***A case can kill the mutation it was written for and leave its stated property untested*** — 12.244
+  killed option 3 while "the LAST state-claiming event wins" went unconstrained, because its fixture had
+  only one such event. This one defeats the usual "I mutation-tested it" reassurance.
+Also from #141's opus review: **the entire client half of closure 4 had ZERO tests** — replacing
+`getSnapshotProvenance`'s body with `return null` left sync-client 63/63 and app-core 1092/1092 green;
+the read-door defect P36 exists to close was never shown closed by any case until 12.246–12.249. The
+`snapshot_provenance` retention gap in `purgeEntity`/`revokeScope` (fixed); a migration that promised a
+healing the code does not do (owner named). **The HELD pair (#150) discharges P25 clause 1 completely**
+— every `owner: 'P25 clause 1 — HELD'` absence in `mappers.ts` is served or catalogued; cases 6.138–6.142,
+the mutation reddening exactly the three exclusion cases and pointedly not the owner exemption.
+
 ### RULING P38 (2026-09-06 03:45, controller as ruling tier; TO BE PUT BEFORE THE OWNER after the fact, revocable in a word) — the HELD pair's admin/member half: `WorkspaceRef.projects` is `eff.projects` for every role except owner
 
 **Lane A escalated before building, as P32 wrote into itself.** `canSeeResolved` (`visibility/can-see.ts:94`)
