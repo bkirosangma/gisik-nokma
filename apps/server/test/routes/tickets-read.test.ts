@@ -157,6 +157,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — invisible is non
     expect(comparableHeaders(invisible)).toEqual(comparableHeaders(ghost));
   });
 
+  /**
+   * 6.67 — the route’s `:workspaceId` MEANS something: `canSee` deliberately takes no workspace, so the path segment is what fences a ticket in another workspace — the same viewer reads it through its own path.
+   */
   it('a ticket in another workspace is a 404 through this workspace’s path, though the same viewer reads it through its own', async () => {
     // `canSee` deliberately takes no workspaceId — it resolves the role in the
     // workspace the TICKET names — so nothing in the visibility decision
@@ -218,6 +221,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets — the viewer’s slice, filt
     expect(theirView.json()).toEqual({ tickets: [] });
   });
 
+  /**
+   * 6.69 — the list row and the single read serve the VERY SAME row, pinned by deep equality, so the two halves of this surface cannot drift apart.
+   */
   it('the list row and the single read serve the very same row, so the two halves of this surface cannot drift', async () => {
     // The substitution pin. Both sites serve the same `toTicketView` allow-list
     // over `proj_visibility` today because `proj_tickets` does not exist (cases
@@ -306,6 +312,9 @@ describe('the single read carries the rollup — true totals with the restrictio
     expect(reachable.statusCode).toBe(200);
   });
 
+  /**
+   * 6.87 — `null` means "no direct children", and a nonexistent ticket answers the same `null`. Not a zeroed family: the key is present rather than omitted.
+   */
   it('a childless ticket carries rollup null, present as a key rather than omitted', async () => {
     const ws = newUlid();
     const prj = newUlid();
@@ -404,6 +413,9 @@ describe('the restricted-parent placeholder — existence, and nothing else', ()
     expect(res.json().title).toBe(`Ticket ${childId}`);
   });
 
+  /**
+   * 6.68 — the inverse leak: a `parent_id` naming NO ticket reports no parent, rather than inventing a restricted one.
+   */
   it('a parent_id naming no ticket at all reports no parent, rather than inventing a restricted one', async () => {
     // The inverse leak, and the one the obvious implementation commits: `canSee`
     // answers `false` for an invisible ticket AND for a ticket with no row, so
@@ -503,6 +515,9 @@ describe('a served row discloses no ticket the viewer may not see, beyond the on
 });
 
 describe('provenance is never redacted from someone entitled to the state', () => {
+  /**
+   * 6.15 — provenance is never redacted from someone entitled to the state: history carries `actor_id` and both clocks untouched, though the actor shares nothing with the viewer.
+   */
   it('history carries the actor and both clocks untouched, though the actor shares no project — indeed nothing — with the viewer', async () => {
     // Mutation: replace `actor_id` with a placeholder for an actor the viewer
     // shares nothing with, or render either clock any way but the ISO instant
@@ -545,6 +560,9 @@ describe('provenance is never redacted from someone entitled to the state', () =
 });
 
 describe('every door on this surface requires a session', () => {
+  /**
+   * 6.70 — all three doors carry `requireSession`, and the collection refuses the way a collection must. The session case is load-bearing rather than routine.
+   */
   it('all three routes answer the generic 401 with no session', async () => {
     // Without this the whole file would prove only that a signed-in caller is
     // filtered: a route registered WITHOUT `requireSession` leaves

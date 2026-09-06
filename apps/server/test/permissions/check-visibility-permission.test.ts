@@ -284,6 +284,9 @@ describe('check 4 — acting on a ticket you cannot see', () => {
     ).toBeNull();
   });
 
+  /**
+   * 6.76 — a ticket that never existed and one the actor may not see are the SAME answer at the WRITE door too, not only on the read side.
+   */
   it('a ticket that never existed and one the actor may not see answer IDENTICALLY', async () => {
     // The oracle that would otherwise sit one layer below Task 8's 404s: if the
     // gate distinguished "no such ticket" from "not yours", a member could
@@ -345,6 +348,9 @@ describe('check 4 — acting on a ticket you cannot see', () => {
 // `permission.role`: it is authority, not audience.
 // ---------------------------------------------------------------------------
 
+/**
+ * 6.19 — cited on the block: `visibility.set` demands project-admin rights OR ticket creatorship, and the row’s four paths are the tests here — plain member refused, creator allowed (read from the LEDGER, since no projection carries it), project admin allowed, and project-admin rights asked of the TICKET’s project. The row’s "must name the ticket it is attached to" clause is check 3 above.
+ */
 describe('check 5 — who may change who sees a ticket', () => {
   it('planted defect: a plain member who is neither project admin nor creator cannot set visibility', async () => {
     // Reached where it can only be itself: the member is ON the project, so
@@ -453,6 +459,9 @@ describe('check 5 — who may change who sees a ticket', () => {
     });
   });
 
+  /**
+   * 6.74 — check 5 must run AFTER check 4, or it is an existence oracle: an unseeable ticket answers the audience refusal, not the authority one. The actor that proves it is an ADMIN, who would otherwise pass check 5.
+   */
   it('check 5 runs AFTER check 4: an unseeable ticket answers the audience refusal, not the authority one', async () => {
     // The ordering that keeps check 5 from being an existence oracle. The actor
     // is a workspace ADMIN, so hasProjectAdminRights is true on every project
