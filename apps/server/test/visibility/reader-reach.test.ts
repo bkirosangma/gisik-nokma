@@ -110,6 +110,28 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
       await applyAll(db.pool, [setVisibilityEnv(ws, ticketId, 'project', undefined, owner)]);
     }
 
+    // THE TICKET THAT MAKES THE PROJECT SCOPE KILLABLE, and without it the scope
+    // filter is unconstrained — measured, not assumed: a mutation deleting the
+    // filter SURVIVED the first version of this case with everything green.
+    //
+    // The reason it survived is worth keeping: `listVisibleTickets` already
+    // excludes `inOther` (project mode, a project this member is not in), so
+    // dropping the scope filter changed nothing this fixture could see. What the
+    // filter actually withholds is a ticket the reader can ALREADY see, in a
+    // project this event did not add them to — so it must be WORKSPACE mode
+    // (visible to any member) and live in `other`.
+    //
+    // A workspace-mode ticket in `joined` would NOT work and the distinction is
+    // the design rather than a fixture detail: the filter keys on the ticket's
+    // project, so it names that one too. That is the documented over-naming —
+    // the notice answers "what can this reader see in the project they were just
+    // added to", not "what did this event newly admit", because there is no
+    // before-image to subtract. Over-naming inside the scope is accepted; naming
+    // things OUTSIDE it is what inflates every notice toward the 200 cap.
+    const alreadyVisibleElsewhere = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, ticketId: alreadyVisibleElsewhere, projectId: other, createdBy: owner });
+    await applyAll(db.pool, [setVisibilityEnv(ws, alreadyVisibleElsewhere, 'workspace', undefined, owner)]);
+
     // THE TRIGGER, and it is in the ledger so a drain can reach it.
     await record(
       testEnvelope({
@@ -121,13 +143,24 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
       }),
     );
 
+    // The newcomer could see the workspace-mode ticket BEFORE the event. Asserted
+    // here so the exclusion below is a fact about the notice rather than about
+    // this member's reach.
+    expect((await collect(newcomer, ws)).length).toBeGreaterThan(0);
+
     const forNewcomer = noticesIn(await collect(newcomer, ws));
-    // EXACTLY the joined project's two tickets. Not `toContain`: an
-    // implementation that named every ticket in the workspace would satisfy
-    // "contains inJoined" while disclosing `inOther`, which this member still
-    // cannot see and which the project scope is the only thing withholding.
+    // EXACTLY the joined project's two tickets — not the workspace-mode ticket
+    // this member could already see, and not the other project's. Not
+    // `toContain`: an implementation that named everything visible would satisfy
+    // "contains inJoined" while dragging in both.
     expect(forNewcomer).toEqual([[inJoined, alsoInJoined].sort()]);
     expect(JSON.stringify(forNewcomer)).not.toContain(inOther);
+    // THE ASSERTION THE SCOPE-FILTER MUTATION REDDENS. This member CAN see
+    // `alreadyVisibleElsewhere` — it is workspace mode — so `canSee` admits it
+    // and `listVisibleTickets` returns it. Only the project scope keeps it out
+    // of the notice, which is what makes this a test of the scope rather than of
+    // `canSee` a second time.
+    expect(JSON.stringify(forNewcomer)).not.toContain(alreadyVisibleElsewhere);
 
     // THE EXCLUDING HALF. The bystander's reach did not grow, so no notice is
     // owed them at all — and this runs against the SAME trigger in the SAME

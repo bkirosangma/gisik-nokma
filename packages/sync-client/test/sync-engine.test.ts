@@ -41,10 +41,24 @@ import { createHttpTransport, type WebSocketLike } from '../src/net/http-transpo
  * here in a way it is not elsewhere: `recorded-hazards.test.ts`'s docblock
  * measures `Tests 2 passed (2)` for its own file and its two cases are quoted
  * with `(22)` denominators in `test-cases/12-offline-sync-apps.md`. Adding the
- * engine's cases to that file would silently falsify both. This file's own
- * denominator is `(16)`; the package's is `Tests 63 passed (63)` — both moved
- * by the fix round's two cases, and both re-run at this tree rather than
- * recomputed from the old pair.
+ * engine's cases to that file would silently falsify both.
+ *
+ * This file's own denominator is `Tests 22 passed (22)` **on Node v22.22.2**,
+ * re-measured at this tree after closure 5b added 12.288 and 12.305–12.308. It
+ * read `(16)` until then and was ALREADY WRONG at 17 before those five landed —
+ * the same written-down-count staleness the parenthesis two paragraphs up spends
+ * a page recording, caught here only because a lane re-ran the number instead of
+ * copying it. **The Node version is part of the measurement, not decoration:**
+ * `package.json` declares `>=22.0.0 <23` and `better-sqlite3`'s native binding
+ * refuses any other major, so on the Node 24 that is default on some machines
+ * this file reddens 14 of its cases with `NODE_MODULE_VERSION 127 … requires
+ * 137` and nothing wrong in it. A denominator that does not name its Node is
+ * not evidence.
+ *
+ * The package's `Tests 63 passed (63)` is quoted as the number it WAS and is
+ * deliberately not restated as current: closure 5b's lane is authorized for
+ * this one file and did not re-run the package, and a count carried forward
+ * under a fresh sentence is exactly the move this docblock exists to refuse.
  *
  * ## No `TZ` case here, and that is a decision rather than an omission
  *
@@ -1072,5 +1086,501 @@ describe('reconcile — closure 5, the narrow half (ruling P37)', () => {
     expect(survivors).toHaveLength(1);
     expect(survivors[0]).not.toBe(presentedFirst);
     expect(neverPresented).not.toBe(b2);
+  });
+});
+
+/**
+ * Closure 5b(d) / 5b(b), ruling P37.1 — the grant side is PULL-SHAPED, and this
+ * describe covers the engine's half of it: the drain that turns a notice into
+ * per-ticket fetches, and what it does when one of those fetches does not come
+ * back.
+ *
+ * ## Why the fixture's default `pullImpl` THROWS, restated where the cases are
+ *
+ * A fake that answered every pull with an empty payload would make every case
+ * in the describes ABOVE — none of which expects a pull, and none of which
+ * asserts `pullCalls` — pass whether or not a drain ran behind their backs, and
+ * would make an applied-nothing payload look like an applied ticket. The
+ * default refuses instead, so an unexpected pull is a loud rejection naming the
+ * id rather than a silent success. The cases below that DO expect a pull say so
+ * by overriding it, which makes the override itself the statement of intent.
+ *
+ * It is not what makes 12.305's exactness work — `pullCalls` is asserted as a
+ * whole array there, which catches a stray pull whatever the fake returns. The
+ * default's job is the cases that assert nothing about pulls at all.
+ */
+describe('12.305-12.308 the per-ticket pull door (closure 5b(d), ruling P37.1)', () => {
+  /**
+   * The engine's `PULL_TIMEOUT_MS`, restated here because it is module-private.
+   *
+   * The same duplication `RECONCILE_CHUNK_SIZE` carries against the server's
+   * `MAX_BATCH_SIZE`, and it is safe for the same reason: 12.308 brackets the
+   * timeout from BOTH sides — parked at `TIMEOUT - 1`, drained at `TIMEOUT + 1`
+   * — so moving the constant in `sync-engine.ts` without moving this one fails
+   * that case loudly rather than weakening it.
+   */
+  const PULL_TIMEOUT_MS = 15_000;
+
+  /**
+   * One ticket's pull payload, built against the SAME definition envelopes the
+   * bootstrap carried.
+   *
+   * Not a shortcut: `loadTicketBootstrap` dedupes definitions by event id and
+   * `applyDefinition` is an `ON CONFLICT … DO UPDATE`, so re-sending the
+   * workspace's own definitions is exactly what the real door does — the server
+   * sends the full version chain every time because a pulled ticket may sit on
+   * a workflow version the device has never seen, and it cannot know which.
+   * Handing this door an EMPTY `definitions` would also pass here (the replica
+   * already holds them from `loadBootstrap`), which is precisely the vacuity
+   * `ticket-bootstrap.test.ts`'s 12.297 exists to refuse; this file does not
+   * re-prove that property, it just declines to depend on its absence.
+   */
+  const pullPayloadOf = (body: BootstrapResponse, ticketId: string): TicketBootstrap => ({
+    workspaceId: WS,
+    definitions: body.definitions,
+    ticket: { ticketId, snapshot: null, events: [created(ticketId)] },
+  });
+
+  /**
+   * 12.305 — A NOTICE PULLS EXACTLY WHAT THE DEVICE DOES NOT HOLD.
+   *
+   * `visibility.set` is not refused when it grants what a principal already
+   * had (`check-permission.ts` does not check), and the hub does not model a
+   * device's holdings and must not start — so a notice naming ten ids reaches a
+   * device that already holds nine of them, routinely, and P37.1's cost
+   * argument ("a repeated no-op `visibility.set` costs a holding client
+   * nothing") is a claim about THIS filter and nothing else. The filter lives
+   * in `replica.applyServerItem`'s `reach-granted` arm, but only the engine can
+   * be observed doing it: the replica records ids and stops, and what actually
+   * crosses the network is the drain's `bootstrapTicket` calls.
+   *
+   * So the load-bearing assertion is `pullCalls` as an EXACT array rather than
+   * a count or a `toContain`. A count of two is satisfied by pulling the held
+   * id and one missing one; `toContain` is satisfied by pulling all three.
+   *
+   * The held ticket is asserted READABLE before the notice is sent. Without
+   * that line "the held id was not pulled" is equally satisfied by a replica
+   * that never held it — the notice would then have named three ids the device
+   * lacks and pulled two, and the case would be measuring nothing.
+   *
+   * *Mutation: drop the `getTicket(...) === null` filter in the `reach-granted`
+   * arm of `replica.ts` (record every id in `instruction.ticketIds`) → red HERE
+   * ALONE, `Tests 1 failed | 21 passed (22)`, on the `pullCalls` line:
+   * `expected [ { …(2) }, { …(2) }, { …(2) } ] to deeply equal [ { …(2) }, { …(2) } ]`
+   * — the held id pulled as a third entry. The engine-side mutation (drop the
+   * `await drainPendingPulls(item.workspaceId)` from `applyOne`'s
+   * `reach-granted` arm) reddens this case too, but reddens 12.306 and 12.308
+   * with it; the filter is what this case owns alone.*
+   */
+  it('12.305 pulls exactly the ids the device does not already hold, and each pulled ticket becomes readable', async () => {
+    const held = newUlid();
+    const missingA = newUlid();
+    const missingB = newUlid();
+    const body = bootstrapOf();
+    const { script, replica, engine } = await fixture({
+      bootstrapImpl: async () => body,
+      pullImpl: async (_workspaceId, ticketId) => pullPayloadOf(body, ticketId),
+    });
+    await engine.start(WS);
+
+    // The device really holds one of the three ids the notice will name. This
+    // is the non-vacuity control for the whole case.
+    script.handlers!.onItem(created(held));
+    await engine.settled();
+    expect((await replica.getTicket(held))?.confirmed?.stateId).toBe('todo');
+    expect(await replica.getTicket(missingA)).toBeNull();
+    expect(await replica.getTicket(missingB)).toBeNull();
+    expect(script.pullCalls).toEqual([]);
+
+    script.handlers!.onItem({ kind: 'reach-granted', workspaceId: WS, ticketIds: [held, missingA, missingB] });
+    await engine.settled();
+
+    // EXACTLY these two, in the order the notice named them. The held id is
+    // absent, and its absence is the whole property.
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: missingA },
+      { workspaceId: WS, ticketId: missingB },
+    ]);
+    // …and a pull that landed is a ticket that READS, not merely a row that
+    // exists: `stateId` is the folded initial state, so a payload that inserted
+    // envelopes without refolding would fail here rather than pass on presence.
+    expect((await replica.getTicket(missingA))?.confirmed?.stateId).toBe('todo');
+    expect((await replica.getTicket(missingB))?.confirmed?.stateId).toBe('todo');
+    expect((await replica.getTicket(held))?.confirmed?.stateId).toBe('todo');
+    // Nothing is still owed — a drain that fetched but never cleared would
+    // re-fetch both ids on every catch-up for the life of the install.
+    expect(await replica.listPendingPulls(WS)).toEqual([]);
+    // The pull door writes no cursor (`loadTicketBootstrap` takes no
+    // `streamSeq`), and no `caught-up` has arrived on this stream.
+    expect(await replica.getCursor(WS)).toBe(7);
+    expect(engine.lastApplyFailure()).toBeNull();
+    engine.stop();
+  });
+
+  /**
+   * 12.306 — A FAILING PULL MUST NOT STALL, AND MUST NOT FORGET.
+   *
+   * The most important case in this set, because the failure it excludes is
+   * terminal and silent-looking. `stall()` is a ONE-WAY LATCH: `stalled` is set
+   * in exactly one place and cleared in exactly one other, `start()`. Mobile
+   * never calls `start()` a second time and the shell renders the state as a
+   * plain "Offline", so a stall is terminal until the process restarts. Letting
+   * a pull's rejection reach it would mean a five-second network wobble bricks
+   * the device where, before closure 5b, the identical wobble merely lost a
+   * backfill.
+   *
+   * Swallowing alone is not enough and is the other half of this case. The
+   * cursor advances past the trigger, the notice is not regenerated, and
+   * `needsBootstrap` refuses to re-bootstrap over a local baseline — so a
+   * swallowed-and-forgotten id is lost until a reinstall. The id therefore
+   * stays in the replica's DURABLE pending set and the next catch-up tries
+   * again. Three outcomes, one of them acceptable.
+   *
+   * ## What makes "nothing stalled" able to fail here
+   *
+   * `lastApplyFailure()` being null is a "nothing happened" assertion, so it is
+   * paired with two positive facts from the SAME run: a frame that arrives
+   * AFTER the failed pull still folds (the chain is alive, not parked), and the
+   * later catch-up drives the engine to `live` with the cursor at 9 (the
+   * caught-up link ran to its end rather than being short-circuited by a
+   * `stalled` guard). A stalled engine reaches neither.
+   *
+   * *Mutation: `catch (err) { throw err; }` — re-raise inside
+   * `drainPendingPulls`'s per-id catch instead of swallowing → red here with
+   * `expected { code: 'apply-failed', …(2) } to be null`: the rejection reaches
+   * `stall()` through `applyOne`'s `.catch`, so `lastApplyFailure()` is the
+   * pull's own message and `status()` is `offline`. RED ON 12.308 TOO
+   * (`Tests 2 failed | 20 passed (22)`), and that is not a defect in either
+   * case — a swallow removed is a swallow removed for both failure shapes, and
+   * the two cases differ in the SHAPE (a rejection here, a promise that never
+   * settles there), not in the property. Nothing separates them, and this note
+   * says so rather than claiming an "alone" that was not measured.*
+   */
+  it('12.306 a failing pull leaves the id owed and the engine running, and the next catch-up converges', async () => {
+    const owed = newUlid();
+    const anchor = newUlid();
+    const body = bootstrapOf();
+    const { script, replica, engine } = await fixture({
+      bootstrapImpl: async () => body,
+      pullImpl: async (_workspaceId, ticketId) => {
+        throw new Error(`transport refused the pull for ${ticketId}`);
+      },
+    });
+    await engine.start(WS);
+
+    // A control that the fold door works in this fixture at all, taken BEFORE
+    // the failure so a broken fixture cannot masquerade as a handled one.
+    script.handlers!.onItem(created(anchor));
+    await engine.settled();
+    expect((await replica.getTicket(anchor))?.confirmed?.stateId).toBe('todo');
+
+    script.handlers!.onItem({ kind: 'reach-granted', workspaceId: WS, ticketIds: [owed] });
+    await engine.settled();
+
+    // The pull was attempted and it failed.
+    expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: owed }]);
+    expect(await replica.getTicket(owed)).toBeNull();
+    // The id is STILL OWED — the whole recovery depends on this row surviving.
+    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    // And nothing latched. `status()` is the one that would read `offline` on a
+    // stall, and `lastApplyFailure()` the one a shell would render.
+    expect(engine.lastApplyFailure()).toBeNull();
+    expect(engine.status()).toBe('catching-up');
+
+    // POSITIVE CONTROL, same run: the apply chain still applies. A stalled
+    // engine returns from `applyOne` at its first line and this transition
+    // would never land.
+    script.handlers!.onItem(transitioned(anchor, 'doing', 2));
+    await engine.settled();
+    expect((await replica.getTicket(anchor))?.confirmed?.stateId).toBe('doing');
+
+    // The network comes back. `fakeTransport` reads `script.pullImpl` at call
+    // time, so reassigning it here is the wobble ending.
+    script.pullImpl = async (_workspaceId, ticketId) => pullPayloadOf(body, ticketId);
+    script.handlers!.onCaughtUp(9);
+    await engine.settled();
+
+    // The retry is the SECOND entry, enumerated rather than counted: a drain
+    // that re-read the pending set twice in one link would show three.
+    expect(script.pullCalls).toEqual([
+      { workspaceId: WS, ticketId: owed },
+      { workspaceId: WS, ticketId: owed },
+    ]);
+    expect((await replica.getTicket(owed))?.confirmed?.stateId).toBe('todo');
+    expect(await replica.listPendingPulls(WS)).toEqual([]);
+    // The caught-up link ran to its END: the drain is awaited BEFORE
+    // `setCursor`, so a cursor at 9 and a status of `live` are only reachable
+    // through a drain that returned.
+    expect(await replica.getCursor(WS)).toBe(9);
+    expect(engine.status()).toBe('live');
+    expect(engine.lastApplyFailure()).toBeNull();
+    engine.stop();
+  });
+
+  /**
+   * 12.308 — A PULL THAT NEVER SETTLES IS ABANDONED, AND THE ID STAYS OWED.
+   *
+   * This is the failure mode that would be WORSE than the terminal stall
+   * `drainPendingPulls` exists to avoid, and it is not hypothetical:
+   * `net/http-transport.ts` calls bare `fetch` with no `AbortSignal` anywhere
+   * in the file, and `applyChain` is strictly serial. A promise that neither
+   * resolves nor rejects therefore does not fail — the chain simply STOPS.
+   * Status stays where it was, `stalled` stays false, `lastApplyFailure()`
+   * stays null, and `settled()` never resolves. Nothing anywhere surfaces it.
+   *
+   * ## How this is asserted without asserting a hang
+   *
+   * "The chain is parked" is an absence, and the only honest way to see it is
+   * to bracket the timeout from both sides in ONE run. `settled()` is raced
+   * against the fake clock: at `PULL_TIMEOUT_MS - 1` it has NOT resolved (a
+   * shorter or absent bound fails this line), and one millisecond past the
+   * bound it HAS (no bound at all fails by running the case out to vitest's own
+   * timeout, loudly, rather than by passing). The `pullCalls` assertion before
+   * either is the control that the pull was really started and the case is not
+   * bracketing an empty drain.
+   *
+   * Fake timers are installed AFTER `start()` and the anchor fold deliberately:
+   * `createReplica` runs migrations and `better-sqlite3` is synchronous, but a
+   * faked clock around setup buys nothing and costs the ability to tell a
+   * fixture problem from a timeout problem.
+   *
+   * *Mutation: call `transport.bootstrapTicket(ws, ticketId)` directly in
+   * `drainPendingPulls`, dropping `withTimeout` → red HERE ALONE,
+   * `Tests 1 failed | 21 passed (22)`, with `expected false to be true //
+   * Object.is equality` on the line one millisecond past the bound.*
+   *
+   * *This note first predicted the mutant would red as a vitest TIMEOUT rather
+   * than an assertion, and the measurement says otherwise:
+   * `advanceTimersByTimeAsync` returns on its own real-timer yields whether or
+   * not the chain moved, so the parked `settled()` is caught by the `drained`
+   * flag in 7 ms instead of by the runner's 5 s clock. Written down because the
+   * distinction is worth something — the case detects the hang, it does not
+   * merely survive it, so it stays fast and says which side of the bound broke.*
+   */
+  it('12.308 a pull that never settles is abandoned after the timeout, and the id stays owed', async () => {
+    const owed = newUlid();
+    const anchor = newUlid();
+    const body = bootstrapOf();
+    const { script, replica, engine } = await fixture({
+      bootstrapImpl: async () => body,
+      // Neither resolves nor rejects. This is what a `fetch` with no
+      // `AbortSignal` against a black-holed connection looks like from here.
+      pullImpl: () => new Promise<TicketBootstrap>(() => undefined),
+    });
+    await engine.start(WS);
+    script.handlers!.onItem(created(anchor));
+    await engine.settled();
+    expect((await replica.getTicket(anchor))?.confirmed?.stateId).toBe('todo');
+
+    vi.useFakeTimers();
+    try {
+      let drained = false;
+      script.handlers!.onItem({ kind: 'reach-granted', workspaceId: WS, ticketIds: [owed] });
+      void engine.settled().then(() => {
+        drained = true;
+      });
+
+      // Every microtask between the notice and the pull runs during this tick;
+      // the timeout timer is armed at 15_000 and fires in none of it.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: owed }]);
+      expect(drained).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(PULL_TIMEOUT_MS - 1);
+      // STILL PARKED one millisecond short of the bound. A timeout shorter than
+      // `PULL_TIMEOUT_MS` — or a drain that gave up on its own — fails here.
+      expect(drained).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2);
+      expect(drained).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await engine.settled();
+    // Abandoned, not cleared: the same conservative reading a rejected pull
+    // gets, and for a stronger reason — a request that never answered says
+    // nothing at all about whether the ticket is still this device's.
+    expect(await replica.listPendingPulls(WS)).toEqual([owed]);
+    expect(await replica.getTicket(owed)).toBeNull();
+    // The abandonment is not a fold failure and must not read as one.
+    expect(engine.lastApplyFailure()).toBeNull();
+    expect(engine.status()).toBe('catching-up');
+    // POSITIVE CONTROL: the chain resumed. Without the timeout this line is
+    // never reached, because `settled()` above never returns.
+    script.handlers!.onItem(transitioned(anchor, 'doing', 2));
+    await engine.settled();
+    expect((await replica.getTicket(anchor))?.confirmed?.stateId).toBe('doing');
+    engine.stop();
+  });
+});
+
+/**
+ * The reconcile SCHEDULE — case 12.288's owner line, answered.
+ *
+ * `SyncEngine.reconcile`'s docblock used to end "Deliberately NOT wired into
+ * `start()` or the reconnect path … **Owner: unassigned; case 12.288.**", and
+ * 12.288 was a RECORD in `test-cases/12-offline-sync-apps.md` that nothing
+ * called the primitive on a schedule. It is a case now, and the two below split
+ * the answer: that there IS a schedule, and what bounds it.
+ */
+describe('12.288 + 12.307 the reconcile schedule (closure 5b(b))', () => {
+  /**
+   * 12.288 — CATCH-UP COMPLETION IS THE TRIGGER, AND NOTHING CALLS RECONCILE
+   * BY HAND IN THIS CASE.
+   *
+   * The moment a device's cursor is current is exactly the moment its HOLDINGS
+   * may be stale, and the two facts are unrelated on purpose: a narrowing sends
+   * the losing device NOTHING AT ALL (`reconcile-route.ts`, case 6.104), so
+   * there is no frame to notice, no purge to apply, and no other trigger
+   * available anywhere in the protocol. That is also why the cheaper trigger is
+   * wrong — gating on "the catch-up delivered something" skips the zero-frame
+   * catch-up, which is precisely the shape a silent narrowing produces.
+   *
+   * The case asserts both halves of a schedule, because either alone is
+   * satisfiable by an accident:
+   *
+   * 1. `transport.reconcile` was called, with the ids the replica holds, and
+   *    `reconcileCalls` was EMPTY immediately before the `caught-up` — so the
+   *    call belongs to the catch-up and not to `start()` or the bootstrap.
+   * 2. A ticket the server names `restricted` is GONE from the replica. A
+   *    schedule that asked and dropped the answer would satisfy (1) alone.
+   *
+   * The surviving ticket is the positive control for (2): the purge is targeted
+   * rather than a store that emptied itself.
+   *
+   * *Mutation: neutralise the whole `if (Date.now() - lastReconcileAt >= …)`
+   * block in `onCaughtUp` → red here with `expected [] to have a length of 1
+   * but got +0`. **NOT red alone, measured**: `Tests 2 failed | 20 passed (22)`
+   * — 12.307 goes with it, and no honest 12.307 survives a schedule that does
+   * not exist, because a case bounding the interval has to observe the
+   * interval's first firing. The mutation that DOES separate them is this
+   * case's own half (2): keep the schedule and skip `replica.purgeEntity` in
+   * `runReconcile` → `Tests 2 failed | 20 passed (22)` again, but the two are
+   * this case and 12.287 (`expected { …(3) } to be null` on both), with 12.307
+   * green. Two mutations, neither of them "alone", and the pair is what pins
+   * the case: the first says a schedule exists, the second says it acts.*
+   */
+  it('12.288 reconciles on catch-up completion with no manual call, and a restricted ticket really leaves', async () => {
+    const stale = newUlid();
+    const kept = newUlid();
+    const { script, replica, engine } = await fixture({
+      // The server narrows exactly one of the two ids the device presents. The
+      // answer is computed from `heldIds` rather than written out, so it stays
+      // in step with whatever the replica actually presents.
+      reconcileImpl: async (workspaceId, heldIds) => ({
+        workspaceId,
+        restricted: heldIds.filter((id) => id === stale).map((id) => ({ kind: 'restricted' as const, id })),
+      }),
+    });
+    await engine.start(WS);
+    script.handlers!.onItem(created(stale));
+    script.handlers!.onItem(created(kept));
+    await engine.settled();
+    expect((await replica.listTickets(WS)).map((t) => t.ticketId).sort()).toEqual([stale, kept].sort());
+    // Nothing has asked yet — so the call below is the catch-up's and no
+    // earlier door's.
+    expect(script.reconcileCalls).toEqual([]);
+
+    script.handlers!.onCaughtUp(9);
+    await engine.settled();
+
+    // Asked, once, about what this device holds. `settled()` rather than
+    // `vi.waitFor`: the reconcile is awaited INSIDE the caught-up link, so the
+    // chain covers it — and `reconcileCalls` is pushed on ENTRY to the
+    // transport, so waiting on it would race the purge that follows.
+    expect(script.reconcileCalls).toHaveLength(1);
+    expect(script.reconcileCalls[0]!.workspaceId).toBe(WS);
+    expect([...script.reconcileCalls[0]!.heldIds].sort()).toEqual([stale, kept].sort());
+    // And ACTED on: the narrowed ticket is gone, its events with it.
+    expect(await replica.getTicket(stale)).toBeNull();
+    expect(await replica.listEntityEvents(stale)).toEqual([]);
+    // The positive control — a purge that is targeted, not a store that
+    // emptied itself.
+    expect((await replica.getTicket(kept))?.confirmed?.stateId).toBe('todo');
+    expect(await replica.getCursor(WS)).toBe(9);
+    engine.stop();
+  });
+
+  /**
+   * 12.307 — THE MINIMUM INTERVAL, WHICH IS WHAT MAKES THE SCHEDULE AFFORDABLE.
+   *
+   * `reconnectDelayMs` is a FIXED 2000 with no growth and no jitter, and the
+   * hub sends one `caught-up` per subscription unconditionally — so without a
+   * bound a flapping socket is a reconcile every two seconds, forever, at
+   * `ceil(held / 100)` requests each. A device holding a thousand tickets would
+   * issue ten requests every two seconds while the network wobbles. The bound
+   * is TIME rather than activity, because gating on activity would skip the
+   * zero-frame catch-up the whole feature exists for.
+   *
+   * ## Time is controlled honestly, and the two halves control it differently
+   *
+   * The first half needs NO clock control at all and that is not luck:
+   * `lastReconcileAt` starts at 0 and `Date.now()` is ~1.8e12, so the first
+   * catch-up passes the gate unconditionally and stamps the clock; the second,
+   * milliseconds later, cannot. The cursor reaching the SECOND `caught-up`'s
+   * seq is what makes "one call" able to fail for the right reason — without
+   * it, a second link that never ran at all would satisfy the count.
+   *
+   * The second half needs the interval to EXPIRE, which real time cannot
+   * deliver in a test. `vi.useFakeTimers({ toFake: ['Date'] })` fakes `Date`
+   * and NOTHING ELSE — `setTimeout` stays real, so the engine's reconnect timer
+   * and `withTimeout`'s timer are untouched and nothing in this file's
+   * machinery is asked to run on a clock it does not control. The base instant
+   * is captured from the real clock first, because sinon's default epoch is 0
+   * and a fake `Date.now()` of 0 against a real `lastReconcileAt` would compute
+   * a NEGATIVE age — which fails closed, and would have made this half pass for
+   * the opposite reason.
+   *
+   * *Mutation: drop the `Date.now() - lastReconcileAt >= RECONCILE_MIN_INTERVAL_MS`
+   * guard, reconciling on every catch-up → red HERE ALONE,
+   * `Tests 1 failed | 21 passed (22)`, with
+   * `expected [ { …(2) }, { …(2) } ] to have a length of 1 but got 2`.*
+   *
+   * *TWO mutations, because the first one stops at the first assertion and the
+   * expiry half below it is then a line nobody has watched fail. Second
+   * mutation: `if (lastReconcileAt === 0)` — reconcile ONCE PER PROCESS, which
+   * is the plausible wrong implementation this docblock argues against and the
+   * one a count-shaped case cannot tell from a time-shaped one → red HERE
+   * ALONE, `Tests 1 failed | 21 passed (22)`, with `expected [ { …(2) } ] to
+   * have a length of 2 but got 1` on the line after the clock is moved. Half
+   * one stays green under it (the first catch-up still stamps, the second is
+   * still refused) and so does 12.288, which sends a single catch-up.*
+   */
+  it('12.307 two catch-ups in quick succession reconcile once, and the bound is time rather than count', async () => {
+    const { script, replica, engine } = await fixture();
+    await engine.start(WS);
+    script.handlers!.onItem(created(newUlid()));
+    await engine.settled();
+
+    script.handlers!.onCaughtUp(9);
+    await engine.settled();
+    expect(script.reconcileCalls).toHaveLength(1);
+    expect(await replica.getCursor(WS)).toBe(9);
+
+    script.handlers!.onCaughtUp(10);
+    await engine.settled();
+    // THE CONTROL FIRST: the second caught-up link really ran to its end. A
+    // link that was dropped, queued behind a stall, or short-circuited would
+    // leave the cursor at 9 and satisfy the count below for the wrong reason.
+    expect(await replica.getCursor(WS)).toBe(10);
+    expect(script.reconcileCalls).toHaveLength(1);
+
+    // …and the interval EXPIRES. `RECONCILE_MIN_INTERVAL_MS` is 60_000 in
+    // `sync-engine.ts` and module-private; 61_000 clears it with a margin, and
+    // raising the constant past that fails this line loudly rather than
+    // weakening it.
+    const base = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(base + 61_000));
+      script.handlers!.onCaughtUp(11);
+      await engine.settled();
+      expect(await replica.getCursor(WS)).toBe(11);
+      expect(script.reconcileCalls).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+    engine.stop();
   });
 });
