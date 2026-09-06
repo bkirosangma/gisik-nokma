@@ -68,6 +68,73 @@ exist. Now the id is asserted to match a ULID shape before it is used, so a bad 
 `mapWorkflowDef` returns the DOMAIN type unreshaped (it validates and casts), so the client-side field
 is `id`, not `workflowId` — a second place the same wrong guess would have landed.
 
+## THE REVIEW FOUND MORE THAN THE BUILD DID — one opus reviewer, and it earned the dispatch
+
+**Two checks that could not fail, two overclaiming titles, and one systemic finding.** I verified every
+one against primary source before acting; the reviewer's own least-confident claim resolved in my
+favour and I am recording that too, because a reviewer that flags its uncertainty accurately is worth
+more than one that is merely right.
+
+### The real defect: 7.227 shipped a check that could not fail
+
+`mapPreferences` ends `return { version: 1, projects, savedFilters }` — **the version is a CLIENT-SIDE
+LITERAL.** There is nothing on the wire to read: the server's `preferencesDocSchema` is `.strict()`
+over exactly `savedFilters`, `listColumns`, `grouping`, and the GET handler returns that document
+unwrapped. My `expect(prefs.version).toBeGreaterThanOrEqual(1)` compared a constant to itself, and my
+comment calling it *"the document's own"* was false. `Array.isArray(prefs.savedFilters)` was unfailable
+for a structural reason — the mapper builds it with `.map()`. **Both removed**, replaced with
+`toEqual([])`, which is what the wire carried. **A product finding falls out and is recorded with an
+owner rather than fixed: `UserPreferences.version` is fabricated and no producer emits it.**
+
+### The systemic one, which is the most useful thing the review produced
+
+**Seven of the eight mutations kill at a SHAPE GATE upstream of the property the case names.** Every
+quoted failure is `MappingError: response mapping failed at <path>`, thrown inside the mapper call
+*before any `expect` about the claim runs* — each would still redden with every assertion below the
+mapper call deleted. So the set measures *"the route's top-level key names agree with the mapper's"*
+seven times and measures no transformation logic. Not worthless — a renamed wire key is exactly how
+client and server drift silently, and nothing measured it before — but **not what the per-case
+sentences implied.** Disclosed once for the cluster in `test-cases/07`.
+
+**This is the FOURTH instance in two passes of a mutation changing colour without measuring its
+property** (7.221's non-vacuity guard · 12.323's 500-instead-of-404 · 7.226's `12 skipped` · now seven
+shape-gate kills). Three were incidents. Four is a class, and the rule is written with the evidence
+behind it: **a red on the case you aimed at is not evidence until you have read WHICH assertion
+produced it.**
+
+### Two titles that claimed more than their bodies kept — the defect this pass exists to catch
+
+- **7.223** sold itself on the regrouping. The fixture **cannot constrain it**: one founding workflow
+  and an unreachable straggler path mean exactly one group is possible, so a mapper keying by
+  `workflowId` alone passes identically. Title and entry corrected to what it keeps.
+- **7.229** claimed the contests fold. **The fold never executes** — with `items` empty,
+  `mapAttention` could be `() => []` and every assertion would pass. Corrected to the two top-level key
+  names, which are real.
+
+Recorded, not fixed: 7.222's roster is one element so `rosterByActorId`'s collapse is untested; 7.226
+is the only case that WRITES (a fourth ticket into the shared project) and 7.223/12.324 depend on
+running first — latent under declaration order, live under `--sequence.shuffle`.
+
+### The reviewer's uncertainty, resolved
+
+It flagged 7.225's `def.id === workflowId` as possibly circular and said so explicitly. **It is not:**
+`getWorkflowDefFromProjection` selects the `definition` JSON blob, so the id comes from inside the
+blob, not reconstructed from the row key. Weak but real.
+
+## SEAM 1 REBASE — measured, not assumed
+
+Rebased onto `592b34c` (E's #190 plus the ledger promotion). **The suite passes 12/12 unchanged.**
+Predicted beforehand from source — `buildTestApp` passes no `security` block so no limiter registers,
+and `httpOriginRefused` is POST-only and *cookie*-gated (`a bearer client lands here` returns false),
+while every witness is Bearer-authenticated — but re-run rather than banked, per the controller.
+
+**The rebase DID break the build first, and the cause is worth carrying:** seam 1 added `@fastify/cors`
+and `nodemailer`, so `BUILD_EXIT=2` with `Cannot find module` until `pnpm install` ran again. **A rebase
+that crosses a dependency change needs a reinstall, and the failure names a missing module rather than
+anything about the branch.** The error line also showed pnpm resolving under `node/v24.11.1`; checked
+rather than assumed — `pnpm exec node -v` reports **v22.22.2**, so the binary is a shim running the
+active node and the toolchain is correct.
+
 ## THE MUTATIONS — eight, all restored, every message naming the mapper's own path
 
 | case | mutation on the ROUTE | result |
