@@ -1,26 +1,62 @@
 import { describe, expect, it } from 'vitest';
 import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/domain';
+import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
 import {
   UnansweredClaimError,
   reopenAndProceed,
   reopenStateOptions,
   submitChildEvent,
 } from '../../src/flows/guarded-child-event.js';
+import { PARENT_TERMINAL_RULE } from '../../src/precheck.js';
 import { makeSubmittedFactory } from '../../src/submit.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { PARENT, TICKET, WF_ERRAND, WS, submittedTicketCreated } from '../helpers/seed.js';
 
 const make = makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
 
-/** The engine's own words, copied from `checks/hierarchy.ts`'s refusal shape. */
+/**
+ * The engine's real sentence for the CREATE arm, and the comment above it used
+ * to be false.
+ *
+ * It read *"the engine's own words, copied from `checks/hierarchy.ts`'s refusal
+ * shape"* over the string `'Parent "Registrations" is Done; it must reopen
+ * because it is acquiring live work.'` — which the engine has never emitted, in
+ * any version reachable from this tree. `parentTerminalRefusal`
+ * (`packages/rule-engine/src/checks/refusals.ts:197`) builds
+ * `"<title>" is finished (<state>). <remedy>`, and the two share nothing but the
+ * title and the word "Done". The same fabricated string sits in
+ * `test/views/reopen-flow.test.tsx` under the name `SERVER_PARENT_TERMINAL_REASON`.
+ * Nothing in this package could see it: every case here feeds the client this
+ * constant and reads it back, so the fixture was only ever compared with itself.
+ *
+ * It is now the sentence the running engine produces, read off the wire by case
+ * **7.238/7.239** in `apps/server/test/integration/fixture-witnesses.test.ts` —
+ * a real `POST /v1/events` under a real terminal parent. That case, not this
+ * constant, is what keeps the wording honest.
+ *
+ * **It is a literal and not an import, and that is a gap rather than a choice.**
+ * `checks/refusals.ts` is not re-exported from `packages/rule-engine/src/index.ts`
+ * and no subpath reaches it (`package.json` exposes `.` and `./fixtures`), so no
+ * consumer of the package can compare against the producer's own words. Recorded
+ * as case 7.245; owner is whoever next touches `rule-engine/src/index.ts`.
+ *
+ * The remedy clause is the ADD arm's. The reparent arm says something different
+ * — one constant standing in for two sentences is a limitation of this fixture
+ * that 7.239 exists to state.
+ */
 const PARENT_TERMINAL_REASON =
-  'Parent "Registrations" is Done; it must reopen because it is acquiring live work.';
+  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 
 function parentTerminalRefusal(eventId: string): IngestResult {
   return {
     status: 'refused',
     eventId,
-    rule: 'hierarchy.parent-terminal',
+    // The CLIENT's own constant, which `submitChildEvent` branches on. Using it
+    // here means this fixture cannot drift away from the branch it is testing.
+    // Whether that constant still matches what the SERVER refuses under is a
+    // different question, and one no test in this package can answer: it is
+    // witnessed at 7.238 over a real round trip and nowhere else.
+    rule: PARENT_TERMINAL_RULE,
     reason: PARENT_TERMINAL_REASON,
   };
 }
@@ -110,7 +146,7 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
     const outcome = await submitChildEvent(source, submittedTicketCreated());
     expect(outcome).toEqual({
       kind: 'needs-reopen',
-      refusal: { rule: 'hierarchy.parent-terminal', reason: PARENT_TERMINAL_REASON },
+      refusal: { rule: PARENT_TERMINAL_RULE, reason: PARENT_TERMINAL_REASON },
     });
   });
 
@@ -128,6 +164,13 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
   });
 
   it('T13.2d any other refusal stays an ordinary refusal, reason verbatim', async () => {
+    // `'hierarchy.rank'` STAYS A LITERAL here and at the three sites below, and
+    // it is the only rule in this file that does. It belongs to no exported
+    // constant anywhere: `checks/hierarchy.ts:134` and `:282` write it out at the
+    // `refuse()` call, and `REFUSAL_RULES` does not carry it. There is nothing to
+    // import. The running producer is witnessed instead — case **7.240**, a real
+    // task-under-task create through `POST /v1/events` — and that case, not this
+    // literal, is what reddens if the engine ever renames it.
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
         refusedWith(event.id, 'hierarchy.rank', 'A task cannot sit under a sub-task.'),
@@ -230,13 +273,13 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
   it("T13.3d the parent's own transition rules still apply — its refusal surfaces and the child is never sent", async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
-        refusedWith(event.id, 'restrict-to', 'Only Anselma Marak may move this out of Done.'),
+        refusedWith(event.id, REFUSAL_RULES.restrictTo, 'Only Anselma Marak may move this out of Done.'),
       ),
     );
     const outcome = await reopenAndProceed(source, plan, make);
     expect(outcome).toEqual({
       kind: 'parent-refused',
-      refusal: { rule: 'restrict-to', reason: 'Only Anselma Marak may move this out of Done.' },
+      refusal: { rule: REFUSAL_RULES.restrictTo, reason: 'Only Anselma Marak may move this out of Done.' },
     });
     expect(source.ingested).toHaveLength(1); // the child claim was never submitted
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');
@@ -245,7 +288,7 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
   it('T13.3e a require-comment refusal on the reopen is honoured the same way — no rule is privileged', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
-        refusedWith(event.id, 'require-comment', 'This move needs a comment saying why.'),
+        refusedWith(event.id, REFUSAL_RULES.requireComment, 'This move needs a comment saying why.'),
       ),
     );
     const outcome = await reopenAndProceed(source, plan, make);

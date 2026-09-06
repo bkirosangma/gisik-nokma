@@ -13,8 +13,34 @@ import type { TicketRead } from '../../src/view-types.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { PARENT, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 
+/**
+ * The engine's real CREATE-arm sentence, and the value here was a fabrication
+ * until case 7.239 read the wire.
+ *
+ * The name says SERVER, and the string was not the server's: it read
+ * `'Parent "Registrations" is Done; it must reopen because it is acquiring live
+ * work.'`, which no version of `parentTerminalRefusal`
+ * (`packages/rule-engine/src/checks/refusals.ts:197`) can produce — the engine
+ * says `"<title>" is finished (<state>). <remedy>`. The identical string sat in
+ * `test/flows/guarded-child-event.test.ts` under a comment claiming it was
+ * "copied from `checks/hierarchy.ts`". Two files, both naming the producer, both
+ * wrong, and neither detectable inside this package: every case feeds the client
+ * this constant and reads it back.
+ *
+ * Corrected here as well as at its twin ON PURPOSE. Fixing one and leaving the
+ * other would leave the repo carrying two constants for one sentence with
+ * different values, which is worse than the state this found. **This file was not
+ * in the scoped row table** — it was reached through the `'hierarchy.rank'` /
+ * `'hierarchy.parent-terminal'` site clause — and the scope call is reported
+ * rather than buried.
+ *
+ * Kept a LITERAL because `checks/refusals.ts` is not exported from
+ * `packages/rule-engine`'s index or any subpath, so no consumer can import the
+ * producer's words. Case 7.245; owner: whoever next touches
+ * `rule-engine/src/index.ts`.
+ */
 const SERVER_PARENT_TERMINAL_REASON =
-  'Parent "Registrations" is Done; it must reopen because it is acquiring live work.';
+  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 
 /** What the pre-check writes when it refuses off cached state (`precheck.ts`'s own words). */
 const INSTANT_PARENT_TERMINAL_REASON =

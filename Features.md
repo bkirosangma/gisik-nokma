@@ -797,6 +797,22 @@ reason on record, not an oversight:*
   whose failure message names the mapper's own path, and each records what it does NOT reach — 7.227
   witnesses the empty-preferences document only, 7.229's correct answer is an empty list.
   `apps/server/test/integration/fixture-witnesses.test.ts`
+- ⚙️ **The refusal vocabulary, witnessed (7.238–7.242).** Five further cases drive the rule
+  engine's and the server's refusals through real routes and read them with the shipped client: the
+  reopenable `hierarchy.parent-terminal` at BOTH of its producer call sites (7.238 `ticket.created`,
+  7.239 `ticket.reparented`), `hierarchy.rank` (7.240), the migrate route's
+  `migration.unknown-target-state` (7.241) and a role-gated `restrict-to` transition (7.242). **The
+  standing rule this cluster established:** where a producer builds its refusal FROM an exported
+  constant, asserting the wire value against that same constant is a self-comparison through one
+  module and cannot fail — so every case pairs the producer's constant with a literal, and 7.238 is
+  the one case comparing two INDEPENDENTLY-OWNED constants (`app-core`'s `PARENT_TERMINAL_RULE`
+  against the engine's bare literal), which is the pair the whole reopen affordance hangs on and which
+  nothing had ever compared. Two fabrications were found and corrected in the client fixtures: a
+  parent-terminal reason no engine version emits, present in two files under comments naming the
+  producer; and a migration rule name from the wrong family (7.246). Not buildable from a server test
+  and recorded with owners instead: the web notifications gateway (7.243), the contest round trip
+  (7.244), `rule-engine`'s unexported refusal words (7.245), and Lane B's `sync-client` literals
+  (7.248). `apps/server/test/integration/fixture-witnesses.test.ts`
 
 
 ## 9. Editor, documents & attachments

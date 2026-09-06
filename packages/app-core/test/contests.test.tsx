@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { newSubmittedEvent } from '@gisik-nokma/domain';
+import { CONTEST_RULES } from '@gisik-nokma/rule-engine';
 import { resolveContest, type ContestLike } from '../src/contests/contest-view-model.js';
 import { ContestBanner } from '../src/contests/contest-banner.js';
 import { OfflineAcceptError } from '../src/replica/replica-data-source.js';
@@ -225,10 +226,19 @@ describe('resolveContest', () => {
 
   it('12.208 — a refused resolution surfaces the refusal instead of pretending', async () => {
     const ingest = vi.fn(async (events: unknown[]) =>
-      events.map(() => ({ status: 'refused', eventId: 'x', rule: 'contest.already-resolved', reason: 'planted' })),
+      // `CONTEST_RULES.alreadyResolved`, imported rather than retyped: this is the
+      // vocabulary `packages/rule-engine/src/contests.ts` refuses under, and a
+      // rename there now moves this fixture with it. What the import does NOT
+      // establish is that the server really answers this rule over the wire — an
+      // assertion against a producer's own constant is a self-comparison through
+      // one module. That half is stated as case 7.244: a contest can only be
+      // OPENED with envelope-origin 'server', which the HTTP door refuses from
+      // every client by design, so no `POST /v1/events` round trip can reach it.
+      // The server-side producer is pinned at `apps/server/test/engine-context.test.ts`.
+      events.map(() => ({ status: 'refused', eventId: 'x', rule: CONTEST_RULES.alreadyResolved, reason: 'planted' })),
     );
     const result = await resolveContest(ingest, contest(), { resolution: 'discarded' }, { userId: 'user_c', origin: 'desktop' });
-    expect(result).toEqual({ ok: false, refused: { rule: 'contest.already-resolved', reason: 'planted' } });
+    expect(result).toEqual({ ok: false, refused: { rule: CONTEST_RULES.alreadyResolved, reason: 'planted' } });
   });
 
   it('12.209 — an INVALID answer surfaces the door’s code and message, not a rule it never named', async () => {
