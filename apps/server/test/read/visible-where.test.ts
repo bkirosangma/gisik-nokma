@@ -269,6 +269,9 @@ async function canSeeSet(userId: string): Promise<string[]> {
 }
 
 describe('visibleTicketsWhere agrees with canSee — one decision table, two implementations, zero drift', () => {
+  /**
+   * 7.64 — `visibleTicketsWhere` and `canSeeResolved` agree on the EXACT id set for every viewer class in the matrix — one decision table, two implementations, zero drift.
+   */
   it('agrees for every viewer in the matrix, on the exact id set', async () => {
     const expected: ReadonlyArray<readonly [string, string, string[]]> = [
       [
@@ -321,6 +324,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     expect(await sqlVisibleSet(world.outsider)).not.toEqual(await sqlVisibleSet(world.guest));
   });
 
+  /**
+   * 7.65 — every cell of the decision table is asserted as a GRID rather than described — four role branches by three resolved modes.
+   */
   it('every cell of the decision table is reached — four role branches by three resolved modes', async () => {
     const slices = {
       stranger: new Set(await sqlVisibleSet(extra.stranger)),
@@ -392,6 +398,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     }
   });
 
+  /**
+   * 7.70 — a guest ON a project roster still sees only what they are explicitly listed on; the discriminating state is seeded through the shipped door’s own event.
+   */
   it('a guest ON a project roster still sees only what they are explicitly listed on', async () => {
     // The premise first, because without it this test is a second copy of "a
     // guest sees only what was explicitly shared" and passes whether or not the
@@ -427,6 +436,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     expect(await sqlVisibleSet(world.outsider)).toEqual([extra.wsWideTaskId]);
   });
 
+  /**
+   * 7.67 — the predicate carries NO tenancy clause, and the consequence is EXECUTED: the caller’s own workspace clause is what fences an owner.
+   */
   it('the predicate carries NO tenancy clause — the caller’s workspace clause is what fences an owner', async () => {
     // The owner of this workspace compiles to TRUE, so the neighbour's
     // workspace-mode ticket is excluded by `t.workspace_id = $1` and by nothing
@@ -440,6 +452,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     expect(params.toArray()).toEqual([]);
   });
 
+  /**
+   * 7.66 — the NULL CONTROL the mutation record names — the member branch returning `'FALSE'` outright reddens this file, so the branch is reached rather than unconstrained. The six mutations themselves (four of them OVER-permissive) are recorded at the case, not asserted here.
+   */
   it('a non-member compiles to FALSE — not to an empty string that matches everything', () => {
     const params = new SqlParams();
     // `as unknown as EffectiveRole`: the interface carries a required,
@@ -451,6 +466,9 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     expect(params.toArray()).toEqual([]);
   });
 
+  /**
+   * 7.68 — the predicate BINDS every value: a `userId` carrying SQL text travels as a parameter and never as syntax, proved by an executed query rather than by string inspection.
+   */
   it('binds every value — a userId carrying SQL text is a parameter, never syntax', async () => {
     const eff = await resolveEffectiveRole(pool, world.guest, world.workspaceId);
     const params = new SqlParams();
