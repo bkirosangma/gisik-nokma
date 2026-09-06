@@ -2482,8 +2482,14 @@ describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () =>
       { workspaceId: WS, ticketId: wobble },
     ]);
 
-    // The set is unchanged across both, and the phantom never became readable —
-    // it is forgotten, not quietly satisfied by an empty payload.
+    // The set is unchanged across both. The exact equality on the line above is
+    // what carries this — an empty payload would have called `clearPendingPull`
+    // and shown up there. The `getTicket` null below is NOT doing work: this
+    // fixture's `pullImpl` throws for both ids, so nothing can ever write a
+    // tickets row for the phantom and the line cannot fail under any reachable
+    // product behaviour. Kept as a cheap tripwire against a future edit that
+    // makes the payload path reachable, and labelled so nobody counts it as
+    // evidence. (Found by this branch's fixture review, reading the runs.)
     expect(await replica.listPendingPulls(WS)).toEqual([{ id: wobble, headSeq: 5 }]);
     expect(await replica.getTicket(phantom)).toBeNull();
     expect(engine.lastApplyFailure()).toBeNull();
@@ -2553,6 +2559,9 @@ describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () =>
     // recorded seq was replaced mid-pull, so the guard's comparison against the
     // 5 the pull was issued for could not match, and the entry stayed.
     expect(await replica.listPendingPulls(WS)).toEqual([{ id: raced, headSeq: 9 }]);
+    // Same caveat as 12.317's: `pullImpl` throws before returning, so this null
+    // is not falsifiable here. The falsifiable readability assertion is the one
+    // AFTER the catch-up, where a payload really lands.
     expect(await replica.getTicket(raced)).toBeNull();
     expect(engine.lastApplyFailure()).toBeNull();
 
@@ -2601,8 +2610,8 @@ describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () =>
  * path by name, and stood in `HEAD` for two further commits. One of those
  * commits reported a measurement taken against the mutated tree. Staging
  * explicit paths does not prevent this; nothing in git does. **The remaining
- * mutations are therefore handed to the branch owner to run under the gate lock
- * rather than run here.**
+ * mutations were therefore handed to the branch owner to run under the gate lock
+ * rather than run here — and it ran them; see the section below.**
  *
  * ## MEASURED, pre-P37.2 tree, Node v22.22.2, denominator (27)
  *
@@ -2621,7 +2630,28 @@ describe('12.317-12.318 the 404 drop, keyed to the notice (ruling P37.3)', () =>
  * re-owe `addPendingPulls(purged)` reddened 12.312 alone (`1 failed | 26
  * passed`). Neither edit exists any more.
  *
- * ## NOT MEASURED — predictions, for the branch owner to run
+ * ## ~~NOT MEASURED~~ — MEASURED 2026-09-06 12:49 IST at `bc45bba`. BOTH RAN.
+ *
+ * The branch owner ran both under the gate lock, in one quiet window, against
+ * the WHOLE package (8 files / 87 tests) rather than this file's 27. Baseline
+ * `87 passed (87)` before and after; every restore left the tree clean; each
+ * edit was grep-confirmed present before its run. **Never below → 9 red**
+ * (12.305, 12.306, 12.308, 12.309, 12.311, 12.312, 12.313, **12.317, 12.318**),
+ * 12.310 surviving as predicted. **Always pull (`<=`) → 12.305 + 12.313**,
+ * `2 failed | 85 passed`, exactly as predicted.
+ *
+ * **The SEVEN below was right when it was derived and is wrong now, and the
+ * reason is worth more than the number.** The enumeration was exhaustive over
+ * this file AS IT THEN STOOD; 12.317 and 12.318 were added afterwards and both
+ * assert a `pullCalls` array reached through that same line, so the clause
+ * "every case that asserts a `pullCalls` array" stopped being true the moment
+ * they landed — without anything in it changing. A derived enumeration is a
+ * fact about a tree, and this one outlived its tree by one commit. The three
+ * numbers are kept separately — predicted-at-derivation 7, predicted-at-this-
+ * tree 9, measured 9 — because collapsing them would make a correct
+ * measurement read as a finding. Full table in `test-cases/12-offline-sync-apps.md`.
+ *
+ * ### The predictions as they were written, kept verbatim
  *
  * Both target the one line ruling P37.2 turns on, `src/replica/replica.ts`'s
  * `if ((await localHeadSeq(storage, id)) < headSeq) missing.push(id);`:
