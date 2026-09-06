@@ -249,7 +249,16 @@ describe('docker-compose.dev.yml env contract', () => {
   describe('postgres host port', () => {
     function publishedPorts(): string[] {
       const ports: unknown[] = readCompose().services.postgres.ports ?? [];
-      return ports.map((mapping) => String(mapping).split(':')[0]);
+      return ports.map((mapping) => {
+        // `String(x).split(':')` always yields at least one element, so [0] is
+        // never undefined at runtime. The fallback exists for
+        // noUncheckedIndexedAccess, not for a reachable case — and it is `''`
+        // rather than a port-shaped string so that if it ever DID fire, the
+        // assertions below would fail rather than quietly compare against
+        // something plausible.
+        const [hostPort] = String(mapping).split(':');
+        return hostPort ?? '';
+      });
     }
 
     it('does not publish 54329 — that port is the shared TEST Postgres for this workspace\'s parallel lanes', () => {
