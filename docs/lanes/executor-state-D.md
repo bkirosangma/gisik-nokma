@@ -18,7 +18,7 @@ this session, both now shipped:
    an explicit CI-billing waiver.** Built case 12.344, a hazard case named by a sibling case (12.361) and
    left unbuilt. Full detail in section 1-3 below.
 
-**Live position as of this write (head `cca84af`, frozen — do not push to this branch without the
+**Live position as of this write (head `552dc26`, frozen — do not push to this branch without the
 controller's say-so):**
 
 - PR #213: https://github.com/bkirosangma/gisik-nokma/pull/213 — MERGEABLE. `mergeStateStatus` reads
@@ -27,16 +27,32 @@ controller's say-so):**
   an account-billing outage, NOT a defect in this PR. The controller has granted an explicit merge waiver
   covering the CI run only; everything else (a full local gate, a real review) is still owed and has now
   been done — see section 1.
-- **The full forced gate has been run and is GREEN at this exact head**, under gate-lock v3.3:
+- **Rebased once, after this position was first reported**, because Lane B's #215 merged
+  (`origin/main` = `d5e562e`) and both PRs appended to `test-cases/12` and `Features.md` §12 — docs
+  hunks only, B's own code (`packages/sync-client/test/sync-engine.test.ts`) disjoint from this PR's.
+  One conflict, in `test-cases/12`'s own allocation-header line, resolved by keeping BOTH sides (B's
+  `12.365` and this PR's `12.344`); `Features.md` auto-merged clean with both bullets present. Also
+  fixed one now-stale-by-one census sentence the merge exposed (`bare 328` → `329`, since Lane B's own
+  `12.365` line is one of the 329). **The code diff is UNCHANGED by the rebase** —
+  `git diff --stat origin/main...HEAD -- . ':!docs' ':!test-cases' ':!Features.md'` is still exactly
+  `apps/server/test/dual-client/socket-cut.test.ts`, 235 insertions/1 deletion, same as before — so **the
+  gate below still stands for this PR's actual code** (the #188/#202 precedent the controller cited: a
+  docs-only rebase does not owe a re-gate when the code diff provably has not moved), and the controller's
+  own forced gate at merged `main` covers the combination.
+- **The full forced gate has been run and is GREEN**, under gate-lock v3.3, at the PRE-REBASE head
+  `cca84af` (still valid per the point above — re-run `pnpm install --frozen-lockfile` after any further
+  rebase, a stale `node_modules` reads as a false regression):
   `GATE_EXIT=0` (`WRAPPER_EXIT=0` from the wrapper's own stdout), `Tasks: 30 successful, 30 total`,
   `Cached: 0 cached, 30 total`, `2m1.172s`, node v22.22.2, zero `Unsupported engine`, zero orphaned vitest
   workers. **3645 tests / 284 files, 5 skipped** (server) — ui 37 · domain 464 · rule-engine 282 ·
   editor 178 · sync-client 88 · app-core 1102 · server 1326+5 skipped · mobile 20 · web 138 · desktop 5.
-  `check:env` on its own line: `CHECK_ENV_EXIT=0`.
-- The PR body has been edited (twice, via `gh pr edit`, no new commits, head unchanged) to disclose: (a)
-  no review agent ever ran on this PR — an account-side access error killed the dispatched reviewer before
-  its first action, so the "verification" in the PR body is the orchestrating session's own independent
-  re-work, not a separate reviewer; (b) the full gate result above.
+  `check:env` on its own line: `CHECK_ENV_EXIT=0`. **`check-case-ids` RE-RUN at the post-rebase head**
+  (required — two lanes minted §12 ids): `CHECK_CASE_IDS_EXIT=0`, 1052 bare + 469 bold + 43 marker-first
+  = 1564 = union, zero duplicates, highest `13.203`.
+- The PR body has been edited (via `gh pr edit`, no new commits from body edits, head unaffected by them)
+  to disclose: (a) no review agent ever ran on this PR — an account-side access error killed the
+  dispatched reviewer before its first action, so the "verification" in the PR body is the orchestrating
+  session's own independent re-work, not a separate reviewer; (b) the full gate result above.
 - **Nothing further is owed from Lane D on this PR.** It is waiting on the controller's merge. If you are
   a fresh session picking this up: check `gh pr view 213 --json state,mergedAt` first — it may already be
   merged, in which case skip straight to "what's next" at the very bottom of this file.
