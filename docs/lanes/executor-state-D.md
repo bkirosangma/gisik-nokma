@@ -12,27 +12,25 @@ relaunch at the fixed point after PR #167 (this lane's own retention sweeps, `5c
 
 ## 1. Where things stand right now
 
-- **Worktree**: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch
-  `exec/36-e2e-testids`, head `14cb81d`, cut from and currently equal to `origin/main` at
-  `2d90a03` plus these three commits (no rebase needed yet — check `git log origin/main..HEAD`
-  is still exactly 3 commits before assuming that stays true).
-- **PR NOT YET OPEN.** Three commits pushed to `origin/exec/36-e2e-testids`:
-  1. `4357e0d` — the four source hooks (`board.tsx`, `ticket-list.tsx`, `workspaces/page.tsx`).
-  2. `cf1a862` — the four render tests (cases 3.153–3.156), mutation-verified by hand (see §3).
-  3. `14cb81d` — `Features.md` line + `test-cases/03-foundation-ledger.md` catalogue entries,
-     header recounted 3.152→3.156, `scripts/check-case-ids.mjs` clean (1328 ids, 0 dupes).
+- **PR #173 IS OPEN**: https://github.com/bkirosangma/gisik-nokma/pull/173. Pushed, not merged.
+  Branch `exec/36-e2e-testids`, head `d8b3a3b`, rebased onto `origin/main` at `aa0318a` (a clean
+  rebase — the two intervening `main` commits touched only `docs/lanes/controller-state.md`).
+  Commits: `f9157e7` (the four source hooks), `0180c22` (the four render tests, cases 3.153–3.156,
+  mutation-verified by hand — see §3), `fd6bddd` (`Features.md` line + catalogue entries, header
+  recounted 3.152→3.156), `d8b3a3b` (this handoff).
+- **Full gate GREEN**, background task `bk2tnuzpe`, log at `/tmp/laneD-gate.log`, under Lane E's
+  v3.2 gate-lock reference (copied from `origin/exec/23-plan11:docs/lanes/gate-lock/` — that path
+  does NOT exist on `main`), adapted only for `REPO=.../lane4-periphery`: **`GATE_EXIT=0`,
+  `Tasks: 30 successful, 30 total`, `Cached: 0 cached, 30 total`, `1m35.089s`, node v22.22.2, 0
+  "Unsupported engine", `CHECK_ENV_EXIT=0`, no orphaned vitest workers.** Per-package totals: ui
+  37/4, domain 464/27, rule-engine 282/12, editor 178/15, sync-client 67/7, app-core 1097/68, web
+  138/18, mobile 20/3, server 1099/108, desktop 5/2 — **3387 tests / 264 files**, zero failures.
+  This ran BEFORE the rebase onto `aa0318a`; the rebase only moved a docs file neither this task
+  nor the gate touches, so re-running was not needed and was not done — named rather than assumed.
 - **Session-limit context**: the controller reported the account-wide meter at 87% at 09:40 IST,
   forecasting a halt around 10:05 until the 12:20 reset. Per its explicit instruction this task
-  was done as small direct commits rather than a Workflow fan-out, so a halt mid-gate loses
+  was done as small direct commits rather than a Workflow fan-out, so a halt at any point loses
   nothing already pushed.
-- **Full gate IN FLIGHT, background task `bk2tnuzpe`**, log at `/tmp/laneD-gate.log`, launched via
-  a copy of Lane E's v3.2 gate-lock reference (`docs/lanes/gate-lock/` on `origin/exec/23-plan11`
-  at the time of copy — that path does NOT exist on `main`, only on Lane E's branch), adapted only
-  for `REPO=.../lane4-periphery`, staged at
-  `/private/tmp/claude-501/-Users-kiro-my-projects-gisik-nokma-lanes-lane4-periphery/441e3a65-fe52-42ef-8eda-3ebc8a56134a/scratchpad/gate-lock/`
-  (`gateD.sh`, `locked-test.sh`, `sweep-test-dbs.sh`). Command: `pnpm turbo run build test
-  typecheck --force --concurrency=1`. **If resumed before this finishes: read `/tmp/laneD-gate.log`
-  and `ps -p <pid from /tmp/gisik-gate.lock>` before relaunching — do not launch a second gate.**
 
 ## 2. What was built, and where
 
@@ -111,8 +109,6 @@ file's own convention of one id covering a property proven in more than one test
 
 ## 5. Left undone / open questions, named rather than glossed
 
-- **The full gate result is not yet in hand** — see §1/§3. Whoever continues this must read
-  `/tmp/laneD-gate.log` first.
 - **No Playwright test consumes these four ids yet.** That is T13's job, not this task's — the
   override brief is explicit that this task is the hooks only. The pinned-row ambiguity (§3) is
   the one thing T13 needs handed to it explicitly.
@@ -137,23 +133,21 @@ UNLOCKED with `--maxWorkers=2`, per the override's own instruction; only the fin
 
 ## 7. Reporting
 
-**Not yet reported to the controller** at the time this file was written — the full gate had not
-returned. Report to `gisik-nokma-0d` (tmux `gisik:0` fallback) once §1's gate finishes, with: head
-sha, `Tasks:` line, test count, node version, `0 cached` (note: WILL show some cached tasks here
-since only the touched packages were force-rebuilt earlier in the session, not stated as `0 cached`
-falsely), `check:env` on its own line, the four ids with their files (§2), every mutation's output
-verbatim (§3), and the pinned-row caveat named explicitly for T13.
+Reporting to `gisik-nokma-0d` (tmux `gisik:0` fallback) in the same turn this file was finalised:
+PR #173, head `d8b3a3b`, `Tasks: 30 successful, 30 total`, `Cached: 0 cached, 30 total`, 3387
+tests / 264 files, node v22.22.2, `CHECK_ENV_EXIT=0` on its own line, zero orphaned vitest
+workers, the four ids with their files (§2), every mutation's output verbatim (§3), and the
+pinned-row caveat named explicitly for T13.
 
 ## 8. Remaining steps, in order
 
 1. ~~Cut branch, build, locate components~~ — done.
-2. ~~Add the four source hooks~~ — done, commit `4357e0d`, pushed.
-3. ~~Write and mutation-verify one render test per hook~~ — done, commit `cf1a862`, pushed.
-4. ~~Catalogue: Features.md line, test-cases 3.153–3.156~~ — done, commit `14cb81d`, pushed.
+2. ~~Add the four source hooks~~ — done, commit `f9157e7`, pushed.
+3. ~~Write and mutation-verify one render test per hook~~ — done, commit `0180c22`, pushed.
+4. ~~Catalogue: Features.md line, test-cases 3.153–3.156~~ — done, commit `fd6bddd`, pushed.
 5. ~~Narrow suites (app-core, web) unlocked, typecheck via turbo~~ — done, both green.
-6. **Read `/tmp/laneD-gate.log` for task `bk2tnuzpe`'s result. If GATE_EXIT≠0, diagnose before
-   doing anything else — do not open a PR on a red gate.**
-7. **If green: rebase onto `origin/main` (it may have moved), re-push, open the PR** (one PR,
-   per the override), with the exact evidence lines §7 names.
-8. **Report the PR to the controller.**
+6. ~~Full gate under the v3.2 lock~~ — done, `GATE_EXIT=0`, 30/30, 3387 tests / 264 files.
+7. ~~Rebase onto `origin/main` (it moved by one docs-only commit), re-push, open the PR~~ — done,
+   **PR #173**.
+8. **Report the PR to the controller.** — this handoff's commit is that report's evidence trail.
 9. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
