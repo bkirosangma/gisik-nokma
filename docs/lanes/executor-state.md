@@ -29,7 +29,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | branch | `exec/31-mywork-residuals`, cut from `origin/main` `b4e2f14` (the HELD pair, #150) |
 | merge-base | `b4e2f14` — verified with `git merge-base origin/main HEAD` |
 | HEAD | `1b441ae` |
-| ahead | **4** commits: `eb2e056` (serving) → `724e51f` (client tests) → `1b441ae` (server tests + catalogue) → `62cd517` (the three fixtures the GATE caught) |
+| ahead | **7** commits (see `git log origin/main..HEAD`); first four: `eb2e056` (serving) → `724e51f` (client tests) → `1b441ae` (server tests + catalogue) → `62cd517` (the three fixtures the GATE caught) |
 | tree | clean |
 | node | **v22.22.2** — every figure below was measured under it |
 
@@ -124,6 +124,26 @@ failures in three fixtures.** None was a defect in the change; all three are wor
 
 **The lesson for the next task: running the files you edited is not the gate.** The three fixtures
 were reachable only from files I had no reason to open.
+
+### A fourth round, and it was my own unmeasured claim
+
+`applyAll` in `test/helpers/seed.ts` applies **four** of the registry's projections — projects,
+memberships, invites, visibility — and its NAME does not say so. A projection ignores event types it
+does not handle, so **four silent no-ops are indistinguishable from four successful applications**: my
+`seedWorkflowDef()` was written, imported, called, and had NO EFFECT, and the throw it was meant to
+prevent fired again on the next gate with the fixture looking correct.
+
+I then widened `applyAll` with the workflows projection and wrote that it was "a no-op for every
+caller that existed before it, since nothing else passes a workflow event here". **That was a
+prediction wearing the clothes of a measurement, and the next gate falsified it in one run:**
+`test/visibility/visible-events-for.test.ts` case 6.91 hands `applyAll` a `workflow.defined` with a
+STUB payload — it asks which events reach a guest and never wanted the definition projected — and the
+real projection parses that payload and throws.
+
+Reverted. The seeder now applies the ONE projection it needs to its OWN event: not `applyAll` (which
+does not carry it) and not the full registry (whose ticket projection would forward-fold every row in
+the workspace, the exact behaviour 7.210 turns on, making the fixture useless a second way).
+**Anything you are about to call a no-op across 23 files is a claim to measure, not to assert.**
 
 ## TWO CORRECTIONS TO THE OVERRIDE — measured, accepted by the controller
 
