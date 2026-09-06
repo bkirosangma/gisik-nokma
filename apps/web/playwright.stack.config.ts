@@ -14,15 +14,27 @@ import { defineConfig } from '@playwright/test';
  * stack must already be up, and `global-setup.ts` refuses the run if what is
  * listening is not the stack.
  *
- * OFF THE GATE, STRUCTURALLY. `turbo` enumerates the `test` script of every
- * workspace package and CI's only execution step is `pnpm turbo run build test
- * typecheck`. This suite is reached by `test:e2e:stack`, a script name turbo
- * defines no task for, so it is unreachable from `turbo run test` by the shape
- * of the graph rather than by a comment asking nobody to add it. Measured at
- * this commit: `turbo run test --dry=json` lists 16 tasks, 10 of them `#test`,
- * before and after this file. (An earlier pre-flight recorded "8 tasks" — that
- * figure was true when written and packages have been added since. Recount; do
- * not carry it.)
+ * OFF THE LOCAL GATE, STRUCTURALLY — AND DELIBERATELY ON CI's.
+ *
+ * Two different things, and an earlier version of this docblock ran them
+ * together into a blanket "off the gate" that was false in two of its three
+ * senses. Precisely:
+ *
+ *   * `pnpm turbo run build test typecheck` — OFF it, for two independent
+ *     reasons. This suite is reached by `test:e2e:stack`, a script name turbo
+ *     defines no task for; and `vitest.config.ts` includes `test/**` only, so
+ *     nothing under `e2e-stack/` is collected by the gate's runner either.
+ *     Measured at this commit: `turbo run test --dry=json` lists 16 tasks, 10
+ *     of them `#test`, zero matching e2e.
+ *   * `turbo run typecheck` — ON it, benignly: `tsconfig.e2e.json` includes
+ *     `e2e-stack/**` and `apps/web`'s typecheck runs it. That is wanted; these
+ *     files should not rot.
+ *   * CI's `gate` job — ON it. `ci.yml` lists `e2e` in `gate`'s `needs`, and
+ *     that job runs this suite against a real compose stack. That is the POINT
+ *     of Task 13, not an accident: the deployment is supposed to be verified
+ *     before a merge. What must never happen is this suite joining the LOCAL
+ *     gate, where no stack and no browser binary exist.
+ *
  */
 export default defineConfig({
   testDir: './e2e-stack',

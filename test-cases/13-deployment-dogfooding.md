@@ -770,7 +770,7 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
 - 13.169 ✅ the run REFUSES to start unless what is listening is the stack: `/healthz` answers `ok` with a
   non-empty deploy sha, AND `GET :3001/v1/me/workspaces` is answered by the API SERVER — status 401 with
   the server's own `{"error":"unauthenticated"}` body, inside a 10 s bound (`e2e-stack/helpers/stack.ts`)
-- 13.170 ✅ the negative control that makes 13.169 falsifiable, MEASURED both ways on one stack: an image
+- 13.170 🧪 the negative control that makes 13.169 falsifiable, MEASURED both ways on one stack: an image
   built without `SERVER_ORIGIN` (what `up -d` reuses WITHOUT `--build`) proxies `/v1/*` at itself and
   answers **500 after 30.014 s**; rebuilt, the same request answers **401 in 0.059 s** — and
   `docker compose ps` reported **every container healthy in BOTH states**, so "the containers are up" is
@@ -785,10 +785,18 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
 - 13.173 ✅ the seeded board renders from REAL projections: `Convenience Corner` → `Shop operations` →
   at least one `board-column-*`, and `ticket-card-*` COUNTED greater than zero (an empty board would
   satisfy "no error appeared")
-- 13.174 ✅ `POST /v1/events` through the WEB container's proxy carries the session cookie the browser
-  actually earned — not 401, and under 500 — with the ticket and workspace ids read off the real page. A
-  probe against an invented workspace is refused for an UNRELATED reason while reading as though the
-  transition rule had fired
+- 13.174 ✅ `POST /v1/events` through the WEB container's proxy is ANSWERED BY THE SERVER — 200 exactly,
+  a body that parses, one `results` entry, and NOT `malformed-envelope` — carrying the session cookie the
+  browser earned, the ids read off the real page, and `actorId` read from the browser's OWN session via
+  `/api/auth/get-session`. Two-sided: the identical POST from a fresh context with no session answers
+  **401**. **This case was REWRITTEN after review found the first version could not fail.** It sent no
+  `Origin`, and `/v1/events` is in `HTTP_ORIGIN_PROTECTED_ROUTES` where `httpOriginRefused` ends
+  `input.origin !== input.expectedOrigin` — so an ABSENT origin is refused by an `onRequest` hook, before
+  routing, and `requireSession` never ran. The old assertions (`not.toBe(401)`, `toBeLessThan(500)`) both
+  passed on that 403, meaning "it is authenticated" had no failure mode at all: an expired or forged
+  cookie produced the same answer. Measured: Playwright's `page.request` sends no `Origin` header. The
+  event id was also `crypto.randomUUID()` against a `ULID_REGEX` envelope, so the ids read off the page
+  never reached a parser
 - 13.175 ✅ a guest sees the workspace and NOT its projects — ruling **P38**'s partial workspace, seen from
   a browser for the first time. The seed makes the accountant a WORKSPACE member with role `guest` plus
   explicit visibility on four TICKETS and never emits `project.member_added`, and `eff.projects` is built
@@ -799,10 +807,13 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   to a ticket is through a project they cannot see (13.175). Explicit per-ticket visibility exists and is
   unreachable from the UI. **13.175 passing does NOT mean the shared tickets were verified reachable —
   none was ever reached.** Owner: Plan 6 / visibility
-- 13.177 ✅ the suite is off the gate STRUCTURALLY, not by request: it is reached by `test:e2e:stack`, a
-  script name turbo defines no task for. Measured before and after the change — `turbo run test
-  --dry=json` = 16 tasks, 10 `#test`, **0** matching e2e. (An earlier pre-flight recorded "8 tasks": true
-  when written, stale by the time it was used. Recount, never carry.)
+- 13.177 ✅ the suite is off the LOCAL gate structurally, for two independent reasons: it is reached by
+  `test:e2e:stack`, a script name turbo defines no task for, AND `apps/web/vitest.config.ts` includes
+  `test/**` only, so `e2e-stack/` is not collected by the gate's runner either. Measured before and after
+  — `turbo run test --dry=json` = 16 tasks, 10 `#test`, **0** e2e. **It is deliberately ON CI's `gate`
+  fan-in** (`ci.yml` lists `e2e` in `gate`'s `needs`), which is the point of Task 13 rather than an
+  oversight, and it is on `turbo run typecheck` via `tsconfig.e2e.json`, which is wanted. The earlier
+  wording said "off the gate" without qualification and was false in two of those three senses
 - 13.178 🧪 `ci.yml`'s `e2e` job supplies the real invocation (bring the stack up, install the browser
   explicitly since playwright declares no install script, run, tear down) and keeps a visibly-skipped
   path with a printed reason. It had become **green-by-presence**: once Task 6 landed
@@ -851,13 +862,25 @@ only one side of its line.
 - 13.186 🚫 a request with NO cookie, NO `Sec-Fetch-*` and NO `Origin`/`Referer` is not origin-checked at
   all and answers 200 — read from outside that looks inverted, since the browser's own origin was refused.
   **Deliberate library policy, cited to the vendor's source rather than inferred from response codes**:
-  in `better-auth@1.7.2`, `validateFormCsrf` (`dist/api/middlewares/origin-check.mjs:131`) returns
-  unvalidated at `:137` (no cookie), `:141` (no `Sec-Fetch-*`) and `:152` (no `Origin`/`Referer`), and
+  in `better-auth@1.7.2`, `validateFormCsrf` (`dist/api/middlewares/origin-check.mjs:131`) validates ONLY
+  at `:137` (has cookie), `:141` (has `Sec-Fetch-*`) and `:152` (has `Origin`/`Referer`) — a request
+  matching none of the three falls off the end at `:153` unvalidated — and
   `validateOrigin` (`:96`) gates on `const useCookies = headers.has("cookie")` (`:101`) at `:108`. CSRF
   needs an AMBIENT CREDENTIAL the browser attaches automatically; a caller sending none gains nothing from
   forgery. Pinned as behaviour so a version bump that changes it is visible. *(Line numbers are `dist`
   line numbers and are only valid for 1.7.2 — re-read them when the lockfile moves.)*
-- 13.187 ✅ node's `fetch` is not `curl`, and a probe cannot stand in for the client here: the SAME request
+- 13.188 ✅ a `WEB_ORIGIN` written with a TRAILING SLASH is still trusted — it is normalised at assembly
+  with the same `normalizeOrigin` every other consumer uses. Un-normalised it would reinstate the exact
+  403 `INVALID_ORIGIN` this change removes, because better-auth matches http(s) patterns by EXACT equality
+  (`auth/trusted-origins.mjs`, `pattern === getOrigin(url)`) while `config.ts`'s `httpUrl()` admits the
+  slash — and CORS and the HTTP-Origin check would both keep working, so it would present as an auth-only
+  regression
+- 13.189 ✅ a `WEB_ORIGIN` containing a wildcard is REFUSED AT ASSEMBLY rather than handed to better-auth,
+  which branches to `wildcardMatch` for any pattern containing `*`. That branch is not hypothetical: this
+  suite's own `'*'` mutation made both permissiveness bounds go green. `auth.ts` previously asserted
+  "never a wildcard" as a property nothing enforced, and `WEB_ORIGIN` is set by hand in
+  `deploy/do/app.yaml`
+- 13.187 🧪 node's `fetch` is not `curl`, and a probe cannot stand in for the client here: the SAME request
   answers 200 under curl and **403 `MISSING_OR_NULL_ORIGIN`** under node, because node presents
   `Sec-Fetch-*` headers and so takes `validateFormCsrf`'s force-validate branch while curl falls through
   unchecked. Pinned by the E2E's own setup, which sends the web origin as a browser does

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { fetchMagicLink, purgeInbox } from './helpers/mailpit.js';
 import { ACCOUNTANT_EMAIL, OWNER_EMAIL } from './helpers/sign-in.js';
 import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
@@ -20,7 +21,9 @@ import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
  */
 
 const COMPOSE_FILE = 'docker-compose.dev.yml';
-const REPO_ROOT = new URL('../../../', import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: a checkout under a path containing a
+// space yields `%20` from `.pathname` and `execFileSync` fails on `cwd`.
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 async function createUser(email: string): Promise<void> {
   await purgeInbox();
@@ -49,9 +52,14 @@ async function createUser(email: string): Promise<void> {
   }
   const link = await fetchMagicLink(email);
   const verified = await fetch(link, { redirect: 'manual' });
-  // 2xx or a redirect are both "verified"; a 5xx is not.
-  if (verified.status >= 500) {
-    throw new Error(`magic-link verify for ${email} answered ${verified.status}`);
+  // 2xx or a redirect are "verified"; anything from 400 up is not. The earlier
+  // bound was `>= 500`, which accepted a 4xx as success — backstopped only by
+  // `seed:cc` refusing later for want of the user, which reports the failure
+  // one step away from its cause.
+  if (verified.status >= 400) {
+    throw new Error(
+      `magic-link verify for ${email} answered ${verified.status}: ${await verified.text()}`,
+    );
   }
 }
 

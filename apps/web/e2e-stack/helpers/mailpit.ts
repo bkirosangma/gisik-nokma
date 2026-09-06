@@ -41,7 +41,19 @@ export async function fetchMagicLink(email: string, timeoutMs = 20_000): Promise
     if (!response.ok) throw new Error(`Mailpit search answered ${response.status}`);
     const result = (await response.json()) as Search;
     seen = result.messages.length;
+    // Settle before deciding. Returning the instant one message is observed
+    // makes the "exactly one" guard racy: a duplicate landing a poll later is
+    // never seen, so the guard held only when both arrived in the same poll.
     if (seen === 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const confirm = await fetch(`${MAILPIT}/api/v1/search?query=${query}`);
+      const settled = (await confirm.json()) as Search;
+      if (settled.messages.length > 1) {
+        throw new Error(
+          `${settled.messages.length} messages for ${email} after a purge — "the newest link" is ` +
+            `ambiguous and picking one would be a guess. Two sends for one sign-in is the finding.`,
+        );
+      }
       const id = result.messages[0]?.ID;
       if (id === undefined) throw new Error('Mailpit returned a message with no ID');
       const detail = await fetch(`${MAILPIT}/api/v1/message/${id}`);

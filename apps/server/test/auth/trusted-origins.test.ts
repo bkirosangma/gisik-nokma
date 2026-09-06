@@ -156,6 +156,38 @@ describe('WEB_ORIGIN is a trusted origin', () => {
   });
 
   /**
+   * A trailing slash must not reinstate the very 403 this change removes.
+   * `config.ts`'s `httpUrl()` admits `http://localhost:3001/`, and better-auth
+   * matches http(s) patterns by EXACT equality
+   * (`auth/trusted-origins.mjs`, `pattern === getOrigin(url)`), so an
+   * un-normalised value would be trusted for a string no browser ever sends.
+   * Every other consumer normalises; this one does too.
+   */
+  it('trusts WEB_ORIGIN written with a trailing slash', async () => {
+    const app = buildServer(`${WEB_ORIGIN}/`);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { origin: WEB_ORIGIN },
+      payload: { email: 'trusted-origin-g@example.test' },
+    });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  /**
+   * A wildcard is REFUSED AT ASSEMBLY rather than handed to better-auth.
+   * `trusted-origins.mjs` branches to `wildcardMatch` for any pattern
+   * containing `*` — this suite's own mutation proved that branch live, by
+   * making both permissiveness bounds go green. `WEB_ORIGIN` is set by hand in
+   * `deploy/do/app.yaml`, so nothing but this check stands between a typo and a
+   * silently widened CSRF boundary.
+   */
+  it('refuses a wildcard WEB_ORIGIN instead of trusting it', () => {
+    expect(() => buildServer('https://*.artsourced.in')).toThrowError(/wildcard/);
+  });
+
+  /**
    * THE INVERSION, RECORDED RATHER THAN CHANGED (ruling P42 item 3).
    *
    * A request that presents NO `Origin`, NO `Referer`, NO `Sec-Fetch-*` and NO

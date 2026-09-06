@@ -5,6 +5,23 @@ import { passkey } from '@better-auth/passkey';
 import type { Pool } from 'pg';
 import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
+import { normalizeOrigin } from '../http/http-origin.js';
+
+/**
+ * The web origin, as better-auth may safely be told it. Normalised the same way
+ * every other consumer normalises it, and refused outright if it carries a `*`:
+ * a wildcard here would widen the CSRF boundary silently, and a thrown
+ * ConfigError at assembly is the loud alternative.
+ */
+function trustedWebOrigin(webOrigin: string): string {
+  if (webOrigin.includes('*')) {
+    throw new Error(
+      `WEB_ORIGIN may not contain a wildcard (got ${webOrigin}): it is handed to better-auth as a ` +
+        `trusted origin, and a wildcard pattern there widens the CSRF boundary to every matching host.`,
+    );
+  }
+  return normalizeOrigin(webOrigin);
+}
 
 export interface AuthDeps {
   pool: Pool;
@@ -46,7 +63,24 @@ export function createAuth(deps: AuthDeps) {
     database: deps.pool,
     baseURL: deps.baseUrl,
     secret: deps.secret,
-    trustedOrigins: [deps.webOrigin],
+    // NORMALISED, and REFUSED if it carries a wildcard. Two review findings,
+    // both with a concrete failure:
+    //
+    //   * un-normalised, `WEB_ORIGIN=http://localhost:3001/` reinstates the
+    //     exact 403 INVALID_ORIGIN this line exists to fix — better-auth
+    //     matches http(s) patterns by EXACT equality
+    //     (`auth/trusted-origins.mjs`, `pattern === getOrigin(url)`), while
+    //     `config.ts`'s `httpUrl()` admits the trailing slash and every other
+    //     consumer normalises (`app.ts` calls `normalizeOrigin`). CORS and the
+    //     HTTP-Origin check would keep working, so it would present as an
+    //     auth-only regression.
+    //   * the comment below used to assert "never a wildcard" as a property
+    //     nothing enforced. `httpUrl()` accepts `https://*.example.com`, and
+    //     `trusted-origins.mjs` branches to `wildcardMatch` for any pattern
+    //     containing `*` — demonstrated live by this fixture's own mutation,
+    //     where `'*'` made both permissiveness bounds go green. `WEB_ORIGIN` is
+    //     set by hand in `deploy/do/app.yaml`, so the path is reachable.
+    trustedOrigins: [trustedWebOrigin(deps.webOrigin)],
     emailAndPassword: { enabled: false }, // the spec forbids passwords
     advanced: {
       /**

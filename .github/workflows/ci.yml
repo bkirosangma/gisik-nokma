@@ -397,65 +397,53 @@ jobs:
       # no `webServer`, reached by `test:e2e:stack` -- a script name turbo
       # defines no task for, so it stays off `turbo run build test typecheck`
       # structurally rather than by request.
-      - name: check the E2E stack is buildable here
-        id: stack
-        run: |
-          if [ -f docker-compose.dev.yml ] && [ -f apps/web/playwright.stack.config.ts ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "E2E SKIPPED: the compose stack or the stack Playwright config"
-            echo "is absent from this checkout. This job reporting green means"
-            echo "ONLY that, NOT that any E2E suite was run."
-          fi
-
+      # NO PRESENCE GATE. An earlier version of this job set an output from
+      # `[ -f docker-compose.dev.yml ] && [ -f apps/web/playwright.stack.config.ts ]`
+      # and made every step below conditional on it. That re-created, one level
+      # up, the exact failure this job was rewritten to remove: rename or move
+      # either file and the condition goes false, every step skips, the job
+      # SUCCEEDS, and `gate` accepts success — the suite silently stops running
+      # while CI stays green. Both files are part of this branch and
+      # `test:e2e:stack` is a real script, so their absence is a defect and
+      # must fail loudly rather than skip quietly. The docs-only case is
+      # already handled by `scope`, which skips this whole job.
       - uses: pnpm/action-setup@v4
-        if: steps.stack.outputs.present == 'true'
       - uses: actions/setup-node@v4
-        if: steps.stack.outputs.present == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - name: install
-        if: steps.stack.outputs.present == 'true'
         run: pnpm install --frozen-lockfile
 
       # The browser binary is NOT fetched by `pnpm install` -- playwright
       # declares no install script -- so it is an explicit step here and
-      # nowhere else. This is the reason the suite must stay off the gate.
+      # nowhere else. This is the reason the suite must stay off the LOCAL gate.
       - name: install the browser
-        if: steps.stack.outputs.present == 'true'
         run: pnpm --filter @gisik-nokma/web exec playwright install --with-deps chromium
 
       - name: bring the stack up
-        if: steps.stack.outputs.present == 'true'
         run: docker compose -f docker-compose.dev.yml up -d --build --wait
 
-      # If the stack cannot come up, say so loudly and FAIL. A stack that will
-      # not start is a finding about the deployment, which is the entire subject
-      # of this job -- it is not a reason to report green.
+      # A stack that will not start is a finding about the deployment, which is
+      # this job's whole subject -- never a reason to report green.
       - name: the stack did not come up
-        if: failure() && steps.stack.outputs.present == 'true'
+        if: failure()
         run: |
           echo "THE COMPOSE STACK FAILED TO START. Container state and logs follow."
           docker compose -f docker-compose.dev.yml ps || true
           docker compose -f docker-compose.dev.yml logs --tail=100 || true
 
       # Seeding and user creation happen inside the suite's own globalSetup,
-      # which also REFUSES the run unless what is listening is really the stack
-      # (a proxied /v1 request answered by the API server, under a time bound --
-      # a web image built without SERVER_ORIGIN answers 500 after ~30s while
-      # every container still reports healthy).
+      # which also REFUSES the run unless what is listening is really the stack.
       - name: run the deployed-stack E2E
-        if: steps.stack.outputs.present == 'true'
         run: pnpm run test:e2e:stack
 
       - name: stack logs on failure
-        if: failure() && steps.stack.outputs.present == 'true'
+        if: failure()
         run: docker compose -f docker-compose.dev.yml logs --tail=200 || true
 
       - name: tear the stack down
-        if: always() && steps.stack.outputs.present == 'true'
+        if: always()
         run: docker compose -f docker-compose.dev.yml down -v || true
 
   # The single check name the auto-merge precondition and any branch
