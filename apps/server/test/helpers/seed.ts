@@ -57,6 +57,26 @@ import { appendTestEvent } from './ledger.js';
  * change to fixtures this task has no business making. Owner: whoever next
  * touches this helper, or a dedicated cleanup.*
  */
+/**
+ * **FOUR of the registry's projections, and the name does not say so.** Projects,
+ * memberships, invites, visibility — and nothing else.
+ *
+ * A projection ignores the event types it does not handle, so four silent
+ * no-ops are indistinguishable from four successful applications: hand this a
+ * `workflow.defined` and it goes NOWHERE and reports nothing. That cost a gate
+ * round — `seedWorkflowDef()` below was written, imported and called, had no
+ * effect, and the throw it was meant to prevent fired again with the fixture
+ * looking correct.
+ *
+ * **It is NOT widened, and the reason was measured rather than predicted.**
+ * Adding the workflows projection here looked like a no-op "because nothing
+ * else passes a workflow event". Untrue: `test/visibility/visible-events-for.ts`
+ * case 6.91 passes a `workflow.defined` with a STUB payload — it asks which
+ * events reach a guest and never wanted the definition projected — and the real
+ * projection parses that payload and throws. Widening this helper broke a case
+ * that had every right to pass. So the seeder below applies the ONE projection
+ * it needs to its OWN event, and this list stays four.
+ */
 export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promise<void> {
   const client = await pool.connect();
   try {
@@ -65,20 +85,6 @@ export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promis
       await membershipsProjection.apply(env, client);
       await projInvites.apply(env, client);
       await projVisibility.apply(env, client);
-      // **ADDED with `seedWorkflowDef()` below, and a no-op for every caller
-      // that existed before it.** A projection ignores the event types it does
-      // not handle, and this one handles only `workflow.*` — which nothing else
-      // passes here, because until now nothing could: this helper's four
-      // projections were projects, memberships, invites and visibility, so a
-      // `workflow.defined` handed to it went NOWHERE and reported nothing.
-      // That silence cost a gate round: `seedWorkflowDef` was written, called,
-      // and had no effect, and the throw it was meant to prevent fired again
-      // with the fixture looking correct. **A helper named `applyAll` that
-      // applies four of the registry's projections is a name that lies**; the
-      // list is enumerated here rather than widened to the whole registry,
-      // because the registry's ticket projection would then fold rows these
-      // callers never asked to be folded.
-      await workflowsProjection.apply(env, client);
     }
   } finally {
     client.release();
@@ -414,8 +420,12 @@ async function insertTicketHead(
  * version) DO NOTHING` — but call it once per world; a second call appends a
  * second identical event to the ledger.
  */
-export function seedWorkflowDef(workspaceId: string, actorId: string = SEED_ACTOR): LedgerEvent {
-  return testEnvelope({
+export async function seedWorkflowDef(
+  pool: Pool,
+  workspaceId: string,
+  actorId: string = SEED_ACTOR,
+): Promise<void> {
+  const env = testEnvelope({
     workspaceId,
     entity: { kind: 'workflow', id: SEED_WORKFLOW_ID },
     type: 'workflow.defined',
@@ -437,6 +447,19 @@ export function seedWorkflowDef(workspaceId: string, actorId: string = SEED_ACTO
     },
     actorId,
   });
+  // The event is APPENDED as well as projected, so the world stays one a replay
+  // could rebuild — the principle this file's own docblock states. It applies
+  // the ONE projection it needs rather than going through `applyAll` (which
+  // does not carry it) or the full registry (whose ticket projection would
+  // forward-fold every row in the workspace to this version, which is the
+  // behaviour case 7.210 turns on).
+  await appendTestEvent(pool, env);
+  const client = await pool.connect();
+  try {
+    await workflowsProjection.apply(env, client);
+  } finally {
+    client.release();
+  }
 }
 
 export function setVisibilityEnv(

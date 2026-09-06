@@ -121,7 +121,8 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     // throw `assembleListCards` has always made, and a state the product path
     // cannot reach. So the definition is published here rather than the throw
     // softened: a fallback would put a slug where a name goes.
-    await applyAll(db.pool, [seedWorkflowDef(ws), setVisibilityEnv(ws, ticket, 'workspace')]);
+    await seedWorkflowDef(db.pool, ws);
+    await applyAll(db.pool, [setVisibilityEnv(ws, ticket, 'workspace')]);
 
     const eff = await resolveEffectiveRole(db.pool, worker, ws);
     const view = await readMyWork(db.pool, eff, worker, ws);
