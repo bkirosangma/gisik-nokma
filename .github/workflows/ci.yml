@@ -202,6 +202,34 @@ jobs:
       - name: every command the runbook names must resolve
         run: pnpm check:runbook
 
+  # ITS OWN JOB, INDEPENDENT OF THE DOCS-ONLY SKIP -- the same reason
+  # `check-runbook` just above is, guarding the same shape of hazard one
+  # level up. `test-cases/NN-*.md` lives outside `docs/`, so `scope`'s own
+  # `code_changed` rule does not even try to call a catalogue-only edit
+  # docs-only today -- but that is `scope`'s CURRENT boundary, not a promise,
+  # and this job's own subject (does every ✅ still have a live citation) is
+  # unrelated to whichever paths `scope` happens to treat as inert. Wiring
+  # this behind `needs: scope` + `if: code_changed == 'true'` would make its
+  # correctness depend on that boundary never moving to include
+  # `test-cases/` -- exactly the kind of skip condition `check-runbook`
+  # was pulled out of `check-env` for. So it always runs, unconditionally,
+  # for the same reason `check-runbook` does: cheap (reads source text and
+  # two small JSON/markdown fixtures, no build), and a check gated on the
+  # change class it guards is not a check.
+  check-citations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: every checked (✅) case id must still be cited by a live test
+        run: pnpm check:citations
+
   check-tasks:
     needs: scope
     runs-on: ubuntu-latest
@@ -480,7 +508,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-runbook, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-citations, check-tasks, build, typecheck, server-tests, other-tests, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4

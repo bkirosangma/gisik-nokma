@@ -2168,3 +2168,27 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   contradict that.
   The cost is recorded with the decision: production drift surfaces at the next monthly drill, so the
   exposure window is up to a month. `apps/server/src/tools/verify-projections.ts`, `deploy/do/README.md`
+- ⚙️ **The `test-cases/` <-> test citation check (Lane F Pass 1) — the gap the coordination doc named by
+  hand, made falsifiable** — a checked (`✅`) catalogue case is supposed to name the test that proves it,
+  but nothing enforced the reverse: the coordination doc recorded, 2026-08-31, that no test in the repo
+  cites a case id, so a `✅` could survive the deletion of its own covering test. `scripts/check-case-
+  citations.mjs`, its own ungated CI job, closes the direction that was missing: every checked id in
+  `test-cases/*.md` must appear as a test name or comment somewhere under a test/e2e directory. **Measured
+  before choosing a mode:** 1470 checked ids, 663 already cited, 807 not — too large to backfill in this
+  errand, so it runs as a RATCHET (`scripts/fixtures/check-case-citations-baseline.json`, one uncited-count
+  ceiling per file) that must equal reality EXACTLY, not merely bound it: higher than reality is a
+  regression (a citing test was deleted, or a new checked case shipped uncited) and fails, naming the
+  offending ids; lower than reality is a STALE ceiling — also a failure, because an upper bound nobody has
+  to tighten stops meaning anything and could hide a real regression on one file behind unrelated
+  improvement on another if the check summed across files instead of holding each one to its own number.
+  Self-tested against a planted fixture covering every id-line shape this repo's catalogues actually use
+  (bare/bold/marker-first, both before and after the id) plus a malformed-id guard (a three-part number
+  like `13.2.1` is not silently truncated to a shorter real-looking id), and against the ratchet's own four
+  failure shapes directly. The delete-a-citing-test property was also reproduced against REAL files, not
+  only the synthetic fixture: removing both of case 11.1's citations moved `11-calendar-notifications.md`
+  from 0 to 1 uncited against a committed ceiling of 0, and the check failed naming `11.1`; restored and
+  re-verified clean. **Its own job carries no `needs: scope` and no docs-only `if:` gate** — the exact
+  shape `check-runbook` was rewritten into after review found it silently skipped on a runbook-only diff,
+  applied here before the same mistake could repeat one level up. `scripts/check-case-citations.mjs`,
+  `scripts/fixtures/check-case-citations-{fixture.md,baseline.json}`, `.github/workflows/ci.yml`,
+  `test-cases/README.md`, cases 13.204–13.208

@@ -18,8 +18,9 @@ that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane
 C takes Plan 11 T11 + T12 (backups, restore drill) after #146" — Tasks 11 [13.9–13.39] and 12) · **Lane
 D 13.41–13.100** (Tasks 7, 8) · **Lane E 13.101–13.200** (the rest of Plan 11: seam 1, Task 13, Task 16;
 NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201–13.240**, allocated
-2026-09-06 once `13.1–13.40` was confirmed exhausted (the scheduler-generalisation errand, minted at
-13.201–13.203). **The next free block is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
+2026-09-06 once `13.1–13.40` was confirmed exhausted — minted at **13.201–13.208** so far (13.201–13.203
+the scheduler-generalisation errand, 13.204–13.208 Lane F Pass 1's citation check; **13.209–13.240 remain
+free in this block**). **The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
 its assigned block and does not derive the next free id from this file — recount the MAXIMUM in use
 against `origin/main` at every rebase as the control, but never mint from it.
 
@@ -29,8 +30,8 @@ until Tasks 1–15 merge) could run: Lane C `13.1–13.40` (Task 14 landed at 13
 inside the block at 13.7–13.8; Tasks 11–12 too, at 13.9+, after the 07:50 re-task cited above moved them
 from Lane E) · Lane D `13.41–13.100` (Tasks 7–8 below, at 13.41–13.76; Tasks 9–10 continue inside the
 block) · Lane E `13.101–13.200` (seam 1, Task 13, Task 16) · Lane C `13.201–13.240` (the scheduler
-generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted). Next block starts at
-`13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
+generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted; Lane F Pass 1's citation check,
+13.204–13.208). Next BLOCK starts at `13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
 the controller for another rather than borrowing a neighbour's.**
 
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
@@ -960,3 +961,81 @@ reconciled, never overwritten.
   (13.194) could be deleted wholesale with the check still green. A content assertion — "this file
   contains the recorded decision" — is the obvious next step and is deliberately not claimed here. Owner:
   this lane
+
+## The test-cases <-> test citation check (Lane F Pass 1)
+
+Ruling P33 and the coordination doc's own record (2026-08-31, "Recorded with owners, not fixed" and
+"What a catalogue entry is actually worth") name the gap this closes: no test in the repo cites a
+catalogue case id, so the `✅` markers this whole series has been writing are one-directional — a test
+can be deleted and its case keeps its checkmark. `scripts/check-case-citations.mjs`, its own ungated CI
+job, `pnpm check:citations`.
+
+**Measured before choosing a mode, per the owner's instruction, because the honest number decides the
+shape:** 1470 checked ids repo-wide, 663 cited (the id string appears somewhere under a test/e2e
+directory), 807 not. Too large to backfill in this errand, so the check runs as a RATCHET rather than a
+hard requirement: `scripts/fixtures/check-case-citations-baseline.json` commits one uncited-count ceiling
+per `test-cases/NN-*.md` file, and the check requires the CURRENT real count to equal that ceiling
+exactly — not merely be under it. An exact-match ratchet, not an upper bound, on purpose: a ceiling
+nobody has to tighten when things improve stops meaning anything, and checking per file rather than a
+repo-wide sum means a real regression on one bucket cannot hide behind unrelated improvement on another.
+
+- 13.204 ✅ every id-line shape this repo's `test-cases/` files actually use is extracted correctly, and
+  every non-checked shape is correctly left alone — a self-test fixture
+  (`scripts/fixtures/check-case-citations-fixture.md`) plants one of each: bare-trailing (`- 90.1 ✅
+  ...`), bold-trailing (`- **90.2** ✅ ...`), marker-first bold (`- ✅ **90.3 — ...`) and marker-first bare
+  (`- ✅ 90.4 ...`) as the four ids that MUST be extracted; four lines using every other real status
+  marker (🧪/❌/🟡/🚫), a renumbering ("absorbed into") line, and a mid-sentence prose citation as lines
+  that must NOT be. Run before this errand's own three-line self-test summary printed and asserted
+  against these exact four ids. `scripts/check-case-citations.mjs`
+- 13.205 ✅ a malformed id is reported, never silently misfiled: `13.2.1` is not an N.M id, but the
+  extraction regex's `(\d+\.\d+)` greedily matches its first two segments ("13.2") — without a guard, a
+  three-part number would silently become a shorter real-looking id rather than what it actually is,
+  which is a typo. The fixture plants `90.5.1` and the self-test asserts it is reported as malformed and
+  contributes to neither the checked-id list nor any uncited count. `scripts/check-case-citations.mjs`
+- 13.206 🧪 deleting the LAST test that cites a checked case reddens the check, naming the exact case —
+  reproduced against real files, not only the self-test's synthetic fixtures. Case 11.1 is cited in
+  exactly two places (`calendar-model.test.ts`'s `describe`, `claim-labels.test.ts`'s `it`); with both
+  citation strings removed, `11-calendar-notifications.md`'s uncited count moved from 0 to 1 (its
+  committed baseline is 0, the file being fully cited today), and the check failed naming `11.1`
+  specifically and the file's baseline vs. actual numbers. Restored via `git status --short` confirming
+  byte-identical content, then re-run clean. **🧪, not ✅, deliberately: this was a one-time hand mutation
+  against real files, not a standing automated test this repo re-runs** — the general property (an
+  increase is caught) IS automated, at 13.207 below, via the self-test's synthetic `checkRatchet` inputs;
+  this case is the corroborating real-world instance, not a citable repeatable check, so it earns no
+  citation and is excluded from this file's own citation ratchet by construction (only ✅ ids count).
+  `packages/app-core/test/calendar/calendar-model.test.ts`, `packages/app-core/test/claims/claim-labels.test.ts`
+- 13.207 ✅ the ratchet's other three shapes, proven directly against the pure `checkRatchet` function
+  with synthetic inputs (the same shape `check-runbook-commands.mjs`'s own self-test uses for its
+  matchers): an increase (actual 5 vs. baseline 3) is caught, reason `increased`; a STALE ceiling (actual
+  2 vs. baseline 5 — the baseline is looser than reality, which this ratchet treats as equally wrong,
+  not merely permissive) is caught, reason `stale`; an exact match (4 vs. 4) passes with no violation; a
+  file with no committed baseline entry at all is caught, reason `missing-baseline`. `scripts/check-case-
+  citations.mjs`
+- 13.208 ✅ `check-citations` is its own CI job, unconditional — no `needs: scope` and no docs-only `if:`
+  gate, the same shape `check-runbook` was rewritten into after review found it silently skipped on a
+  runbook-only diff (`check-env`'s original bug, the exact hazard this errand exists to name one level
+  up). Added to `gate`'s `needs` list. Verified with `actionlint .github/workflows/ci.yml`, exit 0.
+  `.github/workflows/ci.yml`
+
+**Backfill is real, per-file work — carried, not attempted here, owner named per file rather than one
+vague "whoever":** `09-editor-attachments.md` (219 uncited, 0 cited — this lane's own attachment/backup
+work is a large share of it, so first claim if this lane runs again) and `10-workflow-builder.md` (66
+uncited, 0 cited) have never had a single citation attempted; `05-tickets-hierarchy.md` (67 of 73
+uncited), `06-auth-visibility.md` (63 of 111), `04-workflow-engine.md` (45 of 52) and
+`03-foundation-ledger.md` (43 of 104) are mostly uncited with a small existing precedent to extend;
+`07-api-realtime-search.md` (78 of 229) and `12-offline-sync-apps.md` (78 of 314) are already
+majority-cited and need the remaining minority closed; `13-deployment-dogfooding.md` carries 152 of 160
+uncited, up from 148 by this section's own four ✅ cases (13.204, 13.205, 13.207, 13.208) — **NOT cited,
+by an honest structural gap rather than neglect**: `check-case-citations.mjs`, like its siblings
+`check-case-ids.mjs` and `check-runbook-commands.mjs`, is a self-testing script with no companion
+`.test.ts` file (checked: neither of those two siblings has one either, confirmed by grep), and the
+citation corpus this very check scans is test/e2e directories only, by the controller's own explicit
+spec — `scripts/*.mjs` is deliberately outside it. There is no test file these four cases COULD cite
+without either widening that scope unilaterally or inventing an unprecedented companion test file for a
+script whose entire established family never has one. Recorded here rather than silently baselined away:
+the ratchet for this file is bumped to 152 to reflect it, named as its own kind of gap rather than folded
+into the ordinary backfill debt above. Owner for all of the above, absent a
+more specific claim: whoever next does substantial work on that bucket's tests, per the standing
+same-change-set rule — cite while touching, rather than as a separate sweep. `11-calendar-notifications.md`
+needs no owner: it is fully cited today (0 of 147 uncited) and stays that way structurally as long as new
+cases there are cited when written.
