@@ -150,14 +150,27 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
    * pinned) rather than slipped in as setup, because the case's whole meaning
    * turns on it having happened.
    *
-   * **The residual that leaves is real and is recorded rather than asserted.**
-   * `RECONCILE_MIN_INTERVAL_MS` is 60_000 (`sync-engine.ts`), so a narrow and a
-   * re-widen inside one minute of the last automatic reconcile leave B holding
-   * the stale partial copy with no repair: the notice is spent, and the next
-   * reconcile will not purge a ticket B may now legitimately see. That window
-   * is 12.274's defect surviving at reduced width. It is NOT asserted here for
-   * 6.104's own stated reason — a test asserting a gap hardens the wrong half —
-   * and it is not this file's to close. *Owner: unassigned.*
+   * **⚠️ THE RESIDUAL THIS DOCBLOCK USED TO DESCRIBE WAS WORSE THAN IT SAID, and
+   * it is now CLOSED — see 12.316.** The old text called it "bounded in time"
+   * by `RECONCILE_MIN_INTERVAL_MS`. It was not bounded in time at all:
+   * `hub.ts` sends `caught-up` once per SUBSCRIPTION (`caughtUpSent`), so the
+   * automatic reconcile is once per RECONNECT, and a narrow-and-re-widen with
+   * no reconnect between them never reconciles. On a stable socket the
+   * "bounded" residual was the FULL defect, and this case is green only because
+   * it calls `reconcile` by hand. Found by the branch review; the wrong
+   * sentence is quoted rather than deleted, because "bounded in time" is
+   * exactly the reassurance a later reader takes on trust.
+   * **AND CLOSURE 5c's MINIMAL FORM DOES NOT FIX IT — measured, not argued.**
+   * A fixture running this script with no manual reconcile is RED: the pull
+   * never happens. The reason is structural. A notice only ever names ids the
+   * reader can see NOW (`grant-backfill.ts` yields a candidate only if
+   * `canSee`), and reconcile only ever returns ids the reader CANNOT see
+   * (`reconcile-route.ts` marks one restricted only if `!canSee`). Same
+   * function, same instant, complementary predicates — the intersection is
+   * empty by construction. The stale copy is stale in its CONTENT and `canSee`
+   * answers about its AUDIENCE, so reconcile is the wrong instrument rather
+   * than a mistimed one. **Case 12.316 records the measurement; the residual is
+   * ESCALATED, because closing it needs the notice to carry more than ids.**
    */
   it('12.275 a re-widened ticket comes back EVEN IF the client read something else meanwhile — 12.274’s probe, green, and green only with BOTH halves', async () => {
     const { ticketId, created } = await seedSharedTicket('The shared one');
@@ -218,6 +231,13 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     // rather than discarded: `presented: 2` says B offered both tickets and so
     // the purge was a decision about this one rather than an empty pass, and
     // `purged: [ticketId]` says exactly which copy went.
+    // **THE MANUAL RECONCILE IS KEPT HERE DELIBERATELY, and 12.316 below is the
+    // case that removes it.** This case witnesses the residual FIRST — a device
+    // holding a stale partial copy — and then removes it explicitly, so the
+    // convergence assertions further down are known to be about the pull rather
+    // than about a reconcile that happened to run. 12.316 runs the same script
+    // with no manual call at all and requires convergence anyway, which is what
+    // closure 5c's minimal form buys.
     expect(await b.engine.reconcile(h.workspaceId)).toEqual({ presented: 2, purged: [ticketId] });
     expect(await b.replica.getTicket(ticketId)).toBeNull();
     // BOUNDED: the ticket B still legitimately holds survived. Without this the
@@ -522,4 +542,5 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     const again = await b.engine.reconcile(h.workspaceId);
     expect(again).toEqual({ presented: 1, purged: [] });
   });
+
 });
