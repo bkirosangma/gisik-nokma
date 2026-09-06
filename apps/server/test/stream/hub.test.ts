@@ -3,6 +3,7 @@ import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
 import {
   fakeSocket,
+  frameIds,
   framesAbout,
   frameTypes as types,
   rawSocket,
@@ -82,9 +83,28 @@ function event(workspaceId: string, entityId: string, workspaceSeq: number): Led
   };
 }
 
-/** What a scripted ledger may hold: envelopes and Plan 4's two instructions. */
+/** What a scripted ledger may hold: envelopes and Plan 4's three instructions. */
 type ScriptedInstruction =
   | { kind: 'purge'; entityId: string; workspaceId: string; atSeq: number }
+  | {
+      kind: 'reach-granted';
+      workspaceId: string;
+      ticketIds: readonly string[];
+      atSeq: number;
+      /**
+       * What the YIELDED instruction NAMES, when that has to differ from the
+       * workspace this scripted item is routed to.
+       *
+       * `workspaceId` above is the routing key — which subscription sees this
+       * item — while the hub is supposed to ignore the yielded one entirely and
+       * frame the notice with `sub.workspaceId`, the id it registered and
+       * vouches for. The two coincide in production, which is precisely why the
+       * untrustworthy spelling would survive unnoticed, so 12.314 pulls them
+       * apart here rather than hoping. Nothing else needs it, so it is
+       * optional and absent everywhere else.
+       */
+      claimsWorkspaceId?: string;
+    }
   | { kind: 'scope-revoked'; workspaceId: string; projectId?: string; atSeq: number };
 type ScriptedItem = LedgerEvent | ScriptedInstruction;
 
@@ -118,7 +138,15 @@ function deferred(): Deferred {
 /**
  * A `visibleEventsFor` stand-in over a mutable ledger: yields items past
  * `afterSeq`, in order, mirroring Plan 4's semantics — instructions ride along
- * after the envelope that caused them and carry no cursor of their own.
+ * beside the envelope that caused them and carry no cursor of their own.
+ *
+ * BESIDE, not after: `purge` and `scope-revoked` follow their trigger, and a
+ * `reach-granted` notice PRECEDES it (`visible-events-for.ts` yields the notice
+ * and then `yield env`, so the trigger stays above the cursor and regenerates
+ * the notice on a resume). Ledger ORDER decides that here, not this function —
+ * which is the point: the hub is a separate module and must not depend on the
+ * filter's ordering discipline, so 12.315 scripts an order the filter would
+ * never produce.
  */
 function scriptedVisibleEvents(script: Script): VisibleEventsFn {
   let midDrainFired = false;
@@ -135,6 +163,13 @@ function scriptedVisibleEvents(script: Script): VisibleEventsFn {
       if ('kind' in item) {
         if (item.workspaceId !== workspaceId || item.atSeq <= afterSeq) continue;
         if (item.kind === 'purge') yield { kind: 'purge', entityId: item.entityId };
+        else if (item.kind === 'reach-granted')
+          yield {
+            kind: 'reach-granted',
+            // The CLAIM, not the routing key — see `claimsWorkspaceId`.
+            workspaceId: item.claimsWorkspaceId ?? item.workspaceId,
+            ticketIds: [...item.ticketIds],
+          };
         else
           yield {
             kind: 'scope-revoked',
@@ -599,6 +634,169 @@ describe('stream hub — revocation', () => {
     await ok.hub.subscribe(USER, okSocket, WS_A, 0);
     expect(types(okSocket)).toEqual(['event', 'scope-revoked']);
     expect(okSocket.closes).toEqual([]);
+  });
+});
+
+describe('stream hub — a reach notice', () => {
+  it('12.314 frames a notice with the HUB\'s workspaceId, and the subscription runs on behind it', async () => {
+    // Ruling P37.1, closure 5b(d). The `reach-granted` arm sits directly beside
+    // `scope-revoked` in the same switch, and `scope-revoked` DETACHES and
+    // returns. Before closure 5b that switch was an `if/else` reading "purge,
+    // otherwise scope-revoked", so a fourth member would have been handled AS a
+    // revocation — the replica told to empty itself on news that its reach
+    // GREW. An accident of field names is all that objected. So the two halves
+    // asserted here are one claim: the notice goes out, and nothing about it is
+    // terminal.
+    //
+    // `claimsWorkspaceId` names WS_B while the subscription is on WS_A. The hub
+    // registered WS_A and vouches for it; WS_B is whatever the injectable
+    // filter seam said, and this module holds no second opinion about anything
+    // the filter says — hub.ts states that at both instruction arms. The two
+    // coincide in production, which is exactly why `item.workspaceId` would
+    // otherwise ship green.
+    const t1 = newUlid();
+    const t2 = newUlid();
+    // Ticket ids the reader may NOW read, and deliberately the entity of no
+    // envelope in this fixture: a notice names ids whose history sits BELOW the
+    // cursor, which is the whole reason it exists.
+    const reached = [newUlid(), newUlid()];
+    const e11 = event(WS_A, t1, 11);
+    const e12 = event(WS_A, t2, 12);
+    const { hub, commit, ledger } = hubWith({
+      ledger: [
+        e11,
+        // Notice BEFORE its trigger, the order `visible-events-for.ts` emits.
+        {
+          kind: 'reach-granted',
+          workspaceId: WS_A,
+          claimsWorkspaceId: WS_B,
+          ticketIds: reached,
+          atSeq: 11,
+        },
+        e12,
+      ],
+    });
+    const socket = fakeSocket();
+    await hub.subscribe(USER, socket, WS_A, 0);
+
+    // Exact frames rather than `frameIds`: that helper renders a notice as
+    // `reach-granted:<ids>` and never looks at the frame's workspaceId, so the
+    // WS_A-not-WS_B half of this case is unassertable through it.
+    expect(socket.frames).toEqual([
+      { type: 'event', envelope: expect.objectContaining({ id: e11.id, workspaceSeq: 11 }) },
+      { type: 'reach-granted', workspaceId: WS_A, ticketIds: reached },
+      // The envelope BEHIND the notice. This frame existing at all is the proof
+      // that the arm did not end the subscription.
+      { type: 'event', envelope: expect.objectContaining({ id: e12.id, workspaceSeq: 12 }) },
+      { type: 'caught-up', workspaceId: WS_A, seq: 12 },
+    ]);
+    // A `ticketIds` the published schema refuses throws inside the drain, the
+    // pump catches it and closes 1011 — so a bad notice reads as MISSING frames
+    // above rather than as a mismatch. Naming the close keeps that legible.
+    expect(socket.closes).toEqual([]);
+    expect(hub.stats()).toEqual({ sockets: 1, subscriptions: 1, workspaces: 1 });
+
+    // Still on the LIVE path, not merely still registered.
+    const e13 = event(WS_A, t1, 13);
+    ledger.push(e13);
+    commit(e13);
+    await hub.settled();
+    expect(frameIds(socket)).toEqual([
+      e11.id,
+      `reach-granted:${reached.join(',')}`,
+      e12.id,
+      'caught-up:12',
+      e13.id,
+    ]);
+
+    // The control, and every liveness assertion above is worth nothing without
+    // it: the SAME fixture with a `scope-revoked` in the notice's slot. It
+    // proves this position is one where a detach IS visible — the frames stop
+    // there, no `caught-up` follows, the stats go to zero, and the later commit
+    // delivers nothing. A copy-paste of `detach(sub); return;` into the notice
+    // arm produces exactly this, so the pair is the measurement.
+    const revoked = hubWith({
+      ledger: [e11, { kind: 'scope-revoked', workspaceId: WS_A, atSeq: 11 }, e12],
+    });
+    const revokedSocket = fakeSocket();
+    await revoked.hub.subscribe(USER, revokedSocket, WS_A, 0);
+    revoked.ledger.push(e13);
+    revoked.commit(e13);
+    await revoked.hub.settled();
+    expect(frameIds(revokedSocket)).toEqual([e11.id, `scope-revoked:${WS_A}`]);
+    expect(revoked.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
+  });
+
+  it('12.315 moves NO cursor: a drain ending on a notice resumes exactly where it would without one', async () => {
+    // The property the whole pull shape rests on. A notice must be RE-DELIVERED
+    // if the socket dies before the client finishes pulling, and its trigger
+    // event — which IS above the cursor — is what regenerates it. A notice that
+    // advanced the cursor would leave a cut-short client with a gap nothing
+    // ever tells it about again.
+    //
+    // The notice is the LAST item of the drain here, deliberately, even though
+    // `visible-events-for.ts` yields the trigger envelope straight after it.
+    // Two reasons, and the second is the load-bearing one. The hub must not
+    // depend on the filter's ordering discipline — it is a separate module and
+    // this file scripts the seam precisely so it need not. And a trailing
+    // envelope MASKS the mutant: `sub.cursor += 1` in the notice arm takes 11
+    // to 12, after which the envelope's own `12 > sub.cursor` is false and the
+    // cursor stays 12 — so 12.314's fixture reports `caught-up:12` either way
+    // and survives it. Here that mutant reports 12 where 11 is right and
+    // reddens both windows below. 7.32 already parks a `purge` in this same
+    // end-of-drain position, for the same kind of reason.
+    const t1 = newUlid();
+    const reached = [newUlid(), newUlid()];
+    const e11 = event(WS_A, t1, 11);
+    const e12 = event(WS_A, t1, 12);
+    const drains: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
+    const world = hubWith({
+      ledger: [e11, { kind: 'reach-granted', workspaceId: WS_A, ticketIds: reached, atSeq: 11 }],
+      drains,
+    });
+    const socket = fakeSocket();
+    await world.hub.subscribe(USER, socket, WS_A, 0);
+    world.ledger.push(e12);
+    world.commit(e12);
+    await world.hub.settled();
+
+    // 11 in both windows onto the cursor: the `caught-up` the client persists,
+    // and the `afterSeq` the next drain resumes from. The notice sat between
+    // them and moved neither. That second drain running at all is also the
+    // second reading of property 3 — a detaching arm sends no `caught-up` and
+    // is never woken again.
+    //
+    // The in-run positive control for the cursor being observable at all is the
+    // pair of `afterSeq`s, 0 then 11: a hub that advanced no cursor ever
+    // reports 0 twice, so the 11 is movement measured rather than assumed.
+    expect(frameIds(socket)).toEqual([
+      e11.id,
+      `reach-granted:${reached.join(',')}`,
+      'caught-up:11',
+      e12.id,
+    ]);
+    expect(drains).toEqual([
+      { userId: USER, workspaceId: WS_A, afterSeq: 0 },
+      { userId: USER, workspaceId: WS_A, afterSeq: 11 },
+    ]);
+    // As in 12.314: a refused frame reads as an absence, not as a mismatch.
+    expect(socket.closes).toEqual([]);
+
+    // And the differential, which is the claim in its strongest form: the same
+    // script WITHOUT the notice reaches the same cursor by both readings. Any
+    // value the arm might write — not only the `+= 1` named above — shows up
+    // here as a divergence between two runs rather than as a disagreement with
+    // a number this file chose.
+    const bare: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
+    const control = hubWith({ ledger: [e11], drains: bare });
+    const bareSocket = fakeSocket();
+    await control.hub.subscribe(USER, bareSocket, WS_A, 0);
+    control.ledger.push(e12);
+    control.commit(e12);
+    await control.hub.settled();
+
+    expect(bare).toEqual(drains);
+    expect(frameIds(bareSocket)).toEqual([e11.id, 'caught-up:11', e12.id]);
   });
 });
 
