@@ -16,71 +16,99 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR #204 COMPLETE: eight witnesses, EIGHT KILLS, GATE GREEN.** `exec/44-next-cluster`
+# LANE A — **IDLE. #204 IS MERGED as `ebba353`. Nothing is in flight. Awaiting re-tasking.**
 
-**FULL UNCACHED GATE, GREEN**, lock v3.3 captured form, acquired 17:24:07:
-`GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `0 cached, 30 total` · `--force --concurrency=1` ·
-2m3.722s · node **v22.22.2** · `Unsupported engine` 0 · failures section EMPTY · no orphaned workers ·
-**3,652 tests / 284 files** (3,647 passed, 5 skipped).
-`pnpm check:env` → **`CHECK_ENV_EXIT=0`** · `node scripts/check-case-ids.mjs` → **exit 0**, 1,562 ids.
-Two separate commands.
+**The invite/refusal cluster is closed.** 7.230–7.237 are on `main`: eight witnesses, **eight mutation
+kills**, one full uncached gate (30/30, 0 cached, 3,652 tests / 284 files, `check:env` 0,
+`check-case-ids` 0). Squash-merged; **`exec/44-next-cluster` is DELETED on the remote** and this
+worktree may still have it checked out. **No ledger row** — this is a Lane F witness pass, not one of
+the 177 plan tasks; it closes by name.
 
-**Everything owed on #204 is now discharged:** eight witnesses, eight kills, one full uncached gate.
-The only thing still blocking merge is the account-wide CI billing outage, which is not this branch.
+**§7 next free: 7.238. No §12 line** — the surface is §7's; block 12.320–12.339 remains at **12.329**.
 
-**All seven owed mutations ran inside ONE lock acquisition, each PREDICTED in writing first, and every
-prediction matched** — including 7.234's blast radius of 2. **Every red is an `AssertionError` from an
-`expect` in the case itself; not one is a `MappingError` shape gate and not one is grey.**
+## THE NEXT CLUSTER I WOULD TAKE — **THE TRANSCRIBED REFUSAL VOCABULARY** (scoped on paper; nothing built)
 
-**The two earlier failures are what taught the design.** 7.231's first plant refused on three ambiguous
-sites (the guard working); its replacement anchors on unique surrounding text. 7.233's first mutation
-renamed the founding 201's key and produced **`EXIT=1` with 20 SKIPPED** — `beforeAll` reads that key,
-so the fixture's own setup broke and nothing ran; its replacement leaves the seed intact and corrupts a
-value only 7.233 reads. **The rule now written into the catalogue: where a mutation could die at a shape
-gate, keep the KEY and corrupt the VALUE** (7.232, 7.233, 7.237), because a renamed key dies in
-`asString`/`asRecord` before any assertion runs and measures the parse, not the property.
+**Written for a reader with none of my context.** Background in three sentences: a *witness* runs the
+SHIPPED client code against the SHIPPED server route in one process (`app.inject()` + the real mapper
+or gateway imported from `@gisik-nokma/app-core/online`), so a rename on either side reddens. A
+*mirror* is a fixture that models a producer's output but was written by the same hand as its consumer,
+so the two agree by construction and nothing can catch a drift. All witnesses live in
+`apps/server/test/integration/fixture-witnesses.test.ts`; §7 ids, next free **7.238**.
 
-**Disclosed:** the 7.233 attempt ran a test file while a peer held the lock — zero pools, no
-contention, but the protocol says otherwise and that is mine to fix.
+**The cluster: client tests that hard-code the rule engine's and the server's refusal vocabulary.**
+Two of them say in their own comments that the values are *copied* — which is the same defect this lane
+has now closed twice (`founding.test.ts` retyped `INVALID_NAME_BODY`; `invites.test.ts` retyped
+`INVITE_NOT_OPENABLE_BODY`). **Every producer below was verified to exist, with a positive control** (a
+fabricated rule name returns zero files).
 
-**Pre-halt state, written against the controller's 15:10 deadline.** Branch cut from `d5b8bfd`, first
-commit is the #198 handoff correction, second is the eight witnesses. **Local == remote, tree clean.**
+| # | fixture SYMBOL | models | real producer (verified) | witness shape |
+|---|---|---|---|---|
+| 1 | `PARENT_TERMINAL_REASON` in `test/flows/guarded-child-event.test.ts` — its own comment says *"the engine's own words, copied from `checks/hierarchy.ts`"* | the refusal sentence for `hierarchy.parent-terminal` | `packages/rule-engine/src/checks/hierarchy.ts` | real `POST /v1/events` creating a child under a TERMINAL parent → real refusal → compare `rule` and `reason` against the engine module's own export, **imported never retyped** |
+| 2 | `parentTerminalRefusal()` in the same file | the `IngestResult` refused arm for that rule | `apps/server/src/ingest/ingest-service.ts` | same round trip; assert through the real `mapIngestResults` |
+| 3 | `refusedWith(rule, reason)` in the same file | the generic refusal builder every flow case uses | `rule-engine/src/refusal-rules.ts` | one real refusal per rule the flows assert |
+| 4 | the `'hierarchy.rank'` literals in app-core tests | a rank-violation refusal | `rule-engine/src/checks/hierarchy.ts` | real event violating rank depth |
+| 5 | the `'restrict-to'` literals (7 sites) | the most-asserted engine rule in the client suite | `rule-engine/src/refusal-rules.ts` | real event refused by a restrict-to rule |
+| 6 | the `'require-different-user'` literals | a two-actor rule | `rule-engine/src/refusal-rules.ts` | real event with the same actor twice |
+| 7 | the `'contest.already-resolved'` literals | a contest refusal | `rule-engine/src/contests.ts` | real contest resolved twice |
+| 8 | the scripted bodies in `apps/web/test/notifications-gateway.test.ts` — its own comment says *"the SERVER'S, copied from the routes that serve"* | the notifications route bodies | `apps/server/src/routes/notifications.ts` | **CAVEAT: `apps/server` has no dependency on `apps/web`, so the web gateway CANNOT be driven from a server test.** The producer end is already pinned by 12.325. This row is a *catalogue* item unless someone builds a web-side harness. |
 
-**7.230–7.237 built and GREEN: 20 passed / 0 failed** in
-`apps/server/test/integration/fixture-witnesses.test.ts` (12 pre-existing + 8 new), typecheck clean,
-node **v22.22.2**, zero orphaned workers. §7 next free **7.238**. **No §12 line** — this surface is
-§7's; block 12.320–12.339 still at 12.329.
+### A LIVE FINDING that fell out of the scoping, and it is not mine to fix
 
-> **A GREEN RUN AND A CLEAN TYPECHECK ARE NOT A KILL.** At the time of writing, **no mutation has been
-> run against any of the eight.** The catalogue block in `test-cases/07` says so explicitly. Whatever
-> the sweep below reports, **every case without a recorded kill stays marked as unmutated** rather than
-> quietly ✅ — that distinction is the entire subject of this lane's last two passes.
+**Two rule names asserted in app-core tests are emitted by NO producer:** `'ticket.unknown-state'` (2
+sites) and `'state-machine'` (2 sites). Swept across `packages/rule-engine/src`, `apps/server/src` and
+`packages/domain/src`: **zero files each**, with the six verified names above and a fabricated control
+in the same run. **This is the same class as the non-existent `'bad-envelope'` code (case 12.327) that
+this lane handed Lane B** — a client test pinning a discriminant no server produces. *Owner: whoever
+owns the client pre-check vocabulary; worth a ❌ case in §12 or §7 when someone picks it up.*
 
-**The four things the implementer corrected, which arrived WITH the work rather than from a review:**
-1. **7.231 could not be built as I specified.** `createHttpClient`'s `send` turns a GET 404 into `null`
-   before the gateway sees a body, so `getInvite` **structurally cannot** reach
-   `INVITE_NOT_OPENABLE_BODY.message`. Built as two arms, the unreachability named and attributed to
-   the transport's method gate, and the title says *accept*.
-2. **7.235 had a vacuity hole.** The admin-only body is served to a `member` AND to a non-member, so a
-   `membership.granted` that never landed would leave the case green under a false title. The member's
-   own directory is asserted at `member` first.
-3. **An unfailable assertion was found and removed in 7.234** — `mapIngestResults` returns the same
-   object, so comparing the mapped status to the raw one compared a value to itself. **Third such
-   assertion caught in this lane's work; the second caught before it merged.**
-4. **A candidate divergence was written up and then RETRACTED.** `/v1/me/workspaces` serves a `role`
-   the client never reads — but `mapWorkspaceRefs`'s own docblock already declares it, so it was never
-   a gap. Retracted in both places rather than left standing.
+### Why this cluster and not another
 
-**The constants are IMPORTED, never retyped:** `INVITE_NOT_OPENABLE_BODY`, `INVITE_ADMIN_ONLY_BODY`
-(`routes/invites.ts`), `PERMISSION_ROLE_RULE`, `adminOnlyReason` (`permissions/check-permission.ts`).
-That is the whole point of the cluster — the app-core fixture retypes the first, discriminant and full
-sentence, then asserts the gateway hands its own transcription back.
+(a) **It is the defect this lane has already found twice and fixed twice** — a transcribed constant,
+where the test asserts the fixture's own copy and passes forever. Two of the eight rows *document
+themselves* as copies, so there is no inference involved. (b) Every producer is a real module and the
+refusals are reachable through `POST /v1/events`, which the merged harness already drives. (c) It needs
+no new machinery: `fixture-witnesses.test.ts` and its `injectFetch` seam already exist. (d) The mutation
+shape is known and safe — **keep the KEY, corrupt the VALUE**, which is what made all eight of
+7.230–7.237 fail at their own assertion instead of at a parse.
 
-**Carried, with owners:** 7.237's and 7.235's exact-count non-vacuity (`toHaveLength(1)`) couples to the
-shared world — anyone granting a second workspace in `beforeAll` reddens them for a reason unrelated to
-the mapper. Named in both docblocks; a convention a future edit can break silently.
+### What I would NOT take next, so the choice is legible
 
----
+The `editor/` group (Google Picker/Drive), `desktop`/`mobile` storage (a real device runtime), and
+`s3-store` (a real bucket) — **not cheaper later, simply not buildable here**, and taking them would
+mean softening assertions to fit, which is the one thing this pass refuses.
+
+### THE 23-vs-29 NUMBER, NOW FIRM: it is **21**
+
+The controller's re-task said 23 addressable; my filter said 29; the gap was seven borderline rows I
+had not read. **Read individually, they classify as:**
+
+| row (symbol) | classification |
+|---|---|
+| `apps/server/test/helpers/seed.ts` — `applyAll` | **NOT a witness item.** Applies 4 of the registry's 12 projections. Fixing it is a structural change to a helper ~20 files share, not a round trip. Owner: a dedicated cleanup. |
+| `apps/server/test/helpers/seed.ts` — `insertTicketHead` | **Addressable, but the producer is the ticket REDUCER, not a route** — it writes `transitions`/`fields` the real fold computes. Different witness shape; high blast radius. |
+| `app-core/test/helpers/seed.ts` — `WF_ERRAND` | **NOT addressable.** It builds a DOMAIN `WorkflowDef`; the domain owns the type, so there is no external producer to disagree with. Its real problem is that `id: 'wf-errand'` is a non-ULID production cannot mint — a fixture-realism item, not a mirror. |
+| `app-core/test/helpers/seed.ts` — `ticketStateSeed` | **NOT addressable as a route witness** — same reason; domain type, domain-owned. |
+| `app-core/test/helpers/fake-data-source.ts` — `ingest()` default | **DISCHARGED** by 7.226/7.234, which run `mapIngestResults` over real committed and refused arms. |
+| `app-core/test/helpers/fake-data-source.ts` — `pushStreamItem` | **NOT addressable here.** Needs a real hub and a real socket peer — Lane B/D's surface. |
+| `app-core/test/flows/guarded-child-event.test.ts` — the three builders | **ADDRESSABLE — and promoted to rows 1–3 of the cluster above.** |
+
+**So: 29 minus the 8 just landed = 21, and of those, four are not addressable at all (WF_ERRAND,
+ticketStateSeed, pushStreamItem, applyAll-as-a-witness) and one is discharged.** Neither 23 nor 29 was
+right. **The firm number is 21 addressable rows remaining, of which this cluster takes 7 buildable
+plus 1 catalogue-only.**
+
+### Collisions — MEASURED, both lanes, at 17:35
+
+- **Lane B `exec/46-reach-granted-wire`** — measured directly from origin: `packages/sync-client/test/sync-engine.test.ts`, `Features.md`, `test-cases/12-offline-sync-apps.md`, `docs/lanes/executor-state-B.md`. **Disjoint.**
+- **Lane D `exec/45-ping-hazard`** — **not on origin, so I asked D by message rather than assume.** D replied: no to all four files I named, and its live diff is `apps/server/test/dual-client/socket-cut.test.ts` alone, landing later with `test-cases/12` (its own block 12.340–12.359) and a Features.md bullet. **Disjoint.** *This is a REPORTED list, not one I measured from a branch — re-measure when it reaches origin.*
+
+
+> **This header is the first commit after the merge, by the rule this lane wrote and has now needed
+> three times:** *a frozen head makes the handoff stale, so correcting it is the FIRST commit after
+> the merge.* It previously said "#204 COMPLETE … GATE GREEN", which was true of a branch that no
+> longer exists. Twice before, a stale Lane A header reached `main` — once claiming "no full gate"
+> after the gate had gone green. **A restart surface is worth what it says at the moment someone reads
+> it, not what was true when it was written.**
 
 # ↓ LANE A — #198 (mapper cluster) RECORD. **MERGED as `d5b8bfd`; its position line is superseded.**
 
