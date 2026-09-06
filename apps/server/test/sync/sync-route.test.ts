@@ -505,6 +505,39 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(after.rows[0].n).toBe(before.rows[0].n);
   });
 
+  /**
+   * 12.362 — THE SYNC DOOR'S ENVELOPE REFUSAL, AS A VALUE ON THE WIRE.
+   *
+   * 12.109 pins `unknown-event-type` and 12.107 pins `actor-mismatch`, so two of
+   * the door's `invalid` codes were already values here. `malformed-envelope`
+   * was not — it appeared in this suite only in prose — and it is the one a
+   * `sync-client` fixture had drifted from, asserting `'bad-envelope'`, a code
+   * no server emits (12.327). A vocabulary with no assertion against the running
+   * door is a vocabulary a client can imitate wrongly for ever.
+   *
+   * The malformation is a non-ULID `actorId`, which `submittedEventSchema`
+   * refuses BEFORE the actor-mismatch check the session would otherwise make —
+   * so this reaches `parseEvent`'s envelope arm and not `actor-mismatch`, and
+   * the `.not.toBe('actor-mismatch')` says so rather than leaving it to the
+   * reader. `eventId` is asserted non-null because `extractClaimedId` reads the
+   * id off an envelope it could not otherwise parse, and that is the property
+   * that lets a client match the verdict to the claim it sent.
+   *
+   * *Mutation: change `'malformed-envelope'` in `packages/domain/src/parse-event.ts`
+   * → red here. It reddens siblings too and that is reported rather than
+   * assertion-loosened: the code is one shared string with many consumers, so
+   * this case constrains the DOOR'S ANSWER, not that string's uniqueness.*
+   */
+  it('12.362 a malformed envelope answers invalid with malformed-envelope, and the claimed id survives', async () => {
+    const before = await ledgerCount();
+    const claim = { ...offlineField(), actorId: 'not-a-ulid' };
+    const res = await syncPost(memberHeaders, [claim]);
+    const [result] = res.json().results;
+    expect(result).toMatchObject({ status: 'invalid', eventId: claim.id, code: 'malformed-envelope' });
+    expect(result.code).not.toBe('actor-mismatch'); // the schema refuses before the session comparison
+    expect(await ledgerCount()).toBe(before); // a malformed claim is not a claim
+  });
+
   it('12.110 the interactive door NEVER records a contest for the same refusal — proven side by side', async () => {
     const e = offlineTransition();
     const before = await db.pool.query('SELECT count(*)::int AS n FROM proj_contested');
