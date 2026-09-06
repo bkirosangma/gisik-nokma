@@ -10,29 +10,30 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
-## STATUS at 2026-09-06 14:4x IST
+## STATUS at 2026-09-06 14:53 IST — PUSHED, gate green, PR about to open
 
 Branch `exec/34-plan11-scheduler-errands`, cut from `origin/main` at `81a7e44` (post-#183, the same
-commit T11+T12 merged as). Single squashed commit `efa498e`, rebased onto `origin/main` at `fb5e4c2`
-(the tip as of this rebase — **origin/main has certainly moved again since; re-verify before trusting
-this**). Working tree clean. Local test suite for every touched/adjacent file passed independently by
-hand twice (once pre-rebase, once by the workflow's own reviewer): 111+ tests, both `tsc` invocations
-clean, both catalogue check scripts (`check-case-ids.mjs`, `check-env-example.mjs`) clean.
+commit T11+T12 merged as). Rebased onto `origin/main` at `fb5e4c2` — **origin/main has certainly moved
+again since; re-verify before trusting this sha**. Two commits: `efa498e` (the feature) and `d5ea37a`
+(this handoff). **Pushed to `origin/exec/34-plan11-scheduler-errands` at `d5ea37a`.**
 
-**A full locked gate (`pnpm turbo run build test typecheck --force --concurrency=1`) was launched in the
-background at ~14:38 IST**, under `/tmp/gisik-gate.lock`, PID recorded in this session's scratchpad. If
-this file is being read because the session restarted before that gate finished: check `/tmp/gate.log`
-for a `GATE_EXIT=` line before doing anything else. If it says `GATE_EXIT=0` and the `Tasks:` summary
-line shows every task green, the branch is gate-clean and ready to push + PR without re-running it. If
-it's still running or absent, re-run it (own worktree's own gate.sh, `cd` line points at
-`lane3-plan7-8` — confirmed correctly scoped, v3.3 peers-check fix applied and measured).
+**Full locked gate run TWICE.** First run (before `pnpm install`) showed 39 file-level test failures —
+`Cannot find package '@fastify/cors' / 'nodemailer' / 'yaml'` — which is a STALE `node_modules` after the
+rebase brought in Lane E's dependency additions, NOT a real regression (confirmed: `git diff --stat
+81a7e44 origin/main -- pnpm-lock.yaml` showed 26 lines changed, and I'd skipped `pnpm install` because
+only `apps/server/package.json`'s OWN 1-line diff looked lockfile-inert — wrong check; should have diffed
+the ROOT lockfile against origin/main, not just my branch's own package.json delta). Fixed: `pnpm install
+--frozen-lockfile`, `pnpm rebuild better-sqlite3`, re-ran. **Second run: `GATE_EXIT=0`, 30/30 tasks, 0
+cached (forced), 2m7s, node `v22.22.2` (confirmed from the gate script's own `nvm use 22` line, not my
+shell's default of v24.11.1).** `@gisik-nokma/server`: 126 test files / 1325 tests — 1320 passed, 5
+skipped (the pre-existing restore-drill client/server major-version skip, unrelated). Full log at
+`/tmp/gate.log` in this session, `/tmp/gate-run-c2.out` for the nvm/setup lines — both local to this
+machine, not preserved anywhere durable, so this paragraph is the record if they're gone.
 
-**PR not yet opened as of this write** — pending the gate result above, per the pre-halt advisory
-(session meter 75% at 14:37, 100% projected ~15:30). If the session ends before the PR opens: the branch
-`exec/34-plan11-scheduler-errands` is fully rebased, commit `efa498e`, ready to push and open as-is —
-`git push -u origin exec/34-plan11-scheduler-errands` then `gh pr create` with the body drafted in this
-session's scratchpad (`pr-body.md`, or reconstruct from the commit message, which carries the same
-content).
+**CI is down account-wide as of ~14:42** (GitHub Actions billing outage per the controller — "recent
+account payments have failed"; owner-only fix). The PR's CI will show red-at-start regardless of this
+branch's own correctness; say so plainly in the PR body rather than let it read as this branch's fault.
+Nothing merges until the owner resolves it — this is a controller-wide hold, not specific to this PR.
 
 ## THE WORK, WHAT IT IS AND WHY
 
