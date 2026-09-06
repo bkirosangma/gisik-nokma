@@ -278,8 +278,20 @@ async function buildFixture(): Promise<Fixture> {
   // carries none of these three, and every row of theirs sits below the
   // VIEWER's opening cursor where only a `reach-granted` can reach it.
   const parentId = newUlid();
-  const childOneId = newUlid();
-  const childTwoId = newUlid();
+  // SORTED, and the sort is load-bearing rather than tidy. `audienceDependents`
+  // reads a parent's children `ORDER BY ticket_id`, so that ordering decides
+  // which child the drain reaches first — and two ULIDs minted in the SAME
+  // millisecond differ only in their random suffix, so their relative order is
+  // a coin flip. MEASURED: without this line the mid-drain assertion below
+  // ("the second child has not been reached yet") failed once in five runs of
+  // this file, because the drain had already passed it — a flake found by the
+  // mutation sweep's own unmutated baseline block, which is what that block is
+  // for. Naming the smaller id `childOne`
+  // makes the drain position of the faulted ticket a fact instead of a
+  // probability.
+  const sortedChildren: string[] = [newUlid(), newUlid()].sort();
+  const childOneId = sortedChildren[0]!;
+  const childTwoId = sortedChildren[1]!;
   await commit({
     entity: { kind: 'ticket', id: parentId },
     type: 'ticket.created',
