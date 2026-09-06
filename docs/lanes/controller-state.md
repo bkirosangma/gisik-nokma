@@ -55,6 +55,10 @@ next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
 
+### ⏸ #205 (Lane E, T13 + P42) HELD at `1edb667` for its opus REVIEW — the waiver covers CI, not review (15:12)
+
+E's T13 is complete: catalogue 13.169–13.187 (next 13.188) and Features.md §13 in the same change set, gate at the content commit `0e7ee2f` **30/30 · 0 cached · 3644 \| 5 / 285 · node 22 · `check:env` 0 · `check-case-ids` 0**, the two commits after it docs-only; the 20-file non-docs delta from the rebase past `cd0844c` was measured and the older numbers RETIRED. Five not-green cases stated plainly: **13.176 ❌ a guest has no navigation to the tickets explicitly shared with them** (owner Plan 6 / visibility); 13.179 ❌ (12.258's render past the cap, not T13's); 13.181 ❌ (`seed:dev` has no runtime coverage and cannot run the plan's way; 13.90 stays D's); 13.178 🧪 (the CI e2e job has never executed); 13.186 🚫 (the header-less request, cited to better-auth **1.7.2**'s dist with the version pinned in the case). E's own catch: a handoff row named an orphaned sha it had minted by `--amend`ing — `branch --contains` empty while `cat-file` answered — fixed in the second push; a handoff cannot name its own sha. **BUT: E dispatched zero subagents all session, so the branch — two Playwright specs, the second config, the `trustedOrigins` auth change and its fixture, fourteen ✅ — has had NO independent review.** The owner's authorisation waived the CI run, not the lane's review. **HELD. First act after the 17:20 reset, before T16: one opus reviewer over the whole branch, fix, re-gate, report → merge under the waiver with the controller's forced gate → promote 11/13 → T16.**
+
 ### ⏩ MERGES UNDER THE WAIVER, 15:00–15:08 (CI waived, owner ~15:00) — main is `cd0844c`, forced gate GREEN
 
 | what | value |
