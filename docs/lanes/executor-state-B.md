@@ -15,13 +15,13 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/26-closure5-catchup` | `git branch --show-current` |
-| cut from | `origin/main` = **`c7c2b8e`** (the #126 merge — T14 + T15) | `git checkout -b … origin/main` |
-| HEAD | **`13586c68`** | `git rev-parse HEAD` |
-| ahead of `origin/main` | **3** | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES — `git branch --contains 13586c68` prints `exec/26-closure5-catchup`** | `git branch --contains HEAD` — empty output would mean orphaned |
+| cut from | originally `origin/main` = `c7c2b8e` (the #126 merge); **REBASED TWICE** — onto `fdd3bad` (closure 2b #137 + Plan 11 T7/T8 #136) and onto **`4f748d9`** (controller docs only) | `git rebase origin/main`, exit 0 both times |
+| HEAD | **`9762cda`** — pushed; PR **#139** open, MERGEABLE, held for the controller's merge | `git rev-parse HEAD`; `git rev-parse origin/exec/26-closure5-catchup` matches |
+| ahead of `origin/main` | **8** | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES — `git branch --contains 9762cda` prints `exec/26-closure5-catchup`** | `git branch --contains HEAD` — empty output would mean orphaned |
 | tree | clean (`git status --short` empty) | `git status --short` |
 | node | v22.22.2 | `node -v` after `source ~/.nvm/nvm.sh && nvm use 22` |
-| gate | **`GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 1m29.168s · node v22.22.2 · zero `Unsupported engine` · `check:env` exit 0 on its own line · `pg_isready` exit 0.** **3280 tests / 10 packages**, enumerated per package and summed rather than taken from a total: domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 64 · app-core 1086 · web 136 · server 1008 · desktop 5 · mobile 20. **The delta is stated against `c7c2b8e`, NOT against the controller's 3254/983 figure — that one was measured at `e407bf5`, BEFORE #126 merged, and this branch is cut from `c7c2b8e`.** This branch adds 13 `it` blocks, enumerated: server 12 (12.277-12.282 at the filter, 12.284-12.286 at the route, 12.275/12.276/12.289 on the rig) and sync-client 1 (12.287, `sync-engine.test.ts:1006`). So `c7c2b8e` held server 996 and sync-client 63, and #126 accounts for the rest. *The `it`-block count was read from the FILES, not from `git diff | grep -c '^+'`, which answered **0** here — the reformatted-diff-marker silent-empty mode this machine has on record.* | one backgrounded invocation under the lock |
+| gate | **`GATE_EXIT=0` at the PUSHED head `9762cda`** · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 1m34.064s · node v22.22.2 · zero `Unsupported engine` · `check:env` exit 0 on its own line · `pg_isready` exit 0 · orphan reap by `ppid=1` empty. **3333 tests / 10 packages**, enumerated: domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 64 · app-core 1092 · mobile 20 · desktop 5 · web 136 · server 1055. *Re-run at the pushed head rather than carried over from `10b3249` on the argument that the intervening commits were docs — a gate is a fact about a tree. Identical composition (1m25.68s there).* **This branch adds 14 `it` blocks**: server 13 (12.277-12.282 + 12.291 at the filter, 12.284-12.286 at the route, 12.275/12.276/12.289 on the rig), sync-client 1 (12.287). | one backgrounded invocation under the lock |
 
 **⚠️ BRANCH-NUMBER COLLISION, flagged by Lane A and NOT resolved by either of us.** Lane A's branch is
 `exec/26-provenance-block` and this one is `exec/26-closure5-catchup` — two `exec/26-*` branches. Not a
@@ -48,7 +48,7 @@ this lane on 2026-09-06** (next free 12.320, on request only). Do not mint from 
 **⚠️ AND THE RECOUNT ITSELF WAS WRONG-METHOD — read this before running the control.** `test-cases/12`
 carries ids in TWO styles: `- 12.274 🚫 …` and `- **12.240** ✅ …` (Lane A's closure-2b cases).
 `grep -o '^- 12\.[0-9]*'` — the pattern a lane naturally writes, and the one this lane used — matches
-215 and **silently misses 4**. The true figure at this sha is **219 ids, max 12.289, zero duplicates**.
+215 and **silently misses 4**. The true figure at this sha is **221 ids (217 plain + 4 bold), max 12.291, zero duplicates, nothing above this lane's 12.319**.
 The number being wrong is the smaller half: **the control exists to catch a BLOCK COLLISION and in that
 form it cannot see one against a bold-style id**, so two lanes could both recount, both read "zero
 duplicates", and both be wrong — the exact double-mint this file has paid for twice. Use, and print both
