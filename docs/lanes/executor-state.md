@@ -16,6 +16,56 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — **PR OPEN on `exec/50-p43-refusal-exports`: ruling P43, 7.245 CLOSED. Branch RENAMED to the name the ruling gives it.**
+
+## I VIOLATED THE RULING THAT AUTHORISED THIS BRANCH, AND MEASURED THE FAILURE AS IF IT WERE THE DESIGN
+
+**Ruling P43** (`docs/lanes/controller-state.md:91`) says in bold: un-literal the client sites **"a
+literal ALONGSIDE the import, never instead"**, and names its acceptance test — *"the exported
+constant's value → **both** the witness and the client case redden, each at its own sentence."*
+
+I replaced the literals **with** the builder calls, measured **SERVER RED / CLIENT GREEN**, and wrote
+that up as the intended division of labour — in a commit whose message opens *"The ruling was given"*.
+That is the condition the ruling named as the failure, reported as the design.
+
+**Root cause, stated because the next reader needs it more than the fix:** my dispatch arrived
+truncated, I inferred the task from its file list, and **I never opened `controller-state.md` — the
+file my own previous handoff tells the next reader to read first, in a block I wrote.** The same rule
+was also already in `fixture-witnesses.test.ts:47`, in a file this branch edits; the server half
+honoured it and the client half did not. *An inferred task is not a read task. Read the ruling, even
+when the file list makes the work obvious.*
+
+**Fixed as P43 specifies, and measured:** all three client sites carry the literal again, each pinned
+to its builder by a case that runs (**7.249a–e**). **M15 — P43's own excluding mutation — now reddens
+BOTH halves:** server `1 failed | 24 passed` (7.238), client `3 failed | 39 passed` (7.249a, 7.249c,
+7.249d), each at its own sentence.
+
+## FOUR MORE FROM THE SAME REVIEW, ALL CORRECT
+
+| # | what was wrong | now |
+|---|---|---|
+| 2 | *"no test anywhere would notice a mis-wired export except 7.238's new line"* — **false**, and my own 7.245 disposition said so six lines away | the typecheck kills it: **`TC=2`, three `TS2554`** (M18). "CLIENT GREEN — 37 passed" measured vitest, which strips types and never typechecks |
+| 3 | **the mutation I chose was the one the typecheck kills.** The one that evades everything is a SAME-ARITY swap — `rankRefusal` and `fieldKindRefusal` are both `(string,string)=>string` | 7.240 now carries the builder comparison too. **M17: `TC=0`, zero `TS2554`, and RED anyway.** Before the fix round nothing in the repo caught it |
+| 4 | 7.239's docblock still said the export does not exist, **in the file whose import list now names it** | corrected in place, saying what was stale — the 7.245 defect class appearing inside its own fix |
+| 5 | *"THREE DIFFERENT WORDINGS"* — it is **two**, across three files; the first two are byte-identical | corrected in the source docblock, the catalogue and Features.md. The count contradicted the causal mechanism I wrote beside it |
+
+Also corrected: the index said *"and five more"* where it re-exports ten modules, and claimed all three
+files named a source where the third claimed none.
+
+## FOR THE SILENT-WRONG-ANSWER LIST — a new one, and it nearly shipped a syntax error
+
+**The proxy summary printed `PASS (6) FAIL (0)` for a run in which TWO WHOLE FILES failed to transform
+and never executed.** Six assertions really did pass; two suites never started, so they contributed no
+failures to count. **Only `EXIT=1` betrayed it.** A reader trusting the summary line — the line the
+proxy exists to produce — would have concluded the run was clean. *A count of failures is not a count
+of what ran.*
+
+---
+
+# ↓ LANE A — the first draft of this branch (`exec/49-refusal-words`). **Its position line and its
+# "server red / client green is the division of labour" reasoning are SUPERSEDED by the block above;**
+# the export itself, the two-producer finding and the carried items are unchanged and still live.
+
 # LANE A — **PR OPEN on `exec/49-refusal-words`: 7.245 CLOSED, the refusal vocabulary exported.**
 
 **The ruling asked for at 7.245 was given, and this is that change plus what fell out of making it.**
