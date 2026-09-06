@@ -10,40 +10,45 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
-## STATUS at 2026-09-06 14:53 IST — PUSHED, gate green, PR about to open
+## STATUS at 2026-09-06 ~18:45 IST — DONE. PR #203 MERGED at `c1a7105`. Lane C RELEASED for the weekend.
+
+**Both errands shipped, closed by name, nothing outstanding for Lane C.** #203 merged (squash of the
+`exec/34-plan11-scheduler-errands` branch's final head `9d37936` plus a trailing docs commit) under the
+owner's authorisation — CI was waived because GitHub Actions was down account-wide on a billing issue
+(owner-only fix, unrelated to this branch); the merge's real evidence is the branch's own full local
+gate (`GATE_EXIT=0`, 30/30 tasks, 0 cached, node v22.22.2 — see below) plus a three-round adversarial
+review, both completed before the CI outage started. The controller ran a further forced gate at the
+merged `main` as a backstop; that also came back clean.
+
+**Owner ruling, 2026-09-06 18:41: after Monday's weekly reset (06:30), execution goes back to SERIAL**
+(controller + ONE executor) — the five-lane parallel setup, Lane C included, **ends with this weekend**.
+This file's restart procedure below (§ "A Lane C session relaunched from the controller's override") is
+therefore **historical** unless the owner explicitly re-opens parallel lanes; a Monday serial executor
+should read this file for the WORK RECORD (what shipped, what's still owed, who owns it), not as an
+active restart target.
+
+### The work, and its evidence (unchanged from when it was written)
 
 Branch `exec/34-plan11-scheduler-errands`, cut from `origin/main` at `81a7e44` (post-#183, the same
-commit T11+T12 merged as). Rebased onto `origin/main` at `fb5e4c2` — **origin/main has certainly moved
-again since; re-verify before trusting this sha**. Two commits: `efa498e` (the feature) and `d5ea37a`
-(this handoff). **Pushed to `origin/exec/34-plan11-scheduler-errands` at `d5ea37a`.**
+commit T11+T12 merged as), rebased onto `fb5e4c2`. Full locked gate run twice: the first run showed 39
+file-level test failures (`Cannot find package '@fastify/cors' / 'nodemailer' / 'yaml'`) from a STALE
+`node_modules` after the rebase brought in Lane E's dependency additions — not a real regression (I'd
+checked only `apps/server/package.json`'s own 1-line diff for lockfile impact instead of the ROOT
+lockfile against `origin/main`, which had 26 changed lines). Fixed with `pnpm install --frozen-lockfile`
++ `pnpm rebuild better-sqlite3`; second run: `GATE_EXIT=0`, 30/30 tasks, 0 cached (forced), 2m7s, node
+`v22.22.2` (confirmed from the gate script's own `nvm use 22` line). `@gisik-nokma/server`: 126 test
+files / 1325 tests — 1320 passed, 5 skipped (the pre-existing restore-drill client/server
+major-version skip, unrelated). Logs were local-machine-only (`/tmp/gate.log`, `/tmp/gate-run-c2.out`)
+and are not preserved anywhere durable — this paragraph is the record if they're gone.
 
-**Full locked gate run TWICE.** First run (before `pnpm install`) showed 39 file-level test failures —
-`Cannot find package '@fastify/cors' / 'nodemailer' / 'yaml'` — which is a STALE `node_modules` after the
-rebase brought in Lane E's dependency additions, NOT a real regression (confirmed: `git diff --stat
-81a7e44 origin/main -- pnpm-lock.yaml` showed 26 lines changed, and I'd skipped `pnpm install` because
-only `apps/server/package.json`'s OWN 1-line diff looked lockfile-inert — wrong check; should have diffed
-the ROOT lockfile against origin/main, not just my branch's own package.json delta). Fixed: `pnpm install
---frozen-lockfile`, `pnpm rebuild better-sqlite3`, re-ran. **Second run: `GATE_EXIT=0`, 30/30 tasks, 0
-cached (forced), 2m7s, node `v22.22.2` (confirmed from the gate script's own `nvm use 22` line, not my
-shell's default of v24.11.1).** `@gisik-nokma/server`: 126 test files / 1325 tests — 1320 passed, 5
-skipped (the pre-existing restore-drill client/server major-version skip, unrelated). Full log at
-`/tmp/gate.log` in this session, `/tmp/gate-run-c2.out` for the nvm/setup lines — both local to this
-machine, not preserved anywhere durable, so this paragraph is the record if they're gone.
+### §13 catalogue — CLOSED
 
-**CI is down account-wide as of ~14:42** (GitHub Actions billing outage per the controller — "recent
-account payments have failed"; owner-only fix). The PR's CI will show red-at-start regardless of this
-branch's own correctness; say so plainly in the PR body rather than let it read as this branch's fault.
-Nothing merges until the owner resolves it — this is a controller-wide hold, not specific to this PR.
-
-## PR #203 OPEN — HEAD FROZEN at `9d37936`, per the controller
-
-https://github.com/bkirosangma/gisik-nokma/pull/203. After opening at `d5ea37a`/`0678007`, the controller
-allocated Lane C a new §13 block (`13.201–13.240`, next block `13.241` on request) once `13.1–13.40` was
-confirmed exhausted. Minted the three PENDING BLOCK entries as `13.201–13.203`, updated both header
-paragraphs, re-ran `check-case-ids.mjs` (1545 unique ids, highest 13.203, no duplicates), pushed once more
-as instructed ("push once — then the head is frozen"), commented on the PR with the summary. **Do not push
-again to this branch without a fresh instruction** — the head is frozen at `9d37936` pending controller
-review/merge. HOLDING through the session halt from here; nothing else queued for Lane C.
+Controller allocated Lane C a new block, `13.201–13.240` (next block `13.241`, on request), once
+`13.1–13.40` was confirmed exhausted. **Minted at `13.201–13.203`** (the three `startScheduler` /
+`requirePositiveIntervalMs` / `backup-daemon-main.ts`-wiring cases); both header paragraphs updated;
+`check-case-ids.mjs` confirmed 1545 unique ids, highest 13.203, no duplicates, immediately before merge.
+**`13.204–13.240` of this block remain free and are Lane C's to use next**, not up for grabs by another
+lane. See "carried items" below for one specific thing that owes an id from this remainder.
 
 ## THE WORK, WHAT IT IS AND WHY
 
@@ -83,27 +88,30 @@ the scheduler built for T11's backup daemon (`apps/server/src/ops/schedule.ts`) 
   two original jobs); wiring is proven by the unit-level `startScheduler`/`requirePositiveIntervalMs`
   tests plus reading the wiring, not by an integration test of the process.
 
-### CATALOGUE — the one open ask for the controller
+### CATALOGUE — CLOSED for this errand; one pre-existing carried item found while closing it
 
 - `test-cases/09-editor-attachments.md`: **9.242–9.256** minted (15 ids: `list()` × 2 stores, all 9
-  `sweepOrphanObjects` behaviors including the torn-write-temp-file case). **A real id collision was
-  caught and fixed during this task**: the branch's own stale "ending at 9.239" header led it to first
-  claim 9.240–9.252, which collided with `attachments-wired.test.ts`'s cases that had already shipped to
-  `origin/main` at exactly those numbers. Renumbered to continue from the true `origin/main` highest;
-  verified no duplicates post-rebase (`check-case-ids.mjs`: 1542 unique ids, highest 13.168, matching
-  Lane E's block).
-- `test-cases/13-deployment-dogfooding.md`: **Lane C's `13.1–13.40` block is confirmed exhausted** (the
-  file's own text already recorded this before this task started — 13.40 was already spent on the
-  restore-drill guard pair). **Zero ids minted here.** The scheduler-generalization and
-  interval-validator coverage (10 real vitest tests: 4 `startScheduler` + 6
-  `requirePositiveIntervalMs`, both in `schedule.test.ts`) is written out in full under a `PENDING BLOCK`
-  heading, following this file's own established precedent for exactly this situation (Task 12's section
-  two up does the same thing) — **awaiting one new id from the controller's next allocation (`13.201` or
-  whatever is current)**. This is the ask: Lane C needs a new §13 block before this PENDING content can
-  be numbered.
+  `sweepOrphanObjects` behaviors including the torn-write-temp-file case). A real id collision was caught
+  and fixed during this task: the branch's own stale "ending at 9.239" header led it to first claim
+  9.240–9.252, which collided with `attachments-wired.test.ts`'s cases that had already shipped to
+  `origin/main` at exactly those numbers. Renumbered to continue from the true `origin/main` highest.
+- `test-cases/13-deployment-dogfooding.md`: **13.201–13.203 minted**, in the new block the controller
+  allocated (`13.201–13.240`) once `13.1–13.40` was confirmed exhausted. `13.204–13.240` remain free —
+  see the carried item immediately below, which owes one of them.
 - Deliberately did NOT file the scheduler/interval-validator coverage in `test-cases/09` — that file
   mirrors Features.md §9 (editor/attachments), and `ops/schedule.ts` is unrelated to either domain; it
   belongs in §13 with the rest of Plan 11's ops/deployment coverage.
+
+**CARRIED ITEM, found during this file's 2026-09-06 18:45 accuracy pass, owner: whoever next catalogues
+Task 12 (restore drill) or audits §13.** `test-cases/13-deployment-dogfooding.md`'s own "The restore
+drill (Task 12)" section (predates this errand — written in PR #183) has several `PENDING BLOCK` entries
+that said they were "awaiting `13.201`" for a future id. That was true when written; it stopped being
+true the moment THIS errand's PENDING BLOCK entries reached the controller's new allocation first and
+consumed `13.201–13.203`. Fixed the prose in place (docs/lane-c-final-refresh branch) to say they're
+awaiting one of `13.204–13.240` instead of the now-taken `13.201` — a pure accuracy fix, no ids actually
+minted for Task 12's entries, because assigning them for real is more than a docs-only refresh (it means
+re-confirming each restore-drill case still passes as described). That re-cataloguing is the actual
+carried work; this note is so nobody reads the old "awaiting 13.201" text and mints a duplicate.
 
 ## HOW THIS WAS BUILT — for anyone auditing the method, not just the result
 
@@ -144,3 +152,9 @@ end-of-file anchor — kept both in full, E's first, mine after).
 - The gate lock script in this session's scratchpad is v3.3 (peers-check fix for the `$BASHPID`
   off-by-one, measured with a positive control: buggy form read 2, fixed form read 0, in isolation).
   If copying it elsewhere, copy the CURRENT version, not the v3.2 form still referenced in older memory.
+- **This is not an active restart target as of the owner's 2026-09-06 18:41 ruling** (serial execution
+  resumes after Monday's 06:30 reset; the five-lane parallel setup ends this weekend). A session reading
+  this file going forward is doing so for the work record — what shipped, what's carried and to whom —
+  not because a controller is about to relaunch "Lane C" in the old sense. If parallel lanes are ever
+  reopened, re-verify every sha above before trusting it; a great deal of `origin/main` history will have
+  happened in between regardless.
