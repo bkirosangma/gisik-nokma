@@ -13,6 +13,7 @@ import {
   type Outbox,
   type Replica,
   type SyncEngine,
+  type SyncItem,
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 // The node adapter lives on the testing subpath so app builds never resolve
@@ -158,10 +159,34 @@ export type HarnessClient = {
    */
   engine: SyncEngine;
   ds: ReplicaDataSource;
+  /**
+   * Every ticket id this client's transport was ASKED for through
+   * `bootstrapTicket`, in order, appended at ENTRY — before the `canSee` gate
+   * can reject it.
+   *
+   * Entry and not success, because entry is the product's cost model:
+   * `sync-engine.ts`'s `drainPendingPulls` counts a 404 as an attempt that
+   * leaves the id pending and retries it on the next catch-up, so a ledger
+   * written after the return would report zero requests for a device making one
+   * per catch-up forever. Case 12.276 asserts on this array; recording the
+   * successes only would have hidden exactly the shape it measures.
+   */
+  pulls: string[];
   /** Flush the outbox through the REAL sync service (the engine's own loop), then catch up. */
   goOnline(): Promise<void>;
-  /** Catch up only: `visibleEventsFor` → `applyServerItem`, cursor advanced as the hub advances it. */
-  syncDown(): Promise<void>;
+  /**
+   * Catch up only: `visibleEventsFor` → `applyServerItem`, cursor advanced as
+   * the hub advances it, pending pulls drained as the engine drains them.
+   *
+   * Returns every item DELIVERED, envelopes and instructions alike, in arrival
+   * order. A caller that ignores it loses nothing; a caller that needs to prove
+   * an INSTRUCTION reached this replica has no other door — instructions carry
+   * no `workspaceSeq`, leave no row of their own when the client already holds
+   * what they name, and are therefore invisible to every `replica` accessor.
+   * Case 12.276's "this cost zero pulls" would be vacuous without it: a server
+   * that yielded no notice at all would also cost zero pulls.
+   */
+  syncDown(): Promise<SyncItem[]>;
   /**
    * `ds.ingest` sugar: the local pre-check, then the queue. Nothing is sent
    * while the client is offline. Returns the per-claim answer rather than
@@ -323,6 +348,8 @@ export async function createHarness(): Promise<Harness> {
     // backs the outbox off and hides the claim from the next flush.
     let online = false;
     let waiters: Array<() => void> = [];
+    /** See `HarnessClient.pulls`. Appended at the transport's entry, never after. */
+    const pulls: string[] = [];
     const whenOnline = (): Promise<void> =>
       online
         ? Promise.resolve()
@@ -378,6 +405,9 @@ export async function createHarness(): Promise<Harness> {
        * apart would hand the engine the oracle the whole shape refuses.
        */
       async bootstrapTicket(ws, ticketId) {
+        // BEFORE the gate, deliberately — a refused pull is a pull made. See
+        // `HarnessClient.pulls`.
+        pulls.push(ticketId);
         const client = await pool.connect();
         try {
           if (!(await canSee(client, userId, ticketId))) {
@@ -403,7 +433,50 @@ export async function createHarness(): Promise<Harness> {
     const ds = createReplicaDataSource({ workspaceId, replica, outbox, engine, storage });
     await replica.loadBootstrap(await bootstrapFor(pool, userId, workspaceId));
 
-    async function syncDown(): Promise<void> {
+    /**
+     * `sync-engine.ts`'s `drainPendingPulls`, MIRRORED — and the mirror is
+     * forced rather than chosen, which is why the alternative is named here.
+     *
+     * A `reach-granted` notice makes the replica RECORD ids it lacks
+     * (`applyInstruction`'s arm calls `addPendingPulls` and stops); fetching
+     * them is the ENGINE's job, and the engine's own drain is unreachable from
+     * here twice over. It is a closure, not a method on `SyncEngine`, and it
+     * opens with `if (stopped || stalled || streamEnded) return` — `stopped` is
+     * cleared only by `start()`, which these clients never call because
+     * `transport.openStream` throws on purpose. So `b.engine`'s drain would
+     * return immediately having pulled nothing. **Do not "simplify" this into a
+     * call to the engine.**
+     *
+     * What is mirrored, from `drainPendingPulls` and `applyOne`:
+     *
+     * - the id order (`listPendingPulls`), one pull at a time, sequential;
+     * - `loadTicketBootstrap` then `clearPendingPull`, in that order, so a
+     *   throw between them leaves the id owed rather than lost;
+     * - the SILENT swallow, id left pending. The engine's docblock argues it at
+     *   length: a throw would reach `stall()`, whose latch only `start()`
+     *   clears, and a five-second wobble would brick the device. A scenario
+     *   that needs the silence named asserts `listPendingPulls` is empty —
+     *   which is what turns a swallowed pull into a message instead of a
+     *   puzzling equality diff two assertions later.
+     *
+     * What is NOT mirrored, and neither is load-bearing here: `PULL_TIMEOUT_MS`
+     * (nothing crosses a network in this harness, so no pull can fail to
+     * settle) and the `stopped`/`stalled`/`streamEnded` re-checks between ids
+     * (there is no stream to end).
+     */
+    async function drainPendingPulls(): Promise<void> {
+      for (const ticketId of await replica.listPendingPulls(workspaceId)) {
+        try {
+          await replica.loadTicketBootstrap(await transport.bootstrapTicket(workspaceId, ticketId));
+          await replica.clearPendingPull(workspaceId, ticketId);
+        } catch {
+          // Deliberately silent, and deliberately WITHOUT clearing the id —
+          // see the docblock. The next `syncDown()` tries again.
+        }
+      }
+    }
+
+    async function syncDown(): Promise<SyncItem[]> {
       // The hub's rule, not the plan text's: the cursor is the highest
       // `workspaceSeq` of an ENVELOPE actually delivered, instructions do not
       // move it, and a workspace-wide `scope-revoked` ends the drain without
@@ -411,15 +484,34 @@ export async function createHarness(): Promise<Harness> {
       // after the drain would set the cursor past a commit that landed between
       // the two reads — a skip, which is the one thing a cursor must never do.
       let cursor = await replica.getCursor(workspaceId);
+      const delivered: SyncItem[] = [];
       for await (const item of visibleEventsFor(pool, userId, workspaceId, cursor)) {
+        delivered.push(item);
         await replica.applyServerItem(item);
         if ('kind' in item) {
-          if (item.kind === 'scope-revoked' && item.projectId === undefined) return;
+          // `applyOne`'s own site, at `applyOne`'s own moment: INSIDE the loop,
+          // straight after the item applied and therefore AHEAD of the trigger
+          // envelope queued behind it. That ordering is the whole reason
+          // `visible-events-for.ts` yields the notice BEFORE its trigger — a
+          // folded `ticket.reparented` arriving for a ticket this device has
+          // not pulled replays a transition with no `ticket.created` and stalls
+          // the engine terminally. A rig that drained after the loop would look
+          // identical on every `visibility.set` scenario and be wrong on the
+          // one that matters.
+          if (item.kind === 'reach-granted') await drainPendingPulls();
+          if (item.kind === 'scope-revoked' && item.projectId === undefined) return delivered;
           continue;
         }
         if (item.workspaceSeq > cursor) cursor = item.workspaceSeq;
       }
+      // `onCaughtUp`'s site, in `onCaughtUp`'s order: leftovers from a pull that
+      // failed earlier are retried while this drain still holds the floor, and
+      // only THEN does the cursor move. Safe for it to fail again — the pending
+      // set is durable, so the cursor advancing past a trigger whose ids are
+      // still owed loses nothing.
+      await drainPendingPulls();
       await replica.setCursor(workspaceId, cursor);
+      return delivered;
     }
 
     /**
@@ -508,7 +600,7 @@ export async function createHarness(): Promise<Harness> {
       }
     }
 
-    return { userId, replica, outbox, engine, ds, goOnline, syncDown, submit };
+    return { userId, replica, outbox, engine, ds, pulls, goOnline, syncDown, submit };
   }
 
   const harness: Harness = {
