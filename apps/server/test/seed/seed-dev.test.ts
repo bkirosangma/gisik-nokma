@@ -31,6 +31,12 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
   const docs = readPlanSeries(plansDir);
   const events = buildDevSeedEvents(docs, ownerUserId, '2026-08-20T12:00:00.000Z');
 
+  /**
+   * 13.95 — planted defects (invariant 4, "the calendar stays empty"):
+   * buildDevSeedEvents claims no startDate/dueDate (this test) and emits no
+   * ticket.transitioned (the test below) — no script claims progress or
+   * dates on work it did not do.
+   */
   it('planted defect (invariant 4): no date claims at all — the plan series claims no dates', () => {
     const dateClaims = events.filter((event) => {
       if (event.type !== 'ticket.field_set') return false;
@@ -40,14 +46,28 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
     expect(dateClaims).toHaveLength(0);
   });
 
+  /**
+   * 13.95 — planted defects (invariant 4): buildDevSeedEvents emits no
+   * ticket.transitioned (part of the same row as the no-date-claims test
+   * above).
+   */
   it('planted defect: no transitions — no script claims progress on work it did not do', () => {
     expect(events.filter((event) => event.type === 'ticket.transitioned')).toHaveLength(0);
   });
 
+  /**
+   * 13.96 — every built event wears the client door's origin: 'web', never
+   * the internal door's 'server'.
+   */
   it('every event wears the client door\'s origin, not the internal door\'s', () => {
     expect(events.every((event) => event.origin === 'web')).toBe(true);
   });
 
+  /**
+   * 13.97 — the owner joins the one project this seed creates
+   * (project.member_added, correct userId) strictly before the first
+   * ticket.created.
+   */
   it('the owner joins the one project this seed creates, before any ticket.created', () => {
     const memberAddedIndex = events.findIndex((event) => event.type === 'project.member_added');
     const firstTicketCreatedIndex = events.findIndex((event) => event.type === 'ticket.created');
@@ -57,6 +77,11 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
     expect(payload.userId).toBe(ownerUserId);
   });
 
+  /**
+   * 13.98 — one epic ticket per plan document and one task ticket per
+   * `### Task N:` heading, titles verbatim, including plan 11's own title
+   * among the epics.
+   */
   it('one epic per plan, one task ticket per task heading, titles verbatim', () => {
     const created = events.filter((event) => event.type === 'ticket.created');
     const epics = created.filter((event) => (event.payload as { typeId: string }).typeId === 'epic');
@@ -67,6 +92,10 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
     expect(epics.some((event) => (event.payload as { title: string }).title === eleven?.title)).toBe(true);
   });
 
+  /**
+   * 13.99 — buildDevSeedEvents builds no duplicate event ids across the
+   * whole batch.
+   */
   it('builds no duplicate event ids across the whole batch', () => {
     const ids = events.map((event) => event.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -91,6 +120,13 @@ describe('seedDevWorkspace', () => {
     };
   }
 
+  /**
+   * 13.100 — seedDevWorkspace refuses when the owner has never signed in —
+   * the seed never invents people (this test) — and, once signed in, a
+   * first run commits real events while a second run is a no-op
+   * (committed: 0, skippedExisting exactly accounting for the first run —
+   * the test below).
+   */
   it('refuses when the owner has never signed in — people are not invented', async () => {
     await expect(
       seedDevWorkspace(
@@ -100,6 +136,11 @@ describe('seedDevWorkspace', () => {
     ).rejects.toThrowError(/sign in once/);
   });
 
+  /**
+   * 13.100 — seedDevWorkspace: once signed in, a first run commits real
+   * events while a second run is a no-op (part of the same row as the
+   * refusal test above).
+   */
   it('lands, and a re-run is a no-op', async () => {
     const first = await seedDevWorkspace(makeDeps(), { plansDir, ownerEmail: 'kiro@example.com' });
     expect(first.committed).toBeGreaterThan(0);

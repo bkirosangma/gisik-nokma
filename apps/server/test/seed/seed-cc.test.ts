@@ -113,6 +113,10 @@ async function eventCount(): Promise<number> {
 let firstRunCommitted = 0;
 
 describe('seedConvenienceCorner', () => {
+  /**
+   * 13.77 — the seed refuses when the owner has never signed in, and the
+   * ledger stays empty — people are never invented.
+   */
   it('refuses when the owner has never signed in — people are not invented', async () => {
     const deps = makeDeps();
     await expect(
@@ -126,6 +130,16 @@ describe('seedConvenienceCorner', () => {
     expect(await eventCount()).toBe(0);
   });
 
+  /**
+   * 13.78 — first run through ingestClientBatch lands exactly 118 events —
+   * 7 the seed owns plus 111 errand events — and the server adds its own
+   * 6-event founding sequence.
+   * 13.79 — 23 errand tickets, guest NOT configured when the accountant has
+   * not signed in (--allow-missing-guest).
+   * 13.91 — the door, asserted directly: the seed is handed a LIVE ungated
+   * ingestBatch alongside the gated one and calls it exactly 0 times, while
+   * ingestClientBatch is called once carrying all 118 events.
+   */
   it('first run without the accountant: everything except the guest surface lands', async () => {
     const deps = makeDeps();
     const report = await seedConvenienceCorner(deps, {
@@ -163,6 +177,16 @@ describe('seedConvenienceCorner', () => {
     firstRunCommitted = report.committed;
   });
 
+  /**
+   * 13.80 — the seeded board tells the record's truth: ops:duns in `next`,
+   * ops:accountant-hsn-digits in `in-progress`, ops:apple-developer in
+   * `waiting`.
+   * 13.81 — provenance: the dueDate claim is the OWNER's, and its note
+   * carries the derivation ("from the tracker record — first needed in
+   * week N").
+   * 13.82 — the one origin-dated item carries its startDate verbatim
+   * (2026-08-18) as a built-in field claim.
+   */
   it('the seeded board tells the record’s truth', async () => {
     const workspaceId = seedUlid('workspace', 'convenience-corner');
     const duns = await getTicketStateFromDb(db.pool, workspaceId, seedUlid('ticket', 'cc#ops:duns'));
@@ -179,6 +203,13 @@ describe('seedConvenienceCorner', () => {
     expect((hsn?.fields['startDate']?.value as { date: string }).date).toBe('2026-08-18');
   });
 
+  /**
+   * 13.83 — re-run is a no-op: committed is 0 and the ledger is
+   * byte-for-byte the same size.
+   * 13.84 — the re-run accounts for EXACTLY the first run's committed
+   * count (skippedExisting === firstRun.committed) — a seed that built
+   * nothing would pass a bare `> 0` check and is caught here.
+   */
   it('re-run is a no-op: every event is already present, none commits', async () => {
     const before = await eventCount();
     const deps = makeDeps();
@@ -197,6 +228,11 @@ describe('seedConvenienceCorner', () => {
     expect(await eventCount()).toBe(before);
   });
 
+  /**
+   * 13.85 — staged guest: a later run with the accountant resolvable
+   * commits EXACTLY 5 events — 1 membership.granted + 4 visibility.set —
+   * and the ledger grows by exactly 5.
+   */
   it('a later run with the accountant present adds ONLY the guest surface (staged seeding)', async () => {
     const before = await eventCount();
     const deps = makeDeps();
@@ -216,6 +252,12 @@ describe('seedConvenienceCorner', () => {
     expect(await eventCount()).toBe(before + 5);
   });
 
+  /**
+   * 13.86 — the four explicit-visibility rows are exactly the items whose
+   * record names the accountant (meta.who === 'Accountant'), and each list
+   * is exactly [owner, accountant] — the owner never loses sight of their
+   * own errand.
+   */
   it('the accountant sees the four errands their record names, and nothing else', async () => {
     const workspaceId = seedUlid('workspace', 'convenience-corner');
     const named = await getTicketStateFromDb(
@@ -239,6 +281,10 @@ describe('seedConvenienceCorner', () => {
     }
   });
 
+  /**
+   * 13.89 — a refused event fails the run loudly with the rule id and the
+   * refusal sentence quoted, and the ledger is unchanged.
+   */
   it('a refused event fails the run loudly, naming the refusal, and commits nothing', async () => {
     // A stranger's copy of the same seed. `existingEventIds` is stubbed empty
     // so the events actually reach the door — which is also the real race
@@ -265,6 +311,11 @@ describe('seedConvenienceCorner', () => {
     expect(await eventCount()).toBe(before);
   });
 
+  /**
+   * 13.88 — planted defect: two records sharing one seed id fail the run
+   * before the batch is submitted or the ledger is queried — never counted
+   * as "already present".
+   */
   it('planted defect: two records sharing one seed id fail the run before anything is submitted', async () => {
     // The failure this guards is silent by construction: two items hashing to
     // one `seedUlid` would answer `duplicate-event-id` and be COUNTED as
@@ -317,6 +368,10 @@ describe('seedConvenienceCorner', () => {
     }
   });
 
+  /**
+   * 13.87 — verifyProjections is clean over the whole seeded world — every
+   * projection is derivable from the ledger the seed wrote.
+   */
   it('the freshness gate holds over the seeded world', async () => {
     const { projections } = makeDeps();
     const verdict = await verifyProjections({ pool: db.pool, projections });

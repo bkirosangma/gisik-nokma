@@ -21,6 +21,15 @@ beforeEach(() => {
   s3Mock.reset();
 });
 
+/**
+ * 13.21 — s3TargetFromEnv refuses with EVERY missing variable named in one
+ * error, and resolves exactly what the environment says with no default in
+ * the way. Each of the five is dropped in turn and the error must name it;
+ * a multi-variable environment must name all of them, not just the first;
+ * an empty string counts as missing, not as a value; and the built
+ * client's resolved endpoint, region and forcePathStyle are asserted
+ * against what was passed in.
+ */
 describe('s3TargetFromEnv — what it refuses, and what it resolves', () => {
   /**
    * The refusal list is STRICTER than `attachments/store-config.ts`'s on
@@ -71,6 +80,11 @@ describe('s3TargetFromEnv — what it refuses, and what it resolves', () => {
 });
 
 describe('s3SinkFromEnv', () => {
+  /**
+   * 13.22 — s3SinkFromEnv uploads to the bucket named by bucketVar and
+   * never to the attachment bucket, asserted against an environment
+   * holding both bucket names. Key and content type are asserted too.
+   */
   it('puts to the bucket `bucketVar` names — NEVER the attachment bucket, which is also in this env', async () => {
     s3Mock.on(PutObjectCommand).resolves({});
     const sink = s3SinkFromEnv(ENV, 'BACKUP_S3_BUCKET');
@@ -82,6 +96,10 @@ describe('s3SinkFromEnv', () => {
     expect(input.ContentType).toBe('application/octet-stream');
   });
 
+  /**
+   * 13.37 — the REAL sink's discard deletes the key from the backup
+   * bucket (this test), and does so idempotently (the test below).
+   */
   /**
    * `pg-dump.test.ts`'s case 13.30 proves `dumpDatabaseToSink` ASKS the sink to
    * discard the key; its `CaptureSink` only records the request. This is the
@@ -100,6 +118,11 @@ describe('s3SinkFromEnv', () => {
     });
   });
 
+  /**
+   * 13.37 — the REAL sink's discard is idempotent: discarding a key
+   * nothing was written to is not an error (part of the same row as the
+   * test above).
+   */
   it('discarding a key nothing was uploaded to is not an error — the cleanup path is idempotent', async () => {
     s3Mock.on(DeleteObjectCommand).resolves({});
     const sink = s3SinkFromEnv(ENV, 'BACKUP_S3_BUCKET');

@@ -9,12 +9,20 @@ const BOARD_PATH = 'reference/convenience-corner-tracker/board.data.js';
 const boardPath = new URL(`../../../../${BOARD_PATH}`, import.meta.url).pathname;
 
 describe('readCcBoard — the frozen snapshot, read-only', () => {
+  /**
+   * 13.60 — readCcBoard reads week1 and the items out of the frozen
+   * snapshot.
+   */
   it('reads week1 and the items out of the classic-script snapshot', () => {
     const board = readCcBoard(boardPath);
     expect(board.week1).toBe('2026-08-18'); // pinned to snapshot 24e2240
     expect(board.items.length).toBeGreaterThan(0);
   });
 
+  /**
+   * 13.61 — the two operational epics hold exactly 23 errands in snapshot
+   * 24e2240 (13 registrations + 10 questions, 0 done).
+   */
   it('the two operational epics hold exactly 23 errands in snapshot 24e2240', () => {
     const board = readCcBoard(boardPath);
     const errands = errandItems(board);
@@ -24,12 +32,23 @@ describe('readCcBoard — the frozen snapshot, read-only', () => {
     expect(errands.filter((item) => item.state === 'done')).toHaveLength(0);
   });
 
+  /**
+   * 13.62 — planted defect: a file that does not define window.CC_TRACKER
+   * is refused with the path named (a .ts module throws inside the vm
+   * sandbox before any shape check runs).
+   */
   it('planted defect: a file that does not define window.CC_TRACKER is refused with the path named', () => {
     const selfPath = new URL(import.meta.url).pathname; // any JS-ish file that is not the snapshot
     expect(() => readCcBoard(selfPath)).toThrowError(/CC_TRACKER/);
     expect(() => readCcBoard(selfPath)).toThrowError(selfPath);
   });
 
+  /**
+   * 13.63 — planted defect: a sandboxed global that is not CC_TRACKER
+   * exercises the shape-check branch itself (not just the syntax-error
+   * path). Paired below with a CC_TRACKER missing `items` for the other
+   * half of the same row.
+   */
   /**
    * The test above proves the refusal on the route where the file will not even
    * PARSE as a classic script (a .ts source is an ES module — `runInNewContext`
@@ -51,6 +70,11 @@ describe('readCcBoard — the frozen snapshot, read-only', () => {
     }
   });
 
+  /**
+   * 13.63 — planted defect: a CC_TRACKER missing `items` exercises the
+   * shape-check branch itself, the other half of this row (paired with the
+   * "sets some OTHER global" case above).
+   */
   it('planted defect: a CC_TRACKER whose items are missing is refused — a shape, not just a name', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cc-board-'));
     const decoy = join(dir, 'shapeless.js');
