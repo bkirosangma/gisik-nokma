@@ -52,22 +52,26 @@ export async function dumpDatabaseToSink(
     (error: unknown) => error ?? new Error('object upload failed'),
   );
 
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    child.on('error', reject);
-    child.on('close', resolve);
-  });
-  if (exitCode !== 0) {
-    const failure = new Error(
-      `pg_dump exited ${exitCode}: ${Buffer.concat(stderr).toString('utf8').slice(-500)}`,
-    );
-    // THE ALERT IS NOT ENOUGH. `sink.put` was handed `child.stdout` before the
-    // exit code existed, so by now a TRUNCATED archive is either uploaded or on
-    // its way to `pg/<stamp>.dump` — a dated key indistinguishable at rest from
-    // a good dump, which is exactly what a restore drill reaching for "the
-    // latest dump" would pick up. So: stop feeding it, abort/delete the key,
-    // and only then throw. `discard` starts before `uploadOutcome` is awaited
-    // on purpose, so an in-flight multipart upload is ABORTED rather than
-    // allowed to complete and then deleted.
+  // THE ALERT IS NOT ENOUGH. `sink.put` was handed `child.stdout` before the
+  // exit code existed, so by the time anything goes wrong a TRUNCATED (or
+  // empty) archive is either uploaded or on its way to `pg/<stamp>.dump` — a
+  // dated key indistinguishable at rest from a good dump, which is exactly
+  // what a restore drill reaching for "the latest dump" would pick up. So:
+  // stop feeding it, abort/delete the key, and only then throw. `discard`
+  // starts before `uploadOutcome` is awaited on purpose, so an in-flight
+  // multipart upload is ABORTED rather than allowed to complete and then
+  // deleted.
+  //
+  // ONE closure, called from BOTH failure paths, because there are two and
+  // only one of them used to run this. The other is the child's `error` event
+  // — `pg_dump` missing, off `PATH`, or not executable — which happens AFTER
+  // `sink.put` already has the stream, and which used to reject straight out
+  // of the `await` below with no cleanup at all, leaving a ZERO-BYTE object at
+  // the dated key. A zero-byte dump is the worst of the three outcomes: it is
+  // the one a restore drill picks up and the one an operator's bucket listing
+  // shows as a successful night. Sharing the code, rather than copying it, is
+  // what keeps the two paths from drifting apart again.
+  const discardAbandonedUpload = async (): Promise<void> => {
     child.stdout.destroy();
     const discarded = sink.discard(key).then(
       () => undefined,
@@ -88,6 +92,26 @@ export async function dumpDatabaseToSink(
         }),
       );
     }
+  };
+
+  let exitCode: number;
+  try {
+    exitCode = await new Promise<number>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', resolve);
+    });
+  } catch (spawnError: unknown) {
+    // The spawn itself failed — there is no exit code and no stderr to quote,
+    // so the original error is rethrown unwrapped (`spawn pg_dump ENOENT`
+    // names the cause better than anything this could add).
+    await discardAbandonedUpload();
+    throw spawnError;
+  }
+  if (exitCode !== 0) {
+    const failure = new Error(
+      `pg_dump exited ${exitCode}: ${Buffer.concat(stderr).toString('utf8').slice(-500)}`,
+    );
+    await discardAbandonedUpload();
     throw failure;
   }
   const uploadError = await uploadOutcome;

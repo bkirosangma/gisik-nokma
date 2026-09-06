@@ -162,6 +162,69 @@ describe.skipIf(!pgDumpAvailable())('dumpDatabaseToSink (needs pg_dump on PATH �
 });
 
 /**
+ * THE SPAWN-FAILURE PATH — `pg_dump` missing, off `PATH`, or not executable.
+ *
+ * DELIBERATELY OUTSIDE `describe.skipIf(!pgDumpAvailable())`: this case is
+ * ABOUT the binary being absent, so gating it on the binary's presence would
+ * skip it precisely where it matters and run it nowhere. It needs no database
+ * and no libpq, only an empty directory to point `PATH` at.
+ *
+ * What it pins is not "it rejects" — that always happened, the child's `error`
+ * event rejected straight out of the `await`. It is what the rejection left
+ * behind: `sink.put` is handed `child.stdout` BEFORE the spawn's outcome
+ * exists, so a failed spawn had already opened an upload to the dated key,
+ * and the existing cleanup (destroy the stream, `discard` the key) hung off
+ * the `exitCode !== 0` branch only — which a spawn error never reaches. The
+ * result was a ZERO-BYTE object at `pg/<stamp>.dump`: the same shape a good
+ * dump has, in the same dated slot, and the one a restore drill reaching for
+ * "the latest dump" picks up. Worse than 13.30's truncated archive, because a
+ * bucket listing shows it as a night that worked.
+ *
+ * Fails against the pre-fix implementation, where `sink.discarded` is `[]`.
+ */
+describe('dumpDatabaseToSink when pg_dump cannot be spawned at all', () => {
+  let savedPath: string | undefined;
+  let emptyBinDir = '';
+
+  beforeAll(() => {
+    savedPath = process.env.PATH;
+    // An empty directory, not a nonexistent one: `PATH` entries that do not
+    // exist are skipped, so an empty real directory is the honest "the binary
+    // is not here" and cannot be mistaken for a malformed PATH.
+    emptyBinDir = mkdtempSync(join(tmpdir(), 'gisik-no-pg-dump-'));
+    process.env.PATH = emptyBinDir;
+  });
+  afterAll(() => {
+    // RESTORED IN A `finally`-shaped hook, because this file amends
+    // `process.env.PATH` at module scope to put libpq on it and every case
+    // above depends on that still being true. Leaking an empty PATH out of
+    // this describe would redden the rest of the suite in whatever order it
+    // happens to run.
+    if (savedPath === undefined) delete process.env.PATH;
+    else process.env.PATH = savedPath;
+    rmSync(emptyBinDir, { recursive: true, force: true });
+  });
+
+  it('a spawn failure discards the key it was already streaming to — no zero-byte object is left behind', async () => {
+    const sink = new CaptureSink();
+    const key = 'pg/2026-08-20T21-00.dump';
+    await expect(
+      dumpDatabaseToSink(
+        'postgres://gisik:gisik@localhost:54329/postgres',
+        sink,
+        () => new Date('2026-08-20T21:00:00.000Z'),
+      ),
+      // ENOENT, not `pg_dump exited` — there is no exit code on this path, and
+      // asserting the exit-code message would quietly pass on a machine that
+      // still had the binary.
+    ).rejects.toThrowError(/ENOENT/);
+    expect(sink.discarded).toEqual([key]);
+    expect(sink.key).toBe(key); // the same key the put was aimed at, not a near-miss
+    expect(sink.bytes).toHaveLength(0); // and it was indeed a zero-byte upload
+  });
+});
+
+/**
  * OUTSIDE the `skipIf` block on purpose: `splitDatabaseUrl` is a pure function
  * and needs no `pg_dump`, so gating it on the binary would hide it on exactly
  * the machines that skip.

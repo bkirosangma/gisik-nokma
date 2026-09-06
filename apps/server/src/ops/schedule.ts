@@ -13,6 +13,19 @@ import type { ErrorAlerter } from './error-alerter-shim.js';
 export function msUntilNextUtc(timeHHMM: string, from: Date, dayOfWeek?: number): number {
   const match = timeHHMM.match(/^(\d{2}):(\d{2})$/);
   if (!match) throw new Error(`backup time must be HH:MM (UTC), got '${timeHHMM}'`);
+  // REFUSED RATHER THAN CLAMPED, and refused BEFORE the loop below runs.
+  // `getUTCDay()` only ever returns 0-6, so the loop's `next.getUTCDay() !==
+  // dayOfWeek` clause is permanently true for 7, -1, or the `NaN` that
+  // `Number('sunday')` produces — and the loop has no other exit. The daemon's
+  // caller reads this straight off the environment
+  // (`Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0')`), so a mistyped
+  // deployment variable spun a worker at 100% of a core, forever, silently:
+  // no dump, no export, no alert, and a process that still looks alive to App
+  // Platform's health view. Throwing turns that into an immediate exit 1 that
+  // NAMES the bad value, the same bargain the HH:MM refusal above makes.
+  if (dayOfWeek !== undefined && !(Number.isInteger(dayOfWeek) && dayOfWeek >= 0 && dayOfWeek <= 6)) {
+    throw new Error(`backup day-of-week must be an integer 0-6 (0 = Sunday), got '${dayOfWeek}'`);
+  }
   const [, hours, minutes] = match;
   const next = new Date(from);
   next.setUTCHours(Number(hours), Number(minutes), 0, 0);

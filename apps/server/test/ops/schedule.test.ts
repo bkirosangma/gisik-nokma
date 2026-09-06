@@ -21,6 +21,56 @@ describe('msUntilNextUtc', () => {
   it('planted defect: a malformed time is refused, named', () => {
     expect(() => msUntilNextUtc('9pm', new Date())).toThrowError(/9pm/);
   });
+
+  /**
+   * The day-of-week half of the same refusal, and the reason it is not merely
+   * symmetry: `getUTCDay()` returns 0-6 and nothing else, so a `dayOfWeek` the
+   * clock can never equal makes the function's `while` condition permanently
+   * true — an infinite loop with no exit, not a wrong answer. The daemon feeds
+   * this straight from the environment
+   * (`Number(process.env.LEDGER_EXPORT_DOW_UTC ?? '0')`), so a mistyped
+   * deployment variable used to spin the backup worker at a full core forever:
+   * no dump, no export, no alert, and a process App Platform still sees as
+   * alive.
+   *
+   * `Number('sunday')` rather than a cast, because that IS what the call site
+   * produces from a non-numeric value — the test mirrors production instead of
+   * a shape production cannot reach. `7` and `-1` are the off-by-one ends a
+   * clamp would have swallowed silently.
+   *
+   * ASSERTED AS SYNCHRONOUS THROWS, with a per-case timeout: the pre-fix
+   * failure mode is not a wrong value but a call that never returns, and a
+   * case that only asserted "throws" would hang rather than fail. `toThrowError`
+   * on a spinning call never reaches its assertion at all, so the timeout is
+   * the thing that turns a hang into a red test.
+   */
+  it.each([[7], [-1], [Number('sunday')]])(
+    'a day-of-week outside 0-6 (%s) is refused, named — it does not spin the daemon forever',
+    (dayOfWeek) => {
+      expect(() => msUntilNextUtc('22:00', new Date('2026-08-20T12:00:00.000Z'), dayOfWeek)).toThrowError(
+        /day-of-week/,
+      );
+      // The bad value itself is in the message, so an operator sees which
+      // variable they mistyped rather than a generic range complaint.
+      expect(() => msUntilNextUtc('22:00', new Date('2026-08-20T12:00:00.000Z'), dayOfWeek)).toThrowError(
+        new RegExp(String(dayOfWeek).replace('-', '\\-')),
+      );
+    },
+    5000,
+  );
+
+  it('a fractional day-of-week is refused too — 0-6 means the integers, not the range', () => {
+    expect(() => msUntilNextUtc('22:00', new Date(), 3.5)).toThrowError(/day-of-week/);
+  });
+
+  it('the legitimate values still pass: every integer 0-6, and `undefined` for "any day"', () => {
+    for (const dayOfWeek of [0, 1, 2, 3, 4, 5, 6]) {
+      const from = new Date('2026-08-20T12:00:00.000Z');
+      const ms = msUntilNextUtc('22:00', from, dayOfWeek);
+      expect(new Date(from.getTime() + ms).getUTCDay()).toBe(dayOfWeek);
+    }
+    expect(msUntilNextUtc('21:00', new Date('2026-08-20T20:00:00.000Z'))).toBe(60 * 60 * 1000);
+  });
 });
 
 /**
