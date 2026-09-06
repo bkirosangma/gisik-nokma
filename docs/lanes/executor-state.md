@@ -184,14 +184,58 @@ had missed.
 the loop before committing it; HEAD predated Door B, so the restore wiped the whole loop and it had to
 be rewritten. The restore idiom in the brief assumes the file is committed. **Commit, then mutate.**
 
+## THE FIXTURE LIED, AND AN ADVISOR CAUGHT IT — the most important thing on this branch
+
+The first gate was **GREEN (30 successful, 30 total, GATE_EXIT=0)** with all four client cases
+passing, and the evidence was still wrong. **`pagingFetch` implemented the cursor as a PAGE INDEX**
+(`Number(cursor)`, `nextCursor: String(index+1)`). The shipped route is KEYSET —
+`routes/list.ts:143` binds `t.ticket_id > $n` and line 187 emits the LAST ID OF THE PAGE. So 12.257,
+12.258 and 12.259 proved the loop was internally consistent with a protocol I had written myself.
+**That is this series' signature failure verbatim: a mocked contract is the thing that excuses the
+server from existing** — and four green cases plus a green gate did not surface it.
+
+Two repairs. The fake is keyset now (looks the cursor up as a page's last id, emits the last id, and
+12.257 pins `cursor=t2` rather than `cursor=1`). And **7.220** runs the real `mapListPage` over the
+real route TWICE, carrying the server's own cursor between requests — the only thing that can prove
+the route ACCEPTS `cursor` here, that the mapper's value is the one the route RESOLVES, and that it
+ADVANCES. `limit=1`, not 51 seeded tickets: the route pages at `limit + 1`, so the protocol is
+identical at any size. Non-vacuity asserted first, so a one-ticket fixture fails loudly.
+
+**The loop itself needed no change and that is worth stating rather than implying** — it passes the
+cursor back as an opaque string, so it was always protocol-agnostic. Only the evidence was wrong.
+
+| mutation | result |
+|---|---|
+| route ignores the cursor (`params.add('')`) | **6 failed, 50 passed** — 7.220 among them, `expected '01M1TFYYSPBXJSXF82YFSSVBB9' not to be '01M1TFYYSPBXJSXF82YFSSVBB9'` |
+
+**Recorded against my own interest: that blast radius is NOT surgical.** Five list-route cases die
+with it. What makes it evidence about 7.220 is the MESSAGE naming this case's own property, not the
+count.
+
+## THREE SMALLER THINGS, all done
+
+- **`stream.ts` carried a false PRESENT tense** — "the fabrication `mapListView` refuses a truncated
+  page for", about a refusal that no longer exists. Corrected in place per P40 (the analogy still
+  holds; the tense did not). The other three prose hits (`page.tsx:50`, `e2e/smoke.spec.ts:131`,
+  `ticket-dates-input.ts:26`) read as historical and are fine.
+- **The four cases were verified BY NAME** with `--reporter=verbose`, not inferred from an aggregate:
+  12.256, 12.257, 12.258, 12.259 all ✓, and 12.257/12.258 still ✓ under keyset semantics. The earlier
+  `PASS (155)` line could not have told me a case had silently stopped running.
+- **The cap's absence is deliberately NOT a `SERVING_GAPS['getTickets']` key**, and the reasoning is
+  written at `LIST_PAGE_CAP` rather than left to inference: that map means *refuses ALWAYS*,
+  `getTickets` answers for every project small enough to finish, the key would detonate
+  `stub-services.ts`'s `refuse(method)` lookup (the 86-web-test mechanism), and the register carries
+  `search` alone. P41's phrase "in the register" admits the other reading, so a reviewer should see
+  the choice.
+
 ## STILL OUTSTANDING
 
-1. **The full gate** (`pnpm turbo run build test typecheck`) — `/tmp/gate37b.sh`, queued behind
-   another lane's lock (holder pid 46785) as designed. **Door B touches an exported surface and this
-   file already records that running only the files you edited is NOT the gate** — 88 failures in
-   three fixtures were found that way last session. Do not open the PR before it is green.
-2. **Then the opus reviewer** P41 named (client-path change, N consumers — closure 3's class), then
-   the PR. **The controller merges; I never do.**
+1. **The final full gate** — `/tmp/gate37b.sh`, lock acquired, running at node v22.22.2. The earlier
+   green (30/30) predates 7.220, the keyset fixture and the prose fixes, so it does NOT cover them.
+2. **The opus reviewer is DISPATCHED** and running (loop correctness incl. cap off-by-one and cycle
+   risk, fixture honesty, consumers of the removed `mapListView`, the unchanged-type claim, and the
+   cap as product behaviour). Findings not yet seen.
+3. **Then the PR. The controller merges; I never do.**
 
 ## §12 IS EXHAUSTED
 
@@ -201,7 +245,8 @@ block — ask, do not derive.** §7 next free **7.220**.
 
 ## NEXT, IN ORDER
 
-1. **Gate → reviewer → PR.** Nothing else starts before the gate is green.
+1. **Final gate → read the reviewer's findings → fix only on Important-or-worse → PR.**
+2. §7 next free is **7.221** (7.219, 7.220 minted here). §12 is EXHAUSTED — ask for a block.
 2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
    narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
    dangling-`parent_id` branch has no fixture and survives its own mutation).
