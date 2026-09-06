@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { canSee } from '../../src/visibility/can-see.js';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
@@ -143,10 +144,14 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
       }),
     );
 
-    // The newcomer could see the workspace-mode ticket BEFORE the event. Asserted
-    // here so the exclusion below is a fact about the notice rather than about
-    // this member's reach.
-    expect((await collect(newcomer, ws)).length).toBeGreaterThan(0);
+    // THE PRECONDITION, asked of `canSee` directly. An earlier draft asserted
+    // `(await collect(newcomer, ws)).length > 0` here, which the NOTICE ITSELF
+    // satisfies — a control that could not fail for the reason it named, in a
+    // case written to exclude something. What the exclusion below needs is that
+    // this member CAN see `alreadyVisibleElsewhere`, so that only the project
+    // scope keeps it out of the notice.
+    expect(await canSee(db.pool, newcomer, alreadyVisibleElsewhere)).toBe(true);
+    expect(await canSee(db.pool, newcomer, inOther)).toBe(false);
 
     const forNewcomer = noticesIn(await collect(newcomer, ws));
     // EXACTLY the joined project's two tickets — not the workspace-mode ticket
