@@ -16,6 +16,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+> **CONTROLLER, 2026-09-06 20:35 — LANE A IS DONE FOR THE WEEKEND. Ruling P43 MERGED as #225 (`628befb`), forced gate green at that main (3666 | 5 / 285). Nothing is in flight for Lane A; the block below was written before #225 merged and its "PR #225 OPEN / head FROZEN" lines are history. From Monday 2026-09-07 execution is SERIAL: the queue and the procedure are the top block of `docs/lanes/controller-state.md` and `gisik-nokma-lanes/override-serial-monday.md`.**
+
 # LANE A — **PR OPEN on `exec/50-p43-refusal-exports`: ruling P43, 7.245 CLOSED. Branch RENAMED to the name the ruling gives it.**
 
 ## I VIOLATED THE RULING THAT AUTHORISED THIS BRANCH, AND MEASURED THE FAILURE AS IF IT WERE THE DESIGN

@@ -74,7 +74,32 @@ waived to the end of the weekend, and the Monday override's queue starts now, se
   reviewer. Owns `scripts/`, `ci.yml`, root `package.json`, `test-cases/README.md`, `test-cases/13`, Features.md §13.
 - **Stop rule:** the controller dispatches nothing more and tells both lanes to push handoffs at **weekly ~93%**; at 100%
   everything halts together. The Monday override's §1 then starts at whatever these two did not land: (b′) and (c) if open
-  (rebase, re-gate, report), else (d).
+  (rebase, re-gate, report), else (d). *(Timestamps in this block: the owner's word came at 19:53 and the dispatches went at
+  19:54 — the "20:03/20:04" first written here were the controller's guess, not the clock.)*
+
+### 20:35 — **P43 LANDED (#225, `628befb`), forced gate GREEN; A released; C at review with the citation gap MEASURED (1470 ✅ / 663 cited / 807 uncited); TWO meters now bind**
+
+| what | value |
+|---|---|
+| `main` (20:29) | **`628befb`** — **#225 (Lane A, Ruling P43: `packages/rule-engine/src/index.ts` re-exports the refusal builders — nine names, `refuse()`/`ACCEPT` deliberately NOT exported (a consumer could mint an engine-looking refusal; decision stands); the four `'hierarchy.rank'` sites and the parent-terminal reason in three client files pinned with a literal ALONGSIDE the import; 7.245 closed with the test read, 7.249–7.253 (7.249a–e the client pins), §7 next 7.254; gate at the content head `89fd095` 30/30 · 0 cached · 3666 \| 5 / 285; rebased onto `a90c6b4` with the only difference `controller-state.md`, so no re-gate owed; CI waived, owner 15:20)**. Verified: head `e92c776` = origin = PR, worktree clean, non-docs delta = `index.ts` + four tests. Branch deleted |
+| **forced gate at `628befb`** | lock v3.3 pid 2653, install 0, rebuild 0, **`check:env` 0**: **`GATE_EXIT=0` · 30/30 · 0 cached · 2m01s · node v22.22.2 · `Unsupported engine` 0 · 3666 passed \| 5 skipped (3671) / 285 files** (app-core 1102 → **1107**, exactly the five pins) — = A's exactly. Zero orphans |
+| ledger | 177/177 unchanged (P43 has no row) |
+| lanes | **A RELEASED 20:31** (its state file's header corrected by the controller in this PR — one prepended line; A told not to push). **C** (`lane3-plan7-8-34`, ctx 60%) on `exec/51-case-citation-check`: the check BUILT and self-tested (bare / bold / marker-first styles, a malformed-id guard, the ratchet's four shapes), its reviewer running at 20:28; told 20:33 **push the handoff and open the PR for the record by 21:15 whatever the state**. B, D, E released |
+| **meters** | **SESSION 77% at 20:28, burning ~19%/hour → 100% at ~21:40, BEFORE its 22:20 reset** — the account-wide halt takes every session, this one included. Weekly **89–90%** (stop rule 93%). The session meter, not the weekly, is tonight's binding limit now |
+
+**P43's own lesson, from A (its first round replaced the literals WITH the builder calls and measured SERVER RED / CLIENT GREEN
+as "the intended division of labour"):** *an inferred task is not a read task* — A's dispatch arrived truncated in its pane,
+it inferred the task from the file list and never opened `controller-state.md`, the file its own previous handoff says to
+read first; the reviewer caught it, no rule did. **Controller's side of it:** a long tmux paste can arrive collapsed or
+truncated; the only proof a message arrived is watching the executor act on ITS CONTENT, not on a task with the same file
+list. Also from A: *a count of failures is not a count of what ran* (the proxy summary printed `PASS (6) FAIL (0)` for a run
+in which two whole files failed to transform and never executed; only `EXIT=1` betrayed it); and a `grep -c` for a phrase
+that wraps across two comment lines returns 0 — a false negative from a well-formed search, the seventh shape. A's
+reviewer's FOLLOW-UP claimed the Critical was still on `main`; it had read the pre-fix tree and matched on the file list —
+A verified `628befb` line by line rather than adopting it; nothing owed. **C's measurement corrected itself:** the
+throwaway counter missed the bold-id style that dominates four files (1029 → 1470 total); ratchet mode with per-file
+baselines that may only go down, §11 already at 0 uncited, §09 and §10 entirely uncited, the backfill carried with a
+per-file owner.
 
 ## ✅ THE PLAN SERIES IS COMPLETE — 177/177 (100%), Plan 11 16/16 — 2026-09-06 19:50 IST. END OF THE FIVE-LANE RUN. THIS IS THE STATE MONDAY STARTS FROM (before the 20:04 dispatches above).
 
