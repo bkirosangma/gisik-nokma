@@ -75,6 +75,9 @@ async function signedIn() {
   return { server, user, headers: { authorization: `Bearer ${user.token}` } };
 }
 
+/**
+ * 3.16 — cited on the block: `POST /v1/events` answers 200 with index-aligned per-event results, and every malformed shape the row lists is a 400 rather than a half-heard batch — missing, empty and oversized arrays, `events` as an object, string, number or null, and an unknown top-level key.
+ */
 describe('POST /v1/events', () => {
   it('answers 401 unauthenticated with no session, and never reaches ingest', async () => {
     // The door's identity guard, pinned on its own. Everything below this test
@@ -229,6 +232,9 @@ describe('POST /v1/events', () => {
     await server.close();
   });
 
+  /**
+   * 3.29 — an unexpected mid-batch failure answers ONE fixed 500 body: no exception message, no SQL fragment, no constraint or table name.
+   */
   it('planted defect: an unexpected mid-batch failure is a 500 that names no database internals', async () => {
     // The batch-abort semantics are the contract (the client retries and its
     // committed neighbours answer duplicate-event-id). What must never happen
@@ -291,6 +297,9 @@ describe('POST /v1/events', () => {
 });
 
 describe('GET /healthz against the real database', () => {
+  /**
+   * 3.17 — `GET /healthz` answers ok only when the database responds. This half runs against a REAL migrated database, because a double-backed ok test cannot prove a real pg `Pool` satisfies `HealthDb`.
+   */
   it('answers ok on the real path — the double-backed ok test cannot prove a real pg Pool satisfies HealthDb', async () => {
     const server = app();
     const response = await server.inject({ method: 'GET', url: '/healthz' });
