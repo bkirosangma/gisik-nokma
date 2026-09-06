@@ -576,6 +576,17 @@ SERIALLY inside one lock acquisition, from a written list, nothing else touching
 Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
 3,285 lines of lessons and stopped.
 
+### PRE-HALT POSITIONS, 09:45 — every lane's head is PUSHED; read each from its BRANCH, not from `main`
+
+| lane | session | branch · head | state | first action after the reset |
+|---|---|---|---|---|
+| **A** | `gisik-nokma-exec-43` (restarted 09:37, ctx 7%) | `exec/37-c2-cursor` (to be cut from `origin/main`) | orienting onto C2's proper close | continue the override; commit + push at every checkpoint |
+| **B** | `lane2-plan4-a9` (ctx ~67%) | `exec/29-closure5b-reach` · `632ad04` | **#161 HELD by B's own call**: P37.3 implemented, sync-client 85/85, but NO full gate since P37.2/P37.3, P37.3's two excluding fixtures unwritten (ids from 12.317), the two handed-over `headSeq` mutations unrun, rebase onto `aa17046`+ pending; position in `executor-state-B.md`'s top block | fixtures → mutations under the lock in a quiet window → rebase, install, rebuild, full gate → re-report; **then restart onto T18** |
+| **C** | `lane3-plan7-8-3d` (ctx ~29%) | `exec/30-plan11-backups` · `ee5d5f6` | `cf5b3c5` T11 core (reviewed by the workflow); `1c5df30` **labelled WIP** (T11 follow-ups the commit step never staged + T12's restore.sh/drill/catalogue — unverified, unreviewed, ungated); `ee5d5f6` handoff. **No gate has run on this branch.** Workflow `wf_b926b912-c39` resumability across the halt untested | verify the four WIP claims against the tree; run check-case-ids/check-env; run restore-drill for the first time; resume or redo T12's review; split the WIP into clean commits; rebase onto `aa17046`+; gate v3.2; PR |
+| **D** | `lane4-periphery-22` (restarted 09:37, ctx 9%) | `exec/36-e2e-testids` (to be cut) | orienting onto the four entity-keyed `data-testid` hooks | continue the override; small direct commits, no long fan-out |
+| **E** | `lane5-plan11-1d` (ctx ~82%) | `exec/23-plan11` · `1564d16` (37 ahead, 15 behind `aa17046`) | T4 landed; **the shutdown path committed and LABELLED unreviewed** (implementer green, review round not run); T6 NOT started by instruction; retroactive §13 catalogue from 13.101 and the DDL/scratch-DB written decision still owed | **run the shutdown review round first** (`Workflow({scriptPath: '…/scratchpad/t5b-workflow.js', resumeFromRunId: 'wf_8d8cd44c-120'})`; decisive check: delete the handler, re-run, still green = Critical) → rebase → T6 on 54330 with `OBJECT_STORE_S3_*` → catalogue → the seam-1 PR — **consider restarting E first at ctx 82%, with the mid-step override naming `1564d16`** |
+| **controller** | `gisik-nokma-0d` (this session) | `main` `451a92b` (+ #172 pending) | everything above is on `main` or in an open PR; gate at `aa17046` green (3382); lock free; monitor armed (dies with the session — re-arm) | read this file from the top, `gh pr list`, every lane's branch head, the meters; then the loop |
+
 ### #169 (Lane A) and #167 (Lane D) landed — what each changed on `main`, 09:37
 
 **#169:** `/v1/me/work` serves `stateNames` (a sibling map by `workflowVersion` via `foldedWorkflowDefs`,
