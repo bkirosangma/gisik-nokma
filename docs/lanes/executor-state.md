@@ -16,6 +16,59 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~02:55 IST — **§06: 63 → 37 uncited (4 batches). PR opening. §05's PR #244 STILL OPEN.** Weekly reset ~3.5h away. Nothing in flight, no subagent.
+
+| what | value |
+|---|---|
+| `main` | `4f26f21` |
+| **#244** | **OPEN** — `exec/63-s05-backfill`, §05 67 → 17. Merge before this one, or cherry-pick |
+| branch | **`exec/64-s06-backfill`** off `4f26f21`, head `b8e8765`, 4 commits, pushed |
+| **§06** | **74 cited / 37 uncited / 111** (was 48/63). Baseline **37** |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 3666 \| 5 (3671) / 285** — fourteenth identical run · `check:env` 0 · `check:citations` 0 · zero orphans |
+
+## ⚠ MERGE ORDER MATTERS — #244 and this branch touch ADJACENT baseline keys
+
+Both are off `main`. #244 changes `05-tickets-hierarchy.md`'s entry; this changes `06-auth-visibility.md`'s.
+They sit on neighbouring lines of `scripts/fixtures/check-case-citations-baseline.json`. **Whichever merges
+second will need a CHERRY-PICK onto the new `main`, not a rebase** — the same shape #237 and #240 hit.
+
+## §06's remaining 37 — where they are
+
+`can-see` (4) · `engine-context` (4) · `proj-memberships` (2) · `effective-role` (2) · `proj-visibility` (2) ·
+`check-role-permission` (2 left) · `check-visibility-permission` (2 left) · then singletons and the no-file tail.
+
+## SIX rows deliberately left uncited across §06 — each is a DECISION, not an oversight
+
+- **6.80** — left in FOUR consecutive batches. Nine mutations with counts *"recorded rather than claimed"*: a
+  **RECORD, not an assertion**. It needs the specific control it names, never whichever test sits nearby.
+- **6.78** — same shape: *"three shipped fixtures repaired rather than three assertions loosened."*
+- **6.6** — claims admin-only event TYPES are refused below admin and lists three; no single test asserts that
+  set, and the nearest candidates each prove one type through a different door.
+- **6.11** — *"both halves, the HTTP half added by Task 12"*; the guest test in check 4 asserts the PASSING case
+  and I could not find the refusal half without guessing.
+
+## ✅ FIVE DEFERRALS THIS SESSION, FIVE CONFIRMED LATER — the practice is earning its keep
+
+`7.72` (named `compile-filter`, lived at `projections/search:305`) · `13.45–13.47` (bare `doc-text.test.ts` was
+the SERVER seed file) · `5.40` (in `hierarchy`'s list, belonged to `reparent`) · **`6.107` (in
+`check-role-permission`'s list; I said it read as `workspaces.test.ts` — it is `workspaces.test.ts:400`)** ·
+`6.79` (appeared under `proj-projects`; its leading claim is the §8 position, so it went to `projection-order`).
+
+> **The rule: a row appearing in a file's candidate list is not evidence that file asserts it.** The list is
+> built from filename mentions, and rows mention files for several reasons — as the pin of record, as a second
+> pin, as the place a sibling case lives. **Read the row's leading claim and cite the test that asserts THAT.**
+
+**`projection-order.test.ts`'s pinned-order assertion now carries FOUR rows across two sections** — 5.55/5.57/5.63
+(in #244) and 6.79 (here). One assertion of the whole §8 order genuinely carries each position claim; each is
+stated on its own line so none implies the test is about it alone.
+
+## NEXT
+
+1. **§06's remaining 37**, then **§03 (40 named)** and **§05's tail (17)**.
+2. **OPEN ASKS, six times now:** a subagent for the ~94 named rows left; and **§12's block `12.380–12.399`
+   allocated but NOT cleared** — only **2 of §12's 78** are transcribable regardless.
+
+
 # 🟢 MONDAY 2026-09-07 ~01:50 IST — **§07 AND §13 ARE BACKFILLED TO THE LIMIT OF WHAT NAMING ALLOWS. PR open. Nothing in flight, no subagent. Weekly reset ~4.5h away.**
 
 | what | value |
