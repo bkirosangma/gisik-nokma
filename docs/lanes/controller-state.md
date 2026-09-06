@@ -173,6 +173,17 @@ next-free id; every lane recounts the MAXIMUM against `origin/main` at rebase as
 mints from it. Lane B measured at allocation time: 181 ids, max 12.229, zero duplicates; after its
 catalogue commit 186, max 12.266, zero duplicates.
 
+### §6 CASE-ID BLOCKS — allocated 2026-09-06 08:40, after the same collision nearly happened a THIRD time
+
+Lane D reported minting `user_preferences` cases "from 6.138, §6 max 6.137 before this round" — measured
+against its branch base `de88248`, twenty minutes after Lane A's #150 (the HELD pair) had landed **6.138–6.142**
+on `main`. Caught from the message, before the commit. **Blocks: Lane D 6.143–6.159** (the two retention
+sweeps) · **Lane B 6.160–6.179** (closure 5b's 6.102 guest side) · **Lane A 6.180+ on request** (6.138–6.142
+landed) · next block on request. Whoever touches §6's header first carries the blocks; one header.
+**The rule, third statement:** a fork point is a fact about a moment; mint against `origin/main` at the
+moment of minting, with `scripts/check-case-ids.mjs` as the control — and any section three lanes write
+gets blocks BEFORE the second lane starts, not after the first collision.
+
 ### §13 CASE-ID BLOCKS — allocated 2026-09-06 03:10, after the §12 collision recurred one file over
 
 Lane C's #134 (Plan 11 T14) CREATED `test-cases/13-deployment-dogfooding.md` and minted **13.1–13.6**;
