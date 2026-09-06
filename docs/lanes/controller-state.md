@@ -1,5 +1,33 @@
 # Cross-lane controller — live state
 
+## ⏸ MONDAY 01:0x IST (weekly reset ~4.5h away at 06:30) — `main` is `3ffc9f7`, gate green (eleventh identical run). §13 AND §07 BOTH DONE to the limit of what naming allows. Controller holds again, pending an owner scope check on §12/§05/§06/§03/§04.
+
+**PR #242 merged: §13 (153→72 uncited, one subagent, 77 rows/13 files) and §07 (78→36, more by-hand clusters
+picked up while §13 ran).** Gate re-verified: `GATE_EXIT=0` · 30/30 · 3666 passed | 5 skipped (3671), identical
+for the eleventh time. `check:citations`: repo-wide **1124 cited / 406 uncited**, down from 815 uncited at
+Sunday-morning start — **§09, §10, §11 all at zero.** `check:tasks` unchanged, 177/177. `main` **`3ffc9f7`**.
+
+**⛔ §07 (36 left) and §13 (72 left) are DONE, not paused** — every remaining row in both names no covering
+test file. That is a reading job, not transcription; do not dispatch a subagent or hand-batch against those
+counts expecting citations, that is the one way this could go wrong for a future restart.
+
+**Two brief-level defects surfaced during §13, both self-corrected before merge, both worth keeping as
+process notes:** a bare filename in a catalogue row is not an address — two files are both named
+`doc-text.test.ts` (`packages/domain` tests `docToPlainText`, `apps/server/test/seed` tests the inverse
+`plainTextDoc`), and excluding the wrong one by path silently dropped three rows; **a cluster list must be
+generated from the same measurement as its own headline count**, not typed beside it from memory (a headline
+said "81 in-scope", the list beside it summed to 77, the subagent correctly refused to invent an 81st rather
+than match the headline). Also: a private counting instrument must be cross-checked against `check:citations`
+itself before being trusted to brief a dispatch — one such instrument read §13 as 133 ids where the real count
+was 160, caught before dispatch.
+
+**§12 block (`12.380–12.399`) still allocated, still NOT cleared.** Remaining backfill, sizes at `3ffc9f7`:
+§12 78 · §05 67 · §06 63 · §03 45 · §04 45 — **265 rows total**, smaller pieces than tonight's earlier §09/§13
+batches, each plausibly hand-sized (~10 rows) or dispatch-sized (~100) depending on measurement; the executor's
+own rule from tonight: measure each with the both-styles regex and cross-check the checker before choosing
+hand vs. dispatch. None of these five are authorized to start without another explicit owner go, same
+reasoning as both prior scope checks tonight.
+
 ## ▶ MONDAY 00:2x IST (weekly reset still ~6h out at 06:30) — `main` is `749cc46`, gate green (tenth identical run tonight). CLAUSE A DECLARED COMPLETE. §07 at 177/57. §13 (153 rows) DISPATCHED as one subagent, owner's explicit "one more batch" call — in flight now.
 
 **Two more PRs landed since the §09-closed anchor: #239 (clause A closure-pattern rows 7.258a/b) and #240
