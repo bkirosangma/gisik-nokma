@@ -9,6 +9,51 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ▶ T13 IS COMPLETE — catalogue in, gate green at the head. PR #205. (this block first on restart)
+
+**Everything T13 owed is in.** The §13 catalogue and the `Features.md` §13 bullets landed in this change
+set, and the gate was re-run at the head that carries them.
+
+| anchor | value |
+|---|---|
+| HEAD | **`945f1769f3bfad6b1c904758a8bfd70eb69b2eec` (this commit's parent chain; the handoff commit itself is the head)** — verify with `git branch -r --contains`, never `cat-file` |
+| base | `origin/main` = `cd0844c` (rebase #2; #203 and #202 had landed) |
+| PR | **#205**, open, MERGEABLE |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m52.211s · node v22.22.2 · 285 files / 3644 passed / 5 skipped · Unsupported engine 0 · no orphaned workers** |
+| `check:env` | **`CHECK_ENV_EXIT=0`** (separate from the gate; not in the turbo graph) |
+| `check-case-ids` | **exit 0**, 1573 unique ids, highest **13.203** (separate CI step, NOT part of `check:env`) |
+| §13 | Lane E block used through **13.187. Next free: 13.188.** |
+| CI | **none has ever run on this branch** — Actions fails account-wide before the first step on the owner's billing block |
+
+**A re-gate WAS owed and this is how that was decided, not assumed.** The controller's test was whether
+the rebase's non-docs delta is empty:
+`git diff --name-only cf824df HEAD | grep -vE '^(docs/|test-cases/|Features\.md)'` printed **20 files** —
+other lanes' code (`attachments/*`, `ops/schedule.ts`, `sweep-orphans.ts`, `online/stream.ts`,
+`sync-client/*` and their tests) arriving with the base move. So Lane B's #188 reasoning (*docs-only diff
+⇒ the code is already-gated code*) did **NOT** apply here, and the `cf824df` numbers were retired rather
+than carried. Test/file counts moved 284/3614 → 285/3644 for that reason, not because of anything of mine.
+
+## The four §13 cases that are NOT green, because they are the honest part
+
+- **13.176 ❌** a guest has **no navigation** to the four errands explicitly shared with them — the only
+  path to a ticket is through a project they cannot see. The case says in terms that **13.175 passing does
+  NOT mean the shared tickets were verified reachable; none was ever reached.** Owner Plan 6 / visibility.
+- **13.179 ❌** 12.258, the shell's render past the 2000-row cap — T13 does not cover it. Owner Plan 6 / web.
+- **13.181 ❌** `seed:dev` has no runtime coverage and cannot run the plan's way (`docs/superpowers/plans`
+  absent from the image, measured against `reference/` present as the control). Owner Lane D; **13.90
+  stays Lane D's to flip.**
+- **13.178 🧪** the `ci.yml` e2e job — never executed by any CI run (billing block), so verified only by a
+  local YAML parse and Lane C's review.
+- **13.186 🚫** the header-less request that is not origin-checked — deliberate `better-auth@1.7.2` policy,
+  cited to `dist/api/middlewares/origin-check.mjs:131,137,141,152` → `:96,101,108`, **with the version
+  pinned in the case text** because a dist line number without one is stale the moment the lockfile moves.
+
+## Still owed, and it is only this
+
+- **T16** — the runbook, `Features.md` §13's final shape, `test-cases/13`'s final shape. Its catalogue
+  precondition must be **re-measured against `origin/main`**, never assumed.
+- **The verifier's DDL / restore-scratch-DB written decision is T16's** and remains undischarged.
+
 # ⚠ HEAD MOVED TWICE AFTER PR #205 WAS OPENED — read this before trusting the block below
 
 **The gate reported in PR #205 (30/30, 3603 passed, at `1772056`) DOES NOT COVER THE CURRENT HEAD.**
