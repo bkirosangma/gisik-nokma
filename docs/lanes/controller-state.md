@@ -25,7 +25,7 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 | `main` | **`b4e2f14`** — thirty-three merges this context; since `e0c8294`: #157 (lock v3.2) · **#150** (Lane A, the HELD pair under P38, `b4e2f14`, eleven jobs green at `063f6af` — **P25 clause 1 is DISCHARGED: every `owner: 'P25 clause 1 — HELD'` absence in `mappers.ts` is served or catalogued**; `getMyWorkspaces` closes completely, `getMyWork` still refuses on three fields, all now assigned under P39). Every `gh pr merge` exit read from `$?` on its own line |
 | ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (T7–T10, T14, T15 done; T1–T5/A0 on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E) |
 | last forced gate | **`b4e2f14`** — ONE backgrounded invocation under **lock v3.2** (acquired 08:33:28 fifteen seconds after Lane B's gate released, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m35.0s · node v22.22.2** · zero `Unsupported engine` · **3364 tests / 260 files** — server **1083** (+25: T9/T10's seed runners and the HELD pair's route cases), app-core 1092, sync-client 67, the rest unchanged. Covers #154 and #150 together. *(Previous: `c8268e1` 3340.)* |
-| open PRs | **none** at 08:35. In flight: Lane A `getMyWork`'s three residuals under P39 (`exec/31-mywork-residuals`, restarted 08:33 at ctx 8%); Lane B closure 5b (`exec/29-closure5b-reach`, holds the gate lock now); Lane C T11+T12 (`exec/30-plan11-backups`, opus workflow running); Lane D the two retention sweeps (`exec/32-plan11-retention-sweeps`, restarted 08:27); Lane E seam 1 (T1–T3 landed, T4 staged, 29 ahead at `5744489` rebased onto `de88248`; then shutdown, T6, T13, T16). Session meters ~44% at 08:33 (reset 12:20). |
+| open PRs | **#161** (Lane B closure 5b under P37/P37.1, `89b29ca`, 28 commits / 30 files, gate 30/30 · 0 cached · **3385 tests / 263 files** (server 1090, sync-client 80) · check-case-ids self-test fired, 1324 unique ids, union = sum; **HELD for its Fable branch review — merge on B's confirmation, then restart B onto T18, override staged as `override-laneB-next.md`**). In flight: Lane A `getMyWork`'s residuals under P39/P40 (`exec/31-mywork-residuals`); Lane C T11+T12; Lane D the two retention sweeps (rebased to `c86c4b5`, minting §6 from 6.143); Lane E seam 1 (T4 next). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -411,6 +411,57 @@ either (their `rmdir` fails), so the two forms wait for each other correctly unt
 the form at 08:15 and adopt it at their next gate; Lane E's `locked-test.sh` is the reference copy.**
 *Earlier "RECLAIMING stale empty-pid lock after 60s" lines in this file's gate rows (07:43) were this
 mechanism firing benignly — the holder was still in its acquire loop.*
+
+### CLOSURE 5b built (#161, Lane B) — the grant side is pull-shaped; four findings and the LANE F list
+
+1. **The grant half does NOT close 12.274 on its own, and a straight port of that case would have been
+   green and false.** The client's filter is "do I hold this ticket", and a device can hold a STALE PARTIAL
+   copy because narrowings purge nothing (6.101 struck the walk; 6.104 is the disclosed residual). What
+   closes it is BOTH halves in `onCaughtUp`'s order: reconcile purges, THEN the notice finds a ticket not
+   held — the narrow half is a PRECONDITION of the grant half converging, now written into
+   `grant-backfill.ts`. **Residual, disclosed:** reconcile is bounded by a minimum interval, so a
+   narrow-and-re-widen inside that window leaves the stale copy unrepaired until the next reconcile —
+   12.274 at reduced width, bounded in time where it was permanent. **Owner: Lane F as "closure 5c:
+   reconcile-on-notice"** — candidate close: a grant notice naming a ticket the client already holds
+   triggers a reconcile of THAT id before the pull, making the interval irrelevant for exactly the
+   tickets the notice names.
+2. **12.290 (the wedge) stays 🟡, not ✅, and refusing the flip is the point:** the mechanism is gone, but
+   the flip condition (a slow-consumer close MID-PULL followed by convergence) is unmeasurable here —
+   **nothing in this repo can cut a socket** (the rig has none by construction; the engine's tests use a
+   fake transport with no buffer bound). Measured link by link, never end to end; refused on 12.274's own
+   precedent. **Owner: Lane F — a socket-cutting fixture for the rig; 12.290 flips only when it exists.**
+3. **A typecheck is NOT a sweep for a wire union.** The union's fourth arm (the grant notice) had EIGHT
+   consumers: six were type errors — including `hub.ts`, whose `if/else` read "purge, otherwise
+   scope-revoked" and would have handled a notice AS A REVOCATION (detach the subscription, empty the
+   replica); an accident of field names saved it — and TWO the compiler could not find, both silent:
+   app-core's `parseFrame` returning null (a second, independent wire reader that would have dropped the
+   notice while accepting the trigger behind it) and the cross-package `CLIENT_STREAM_TYPES` pin, caught
+   only by cases that read SOURCE TEXT. Closure 3 taught *the compiler is the enumerator for interfaces*;
+   this teaches its limit. T18 puts both beside each other in §12's scope notes.
+4. 6.102's guest side needed no escalation: `reconcileHeldIds` asks `canSee` and nothing else, and `canSee`
+   resolves a guest through the explicit list exactly as a member through a project — an APPLICATION,
+   closed by measurement (12.304), 6.102 amended in place, no new §6 id.
+**Least sure (B's own):** the durable pending-pull set — unpulled ids as durable client state so the
+cursor can advance without stalling on a transient failure; the review is aimed at it first. **Two
+process notes for every lane:** `git add -A` with subagents running commits their work-in-progress under
+your message (two commits on #161 carry hunks their messages do not describe — not rewritten, because
+rebasing under live writers trades a cosmetic problem for a real one); and the permission hook refuses a
+WHOLE compound command, so a python edit paired with a bad pipe runs neither and reads exactly like an
+edit with no effect.
+
+### LANE F — the serial end-of-run passes, accumulated (run after every lane's last PR merges, one at a time)
+1. The repo-wide test-cases↔test citation convention (P33; coordination:3749/:4108 — no ✅ is grep-checkable
+   and deleting a test reddens nothing) — the worst collision surface while lanes write tests.
+2. The semantic-extraction pass (`--mode deep`, client packages only — scheduled section below).
+3. The comment-cleanup pass (a tightening pass, not a stripping pass — scheduled section below).
+4. **Closure 5c: reconcile-on-notice** (item 1 above).
+5. **A socket-cutting fixture for the dual-client rig** (item 2 above) → flips 12.290.
+6. The rig calling the REAL reconcile route through `inject()` instead of restating its rule — if #161 did
+   not already do it (B's "first commit if cheap"); verify at merge.
+7. The verifier's DDL credential / scratch-DB written decision — with **Lane E's T16**, not F, unless T16
+   does not land.
+8. The `TicketState`-fold `BoardCard.cause` ❌ case under P36, the 7.210/7.211 fixture items — with **Lane A**
+   after `getMyWork`'s residuals, unless A runs out of runway; then F.
 
 ### RULING P40 (2026-09-06 08:45, controller as ruling tier) — `/v1/me/work` serves the viewer's OWN contested claims (Door B); mappers.ts's "never will" was wrong and is corrected in place
 
