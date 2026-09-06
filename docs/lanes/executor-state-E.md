@@ -100,7 +100,7 @@ main as part of P33.
 | T2 | CORS + 3 rate-limit buckets + **HTTP-Origin** + invite-mint bucket | **DONE — `805b39c`** (rebased). Critical fixed: `trustProxy` made the limiter key attacker-chosen |
 | T3 | error alerting hook | **DONE — `b5ec53a`.** 2 Criticals, both guards that could not fire |
 | T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | **DONE.** 3 Importants, incl. a 2-minute sign-in hang |
-| T5b | SIGTERM / shutdown path (inherited errand #2) | **CHECKPOINTED PRE-REVIEW** — implementer complete + gate-verified by it; REVIEW ROUND NOT RUN (session window) |
+| T5b | SIGTERM / shutdown path (inherited errand #2) | **DONE — reviewed and fixed.** Review found my own `withDeadline` rationale FALSE and a real uncaughtException gap |
 | T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
 
 **Seam 2 (PR 2) — T7 seed plumbing · T8 Convenience Corner mapping · T9 seed runner · T10 dev seed ·
@@ -1475,18 +1475,16 @@ mutation moves until its completion notification lands.
 
 # ⛔ CHECKPOINT AHEAD OF THE 10:05 SESSION WINDOW — READ THIS FIRST ON RESTART
 
-**The shutdown path is committed but NOT REVIEWED.** Its implementer finished and ran its own gate; the
+**~~The shutdown path is committed but NOT REVIEWED.~~ SUPERSEDED — the workflow DID complete after the
+checkpoint; review and fix both ran.** The original note said the
 **review round and any fix round did not run** — the account-wide session meter was at 87% at 09:40 with a
 halt forecast around 10:05 and a reset at 12:20, and a review that cannot finish is worse than one not
 started, because the branch would then carry a half-applied fix.
 
-**FIRST ACTION ON RESTART — do not skip and do not treat the code as reviewed:**
+**FIRST ACTION ON RESTART — step 1 below is DISCHARGED; start at step 2:**
 
-1. **Run the review round for the shutdown path.** The dispatch is staged and reusable at
-   `scratchpad/t5b-workflow.js`; re-running it replays the implementer from cache and runs review+fix live
-   (`Workflow({scriptPath, resumeFromRunId: 'wf_8d8cd44c-120'})`). **The single most important check is
-   the one in that brief: DELETE the handler and re-run the test — if it still passes, the errand is not
-   closed and that is Critical.**
+1. ~~Run the review round.~~ **DONE.** It found the `withDeadline` rationale false and a real
+   `uncaughtException` gap; both fixed, gate green at **267 files / 3467 tests**.
 2. **Then rebase onto `aa17046` or later** and `pnpm install`.
 3. **Then T6** — `docker-compose.dev.yml`, five services, Postgres on **54330** (NOT the plan's 54329,
    which is the shared test Postgres), and the `OBJECT_STORE_S3_*` vs `S3_*` split that would otherwise
@@ -1503,11 +1501,31 @@ subagent is mutating: no `MUTANT`/`MUTATION` marker in `index.ts` or `shutdown.t
 handlers for SIGTERM and SIGINT in the one non-test boot path, `app.close()` (bounded 5 s) → `pool.end()`
 (bounded 2 s) → exit, with a whole-process deadline at 8 s. The bounds are argued from `docker stop`'s
 **10 s default** as the binding constraint (Kubernetes 30 s, App Platform larger), leaving room to
-actually exit. `withDeadline` attaches a `.catch` to the abandoned promise because **`Promise.race` does
-not cancel the loser**, so a step rejecting after its deadline would otherwise surface as an
-`unhandledRejection` and kill the process mid-shutdown, skipping the steps after it. A `shutdownStarted`
+actually exit. ~~`withDeadline` attaches a `.catch` to the abandoned promise because **`Promise.race`
+does not cancel the loser**, so a step rejecting after its deadline would otherwise surface as an
+`unhandledRejection` and kill the process mid-shutdown, skipping the steps after it.~~ **THAT SENTENCE IS
+FALSE — struck through rather than deleted, because the shape is the lesson.** Review measured it and the
+fix round reproduced it independently: `Promise.race` does not cancel the loser but it DOES subscribe to
+it (`work.then(resolve, reject)` before the race returns), so an abandoned rejection is ALREADY handled
+and that `unhandledRejection` cannot occur. The line was inert and is now deleted. The probe first cited
+as its witness printed zero unhandled rejections whether or not the line was present — this lane's
+recurring check-that-cannot-fail, in the review round's own words. The discriminating experiment is
+deletion, against a positive control that CAN fail: an identical late-rejecting promise with genuinely no
+handler does fire `unhandledRejection` and set a non-zero exit code, while the same promise inside a
+`Promise.race` does not, with or without the `.catch`. A `shutdownStarted`
 flag makes a second signal a no-op and stops a signal landing during `app.listen` from turning a clean
 stop into `exit(1)`.
+
+**Also corrected by the fix round** (same review): "a step that throws or hangs cannot skip the steps
+after it" held for a REJECTION or a hang, and **not** for a synchronous throw from an `onClose` hook —
+avvio runs those synchronously, so the throw was an uncaughtException that skipped `pool.end()` and exited
+1 at 12 ms. Closed with an `uncaughtException` listener scoped to the shutdown window only (installed
+after the signal, `once`, removed when the sequence ends), and pinned by case **13.104**. The shutdown
+block moved out of `index.ts` into `apps/server/src/shutdown.ts` so a fixture could hand it a
+deliberately broken app without putting a test-only fault seam in the production boot path.
+
+**§13 ids consumed by this work: 13.101–13.104.** The T1/T5 retroactive catalogue named above as starting
+"from 13.101" starts from **13.105** instead — landed ids are never renumbered.
 
 ---
 

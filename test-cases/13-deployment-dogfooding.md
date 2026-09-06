@@ -365,3 +365,39 @@ that caused it. Scratch database names come from `randomUUID()`, the generator `
 uses, not `Date.now()` evaluated once at module load — two runs in the same millisecond (plausible across this
 multi-worktree lane setup) collided, and the loser's `afterAll` then issued `DROP DATABASE ... WITH (FORCE)`
 against the winner's live database mid-drill. `apps/server/test/ops/restore-drill.test.ts`
+## Graceful shutdown (Task 5b — Lane E block, 13.101–13.200)
+
+**First IDs minted from Lane E's block; the block's next free id is `13.105`.** The T1/T5 retroactive
+catalogue that `docs/lanes/executor-state-E.md` says starts "from 13.101" continues from 13.105 instead —
+these landed first and are never renumbered.
+
+*(Every case boots a REAL process and delivers a REAL signal with `child.kill()`. Cases 13.101–13.103
+spawn `src/index.ts` itself — the one non-test boot path — so deleting the `installShutdownHandlers` call
+site reddens all three. 13.104 spawns `test/fixtures/sync-throw-close-hook.ts`, which imports the same
+shutdown module and hands it a deliberately broken app, because a synchronous throw from inside avvio's
+close chain is not reachable from outside the process. The children are **not PID 1**, so what the
+container measurement showed — an unhandled SIGTERM is IGNORED — is not what these reproduce; under a
+normal parent node's default disposition applies, so a missing handler kills the child BY SIGNAL instead.
+Still a specific red, just for the neighbouring reason.)*
+
+- 13.101 ✅ SIGTERM: the real boot path exits `{code: 0, signal: null}` inside 3 s with `signal received`
+  → `http server closed` → `database pool closed` → `complete` in that order, and the pino `pid` on the
+  first line equals `child.pid` — the process signalled is the one that installed the handler, not a CLI
+  shim. Positive control: the child is asserted to hold ≥ 1 backend against the throwaway database before
+  the signal (and 0 before boot), so `pool.end()` is load-bearing rather than a marker that cannot
+  fail — `shutdown.test.ts`
+- 13.102 ✅ SIGINT: identical sequence and exit code — `shutdown.test.ts`
+- 13.103 ✅ a second signal is logged and dropped (exactly one `signal received`, exactly one `already in
+  progress`), a hung `app.close()` is bounded (`app.close() did not finish within 5000ms`) and does NOT
+  skip `pool.end()`, and the process still stops — the stalled socket holds the loop so the 8 s watchdog
+  exits 1 rather than hanging for the platform to SIGKILL. The second signal is driven off the OBSERVED
+  begin marker, not a back-to-back pair POSIX could collapse into one delivery — `shutdown.test.ts`
+- 13.104 ✅ a close hook that throws **synchronously** does not skip `pool.end()`. avvio runs close hooks
+  synchronously from the http server's own `'close'` callback, so the throw is an uncaughtException and
+  never rejects `app.close()`'s promise — the per-step `catch` cannot see it. Measured before the fix:
+  the sequence stopped after `signal received`, the pool was never ended, nothing logged `complete`, exit
+  1 at 12 ms. Now: the throw is absorbed for the shutdown window only, the hooks queued behind the
+  throwing one still run, the 5 s bound moves the sequence on, the pool closes, `complete` logs, and the
+  process exits 0 at ~5010 ms — both timing edges asserted, since under 5 s would mean `app.close()`
+  resolved after all and 8 s or more would mean the watchdog fired instead of the loop draining —
+  `shutdown.test.ts`, `test/fixtures/sync-throw-close-hook.ts`

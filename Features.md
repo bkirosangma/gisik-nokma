@@ -1190,16 +1190,19 @@ survived a whole task.)*
   which recomputes a snapshot at a seq that already has a row and collides on the snapshots primary
   key. Neither is a correctness knob — a server that never writes a snapshot answers with exactly the
   same state, only slower. `apps/server/src/config.ts`, `.env.example`
-- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — because the shutdown path the
-  plan named does not exist** — `apps/server/src/index.ts` has no SIGTERM handler, no `pool.end()` and
-  no `app.close()`. Rather than invent a signal handler (Plan 11 owns the boot path) or leave an
-  unstoppable timer, `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
+- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — and the shutdown that fires it
+  now exists** — `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
   registered BEFORE `app.listen` because fastify 5 throws `FST_ERR_INSTANCE_ALREADY_LISTENING` on an
   `addHook` after start. It is not registered inside `buildApp` with the routes: `buildApp` is called
   by around sixty test files, and a five-minute timer in each of them could fire mid-test and write
-  snapshots into a fixture nothing expects them in. Today nothing calls `app.close()`, so the writer
-  runs for the life of the dev process — which costs nothing, the interval is `unref`'d — and it stops
-  by itself on the day a real shutdown lands. `apps/server/src/index.ts`
+  snapshots into a fixture nothing expects them in. **This bullet used to end "today nothing calls
+  `app.close()` … it stops by itself on the day a real shutdown lands", and asserted that
+  `apps/server/src/index.ts` had no SIGTERM handler, no `pool.end()` and no `app.close()`. All of that
+  is now false**: the graceful-shutdown bullet in §13 is that day — `installShutdownHandlers` awaits
+  `app.close()` on SIGTERM/SIGINT, which runs this hook, and only then ends the pool. The deferral cost
+  nothing: not one line of this registration changed when the shutdown landed. What is unchanged is the
+  `pnpm dev` case — a process nobody signals still runs the writer for its whole life, which costs
+  nothing because the interval is `unref`'d. `apps/server/src/index.ts`
 - ⚙️ **One assembled test server** — `buildTestApp(db)` builds the real app, real auth, real ingest and
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
@@ -1644,6 +1647,24 @@ alerting, SMTP, Dockerfiles, the dev compose stack, backups, the restore drill, 
 stack, the runbook) is still `❌`/unwritten here and arrives with whichever task lands it — do not infer
 completion of Plan 11 as a whole from this section's presence.)*
 
+- ⚙️ **Graceful shutdown on SIGTERM / SIGINT** — `installShutdownHandlers(app, pool)` is installed by
+  the one non-test boot path BEFORE `app.listen`, and runs `app.close()` (bounded 5 s) → `pool.end()`
+  (bounded 2 s), then lets the event loop drain to exit 0; a whole-process watchdog exits 1 at 8 s if
+  something still holds the loop. The bounds are sized under `docker stop`'s 10 s default, the smallest
+  grace period this image meets in the wild. **The defect it closes is a PID-1 one, measured against
+  the built image, not reasoned about**: `apps/server/Dockerfile`'s entrypoint `exec`s node, so node is
+  PID 1, and PID 1 has no default signal dispositions — with no handler installed, SIGTERM was
+  **ignored** and every deploy ended in SIGKILL after the grace period (`docker stop -t 3`: 3197 ms
+  ignored vs 172 ms handled), severing in-flight requests and leaving the snapshot writer's interval,
+  the stream hub's sockets, the notification fan-out's subscription and the pool all unreleased. A
+  second signal is logged and dropped (`pool.end()` twice throws). Process-level `unhandledRejection` /
+  `uncaughtException` handlers are deliberately NOT installed for the life of the process — they
+  suppress Node's own crash — with ONE narrow exception, installed only for the duration of a shutdown
+  and removed after it: avvio runs `onClose` hooks synchronously, so a hook that throws
+  **synchronously** never rejects `app.close()`'s promise and is not catchable there; measured without
+  the exception, that fault skipped `pool.end()` entirely and exited 1 in 12 ms — a graceful stop
+  reported to the orchestrator as a crash. `apps/server/src/shutdown.ts`, called from
+  `apps/server/src/index.ts`
 - ⚙️ **Seed plumbing** — `seedUlid(namespace, key)` mints a deterministic, `ULID_REGEX`-valid id from a SHA-256 digest, so re-running a seed regenerates identical event ids and a re-run can recognise its own prior work rather than duplicating it. (The recognition is a ledger lookup BEFORE submission, not the plan text's `duplicate-event-id` refusal — measured in Task 9: the permission gate and the rule engine both answer before `insertEvent` ever reaches the primary key, so that refusal is unreachable for most seed events at either door.) `plainTextDoc(text)` builds a literal-text ProseMirror doc, one paragraph per line, by delegating each line to the domain's own single-paragraph `plainTextToDoc` rather than duplicating its paragraph-shape logic. `findUserIdByEmail` looks a person up in better-auth's `"user"` table by email — seeds never invent people. `apps/server/src/seed/{seed-ulid,doc-text,users}.ts`
 - ⚙️ **`checkErrandTemplate` — the executable pin on the errand-with-waits template, and Ruling P29's tripwire** — verifies Plan 8's `ERRAND_WITH_WAITS_TEMPLATE` can structurally carry the Convenience Corner tracker board before any seed event is built: every tracker state the seed maps to is present and reachable from the initial state in exactly one transition (no fabricated intermediate history), `waiting` carries `blocked: true`, every door into `done` is guarded by `require-comment`, and — the tripwire — every one-hop transition the seed relies on carries **zero** rules, because the seed submits a bare `ticket.transitioned` with no comment or evidence and any rule there would make the real engine refuse the seed's own event at ingest. This last check is what reddens if a copy of the template ever grows a rule on one of the two paths (`later`→`waiting`, `next`→`waiting`) that Ruling P29 deliberately leaves rule-free — a test pins `adviseWorkflowDef`'s two `rule-bypassable` advisories on the real template by identity, proves a single-edge "fix" genuinely silences one advisory while `checkErrandTemplate` still reddens, and proves guarding both edges clears the advisory panel to zero while `checkErrandTemplate` still refuses it. `workflowFromTemplate` clones a template into a live, published-shape definition at version 1. `apps/server/src/seed/templates.ts`
 - ⚙️ **Convenience Corner seed mapping — frozen record in, events out, nothing invented** — `readCcBoard` reads the frozen `reference/convenience-corner-tracker/board.data.js` snapshot read-only through a `vm` sandbox and refuses (naming the path) a file that does not define `window.CC_TRACKER` with the expected shape. `buildErrandEvents` maps one tracker item to its full ticket event sequence: `ticket.created`, a literal-text `description`, an optional `counterparty` custom field, an origin-dated `startDate` claim (built-in field, `{date, note?}` shape) only when the record itself dates it, a `dueDate` claim derived from `needed_week` by the tracker generator's own published week arithmetic with the derivation named in the claim's note, and at most one `ticket.transitioned` (payload key `to`) mapping the tracker's `later/next/in-progress/blocked` states onto the template's `later/next/in-progress/waiting`. Refuses — never guesses or fabricates — on a `done` item (checked by both the state string and the done flag, so the two disagreeing can never slip a completed item through as open) and on any unmapped tracker state. Every event id is a `seedUlid` derived from the item's own tracker id, so two builds of the same item are identical and a re-snapshot cannot collide event ids across items. `apps/server/src/seed/{cc-board,cc-map}.ts`

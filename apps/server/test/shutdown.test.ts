@@ -41,12 +41,15 @@ import type { TestDatabase } from './helpers/db.js';
  * order, a second signal does not start a second shutdown, a hung `app.close()`
  * does not skip `pool.end()` or hang forever, and the clean exit code is 0.
  *
- * `test-cases/` carries no ID for this yet — it is outside this errand's scope
- * and is reported as such rather than invented here.
+ * `test-cases/13-deployment-dogfooding.md` carries these as **13.101–13.104**,
+ * minted from Lane E's allocated block (13.101–13.200); each case names its own
+ * id below.
  */
 
 const SERVER_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const INDEX_PATH = 'src/index.ts';
+/** A real server whose `onClose` hook throws synchronously; see the file. */
+const SYNC_THROW_FIXTURE = 'test/fixtures/sync-throw-close-hook.ts';
 /** Measured clean shutdown: ~15 ms. 3 s is a bound no healthy path approaches
  *  and one that no unhealthy path can reach — the shutdown's own deadlines are
  *  5 s / 2 s / 8 s, and pg's idle-connection reaper is ~10 s, so nothing can
@@ -82,10 +85,10 @@ async function freePort(): Promise<number> {
   });
 }
 
-/** Boots `src/index.ts` and resolves once it has logged that it is listening. */
-async function startServer(): Promise<Child> {
+/** Boots an entry file and resolves once it has logged that it is listening. */
+async function startServer(entry: string = INDEX_PATH): Promise<Child> {
   const port = await freePort();
-  const child = spawn(process.execPath, ['--import', 'tsx', INDEX_PATH], {
+  const child = spawn(process.execPath, ['--import', 'tsx', entry], {
     cwd: SERVER_ROOT,
     env: {
       ...process.env,
@@ -188,7 +191,7 @@ afterEach(async () => {
 
 describe('graceful shutdown', () => {
   it.each(['SIGTERM', 'SIGINT'] as const)(
-    'exits 0 on %s after closing the app and ending the pool',
+    'exits 0 on %s after closing the app and ending the pool (13.101 SIGTERM / 13.102 SIGINT)',
     async (signal) => {
       const child = await startServer();
 
@@ -239,7 +242,7 @@ describe('graceful shutdown', () => {
   );
 
   it(
-    'ignores a second signal, bounds a hung app.close(), and still ends the pool',
+    'ignores a second signal, bounds a hung app.close(), and still ends the pool (13.103)',
     async () => {
       const child = await startServer();
       await fetch(`http://127.0.0.1:${String(child.port)}/healthz`);
@@ -295,6 +298,73 @@ describe('graceful shutdown', () => {
       expect(result).toEqual({ code: 1, signal: null });
       expect(elapsed).toBeLessThan(12_000);
       expect(messages(child)).toContain('shutdown: forced exit, something still holds the event loop');
+    },
+    60_000,
+  );
+
+  it(
+    'a close hook that throws SYNCHRONOUSLY does not skip pool.end() (13.104)',
+    async () => {
+      // The mechanism, and why the try/catch around each step is not enough for
+      // it: avvio runs close hooks synchronously from the http server's own
+      // 'close' callback, so a hook that THROWS never rejects `app.close()`'s
+      // promise — it unwinds as an uncaughtException, outside the shutdown
+      // closure entirely. Measured before the fix: the sequence stopped after
+      // 'signal received', the pool was never ended, nothing logged 'complete',
+      // and the process exited 1 in 12 ms.
+      const child = await startServer(SYNC_THROW_FIXTURE);
+      expect(await childBackendCount()).toBeGreaterThanOrEqual(1);
+
+      const sentAt = Date.now();
+      child.process.kill('SIGTERM');
+      const result = await Promise.race([
+        child.exit,
+        new Promise<'timeout'>((resolve) =>
+          setTimeout(() => {
+            resolve('timeout');
+          }, 20_000),
+        ),
+      ]);
+      const elapsed = Date.now() - sentAt;
+
+      expect(result, `child never exited.\n${child.stdout()}`).not.toBe('timeout');
+
+      // The throw was absorbed for the length of the shutdown window only, and
+      // the hooks queued behind the throwing one still ran.
+      expect(messages(child)).toContain('shutdown: uncaught exception during shutdown, continuing');
+      expect(messages(child)).toContain('fixture: the close hook after the throwing one ran');
+
+      // The whole point: `pool.end()` is REACHED and the sequence completes.
+      const order = messages(child).filter((msg) => msg.startsWith('shutdown: '));
+      expect(order).toEqual([
+        'shutdown: signal received',
+        'shutdown: uncaught exception during shutdown, continuing',
+        'shutdown: http server did not close cleanly',
+        'shutdown: database pool closed',
+        'shutdown: complete',
+      ]);
+
+      // Exit 0, and by the route the design says: `app.close()`'s promise never
+      // settles after the throw, so it is the 5 s BOUND that moves the sequence
+      // on — measured 5010 ms.
+      //
+      // The DISCRIMINATOR for "the bound fired" is the
+      // 'http server did not close cleanly' marker in the ordered list above,
+      // which only that path writes; a clean close logs 'http server closed'
+      // instead and takes ~15 ms. The timing assertions below are a second,
+      // coarser statement of the same thing, and they are deliberately loose on
+      // BOTH sides rather than snug against the constants. `elapsed` is
+      // measured in the parent from `kill()`, not in the child from the signal,
+      // so it is the bound plus delivery and handler-entry latency — asserting
+      // `>= 5_000` against a 5000 ms `setTimeout` would leave a ~10 ms margin
+      // in which a correct build reddens. 4.5 s is far above the ~15 ms a
+      // resolved `app.close()` takes and far below the bound, and 8 s is the
+      // watchdog: over it would mean the forced exit fired instead of the loop
+      // draining.
+      expect(result).toEqual({ code: 0, signal: null });
+      expect(elapsed).toBeGreaterThanOrEqual(4_500);
+      expect(elapsed).toBeLessThan(8_000);
+      expect(messages(child)).not.toContain('shutdown: forced exit, something still holds the event loop');
     },
     60_000,
   );

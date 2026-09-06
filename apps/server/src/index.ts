@@ -1,5 +1,3 @@
-import type { FastifyInstance } from 'fastify';
-import type { Pool } from 'pg';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
@@ -11,163 +9,8 @@ import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
+import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
-
-// ── Graceful shutdown (SIGTERM / SIGINT) ───────────────────────────────────
-//
-// THE DEFECT THIS CLOSES, measured against the image this repo builds
-// (`apps/server/Dockerfile`), not reasoned about. The entrypoint is
-// `sh -c '… exec "$@"'` with `CMD ["node","dist/index.js"]`, and `exec` makes
-// sh REPLACE itself with node — so node is **PID 1**. PID 1 has no default
-// signal dispositions: the kernel delivers a signal to it only if the process
-// installed a handler, so with this file as it stood, **SIGTERM was ignored**.
-// Timed with `docker stop -t 3`:
-//
-//     no handler        3197 ms   signal ignored; docker fell through to SIGKILL
-//     with a handler     172 ms   handler ran, process exited on its own
-//
-// Every deploy was therefore a hard kill after the grace period: in-flight
-// requests severed mid-response, the snapshot writer's interval never stopped,
-// the stream hub's sockets and the notification fan-out's subscription never
-// released, `pool.end()` never called.
-//
-// The fix is A HANDLER, not `tini` or `--init`. `exec` already gives node PID 1,
-// so there is no orphan-reaping or signal-forwarding problem for an init shim to
-// solve here, and the 172 ms row above is the whole proof that a handler is
-// sufficient. No init shim was added.
-//
-// ## The bounds, and why these numbers
-//
-// A shutdown that never completes is the same outage as no shutdown — the
-// platform SIGKILLs you at the end of the grace period either way, and the
-// difference is only whether the log says what was stuck. So every step is
-// bounded and the total is bounded under the SMALLEST grace period this image
-// can meet in the wild: `docker stop`'s default is 10 s (Kubernetes'
-// `terminationGracePeriodSeconds` default is 30 s, and App Platform's is
-// larger still, so docker is the binding constraint). 5 s for `app.close()`
-// plus 2 s for `pool.end()` is 7 s worst case, and the whole-process deadline
-// sits at 8 s — inside 10 s with room for the process to actually exit, and
-// far enough above a healthy shutdown (measured in milliseconds) that the
-// bound never fires on a working server.
-const APP_CLOSE_TIMEOUT_MS = 5_000;
-const POOL_END_TIMEOUT_MS = 2_000;
-const FORCED_EXIT_MS = 8_000;
-
-/**
- * True from the first signal onward. Read in two places: the second signal's
- * guard below, and `main().catch` at the bottom of this file — a signal that
- * lands while `app.listen` is still in flight can reject that await, and
- * without this flag the tail would turn a clean stop into `exit(1)`.
- */
-let shutdownStarted = false;
-
-/**
- * Await `work`, but give up after `ms` — and never leave the abandoned promise
- * to reject into nothing. `Promise.race` does not cancel the loser, so a step
- * that rejects AFTER its deadline would otherwise surface as an
- * `unhandledRejection` and kill the process mid-shutdown, skipping the steps
- * after it. The extra `.catch` is what makes the abandonment safe.
- */
-async function withDeadline(work: Promise<unknown>, ms: number, label: string): Promise<void> {
-  void work.catch(() => {
-    // Swallowed only for the abandoned-after-deadline case; the race below is
-    // what reports a rejection that arrives in time.
-  });
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    await Promise.race([
-      work,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`${label} did not finish within ${String(ms)}ms`));
-        }, ms);
-      }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
-}
-
-/**
- * Installs the SIGTERM and SIGINT handlers. Called BEFORE `app.listen` on
- * purpose: on PID 1 the window between "process is alive" and "handler
- * installed" is a window in which the signal is ignored, so it is made as
- * small as this file can make it. Closing a Fastify instance that has not
- * started listening is legal and simply runs the `onClose` hooks.
- *
- * The order is `app.close()` then `pool.end()`, and it is not interchangeable:
- * `app.close()` fires the two `onClose` hooks `app.ts` registers (stop the
- * stream hub, unsubscribe the notification fan-out) plus the one registered in
- * `main()` (stop the snapshot writer), and all three can still touch the
- * database. Ending the pool first would pull the connection out from under
- * them.
- *
- * NOT installed here, deliberately: `unhandledRejection` and
- * `uncaughtException`. Registering those SUPPRESSES Node's own crash, so a bug
- * that today kills the process would instead leave it listening in an unknown
- * state. See the note beside `alerter` in `main()` for where that deferral was
- * first recorded — it named this errand as the owner, and this is the errand
- * declining it on the merits rather than passing it on again.
- */
-function installShutdownHandlers(app: FastifyInstance, pool: Pool): void {
-  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-    // IDEMPOTENCE. A platform that sends SIGTERM and then, impatient, sends it
-    // again must not start a second sequence: `pool.end()` called twice throws
-    // ('Called end on pool more than once'), and two `app.close()` runs would
-    // race the hooks against their own teardown. The second signal is logged
-    // and dropped.
-    if (shutdownStarted) {
-      app.log.warn({ signal }, 'shutdown: already in progress, signal ignored');
-      return;
-    }
-    shutdownStarted = true;
-    const startedAt = Date.now();
-    app.log.info({ signal }, 'shutdown: signal received');
-
-    // The last resort, and `unref`'d so it is not itself a reason to stay
-    // alive. If every step finished and released what it held, the event loop
-    // empties and the process exits 0 on its own before this ever fires — that
-    // natural drain is the design, not `process.exit(0)`, precisely so that
-    // anything still holding the loop (a socket that was never closed, a pool
-    // that was never ended) shows up as a forced exit instead of being papered
-    // over by an explicit exit call.
-    const forcedExit = setTimeout(() => {
-      app.log.error(
-        { signal, deadlineMs: FORCED_EXIT_MS },
-        'shutdown: forced exit, something still holds the event loop',
-      );
-      process.exit(1);
-    }, FORCED_EXIT_MS);
-    forcedExit.unref();
-
-    // Each step is bounded AND caught, so a step that throws or hangs cannot
-    // skip the steps after it.
-    try {
-      await withDeadline(app.close(), APP_CLOSE_TIMEOUT_MS, 'app.close()');
-      app.log.info({ signal }, 'shutdown: http server closed');
-    } catch (error: unknown) {
-      app.log.error({ err: error, signal }, 'shutdown: http server did not close cleanly');
-    }
-    try {
-      await withDeadline(pool.end(), POOL_END_TIMEOUT_MS, 'pool.end()');
-      app.log.info({ signal }, 'shutdown: database pool closed');
-    } catch (error: unknown) {
-      app.log.error({ err: error, signal }, 'shutdown: database pool did not close cleanly');
-    }
-
-    // Exit code 0 is what an orchestrator reads as a clean stop, and it is
-    // reached by letting the loop drain rather than by calling `process.exit`,
-    // which would also risk truncating these very log lines on a pipe. The
-    // only non-zero exit from this path is the forced one above.
-    app.log.info({ signal, durationMs: Date.now() - startedAt }, 'shutdown: complete');
-  };
-
-  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-    process.on(signal, () => {
-      void shutdown(signal);
-    });
-  }
-}
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
@@ -304,9 +147,13 @@ async function main(): Promise<void> {
       // Node's own crash, so a bug that today kills the process would instead
       // leave it listening in an unknown state. This comment used to defer them
       // to "the SIGTERM/shutdown errand this file still owes". **That errand has
-      // landed** — `installShutdownHandlers` above — and it declined them on the
-      // same merits rather than passing the deferral on again, so the deferral
-      // is closed, not outstanding. The reason is restated at that function.
+      // landed** — `installShutdownHandlers`, called below and living in
+      // `shutdown.ts` — and it declined them on the same merits rather than
+      // passing the deferral on again, so the deferral is closed, not
+      // outstanding. The one narrow exception is an `uncaughtException`
+      // listener that exists only WHILE a shutdown is running, for a close hook
+      // that throws synchronously; the reason it does not reopen this decision
+      // is argued where it is installed.
       alerter: alerterFromConfig(config.alertWebhookUrl),
       // The one non-test boot path, so the one place the security surface is
       // ON (Plan 11 Task 2). Absent everywhere else, which is the contract
@@ -374,10 +221,10 @@ async function main(): Promise<void> {
   //    stop function was hung on the hook Fastify already provides, with the
   //    note that "on the day Plan 11 adds a real shutdown, the writer stops
   //    without anyone having to remember it exists". **This file now installs
-  //    that shutdown** (see the block above `main`), so the hook below is no
-  //    longer a hook nothing calls: `installShutdownHandlers` awaits
-  //    `app.close()` on SIGTERM/SIGINT, which fires this hook alongside the two
-  //    `app.ts` registers, and only then ends the pool. The deferral was the
+  //    that shutdown** (`installShutdownHandlers`, called below and defined in
+  //    `shutdown.ts`), so the hook below is no longer a hook nothing calls: it
+  //    awaits `app.close()` on SIGTERM/SIGINT, which fires this hook alongside
+  //    the two `app.ts` registers, and only then ends the pool. The deferral was the
   //    right call and it cost nothing: not one line of this registration
   //    changed when the shutdown landed.
   //
@@ -397,8 +244,8 @@ async function main(): Promise<void> {
 
   // BEFORE `listen`, so there is no window in which this process is alive and
   // ignoring SIGTERM — on PID 1 that window is not a race with a default
-  // disposition, it is a window with NO disposition at all. See the block at
-  // the top of this file for the measurement and the bounds.
+  // disposition, it is a window with NO disposition at all. See `shutdown.ts`
+  // for the measurement and the bounds.
   installShutdownHandlers(app, pool);
 
   await app.listen({ port: config.port, host: config.host });
@@ -409,7 +256,7 @@ main().catch((error: unknown) => {
   // await — `app.close()` from the shutdown path is one way it happens. Exiting
   // 1 there would report a clean, requested stop as a crash, so the shutdown
   // path keeps the exit it already owns.
-  if (shutdownStarted) return;
+  if (isShuttingDown()) return;
   console.error(error);
   process.exit(1);
 });
