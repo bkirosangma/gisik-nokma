@@ -1,5 +1,49 @@
 # Cross-lane controller — live state
 
+## ⏹ CONTROLLER `gisik-nokma-0c` STOPS AT 22:4x IST — `main` is `de33c07`, gate green, §09 at 98/219, EXECUTOR HOLDING (nothing in flight). WEEKLY METER READS "Weekly reset used · available again Sep 7 at 6:30am" — that banner, not the 93% figure, is what ends tonight.
+
+**Since the block below (21:20ish): PR #232 (§09 batch 1, 98 more citations) and #233 (handoff header
+correction) both merged.** `main` **`de33c07`**. Forced gate re-verified at the code head `1bf5e92` (#233 is
+docs-only, no gate owed by series precedent): `GATE_EXIT=0` · 30/30 · 0 cached · node v22.22.2 ·
+`Unsupported engine` 0 · **3666 passed | 5 skipped (3671)** — identical again. `check:citations`: **§09 98
+cited / 121 uncited** (was 0/219); §05 correctly tightened 68→67 (9.57 was an accidental cross-section
+citation of case 5.26, caught and fixed, not left as a false green); repo-wide 879/650, ratchet holds
+everywhere. `check:env`/`check:runbook` both 0. `pnpm check:tasks` unchanged, 177/177.
+
+**Verification-method finding, machine-wide, now in `[[rtk-proxy-search-pitfalls]]` as its ninth shape:**
+`git diff | grep "^+"` is **always empty** under the rtk proxy (it reformats diffs with a stat header and
+indented hunk lines), so three "comments-only" claims tonight — including one already merged as #230 — rested
+on a filter that never ran on real input. All three were re-checked independently (`git show` + `--numstat`
+line counts) and **all three conclusions held; no defect reached `main`.** Caught only because a *different*
+probe returned an impossible zero. The lesson stated plainly: **a positive control must traverse the same path
+as the measurement** — testing the filter against a `printf` and never the diff output certifies nothing.
+
+**Why the executor stopped instead of running §09 batch 2 (113 `apps/server/` rows):** its status line showed
+**"⚠ Weekly reset used · available again Sep 7 at 6:30am"** — a hard banner, not the numeric 93%, and distinct
+from the session meter (which DID reset at 22:20 and reads ~2% now; that reset is real but does not touch the
+weekly figure). Put to the executor as a HOLD rather than let it guess: dispatching a fresh subagent against an
+exhausted weekly pool risks losing it to a mid-run rejection for nothing (exactly how batch 1's implementer
+died to a 429, recovered only because a failed dispatch was read as UNVERIFIED, never EMPTY). **Confirmed
+stopped: nothing in flight, no subagents running, no further dispatch, from either session.**
+
+**A controller-side mistake worth a rule for the next restart.** This session's own forced-gate script and a
+`git checkout`/`git pull` were run in the same command block against the SAME working directory
+(`/Users/kiro/my_projects/gisik-nokma`, not an isolated worktree) — the pull raced the gate's `cd`, so the log
+recorded the wrong SHA and killing the mis-run turbo process briefly left `vitest` workers without a parent
+(found and confirmed reaped — zero orphans — but only by luck of a fast-finishing file, not by design). **Rule:
+never run `git checkout`/`git pull`/`git merge` in the controller's own checkout while a `gate.sh` background
+run against that same directory is in flight or about to be; wait for `GATE_EXIT=` in its log first, or launch
+the gate strictly after the checkout settles, never interleaved in one bash call.**
+
+**Next restart (tonight if the weekly figure turns out to have headroom, or Monday's real 06:30 reset):** read
+`docs/lanes/executor-state.md` on `main` (current as of #233 — no branch to chase, nothing stale). Queue: §09
+batch 2 (113 `apps/server/` rows, same method, mutation-check the zero before trusting it — §09 has no prefix
+collisions like §10's `10.1`, so pick a real prefix pair e.g. one already used, `9.36`-style, before calling it
+proven), then **Ruling P44's (A)**: the semble-based duplicate-logic hunt starting from
+`packages/app-core/src/precheck.ts:375` ↔ `rule-engine` (0.61–0.67), written as named-owner rows. `override-
+serial-monday.md` §0 is now stale in full (its "Monday", "after 06:30", and task-list preconditions no longer
+match reality) — this section is the restart surface, not that file.
+
 ## ⏩ CONTROLLER `gisik-nokma-0c` RESUMED SUNDAY 20:53 IST — BEFORE THE WEEKLY RESET, NOT AFTER IT. RULING P44: LANE F PASS 2 IS A+C. PR #230 MERGED. SESSION METER AT THE WALL (98%, resets 10:20pm); WEEKLY 92% (resets Mon 6:30am).
 
 **How this session started, for the next restart's benefit.** This controller (`gisik-nokma-0c`) and a fresh
