@@ -346,7 +346,27 @@ describe('3.60 useAttention — a refusal is an error, never an empty strip', ()
   }
 
   it('PLANTED DEFECT: the serving gap surfaces as an error and the strip never renders "0"', async () => {
-    const gap = new ServingGapError('getAttention', SERVING_GAPS['getAttention'] ?? []);
+    // The absence is CONSTRUCTED here, and that is a change from how this case
+    // was written. It used to read the register — correct while `getAttention`
+    // refused, and silently VACUOUS the moment ruling P40 served it: an empty
+    // lookup falls back to `[]`, and a `ServingGapError` over no absences still
+    // carries the message prefix this asserts, so the case would have gone on
+    // passing while measuring a refusal about nothing. Its sibling below is what
+    // caught that, and it is the same move `reopen-flow.test.tsx`'s
+    // T13.4h-control made when P25 clause 1 served `getTicket`.
+    //
+    // What is under test here is the HOOK — that a refusal surfaces as an error
+    // and `data` never becomes `[]` — which is true of any serving gap and does
+    // not need this method to be one.
+    const gap = new ServingGapError('getAttention', [
+      {
+        field: "AttentionItem kind 'contested' — its title",
+        wireKey: 'title',
+        wireRoute: '/v1/contests',
+        because: 'a hand-built absence standing in for a refusal this method no longer makes',
+        owner: 'this test',
+      },
+    ]);
     const source = createFakeDataSource({
       getAttention: async () => {
         throw gap;
@@ -360,14 +380,21 @@ describe('3.60 useAttention — a refusal is an error, never an empty strip', ()
     expect(screen.getByTestId('items')).not.toHaveTextContent('items:0');
   });
 
-  it('and the register it names is the contested kind’s missing title, not something else', () => {
-    // Pins WHICH gap, so a future edit that empties the register cannot leave
-    // the test above passing on a refusal about nothing.
-    const absences = SERVING_GAPS['getAttention'] ?? [];
-    expect(absences).toHaveLength(1);
-    expect(absences[0]?.field).toContain("'contested'");
-    expect(absences[0]?.field).toContain('title');
-    expect(absences[0]?.wireRoute).toBe('/v1/contests');
+  it('(INVERTED) getAttention no longer refuses, which is why the case above constructs its own absence', () => {
+    // This pinned WHICH gap, so that an edit emptying the register could not
+    // leave the case above passing on a refusal about nothing. Ruling P40 served
+    // the gap, so the duty inverts rather than disappearing: it now pins the
+    // fact that LICENSES the hand-construction above.
+    //
+    // The contested kind's title was the whole refusal. `GET /v1/contests`
+    // serves `title` and `projectId` off the contest row now, so the fourth kind
+    // is a join and the register carries nothing for this method.
+    expect(SERVING_GAPS['getAttention']).toBeUndefined();
+    // Non-vacuity, in the same run: the register still exists and still carries
+    // a real refusal, so the line above is a fact about `getAttention` rather
+    // than about a register that was emptied wholesale.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
+    expect((SERVING_GAPS['search'] ?? []).length).toBeGreaterThan(0);
   });
 
   it('the hook subscribes to the workspace it was asked about', async () => {

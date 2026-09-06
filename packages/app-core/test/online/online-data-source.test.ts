@@ -242,8 +242,6 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const expected: ReadonlyArray<[string, () => Promise<unknown>, string]> = [
       ['search', () => source.query.search(WORKSPACE, 'q'), 'SearchHit.matchedIn'],
-      ['getMyWork', () => source.query.getMyWork(WORKSPACE), 'ContestedClaim.title'],
-      ['getAttention', () => source.query.getAttention(WORKSPACE), "kind 'contested'"],
     ];
     for (const [method, call, field] of expected) {
       await expect(call(), method).rejects.toBeInstanceOf(ServingGapError);
@@ -262,6 +260,14 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     const nowServed: ReadonlyArray<[string, () => Promise<unknown>]> = [
       ['getTickets', () => source.query.getTickets(PROJECT, {}, 'flat')],
       ['getTicket', () => source.query.getTicket(WORKSPACE, 't_1')],
+      // `getMyWork` and `getAttention` WERE two of the three rows above until
+      // rulings P39 and P40, and they move here rather than being deleted for
+      // the reason this block exists. `search` is now the only row left up
+      // there — which is also the positive control on this list: if the loop
+      // above stopped observing refusals altogether, `search` would fail there
+      // rather than everything quietly passing here.
+      ['getMyWork', () => source.query.getMyWork(WORKSPACE)],
+      ['getAttention', () => source.query.getAttention(WORKSPACE)],
       // Joined by rulings P32/P38. Kept as a ROW rather than deleted, for the
       // reason this block exists: a refusal that stops refusing has to be
       // pinned as SERVED, or the only record it ever refused is a shorter array.
@@ -299,10 +305,17 @@ describe('3.40 the three signatures that grew a workspaceId (P25 clause 2)', () 
       savedFilters: [],
     });
     await source.query.getMyWork(WORKSPACE).catch(() => undefined);
+    // Three requests, not two: `getMyWork` fetches the workspace ROSTER
+    // alongside its own body (ruling P40's change — it answers now, and a
+    // `ClaimProvenance` names its actor), the same uncached read `getBoard`
+    // makes. They are issued together, so the order between the last two is the
+    // order `Promise.all` starts them in and is asserted as such rather than as
+    // a sequence anything depends on.
     expect(calls.map((call) => call.input)).toEqual([
       `/v1/me/preferences?workspaceId=${WORKSPACE}`,
       `/v1/me/preferences?workspaceId=${WORKSPACE}`,
       `/v1/me/work?workspaceId=${WORKSPACE}`,
+      `/v1/workspaces/${WORKSPACE}/members`,
     ]);
     // The PUT sends the SERVER's document (P24), not the client's.
     expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
