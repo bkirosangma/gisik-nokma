@@ -471,6 +471,56 @@ restored; `git diff -- packages/app-core/src/online/mappers.ts` clean afterwards
 - 7.247 ❌ **`packages/app-core/test/online/mappers.test.ts:958,1116` USE `'state-machine'` AS A CONTEST'S RULE, AND NO PRODUCER EMITS IT.** Swept across all four `src` trees with a fabricated control in the same run: zero files. **Deliberately filed one severity BELOW 7.246 and below `'bad-envelope'` (12.327), and the difference is not cosmetic:** `mapMyWork` and `mapAttention` carry a contest's `rule` through opaquely and nothing branches on it, so this pins no discriminant — it is a fixture-REALISM defect, a body modelling a value production cannot produce. The real values in that slot are the rule the original claim was refused under (`restrict-to`, `hierarchy.rank`, …). Smoothing it together with 7.246 would overstate it; leaving it out would repeat the mistake that made this whole cluster necessary. *Owner: whoever owns `mappers.test.ts`'s contest fixtures.*
 - 7.248 ❌ **THE `rule: 'restrict-to'` LITERALS IN `packages/sync-client/test` ARE THE SAME MIRROR, IN ANOTHER LANE'S PACKAGE.** `replica.test.ts:307,353`, `precheck.test.ts:284` and `outbox.test.ts:206,357` assert the refusal rule as a bare string against fixtures those files wrote. `REFUSAL_RULES.restrictTo` is importable and `sync-client` already depends on `rule-engine`, so the un-literalling is available — but the files are Lane B's surface and this pass measured no branch of theirs holding them. Deliberately NOT taken: the instinct to fix what you find is the one that hides compounds. The producer behind all five is witnessed at 7.242. *Owner: Lane B.*
 
+> **MUTATION STATUS FOR 7.238–7.242 — NINE KILLS, EVERY BLAST RADIUS 1, EVERY RED AN
+> `AssertionError` FROM THE CASE'S OWN `expect`.** None died at a `MappingError` shape gate and none
+> was grey. Each was written down with its prediction BEFORE it ran; all nine matched. Run serially
+> inside one lock acquisition against `apps/server/test/integration/fixture-witnesses.test.ts`
+> (25 tests), `packages/rule-engine` rebuilt after every apply **and after every restore** — see the
+> contaminated run below for why the second half of that sentence is not optional. Restores verified by
+> READING the file back, never by a shell `diff`.
+>
+> - **M1** `checks/hierarchy.ts:150` (CREATE arm) `'hierarchy.parent-terminal'` → `…-X` → **7.238
+>   alone**: `expected 'hierarchy.parent-terminal-X' to be 'hierarchy.parent-terminal'`.
+> - **M2** `checks/hierarchy.ts:298` (REPARENT arm), same corruption → **7.239 alone**, same message.
+>   *M1 and M2 together are what make "at both its call sites" a measurement: one site each, neither
+>   case covering for the other.*
+> - **M3** `refusals.ts:201` the MOVE remedy replaced by the ADD sentence → **7.239 alone**:
+>   `expected '"Quarterly filings" is finished (Done…' to contain 'Moving live work under it reopens it'`.
+> - **M4** `refusals.ts:202` `(${stateName})` dropped from the template → **7.239 alone**:
+>   `expected '"Quarterly filings" is finished. Movi…' to contain '(Done)'` — the workflow-def lookup
+>   that resolves a state's NAME, which degrades to a raw id when it fails.
+> - **M5** `checks/hierarchy.ts:134` `'hierarchy.rank'` → `'hierarchy.rankk'` → **7.240 alone**.
+> - **M6** `refusals.ts` `rankRefusal`'s two arguments SWAPPED → **7.240 alone**:
+>   `expected '"Task" cannot go under "Story"…' to be '"Story" cannot go under "Task"…'`. **This is the
+>   mutation the case was redesigned for.** Under the obvious task-under-task world both names are
+>   "Task", the sentence is byte-identical, and this mutation SURVIVES — a check that could not fail,
+>   caught by asking what would kill it before writing it rather than after.
+> - **M7** `builder-reads.ts:448` `MIGRATION_RULES.unknownTargetState` value corrupted → **7.241 alone**:
+>   `expected 'migration.unknown-target-statee' to be 'migration.unknown-target-state'`.
+> - **M8** `rules/restrict-to.ts` both refusal arms' `rule` → `'restrict-to-X'` → **7.242 alone**.
+>   *The first attempt anchored on `REFUSAL_RULES.restrictTo` alone, which matches TWICE, and the
+>   harness refused to apply it. An anchor failure is a mutation that NEVER RAN; reporting it as a
+>   survivor would have condemned a check that is fine.*
+> - **M9** `checks/hierarchy.ts` CREATE arm's parent-terminal branch returns `ACCEPT` → **7.238 alone**,
+>   in the non-vacuity direction: `expected 'committed' to be 'refused'`.
+>
+> **ONE DELIBERATE SURVIVOR, AND IT IS THE POINT OF THE WHOLE CLUSTER.** M7 re-run with 7.241's
+> LITERAL assertion deleted from the test, leaving only
+> `expect(body.rule).toBe(MIGRATION_RULES.unknownTargetState)`: **25 passed, 0 failed.** The mutation
+> corrupts the constant, the assertion reads the same constant, and the two move together. That is this
+> block's standing rule **measured rather than argued**: *asserting a wire value against the producer's
+> own constant is a self-comparison through one module and cannot fail.* It is why every case above
+> carries a literal alongside the import and never instead of it.
+>
+> **ONE CONTAMINATED RUN, REPORTED RATHER THAN TRIMMED.** M7's first execution killed **two** cases —
+> 7.241 as predicted and 7.240 as well, with M6's `"Task" cannot go under "Story"` message. M7 touches
+> `apps/server/src`, which the server tests import by relative path, so the harness skipped its rebuild
+> — and M6's restore had not been followed by one either, so `packages/rule-engine/dist` was still
+> carrying M6's mutant. **A blast radius that is an artefact of the harness, not a property of the
+> code.** Re-run with a rebuild first: 7.241 alone. *The repo's own rule — "rebuild again after
+> restoring or you leave a mutated dist for the next agent" — was written down before this battery and
+> still cost a run; a conditional rebuild is the shape that defeats it.*
+
 
 ### Mutation results for 7.163–7.198 — the CASES each kills, never the count
 
