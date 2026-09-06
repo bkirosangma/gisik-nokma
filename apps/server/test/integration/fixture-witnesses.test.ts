@@ -465,6 +465,10 @@ describe('the mapper cluster, against real routes', () => {
     // NON-VACUITY FIRST: an empty roster would satisfy every `toContain` below.
     expect(actors.length).toBeGreaterThan(0);
     const roster = rosterByActorId(actors);
+    // RECORDED: this workspace has exactly ONE member, so `roster.size ===
+    // actors.length` is 1 === 1 and the only property `rosterByActorId` has —
+    // collapsing duplicate ids to one entry — is satisfied trivially. Kept as a
+    // shape check, not claimed as a witness for the collapse.
     expect(roster.size).toBe(actors.length);
     // The founder is IN it, by the id the server minted — not by a name this
     // case invented.
@@ -472,7 +476,7 @@ describe('the mapper cluster, against real routes', () => {
     expect(actors.map((a) => a.id)).toContain(owner.userId);
   });
 
-  it('7.223 mapBoardView over the REAL board route', async () => {
+  it('7.223 mapBoardView over the REAL board route — every card once, no group claim', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/v1/projects/${projectId}/board`,
@@ -487,6 +491,16 @@ describe('the mapper cluster, against real routes', () => {
     expect(board.groups.length).toBeGreaterThan(0);
     const columns = board.groups.flatMap((g) => g.columns);
     expect(columns.length).toBeGreaterThan(0);
+
+    // **WHAT THIS CASE DOES NOT WITNESS, corrected after review.** The route
+    // sends `columns` FLAT and the mapper regroups them under a
+    // `workflowId@workflowVersion` key — but this fixture CANNOT constrain that
+    // grouping. `beforeAll` asserts exactly one founding workflow, and
+    // `appendStragglerColumns` documents itself as unreachable, so exactly one
+    // group is possible: a mapper that keyed by `workflowId` alone, or put every
+    // column in one group, passes identically. **The regrouping is unmeasured
+    // here and calling it witnessed would be this file's own overclaim.**
+    // *Owner: a fixture with a second published workflow version.*
     // THE ROUND TRIP: the project the mapper reports is the project asked for.
     expect(board.projectId).toBe(projectId);
     // Every seeded ticket is on the board exactly once — the mapper's own
@@ -536,6 +550,15 @@ describe('the mapper cluster, against real routes', () => {
     expect(def.version).toBeGreaterThanOrEqual(1);
   });
 
+  /**
+   * **THIS CASE WRITES, and it is the only one in the cluster that does.** It
+   * commits a fourth ticket into the shared `projectId`. `vitest.config.ts` sets
+   * no `sequence.shuffle`, so declaration order holds and 7.223's
+   * `toEqual(ticketIds)` and 12.324's `toHaveLength(3)` both run before it.
+   * **Latent, not live — recorded because a reorder or `--sequence.shuffle`
+   * would break two cases for a reason nothing else in this file names.**
+   * *Owner: whoever introduces shuffled ordering here.*
+   */
   it('7.226 mapIngestResults over the REAL /v1/events response', async () => {
     const id = newUlid();
     const submitted: SubmittedEvent = {
@@ -562,7 +585,11 @@ describe('the mapper cluster, against real routes', () => {
     // than were sent, so passing the real 1 here is what makes that check live.
     const results = mapIngestResults(res.json(), 1);
 
-    expect(results).toHaveLength(1);
+    // `expect(results).toHaveLength(1)` used to sit here and is GONE: the mapper
+    // throws unless `results.length === submittedCount` and `.map()` preserves
+    // length, so if the call returned at all the length was 1 by construction.
+    // It could not fail. The count property it looked like it was testing is
+    // real, but it is the MUTATION below that measures it, not this line.
     expect(results[0]?.status).toBe('committed');
     // The result names the event the client sent, by the client's own id.
     expect(results[0]?.eventId).toBe(submitted.id);
@@ -578,16 +605,33 @@ describe('the mapper cluster, against real routes', () => {
 
     const prefs = mapPreferences(res.json());
 
-    // NON-VACUITY of a different kind, and it is the honest one here: a fresh
-    // user's document is legitimately EMPTY, so there is no non-empty value to
-    // demand. What must hold is that the mapper produced the document's SHAPE
-    // from real bytes rather than throwing — `savedFilters` is an array and the
-    // version is the document's own.
-    expect(Array.isArray(prefs.savedFilters)).toBe(true);
-    expect(prefs.version).toBeGreaterThanOrEqual(1);
-    // RECORDED, not asserted: this world never writes a preferences document, so
-    // this case witnesses the EMPTY-document path only. A witness for a populated
-    // document needs a PUT first and belongs with whoever owns preferences.
+    // WHAT THIS CASE CAN AND CANNOT ASSERT, corrected after review.
+    //
+    // An earlier draft asserted `prefs.version >= 1` and called it "the
+    // document's own". **That was a check that could not fail.** `mapPreferences`
+    // ends `return { version: 1, projects, savedFilters }` — the version is a
+    // CLIENT-SIDE LITERAL. There is nothing on the wire to read: the server's
+    // `preferencesDocSchema` is `.strict()` over exactly `savedFilters`,
+    // `listColumns` and `grouping`, and the GET handler returns that document
+    // unwrapped. So the assertion compared a constant to itself and no server
+    // behaviour whatsoever could have moved it.
+    //
+    // `Array.isArray(prefs.savedFilters)` is unfailable for the same structural
+    // reason — the mapper builds it with `.map()`, so if the call returned at all
+    // it is an array. Both are gone.
+    //
+    // What is left is the honest claim, and it is narrow: the REAL mapper
+    // accepted the REAL document without throwing, and the saved-filter list it
+    // built is the one the wire carried (empty here, and empty is correct for a
+    // user who has never saved). The mutation below is what gives even that
+    // teeth.
+    expect(prefs.savedFilters).toEqual([]);
+    // RECORDED, not asserted, and it is a finding rather than a limitation:
+    // **`UserPreferences.version` is fabricated by the client and no producer
+    // emits it.** Whether the type should carry it at all is a product question.
+    // *Owner: whoever owns preferences.* Separately, this world never writes a
+    // document, so this case witnesses the EMPTY-document path only; a populated
+    // one needs a PUT first.
   });
 
   it('7.228 mapMyWork over the REAL /v1/me/work route', async () => {
@@ -619,7 +663,7 @@ describe('the mapper cluster, against real routes', () => {
     expect(card?.projectName).toBe('The aisle');
   });
 
-  it('7.229 mapAttention over the REAL attention and contests routes', async () => {
+  it('7.229 mapAttention accepts BOTH real bodies — the fold is not reached here', async () => {
     const members = await app.inject({
       method: 'GET',
       url: `/v1/workspaces/${workspaceId}/members`,
@@ -655,5 +699,13 @@ describe('the mapper cluster, against real routes', () => {
     // make a number non-zero would be this case asserting its own setup.
     expect(Array.isArray(items)).toBe(true);
     expect(items).toHaveLength(0);
+    // **AND THE HARDER TRUTH, added after review: THE FOLD IS NOT WITNESSED.**
+    // With `items` empty and no open contest, `mapAttentionItem` and the whole
+    // contested-item push never execute — replace `mapAttention` with `() => []`
+    // and every assertion above still passes. What IS witnessed is narrower and
+    // real: the two TOP-LEVEL key names, `attention.items` and
+    // `contests.contests`, both fire against real bodies from two real routes,
+    // which is what the mutation below kills. The fold itself needs a world with
+    // a stale ticket or an open contest. *Owner: whoever builds that world.*
   });
 });
