@@ -249,6 +249,27 @@ failed** across ten packages. `pnpm run check:env` → 0. Node **v22.22.2**. `ch
 - The page-index-vs-keyset finding goes to **Lane F** in these words: *any fixture whose protocol was
   authored alongside its consumer.*
 
+## TWO ANSWERS PREPARED FOR THE REVIEWER — measured from the route, not asserted
+
+If the opus reviewer raises either of these, the argument is already made; do not re-derive it.
+
+- **Cycle risk in the loop.** None. `routes/list.ts:143` binds `t.ticket_id > $n` — a STRICT
+  inequality — and :187 emits the page's LAST id as `nextCursor`. So each cursor is strictly greater
+  than the one before it and the sequence is monotone increasing: a repeated or backward cursor
+  cannot advance and cannot recur. A server misbehaving outside that contract is still bounded by
+  `LIST_PAGE_CAP`, which terminates with a refusal rather than spinning.
+- **`projectId` taken from the LAST page** (`online-data-source.ts:210`). Harmless. The route echoes
+  the projectId from the REQUEST PATH (`routes/list.ts:184`), and the loop requests the same
+  `projectId` on every iteration, so every page returns an identical value. Taking it from the last
+  page is the same as taking it from the first.
+
+## BLOCK OWNERSHIP RE-VERIFIED (a check `check-case-ids` structurally cannot do)
+
+`check-case-ids` proves uniqueness and union==sum. It CANNOT tell you whether a range your header
+claims is already occupied. Measured against `origin/main`: ids in 12.290–12.339 are **12.290 and
+12.291 only**, both inside LANE B's range where they belong. **12.320–12.339 is genuinely free**, so
+the header is accurate rather than merely transcribed. Nothing was minted from it.
+
 ## STILL OUTSTANDING — the only things left
 
 1. **The opus reviewer's findings** — dispatched, still running when this was written. Fix on
