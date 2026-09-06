@@ -509,11 +509,18 @@ export function createSyncEngine(deps: {
    * server to be safe from it.
    */
   async function reconcileNamed(ws: string, ids: readonly string[]): Promise<string[]> {
-    const held = new Set((await replica.listTickets(ws)).map((t) => t.ticketId));
     // Only ids we actually hold can be stale, and only they can be purged.
     // Presenting one we do not hold would ask the server a question whose
     // answer we could not act on.
-    const present = ids.filter((id) => held.has(id));
+    //
+    // Asked PER NAMED ID rather than by listing the workspace: `listTickets`
+    // runs a `getTicket` per row, so it is O(every ticket held) with a query
+    // each, while a notice names at most `GRANT_BACKFILL_MAX_TICKETS`. The
+    // whole point of this call is that it costs a notice, not a catch-up.
+    const present: string[] = [];
+    for (const id of ids) {
+      if ((await replica.getTicket(id)) !== null) present.push(id);
+    }
     const purged: string[] = [];
     for (let i = 0; i < present.length; i += RECONCILE_CHUNK_SIZE) {
       const chunk = present.slice(i, i + RECONCILE_CHUNK_SIZE);
