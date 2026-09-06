@@ -11,6 +11,47 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 12:25 IST AT THE OWNER'S INSTRUCTION (ctx 95%) — RESUME FROM HERE
+
+**Deliberate, not a crash.** The owner said *"limit has been reset now. and its already 95% ctx. prepare and
+restart yourself."* This controller landed this block, then typed `/clear` into its own pane (`gisik:0`)
+followed by a paste of `dispatch-controller-serial.md` — the same mechanism as the 02:10 clear. **Session
+model is Fable (owner-set); the brief's Sonnet gating does not apply; rulings are taken in-session.** The
+block below this one (02:10) and everything under it remain true history; **this block is the live state.**
+
+### Anchors — re-measured 12:23 IST
+
+| what | value |
+|---|---|
+| `main` | **`dfd9485`** (+ this PR). Forty-seven merges since 02:10; the last three: **#176** (Lane A, C2 closed by paging under P41, `2d2bc5c`) · #179 (its record) |
+| ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** at 10:19, unchanged since — Plan 10 **17/18** (T18 held), Plan 11 **6/16** (T7–T10, T14, T15) |
+| last forced gate | **`2d2bc5c`** (code-identical to `dfd9485`) — lock v3.2, install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · node v22.22.2 · 3393 tests / 264 files** (matches Lane A's 3388 + 5). |
+| open PRs | **#161 only** — Lane B closure 5b, HELD by B until P37.3's two fixtures, the two unrun `headSeq` mutations and a full gate exist; rebase target `2d2bc5c` |
+| the second limit window | **~10:35 → 12:20** (the meter hit 100% after 99% at 10:31); every lane's position was pushed before it; nothing was lost. Meters are fresh now |
+| watch | the `Monitor` task from 02:14 is a child of this session process and may survive `/clear` (the 02:10 note says the 60bc7ca event fired into a cleared context) — **check `TaskOutput`/status first; if no event arrives within one poll, re-arm `scratchpad/ctl-watch.sh`** (in this session's scratchpad `ffa02cf1-…`) |
+| lock | free; the controller's `gate.sh` (same scratchpad) is on v3.2 |
+
+### The five lanes at the clear — verify each with `git log origin/<branch>` and `ListAgents`, do not adopt
+
+| lane | session (per `ListAgents`) · ctx | branch · head | state | controller's next action |
+|---|---|---|---|---|
+| **A** | `gisik-nokma-exec-43` · 30% | `exec/37-c2-cursor` → MERGED as #176 | **reported and STOPPED per its override — its whole queue since 02:10 is on `main`** | **re-task**: candidates in order — Lane F's "any fixture whose protocol was authored alongside its consumer" sweep (A named it; it knows the shape), then the socket-cutting rig fixture with B, then the comment-cleanup pass planning; write a new override, relaunch with `start-lanes.sh A` |
+| **B** | `lane2-plan4-a9` · **79%** | `exec/29-closure5b-reach` · `632ad04` | #161 held by B: P37.3 fixtures (12.317+), two `headSeq` mutations under the lock, rebase onto `2d2bc5c`, full gate | merge on B's re-report at a green head; **then restart B** with `override-laneB-next.md` (T18) — swap it into `override-laneB.md` first |
+| **C** | `lane3-plan7-8-3d` · 38% | `exec/30-plan11-backups` · `0a1182a`+ | T12 clean (`91b3b81`); **T11's `cf5b3c5` NOT clean** — Critical (the backup worker cannot boot: `loadConfig` requires `BETTER_AUTH_URL`/`BETTER_AUTH_SECRET`/`WEB_ORIGIN`, none in the worker's `app.yaml` env block) + 3 Importants; fix workflow `wf_06c65784-7e3` dispatched 10:14, gated on the LAST verdict this time; then verify, rebase, gate v3.2, PR | merge on its report + eleven jobs; **promote 11/11, 11/12**; then restart C with `override-laneC-next.md` (the two scheduler errands) |
+| **D** | `lane4-periphery-22` · 31% | `exec/36-e2e-testids` → MERGED as #173 | **HOLDING by instruction** | re-task (candidates: pair with B on the socket-cut fixture; or hold for T13's needs) |
+| **E** | `lane5-plan11-1d` · **91%** | `exec/23-plan11` · `c0bba56` | seam 1: everything through the REVIEWED shutdown path landed; **T6 NOT started**; retroactive §13 catalogue from **13.105**; the DDL/scratch-DB written decision owed; seam-1 PR held for a session that can finish its review round | **RESTART E FIRST, mid-step** (ctx 91%): tell it to push any last handoff refresh, then relaunch with an override naming `c0bba56` and the list above (T6 on 54330 with `OBJECT_STORE_S3_*` → catalogue from 13.105 → the seam-1 PR → then `override-laneE-next.md` for T13/T16); Lane E's `docs/lanes/gate-lock/` is the lock reference copy |
+
+**Staged overrides in `gisik-nokma-lanes/`:** `override-laneB-next.md` (T18), `override-laneC-next.md`
+(scheduler errands), `override-laneD-next.md` (SPENT — it was the hooks; D needs a new one),
+`override-laneE-next.md` (T13 → T16, for AFTER seam 1 merges — not for the mid-step restart above).
+**§ id blocks:** §12 — A 12.320–12.339 (used through 12.322), B 12.290–12.319 (12.317+ for P37.3), next 12.340;
+§13 — C 1–40, D 41–100 (exhausted), E 101–200 (101–104 used; catalogue from 105); §6 — D 143–159 (143–149
+used), B 160–179, A 180+. **Standing rules for the fresh context:** never pipe a merge or a gate (read `$?`);
+ledger-only PRs get an independent `check:tasks`; the gate lock is v3.2 (`gate.sh`), one backgrounded
+invocation; never commit a shared file while another party mutates it; a control never launches the
+instrument it tests; a Fable review that dies on a limit returns zero findings and looks clean; a lane pane
+that takes no keys is relaunched, not pasted into; `SendMessage` to the names above works, tmux is the fallback.
+
 ## ⏩ CONTROLLER RESUMED 2026-09-06 02:10 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `c017cdf`
 
 **This block supersedes the "CLEARED ITSELF" block below it; that one's per-lane table is history now.** The
