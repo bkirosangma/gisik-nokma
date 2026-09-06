@@ -346,13 +346,35 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
     expect(sentFrame(1)).toEqual({ type: 'subscribe', workspaceId: 'ws_1', afterSeq: 6 });
   });
 
-  it('answers ping with pong without delivering it', () => {
+  /**
+   * 12.360 — A TEXT `ping` IS NEITHER ANSWERED NOR DELIVERED.
+   *
+   * This case replaces `answers ping with pong without delivering it`, and the
+   * replacement is the whole point: that test agreed with a protocol nothing on
+   * the other side implements (12.328). The server's heartbeat is
+   * `socket.ping()` — a WebSocket PROTOCOL control frame the platform socket
+   * answers below JavaScript — and its message door accepts
+   * `subscribeFrameSchema` and nothing else, so a client that replied with a
+   * TEXT `{type:'pong'}` would earn `bad-message`. The arms were deleted; this
+   * is the fixture that keeps them deleted.
+   *
+   * It asserts the SENT LIST EXACTLY rather than `not.toContain('pong')`,
+   * because a `not.toContain` also passes when the subscriber sends nothing at
+   * all — including when it never opened. The `subscribe` frame is that
+   * assertion's own positive control: it proves sends are observable on this
+   * fake in this run, so the absence of a second one is a fact about the
+   * client rather than about the harness.
+   *
+   * *Mutation: restore `if (frame.type === 'ping') { socket?.send(…pong…); }`
+   * in `stream.ts`'s `onmessage` → red HERE and nowhere else in this file.*
+   */
+  it('12.360 a text ping is neither answered nor delivered', () => {
     const { subscribe, socketAt } = harness();
     const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 0, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'ping' });
-    expect(socketAt(0).sent).toContain('{"type":"pong"}');
+    expect(socketAt(0).sent).toEqual([JSON.stringify({ type: 'subscribe', workspaceId: 'ws_1', afterSeq: 0 })]);
     expect(seen).toEqual([]);
   });
 

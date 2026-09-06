@@ -115,6 +115,17 @@ type _FramesHandled = AssertTrue<ServerStreamFrame['type'] extends HandledFrameT
  * duplication is one lenient switch, and it is bounded by the compile-time link
  * above rather than by anyone remembering.
  */
+/**
+ * OWNER RULE — case 12.328. **Never inject a raw `ws` socket into
+ * `webSocketFactory`.** Same rule, same reason, as
+ * `app-core/src/online/stream.ts`'s default application: the platform socket
+ * answers protocol pings below JavaScript, so this transport's TEXT
+ * `{type:'ping'}` / `{type:'pong'}` arms were dead on both sides and were
+ * deleted with it. Inject a `ws` socket, which DOES surface protocol pings to a
+ * listener, and a client that answered one with a text frame would earn
+ * `bad-message` from `stream/routes.ts:342`. This is a docblock, not a check —
+ * 12.361 records that.
+ */
 export function createHttpTransport(opts: {
   /** e.g. `https://api.gisik-nokma.example` — no trailing slash. */
   baseUrl: string;
@@ -197,11 +208,6 @@ export function createHttpTransport(opts: {
         }
         if (raw === null || typeof raw !== 'object') return;
         const frame = raw as Record<string, unknown>;
-
-        if (frame.type === 'ping') {
-          socket.send(JSON.stringify({ type: 'pong' }));
-          return;
-        }
 
         if (frame.type === 'event') {
           if (frame.envelope === null || typeof frame.envelope !== 'object') return;

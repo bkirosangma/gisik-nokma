@@ -899,8 +899,21 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
    *
    * The assertion pins the frame TYPE STRINGS, not that the handling is right —
    * which is what this case is for.
+   *
+   * **The `ping` half was deleted, and its absence is now the assertion (12.328).**
+   * This case used to send a TEXT `{type:'ping'}` and expect `pong` back — a
+   * protocol nothing on the other side implements. The server's heartbeat is
+   * `socket.ping()`, a control frame the platform socket answers below
+   * JavaScript, and `stream/routes.ts:342` answers `bad-message` to any text
+   * frame that is not a `subscribe`. So the ping is still SENT here and the
+   * sent-list is asserted EXACTLY as `['subscribe']`: the frame goes in, nothing
+   * comes back, and `subscribe` is that absence's own positive control that
+   * sends are observable at all.
+   *
+   * *Mutation: restore the `pong` arm in `http-transport.ts`'s `onmessage` →
+   * red HERE alone (`['subscribe','pong']` against `['subscribe']`).*
    */
-  it('12.167 delivers all five server frames and answers ping with pong', async () => {
+  it('12.167 delivers all five server frames and answers a text ping with nothing', async () => {
     const { transport, urls, socketOf } = transportFixture();
     const seen: string[] = [];
     const items: SyncItem[] = [];
@@ -929,7 +942,7 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
 
     expect(seen).toEqual(['item', 'item', 'item', 'caught-up:12', 'error:bad-message']);
     expect(items).toEqual([env, { kind: 'purge', entityId: 'ticket_x' }, { kind: 'scope-revoked', workspaceId: WS }]);
-    expect(socket.sent.map((s) => JSON.parse(s).type)).toEqual(['subscribe', 'pong']);
+    expect(socket.sent.map((s) => JSON.parse(s).type)).toEqual(['subscribe']);
 
     socket.onclose!({});
     expect(seen.at(-1)).toBe('close');
