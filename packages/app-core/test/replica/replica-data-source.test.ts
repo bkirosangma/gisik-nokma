@@ -227,6 +227,9 @@ describe('12.172-12.177 the ruling P30 contract: one interface, two implementati
     expect(typeof ds.query.searchOfflineCopy).toBe('function');
   });
 
+  /**
+   * 12.22 — a locally-accepted claim through the replica DataSource answers pending (via a thrown OfflineAcceptError carrying {status:'pending'}), and no path in this test returns 'committed' for a local accept.
+   */
   it('12.173 a locally-accepted claim answers pending — through a throw, never as an IngestResult', async () => {
     const { ds, outbox, taskId } = await fixture();
     const claim = fieldSet(taskId, 'notes', 'offline note');

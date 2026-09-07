@@ -124,6 +124,9 @@ async function contestRowsFor(eventId: string): Promise<number> {
 }
 
 describe('§11 closer — the INTERNAL door (ingestBatch)', () => {
+  /**
+   * 12.55 — a coherent server contest, ingested through the internal door (ingestBatch), commits and produces exactly one row in both the events ledger and proj_contested — the non-vacuity control without which every refusal test above would be equally consistent with a check that refuses all contests.
+   */
   it('non-vacuity control: a COHERENT server contest still commits and lands in proj_contested', async () => {
     // Without this, every refusal below is consistent with a check that refuses
     // all contests — and with the whole event type having been broken.
@@ -134,6 +137,9 @@ describe('§11 closer — the INTERNAL door (ingestBatch)', () => {
     expect(await contestRowsFor(honest.id)).toBe(1);
   });
 
+  /**
+   * 12.54 — PLANTED DEFECT / the compound's own path: through the internal door (ingestBatch), a contest embedding a claim about a different TICKET is refused via ingestService().ingestBatch and nothing lands in the events ledger or proj_contested. The sibling clause — a contest naming a different WORKSPACE, same door, same outcome — is proven by the adjacent test 'refuses a contest embedding a claim naming a DIFFERENT WORKSPACE, and appends nothing' at line 163-181 of this file.
+   */
   it('refuses a contest embedding a claim about a DIFFERENT TICKET, and appends nothing', async () => {
     // Mutation that reddens it, naming its own site: delete the
     // `original.entity.id !== env.entity.id` comparison in
@@ -180,6 +186,9 @@ describe('§11 closer — the INTERNAL door (ingestBatch)', () => {
     expect(await ledgerRowsFor(forged.id)).toBe(0);
   });
 
+  /**
+   * 12.56 — in a single ingestBatch call carrying one honest and one workspace-forged contest, only the forged one is refused; its honest neighbour still commits to the ledger.
+   */
   it('refuses only the forged contest in a batch, leaving its honest neighbour committed', async () => {
     const workspaceId = newUlid();
     const ticketId = newUlid();
@@ -247,6 +256,9 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
     return { app, headers, user, workspaceId: founding.workspaceId, ticketId };
   }
 
+  /**
+   * 12.57 — through the client door (POST /v1/events), a caller who founded the workspace and wears an honest envelope-origin ('web') files an incoherent contest naming a different ticket; it is refused with CONTEST_COHERENCE_RULE and nothing is appended, proving identity/membership/role all pass so the coherence check itself is what refuses.
+   */
   it('refuses a client contest embedding a claim about a different ticket — the gate having nothing to say', async () => {
     const { app, headers, user, workspaceId, ticketId } = await founder();
     const forged = contest({
@@ -277,6 +289,9 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
     await app.close();
   });
 
+  /**
+   * 12.58 — a client-submitted incoherent contest forged with envelope-origin 'server' is refused by Plan 4's permission.role gate BEFORE the coherence check ever runs, since the coherence check sits after that gate in commitOne — so a forger sees the fault it can act on.
+   */
   it('a client contest wearing server provenance still meets the ENVELOPE-ORIGIN refusal first', async () => {
     // The ordering the coherence check was placed to preserve: a client that has
     // forged its provenance is told the fault it can actually fix, and Plan 4's

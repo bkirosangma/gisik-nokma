@@ -326,6 +326,9 @@ describe('12.119–12.122 the read model is folded by the domain reducer, never 
     ]);
   });
 
+  /**
+   * 12.17 — the same envelope applied twice to the replica returns {applied:true} then {applied:false}, and listEntityEvents confirms only one row was stored: duplicate stream delivery is a no-op.
+   */
   it('12.120 ignores a duplicate event id — at-least-once delivery is expected', async () => {
     const replica = await seededReplica();
     const create = created(TICKET, 'Once');
@@ -519,6 +522,9 @@ describe('12.123–12.125 refresh on publish — an arriving workflow.defined fo
 });
 
 describe('12.126–12.127 purge — revocation removes every local trace, except what this user authored', () => {
+  /**
+   * 12.18 — purge deletes every raw-storage row for the ticket across events/tickets/snapshots/contests and blanks searchLocal (12.126); the paired case 12.127 (line 560) asserts the sole exception, that the claimant's own contested-claim stub survives purge while another user's is dropped.
+   */
   it('12.126 after purge the ticket is unreadable, unsearchable, and gone from raw storage', async () => {
     const storage = createBetterSqliteStorage();
     const replica = await seededReplica(storage);

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerPushToken } from './register-push.js';
 
+/**
+ * 12.39 — registerPushToken registers on a 200, reports transport-unavailable on a 404 (missing transport), and reports no-token when getToken throws (denied permission) — the three clauses this row names, each its own it().
+ * 12.227 — registerPushToken registers the Expo token on a 200, reports transport-unavailable on the real 404 apps/server answers (no /v1/push/registrations route registered — asserted by the response status the fake fetchImpl returns, matching the route's real absence), reports no-token on a denied OS permission, and reports http-<status> for any other non-404 error.
+ */
 describe('registerPushToken', () => {
   const getToken = vi.fn(async () => ({ data: 'ExponentPushToken[abc]' }));
 

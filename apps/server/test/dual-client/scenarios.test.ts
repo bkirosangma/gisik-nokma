@@ -220,6 +220,9 @@ describe('S1 — concurrent field_set: the later claim wins the projection, the 
    * scenario would never leave the device. `title` is a built-in the field
    * check accepts as non-blank text (`checks/fields.ts`).
    */
+  /**
+   * 12.30 — S1: two concurrent field_set claims on the same ticket both commit; the later claim (B) wins the server projection, the earlier claim (A) survives whole in the ledger and every replica's history, and both replicas converge byte-identical.
+   */
   it('12.267 — asserts the exact final ledger, the server projection, and both replicas byte-identical', async () => {
     const { ticketId, created } = await seedSharedTicket();
     const claimA = ticketEvent(USER_A, ticketId, 'ticket.field_set', { fieldId: 'title', value: 'A said this' });
@@ -263,6 +266,9 @@ describe('S2 — restrict-to violated because the world changed: contested with 
    * server judges the queued claim against ITS world and refuses `restrict-to`;
    * the refusal is recorded as a `claim.contested` event on the ticket, and the
    * claimant's attention is where the contest surfaces.
+   */
+  /**
+   * 12.31 — re-filed as 12.268: B's local replica still shows B as assignee (the stale fact asserted, not assumed) so the local restrict-to pre-check passes B's own submit, and the claim then contests at the sync door with the exact restrict-to rule once A's reassignment has landed.
    */
   it('12.268 — B was assignee locally, reassignment landed meanwhile; the offline claim contests', async () => {
     const { ticketId, created } = await seedSharedTicket();
@@ -382,6 +388,9 @@ describe('S3 — workflow changed while offline: the stranded transition contest
    *
    * The publish goes through the GATED door as the workspace OWNER: a member's
    * `workflow.defined` is refused (`ADMIN_ONLY_TYPES`; rig.test.ts I2 pins it).
+   */
+  /**
+   * 12.32 — re-filed as 12.269: a transition to a state (review) legal under workflow v1 while B is offline is later judged against v2 (which dropped that state) on arrival, contesting with the unknownState rule rather than a 'stranded-state' literal.
    */
   it("12.269 — v2 removed 'review'; B's queued transition to it contests with unknown-state, judged against v2", async () => {
     const { ticketId, created } = await seedSharedTicket();
@@ -747,6 +756,9 @@ describe('S5 — the offline reopen pair contests coherently when the world chan
    * catch-up that follows delivers A's re-assignment and the parent's contest.
    * The replica's INTERMEDIATE state is not asserted.
    */
+  /**
+   * 12.34 — re-filed as 12.272: the offline reopen pair each contest coherently with their own exact rules (restrict-to on the parent side, hierarchy.parent-terminal on the child's locally-refused create), with nothing in the ticket state moved by either.
+   */
   it('12.272 — reopen refused restrict-to, child then refused hierarchy.parent-terminal — two contests, exact rules and reasons', async () => {
     // Parent assigned to A and finished by A (A is the assignee, so `todo → done` passes).
     const { ticketId: parentId, created } = await seedSharedTicket();
@@ -912,6 +924,9 @@ describe('S6 — the same batch twice: idempotent to the byte', () => {
    * assignee) and the point is the SERVER's idempotency, not the device's
    * honesty. The two replicas then catch up, so the doubled batch is also
    * shown to leave one ledger both fold identically.
+   */
+  /**
+   * 12.35 — re-filed as 12.273: replaying the same batch of two real POST /v1/sync calls through the object the route delegates to is byte-identical, compared with toEqual over both the committed and contested results.
    */
   it('12.273 — replaying a mixed committed/contested batch changes nothing', async () => {
     const { ticketId, created } = await seedSharedTicket();

@@ -59,6 +59,9 @@ describe('claim.contested', () => {
     expect(parsed.message).toContain('does not point at a ticket');
   });
 
+  /**
+   * 12.1 — proves the parse door refuses claim.contested when originalEvent is ABSENT (undefined/missing key) while accepting an EMPTY original (null or {}), the absence-vs-emptiness discriminator the row calls load-bearing.
+   */
   it('a contest without the refused claim\'s payload is refused at the door', () => {
     // `submittedEventSchema.payload` was `z.unknown()`, and zod makes an unknown
     // key OPTIONAL — so this envelope was ADMITTED, and
@@ -88,6 +91,9 @@ describe('claim.contested', () => {
   });
 });
 
+/**
+ * 12.2 — proves claim.contested_resolved requires replacementEventId for 'redone' and commentEventId for 'converted-to-comment' (both throw without it, accept with it), and that 'discarded' needs neither extra field; each of the three resolutions is its own it() in this describe block.
+ */
 describe('claim.contested_resolved', () => {
   const base = { contestedEventId: '01J9GCON000000000000000000' };
 
@@ -136,6 +142,9 @@ describe('renderContestedClaimText', () => {
     expect(text).toContain(JSON.stringify(o.payload));
   });
 
+  /**
+   * 12.43 — proves the DOMAIN half of the row: renderContestedClaimText (the text a contest's converted comment carries) renders a claim made at 00:00 IST on 21 Aug (18:30Z on the 20th) as '21 Aug 2026, 00:00 IST', never the raw ISO instant. The banner-rendering half is separately proven by 12.193 and the actual comment-emission half by 12.206, both in packages/app-core/test/contests.test.tsx.
+   */
   it('planted defect: the time is India time, not the raw instant — and it rolls at IST midnight', () => {
     // The claim was made at 00:00 IST on 21 Aug, which is 18:30Z on the 20th.
     // A banner printing the ISO string would tell the claimant their claim was

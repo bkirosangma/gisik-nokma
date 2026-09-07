@@ -18,6 +18,10 @@ function fakeDb() {
   };
 }
 
+/**
+ * 12.36 — wrapTauriDatabase maps run→execute and all→select with positional params (first it), and its transaction wraps the caller's statement in BEGIN IMMEDIATE/COMMIT, rolling back to ROLLBACK on throw (second it) — the exact call-sequence discipline this row claims.
+ * 12.228 — wrapTauriDatabase's mapping (run→execute, all→select, positional params) and its exact transaction sequence — BEGIN IMMEDIATE / statement / COMMIT, or BEGIN IMMEDIATE / ROLLBACK on throw — are pinned against a vi.fn() {execute,select} fixture asserting the exact call sequence, per the file's own docblock naming a rollback-vs-commit mutation as the discriminating mutant.
+ */
 describe('wrapTauriDatabase', () => {
   it('maps run→execute and all→select with positional params', async () => {
     const db = fakeDb();

@@ -40,6 +40,9 @@ async function seed(events: readonly LedgerEvent[]): Promise<void> {
   }
 }
 
+/**
+ * 12.15 — readStreamSeq is 0 (not null/NaN) for an empty workspace, is workspace-scoped against a busier neighbour, and reads the workspace_seq high-water mark even when both entities' own per-entity seq is 1 (the third it(), line 79).
+ */
 describe('readStreamSeq', () => {
   it('is 0 — not null, not NaN — for a workspace with no events', async () => {
     const streamSeq = await readStreamSeq(db.pool, 'ws-empty');

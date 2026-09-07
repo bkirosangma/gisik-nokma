@@ -162,6 +162,9 @@ function rootTicket(): SubmittedEvent {
 }
 
 describe('12.138–12.139 the same engine, the same refusals, before anything is queued', () => {
+  /**
+   * 12.19 — the local pre-check refuses a locally-illegal claim instantly, naming the engine's own rule and reason string, and leaves the outbox table and nextBatch() both empty.
+   */
   it('12.138 creating under a terminal parent refuses hierarchy.parent-terminal and queues NOTHING', async () => {
     const { storage, outbox } = await seeded();
     const result = await outbox.enqueue(childUnderParent());

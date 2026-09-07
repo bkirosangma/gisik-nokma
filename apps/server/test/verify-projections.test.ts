@@ -192,6 +192,9 @@ describe('verifyProjections', () => {
     }
   });
 
+  /**
+   * 12.81 — the rebuild-and-diff verifier runs over proj_contested (among other tables) with a real seeded row, diffing its jsonb original_event column in both directions between live and the shadow schema; the seed's non-emptiness for proj_contested is asserted separately (this file, line 157-193) so a clean verdict over an empty table cannot pass.
+   */
   it('reports clean when live projections match their rebuild, and drops its shadow schema', async () => {
     // proj_contested's jsonb column is diffed here in both directions, which is
     // what earns the migration's claim that jsonb is legal where `json` is not.

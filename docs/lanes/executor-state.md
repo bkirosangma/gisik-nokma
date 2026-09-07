@@ -16,6 +16,125 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~12:30 IST — **§12 IS DONE: 78 → 1. REPO-WIDE 115 → 38.** PR open on `exec/68-s12-backfill`, head **`8070ef7`**, gate green. Nothing running.
+
+| what | value |
+|---|---|
+| `main` | `aff899b` |
+| branch | **`exec/68-s12-backfill`**, head **`8070ef7`**, off `aff899b` |
+| **repo-wide** | **1492 cited / 38 uncited / 1530** (was 815 uncited Sunday morning) |
+| gate | `GATE_EXIT=0` · 30/30 · **3666 \| 5 (3671) / 285** · `check:citations` 0 · zero orphans |
+| diff | **223 added lines, ALL comments, 0 removed** |
+
+| § | uncited | | § | uncited |
+|---|---|---|---|---|
+| §03 | 2 | | §09 · §10 · §11 | **0** |
+| §04 | 5 | | **§12** | **1** |
+| §05 | **0** | | §13 | 23 |
+| §06 | 6 | | §07 | 1 |
+| | | | **total** | **38** |
+
+## THE TEN POINTER ROWS WERE ALL CITABLE — the fourth instrument artefact this session
+
+Every one read *"→ **landed 12.NNN**"* and handed its coverage to a successor; all ten resolved. **"67
+citable of 78" was wrong; the answer was 77.** Fourth time this session a measurement of mine was a
+well-formed number about the wrong thing, and the **third** time the correction came from **reading raw
+records rather than counting again**.
+
+## CLAUSE ATTRIBUTION WAS THE WORK, NOT PLACEMENT
+
+The catalogue states outright that *"12.104 contains no contest assertion; 'exactly one contest' is
+12.105's"* — so 12.8's citation names **all three** successors and says which clause each proves. Several
+rows bundle two forgeries or five clauses across adjacent `it()` blocks; each citation says where the rest
+live. **A citation that implied one test proved a whole row would be wrong in a way the checker cannot see.**
+
+## ⚠ THE ANCHOR GUARD REFUSED THREE CITATIONS AND BOTH REFUSALS WERE REAL
+
+1. Two conformance suites are declared through a shared **`storageConformanceTests()`** helper, not a
+   literal `it`/`describe` — my regex did not know the shape.
+2. The tauri anchor was reported **one line off** — the stale-line-number hazard, arriving exactly where
+   rule 9 says it does.
+
+**Re-finding both by CONTENT rather than by the reported number fixed both.** *A line number is a claim;
+the text at it is the fact.* **Never insert at a number you have not re-read.**
+
+## `12.76` STAYS UNCITED ON PURPOSE
+
+Its assignment named `contest-coherence.test.ts`, but the row's claim is about the **`POST /v1/sync`
+PRODUCER building** the contest, not the coherence checker **validating** one. Citing it there would have
+satisfied the checker while pointing at the wrong side of the boundary.
+
+## WHAT IS LEFT — 38 rows, and none of it is transcription
+
+| § | n | character |
+|---|---|---|
+| §13 | 23 | structural claims: CI yaml, compose files, scripts, e2e-stack wiring |
+| §06 | 6 | largely RECORDS (mutation sweeps, "closed by 6.127") |
+| §04 | 5 | no fixture, no test named |
+| §03 | 2 | **TYPE-LEVEL, zero runtime deaths** (`3.62`, `3.66`) — genuinely uncitable, same class as `7.199` |
+| §07 | 1 | `7.199` — closure is a TS compile error |
+| §12 | 1 | `12.76` — wrong side of the producer/validator boundary |
+
+**These were characterised by reading them, not inherited.** The honest statement is that their proof is
+**structural or a record rather than a runtime assertion** — not that nobody has looked.
+
+---
+
+# 🔵 MONDAY 2026-09-07 ~11:50 IST — **§12 IS CLEARED AND IN FLIGHT.** Branch `exec/68-s12-backfill` off `aff899b`. #248 and #249 both MERGED. Repo-wide **115 uncited**.
+
+| what | value |
+|---|---|
+| `main` | **`aff899b`** (#249 merged; #248 merged as `7a3c275`) |
+| branch | **`exec/68-s12-backfill`** off `aff899b`, no commits yet |
+| repo-wide | **1415 cited / 115 uncited / 1530** |
+| §12 | **78 uncited** — the last substantial pool |
+| **IN FLIGHT** | **read-only 5-agent adjudication of all 78 §12 rows** (sonnet). Edits nothing |
+
+**OWNER RULINGS RECEIVED (controller relayed, 2026-09-07 ~11:40):**
+1. **CI waiver: KEEP RELYING ON THE LOCAL GATE.** The billing block is real and current; controller
+   re-confirmed the annotation independently. Merge on **forced-gate green + independent verification**.
+   **This is now authorized, not a gap** — stop reporting it as a blocker; report only if it CHANGES.
+2. **§12 CLEARED**, block `12.380–12.399` allocated, hand-vs-dispatch left to executor judgement.
+
+## §12's SHAPE — measured at `aff899b`, and it is NOT what "67 citable of 78" implied
+
+Control passed first: my lister agrees with the checker on **all ten sections**, and matched **78 rows to
+78 ids**.
+
+| kind | ids |
+|---|---|
+| names a test **in the row** | **67** |
+| names a **source file with a sibling test** | **1** |
+| names nothing — **POINTER ROWS** | **10** |
+| | **78** |
+
+**The 10 are not uncoverable — they are SUPERSEDED rows.** Every one reads *"→ **landed 12.NNN**"*, handing
+its coverage to a successor id, usually with a `:line`. And §12 frequently puts the id **in the test name**
+(`it('12.103 DOOR TEST: …')`), so the successors are findable. **So all 78 are candidates, not 67** — the
+figure I gave the controller was itself another instrument artefact, the fourth this session.
+
+**The catalogue is precise about clause attribution and a citation must respect it** — e.g. 12.8 lands on
+12.104/12.105/12.106, and the row states outright that *"12.104 contains no contest assertion; 'exactly one
+contest' is 12.105's."* **Citing 12.8 on 12.104 alone would be wrong in a way the checker cannot see.**
+
+## WHY DISPATCH HERE, WHEN 28 AND 24 WERE DONE BY HAND
+
+**78 rows across 32 distinct named files.** The threshold that has held all session: *a subagent is the cheap
+option at ~100 rows, not at ~10* — 32 files each needing its own read puts this firmly past it. Five sonnet
+agents, read-only, one per cluster (contest-core 17 · contest-routes 20 · storage-apps 15 · server-sync 16 ·
+pointers 10), each reading its own assignment file so no prompt carries a document.
+
+## NEXT
+
+1. Place the adjudicated citations **by hand, bottom-up per file, with the anchor guard** — the two hazards
+   that have already bitten (stale line numbers; and the substring check, which must use the checker's
+   boundary rule, never `in`).
+2. Baseline from **the checker's printed numbers**. Gate. PR.
+3. After §12: **36 rows outside it name no test** and are structural/record claims — characterised by
+   reading, not inherited.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~11:20 IST — **168 → 115 uncited. §05 at ZERO, §04 at 5.** #249 head **`fb3255d`**, gate green. **BLOCKED on the controller for the only two things left.**
 
 | § | start | now | | § | start | now |

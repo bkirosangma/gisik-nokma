@@ -126,6 +126,9 @@ afterAll(async () => {
 });
 
 describe('GET /v1/contests', () => {
+  /**
+   * 12.68 — proves GET /v1/contests without a session answers 401 with { error: 'unauthenticated' }; the accompanying comment names the mutation (dropping requireSession) that would redden it, i.e. the case for 'never reaches the projection'.
+   */
   it('401s without a session, and never reaches the projection', async () => {
     // Mutation that reddens it: drop `preHandler: requireSession` from
     // registerContestsRoute.
@@ -134,6 +137,9 @@ describe('GET /v1/contests', () => {
     expect(res.json()).toEqual({ error: 'unauthenticated' });
   });
 
+  /**
+   * 12.69 — proves GET /v1/contests returns an open contest visible to the caller with its full field set and the original refused claim's id, confirming the claim travels whole in the response.
+   */
   it('lists an open contest for a ticket the caller can see, carrying the refused claim whole', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -161,6 +167,9 @@ describe('GET /v1/contests', () => {
     expect((contests[0]?.originalEvent as { id: string }).id).toBe(openOriginalId);
   });
 
+  /**
+   * 12.70 — proves a signed-in caller naming the right workspace but lacking ticket visibility gets a 200 with an empty contests array, not any indication a contest exists — the canSee guard is the only thing withholding the row.
+   */
   it('planted defect: a caller who cannot see the ticket gets NO contest — not even its existence', async () => {
     // Mutation that reddens it: delete the `canSee` guard in the route loop.
     // The outsider is signed in and names the right workspace, so the ONLY
@@ -174,6 +183,9 @@ describe('GET /v1/contests', () => {
     expect(res.json().contests).toEqual([]);
   });
 
+  /**
+   * 12.71 — proves open=true excludes a resolved contest from the results (empty array) while the same query without open=true lists it, including its resolution, resolvedBy and a non-null resolvedAt.
+   */
   it('open=true excludes resolved contests; without it they are listed', async () => {
     // Mutation that reddens it: drop the `NOT resolved` clause. Both halves are
     // asserted, so a filter that excluded everything would fail the second.
@@ -200,6 +212,9 @@ describe('GET /v1/contests', () => {
     expect(contests[0]?.resolvedAt).not.toBeNull();
   });
 
+  /**
+   * 12.72 — proves GET /v1/contests?claimantId=... filters results down to only contests claimed by the given claimant, excluding another ticket's contest with a different claimant.
+   */
   it('filters by claimant for the My Work surface', async () => {
     // Mutation that reddens it: drop the `claimant_id = $n` clause — the other
     // ticket's contest names a different claimant and would appear.
@@ -213,6 +228,9 @@ describe('GET /v1/contests', () => {
     expect(contests.map((c) => c.claimantId)).toEqual([memberId]);
   });
 
+  /**
+   * 12.73 — proves a request naming a workspace the caller does not belong to answers 200 with an empty contests array rather than an error, so 'forbidden' and 'empty' read identically and the route is not an existence oracle.
+   */
   it('a workspace the caller is not in answers empty, not an error — no existence oracle', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -223,6 +241,9 @@ describe('GET /v1/contests', () => {
     expect(res.json().contests).toEqual([]);
   });
 
+  /**
+   * 12.74 — proves GET /v1/contests with no workspaceId query param is refused with 400.
+   */
   it('refuses a request with no workspaceId — the query is workspace-scoped by contract', async () => {
     const res = await app.inject({ method: 'GET', url: '/v1/contests', headers: memberHeaders });
     expect(res.statusCode).toBe(400);

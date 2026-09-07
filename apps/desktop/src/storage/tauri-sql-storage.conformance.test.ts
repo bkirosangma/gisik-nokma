@@ -28,6 +28,9 @@ function fakePluginSqlDatabase() {
   };
 }
 
+/**
+ * 12.229 — the same SyncStorage conformance suite (storageConformanceTests) that packages/sync-client/test/storage.test.ts runs against better-sqlite3 itself is run here against wrapTauriDatabase over a real in-memory better-sqlite3-backed fake plugin-sql shim — DDL/DML round-trip, transaction atomicity with rollback, and non-interleaving of concurrent transactions — not merely the exact-string fixture in tauri-sql-storage.test.ts (12.228).
+ */
 storageConformanceTests('tauri (fake plugin-sql over better-sqlite3)', async () =>
   wrapTauriDatabase(fakePluginSqlDatabase()),
 );
