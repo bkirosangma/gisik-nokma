@@ -635,6 +635,9 @@ describe('createEngineContext.getContest — the contest lookup the engine canno
     });
   }
 
+  /**
+   * 12.75 — a claim.contested_resolved commits only because createEngineContext.getContest can read the recorded contest back from proj_contested; the file's own docblock (line 602-609) notes the mutation this test catches (getContest returning null unconditionally) turns the commit into a contest.unknown refusal.
+   */
   it('a resolution commits only because the context can READ the contest it names', async () => {
     // Mutation that reddens it, naming its own site: make getContest return
     // null unconditionally in src/engine-context.ts — the evaluator then
@@ -647,11 +650,17 @@ describe('createEngineContext.getContest — the contest lookup the engine canno
     expect(resolved).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 12.78 — a resolution naming a contestedEventId that was never recorded is refused contest.unknown, because getContest honestly answers null for it.
+   */
   it('a resolution naming no recorded contest is refused contest.unknown — null means "never recorded"', async () => {
     const [result] = await service().ingestBatch([resolutionOf(CONTEST_TICKET, newUlid())]);
     expect(result).toMatchObject({ status: 'refused', rule: 'contest.unknown' });
   });
 
+  /**
+   * 12.79 — a resolution that names a real contestedEventId but submits it against a different ticket than the contest was opened on is refused contest.wrong-ticket, proving the returned ticketId from getContest is load-bearing rather than decorative.
+   */
   it('a resolution aimed at a contest on ANOTHER ticket is refused contest.wrong-ticket', async () => {
     // This is what makes the returned `ticketId` load-bearing rather than
     // decorative. Mutation that reddens it: return `env.entity.id` from
@@ -664,6 +673,9 @@ describe('createEngineContext.getContest — the contest lookup the engine canno
     expect(result).toMatchObject({ status: 'refused', rule: 'contest.wrong-ticket' });
   });
 
+  /**
+   * 12.80 — resolving the same contest twice refuses the second attempt with contest.already-resolved, because getContest reads the real resolved column back rather than a hard-coded false.
+   */
   it('a second resolution of the same contest is refused contest.already-resolved — the `resolved` column read back', async () => {
     // Mutation that reddens it: return a hard-coded `resolved: false` from
     // getContest. The first resolution still commits; the second one stops

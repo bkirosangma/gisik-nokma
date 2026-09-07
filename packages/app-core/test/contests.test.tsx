@@ -62,6 +62,9 @@ function underTz(zone: string, body: () => void): void {
 }
 
 describe('ContestBanner', () => {
+  /**
+   * 12.25 — the 'what/who/when/rule' half is proven by this test (12.193), which asserts the banner text contains the actor, the claimed action, the rule and reason, and the claim time rendered as IST rather than the raw instant; the 'renders nothing when there is nothing contested' half is a separate assertion in the '12.201' test two blocks down (line 116, `expect(container.innerHTML).toBe('')`).
+   */
   it('12.193 — names what was claimed, by whom, when, and which rule now refuses it', () => {
     render(<ContestBanner contests={[contest()]} onResolve={() => undefined} onRedo={() => undefined} />);
     const banner = screen.getByRole('alert');
@@ -155,6 +158,9 @@ function underTzValue<T>(zone: string, body: () => T): T {
 }
 
 describe('resolveContest', () => {
+  /**
+   * 12.26 — re-filed across three successors: 12.204 (discard emits exactly one claim.contested_resolved event attributed to the discarding actor); 12.206 (convert-to-comment emits comment.added carrying the claim text, then the linked resolution); 12.207 (redo sends the replacement event first, then a resolution linking to its id).
+   */
   it('12.204 — discard emits ONE recorded resolution event carrying who discarded', async () => {
     const ingest = vi.fn(async (events: unknown[]) => events.map(() => ({ status: 'pending', eventId: 'x' })));
     const c = contest();

@@ -67,6 +67,9 @@ function reachableFrom(entry: string): Map<string, string[]> {
   return seen;
 }
 
+/**
+ * 12.319 — clause (a): barrel.test.ts's four cases prove the root barrel reaches no native module/test framework/node: builtin and does not reach the adapter or conformance suite, with two positive controls proving the walker actually walks the graph rather than passing on emptiness. Clause (b), the three storageConformanceTests assertions run against better-sqlite3 plus migrateLocal's idempotent table/version stamp, lives in packages/sync-client/test/storage.test.ts (storageConformanceTests call line 6, migrateLocal it() line 9) — not in this file.
+ */
 describe('root barrel cleanliness', () => {
   const graph = reachableFrom(join(SRC, 'index.ts'));
 

@@ -318,6 +318,9 @@ async function fixture(
 }
 
 describe('12.156-12.164 + 12.169-12.170 sync engine lifecycle and flush', () => {
+  /**
+   * 12.23 — the sync engine bootstraps exactly once (12.156), flushes the queued outbox in stream order at caught-up (12.159), survives a transport failure without losing the claim (12.160), reconnects at the persisted cursor after a stream close (12.161), and holds its cursor whenever an item has not yet been judged, whether by error frame (12.162) or apply failure (12.164) — six clauses, one per named test.
+   */
   it('12.156 bootstraps once, subscribes at the bootstrap cursor, and goes live at caught-up', async () => {
     const { script, replica, engine } = await fixture();
     await engine.start(WS);

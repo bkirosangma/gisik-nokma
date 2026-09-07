@@ -65,6 +65,9 @@ describe('buildReopenPair', () => {
       origin: 'desktop',
     });
 
+  /**
+   * 12.27 — proves buildReopenPair returns the parent transition (carrying the reopened-for-child cause) as the first element of the pair and the untouched child event as the second, asserting order via array destructuring [reopen, reissued].
+   */
   it('12.220 — emits parent transition WITH cause first, then the child event — order is the contract', () => {
     const c = child();
     const [reopen, reissued] = buildReopenPair({

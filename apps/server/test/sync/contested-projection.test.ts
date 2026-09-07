@@ -114,6 +114,9 @@ async function dump(ticketIds: readonly string[]): Promise<string> {
 }
 
 describe('projContested', () => {
+  /**
+   * 12.61 — proves a contest open row is keyed by contested_event_id and original_event_id, claimant_id is read off the refused claim's actor (not the appending server), and contested_at equals the event's stored serverTime rather than a clock read at apply time.
+   */
   it('records a contest open, keyed by both event ids, claimant read off the refused claim', async () => {
     const ticket = newUlid();
     const claimant = newUlid();
@@ -150,6 +153,9 @@ describe('projContested', () => {
     expect((rows[0].contested_at as Date).toISOString()).toBe(env.serverTime);
   });
 
+  /**
+   * 12.62 — proves resolving a contest records resolved=true, resolution, resolved_by (who), resolved_at (when, from the resolving event's serverTime), and resolved_event_id (the resolving event id).
+   */
   it('marks the contest resolved with who, how, when, and the resolving event', async () => {
     const ticket = newUlid();
     const contest = contestEnv(ticket, newUlid());
@@ -170,6 +176,9 @@ describe('projContested', () => {
     expect((rows[0].resolved_at as Date).toISOString()).toBe(resolution.serverTime);
   });
 
+  /**
+   * 12.63 — proves a non-contest event type (ticket.assigned) applied to the projection leaves the proj_contested row count unchanged.
+   */
   it('ignores every other event type — determinism over defensiveness', async () => {
     const ticket = newUlid();
     await applyAndStore([contestEnv(ticket, newUlid())]);
@@ -187,6 +196,9 @@ describe('projContested', () => {
     expect(after.rows[0].n).toBe(before.rows[0].n);
   });
 
+  /**
+   * 12.64 — proves a claim.contested_resolved event whose contested_event_id has no matching open contest causes the projection apply to throw (rejects.toThrow), rather than silently no-op leaving the (nonexistent) contest looking open.
+   */
   it('a resolution aimed at an unknown contest FAILS LOUDLY rather than silently doing nothing', async () => {
     // The ordering premise asserted rather than assumed: the evaluator refuses
     // `contest.wrong-ticket`, so this state is unreachable through ingest. If it
@@ -197,6 +209,9 @@ describe('projContested', () => {
     );
   });
 
+  /**
+   * 12.65 — proves projContested.reset empties the proj_contested table, asserted against a table first shown non-empty so resetting nothing cannot pass.
+   */
   it('reset empties the table, which is what makes a rebuild start from scratch', async () => {
     await applyAndStore([contestEnv(newUlid(), newUlid())]);
     const before = await db.pool.query('SELECT count(*)::int AS n FROM proj_contested');
@@ -208,6 +223,9 @@ describe('projContested', () => {
 });
 
 describe('projContested determinism: canonical replay equals live arrival', () => {
+  /**
+   * 12.66 — proves a canonical (entity_kind, entity_id, seq)-ordered rebuild of proj_contested derives the same rows as a live application that arrived in a different, interleaved order across two ticket streams; the two orders are asserted to differ before the byte comparison, ruling out a vacuous self-comparison.
+   */
   it('a rebuild in canonical order derives the same bytes as an application in a DIFFERENT arrival order', async () => {
     // Two ticket streams, interleaved on arrival. `readLedger` replays
     // (entity_kind, entity_id, seq) — per-entity causality only — so the

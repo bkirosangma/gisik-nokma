@@ -245,6 +245,9 @@ describe('runSnapshotPass', () => {
     expect(await snapshotSeqs()).toEqual([]);
   });
 
+  /**
+   * 12.14 — the written snapshot equals the reducer's full fold, proven with every source projection empty (this test); the resume-from-previous-snapshot half is proved by 12.87 (snapshot-writer.test.ts:272-294, asserting the bounded replay reads only the tail past seq 21).
+   */
   it('12.86 the snapshot IS the reducer fold, and the projections it could have been read from are empty', async () => {
     await appendFieldSets(10); // 21 events total
 

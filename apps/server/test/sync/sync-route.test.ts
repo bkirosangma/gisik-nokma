@@ -297,6 +297,9 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(Date.parse(result.serverTime)).toBe((rows[0].server_time as Date).getTime());
   });
 
+  /**
+   * 12.7 — a refused offline claim's ledger row is type claim.contested and carries the exact refusing rule ('restrict-to') in its payload.
+   */
   it('12.101 an engine refusal becomes a claim.contested ledger event, and the contest is COHERENT by construction', async () => {
     const e = offlineTransition();
     const res = await syncPost(memberHeaders, [e]);
@@ -362,6 +365,9 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(await contestRows(forged.id)).toHaveLength(1);
   });
 
+  /**
+   * 12.11 — re-filed as 12.103: an offline claim on a ticket the caller cannot see is contested with the permission.visibility rule, at the sync door specifically (there is deliberately no local visibility pre-check).
+   */
   it('12.103 DOOR TEST: a claim on a ticket the caller cannot see is contested permission.visibility', async () => {
     // The second discriminator, and a different gate check from 12.102's:
     // `checkVisibilityPermission`. There is deliberately no local visibility
@@ -387,6 +393,10 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(blindRow.rows[0].n).toBe(0);
   });
 
+  /**
+   * 12.8 — re-filed as 12.104 (the retried-committed-claim half: same instant/seq/cursor, no second ledger row) with the contest half attributed to 12.105 and the batch-neighbour half to 12.106; this test proves only the committed-retry clause, per the catalogue's own note that 12.104 carries no contest assertion.
+   * 12.44 — a sync retry re-answers the same parsed instant (via Date.parse, not string equality), the same seq and workspaceSeq as the first answer, and the stored timestamptz agrees with both.
+   */
   it('12.104 a retried committed claim re-answers the SAME instant, seq and cursor, with no second event', async () => {
     const e = offlineField('retried');
     const first = await syncPost(memberHeaders, [e]);
@@ -451,6 +461,9 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(committed.rows[0].n).toBe(1);
   });
 
+  /**
+   * 12.10 — re-filed: the actor-mismatch half is 12.107 (a claim whose actorId does not match the signed-in user is refused invalid/actor-mismatch, no contest row); the client-supplied claim.contested half is 12.108 (refused invalid/reserved-type before the coherence check runs).
+   */
   it('12.107 refuses to relay another actor’s claim — a synced claim is still the signed-in user’s', async () => {
     const forged = { ...offlineField(), id: newUlid(), actorId: OTHER };
     const res = await syncPost(memberHeaders, [forged]);
@@ -538,6 +551,9 @@ describe('POST /v1/sync — the sync ingress', () => {
     expect(await ledgerCount()).toBe(before); // a malformed claim is not a claim
   });
 
+  /**
+   * 12.9 — re-filed as 12.110: the interactive `/v1/events` door refuses the same claim and leaves `proj_contested` unchanged, proven side by side against the sync door which records exactly one contest for the identical refusal.
+   */
   it('12.110 the interactive door NEVER records a contest for the same refusal — proven side by side', async () => {
     const e = offlineTransition();
     const before = await db.pool.query('SELECT count(*)::int AS n FROM proj_contested');

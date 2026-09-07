@@ -112,6 +112,9 @@ function createTicket(ticketId = newUlid(), title = 'Offline born'): SubmittedEv
   });
 }
 
+/**
+ * 12.21 — order preservation is asserted at 12.144 (outbox.test.ts:116), the committed/contested/failed result-application clauses at 12.145 (:138), 12.146 (:164) and 12.147 (:198) respectively, and the exponential backoff (doubling from 1s, capped at 60s) at 12.153 (:438) — no single test proves this row; each clause lives in its own named case.
+ */
 describe('12.144–12.146 ordering, and what each server answer does to a row', () => {
   it('12.144 preserves enqueue order and offers only rows that are due', async () => {
     const { storage, outbox } = await fixture();
@@ -322,6 +325,9 @@ describe('12.150–12.151 pending is never settled fact', () => {
     await storage.close();
   });
 
+  /**
+   * 12.20 — a queued transition leaves the confirmed ticket state and its transition log unmoved while pendingFor exposes the pending stateId/category separately and pendingEventIds names the queued (badge) ids.
+   */
   it('12.151 a queued transition moves the pending reading only; the confirmed state is unmoved', async () => {
     const { storage, replica, outbox } = await fixture();
     const create = createTicket();

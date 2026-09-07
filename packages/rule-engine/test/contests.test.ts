@@ -61,6 +61,9 @@ describe('evaluateClaimContested', () => {
   // stopped at the first of several assertions would prove only that one
   // assertion load-bearing under mutation, which is how a fixture ends up
   // pinning something other than what it names.
+  /**
+   * 12.3 — proves a claim.contested envelope with origin 'mobile' (client-forged) is refused with contest.server-only via a whole-verdict toEqual, confirming this is envelope-origin provenance, not the HTTP Origin header.
+   */
   it('planted defect: a client-forged contest is refused with contest.server-only', async () => {
     const verdict = await evaluateClaimContested(
       env({ origin: 'mobile', payload: contestedPayload }),
@@ -87,6 +90,9 @@ describe('evaluateClaimContestedResolved', () => {
       payload: { contestedEventId: CONTEST_ID, resolution: 'discarded', ...payload },
     });
 
+  /**
+   * 12.4 — proves the three rule-engine refusals (contest.unknown for an unrecorded contest, contest.already-resolved for a second resolution, contest.wrong-ticket for a misaimed one), each asserted as a whole verdict via toEqual across the three its at lines 90, 99 and 118 of this describe block.
+   */
   it('planted defect: resolving a contest nobody recorded is refused with contest.unknown', async () => {
     const verdict = await evaluateClaimContestedResolved(resolved({}), ctx({}));
     expect(verdict).toEqual({

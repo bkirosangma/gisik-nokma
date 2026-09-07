@@ -69,6 +69,9 @@ describe('projection registration order (coordination §8)', () => {
   /**
    * 4.42 — the registration order is pinned DB-FREE: `proj_entity_heads` before `proj_workflows`, so a later projection reading an earlier one always finds it applied.
    */
+  /**
+   * 12.67 — proj_contested is registered directly after proj_visibility, last in the pinned order, in both the DB-free names pin (projection-order.test.ts) and its [name, tables] mirror (also this file, line 149) and the second, DB-required pin in entity-heads.test.ts (line 95-122).
+   */
   it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested, workspace settings, search', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([

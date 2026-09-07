@@ -41,6 +41,9 @@ describe('hasGrossClockSkew', () => {
   });
 });
 
+/**
+ * 12.42 — formatIstInstant prints India time and rolls the calendar day at IST midnight rather than UTC midnight — 18:29:59.999Z lands on the 20th and one millisecond later, 18:30:00.000Z, lands on the 21st, agreeing with istDayOf.
+ */
 describe('formatIstInstant', () => {
   it('prints India time, and the day it prints is the day istDayOf gives', () => {
     expect(formatIstInstant('2026-08-20T12:00:00.000Z')).toBe('20 Aug 2026, 17:30 IST');

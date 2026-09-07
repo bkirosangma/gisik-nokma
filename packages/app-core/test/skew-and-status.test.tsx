@@ -5,6 +5,9 @@ import { ClockSkewBadge, formatClockSkew } from '../src/history/clock-skew-badge
 import { SyncStatusBar, syncErrorNotice, syncStatusLabel } from '../src/sync/sync-status-bar.js';
 
 describe('clock skew in history', () => {
+  /**
+   * 12.28 — sub-threshold skew renders nothing (12.211), gross skew in both directions renders attributed to the device clock (12.212), and an unreadable client or server instant is flagged as unreadable rather than hidden (12.213/12.214).
+   */
   it('12.211 — no badge under the gross threshold — both clocks are simply kept', () => {
     expect(
       formatClockSkew({ clientTime: '2026-08-20T12:00:30.000Z', serverTime: '2026-08-20T12:00:00.000Z' }),
@@ -62,6 +65,9 @@ describe('clock skew in history', () => {
 });
 
 describe('sync status bar', () => {
+  /**
+   * 12.29 — re-filed as 12.215: sync status labels for waiting-claim count, offline, catching-up, and a rendered 'needs attention' failed-count badge.
+   */
   it('12.215 — says how many claims wait, and that offline search is the offline copy story', () => {
     expect(syncStatusLabel('live', 0)).toBe('Live');
     expect(syncStatusLabel('live', 3)).toBe('3 claims waiting to send');

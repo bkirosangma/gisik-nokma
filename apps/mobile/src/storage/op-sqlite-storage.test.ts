@@ -36,6 +36,10 @@ function realBackedFakeDb(): OpSqliteDb {
   };
 }
 
+/**
+ * 12.37 — wrapOpSqliteDatabase is run through the shared storageConformanceTests suite against a fake backed by a REAL better-sqlite3 engine (not a canned responder, which the docblock above measures as passing only 1 of 3 conformance tests), proving DDL/DML round-trip and transaction behaviour for real.
+ * 12.224 — wrapOpSqliteDatabase conforms to SyncStorage against the shared storageConformanceTests suite over a real-engine (better-sqlite3-backed) fake rather than a canned responder (docblock measures the canned version passing only 1 of 3), plus two properties the shared suite doesn't reach: nested transactions reject with 'no nested transactions' and close() closes the real underlying database.
+ */
 storageConformanceTests('op-sqlite (real-engine fake)', async () => wrapOpSqliteDatabase(realBackedFakeDb()));
 
 describe('wrapOpSqliteDatabase — properties the conformance suite does not reach', () => {
@@ -55,6 +59,9 @@ describe('wrapOpSqliteDatabase — properties the conformance suite does not rea
   });
 });
 
+/**
+ * 12.225 — against a separate recording vi.fn() fake, run/all map onto execute unchanged and a transaction emits exactly BEGIN IMMEDIATE, the caller's SQL, COMMIT on success or ROLLBACK on throw — the literal-SQL-text property the real-engine conformance fake in the same file cannot check.
+ */
 describe('wrapOpSqliteDatabase — SQL shape pinned against a recording fake', () => {
   function recordingFakeDb() {
     const calls: Array<{ sql: string; params: unknown[] }> = [];

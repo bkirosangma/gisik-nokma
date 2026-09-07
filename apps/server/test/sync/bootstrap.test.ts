@@ -389,6 +389,9 @@ afterAll(async () => {
 });
 
 describe('GET /v1/sync/bootstrap', () => {
+  /**
+   * 12.12 — bootstrap returns snapshot + tail for exactly the visible ticket (this test); the invisible-ticket no-trace clause is proved separately by 12.95 (bootstrap.test.ts:444-458, `not.toContain(HIDDEN)` against the whole stringified body with `toContain(VISIBLE)` as positive control).
+   */
   it('12.94 hands a member the snapshot + tail for a visible ticket, definitions, me (real project ids, not tuples), and the stream cursor', async () => {
     const res = await app.inject({
       method: 'GET',

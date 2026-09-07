@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { EDITOR_BRIDGE_VERSION, parseHostMessage, type HostToEditorMessage } from '@gisik-nokma/editor/webview-bridge';
 import { parseEditorMessage, parseRawEditorMessage, serializeHostMessage } from './editor-bridge.js';
 
+/**
+ * 12.226 — parseEditorMessage (this file's host-side reader for the versioned {bridge,kind} editor→host protocol) parses all five EditorToHostMessage kinds (ready, change, submit, requestUpload, mentionQuery) and rejects, without throwing, a wrong bridge version, a missing version field, an unrecognised kind, a recognised kind missing its required field, a doc failing all four isDocJson checks, non-object/array payloads, and unparseable JSON strings — one clause per it() across this describe block.
+ */
 describe('editor bridge protocol — host side', () => {
   it('serialises a host→editor message as-is', () => {
     expect(serializeHostMessage({ bridge: 1, kind: 'requestSubmit' })).toBe(
