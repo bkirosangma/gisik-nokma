@@ -11,8 +11,8 @@ something that could not have been noticed from the source alone.
 | 3 | Terms & conditions page | ✅ **built, unreviewed boilerplate** |
 | 4 | No secrets stored in the frontend | ✅ **audited; two gate blind spots found and closed** |
 | 5 | Force HTTPS | ✅ **answered: mostly the platform's job; HSTS was the app's and was missing** |
-| 6 | Colour contrast | ☐ deferred to LAST, by approved reorder |
-| 7 | Mobile-friendly / responsive | ☐ deferred to LAST — **and it needs Playwright, not the browser tool; see below** |
+| 6 | Colour contrast | ✅ **measured on the real stack. TEXT contrast: zero failures in 60 page-loads, two enforcement gaps closed. NON-TEXT contrast: 17 of 24 bordered classes below 3:1 — recorded for the owner, see the box** |
+| 7 | Mobile-friendly / responsive | ✅ **measured at real viewports; two defects found and fixed, and a committed suite that would catch either again** |
 
 ---
 
@@ -157,10 +157,173 @@ Rendered at `localhost:3007` and measured rather than eyeballed:
 > That is recorded rather than glossed because the checklist's own wording for item 7 is *"actually
 > check in a real viewport, not just visually inspect the code"* — and a resize that reports success
 > while changing nothing is precisely how that instruction gets satisfied on paper. **Item 7 should use
-> Playwright**, which this repo already has configured with real device viewports
-> (`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`).
+> Playwright.**
+>
+> **CORRECTION (item 7, 2026-09-07): the second half of that sentence was false, and it was false in
+> both places it was written** — here and in `docs/lanes/executor-state.md`. It read *"which this repo
+> already has configured with real device viewports (`apps/web/playwright.stack.config.ts`)"*. It has
+> not. Measured across both configs and every spec: zero occurrences of `devices`, `projects`,
+> `viewport`, or `setViewportSize`, against a positive control of 4 `defineConfig`/`use:` hits in the
+> same files. **Nothing in this repo had ever exercised a non-default Playwright viewport.** Playwright
+> itself was ready — `@playwright/test` 1.62.1 installed, with a working chromium — so the conclusion
+> "use Playwright" survived; the claim that the instrument already existed did not, and a stale claim
+> that an instrument exists is exactly how the next session skips building it.
+>
+> **A correction to that correction, since a directory listing is not a working browser.** An earlier
+> draft of this box said "chromium and webkit binaries present". The listing does show `webkit-2272`,
+> but Playwright 1.62.1 wants `webkit-2336`, and `webkit.launch()` fails with *"Executable doesn't
+> exist at …/webkit-2336/pw_run.sh"*. **Webkit does not run on this machine today.** All three viewport
+> projects are chromium — which is independently the right call, because a cross-width comparison across
+> two engines cannot attribute a difference to the width. Recorded because "the binary is present" and
+> "the browser launches" are different claims and only the second one matters.
 
-## Items 6, 7
+## Items 6 and 7 — done, 2026-09-07
+
+**Both were measured against the real seeded stack in a real browser at real viewports, not read off the
+source.** The full dev stack was brought up (`docker-compose.dev.yml`: postgres, minio, mailpit, server,
+web), seeded with the Convenience Corner world (123 tickets, a guest with per-ticket visibility), and
+signed into through the shipped magic-link UI. That matters because **the interesting colours only exist
+on the authenticated surface** — the status chips carrying `blocked`, `pending`, `open`, `active` and
+`terminal` render on a populated board and nowhere else, so an audit of the public pages would have
+measured the palette's easy half and reported it as the whole.
+
+**Coverage: 60 page-loads.** 12 routes × 3 viewports (390 / 768 / 1512) in light, plus 12 × 2 in dark.
+Every measurement asserts `window.innerWidth` **inside the page** before measuring anything, because the
+failure this item exists to avoid is an instrument that reports success while changing nothing. The dark
+pass likewise asserts the theme took effect — `getComputedStyle(document.body).backgroundColor` resolved
+to `rgb(27, 26, 23)`, which is `coal`, the dark `surface` token — rather than assuming `colorScheme`
+applied.
+
+### Item 7 — one defect, one cause, and it is data-dependent
+
+At **390×844 every page that renders `AppNav` overflowed horizontally by 10px**: `/my-work`, `/members`,
+both settings pages and the board. **Every page that does not render it overflowed by none**: `/help`,
+`/privacy`, `/terms`, `/sign-in`, the 404. At 768 and 1512, nothing overflowed anywhere. That split is
+what turned a symptom into a cause.
+
+The offender is a single element — `button.gn-button--ghost` inside `.gn-nav`, measured running
+**338.9 → 400.1 in a 390px viewport**. `.gn-nav` was a no-wrap flex row and its last child is
+`Sign out {user.name}`, **so the overflow is a function of the signed-in user's name**: 10px was the
+seeded owner's, and a longer name pushes further. That is why the fix is `flex-wrap: wrap` and not a
+width guess — and every other flex row of this shape in the two stylesheets already sets it.
+
+**Verified causally rather than by eye.** Injecting `.gn-nav{flex-wrap:wrap}` into the live page took all
+five routes from 10 to 0; a **negative control** — an irrelevant declaration on the same selector — left
+all five at 10. Without that control the "after" reading measures page settling, not the rule.
+
+**The three breakpoints, all confirmed firing.** The checklist previously mentioned only `max-width: 40rem`;
+there are two thresholds, and the three viewports discriminate all three states:
+
+| measured property | 390 | 768 | 1512 |
+|---|---|---|---|
+| `.gn-help__tabs` / `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
+| `.gn-shell` padding-left (60rem = 960px) | 12px | 12px | 20px |
+
+### Item 6 — the text palette is sound; the NON-TEXT palette is not, and nothing was watching either
+
+**Zero TEXT contrast failures across all 60 page-loads**, computed from the live DOM with the used
+foreground colour composited over the **effective** background — every layer walked up the ancestor
+chain, alpha composited, rather than the element's own possibly-transparent `background-color`.
+
+> **That instrument measured text and only text, and the unqualified sentence it first replaced —
+> "zero contrast failures" — was the wrong claim.** Non-text contrast (WCAG 1.4.11: borders, focus
+> rings, anything that identifies a control) was outside what it walked. When a second pass did measure
+> it, **17 of 24 distinct bordered classes fall below 3:1 in BOTH themes.** See the owner box at the end
+> of this section. A scoped result reported without its scope is how a real gap gets signed off.
+
+The text palette is genuinely well built. Two things were nonetheless wrong there, and neither was a
+colour that fails today:
+
+**6a. `CONTRAST_PAIRS` declared 8 pairs; 18 more actually co-occur on screen.** That array's own docblock
+calls a colour with no guarantee *"the one thing this file exists to make impossible"* — and nothing
+checked that a pair which co-occurs had ever been declared, so it was entirely possible. All 18 measure
+above their minimum in both themes today (tightest: `accent on surface` at 5.33 against 4.5), so this
+closes the hole **before** a palette edit finds it rather than fixing a break. The status roles are pinned
+at **3**, not relaxed to it: they reach the screen as `.gn-chip__dot`'s background, a non-text component
+WCAG 1.4.11 holds to 3:1, and all seven measure above 5.0 regardless. Test count 21 → 57. A mutation
+(`sand`, used only by `surfaceSunken`) reddens exactly `light: text on surfaceSunken ≥ 4.5` and nothing
+else — the new assertions are load-bearing, not decorative.
+
+**6b. `apps/desktop` was shipping with every design token undefined.** `ui.css` references the tokens and
+defines none of them (321 `var(--gn-…)` usages, zero declarations, no `:root`); the definitions come from
+`themeStylesheet()`, which only `apps/web/app/layout.tsx:32` ever called. Confirmed in the built artifact:
+`apps/desktop/dist/assets/index-*.css` carries 24 distinct `var(--gn-…)` usages and zero definitions, with
+the 24 as the positive control. **Nothing caught it because both existing guards are claims about text** —
+that every `var()` names a declared role, and that no colour literal is written outside `tokens.ts`.
+Neither says a stylesheet defining those variables is ever installed in a given app, which is a property
+of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
+
+> ### ⚠ Open for the owner — non-text contrast, product-wide. NOT fixed here, and deliberately so.
+>
+> **17 of 24 distinct bordered classes render below WCAG 1.4.11's 3:1, in both themes.** Measured on the
+> live authenticated stack across five routes, with a positive control in the same run: the primary
+> `button` reads **19.43** (light) / **18.26** (dark), so the instrument distinguishes red from green.
+>
+> Ranked by how defensible the finding is, not by ratio:
+>
+> | what | light | dark | standing |
+> |---|---|---|---|
+> | `.gn-button--ghost` | **2.49** | **2.30** | **Least contestable.** A control whose fill is 1.09 against the page, so the border is the *only* thing identifying it. Includes the nav's own Sign out button. |
+> | `td`, `th`, `ticket-type-list__row`, `gn-board__column` | 1.34–1.61 | 1.34–1.61 | Defensible: table and column structure is information, not decoration. |
+> | `.gn-card`, `.gn-chip` | 1.45 | 1.34–1.61 | **Concede if pressed** — decorative containers arguably do not invoke 1.4.11 at all. |
+>
+> **Why this is recorded rather than fixed, in three parts.** (1) The remedy is to darken the `line` and
+> `lineStrong` primitives, which changes every card, chip, table cell and column in the product, in both
+> themes — a design decision with product-wide blast radius, and the owner's to make. (2) These pairs
+> **cannot be added to `CONTRAST_PAIRS` first**: enforcement and remedy would have to be the same commit,
+> because declaring them reddens the gate immediately. (3) The `surfaceOverlay` pairs need a
+> compositing-aware `relativeLuminance` before they can be enforced *at all* — see the note below.
+>
+> **Named owner: whoever next takes a design pass over `packages/ui`.** Nothing is blocked by it; items 6
+> and 7 are complete without it.
+>
+> #### How this was nearly missed, which is the part worth keeping
+>
+> The contrast calculator used through item 6 was validated with a known-failing pair: `line #d9d6cf` on
+> `paper #f7f6f3` = **1.34**, chosen because it was obviously too low to be real. **It is real.** That is
+> the exact pair `.gn-card`, `.gn-chip`, `td`, `th` and `.gn-board__column` render every day, and the
+> same 1.34 appears twice in the table above. A number picked as a synthetic floor turned out to be a
+> shipped colour, and the first pass read right past it because the instrument that produced the
+> confident "zero failures" only ever walked text. **The control was sound; the scope it certified was
+> narrower than the sentence it was used to support.**
+>
+> #### The existing contrast function cannot be used for `surfaceOverlay`, and would print a false red
+>
+> `relativeLuminance()` in `tokens.test.ts:24` ignores alpha *by documented design*. `surfaceOverlay` is
+> the one alpha role (`scrimLight #1c1b1866`, `scrimDark #000000a6`). Slicing the alpha off `#1c1b1866`
+> yields `#1c1b18` — which is literally the `ink` primitive that `text` resolves to — so `text` on
+> `surfaceOverlay` computes **1.00** and would report a catastrophic failure. Composited correctly it is
+> **6.43** light / **16.43** dark: a comfortable pass. **Had item 6 simply declared that pair, the gate
+> would have gone red on a colour that is fine.** It runs the other way too: `border` on `surfaceOverlay`
+> reads 11.87 naively and **1.85** composited — a false *green*, which is the more dangerous direction.
+>
+> This is not a duplicate implementation to reconcile: the token-level function is correct for opaque
+> pairs and documents its own limit, while the live-DOM walker must composite to say anything at all.
+> Enforcing any overlay pair means teaching the token function a backdrop first, because a scrim's
+> contrast is a property of what is behind it.
+
+### What was NOT measured, stated so it is a known absence
+
+- **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were
+  read statically and its pairs are included in 6a. One thing found there and **not** fixed:
+  `help-screen.tsx:59` resolves every token through `colorOf('light', role)`, so **the mobile help screen
+  is hardcoded to the light theme** and a dark-mode phone gets light colours. That is a theme-support gap
+  rather than a contrast failure — the light palette is internally consistent, so nothing fails a ratio —
+  and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
+  fixed**, because it is a design decision rather than a defect with one obvious remedy.
+- **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
+  measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
+  `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,
+  plus one genuine `13×13` input. Only 2 of the 50 fall between 24 and 44. Small text is real but mostly legitimate labels
+  (`gn-board-card__provenance` at 12.5px ×25, chips at 12.8px); the counts are identical at 768 and 1512,
+  so it is a type-scale question, not a responsive one. Both are **owner calls about the design**, not
+  contrast or overflow defects, and neither was in items 6/7's wording.
+- The overflow fix is verified against the live page and by the committed viewport suite; the running
+  container serves a pre-built image, so it was not re-verified by rebuilding that image.
+
+---
+
+## Items 6, 7 — why they were deferred (original note, kept)
 
 **Deferred to last by an approved reorder**, so they run once over the whole surface. Between them and
 now, the in-app manual/FAQ surface adds a browsable documentation surface across three clients; auditing
