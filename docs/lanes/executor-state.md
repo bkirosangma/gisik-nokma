@@ -23,11 +23,71 @@ MERGED. A resuming executor should not start from them.
 
 | what | value |
 |---|---|
-| `origin/main` | **`58a4d4a`** (PR #284, the idle handoff itself, merged 17:03 IST) |
-| branch | `exec/83-brief-sequence-is-complete` (this amendment only), off `58a4d4a` |
+| `origin/main` | **`c5e3e02`** (PR #285 merged; its squash verified complete, with a control that printed) |
+| branch | `exec/84-step10-ran-and-a-truncated-message` (docs only), off `c5e3e02` |
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
+
+## AMENDED 17:2x IST — **STEP 10 (THE INTEGRATION CHECKPOINT) DID RUN.** The one thing 177/177 could not have told you.
+
+**Why this was worth checking.** The amendment below asks the controller to retire the brief's SERIAL
+SEQUENCE section. That section is the only surviving pointer to **step 10 — the integration checkpoint,
+"prove Plans 6a, 8 and 9's fakes against the real server"** — and the brief lists it under *"TWO KNOWN
+GAPS — do not assume them away."* Step 10 has **no `### Task N:` heading**, so it has **no row in
+`task-ledger.tsv`**, so **`check:tasks` is structurally blind to it and 177/177 says nothing about it.**
+Retiring the section on a ledger count alone could have deleted the trigger for the one gap the brief
+says not to assume away, and the failure mode is *work silently never happens*.
+
+**It ran. Verified against `origin/main` directly, not taken from any document's word:**
+
+| claim | measured on `origin/main` |
+|---|---|
+| the checkpoint's tests exist | `real-door-round-trip.test.ts`, `client-contract.test.ts`, `fixture-witnesses.test.ts` — all three PRESENT under `apps/server/test/integration/` |
+| they are step 10, by their own account | `:17` *"Step 10, Task B — the integration checkpoint"* · `:25` *"Step 10, Task B — the divergences between the shipped `/v1` surface and…"* |
+| it is the REAL door, not a fake | **22** `app.inject` calls · `createTestDatabase` (real Postgres) · **0** `vi.mock` |
+| no seeding backdoor | all **5** `applyCommitted`/`INSERT INTO` hits are comment prose (docblock `:36`, `:51`; `//` at `:157`, `:395`, `:796`) — zero executable |
+
+**Negative control:** the same existence test answers ABSENT for a file that does not exist, so it can fail.
+
+**It did real work, which is the part that distinguishes "the checkpoint ran" from "files with the right
+name exist":** `fixture-witnesses.test.ts` case 7.241 caught Plan 8's fake gateway pinning a refusal rule
+(`ticket.unknown-state`) that **no real producer emits** — the route emits `migration.unknown-target-state`.
+A fake that had drifted from the server it stands for is exactly what step 10 exists to catch.
+
+**The residual, stated by the test file itself rather than discovered later** (`:380-403`): Plan 9's
+notifications fake is witnessed **producer-side only**, because the real consumer adapter lives in
+`apps/web`, outside `apps/server`'s dependency graph. So the *wire contract* is proven; the client gateway
+was not executed end-to-end. **Recorded with an owner, not fixed** — out of scope here.
+
+## A SEARCH OVER THE AUTHORITATIVE DOCUMENT CONCLUDED THE OPPOSITE OF THE TRUTH
+
+Four independent angles ran. The one that searched **the coordination doc** — the interface authority —
+returned **"the checkpoint never ran as specified: static grep analysis, no live server."** It cited real
+line numbers and carried a positive control that fired. **It was wrong**, and not by carelessness: step 10
+had two halves, and the doc records only the first. §5761 is *"what it found before it wrote a line"* —
+the reconnaissance. **Task B, the executable half, lives in code and was never narrated into the doc.**
+
+**The lesson generalises past this instance.** A single angle over the *most authoritative prose* is the
+search most likely to feel sufficient and be wrong, because a document records what someone chose to write
+down. The angle that read **test code** answered correctly. When the question is *did this happen*, prefer
+the artefact that had to exist for it to happen over the document that describes it.
+
+## A LONG tmux MESSAGE LOSES ITS HEAD, AND THE CONTROLLER ANSWERS THE FRAGMENT
+
+I sent the controller ~25 lines carrying a ruling request, a PR notice, and a squash verification. **It
+received only the last paragraph** — its pane shows the message arriving as `> 1ractice: #284 squash
+dropped nothing (`, the head eaten mid-word.
+
+**The damage is not the truncation; it is that the reply was confident.** The controller answered
+*"Nothing for me to act on here — this just reinforces the status quo"* and re-listed its open items. That
+is a correct response **to the fragment** and a wrong one to the message. `send-keys` returned success,
+the Enter submitted, the reply was fluent and on topic, and **nothing on either side reported a failure.**
+Had I not read the recipient's pane, PR #285's ruling request would have sat believed-delivered.
+
+**Practice: keep an inter-session message to a few lines, and confirm what ARRIVED by reading the
+recipient's pane — not that it sent.** A compact re-send of the same content landed verbatim, so length is
+the variable, not content. For anything longer, write a file and send the path.
 
 ## AMENDED 17:0x IST — **THE DISPATCH BRIEF'S SERIAL SEQUENCE IS COMPLETE. ALL 177 TASKS ARE DONE.** Read this before you read the brief.
 
