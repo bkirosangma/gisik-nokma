@@ -38,6 +38,47 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 **218 (exec/65's tip) − 50 (#244's §05 citations, now underneath) = 168.** The two measurements reconcile.
 
+## 🔴 MEASURED: **95 of the 168 uncited rows NAME a test file, not 31** — and this file contradicted itself
+
+The claim carried forward all session — *"outside §12, every remaining row genuinely names no covering
+test"*, with §12's 31 as the only citable pool — **is false.** Measured at `84060ac` against the checker's
+own uncited ids:
+
+| § | uncited | names a test **in the row** | names one in a **block header** | names **none** |
+|---|---|---|---|---|
+| §03 | 5 | 3 | 0 | 2 |
+| §04 | 29 | 0 | 0 | 29 |
+| **§05** | **17** | **17** | 0 | **0** |
+| §06 | 12 | 5 | 0 | 7 |
+| §07 | 1 | 0 | 1 | 0 |
+| §12 | 78 | 67 | 0 | 11 |
+| §13 | 26 | 2 | 0 | 24 |
+| **total** | **168** | **94** | **1** | **73** |
+
+**28 of those 95 are outside §12** — so they need no block clearance and no dispatch authorization; by-hand
+work never did. §12's citable pool is **67 by naming, not 31**.
+
+**How the instrument was kept honest.** It imports `extractCheckedIds` and `isCited` **from the checker
+itself** rather than re-deriving them — no ninth shape of rule 9 — and rebuilds only the corpus walk. The
+control: its per-section uncited counts must equal the checker's printed counts. **All ten agreed
+(5/29/17/12/1/0/0/0/78/26, total 168)**, and the row extractor independently matched 168 rows to 168 ids.
+
+**The contradiction was inside this file the whole time.** Its §05 section says, in its own words, that
+§05's tail is *"a scattered tail, mapped but NOT done"* and lists them: *ticket-state (5.6, 5.30, 5.50) ·
+ticket-events (5.3, 5.48, 5.53) · ticket-types (5.1, 5.2) · harness (5.51, 5.52)* and six singletons. **That
+is sixteen rows explicitly recorded as naming their files** — and a later section of the same document then
+asserted no such rows existed. My measurement reproduces that list exactly, plus `5.12`, which is how I know
+the instrument is reading the same thing the earlier session read.
+
+**This is the sha-list defect again, one section further on:** a summary sentence and a detailed list, written
+at different times from different measurements, standing in the same document and disagreeing. **Rule 9's
+eighth shape covers it.** *(Do not over-correct: naming a test is still NOT evidence the test asserts the
+row — five refusals this session were exactly that case. 95 rows deserve a READ, not 95 citations.)*
+
+**In flight:** a **read-only** four-agent adjudication of the 28 non-§12 rows — does the named test actually
+assert the row — producing evidence and drafted citations for me to place by hand. It edits nothing. §12 is
+deliberately excluded until its block is cleared.
+
 ## 🔴 THE DISPATCH BRIEF'S "SERIAL SEQUENCE" HAS EXPIRED — the ledger says 177/177, 0 todo
 
 The executor dispatch brief states *"~109 of 177 tasks remain"* and lays out steps 4–16 beginning at
@@ -152,7 +193,7 @@ checked against a prediction written *before* the sequence ran — all ten keys 
 
 1. **PR is open — controller merges.** Then **close #245 as superseded** (its 4 commits are a strict prefix of this branch).
 2. **§12 is the only citable pool left: 31 of its 78 rows name a covering test.** Its block `12.380–12.399` is **ALLOCATED but NOT CLEARED** — controller's words, *"one thing at a time"*. Backfilling citations mints no ids, so the block may not gate it, but **that is the controller's call.** ASK.
-3. The **~137 rows outside §12 that name no covering test** are a **reader pass**, not transcription. **Do not let a dispatch "finish the backfill" from counts alone; it would manufacture citations.**
+3. **CORRECTED BELOW — see the measurement section.** The figure I first wrote here ("~137 rows outside §12") was mis-scoped: there are **90** uncited rows outside §12, not 137. 137 was the count of rows naming no test *across all sections including §12*, and even that turns out to be wrong.
 
 ---
 
