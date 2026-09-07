@@ -234,8 +234,8 @@ first, and this is the measurement.
 ## MEASURED FOR 13.176: IT LANDS ON A RULING THE OWNER ALREADY HOLDS
 
 13.176 says *"a guest has NO NAVIGATION to the four errands explicitly shared with them"*. The measurement
-says why, and the why matters more than the symptom: **there is no read that could serve it, and the one
-that would is already held with the owner over this exact question.**
+says why. **The first version of this section got the why wrong — see the correction below, which is kept
+in place of a quiet edit because the wrong version was pushed and may have been acted on.**
 
 - **No `DataSource` method lists "tickets shared with me."** All thirteen enumerated at
   `packages/app-core/src/data-source.ts:132-143`; the closest is `getMyWork(workspaceId)`.
@@ -244,15 +244,59 @@ that would is already held with the owner over this exact question.**
   (`view-types.ts:238`). A ticket shared with a guest who is not its **assignee** appears in none of the
   three. The route's own docblock (`:56`) names *"a ticket explicitly shared with somebody else"* as a case
   it is measured against — it is deliberately not this read's job.
-- **`getMyWorkspaces` — the natural entry point for a guest with no project — REFUSES**, and
-  `online-data-source.ts:92-95` says it is **HELD with the owner** because *"serving them means deciding
-  what a project-scoped guest sees of a workspace's other projects, and there is no shipped project-list
-  read at all."*
+### ⚠ CORRECTION — THE PARAGRAPH THAT STOOD HERE WAS WRONG, AND IT WAS WRONG BECAUSE I QUOTED A DOCBLOCK INSTEAD OF THE REGISTER
 
-**That last line IS 13.176.** So this is not a fresh UX question to design and build; it is the client-side
-face of a ruling already sitting with the owner, and designing a guest navigation before that ruling lands
-would be picking the answer to the held question by implementing one. **Recommend it be raised as part of
-the `getMyWorkspaces`/`getMyWork` hold rather than opened as its own design item.** Recorded, not decided.
+It said `getMyWorkspaces` **REFUSES** and is **HELD with the owner**, and concluded 13.176 was "the
+client-side face of a ruling already sitting with the owner" and must not be built. **All of that is
+false.** It was taken from `online-data-source.ts:88-98`, which is **stale prose**. Measured instead from
+the things that decide:
+
+| claim | the register says |
+|---|---|
+| `getMyWorkspaces` refuses | **No.** `online-data-source.ts:127` → `mapWorkspaceRefs(await http.get('/v1/me/workspaces'))`. It answers. |
+| `getMyWork` refuses | **No.** `online-data-source.ts:328` answers. |
+| four methods still refuse | **No.** `SERVING_GAPS` (`mappers.ts:1729-1731`) has exactly **one** key: `search`. |
+
+**So there is no hold, 13.176 is nobody else's open item, and it is buildable now.** The docblock names
+"the four that remain"; three of those four have since been served, and its sentence about "no shipped
+project-list read at all" is contradicted by `/v1/me/workspaces` serving `projects` per workspace
+(`routes/workspaces.ts:172`).
+
+> **The lesson, in the family this file keeps collecting:** a docblock is a claim about the day it was
+> written. `SERVING_GAPS` is the register and the implementation is the fact. I read the prose because it
+> was more articulate than the data, and articulate is not current.
+
+### WHAT 13.176 ACTUALLY NEEDS — measured to the predicate
+
+The navigation is missing for a reason with a precise site, not a missing ruling:
+
+1. `/v1/me/workspaces` serves each workspace's `projects` via `visibleProjects` (`routes/workspaces.ts:172`).
+2. `visibleProjects` returns everything for an `owner`, else
+   **`visible.filter((p) => eff.projects.has(p.projectId))`** (`read/visible-projects.ts:57-60`).
+3. `eff.projects` is built **only** from `proj_memberships`
+   (`permissions/effective-role.ts:105-118`) — per-ticket visibility (`proj_visibility`) never enters it.
+
+**So a guest holding four explicitly-shared tickets in a project they are not a member of gets no project
+card, hence no link, hence no route in.** That is 13.176, exactly.
+
+**There IS a design decision, but it is a recorded deliberate tie-break, not a hold** — and reading it as a
+hold is what the wrong paragraph did. `visible-projects.ts:26-35` states that a project's NAME is a
+disclosure, withheld role-independently under rulings P32/P38, and writes the tie-break down:
+*"serving MORE later is a widening and reversible; serving a name and retracting it is not."*
+
+| shape | what it costs |
+|---|---|
+| **A.** put the shared ticket's project into the project list | **discloses the project NAME → reverses P32/P38.** Needs an owner ruling. |
+| **B.** a *"Shared with me"* surface listing the TICKETS directly, never via a project | discloses no project name, so it **respects P32/P38**, and the recorded tie-break explicitly anticipates widening. Needs a new read — there is none: `my-work.ts:120` filters `t.assignee_id = <viewer>` and `MyWorkView` is `{assigned, inTransit, contested}`. |
+
+**B is the shape that does not reverse a ruling**, and is the recommendation. Still the owner's call, but the
+question is "which surface", not "may we proceed".
+
+**Also found, and recorded rather than fixed:** rulings **P39 and P40 appear nowhere in the coordination
+doc** — only in `apps/server/src/routes/my-work.ts`, its test, and `client-contract.test.ts`. Positive
+control: `P25` is present in the coordination doc, so the sweep works. The rulings that discharged these
+gaps live only in code comments, which is how the stale docblock survived. Owner: whoever next reconciles
+the ruling register.
 
 ## NEXT
 
