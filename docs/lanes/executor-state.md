@@ -16,6 +16,81 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🔴→🟢 MONDAY 2026-09-07 ~16:0x IST — **REVIEW FOUND A CRITICAL THIS BRANCH INTRODUCED. FIXED, WITNESSED, RE-GATED.** The section below is still accurate about the red; this supersedes its "ready to merge" reading.
+
+| what | value |
+|---|---|
+| the defect | **the dialog submitted a parent it had just told the user would not apply** |
+| introduced by | **this branch** — at `a0d9963` a list error unmounted the create flow, so the state was unreachable |
+| why it shipped green | **`parentCandidatesUnavailable` appeared in ZERO tests**, and 3.142's guard could not fail |
+| fixed at | `new-ticket-dialog.tsx` (the draft) **and** `page.tsx` (the condition) — two different mistakes |
+| witnessed by | **3.157** (component, with a control) and **3.158** (page) |
+
+## THE CRITICAL, AND WHY READING THE SCREEN WOULD HAVE MISSED IT
+
+`NewTicketDialog` holds `parentId` in `useState` and Create emitted it unconditionally. **Withholding the
+picker stops it RENDERING; it does not clear the state behind it.** So: the list answers → the user picks a
+parent → a later read fails → the picker is replaced by *"This ticket will be created at project root"* →
+Create submits the earlier id.
+
+**The sentence on screen was correct. The payload contradicted it.** Any case asserting the rendered text
+would have passed against the defect, which is why 3.157 asserts the emitted **draft**.
+
+**Reachability never needed the row cap.** `useTicketList` returns `error: list.error ?? preferences.error`
+(`ticket-list.ts:459`), so an ordinary `getPreferences` 500 — or a `setPrefs` PUT the user triggered
+themselves — set `list.error` with `list.rows` intact. The page keyed the withheld picker on that error, so
+it told the user the parent list *"cannot be shown"* **and offered a preferences failure as the reason**, on
+a page that could have listed them. Two false sentences, and the state the stale submit fired from.
+
+## ⚠ 3.142's GUARD COULD NOT FAIL — the sixteenth disguise, in a check written to be strict
+
+```js
+screen.queryByLabelText('Parent')?.querySelector('select') ?? null   // null in BOTH states
+```
+
+`queryByLabelText('Parent')` returns the `<select>` **itself** (the label wraps the control), so
+`querySelector('select')` looks *inside* it and finds nothing when the picker is present — and the optional
+chain yields `null` when it is absent. **Null for opposite reasons.** The reviewer killed it two ways and
+**1255 tests stayed green**: restoring the empty picker, and rendering the picker AND the reason together —
+the one arrangement the case exists to forbid. Counted over the dialog now; both mutations fail loudly
+(`expected […] to have a length of 1 but got 2`).
+
+## THE FOUR WITNESSES, ALL KILLING AT THEIR OWN SITE
+
+| mutation | result |
+|---|---|
+| **N1** dialog emits the stale `parentId` again | **3.157 fails, its CONTROL passes** — so the case is not satisfied by a dialog that drops every parent |
+| **N2** page keyed on `list.error !== null` again | **3.158 fails** (`Unable to find a label with the text of: Parent`) |
+| **N3** the `parentCandidatesUnavailable` spread removed — the empty picker returns | **3.142 fails**, `length of 1 but got 2` |
+| **N4** picker AND reason rendered together (the arrangement 1255 tests survived) | **3.142 fails**, same assertion |
+
+## ⚠ I REPEATED MEMORY #16 WITH THE MEMORY ALREADY WRITTEN
+
+`git checkout --` during the mutation round **destroyed both source fixes**, because I had committed the
+TEST and left the two source edits uncommitted. The rule I was carrying says *commit first, then mutate*;
+I applied it to one file and not the two it most protected.
+
+**It was caught only because a baseline re-run failed** — `git status` was clean, both mutations reported
+"restored: []", and every signal said the round was healthy. **A restore that reports success tells you the
+tree matches HEAD, which is exactly what a destroyed fix also looks like.** The recovery was cheap only
+because the edits were minutes old and reproducible from the review's own text.
+
+> **The generalisation: `git checkout -- <path>` is a claim about HEAD, never about your work.** Before
+> running one, the question is not "is the tree dirty" but "is everything I want to keep IN HEAD".
+
+## THE FOUR MINORS, ALL REAL, ALL FIXED
+
+1. `new-ticket-dialog.tsx:17`'s docblock stated a contract the code did not keep — now enforced at the
+   submit site and the docblock says where.
+2. 12.382's `getTicketTypes` override is **inert** (deleting it leaves 10/10 green, measured) and its
+   comment claimed it protected an assertion that does not exist. Kept, honestly described.
+3. A negative assertion in 3.142's control named a string **no source file produces any more**, so it
+   asserted nothing. Replaced with one that can be present.
+4. My own comment said **three** `role="status"` nodes stand on the page; it is **two** — the board arm
+   unmounts on tab change. The count was inferred from the stubs rather than read off the page.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~15:1x IST — **THE RED IS RESOLVED AND THE OPEN QUESTION IS ANSWERED. `exec/77-decouple-create` is GREEN.** PR open; the Board-tab change is a design call recorded for reversal.
 
 | what | value |
