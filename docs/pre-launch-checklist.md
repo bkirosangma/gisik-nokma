@@ -11,8 +11,8 @@ something that could not have been noticed from the source alone.
 | 3 | Terms & conditions page | ✅ **built, unreviewed boilerplate** |
 | 4 | No secrets stored in the frontend | ✅ **audited; two gate blind spots found and closed** |
 | 5 | Force HTTPS | ✅ **answered: mostly the platform's job; HSTS was the app's and was missing** |
-| 6 | Colour contrast | ✅ **measured on the real stack; no live defect, two real gaps closed** |
-| 7 | Mobile-friendly / responsive | ✅ **measured at real viewports; one systematic overflow found and fixed** |
+| 6 | Colour contrast | ✅ **measured on the real stack. TEXT contrast: zero failures in 60 page-loads, two enforcement gaps closed. NON-TEXT contrast: 17 of 24 bordered classes below 3:1 — recorded for the owner, see the box** |
+| 7 | Mobile-friendly / responsive | ✅ **measured at real viewports; two defects found and fixed, and a committed suite that would catch either again** |
 
 ---
 
@@ -219,7 +219,7 @@ there are two thresholds, and the three viewports discriminate all three states:
 | `.gn-help__tabs` / `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
 | `.gn-shell` padding-left (60rem = 960px) | 12px | 12px | 20px |
 
-### Item 6 — no live defect anywhere, and two real gaps that had nothing watching them
+### Item 6 — the text palette is sound; the NON-TEXT palette is not, and nothing was watching either
 
 **Zero TEXT contrast failures across all 60 page-loads**, computed from the live DOM with the used
 foreground colour composited over the **effective** background — every layer walked up the ancestor
