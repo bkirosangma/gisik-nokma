@@ -1,5 +1,38 @@
 # Cross-lane controller — live state
 
+## ⏹ MONDAY 09:4x IST — CITATION BACKFILL EFFECTIVELY DONE: 1492/38 (from 815 uncited Sunday morning). `main` is `e34844d`, gate green. The remaining 38 are NOT transcription backlog — they need a design decision, not more dispatching.
+
+**PR #251 merged: §12 78→1, dispatched to five read-only sonnet agents (78 rows across 32 files, zero errors).**
+Gate: `GATE_EXIT=0` · 30/30 · 3666 passed | 5 skipped (3671), identical again. `check:citations`: **1492 cited /
+38 uncited** repo-wide. `check:tasks`: 177/177 unchanged.
+
+**§12's own "citable" count needed a FOURTH correction this session — 67 was still wrong; the real answer was
+77.** Ten "pointer" rows (a row that says outright "→ landed 12.NNN", handing its coverage to a named
+successor) were citable and had been undercounted as unnamed. Found by reading raw records again, not by
+recounting — the same recovery method as every other correction tonight. **Lesson for whoever reads this
+before trusting a "de-facto reader job" claim anywhere in this file: verify it against the checker's own
+extraction, don't take a private instrument's word twice.**
+
+**Where the backfill actually stands, per-section, at `e34844d`:** §05/§09/§10/§11 all zero. §12 down to 1
+(`12.76`, deliberately left — its assignment named a validator test but the row is about the producer building
+the contest, wrong side of a boundary the row itself draws). §03 2, §04 5, §06 6, §07 1 (`7.199`, refused —
+the named test's own docblock disclaims covering it), §13 23. **38 total, and every one of them has now been
+individually read, not just counted.**
+
+**⛔ The remaining 38 are a genuinely different class of problem, not a backlog to clear.** Per the executor,
+read case by case: §13's 23 are structural claims (CI yaml, compose, e2e-stack wiring) with no unit-test home;
+§06's 6 are largely mutation/measurement records, same shape as `6.78`/`6.80` earlier; §03's `3.62`/`3.66` and
+§07's `7.199` are type-level — their failure mode is a compile error, so there is nothing at runtime to cite.
+**Closing these needs one of: new runtime tests written for the structural/type claims, or a written
+"structural claims" citation convention added to the coordination doc** (the §12 block `12.380–12.399` still
+has room if new case ids are needed for either). This is a scope/design call, not mechanical work — put to the
+owner before anyone dispatches against these 38 expecting more automatic movement.
+
+**Everything from this session (nine-plus citation-method rules, the four-times-corrected "reader job"
+instrument lesson, the CI-billing-waiver reaffirmation) is in
+`docs/superpowers/plans/2026-08-20-00-series-coordination.md` and `docs/lanes/executor-state.md` on `main`.**
+Executor idle, nothing in flight, no open PRs.
+
 ## ▶ MONDAY 09:3x IST — `main` is `aff899b`, gate green (thirteenth+ identical run). CITATIONS AT 1415/115 (from 815 uncited Sunday morning). GITHUB ACTIONS CONFIRMED DOWN ON BILLING, OWNER SAYS KEEP RELYING ON THE WAIVER. §12 CLEARED (67 citable of 78).
 
 **PR #247 (the consolidated backfill rebuild, 23 commits) merged, then #248 (a handoff correction — three
