@@ -225,7 +225,7 @@ without editing it; no migration added.
 - Consumes: nothing.
 - Produces: the workspace member `@gisik-nokma/mcp-server`; `McpConfig` and `loadMcpConfig(env: NodeJS.ProcessEnv, home: string): McpConfig` — every later task in this package imports these.
 
-- [ ] **Step 1: Write `packages/mcp-server/package.json`**
+- [x] **Step 1: Write `packages/mcp-server/package.json`**
 
 Copied from `packages/rule-engine/package.json` with the name and dependencies swapped. `bin` is what makes Task 10's entrypoint launchable by an MCP client config.
 
@@ -265,7 +265,7 @@ Copied from `packages/rule-engine/package.json` with the name and dependencies s
 
 `@modelcontextprotocol/sdk@1.30.0` declares `zod: '^3.25 || ^4.0'` in both `dependencies` and `peerDependencies` — verified against the registry, so the repo's pinned `zod ^3.25.0` satisfies it and no second zod copy is installed.
 
-- [ ] **Step 2: Write the three config files, verbatim from `packages/rule-engine`**
+- [x] **Step 2: Write the three config files, verbatim from `packages/rule-engine`**
 
 `tsconfig.json`:
 
@@ -306,7 +306,7 @@ export default defineConfig({
 
 No `pnpm-workspace.yaml` edit — the `packages/*` glob already covers it. No `turbo.json` entry — that is only needed when a package's tests read files **outside** its own directory, and none of this package's tests do. (If a later task adds such a test it MUST add a `"@gisik-nokma/mcp-server#test"` block with `$TURBO_DEFAULT$` plus the foreign `$TURBO_ROOT$/…` inputs, or turbo serves a stale green — the failure measured on 2026-09-07 that let `#270` reach `main`.)
 
-- [ ] **Step 3: Write the failing test for `loadMcpConfig`**
+- [x] **Step 3: Write the failing test for `loadMcpConfig`**
 
 `packages/mcp-server/test/config.test.ts`:
 
@@ -336,12 +336,12 @@ describe('loadMcpConfig', () => {
 });
 ```
 
-- [ ] **Step 4: Run it and watch it fail for the right reason**
+- [x] **Step 4: Run it and watch it fail for the right reason**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: FAIL — `Failed to resolve import "../src/config.js"`. A failure naming anything else means the scaffold is wrong, not the test.
 
-- [ ] **Step 5: Write `src/config.ts` and `src/index.ts`**
+- [x] **Step 5: Write `src/config.ts` and `src/index.ts`**
 
 ```ts
 import { join } from 'node:path';
@@ -387,7 +387,7 @@ export function loadMcpConfig(env: NodeJS.ProcessEnv, home: string): McpConfig {
 export * from './config.js';
 ```
 
-- [ ] **Step 6: Run the tests and the whole gate**
+- [x] **Step 6: Run the tests and the whole gate**
 
 Run: `pnpm install`
 Expected: succeeds, links `@gisik-nokma/mcp-server`, updates `pnpm-lock.yaml`.
@@ -398,7 +398,7 @@ Expected: 3 passed.
 Run: `pnpm turbo run build typecheck --filter @gisik-nokma/mcp-server 2>&1 | tail -20`
 Expected: both green.
 
-- [ ] **Step 7: Register the package with the one gate that hardcodes a list**
+- [x] **Step 7: Register the package with the one gate that hardcodes a list**
 
 `scripts/check-runbook-commands.mjs:69-71` enumerates package directories by hand. Every other gate discovers packages dynamically (`check-case-citations.mjs:189` walks `apps` and `packages`; CI's `other-tests` job runs `turbo run test --filter='!@gisik-nokma/server'` and picks a new package up automatically). This one does not, and a hardcoded list that stops matching the tree is the defect PR #278 was opened for ("the gate could not see the trees its own tests police — four packages, not one").
 
@@ -422,7 +422,7 @@ with:
 Run: `pnpm check:runbook 2>&1 | tail -10`
 Expected: ok. (It stays ok either way today — `docs/runbook.md` names no `@gisik-nokma/mcp-server` script until Task 10. The line is added **now** so Task 10's runbook entry cannot land against a list that does not know this package exists.)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/mcp-server scripts/check-runbook-commands.mjs pnpm-lock.yaml

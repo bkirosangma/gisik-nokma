@@ -68,7 +68,19 @@ function packageDirs() {
   const dirs = {};
   for (const d of ['apps/server', 'apps/web', 'apps/mobile', 'apps/desktop',
                    'packages/domain', 'packages/app-core', 'packages/rule-engine',
-                   'packages/sync-client', 'packages/editor', 'packages/ui']) {
+                   'packages/sync-client', 'packages/editor', 'packages/ui',
+                   // Added by MCP plan Task 1, BEFORE the runbook names any of this
+                   // package's scripts (Task 10), so Task 10's entry cannot land
+                   // against a list that does not know the package exists.
+                   //
+                   // This list is hand-maintained while every other gate discovers
+                   // packages dynamically — `check-case-citations.mjs` walks `apps`
+                   // and `packages`, and CI's `other-tests` filters rather than
+                   // enumerates. A hardcoded list that stops matching the tree is
+                   // the defect PR #278 was opened for. Left hand-maintained here
+                   // because the MCP plan specifies this exact edit and making the
+                   // gate dynamic is a change to its behaviour, not to its data.
+                   'packages/mcp-server']) {
     const p = join(ROOT, d, 'package.json');
     if (existsSync(p)) dirs[JSON.parse(readFileSync(p, 'utf8')).name] = d;
   }
