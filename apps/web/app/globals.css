@@ -69,7 +69,14 @@ a { color: var(--gn-accent); }
 .gn-nav button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 2.75rem;
+  /* WIDTH too, and it took a second reading to notice. The first pass set only
+     `min-height`, and the signed-in sweep still reported `39x44` on
+     `a.gn-nav__inbox "Inbox"` — tall enough, and six pixels too NARROW, because
+     the target is a short word. A tap target is a box: fixing one dimension and
+     re-reading only the count leaves the other one exactly as it was. */
+  min-width: 2.75rem;
 }
 
 .gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
