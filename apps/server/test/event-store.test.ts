@@ -286,6 +286,9 @@ describe('workspace stream cursor (coordination §18)', () => {
     expect([...cursors].sort()).toEqual([1, 2, 3]);
   });
 
+  /**
+   * 3.25 — Replay orders the ledger by (entity_kind, entity_id, seq) regardless of workspace_seq, and every workspace's set of workspace_seq values is duplicate-free (the third clause, onEventCommitted handing listeners the resuming cursor, is proven separately in apps/server/test/ingest.test.ts).
+   */
   it('replay is unaffected: the canonical order is still (entity_kind, entity_id, seq)', async () => {
     const ledger = await readLedger(db.pool);
     const keys = ledger.map((event) => `${event.entity.kind}|${event.entity.id}|${event.seq}`);

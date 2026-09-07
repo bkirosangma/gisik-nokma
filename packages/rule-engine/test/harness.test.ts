@@ -552,6 +552,9 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
  * fabrication it exists to catch, so no fixture could witness the difference
  * between the two doors.
  */
+/**
+ * 5.51 — the fixture harness' prior-event schemas mirror their domain twins in required-key PRESENCE (payload key, field-claim value, create's typeId/projectId/title, reparent's newParentId), closing four silent divergences that previously let a fixture stage a prior state the real ingestion door would have refused.
+ */
 describe('prior-event schemas mirror the domain doors in PRESENCE', () => {
   const CANDIDATE = {
     type: 'ticket.transitioned',
@@ -738,6 +741,9 @@ describe('prior-event schemas mirror the domain doors in PRESENCE', () => {
  * Both folds are mirrored from `buildMemoryContext` deliberately (pre-flight
  * A15/C-06): these fixtures do NOT traverse the shared reducer, so nothing but
  * the mirroring keeps the two folds honest about what a rule sees.
+ */
+/**
+ * 5.52 — the harness folds ticket-type.defined and ticket.reparented (getTicketTypeDef has a real body, last-definition-wins is asserted rather than assumed, and reparent moves parentId), so a fixture reaching a rank check or a loop-closing reparent has a real definition and a real parent to be judged against.
  */
 describe('buildInMemoryContext folds ticket-type.defined and ticket.reparented', () => {
   const TASK_TYPE = { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_basic', fields: [] };

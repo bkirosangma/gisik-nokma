@@ -265,6 +265,9 @@ describe('startBackupDaemon', () => {
  * arbitrary NUMBER of independent jobs, and `stop()` clearing every one of
  * their timers rather than just two.
  */
+/**
+ * 13.201 — startScheduler generalises the daemon loop to an arbitrary job list: N jobs arm N timers synchronously at construction, one job's failure/re-arm never disturbs a sibling's schedule or count, each job re-arms on its own delayMs independent of others, a later job's throwing delayMs() leaves zero jobs armed (construction is all-or-nothing), and stop() clears every job's timer (proven for five).
+ */
 describe('startScheduler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -411,6 +414,9 @@ describe('startScheduler', () => {
  * scheduler. Every legitimate value passes; every illegitimate one throws
  * synchronously, naming the value, rather than producing a tight re-arm loop
  * (`0`/negative) or a call that never fires (`NaN`).
+ */
+/**
+ * 13.202 — requirePositiveIntervalMs refuses rather than clamps: a legitimate positive integer (and the boundary 1) pass; 0, a negative value, NaN, a fractional value, and Infinity are each refused with a synchronous throw naming the bad value.
  */
 describe('requirePositiveIntervalMs', () => {
   it('a positive integer millisecond value passes through unchanged', () => {

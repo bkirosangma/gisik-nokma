@@ -187,6 +187,9 @@ test('sign-in offers all four passwordless methods', async ({ page }) => {
  * it must not print: `/workspaces` must not say there are no workspaces, and it
  * must still let a person found one.
  */
+/**
+ * 3.137 — The plan's dropped-and-replaced /workspaces navigation renders the refusal out loud (never 'no workspaces yet') while still offering the founding door, proven against Playwright/Chromium.
+ */
 test('the workspace list REFUSES out loud, and the founding door is still open', async ({ page }) => {
   await stubApi(page);
   await page.goto('/workspaces');

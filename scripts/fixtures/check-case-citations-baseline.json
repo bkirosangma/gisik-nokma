@@ -1,12 +1,12 @@
 {
-  "03-foundation-ledger.md": 5,
-  "04-workflow-engine.md": 29,
-  "05-tickets-hierarchy.md": 17,
-  "06-auth-visibility.md": 12,
+  "03-foundation-ledger.md": 2,
+  "04-workflow-engine.md": 5,
+  "05-tickets-hierarchy.md": 0,
+  "06-auth-visibility.md": 6,
   "07-api-realtime-search.md": 1,
   "09-editor-attachments.md": 0,
   "10-workflow-builder.md": 0,
   "11-calendar-notifications.md": 0,
   "12-offline-sync-apps.md": 78,
-  "13-deployment-dogfooding.md": 26
+  "13-deployment-dogfooding.md": 23
 }

@@ -156,6 +156,8 @@ describe('WEB_ORIGIN is a trusted origin', () => {
   });
 
   /**
+ * 13.188 — a `WEB_ORIGIN` written with a TRAILING SLASH is still trusted, normalised at assembly with the same `normalizeOrigin` every other consumer uses; un-normalised it would reinstate the exact 403 `INVALID_ORIGIN` this change removes, and would present as an auth-only regression because CORS and the HTTP-Origin check would both keep working.
+ *
    * A trailing slash must not reinstate the very 403 this change removes.
    * `config.ts`'s `httpUrl()` admits `http://localhost:3001/`, and better-auth
    * matches http(s) patterns by EXACT equality

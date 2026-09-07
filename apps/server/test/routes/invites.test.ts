@@ -890,6 +890,9 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
    * real revocation beside it as the killer: without that second half, "no purge
    * instructions" would pass equally on a generator that emits none at all.
    */
+  /**
+   * 6.119 — acceptance via invite (a GRANT) emits no purge instruction through visibleEventsFor, walked against a real membership.revoked in the same run as the killer that proves a silent-empty generator could not pass.
+   */
   it('acceptance emits no purge instruction, and a revocation in the same workspace does', async () => {
     const { visibleEventsFor } = await import('../../src/visibility/visible-events-for.js');
     const owner = await signedIn();

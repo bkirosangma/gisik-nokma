@@ -79,6 +79,9 @@ function fieldSetWithNoValue(fieldId: string): EventEnvelope {
 }
 
 /** Literal rule ids and literal, fully-interpolated reasons — never the builder. */
+/**
+ * 5.12 — field_set semantics across kinds: unknown field, text/number/date/select/person mismatches, document description, day-only dueDate/startDate, and the title that can never be cleared, each refused (or accepted) with the exact reason.
+ */
 describe('checkTicketFieldSet', () => {
   it('accepts fitting values for every kind, and null to clear', async () => {
     expect(await checkTicketFieldSet(fieldSet('amount', 1200), ctx())).toEqual({ refused: false });

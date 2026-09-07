@@ -331,6 +331,9 @@ describe('ingestBatch', () => {
     }
   });
 
+  /**
+   * 3.30 — A ROLLBACK that itself throws (dead connection) does not swallow or replace the original duplicate-event-id answer, which still lands unchanged.
+   */
   it('planted defect: a ROLLBACK that throws cannot swallow the duplicate-event-id answer', async () => {
     // The dead connection is exactly the case where the original error matters
     // most, and an unguarded ROLLBACK in the catch throws its own error over it
@@ -587,6 +590,9 @@ describe('workspace stream cursor (coordination §18)', () => {
     expect(other.rows.map((row) => row.workspace_seq)).toEqual([1]);
   });
 
+  /**
+   * 3.25 — onEventCommitted hands each listener the event's workspaceSeq, proven as the strictly-increasing 1, 2 a resuming client would expect across two commits in one workspace.
+   */
   it('onEventCommitted hands the listener the cursor the stream resumes by', async () => {
     const ingest = service();
     const cursors: number[] = [];

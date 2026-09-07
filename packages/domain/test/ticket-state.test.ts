@@ -243,6 +243,9 @@ describe('applyTicketEvent', () => {
     });
   });
 
+  /**
+   * 5.50 — The field_set fold's null-clearing path (now claim(p.value, env), the removed p.value ?? null coalesce being an identity for null) is exercised and stays green, storing the explicit null clearing claim with its provenance.
+   */
   it('clearing a field with null keeps the provenance of the clearing claim', () => {
     let state = createdState();
     state = applyTicketEvent(
@@ -296,6 +299,9 @@ describe('applyTicketEvent', () => {
     expect(state.assigneeId).toBeNull();
   });
 
+  /**
+   * 5.6 — Adding the same collaborator twice deduplicates (and returns the identical object, no spurious write), and removing a userId that is not a collaborator is a no-op.
+   */
   it('collaborators deduplicate on add and no-op on removing a non-member', () => {
     const add = () =>
       makeEnvelope({
@@ -624,6 +630,9 @@ describe('foldTicketToWorkflowVersion', () => {
     expect(folded.transitions).toEqual(before.transitions);
   });
 
+  /**
+   * 5.30 — The fold is a no-op (returns the identical object) for a ticket already at or past the target workflow version, and a version chain with an unmapped dropped state throws rather than guessing a state.
+   */
   it('is a no-op for a ticket already at or past the target version — the guard that makes replay order-insensitive', () => {
     const already: TicketState = { ...inDoing(), workflowVersion: 2, stateCategory: 'terminal' };
     expect(foldTicketToWorkflowVersion(already, WF, noIntermediates)).toBe(already);
