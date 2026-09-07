@@ -1,5 +1,22 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 11:4x IST — `main` is `e72dd02`. Six `helpers/seed.ts` rows settled (docs-only, gate carries from `e8d0cce`). ONE ITEM SCHEDULED, NOT DONE: `wf-errand`, a fixture id production would refuse, deliberately deferred by owner ruling.
+
+PR #263 merged: Lane A's Saturday classification of seven borderline rows was **re-measured, not adopted** —
+A's own count moved 23→29→21 getting to its answer, so each row was checked fresh rather than trusted.
+
+**⚠ SCHEDULED FOLLOW-UP, deliberately NOT done tonight — read before assuming the backfill/sweep is exhaustive:**
+`wf-errand` is used as a workflow-definition fixture id across **139 occurrences / 23 test files**, but
+production's own envelope validation (`ULID_REGEX` on `entity.id` for every `workflow.defined` event) would
+refuse that exact string — measured directly, `ULID_REGEX.test('wf-errand') === false`. Nothing in `src`
+depends on the literal (4 hits are inside a docblock quoting a *different* string). **Owner ruling: schedule as
+its own deliberately-scoped item, not folded into tonight's sweep** — a mass rename across shared test helpers
+risks silently weakening assertions rather than breaking them loudly, which is worse than leaving it named. Do
+not let a future "clean up the fixtures" pass treat this as already handled; it is diagnosed, not touched.
+
+Executor context was at 65% when this was sent — told to push a handoff proactively at 80% or after finishing
+`12.321`, whichever comes first, rather than wait to be told.
+
 ## ▶ MONDAY 11:2x IST — `main` is `e8d0cce`, gate green. `TicketPullNotFound` CLOSED — a negative finding: the reported crash never existed, but a real, narrower silent-failure defect did, and is now fixed.
 
 PR #261 merged. `check:citations`: 1534/1534, still zero. **Measured, not assumed:** `Promise.race` subscribes
