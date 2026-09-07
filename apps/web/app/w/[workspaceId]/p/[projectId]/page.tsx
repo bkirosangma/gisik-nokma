@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { BUILTIN_TICKET_TYPE_SEEDS } from '@gisik-nokma/domain';
+import { BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
@@ -124,9 +124,52 @@ function ProjectBoard() {
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
   const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
+  /**
+   * The list's narrowing, and the reason there is one at all.
+   *
+   * `getTickets` walks up to `LIST_PAGE_CAP` pages and REFUSES past it, because a
+   * `TicketListView` is defined as the complete row set and serving the pages it
+   * already had would present a truncated list as the whole project (12.258).
+   * That refusal is right and stays. What was missing is any way for the person
+   * who meets it to ask a smaller question — `ticket-list.tsx` sent `{}` and
+   * nothing could change it, so a project past the bound refused for ever.
+   *
+   * **One axis, chosen for whether it RELIEVES the bound** rather than for whether
+   * it is useful: a text search narrows nothing reliably — it can match anything —
+   * so it would not shorten the walk. More axes are a scope call, not a free
+   * addition.
+   *
+   * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
+   * The first version of this asked for `['open', 'active']` — *"hide done"*, which
+   * is the narrowing a person would actually reach for. `toServerFilterSpec`
+   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: the SIX
+   * id-shaped axes are LISTS client-side — `assigneeIds`, `collaboratorIds`,
+   * `typeIds`, `stateIds`, `stateCategories`, `projectIds` — while
+   * `filterSpecSchema` takes exactly ONE value for each (`text`, `dueBefore`,
+   * `dueAfter` are scalars and `fields` is a record, so they are not part of this).
+   * So `stateCategory` can name `open` OR `active` OR `terminal` and never "not
+   * terminal". Found by 12.383 failing, not by reading the type — the plural axes
+   * look as though they compose.
+   *
+   * That guard is right and is the reason this is a label change rather than a bug:
+   * an unexpressible filter REFUSES loudly instead of being silently dropped and
+   * answering the wrong question. The consequence is only that this control says
+   * what it can actually do. **Recorded for whoever designs the fuller filter
+   * surface: "not done" needs either a plural `stateCategory` on the route or a
+   * negation term, and today it has neither.**
+   *
+   * Local state, not preferences: writing this through `usePreferences` is a
+   * whole-document PUT gated on `canSetPrefs`, and the user who most needs the
+   * control may be unable to persist anything. Persisting is its own change.
+   */
+  const [activeOnly, setActiveOnly] = useState(false);
+  const listFilter = useMemo(
+    () => (activeOnly ? { stateCategories: ['active'] as StateCategory[] } : {}),
+    [activeOnly],
+  );
 
   const board = useBoard(dataSource, workspaceId, projectId);
-  const list = useTicketList(dataSource, workspaceId, projectId, currentUserId);
+  const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
   const attention = useAttention(dataSource, workspaceId);
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
@@ -167,10 +210,20 @@ function ProjectBoard() {
     // predicates, because claiming a test for it would be the overclaim.
     const rows = list.rows ?? [];
     return {
-      epicTitle: (epicId) => rows.find((row) => row.ticketId === epicId)?.title ?? epicId,
+      // `?? epicId` was safe while `list.rows` was always the COMPLETE set: any
+      // epic a surviving child pointed at was necessarily in it. A narrowing
+      // breaks that — an epic that is `open` or `terminal` is filtered out while
+      // its `active` children survive and are rooted by `nestRows`, so the lookup
+      // misses and a 26-character ULID appears where a section title goes. Named
+      // rather than printed raw, and only when a narrowing can explain it: with no
+      // narrowing in force a missing epic means something else (visibility), and
+      // saying "outside the narrowing" there would be inventing a reason.
+      epicTitle: (epicId) =>
+        rows.find((row) => row.ticketId === epicId)?.title ??
+        (activeOnly ? 'An epic outside this narrowing' : epicId),
       typeName: (typeId) => typeId,
     };
-  }, [list.rows]);
+  }, [list.rows, activeOnly]);
 
   /**
    * The roster, for the two views that print a claim's AUTHOR.
@@ -378,6 +431,7 @@ function ProjectBoard() {
           currentUserId={currentUserId}
           typeOptions={typeOptions}
           parentCandidates={parentCandidates}
+          {...(activeOnly ? { parentCandidatesNarrowing: 'tickets in progress' } : {})}
           {...parentsUnavailable}
           onCreated={openTicket}
         />
@@ -407,6 +461,46 @@ function ProjectBoard() {
             ) : attention.data !== null ? (
               <AttentionStrip items={attention.data} onOpenTicket={openTicket} />
             ) : null}
+
+            {/*
+              ABOVE the tab arms, and that placement is the whole point rather than
+              a layout choice.
+
+              Which forces the note beside it to NAME THE SURFACES. The control
+              renders on every tab, but it narrows only the reads that take a
+              filter: `useBoard` takes none and cannot be narrowed, so an unscoped
+              "done are excluded" sits on the DEFAULT tab directly above a Done
+              column holding a done card — an unnarrowed set claiming to be
+              narrowed, which is the same class of lie as a narrowed one claiming
+              to be whole and is the reason this control exists. Every renderer of the list lives inside
+              `list.error === null` — put the narrowing control there and it is
+              reachable by everyone EXCEPT the person who needs it, because past the
+              cap those arms render a refusal instead. That is the identical mistake
+              `createRegion` was making until PR #270, and it has the identical fix:
+              gate an affordance on what it actually needs, not on the read that
+              happens to sit beside it. This control needs nothing.
+            */}
+            <div className="gn-list-filter">
+              <label className="gn-list-filter__control">
+                <input
+                  type="checkbox"
+                  checked={activeOnly}
+                  onChange={(event) => setActiveOnly(event.target.checked)}
+                />
+                Only tickets in progress
+              </label>
+              {/*
+                Said here as well as in the list's own summary, because past the cap
+                there IS no list to carry a summary — the arms are refusing — and
+                this is the only place the state of the question is visible.
+              */}
+              {activeOnly ? (
+                <span className="gn-list-filter__note" data-testid="list-filter-note">
+                  the list, calendar and timeline are asking only for tickets in progress —
+                  not started and done are both excluded. The board is not narrowed.
+                </span>
+              ) : null}
+            </div>
 
             <div className="gn-view-tabs" role="tablist">
               <button
@@ -520,6 +614,10 @@ function ProjectBoard() {
               <ShellRefusal what="The ticket list" message={list.error} />
             ) : list.rows !== null ? (
               <TicketList
+                // The words, not a flag: the summary has to say WHICH narrowing,
+                // and `undefined` here is what makes the unnarrowed count still
+                // read as the project's own.
+                {...(activeOnly ? { narrowing: 'tickets in progress' } : {})}
                 rows={list.rows}
                 // `''` while the session resolves or when signed out, and here
                 // that is harmless and deliberate: this prop drives only the

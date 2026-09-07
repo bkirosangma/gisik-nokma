@@ -24,6 +24,19 @@ export type NewTicketDialogProps = {
    * from the DRAFT; anything less makes this sentence a claim the payload contradicts.
    */
   parentCandidatesUnavailable?: string;
+  /**
+   * What narrowing the candidate list was built under, when it was built under
+   * one — NOT the same fact as `parentCandidatesUnavailable`, and kept separate
+   * for the reason that prop exists at all.
+   *
+   * `parentCandidates` is whatever the caller could see. Once the caller can be
+   * asked a narrower question, "everything I can see" stops meaning "everything
+   * there is", and a picker offering the narrowed set asserts *these are the
+   * tickets that could be a parent* — the same silent claim an EMPTY picker
+   * makes, one notch quieter. The user cannot read the page behind a modal to
+   * find the control that caused it.
+   */
+  parentCandidatesNarrowing?: string;
   onCreate: (draft: NewTicketDraft) => void;
   onClose: () => void;
 };
@@ -48,6 +61,7 @@ export function NewTicketDialog({
   typeOptions,
   parentCandidates,
   parentCandidatesUnavailable,
+  parentCandidatesNarrowing,
   onCreate,
   onClose,
 }: NewTicketDialogProps) {
@@ -88,6 +102,27 @@ export function NewTicketDialog({
           </p>
         )}
       </label>
+      {/*
+        OUTSIDE the `<label>`, and that is not cosmetic. A `<label>` is matched by
+        its TEXT, so a sentence inside this one becomes part of the control's
+        accessible name — `getByLabelText('Parent')` stops resolving, and a screen
+        reader announces the whole disclosure as the field's label every time focus
+        lands on it. Measured: putting it inside turned 12.388 red with "Unable to
+        find a label with the text of: Parent" while the field rendered fine.
+
+        Beside the picker rather than on the page behind it, because
+        `parentCandidates` is whatever the caller could see — and once the caller
+        can be asked a narrower question, "everything I can see" stops meaning
+        "everything there is". A narrowed picker asserts THESE are the tickets that
+        could be a parent, which is the same silent claim an empty picker makes,
+        one notch quieter, and a person inside a modal cannot read the control that
+        caused it.
+      */}
+      {parentCandidatesUnavailable === undefined && parentCandidatesNarrowing !== undefined ? (
+        <span className="gn-new-ticket__parent-narrowing" data-testid="parent-narrowing">
+          showing only {parentCandidatesNarrowing} — a ticket outside that is not offered here
+        </span>
+      ) : null}
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>
         <Button

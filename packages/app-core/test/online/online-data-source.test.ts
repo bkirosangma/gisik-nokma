@@ -772,6 +772,87 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     expect(urls).toHaveLength(LIST_PAGE_CAP);
   });
 
+  /**
+   * 12.383 — THE CLIFF IS RELIEVED BY NARROWING, which is the property that decides
+   * whether a filter affordance is an answer to 12.322 or only a convenience.
+   *
+   * 12.258 proves the refusal past the cap and 12.320 proves the boundary. Neither
+   * says a user who meets that refusal has ANY way out — and until this change there
+   * was none: `ticket-list.tsx` sent `{}` and nothing could change it, so a project
+   * past the bound refused for ever, on every tab that reads the list.
+   *
+   * **The fixture is the whole point, and a smaller one would prove nothing.** A case
+   * that filters a two-page project shows the filter is WIRED. It does not show the
+   * cliff is relieved, because that project never refused. This one is a single
+   * project seen two ways: unfiltered it needs `LIST_PAGE_CAP + 1` pages and refuses;
+   * narrowed it needs two and answers. Same source, same walk, same cap.
+   *
+   * The filter is also asserted to reach EVERY page of the walk, not just the first.
+   * `listQueryString` is called inside the loop, but a refactor hoisting it out of the
+   * loop while keeping the first request correct would narrow page 1 and then ask the
+   * server for everything else — a walk that neither refuses nor answers the question,
+   * and one no assertion about the returned rows would catch.
+   */
+  it('12.383 the SAME project refuses unfiltered and answers narrowed — the cliff has a way out', async () => {
+    // Eleven pages unfiltered, two when the request carries a `filter`. The fake
+    // narrows on the URL because that is where the real narrowing happens: the
+    // client's only lever on the walk's length is what it asks for.
+    const narrow = (input: string) =>
+      new URL(input, 'http://x').searchParams.get('filter') !== null;
+    const WIDE = Array.from({ length: LIST_PAGE_CAP + 1 }, (_unused, i) => ({
+      ticketIds: [`t${i}`],
+    }));
+    const NARROW = [{ ticketIds: ['t0'] }, { ticketIds: ['t1'] }];
+    const urls: string[] = [];
+    const fetchImpl = async (input: string) => {
+      urls.push(input);
+      const pages = narrow(input) ? NARROW : WIDE;
+      const cursor = new URL(input, 'http://x').searchParams.get('cursor');
+      const index =
+        cursor === null ? 0 : pages.findIndex((page) => page.ticketIds.at(-1) === cursor) + 1;
+      const page = pages[index];
+      const isLast = index === pages.length - 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          projectId: PROJECT,
+          groupBy: 'flat',
+          groups: [
+            { key: 'all', label: 'All', cards: (page?.ticketIds ?? []).map((id) => listCard(id)) },
+          ],
+          nextCursor: page === undefined || isLast ? null : (page.ticketIds.at(-1) ?? null),
+        }),
+      } as unknown as Response;
+    };
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+
+    // The control, and it must come FIRST: if this did not refuse, the case below
+    // would be measuring a project that was never past the cap.
+    const refused = await source.query
+      .getTickets(PROJECT, {}, 'flat')
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ServingGapError);
+    expect((refused as ServingGapError).absences).toEqual([LIST_TOO_LARGE_ABSENCE]);
+
+    // The same project, asked a smaller question, ANSWERS.
+    urls.length = 0;
+    const view = await source.query.getTickets(
+      PROJECT,
+      { stateCategories: ['active'] },
+      'flat',
+    );
+    expect(view.rows.map((row) => row.ticketId)).toEqual(['t0', 't1']);
+
+    // And the narrowing was on EVERY request of the walk, not only the first.
+    // Printed as a list so a failure names which page went out wide.
+    expect(urls.map((url) => new URL(url, 'http://x').searchParams.get('filter'))).toEqual([
+      JSON.stringify({ stateCategory: 'active' }),
+      JSON.stringify({ stateCategory: 'active' }),
+    ]);
+  });
+
   it('12.259 a single-page project makes ONE request and never pages', async () => {
     // The control that keeps the two cases above from being satisfied by a
     // source that always pages: the ordinary small project must not pay a

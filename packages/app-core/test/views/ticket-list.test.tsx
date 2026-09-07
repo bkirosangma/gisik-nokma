@@ -80,12 +80,17 @@ function ControlledList({
   prefsEditable,
   onOpenTicket = vi.fn(),
   onChange,
+  // Undefaulted for the same reason `prefsEditable` is: `TicketList`'s own
+  // unnarrowed arm is the one every existing case exercises, and defaulting it
+  // here would leave that arm untested by all of them.
+  narrowing,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
   prefsEditable?: boolean;
   onOpenTicket?: (ticketId: string) => void;
   onChange?: (prefs: ProjectViewPrefs) => void;
+  narrowing?: string;
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -100,9 +105,47 @@ function ControlledList({
       }}
       labels={LABELS}
       onOpenTicket={onOpenTicket}
+      {...(narrowing === undefined ? {} : { narrowing })}
     />
   );
 }
+
+/**
+ * 12.384 — A NARROWED LIST MAY NOT WEAR THE PROJECT'S COUNT.
+ *
+ * `{total} tickets · {terminal} done` is a claim about the PROJECT. Over a filtered
+ * set it says the project holds `total` tickets, which is 12.258's defect — a partial
+ * list presented as whole — in a new costume. That case is precisely why `getTickets`
+ * refuses past the cap instead of serving the pages it already had, so handing the
+ * same falsehood back through a filter would return what the refusal was protecting.
+ *
+ * **Both halves are asserted because either alone passes against a page that is still
+ * lying.** A note saying "narrowed" beside the words "12 tickets" leaves the NUMBER
+ * claiming to be the project's, and the number is what a person reads first; changing
+ * the number without naming the narrowing leaves a reader unable to tell what "12
+ * matching" matched. And the unnarrowed control is what stops the fix from being "say
+ * `matching` always", which would make every list hedge and none of them informative.
+ */
+describe('12.384 the summary says when the rows are not the whole project', () => {
+  it('narrowed: the count reads `matching`, the `done` half is gone, and the narrowing is named', () => {
+    render(<ControlledList narrowing="tickets in progress" />);
+    // `· N done` is dropped, not recomputed. It is a claim about the PROJECT, and
+    // under the only shipped narrowing it is structurally always `0 done` — a
+    // number that can only say zero, in a shape that invites the project-wide
+    // reading the count no longer supports.
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 matching');
+    expect(screen.getByTestId('list-summary')).not.toHaveTextContent('done');
+    expect(screen.getByTestId('list-narrowing')).toHaveTextContent(
+      'narrowed to tickets in progress — not the whole project',
+    );
+  });
+
+  it('CONTROL: unnarrowed, the count still speaks for the project and no note appears', () => {
+    render(<ControlledList />);
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets · 1 done');
+    expect(screen.queryByTestId('list-narrowing')).not.toBeInTheDocument();
+  });
+});
 
 const ALL_GROUPINGS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
 
@@ -615,6 +658,74 @@ function eventFrame(source: FakeDataSource): void {
     },
   });
 }
+
+/**
+ * 12.386 — CHANGING THE FILTER ASKS THE QUESTION AGAIN.
+ *
+ * **This case exists because its mutation SURVIVED.** Dropping the filter from
+ * `useLiveQuery`'s key — leaving it as the bare `projectId` — broke nothing in the
+ * suite, so the docblock claiming the key must carry it was an unwitnessed claim.
+ * Recorded rather than quietly covered, because a survivor with no explanation is the
+ * thing this series keeps finding, and here the explanation was simply that nobody had
+ * ever changed a filter on a mounted hook.
+ *
+ * The failure it guards is silent and worse than a stale render: `useLiveQuery`'s load
+ * effect depends on the KEY, and its `load` closure is refreshed through a ref on every
+ * render. So with the filter outside the key the component re-renders with the new
+ * filter, issues NO request, and leaves the previous rows on screen underneath a
+ * control that says they were narrowed. Nothing throws and nothing spins — the list
+ * simply answers the wrong question, and 12.384's summary would then name a narrowing
+ * that had not been applied.
+ *
+ * Both halves: the read is re-issued WITH the new filter, and the rows on screen become
+ * the narrowed ones. The first alone would pass if the answer were discarded; the
+ * second alone would pass if the fake ignored its argument.
+ */
+describe('12.386 useTicketList — a filter change re-issues the read', () => {
+  function FilterHarness({ source }: { source: FakeDataSource }) {
+    const [narrow, setNarrow] = useState(false);
+    const list = useTicketList(
+      source,
+      WS,
+      PROJECT,
+      'me',
+      narrow ? { stateCategories: ['active'] } : {},
+    );
+    return (
+      <div>
+        <span data-testid="rows">{list.rows === null ? 'loading' : `rows:${list.rows.length}`}</span>
+        <button type="button" onClick={() => setNarrow(true)}>
+          narrow
+        </button>
+      </div>
+    );
+  }
+
+  it('re-asks with the new filter, and the narrowed rows reach the screen', async () => {
+    const asked: unknown[] = [];
+    const source = createFakeDataSource({
+      getTickets: async (_projectId: string, filter: unknown) => {
+        asked.push(filter);
+        const wide = (filter as { stateCategories?: string[] }).stateCategories === undefined;
+        return {
+          projectId: PROJECT,
+          rows: wide ? [ROWS[0]!, ROWS[1]!, ROWS[2]!] : [ROWS[0]!],
+        };
+      },
+    });
+    render(<FilterHarness source={source} />);
+    await waitFor(() => expect(screen.getByTestId('rows')).toHaveTextContent('rows:3'));
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'narrow' }));
+
+    // The rows on screen are the narrowed ones — the half a user sees.
+    await waitFor(() => expect(screen.getByTestId('rows')).toHaveTextContent('rows:1'));
+    // And the read was actually re-issued, with the filter, rather than the view
+    // being filtered client-side out of rows it already had. Printed whole so a
+    // failure says what was asked instead of only how many times.
+    expect(asked).toEqual([{}, { stateCategories: ['active'] }]);
+  });
+});
 
 describe('3.53 useTicketList — preferences round-trip through the DataSource (amendment 14)', () => {
   it('loads stored prefs and writes changes back via putPreferences, workspace and all', async () => {

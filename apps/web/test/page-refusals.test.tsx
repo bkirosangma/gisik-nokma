@@ -56,6 +56,48 @@ afterEach(() => {
   push.mockClear();
 });
 
+/**
+ * A board carrying a DONE card, for 12.387. The board read takes no filter, so
+ * this card survives every narrowing — which is the whole point: the note must not
+ * tell a user on this tab that done tickets are excluded while one is on screen.
+ */
+const PROVENANCE_387 = {
+  actorId: '01J9USER000000000000000000',
+  actorName: 'Anselma Marak',
+  clientTime: '2026-08-20T08:59:00.000Z',
+  serverTime: '2026-08-20T09:00:00.000Z',
+};
+const BOARD_WITH_DONE = {
+  projectId: '01J9PROJECT000000000000000',
+  groups: [
+    {
+      workflowId: 'wf-errands',
+      workflowVersion: 1,
+      workflowName: 'Errand',
+      columns: [
+        {
+          stateId: 'done',
+          name: 'Done',
+          category: 'terminal' as const,
+          blocked: false,
+          cards: [
+            {
+              ticketId: '01J9TICKET00000000000000DN',
+              title: 'Old sign taken down',
+              typeId: 'task',
+              assignee: null,
+              stateProvenance: PROVENANCE_387,
+              cause: null,
+              rollup: null,
+              pending: false,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe('a refused read is rendered as the refusal, never as a spinner or an empty list', () => {
   it('My Work: both reads refuse, and both refusals are on the page instead of "Loading…"', async () => {
     // **The two refusals are CONSTRUCTED here now, and that is a change.** This
@@ -272,6 +314,191 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // is what says the refusal took the arm rather than sitting beside a drawn list.
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     expect(screen.queryByTestId('list-summary')).not.toBeInTheDocument();
+  });
+
+  /**
+   * 12.385 — THE WAY OUT OF THE CLIFF IS REACHABLE FROM INSIDE IT.
+   *
+   * 12.382 above proves the refusal renders. This proves the user who meets it can do
+   * something about it, which is the half that makes the refusal survivable rather
+   * than merely honest.
+   *
+   * **The placement is the property, not the markup.** Every renderer of the list —
+   * the List, Calendar and Timeline arms — lives inside `list.error === null`. A
+   * narrowing control put among them is reachable by everyone EXCEPT the person past
+   * the cap, because for that person those arms render a refusal instead. It is the
+   * same mistake `createRegion` made until #270 and it fails the same way: the
+   * affordance exists, is tested, and is unreachable in the one state it was built
+   * for.
+   *
+   * So this case asserts it from the state that matters — `getTickets` refusing with
+   * the real `LIST_TOO_LARGE_ABSENCE` — and pairs the control's presence with the
+   * refusal's, because a control on a page with no refusal would prove nothing about
+   * this state, and a refusal with no control is the cliff as it stood.
+   */
+  it('12.385 past the cap, the narrowing control is on the page beside the refusal', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices({
+          getTickets: () =>
+            Promise.reject(new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])),
+          getTicketTypes: async () => [
+            { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+          ],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // Present in the refusing state, and reached WITHOUT first going to a tab that
+    // renders a list — there is none to go to.
+    const narrow = await screen.findByRole('checkbox', { name: 'Only tickets in progress' });
+    expect(narrow).toBeInTheDocument();
+
+    // Paired with the thing that makes the state real. Without this the case would
+    // pass on a page whose list answered, where the control is not the point.
+    const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 40);
+    await user.click(await screen.findByRole('tab', { name: 'List' }));
+    await waitFor(() => {
+      const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
+      expect(statuses.some((text) => text.includes(ownWords))).toBe(true);
+    });
+
+    // And it is operable, not merely rendered: ticking it states the narrowing on the
+    // page itself. Past the cap there is no list, so the list's own summary cannot be
+    // the only place the question's state is visible.
+    await user.click(narrow);
+    expect(await screen.findByTestId('list-filter-note')).toHaveTextContent(
+      'asking only for tickets in progress',
+    );
+  });
+
+  /**
+   * 12.389 — A NARROWING MUST NOT TURN A SECTION HEADING INTO A ULID.
+   *
+   * `epicTitle` resolves an epic by searching `list.rows`, with `?? epicId` as the
+   * fallback. That was safe while `list.rows` was always the COMPLETE set: any epic a
+   * surviving child pointed at was necessarily in it. A narrowing breaks the invariant
+   * — an `open` or `terminal` epic is filtered out while its `active` children survive
+   * and are correctly rooted by `nestRows` — so the lookup misses and a 26-character
+   * ULID appears where a section title belongs.
+   *
+   * Named rather than printed raw, and ONLY when a narrowing can explain it: with no
+   * narrowing in force a missing epic means something else (visibility), and saying
+   * "outside this narrowing" there would be inventing a reason. The control below is
+   * that half.
+   */
+  it('12.389 an epic filtered out of the rows is named, not rendered as its id', async () => {
+    const user = userEvent.setup();
+    const EPIC = '01J9TICKET00000000000000EP';
+    const CHILD = '01J9TICKET00000000000000CH';
+    const row = (id: string, title: string, category: 'active' | 'terminal', epicId: string | null) => ({
+      ticketId: id,
+      title,
+      typeId: epicId === null ? 'epic' : 'task',
+      typeRank: epicId === null ? 1 : 3,
+      parentId: epicId,
+      epicId,
+      stateId: category === 'active' ? 'doing' : 'done',
+      stateName: category === 'active' ? 'Doing' : 'Done',
+      stateCategory: category,
+      stateProvenance: PROVENANCE_387,
+      assignee: null,
+      assignedProvenance: null,
+      dueDate: null,
+      fields: {},
+      rollup: null,
+      hasRestrictedParent: false,
+      pending: false,
+    });
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD_WITH_DONE,
+          // The narrowed answer drops the epic and keeps its child — exactly what the
+          // server does, since the epic is terminal and the child is not.
+          getTickets: async (_p: string, filter: { stateCategories?: string[] }) => ({
+            projectId: '01J9PROJECT000000000000000',
+            rows:
+              filter.stateCategories === undefined
+                ? [row(EPIC, 'Rewire the shop sign', 'terminal', null), row(CHILD, 'Chase the vendor', 'active', EPIC)]
+                : [row(CHILD, 'Chase the vendor', 'active', EPIC)],
+          }),
+          getTicketTypes: async () => [
+            { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+          ],
+          getPreferences: async () => ({
+            version: 1 as const,
+            projects: {
+              '01J9PROJECT000000000000000': {
+                columns: { origin: 'default' as const },
+                grouping: { origin: 'stored' as const, value: 'epic' as const },
+              },
+            },
+            savedFilters: [],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'List' }));
+
+    // CONTROL first: unnarrowed, the real title is the heading. Without this the case
+    // would pass against a page that never renders a title at all.
+    expect(await screen.findByRole('region', { name: 'Rewire the shop sign' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Only tickets in progress' }));
+
+    // The child survives and is still on screen — the heading is the only thing at issue.
+    expect(await screen.findByText('Chase the vendor')).toBeInTheDocument();
+    // And no ULID is standing in for a title.
+    expect(screen.queryByRole('region', { name: EPIC })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'An epic outside this narrowing' }),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * 12.387 — THE NOTE MAY NOT CLAIM A SURFACE IT DOES NOT NARROW.
+   *
+   * The control renders on every tab, which 12.385 requires. But it narrows only the
+   * reads that TAKE a filter, and `useBoard` takes none — so an unscoped *"done are
+   * excluded"* sits on the DEFAULT tab directly above a Done column holding a done
+   * card. That is an unnarrowed set claiming to be narrowed: the same class of lie as
+   * a narrowed one claiming to be whole, and the reason this control exists at all.
+   */
+  it('12.387 the narrowing note names the surfaces it narrows, and exempts the board', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD_WITH_DONE,
+          getTickets: async () => ({ projectId: '01J9PROJECT000000000000000', rows: [] }),
+          getTicketTypes: async () => [
+            { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+          ],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await user.click(await screen.findByRole('checkbox', { name: 'Only tickets in progress' }));
+
+    // The board is the DEFAULT tab, so this is what a user sees first.
+    expect(await screen.findByRole('tab', { name: 'Board' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // The done card really is still on the board — without this the note could be
+    // exempting the board from a narrowing that had no visible effect there anyway.
+    expect(await screen.findByText('Old sign taken down')).toBeInTheDocument();
+    expect(screen.getByTestId('list-filter-note')).toHaveTextContent('The board is not narrowed');
+    expect(screen.getByTestId('list-filter-note')).toHaveTextContent(
+      'the list, calendar and timeline are asking only for tickets in progress',
+    );
   });
 
   it('Project page: the board tab shows the board read’s own failure, not "Loading…"', async () => {

@@ -96,6 +96,114 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# 🟢 MONDAY 2026-09-07 ~17:xx IST — **THE FILTER PR: the cliff has a way out, and the summary stops claiming to be the project.** `exec/78-list-filter`, off `7d24716`. Fresh off main, not stacked.
+
+| what | value |
+|---|---|
+| `main` | `7d24716` (#270 merged as `c3404af`, #271 anchored) |
+| branch | **`exec/78-list-filter`** |
+| owner ruling used | remedy 4 landed; this is the **second half** the owner authorised. **13.176 = option B confirmed**, queued behind this PR. |
+| gate | `GATE_EXIT=0` · **30/30** · **3715 \| 5 skipped (3720) / 297 files** · Node **v22.22.2** · `check:env`/`check:tasks`/`check:runbook`/`check:citations` all 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| delta | **+9 cases, +0 files** vs `main`'s 3706/297 — 12.383, 12.384's pair, 12.385, 12.386, 12.387, 12.388's pair, 12.389 |
+
+## WHAT IT DOES
+
+`getTickets` walks ten pages and refuses past them — right, and it stays. What was missing is any way for
+the person who meets that refusal to ask something smaller: `ticket-list.tsx` sent `{}` and nothing could
+change it, so a project past the bound refused **for ever**.
+
+- `useTicketList` takes a `FilterSpec` (defaulted, so every existing caller is unchanged).
+- **The control sits ABOVE the tab arms** — every list renderer lives inside `list.error === null`, so a
+  control placed among them is reachable by everyone *except* the person past the cap. Same mistake
+  `createRegion` made until #270, same fix.
+- **The summary stops wearing the project's count when narrowed** (`matching`, plus the narrowing named).
+
+## ⚠ THE WIRE IS NARROWER THAN THE CLIENT TYPE — found by a test failing, not by reading
+
+The control first asked for `['open','active']` — *"hide done"*, the narrowing a person actually wants.
+`toServerFilterSpec` (`mappers.ts:838-853`) **throws `UnexpressibleFilterError`**: every `FilterSpec` axis
+is a LIST client-side while `filterSpecSchema` takes exactly **ONE** value. So `stateCategory` can say
+`open` OR `active` OR `terminal` and **never "not terminal"**.
+
+**The guard is right** — an unexpressible filter refuses loudly instead of being dropped and silently
+answering a different question — so this was a label change, not a bug. **Recorded for the fuller filter
+surface: "not done" needs a plural `stateCategory` or a negation term on the route, and has neither.**
+
+> The client type is plural and *looks* as though it composes. Reading it would have produced a wrong
+> design confidently; only running it said otherwise.
+
+## FIVE MUTATIONS, AND THE ONE THAT SURVIVED
+
+| mutation | result |
+|---|---|
+| **F1** query string hoisted out of the walk (page 1 narrowed, rest wide) | **12.383 kills** |
+| **F2** summary wears the project's count over a narrowed set | **12.384 kills** |
+| **F3** the narrowing never named beside the count | **12.384 kills** |
+| **F4** the filter dropped from the query key | **SURVIVED — see below** |
+| **F5′** control gated on the list having answered | **12.385 kills** |
+
+**F4 survived, and that was the finding.** The key's docblock claimed the filter must be in it and *nothing
+tested it* — nobody had ever changed a filter on a mounted hook. The failure it guards is silent and worse
+than a stale render: `useLiveQuery`'s load effect depends on the key while its `load` closure is refreshed
+through a ref every render, so with the filter outside the key the component re-renders, **issues no request
+at all**, and leaves the old rows under a control saying they were narrowed — with 12.384's summary then
+naming a narrowing that was never applied. **12.386 was written for it and now kills it.**
+
+**An F5 was discarded rather than counted** — moving the control's JSX produced a transform error, so it
+killed at a shape gate and measured no property. Replaced with F5′, which gates the control on
+`list.rows !== null` and is valid code.
+
+## ⚠ REVIEW ROUND — ONE CRITICAL, TWO IMPORTANT, AND A ROOT CAUSE WORTH KEEPING
+
+**The root cause in one line, because it explains all three:** the narrowing is
+`list.rows`-scoped and the sentence announcing it is page-scoped. So every OTHER consumer of `list.rows`
+inherited the narrowing without the announcement, and every surface that is NOT `list.rows` inherited the
+announcement without the narrowing. **`list.rows` has four consumers on this page and I updated one.**
+
+| finding | what it did |
+|---|---|
+| **CRITICAL** `parentCandidates` is built from `list.rows` | narrowing silently removed every done ticket from the New-ticket parent picker. A user filing a sub-task under a finished ticket found it absent, **inside a modal**, with nothing saying why — and the page note that would explain it is exactly the sentence a modal hides. **It blocks an action, not just misinforms.** |
+| **IMPORTANT** the note claimed a surface it does not narrow | `useBoard` takes no filter, so an unscoped *"done are excluded"* sat on the **default** tab above a Done column holding a done card — an unnarrowed set claiming to be narrowed. |
+| **IMPORTANT** `epicTitle`'s `?? epicId` | safe only while `list.rows` was complete. A terminal epic filtered out from under its surviving active children put a **26-character ULID** where a section title goes. |
+
+Closed as **12.388**, **12.387**, **12.389**; all three mutation-witnessed, each killing at its own site,
+each with a control.
+
+## ⚠ A TYPE HOLE FOUND WHILE FIXING THE CRITICAL
+
+Passing the new prop through the JSX **spread** form — `{...(cond ? { prop: v } : {})}` — **typechecked
+while `CreateTicketFlow` had no such prop**, so it was silently dropped and the fix did nothing. An excess
+property inside a spread is not checked the way a named attribute is. Caught only because the test failed.
+
+> **Never introduce a new prop through the conditional-spread idiom.** It is the repo's house style for
+> `exactOptionalPropertyTypes`, and it silently swallows a name the target does not accept.
+
+## ⚠ `check:citations` CANNOT CATCH A MISSING CATALOGUE ENTRY
+
+12.386 had no `test-cases/` row and the gate was green. `scripts/check-case-citations.mjs` checks
+**catalogue → test**, never test → catalogue, so **a test citing an id nothing catalogues passes
+silently**. `check-case-ids.mjs` checks duplicates and **is not wired into the gate at all**.
+
+Four entries added (12.386–12.389). **Owner for the missing direction: whoever next touches the gate
+scripts** — this is a check that cannot fail in the direction a new case actually travels.
+
+## ⚠ `Features.md` CARRIED TWO FALSE SENTENCES, ONE OF THEM SINCE #270
+
+- *"no ticket can be created from this page — not even at project root"* — **false since remedy 4 landed**,
+  i.e. #270 changed the behaviour and left the entry. Mine to have caught, and I did not.
+- *"the project page passes neither a FilterSpec nor a lane"* — **falsified by this PR.**
+
+Both corrected in place rather than quietly rewritten, and the new control now has its own ✅ entry.
+
+## NEXT
+
+1. **13.176 — option B, confirmed by the owner**: a *"Shared with me"* surface listing tickets directly,
+   never via a project. Needs a new read: `my-work.ts:120` filters `t.assignee_id`, and `visibleProjects`
+   filters on `eff.projects`, which is built only from `proj_memberships`.
+2. Still the owner's: whether remedies 1 (raise the cap) or 2 (a paged view type) follow.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~15:1x IST — **THE RED IS RESOLVED AND THE OPEN QUESTION IS ANSWERED. `exec/77-decouple-create` is GREEN.** PR open; the Board-tab change is a design call recorded for reversal.
 
 | what | value |
@@ -234,8 +342,8 @@ first, and this is the measurement.
 ## MEASURED FOR 13.176: IT LANDS ON A RULING THE OWNER ALREADY HOLDS
 
 13.176 says *"a guest has NO NAVIGATION to the four errands explicitly shared with them"*. The measurement
-says why, and the why matters more than the symptom: **there is no read that could serve it, and the one
-that would is already held with the owner over this exact question.**
+says why. **The first version of this section got the why wrong — see the correction below, which is kept
+in place of a quiet edit because the wrong version was pushed and may have been acted on.**
 
 - **No `DataSource` method lists "tickets shared with me."** All thirteen enumerated at
   `packages/app-core/src/data-source.ts:132-143`; the closest is `getMyWork(workspaceId)`.
@@ -244,15 +352,59 @@ that would is already held with the owner over this exact question.**
   (`view-types.ts:238`). A ticket shared with a guest who is not its **assignee** appears in none of the
   three. The route's own docblock (`:56`) names *"a ticket explicitly shared with somebody else"* as a case
   it is measured against — it is deliberately not this read's job.
-- **`getMyWorkspaces` — the natural entry point for a guest with no project — REFUSES**, and
-  `online-data-source.ts:92-95` says it is **HELD with the owner** because *"serving them means deciding
-  what a project-scoped guest sees of a workspace's other projects, and there is no shipped project-list
-  read at all."*
+### ⚠ CORRECTION — THE PARAGRAPH THAT STOOD HERE WAS WRONG, AND IT WAS WRONG BECAUSE I QUOTED A DOCBLOCK INSTEAD OF THE REGISTER
 
-**That last line IS 13.176.** So this is not a fresh UX question to design and build; it is the client-side
-face of a ruling already sitting with the owner, and designing a guest navigation before that ruling lands
-would be picking the answer to the held question by implementing one. **Recommend it be raised as part of
-the `getMyWorkspaces`/`getMyWork` hold rather than opened as its own design item.** Recorded, not decided.
+It said `getMyWorkspaces` **REFUSES** and is **HELD with the owner**, and concluded 13.176 was "the
+client-side face of a ruling already sitting with the owner" and must not be built. **All of that is
+false.** It was taken from `online-data-source.ts:88-98`, which is **stale prose**. Measured instead from
+the things that decide:
+
+| claim | the register says |
+|---|---|
+| `getMyWorkspaces` refuses | **No.** `online-data-source.ts:127` → `mapWorkspaceRefs(await http.get('/v1/me/workspaces'))`. It answers. |
+| `getMyWork` refuses | **No.** `online-data-source.ts:328` answers. |
+| four methods still refuse | **No.** `SERVING_GAPS` (`mappers.ts:1729-1731`) has exactly **one** key: `search`. |
+
+**So there is no hold, 13.176 is nobody else's open item, and it is buildable now.** The docblock names
+"the four that remain"; three of those four have since been served, and its sentence about "no shipped
+project-list read at all" is contradicted by `/v1/me/workspaces` serving `projects` per workspace
+(`routes/workspaces.ts:172`).
+
+> **The lesson, in the family this file keeps collecting:** a docblock is a claim about the day it was
+> written. `SERVING_GAPS` is the register and the implementation is the fact. I read the prose because it
+> was more articulate than the data, and articulate is not current.
+
+### WHAT 13.176 ACTUALLY NEEDS — measured to the predicate
+
+The navigation is missing for a reason with a precise site, not a missing ruling:
+
+1. `/v1/me/workspaces` serves each workspace's `projects` via `visibleProjects` (`routes/workspaces.ts:172`).
+2. `visibleProjects` returns everything for an `owner`, else
+   **`visible.filter((p) => eff.projects.has(p.projectId))`** (`read/visible-projects.ts:57-60`).
+3. `eff.projects` is built **only** from `proj_memberships`
+   (`permissions/effective-role.ts:105-118`) — per-ticket visibility (`proj_visibility`) never enters it.
+
+**So a guest holding four explicitly-shared tickets in a project they are not a member of gets no project
+card, hence no link, hence no route in.** That is 13.176, exactly.
+
+**There IS a design decision, but it is a recorded deliberate tie-break, not a hold** — and reading it as a
+hold is what the wrong paragraph did. `visible-projects.ts:26-35` states that a project's NAME is a
+disclosure, withheld role-independently under rulings P32/P38, and writes the tie-break down:
+*"serving MORE later is a widening and reversible; serving a name and retracting it is not."*
+
+| shape | what it costs |
+|---|---|
+| **A.** put the shared ticket's project into the project list | **discloses the project NAME → reverses P32/P38.** Needs an owner ruling. |
+| **B.** a *"Shared with me"* surface listing the TICKETS directly, never via a project | discloses no project name, so it **respects P32/P38**, and the recorded tie-break explicitly anticipates widening. Needs a new read — there is none: `my-work.ts:120` filters `t.assignee_id = <viewer>` and `MyWorkView` is `{assigned, inTransit, contested}`. |
+
+**B is the shape that does not reverse a ruling**, and is the recommendation. Still the owner's call, but the
+question is "which surface", not "may we proceed".
+
+**Also found, and recorded rather than fixed:** rulings **P39 and P40 appear nowhere in the coordination
+doc** — only in `apps/server/src/routes/my-work.ts`, its test, and `client-contract.test.ts`. Positive
+control: `P25` is present in the coordination doc, so the sweep works. The rulings that discharged these
+gaps live only in code comments, which is how the stale docblock survived. Owner: whoever next reconciles
+the ruling register.
 
 ## NEXT
 
