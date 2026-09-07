@@ -170,10 +170,71 @@ describe('HSTS — emitted only when this build targets an https deployment', ()
     expect(hsts?.value).not.toContain('preload');
   });
 
-  it('13.248 sends NOTHING for an http SERVER_ORIGIN — RFC 6797 forbids it, and local dev is http', async () => {
+  it('13.248 sends NO HSTS for an http SERVER_ORIGIN — RFC 6797 forbids it, and local dev is http', async () => {
     // The positive case above is this one's control: the same function, the
-    // same import path, one input changed. Without it an empty array here
-    // would equally well mean `headers()` is not wired at all.
-    expect(await headersUnder('http://localhost:3000')).toEqual([]);
+    // same import path, one input changed.
+    //
+    // This asserted `toEqual([])` until 2026-09-08, when the three
+    // unconditional headers landed beside HSTS. That was a weaker claim wearing
+    // a stronger sentence: an empty array equally well meant `headers()` was not
+    // wired at all, and it would have gone green if someone had deleted the
+    // whole function. Naming the header that must be absent says the thing the
+    // case is actually about, and it fails if the gate is removed.
+    const headers = await headersUnder('http://localhost:3000');
+    expect(headers.find((header) => header.key === 'strict-transport-security')).toBeUndefined();
+    expect(headers.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * 13.260 — the three headers that do NOT depend on the deployment protocol, over http and https alike.
+ * 13.261 — Content-Security-Policy is DEFERRED, and its absence is asserted so adding one is deliberate.
+ */
+describe('the unconditional security headers', () => {
+  async function headersUnder(serverOrigin: string): Promise<Array<{ key: string; value: string }>> {
+    vi.resetModules();
+    vi.stubEnv('SERVER_ORIGIN', serverOrigin);
+    const fresh = (await import('../next.config.js')).default;
+    const groups = (await fresh.headers?.()) ?? [];
+    return groups.flatMap((group) => group.headers as Array<{ key: string; value: string }>);
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  const EXPECTED = {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    // NOT the API server's `no-referrer`: this is a document origin, and a page
+    // whose links stop carrying their origin breaks flows that legitimately
+    // read it.
+    'referrer-policy': 'strict-origin-when-cross-origin',
+  };
+
+  it('13.260 sends all three over http AND https — they carry no protocol condition', async () => {
+    // Both inputs, in one case. Either alone passes for a function that gates
+    // everything on the protocol, which is exactly the shape this replaced.
+    for (const origin of ['http://localhost:3000', 'https://pm-api.artsourced.in']) {
+      const headers = await headersUnder(origin);
+      for (const [key, value] of Object.entries(EXPECTED)) {
+        expect(headers.find((header) => header.key === key)?.value, `${key} under ${origin}`).toBe(
+          value,
+        );
+      }
+    }
+  });
+
+  it('13.261 sends NO Content-Security-Policy — deferred, and pinned so adding one is deliberate', async () => {
+    const headers = await headersUnder('https://pm-api.artsourced.in');
+    const keys = headers.map((header) => header.key);
+    // A CSP for this app is a real design problem — webpack rather than
+    // Turbopack, `output: 'standalone'`, a rewrite-based same-origin proxy —
+    // whose failure mode is breaking in production only. The owner deferred it
+    // on 2026-09-08. Asserting the absence is what turns "we have not done it
+    // yet" into a statement the next person has to change on purpose.
+    expect(keys).not.toContain('content-security-policy');
+    expect(keys).not.toContain('permissions-policy');
   });
 });

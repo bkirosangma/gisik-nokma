@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { hstsHeaderFor } from './http/hsts.js';
+import { SECURITY_HEADERS } from './http/security-headers.js';
 import { FORBIDDEN_ORIGIN_BODY, httpOriginRefused, normalizeOrigin } from './http/http-origin.js';
 import { makeFixedWindowLimiter, rateLimitKeyFor } from './http/rate-limit.js';
 import type { Auth } from './auth/auth.js';
@@ -393,7 +394,16 @@ export function buildApp(
   // `hstsHeaderFor` returns `null` for anything but https, so this is silent in
   // local dev by construction — see its docblock for why emitting it there
   // would be a self-inflicted, uninstallable outage.
+  // The three unconditional headers ride in the SAME hook, for the same reason
+  // it is registered here rather than inside `options.security`: roughly sixty
+  // test call sites build the app without that block, and a header only present
+  // in the configuration nobody exercises is a control nobody can witness.
+  // Unlike HSTS they carry no protocol condition — see `http/security-headers.ts`
+  // for why each is a property of what this server is rather than a policy.
   app.addHook('onRequest', async (request, reply) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      void reply.header(name, value);
+    }
     const hsts = hstsHeaderFor(request.protocol);
     if (hsts !== null) void reply.header('strict-transport-security', hsts);
     return undefined;

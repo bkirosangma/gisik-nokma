@@ -109,15 +109,36 @@ const nextConfig: NextConfig = {
    * header would not be its most urgent problem.
    */
   async headers() {
-    if (!serverOrigin.startsWith('https://')) return [];
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'strict-transport-security', value: 'max-age=31536000; includeSubDomains' },
-        ],
-      },
+    // Three unconditional, then HSTS only when this build targets https.
+    //
+    // The split matters and the old shape hid it: this function used to return
+    // `[]` outright for an http `SERVER_ORIGIN`, which was right for HSTS and
+    // would be wrong for everything else. `nosniff`, `DENY` and a referrer
+    // policy are safe — and useful — over plain http, and gating them on the
+    // deployment protocol would leave local dev running under a weaker
+    // configuration than production, which is how a header that breaks
+    // something gets discovered by users rather than by a developer.
+    //
+    // `strict-origin-when-cross-origin`, NOT the API server's `no-referrer`,
+    // and the difference is deliberate: this IS a document origin. A page whose
+    // own links stop carrying their origin breaks flows that legitimately read
+    // it, while the API is never a page a browser navigates FROM.
+    //
+    // No `Content-Security-Policy` here yet. It is the one that needs real
+    // design for this app — webpack rather than Turbopack, `output:
+    // 'standalone'`, and a rewrite-based same-origin proxy — and its failure
+    // mode is breaking in production only. Deferred by the owner on 2026-09-08
+    // rather than guessed at; `test/next-config.test.ts` pins the absence so
+    // adding one is a deliberate act.
+    const always = [
+      { key: 'x-content-type-options', value: 'nosniff' },
+      { key: 'x-frame-options', value: 'DENY' },
+      { key: 'referrer-policy', value: 'strict-origin-when-cross-origin' },
     ];
+    const hsts = serverOrigin.startsWith('https://')
+      ? [{ key: 'strict-transport-security', value: 'max-age=31536000; includeSubDomains' }]
+      : [];
+    return [{ source: '/:path*', headers: [...always, ...hsts] }];
   },
 };
 
