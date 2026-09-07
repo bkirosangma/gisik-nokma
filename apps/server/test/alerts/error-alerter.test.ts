@@ -168,6 +168,9 @@ describe('alerterFromConfig', () => {
 });
 
 describe('alertWithoutWaiting', () => {
+  /**
+   * 13.129 — `alertWithoutWaiting` CONTAINS a synchronous throw from `notify`: it does not propagate out of `alertWithoutWaiting` itself.
+   */
   it('contains a SYNCHRONOUS throw from the alerter', () => {
     const alerter: ErrorAlerter = {
       notify() {
@@ -179,6 +182,9 @@ describe('alertWithoutWaiting', () => {
     }).not.toThrow();
   });
 
+  /**
+   * 13.130 — it contains a REJECTING `notify` too, asserted with a real `process.on('unhandledRejection')` collector rather than by inspection.
+   */
   it('contains a REJECTION from the alerter — nothing escapes as an unhandled rejection', async () => {
     const alerter: ErrorAlerter = { notify: async () => Promise.reject(new Error('webhook down')) };
     const escaped = await escapedRejectionsDuring(async () => {
@@ -187,6 +193,9 @@ describe('alertWithoutWaiting', () => {
     expect(escaped).toEqual([]);
   });
 
+  /**
+   * 13.131 — it does not WAIT for the alerter, proven with a RELEASABLE gate rather than an unresolvable promise (which would make "not settled yet" trivially true).
+   */
   it('does not WAIT for the alerter — it returns while notify is unsettled, and the alert lands afterwards', async () => {
     let settled = false;
     const { gate, release } = openGate();
@@ -213,6 +222,9 @@ describe('alertWithoutWaiting', () => {
 });
 
 describe('the app error handler', () => {
+  /**
+   * 13.132 — the 5xx handler answers the exact `INTERNAL_ERROR_BODY` shape by `toEqual`, and the body does not carry the thrown error’s message.
+   */
   it('answers the fixed 500 body, alerts once, and leaks nothing', async () => {
     const notified: Array<{ context: string; error: unknown }> = [];
     const app = buildTestApp({
@@ -235,6 +247,9 @@ describe('the app error handler', () => {
     await app.close();
   });
 
+  /**
+   * 13.133 — the alert context carries the REDACTED url, asserted to literally equal the redacted string: an invite token must not be paged out to a webhook.
+   */
   it('the alert context carries the REDACTED url — an invite token must not be paged out to a webhook', async () => {
     const contexts: string[] = [];
     const app = buildTestApp({ notify: async (context) => void contexts.push(context) });
@@ -249,6 +264,9 @@ describe('the app error handler', () => {
     await app.close();
   });
 
+  /**
+   * 13.134 — planted defect: a 400 from a schema refusal is the door WORKING — zero alert contexts are recorded, confirming sub-500s never page.
+   */
   it('planted defect: a schema refusal is the door WORKING — 400 keeps its shape and pages nobody', async () => {
     const contexts: string[] = [];
     const app = buildTestApp({ notify: async (context) => void contexts.push(context) });
@@ -261,6 +279,9 @@ describe('the app error handler', () => {
     await app.close();
   });
 
+  /**
+   * 13.135 — planted defect: an alerter that THROWS still leaves the response exactly 500 + `INTERNAL_ERROR_BODY`. The rejecting case is the test below.
+   */
   it('planted defect: an alerter that THROWS leaves the 500 exactly as it is', async () => {
     const app = buildTestApp({
       notify() {
@@ -295,6 +316,9 @@ describe('the app error handler', () => {
     await app.close();
   });
 
+  /**
+   * 13.136 — planted defect: an alerter that HANGS does not hold the response — the 500 is answered while the alert is still unsettled.
+   */
   it('planted defect: an alerter that HANGS does not hold the response — it answers with the alert still unsettled', async () => {
     let settled = false;
     const { gate, release } = openGate();
@@ -323,6 +347,9 @@ describe('the app error handler', () => {
     await app.close();
   });
 
+  /**
+   * 13.137 — with NO alerter configured, nothing reaches the network. `globalThis.fetch` is replaced BEFORE `buildTestApp()` is called, which is what closes the instrumentation gap.
+   */
   it('with NO alerter configured the 500 is unchanged and NOTHING reaches the network — absent alerting is the dev default', async () => {
     // The stub goes in BEFORE `buildTestApp`, and that ordering is the test.
     // `WebhookErrorAlerter`'s `fetchFn` defaults to the global `fetch` and
