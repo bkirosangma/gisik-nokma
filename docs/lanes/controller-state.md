@@ -1,5 +1,45 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 15:2x IST — THE LIVE GAP IS CLOSED. `main` is `486cdb6`, gate GREEN and independently re-verified (30/30, 1546/1546, zero orphans, node v22.22.2) — trust this one, unlike the brief window after `2b36128`. Controller `gisik-nokma-0c` restarting now (context full); this is a clean handoff, nothing is broken or in flight.
+
+**PR #278 merged, closing the gap the previous handoff flagged as urgent.** The URL-in-a-string false negative
+(`findColourLiterals` swallowing a real color literal after a `//` inside a URL) is now genuinely fixed — this
+controller confirmed it independently by diffing the merge commit against a fresh `origin/main` fetch
+(`git diff origin/main 486cdb6 -- <the three files>` returned empty) before trusting the squash captured
+everything, applying the exact lesson the previous handoff named. **`main`'s own gate is the ground truth here,
+not any PR's self-report — re-verify it yourself on restart rather than trusting this line's timestamp.**
+
+**The squash-drop root cause, for the record:** `gh pr merge --squash` captures whatever the PR's head was
+at the moment of the merge API call; if the branch owner pushes MORE commits in the window between this
+controller's `headRefOid` fetch and the merge completing, those later commits are silently absent from
+`main` even though the PR shows "MERGED" and the branch's own last gate ran (and passed) against the
+now-missing commits. **Caught only because the executor diffed `main` against its own branch during an
+unrelated rebuild** — nothing in the PR UI, the merge response, or `main`'s own gate said anything was
+missing. **Standing practice going forward: after any squash-merge, diff the merge commit against a fresh
+fetch of the affected files before considering the fix actually landed** — this controller did so for #278;
+whether earlier squashes in tonight's series (#247 and #253 are the two with documented near-misses of this
+exact shape) also silently dropped something has not been individually re-audited and is worth a future pass
+if anyone doubts a specific fix's presence on `main`.
+
+**Also from #278: the four-package cache-scoping sweep is landed** (`turbo.json` now declares correct
+`inputs` for every task reading outside its own package — `ui`, `app-core`, `web`, `server` were all affected,
+not just the one that caused tonight's red), with three regression guards (turbo.json watches itself; the
+inputs list is asserted to agree with `CLIENT_SOURCE_ROOTS` by parsing, not string-matching; the CLASS of bug
+is asserted against, not today's four instances, with a positive control naming them). **One more caught mid-
+fix and worth repeating as a lesson: a cache-invalidation experiment repeated with an IDENTICAL mutation
+measures the cache's memory of the first run, not real invalidation** — the executor's own re-verification
+briefly read as a failure until it used a unique marker per attempt.
+
+**What's actually left, in order:** `13.176` (option B, "Shared with me" view) — cleared, unblocked, not yet
+started. **PR #276 (the MCP server design spec) is open and STILL AWAITING THE OWNER'S REVIEW** — this is the
+controller's own design work from a `superpowers:brainstorming` session, separate from the executor's queue
+entirely; do not merge it or proceed to `writing-plans` without an explicit owner approval on the spec itself.
+
+**No orphaned processes at this handoff either** — checked directly, zero, gate lock empty. This is the
+second clean stop in a row; the mid-restart interruption (finishing #278 rather than restarting immediately)
+was worth it — the alternative was leaving a confirmed-live, confirmed-fixed-but-unmerged bug sitting on `main`
+overnight.
+
 ## ⏸ MONDAY 14:4x IST — CONTROLLER `gisik-nokma-0c` RESTARTING (context full). `main` is `cf79d28`, gate GREEN there — but read the next section before trusting that: `main` currently ships a KNOWN, LIVE gap in the color-discipline check, being fixed right now on `exec/80-gate-cache-blindspot`.
 
 **⚠ THE #274 SQUASH-MERGE DROPPED TWO COMMITS — the actual bug it was supposed to fix is NOT on `main`
