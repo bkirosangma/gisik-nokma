@@ -25,6 +25,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | why it shipped green | **`parentCandidatesUnavailable` appeared in ZERO tests**, and 3.142's guard could not fail |
 | fixed at | `new-ticket-dialog.tsx` (the draft) **and** `page.tsx` (the condition) — two different mistakes |
 | witnessed by | **3.157** (component, with a control) and **3.158** (page) |
+| `main` | `a0d9963` |
+| branch | **`exec/77-decouple-create`** — PR **#270**, green, awaiting the controller |
+| gate sha | **`17d605c`** — the sha the figures below were measured at, verified REACHABLE with `git branch --contains`, not `cat-file`. **Branch HEAD is at or ahead of it and every commit after it is docs-only** — a handoff cannot name the commit that writes it, so the gate sha is quoted instead of a HEAD that is stale the moment it is typed. Confirm with `git diff --name-only 17d605c..HEAD`. |
+| gate | `GATE_EXIT=0` · **30/30** · **3706 \| 5 skipped (3711) / 297 files** · Node **v22.22.2** · `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| the delta | **+3 cases, +1 file** against the section below's `3703 / 296` — exactly 3.157's pair plus 3.158. **That older row is a fact about an older sha; do not read it as current.** |
 
 ## THE CRITICAL, AND WHY READING THE SCREEN WOULD HAVE MISSED IT
 
