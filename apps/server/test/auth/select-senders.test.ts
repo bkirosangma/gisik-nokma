@@ -19,6 +19,9 @@ import { SmtpMagicLinkSender } from '../../src/auth/smtp-magic-link-sender.js';
  * and an errand closed without a guard reopens the first time someone reaches
  * for the convenient class.
  */
+/**
+ * 13.145 — cited on the block: `selectMagicLinkSender` picks the SMTP sender when `SMTP_URL` is configured and the log sender otherwise. BOTH directions are asserted, which is what makes it a selection rather than a default.
+ */
 describe('selectMagicLinkSender', () => {
   it('mails over SMTP when SMTP_URL is configured', () => {
     const sender = selectMagicLinkSender({
@@ -39,6 +42,9 @@ describe('selectMagicLinkSender', () => {
 });
 
 describe('selectOtpSender', () => {
+  /**
+   * 13.146 — `selectOtpSender()` NEVER returns `LogOtpSender` on the production path.
+   */
   it('never puts the log sender on the production path', () => {
     const sender = selectOtpSender();
     // Both halves of the inherited errand, one assertion each, so a regression
@@ -50,6 +56,9 @@ describe('selectOtpSender', () => {
     expect(sender).toBeInstanceOf(NullOtpSender);
   });
 
+  /**
+   * 13.147 — `NullOtpSender` holds no transcript of issued codes — a STRUCTURAL check (no `sent` key, empty own-keys) rather than a behavioural one, so there is nothing to grow and nothing to dump.
+   */
   it('holds no transcript of issued codes — nothing to grow, nothing to dump', () => {
     const sender = selectOtpSender();
     // Fault 2 — the unbounded in-process array. Asserted STRUCTURALLY rather
