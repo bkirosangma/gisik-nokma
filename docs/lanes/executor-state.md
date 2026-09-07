@@ -96,6 +96,59 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# 🔴→🟢 MONDAY 2026-09-07 ~18:xx IST — **MAIN WAS RED OVER A PR NUMBER. The colour scanner now judges POSITION, not shape.** `exec/79-colour-scanner-context` off `4f89591`.
+
+| what | value |
+|---|---|
+| the red | `@gisik-nokma/ui#test` → `token-discipline.test.ts` matched **`#270`** in a prose comment (`page.tsx:479`, *"createRegion was making until PR #270"*) as a 3-digit hex colour |
+| why no pattern fix works | **`#270` and `#fff` are the same token.** Three hex digits is a legal CSS shorthand colour. Shape cannot separate them; only position can. |
+| landed by | **#272**, which I wrote — the comment and the gate are both mine |
+| gate | `GATE_EXIT=0` · **30/30** · **3720 \| 5 skipped (3725) / 297 files** · Node **v22.22.2** · four doc checks 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| delta | **+5 cases, +0 files** vs `main`'s 3715/297 — the scanner's own new cases |
+
+## THE TWO CHANGES, AND WHY THE FIRST IS THE ONE THAT BITES
+
+1. **Comments are stripped over the WHOLE FILE, never per line.** The `#270` sat in the middle of a
+   multi-line block comment, **on a line carrying no comment marker of its own** — so a per-line scanner,
+   which is exactly what this was, cannot tell that line is inside a comment. Newlines survive the strip so
+   reported line numbers stay true.
+2. **A literal counts only where a colour is APPLIED** — a declaration value in CSS (after a `:`), a string
+   or template literal in script, since no colour reaches a screen from JavaScript except through one.
+
+**A second false positive fell out of (2), latent from the start:** a CSS **ID selector** (`#abc { }`) was
+being read as a colour.
+
+**Deliberately no longer caught: a colour literal inside a comment.** Amendment 11 governs what the client
+SHIPS; a hex in prose ships nothing.
+
+**The limit, stated at the site rather than discovered later:** position is judged per line after
+stripping, so a declaration split across lines is not seen. **The failure direction is a MISS, not a false
+red** — the right way round for a gate that blocks every branch.
+
+## THE CONTROLS — because "stopped matching" is the easy way to pass this
+
+Every unit case is **paired** with the real colour it must still catch in the same position. Beyond those,
+three planted against the REAL trees, since the unit cases prove the pattern and not what the gate runs:
+
+| control | expected | got |
+|---|---|---|
+| **P1** real `#b3261e` in `packages/ui/src/ui.css` | RED | **RED**, `ui.css:204 #b3261e` |
+| **P2** real `#b3261e` in a `.tsx` **string** | RED | **RED**, `shell-refusal.tsx:36 #b3261e` |
+| **P3** `/* see PR #270 and PR #abc for why */` in a comment | GREEN | **GREEN**, 9/9 |
+
+**P3 plants `#abc`, which is a VALID hex shorthand**, in a comment — so it tests the discrimination and not
+merely that digits-starting-with-2 are ignored.
+
+## RECORDED, NOT FIXED
+
+`token-discipline.test.ts` **is cited by no `test-cases/` row and carries no case id** — it sits outside
+the citation corpus entirely, so `check:citations` neither covers it nor could. Same family as 12.386's
+missing entry: the ratchet runs catalogue → test and never test → catalogue. Numbering was NOT invented
+for it here, because the file has never had ids and inventing one mid-incident is a worse trade than
+recording the gap. **Owner: whoever next touches the gate scripts** — the same owner as the 12.386 finding.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~17:xx IST — **THE FILTER PR: the cliff has a way out, and the summary stops claiming to be the project.** `exec/78-list-filter`, off `7d24716`. Fresh off main, not stacked.
 
 | what | value |
