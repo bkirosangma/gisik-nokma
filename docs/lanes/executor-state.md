@@ -29,49 +29,72 @@ MERGED. A resuming executor should not start from them.
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
 
-## AMENDED 17:2x IST — **STEP 10 (THE INTEGRATION CHECKPOINT) DID RUN.** The one thing 177/177 could not have told you.
+## AMENDED 17:3x IST — **STEP 10 AS THE BRIEF WORDS IT NEVER RAN IN FULL. A NARROWER PASS RAN UNDER THAT NAME; THE OTHER TWO-THIRDS WERE COVERED FOUR DAYS LATER UNDER A DIFFERENT ONE.**
 
-**Why this was worth checking.** The amendment below asks the controller to retire the brief's SERIAL
-SEQUENCE section. That section is the only surviving pointer to **step 10 — the integration checkpoint,
-"prove Plans 6a, 8 and 9's fakes against the real server"** — and the brief lists it under *"TWO KNOWN
-GAPS — do not assume them away."* Step 10 has **no `### Task N:` heading**, so it has **no row in
-`task-ledger.tsv`**, so **`check:tasks` is structurally blind to it and 177/177 says nothing about it.**
-Retiring the section on a ledger count alone could have deleted the trigger for the one gap the brief
-says not to assume away, and the failure mode is *work silently never happens*.
+> **This section replaces an earlier version of itself that said, flatly, "It ran."** That was wrong, and
+> it was wrong in the specific way this file keeps recording: I verified two of three files myself and
+> **took the third from a subagent's summary**, then presented all three under one claim. The third is not
+> step 10. Corrected before merge; the false version never reached `main`.
 
-**It ran. Verified against `origin/main` directly, not taken from any document's word:**
+**Why this was checked at all.** The amendment below asks the controller to retire the brief's SERIAL
+SEQUENCE section. That section is the only surviving pointer to **step 10 — "prove Plans 6a, 8 and 9's
+fakes against the real server"** — which the brief lists under *"TWO KNOWN GAPS — do not assume them
+away."* Step 10 has **no `### Task N:` heading → no row in `task-ledger.tsv` → `check:tasks` is
+structurally blind to it.** The 177/177 below says **nothing** about step 10 and never could.
 
-| claim | measured on `origin/main` |
-|---|---|
-| the checkpoint's tests exist | `real-door-round-trip.test.ts`, `client-contract.test.ts`, `fixture-witnesses.test.ts` — all three PRESENT under `apps/server/test/integration/` |
-| they are step 10, by their own account | `:17` *"Step 10, Task B — the integration checkpoint"* · `:25` *"Step 10, Task B — the divergences between the shipped `/v1` surface and…"* |
-| it is the REAL door, not a fake | **22** `app.inject` calls · `createTestDatabase` (real Postgres) · **0** `vi.mock` |
-| no seeding backdoor | all **5** `applyCommitted`/`INSERT INTO` hits are comment prose (docblock `:36`, `:51`; `//` at `:157`, `:395`, `:796`) — zero executable |
+**What actually happened, by first-appearance commit, measured on `origin/main`:**
 
-**Negative control:** the same existence test answers ABSENT for a file that does not exist, so it can fail.
+| file | first added | commit / PR | what it is |
+|---|---|---|---|
+| `real-door-round-trip.test.ts` | **09-02 08:46** | `ac187e8` (#70) | **step 10** — docblock `:17` *"Step 10, Task B"* |
+| `client-contract.test.ts` | **09-02 08:46** | `ac187e8` (#70) | **step 10** — docblock `:25` *"Step 10, Task B"* |
+| `fixture-witnesses.test.ts` | **09-06 13:45** | `e33c429` (**#187**) | **NOT step 10** — *"Lane F — witnesses for fixtures…"*, **zero** occurrences of "step 10" |
 
-**It did real work, which is the part that distinguishes "the checkpoint ran" from "files with the right
-name exist":** `fixture-witnesses.test.ts` case 7.241 caught Plan 8's fake gateway pinning a refusal rule
-(`ticket.unknown-state`) that **no real producer emits** — the route emits `migration.unknown-target-state`.
-A fake that had drifted from the server it stands for is exactly what step 10 exists to catch.
+**Positive control on that last row:** the same `grep -ci 'step 10'` returns **1** for
+`real-door-round-trip.test.ts`. The instrument finds the string when it is there; the Lane F file's **0**
+is a real absence.
 
-**The residual, stated by the test file itself rather than discovered later** (`:380-403`): Plan 9's
-notifications fake is witnessed **producer-side only**, because the real consumer adapter lives in
-`apps/web`, outside `apps/server`'s dependency graph. So the *wire contract* is proven; the client gateway
-was not executed end-to-end. **Recorded with an owner, not fixed** — out of scope here.
+**Step 10 was a genuine real-door pass — that part of the earlier claim survives.** `ac187e8`'s round-trip
+file makes **22** `app.inject` calls against a real `createTestDatabase`, with **0** `vi.mock`, and all
+five `applyCommitted`/`INSERT INTO` hits are comment prose (`:36`, `:51`, `:157`, `:395`, `:796`) — no
+seeding backdoor. It built its world through the shipped doors.
 
-## A SEARCH OVER THE AUTHORITATIVE DOCUMENT CONCLUDED THE OPPOSITE OF THE TRUTH
+**But its scope was not the brief's scope, and could not have been.** Step 10 ran **09-02**. Plan 9's
+notifications landed **09-04** (`e09666c`) — *two days later*. Step 10 executed against a tree where Plans
+8 and 9 had no client fakes to prove. The commit says so itself: *"that file names its mocking readers as
+Plans 6, 9 and 10. The dispatch brief says '6a, 8 and 9'. The code is the primary source."* **The brief's
+own list of which plans own the fakes was wrong when it was written.**
 
-Four independent angles ran. The one that searched **the coordination doc** — the interface authority —
-returned **"the checkpoint never ran as specified: static grep analysis, no live server."** It cited real
-line numbers and carried a positive control that fired. **It was wrong**, and not by carelessness: step 10
-had two halves, and the doc records only the first. §5761 is *"what it found before it wrote a line"* —
-the reconnaissance. **Task B, the executable half, lives in code and was never narrated into the doc.**
+**Plans 8 and 9 were witnessed — by Lane F (#187), four days later.** Case **7.241** — the Plan 8 fake
+gateway pinning a refusal rule (`ticket.unknown-state`) that no real producer emits, where the route emits
+`migration.unknown-target-state` — is **Lane F's catch, not step 10's.** I attributed it to step 10; it
+lives in the Lane F file (3 occurrences there).
 
-**The lesson generalises past this instance.** A single angle over the *most authoritative prose* is the
-search most likely to feel sufficient and be wrong, because a document records what someone chose to write
-down. The angle that read **test code** answered correctly. When the question is *did this happen*, prefer
-the artefact that had to exist for it to happen over the document that describes it.
+**And nothing was ever updated to say so.** `controller-state.md:4485`, unchanged at current HEAD, still
+reads *"**The integration checkpoint no longer fires** — replacement trigger is the Phase 2/3 boundary."*
+
+**So: retiring the SERIAL SEQUENCE section is still safe, but for a different and more contingent reason
+than "it ran."** The coverage exists — 6a from step 10, 8 and 9 from Lane F — but it was assembled by two
+passes under two names, neither of which closes the brief's sentence as written, and no document says the
+gap is shut. **The residual to hand to the owner: the brief's step 10 is not merely stale, it was
+mis-scoped from the start, and the state files still describe it as unfired.**
+
+**Residual limit, stated by the Lane F file itself** (`:380-403`): Plan 9's notifications fake is witnessed
+**producer-side only** — the real consumer lives in `apps/web`, outside `apps/server`'s dependency graph.
+Wire contract proven; client gateway not executed end-to-end. Recorded with an owner, not fixed.
+
+## FOUR ANGLES SPLIT 1–3, AND THE MAJORITY WAS RIGHT — THE ONE I BELIEVED FIRST WAS THE WRONG ONE
+
+The sweep returned **one** `found_evidence: true` and **three** `false`. I read the affirmative one first,
+verified the two files it named, found them exactly as described, and wrote "it ran." **The three dissents
+were not weaker — they were narrower and more specific**, and the discriminating fact was one I had not
+thought to ask for: *when did each file first appear?* One `git log --diff-filter=A` settled it.
+
+**The transferable part: an angle that confirms what you already suspect gets checked against the files it
+names; an angle that contradicts you gets checked against the claim it makes.** I did the first and not
+the second, and the first is the weaker test — it can only tell you the agent read real files, never that
+it read the right ones. The dissent carried a **timeline** argument, and a timeline is falsifiable in one
+command.
 
 ## A LONG tmux MESSAGE LOSES ITS HEAD, AND THE CONTROLLER ANSWERS THE FRAGMENT
 
