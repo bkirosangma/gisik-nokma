@@ -460,3 +460,91 @@ definitions, which is the one question Step 1 of this task exists to answer.*
 > client, `submitOne` and `registerTools`, which is case 14.85's property demonstrated in production
 > rather than in a test. `docker compose -f docker-compose.dev.yml up -d --build --wait server` fixed
 > it, exactly as the plan's Step 6 says to run it.
+
+## Task 12 — the revoke surface (`apps/server/src/routes/mcp-tokens.ts`, `apps/web/app/mcp/tokens/`)
+
+*Owner ruling 5, and the one that went against the plan's default. The plan had settled for no UI —
+granted in two clicks, withdrawn only by somebody with a `psql` prompt — and flagged the asymmetry as
+"something a person should agree to knowingly". Every token in these cases is minted through the REAL
+device flow rather than inserted: a row the test wrote itself would prove the list can read rows the
+test wrote, not that it shows the credential the CLI is holding.*
+
+- **14.90** ✅ `GET /v1/me/mcp-tokens` lists the caller's tokens and **never the credential itself** —
+  the id is `sha256(token)` in hex, and the whole response is asserted not to contain the raw token
+  the device flow just issued. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+- **14.91** ✅ The list is the caller's own: two people, two real tokens, **disjoint in both
+  directions** — one direction alone passes for a list that returns everything to one caller and
+  nothing to the other. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+  *Mutation: drop `WHERE user_id = $1` from the list query → 14.90, 14.91, 14.93, 14.94 and 14.95 all
+  fail.*
+- **14.92** ✅ The list needs a session, and answers the product-wide `unauthenticated` body. —
+  (`apps/server/test/mcp/mcp-tokens.test.ts`)
+- **14.93** ✅ Revoking **ends access at the next request** — the raw token authenticates a real route
+  before the revoke and is refused 401 after it, with the control asserted first so a route that never
+  authenticated anything could not pass. A case that only checked the list had gone empty would pass on
+  a delete some other code path still honoured. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+- **14.94** ✅ The **same 404, byte for byte**, for somebody else's real token id and for an id that
+  names nothing — `expect(notMine.body).toBe(nowhere.body)`, because any difference between them is an
+  oracle for which token hashes exist. And the refusal was a refusal: the other person's token
+  survives. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+  *Mutations: drop `AND user_id = $2` from the DELETE → 14.93, 14.94, 14.95 fail. Return 204 when the
+  delete matched nothing → 14.94 fails.*
+- **14.95** ✅ `/v1/me/mcp-tokens/:id` is CSRF-protected: a cookie-carrying forged-`Origin` DELETE is
+  refused 403 `forbidden_origin`, with the honest bearer DELETE succeeding as the control — without
+  which a route that 403'd everything would pass. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+- **14.96** ✅ Signed out, the screen offers a sign-in that lands back on `/mcp/tokens` and **asks the
+  server nothing** — asserted on the recorded calls, because a signed-out page that still fired the
+  request would 401 and look identical. — (`apps/web/test/mcp-tokens-page.test.tsx`)
+- **14.97** ✅ The row names the approval date in the product's timezone and the page **never prints
+  the id**; the empty state names the connect page. —
+  (`apps/web/test/mcp-tokens-page.test.tsx`)
+  *Mutation: print `token.id` in the row → fails.*
+- **14.98** ✅ Revoking sends `DELETE /v1/me/mcp-tokens/<that row's id>` and **reloads the list from the
+  server** rather than splicing it locally. — (`apps/web/test/mcp-tokens-page.test.tsx`)
+- **14.99** ✅ A 404 on revoke is reported as "already gone" — the only thing true of both meanings the
+  server deliberately refuses to distinguish — with `role="alert"`, and the list is re-read. —
+  (`apps/web/test/mcp-tokens-page.test.tsx`)
+
+> ### The CSRF control could not see a DELETE
+>
+> `httpOriginRefused` opened with `if (input.method !== 'POST') return false;` under a comment reading
+> "Mutations only". Every route in `HTTP_ORIGIN_PROTECTED_ROUTES` happened to be a POST, so the control
+> looked complete while being **unable to protect a PUT, a PATCH or a DELETE that had been added to the
+> set** — a hole with no symptom, in the one control this repo describes as "not defence in depth here,
+> it is the defence".
+>
+> It was found the only way it could be: adding `DELETE /v1/me/mcp-tokens/:id` to the set and watching
+> the forged-`Origin` request sail past the hook to `requireSession`, which answered **401** — a
+> refusal, for entirely the wrong reason, that reads as a pass to anyone checking that the request was
+> rejected. Widened to all four mutating methods; it admits nothing that was previously refused,
+> because all eight pre-existing routes are POST-only.
+>
+> `security-middleware.test.ts`'s `PROTECTED` table gained a **method column** for the same reason: a
+> table that cannot express a non-POST route cannot catch that hole. Its own drift guard (13.116) is
+> what forced the new row to exist at all — protecting a route without adding a row reddens it.
+
+> ### Two more checks that could not fail, both found by mutation
+>
+> **14.98** rendered ONE token, so `tokens[0].id` and the clicked row's id were the same string: a
+> handler that always revoked the first token passed, and the `not.toContain(OTHER)` guard was vacuous
+> because `OTHER` appeared in no list. Now two rows, and the second is the one revoked.
+>
+> **14.97** asserted the rendered day — "8 Sept 2026", which is the 7th in UTC — and claimed that pinned
+> `Asia/Kolkata`. It did not. **This runner is already in IST**, so deleting the forced timezone left
+> the case green. The `toLocaleDateString` options object is now asserted too, which is falsifiable
+> wherever it runs.
+
+> ### The fenced sub-question, and what execution found about its premise
+>
+> The plan reserved one question for the owner: **should the list show when each token was last used?**
+> It records the honest cost — *"it is a log of when a person's assistant acted on their behalf, kept
+> per token"* — and says it is "not in Task 2's schema today".
+>
+> **It is.** `mcp_tokens.last_used` exists, and `resolveMcpToken` writes it on **every** successful
+> resolution (`UPDATE mcp_tokens SET last_used = $2 … RETURNING user_id`); the live end-to-end run in
+> Task 10 observed it being written. So the recording half was decided and shipped in Task 2, and what
+> remains open is only whether the product **surfaces** it.
+>
+> Built without it, deliberately, because that is still the owner's call and the fence is the signal.
+> `listMcpTokens` does not select the column and the screen has no cell for it. **Adding it is one
+> column in one query and one `<td>`.**

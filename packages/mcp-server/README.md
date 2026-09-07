@@ -77,18 +77,22 @@ own words rather than a summary of them.
 
 ## Revoke
 
-There is no revoke surface yet (the plan's open question 5). Until there is, it is one statement against
-the application database:
+Open **`/mcp/tokens`** — *Connected assistants* — sign in, and click **Revoke**. It takes effect at the
+assistant's next request: the token stops resolving, the server answers 401, and the client clears its
+cached copy and starts a fresh device flow. Nothing is interrupted mid-task.
+
+The list shows when each connection was approved and nothing else, because that is all there is:
+`mcp_tokens` stores `sha256(token)` and the raw value existed only in the response that minted it.
+
+If you would rather do it against the database — every connection for one person, in one statement:
 
 ```sql
 DELETE FROM mcp_tokens WHERE user_id = '<your user id>';
 ```
 
-It takes effect on the next call: the token stops resolving, the server answers 401, and the client
-clears its cached copy and starts a fresh device flow. Deleting the row is the whole revocation —
-`mcp_tokens` has no `expires_at`, deliberately (see `apps/server/migrations/1788600000000_mcp-device-auth.sql`),
-because a token you minted for your own machine should not sign your assistant out mid-task on a timer
-nobody chose.
+Deleting the row is the whole revocation. `mcp_tokens` has no `expires_at`, deliberately (see
+`apps/server/migrations/1788600000000_mcp-device-auth.sql`), because a token you minted for your own
+machine should not sign your assistant out mid-task on a timer nobody chose.
 
-`mcp_tokens.last_used` tells you whether the token you are about to revoke is still being used. It is an
-observation only — no code path reads it to decide anything.
+`mcp_tokens.last_used` records whether a token is still being used. It is an observation only — no code
+path reads it to decide anything, and the screen does not show it.

@@ -27,6 +27,7 @@ function fakeHttp(answers: Record<string, unknown>): HttpClient & { calls: Call[
     get: async (path) => answer('GET', path),
     post: async (path, body) => answer('POST', path, body),
     put: async (path, body) => answer('PUT', path, body),
+    del: async () => undefined,
   };
 }
 

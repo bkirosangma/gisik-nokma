@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
 import { createHttpClient, HttpError, refusalText } from '@gisik-nokma/app-core/online';
+import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { useSessionStatus } from '../../../src/providers.js';
 
 /**
@@ -39,15 +40,20 @@ type TokenRow = { id: string; createdAt: string };
 /**
  * The approval date, in the product's timezone.
  *
- * `Asia/Kolkata` explicitly, not the viewer's locale default: an event ledger
- * whose owner decided on one timezone should not render "yesterday" to one
- * person and "today" to another looking at the same row.
+ * The product's zone explicitly, not the viewer's locale default: a ledger whose
+ * owner decided on one timezone should not render "yesterday" to one person and
+ * "today" to another looking at the same row.
+ *
+ * `IST_TIME_ZONE` imported rather than the literal re-spelled. `packages/domain/
+ * src/ist-day.ts` is the ONE declaration site, and `reporting-scope-guard.test.ts`
+ * scans every source root to keep it that way — it caught the literal here on the
+ * first full gate, which is the guard doing exactly its job.
  */
 function approvedOn(iso: string): string {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return 'an unknown date';
   return at.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
+    timeZone: IST_TIME_ZONE,
     year: 'numeric',
     month: 'short',
     day: 'numeric',

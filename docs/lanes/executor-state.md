@@ -20,6 +20,44 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~03:1x IST — **THE MCP PLAN IS FINISHED. ALL THIRTEEN TASKS, ZERO UNTICKED STEPS.**
+
+> **READ THIS FIRST.** `origin/main` is `f200cb0`; Tasks 0–10 landed in #321 at `60a4a1e`. Two PRs are
+> open and both are mergeable: **#323** (Task 11 — the catalogue, the ledger gate, the case-id reader)
+> and **#324** (Task 12 — the revoke surface), stacked in that order. **Merge #323 first, and do NOT
+> delete its branch on merge** — deleting the base of a stacked PR is what auto-closed four PRs
+> unmerged earlier tonight. CI still cannot run: every Actions job dies in 3–4 s on the account billing
+> failure.
+
+| plan | state |
+|---|---|
+| MCP Tasks 0–10 | on `main` at `60a4a1e` (#321) |
+| MCP Task 11 | **#323**, mergeable |
+| MCP Task 12 | **#324**, mergeable, stacked on #323 |
+| the plan itself | **0 unticked steps across all 13 tasks** |
+
+**Task 12 found the CSRF control could not see a DELETE.** `httpOriginRefused` opened with
+`method !== 'POST'` under a comment reading "mutations only". Every route in
+`HTTP_ORIGIN_PROTECTED_ROUTES` happened to be a POST, so the control looked complete while being unable
+to protect a PUT, PATCH or DELETE added to it — in the one control this repo calls "not defence in
+depth here, it is the defence". Found by adding the route and watching the forged-`Origin` DELETE reach
+`requireSession`, which answered **401**: a refusal, for the wrong reason, that reads as a pass.
+
+**Ten mutations on Task 12, ten killed — two only after the cases were rewritten.** 14.98 rendered one
+token, so "revoke the row you clicked" and "revoke the first row" were the same assertion; 14.97 claimed
+to pin `Asia/Kolkata` while running on a machine already in IST. Neither was visible by reading.
+
+**THE ONE THING STILL OWED TO THE OWNER.** The plan fenced a sub-question off from the executor —
+*should the token list show when each token was last used?* — and its premise is stale:
+`mcp_tokens.last_used` **already exists** and `resolveMcpToken` writes it on every resolution, so the
+recording half shipped in Task 2. What is open is only whether the product SURFACES it. Built without
+it. **Adding it is one column in one query and one cell.**
+
+Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**; seven checks EXIT 0 (`check:env`,
+`check:tasks`, `check:runbook`, `check:citations`, `check:help`, `check:db-tz` against the dev stack,
+`check-case-ids` — 1758 unique ids).
+
+
 # ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE MCP SERVER IS ON `main`. TASK 11 DONE; ONLY TASK 12 REMAINS.**
 
 > **READ THIS FIRST.** `origin/main` is `f200cb0`. **#321 landed the whole MCP server (plan Tasks
