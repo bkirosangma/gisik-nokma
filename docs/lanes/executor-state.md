@@ -23,11 +23,63 @@ MERGED. A resuming executor should not start from them.
 
 | what | value |
 |---|---|
-| `origin/main` | **`fce81ac`** |
-| branch | `exec/82-idle-handoff` (this handoff only), off `fce81ac` |
+| `origin/main` | **`58a4d4a`** (PR #284, the idle handoff itself, merged 17:03 IST) |
+| branch | `exec/83-brief-sequence-is-complete` (this amendment only), off `58a4d4a` |
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
+
+## AMENDED 17:0x IST — **THE DISPATCH BRIEF'S SERIAL SEQUENCE IS COMPLETE. ALL 177 TASKS ARE DONE.** Read this before you read the brief.
+
+The section above said "do not start Phase 1–4 of the dispatch brief's serial sequence on your own
+initiative." That was right, but it gave a *procedural* reason — an active hold — and a procedural reason
+expires. **The real reason is that there is nothing left in Phase 1–4 to start.** A restarting executor
+who reads only the brief will find `~109 of 177 tasks remain` and an enumerated Phase 1–4 naming Plan 4 T4
+as the first item, and will start redoing merged work the moment the hold lifts.
+
+**This is the brief's own §"This section deliberately names no task" trap, sitting inside the brief.** That
+section says *a brief that names a position is a brief that expires* — and then the SERIAL SEQUENCE
+section, sixty lines later, names one. It was true on 2026-08-31 and has not been true for some time.
+
+**Measured at `58a4d4a`, not inferred from a counter.** `pnpm check:tasks` → `CHECK_EXIT=0`,
+**VERIFIED COMPLETE: 177/177 (100.0%)**, `claimed 0 · in-flight 0 · todo 0`. That counter alone is not
+enough — *a count equal to a max because the fixtures were tidy* is on the brief's own list of costumes —
+so every task the brief names as next was checked individually in `docs/lanes/task-ledger.tsv`, each row's
+`merge_sha` tested with `git merge-base --is-ancestor <sha> origin/main`:
+
+| brief item | ledger | PR | merge_sha | ancestor of `origin/main` |
+|---|---|---|---|---|
+| Plan 4 T4, T5 *(the CSRF ruling's three items)* | done | #51 | `45c83eb4` | YES |
+| Plan 4 T6, T7 | done | #52 | `40c52191` | YES |
+| Plan 4 T8, T11, T14 | done | #57 | `dd7bfcfd` | YES |
+| **Plan 10 T4** *(the lifted §11 closer)* | done | #53 | `33538bee` | YES |
+| Plan 3 Chain B T9, T10, T12, T14 | done | #59 | `6cb631d0` | YES |
+| Plan 5 T1 · T5, T15 | done | #8 · #67 | `23361496` · `563c983` | YES |
+| Plan 7 T9 · Plan 8 T13 · Plan 9 T6 | done | #82 · #85 · #93 | `7337357` · `9b70ab9` · `e09666c` | YES |
+| Plan 11 T8, T12 *(last by construction)* | done | #136 · #183 | `a1252bc` · `81a7e44` | YES |
+
+**Both controls fired, through the same command shape:** the matcher prints `<<NO ROW MATCHED>>` for a
+task that does not exist (plan 04 T99), so a hit is distinguishable from a silent miss; and the ancestry
+test answers **NO** for `4c8c153` — this file's own pre-squash commit — so it is capable of failing.
+A first pass of this same check returned `<<NO ROW MATCHED>>` for all twenty rows because the ledger's
+task column is a bare `4`, not `T4`. **That is the sixth silent-empty mode again**: a well-formed wrong
+answer, no error, and it would have read as *the ledger has no rows for the brief's tasks* — the exact
+opposite of the truth — had the control not been there to contradict it.
+
+**What this does NOT establish, and where to aim doubt.** `done` in that ledger is a hand-asserted status
+whose *sha* is machine-validated, not its *substance* — the checker's own header says so. So this proves
+the brief's Phase 1–4 items were executed and merged; it does not re-prove they were executed *well*. The
+claim I am least sure of is therefore *quality*, not *coverage*, and no cheap check settles it.
+
+Coverage itself I did chase down, because I had written a hedge here and the hedge was false. I had said
+Plan 5's ledger "carries plain integers" so the brief's `T9b` might not map. **It maps exactly**: the task
+column holds `9b` verbatim, `### Task 9b:` is a real heading in the plan at line 3183, and the row is
+`done` on PR #67 / `563c983`. Plan 5 is **17 ledger rows against 17 `### Task` headings** — the brief's
+"Plan 5, all 17 tasks," complete. Writing down an uncertainty I had not actually tested would have been
+the same defect as the false sentence this file's own next section records; one grep retired it.
+
+**So: the queue being empty is the finished state of this project's plan series, not a stall.** Whatever
+the owner says next is new scope by definition, and it will arrive through the controller.
 
 ## PR #282 IS MERGED AND ITS SQUASH DROPPED NOTHING — verified, with a control that fired
 
