@@ -471,6 +471,9 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
     expect((await app.inject({ method: 'GET', url: `/v1/invites/${live.token}` })).statusCode).toBe(200);
   });
 
+  /**
+   * 6.113 — an invitation link LAPSES, and the sibling minted beside it still works. `invite_tokens.expires_at` is NOT NULL and set at mint, so `expires_at > now()` decides something for EVERY row — the nullable `IS NULL OR expires_at > now()` shape would have shipped a check that is vacuous for most invitations.
+   */
   it('a lapsed link cannot be accepted either, and the sibling minted beside it can', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);

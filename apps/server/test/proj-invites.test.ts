@@ -83,6 +83,9 @@ async function statusOf(inviteId: string): Promise<{ status: string; accepted_us
   return rows[0];
 }
 
+/**
+ * 6.118 — cited on the block: `pending` is a one-way door in BOTH directions — a revocation after an acceptance leaves it accepted, and an acceptance after a revocation leaves it revoked. Unreachable through the routes (the accept route refuses a non-pending invitation) but entirely reachable in the ledger, which is why it is tested here rather than assumed.
+ */
 describe('proj_invites — pending is a one-way door', () => {
   it('a revocation arriving after an acceptance does not undo it', async () => {
     const ws = newUlid();
@@ -171,6 +174,9 @@ describe('proj_invites — pending is a one-way door', () => {
   });
 });
 
+/**
+ * 6.117 — cited on the block: `invite_tokens` survives a rebuild AND a verify, and the verifier really is comparing `proj_invites`. The credential store is not derivable from the ledger, so anything that empties it destroys every live invitation link with no way to put one back. Proved by RUNNING the rebuild and the verifier, not by reading the registry.
+ */
 describe('invite_tokens is not a projection', () => {
   /**
    * The hazard, run rather than reasoned about: `rebuildProjection` empties what
