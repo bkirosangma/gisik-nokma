@@ -3409,6 +3409,32 @@ noticing one ended mid-sentence at *"each refused by name when"*. **A truncated 
 can SEE; a wrong total is not.** Prefer, at least once per instrument, reading a handful of raw records beside
 the number the instrument gives for them.
 
+**TWO MORE OF THE SAME CLASS, found after this rule was first written — the shape error is not confined to parsing.**
+
+**6. The GROUPING step, not the parser.** Candidates were clustered with `'invites.test.ts' in row`, which
+substring-matches **`proj-invites.test.ts`** and **`packages/domain/test/events/invites.test.ts`** as well. Three
+different files were collapsed into one cluster, so six rows appeared not to match the tests being read — and
+were written off as "each would have been a guess" — when they simply belonged to two other files. **A
+well-formed set that is about something slightly different from the question asked.** Resolve names to REAL
+paths before grouping by them; a substring is not an identity.
+
+**7. A POSITIONAL reference that was true when measured and false when used.** An inserter refused to write a
+docblock at `events-route.test.ts:79` because that line was no longer an `it(` — an earlier docblock in the same
+file had shifted every line below it. **The assertion turned a would-be misplaced citation into a stopped run.**
+Line numbers gathered before an edit are stale after it; re-read them, or assert on the content at the line.
+
+**And a habit worth naming, because it cost more than any single defect.** Rows were deferred as "ambiguous" or
+"undecidable" eleven times. On re-examination **almost none were**: five lived in a file their candidate list did
+not point at, three were simply further down a file whose head had been skimmed, and two were RECORDS rather than
+assertions — which is a decision about the convention, not an ambiguity in the source. **"I have not decided" and
+"this is undecidable" are different claims, and the first was repeatedly reported as the second.** Deferring
+remained the right call each time — the alternative was citing on a filename rather than on a read — but the
+deferrals were far cheaper to resolve than they looked, and should be revisited rather than accumulated.
+
+*(A record CAN be cited, incidentally: its ✅ means the work was done and verified, so citing it beside the suite
+it describes points a reader at where it applies. Say in the docblock that it is a record. Pretending it is an
+assertion is dishonest; leaving it uncited forever because it is not one is merely incomplete.)*
+
 **Corollary already in this document's spirit:** the totals agreed with the checker at every point after defects
 1 and 2 were fixed, because the checker counts ✅ ids — it has no opinion on which rows name a file. **An
 authority validates only the question it answers.** Agreement with it on totals said nothing about the
