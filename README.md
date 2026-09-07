@@ -1,41 +1,180 @@
 # Gisik Nokma
 
-Project management software. *Gisik* — mind, memory; *nokma* — the village custodian who holds the community's affairs in trust. **The keeper of memory**: a tool whose board structurally cannot lie about the work.
+*The keeper of memory.* From Garo: **gisik**, mind or memory; **nokma**, the custodian who holds
+things in trust.
 
-**Status: building.** The product design spec is approved — `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md`. Implementation follows the plan series in `docs/superpowers/plans/`. What follows below is the base the design started from.
+Gisik Nokma is a work tracker for small teams who are not software teams. A design studio of five. A
+plumbing business with an office helper and two people on the road. A shop with twenty-three errands
+running at once. It keeps track of jobs, who is doing what stage of them, and what happened to them —
+and it is unusually careful about the difference between something it knows and something it is
+guessing.
+
+## The one idea worth knowing
+
+**Nothing in Gisik Nokma is presented as a plain fact floating on the screen.** Every value carries
+who said it and when. A due date does not say "30 August"; it says 30 August, and whose claim that is.
+A card does not just say which column it is in; it will tell you who moved it there and on what day.
+
+That sounds fussy until the first time it matters — when two people remember a deadline differently,
+or when somebody wants to know who marked a job finished. Then it is the whole point.
+
+The same instinct runs through the rest of it. If a job has eight sub-jobs and two of them are hidden
+from you, it says **"5 of 8 done · 2 restricted"** rather than quietly showing you a smaller, tidier,
+wrong number. If a calendar month is empty, it tells you *which kind* of empty — nothing has a claimed
+date, or your filter removed everything, or you switched a date off in the legend — because "nothing
+here" is a useless message when there are four reasons for it. A file linked from Google Drive is
+always described as **unknown**, never "still fine", because the product genuinely does not know.
+
+If you have spent twenty years with spreadsheets that lie to you confidently, this will feel unusual.
+It would rather tell you it does not know.
+
+## Who it is for
+
+People who run the work, not people who run software. There is deliberately no burndown chart, no
+velocity score, no sprint report, and there is a check in the product that stops those from being
+added. It will show you what people claimed and when. It will not forecast anything or score anyone's
+speed.
+
+## What it can do today
+
+- **Sign in without a password** — a link to your email, your Google account, or your device's
+  fingerprint/face unlock. There is no password anywhere in the product.
+- **Set up your business** — create a workspace, invite people into it with one of three roles, and
+  design your own set of stages for work to move through, with rules on the moves between them.
+- **Follow work** — a board, a table, a month calendar and a week-by-week timeline, all of one
+  project, with a strip at the top telling you what is blocked, what has gone stale, and what is due
+  soon.
+- **Move work along** — open a job, press Move, pick the next stage. Your rules decide what is
+  offered and what it asks for first.
+- **Control who sees what** — per job, down to a named list of people, with sub-jobs inheriting from
+  the job above unless they say otherwise.
+- **Keep a complete history** — every change to every job, in order, with who and when, and *two*
+  clocks: what the person's device thought the time was, and what the system recorded.
+- **Work with no signal** — on the phone and desktop apps, which each keep a copy on the device.
+  Changes queue up and go when you reconnect.
+
+## What it cannot do yet
+
+This is the part a marketing page would leave out. Read it before you decide anything.
+
+- **You cannot create a project.** There is no button anywhere in the product that makes one. A brand
+  new workspace comes with stages, job types and you as its owner — and nowhere to put a job. Until
+  this is built, projects have to be put there for you.
+- **You cannot assign a job to anybody.** The board shows who a job is on, the Inbox tells you when
+  you have been assigned something, and the table can group by person — but nothing on any screen puts
+  a job on a person.
+- **You cannot set a due date.** The calendar, the timeline and the whole "due soon" list are built
+  around claimed dates, and there is no control that claims one.
+- **You cannot write a description or leave a comment on the web.** The writing box — formatting,
+  mentions, attachments, all of it — is built and is not connected to the job screen. The phone app
+  can post a comment; the full website cannot.
+- **There is no search box on the web.** A good search exists underneath and nothing on any screen
+  calls it. The phone app's board screen has the only search box in the product.
+- **Nothing links to the settings screens.** The stage builder and the job-type editor — the screens
+  that make the product yours — can only be reached by typing their address into the browser.
+- **Notifications never leave the app.** No email, no text message, no push. The only email Gisik
+  Nokma sends is your sign-in link. If nobody opens the Inbox, nobody finds out about anything.
+- **Sign-in by phone number does not work.** The sign-in screen opens on the Phone tab and that tab is
+  refused. Use **Email link**, Google or a passkey.
+
+There is also one thing that surprises everybody, and it is a decision rather than a gap: **the whole
+product runs on Indian time, for everybody, everywhere.** A day starts at midnight in India, not
+midnight where you are. In London the product's "today" flips over at about half past six in the
+evening; in Los Angeles, late morning. Every due date and every "today" means India's day. The
+reasoning is that everyone reading the same record sees the same day for the same moment. It is
+defensible and it will still catch you out.
+
+## Where to go next
+
+- **[Instruction manual](docs/manual.md)** — the walkthrough. Start here if you are setting the
+  product up or using it for the first time. It assumes nothing.
+- **[FAQ](docs/faq.md)** — "can I do X", edge cases, and what to do when something looks wrong.
+- **[Coverage map](docs/product-coverage-map.md)** — how those two documents were checked against
+  `Features.md`, feature by feature, including what they deliberately leave out and why.
+
+Both were written by working through the actual screens and writing down what is there, including the
+parts that are not. Where an answer is "no, it doesn't do that", they say so rather than sending you
+hunting for a button that was never built. The gap list above is not an apology; it is the same
+honesty the product applies to its own data, applied to itself.
+
+---
+
+# For developers
 
 ## Workspace layout
 
 pnpm workspaces + Turborepo (Node 22, TypeScript strict, ESM, Vitest):
 
-- `packages/domain` — shared types and zod schemas: the event envelope, entity kinds, id helpers, the versioned event-type registry.
-- `packages/rule-engine` — pure validation, no I/O: `evaluateEvent` returns Accept or a Refusal that names its rule.
-- `apps/server` — Fastify server; the append-only Postgres event ledger and its projections; migrations via node-pg-migrate.
-- Later plans add `packages/ui`, `packages/sync-client`, `apps/web`, `apps/mobile`, `apps/desktop`.
+| Package | What it is |
+|---|---|
+| `packages/domain` | Shared types and zod schemas: the event envelope, entity kinds, id helpers, the versioned event-type registry. |
+| `packages/rule-engine` | Pure validation, no I/O: `evaluateEvent` returns Accept or a Refusal that names its rule. |
+| `packages/app-core` | Client-side core shared by every app — view models, the offline `DataSource` contract, and the `./online` subpath that is the one module allowed to speak HTTP or WebSocket. |
+| `packages/sync-client` | The offline replica and the sync protocol the native apps run on. |
+| `packages/ui` | Shared components and design tokens. |
+| `packages/editor` | The rich-text/mention editor. |
+| `apps/server` | Fastify server; the append-only Postgres event ledger and its projections; migrations via node-pg-migrate. |
+| `apps/web` | The Next.js 15 App Router shell. |
+| `apps/mobile` | Expo/React Native. |
+| `apps/desktop` | Tauri + Vite. |
 
-Dev database: `docker compose up -d` starts Postgres 16 on port 54329. Then `pnpm install` and `pnpm turbo run build test`.
+## Getting it running
+
+```
+docker compose up -d          # Postgres 16 on port 54329
+pnpm install
+pnpm turbo run build test
+```
+
+The gate is `pnpm turbo run build test typecheck`, plus four repository checks — `pnpm check:tasks`,
+`check:runbook`, `check:citations` and `check:env`.
+
+**If `pnpm install` exits 1 with no output at all, check `node -v` first.** `engine-strict=true` makes
+the declared Node range binding, and pnpm's refusal under a wrong version is completely silent — the
+natural readings ("the lockfile is broken", "the registry is down") are wrong every time. `.nvmrc`
+says 22; `nvm use` is the fix.
+
+## Conventions
+
+- `Features.md` is the catalogue of every feature and sub-system, and `test-cases/` the catalogue of
+  every scenario worth covering. Both stay in sync with the code **in the same change set**, never in
+  a follow-up.
+- **Never pipe a test or build run into `head`** (or `grep -m N`). It closes the pipe, the runner's
+  parent dies on EPIPE, and its workers are orphaned at `ppid=1` spinning at about a core each — this
+  cost the machine a forced restart on 2026-09-04. Use `| tail -N`, or redirect to a file and read it.
 
 ## The base
 
-`reference/convenience-corner-tracker/` is a verbatim snapshot of the project tracker built inside the [convenience-corner](https://github.com/bkirosangma/convenience-corner) repository (snapshot at commit `24e2240`, 2026-08-19). Open `reference/convenience-corner-tracker/tracker.html` in a browser — it runs standalone from a `file:` URL with its snapshot data, four views included (Focus, Board, Backlog, Calendar).
+`reference/convenience-corner-tracker/` is a verbatim snapshot of the project tracker built inside the
+[convenience-corner](https://github.com/bkirosangma/convenience-corner) repository (snapshot at commit
+`24e2240`, 2026-08-19). Open `reference/convenience-corner-tracker/tracker.html` in a browser — it runs
+standalone from a `file:` URL with its snapshot data, four views included (Focus, Board, Backlog,
+Calendar).
 
-The generator (`tools/build_tracker.py`, 73 tests) is included as reference; it reads that repository's origin files (README roadmap, `test-cases/`, `operations/`, `tokens.json`) and will not run here. That is expected — the snapshot is provenance, not a dev environment.
+The generator (`tools/build_tracker.py`, 73 tests) is included as reference; it reads that
+repository's origin files (README roadmap, `test-cases/`, `operations/`, `tokens.json`) and will not
+run here. That is expected — the snapshot is provenance, not a dev environment.
 
-`reference/design-docs/` holds the three documents that designed the base: the tracker itself, the calendar view, and the calendar's implementation plan.
+`reference/design-docs/` holds the three documents that designed the base: the tracker itself, the
+calendar view, and the calendar's implementation plan.
 
-## What the base proved (the ideas worth generalising)
+**`reference/` is frozen.** It is never edited here — corrections happen upstream and get re-snapshotted
+with a new commit reference.
 
-1. **Origins own facts; the board owns attention.** Task state lives in the files that own the work; the board may only say *later / next / in-progress / blocked* about them. `done` is not a legal value on the board — completion is recorded at the origin, so the board cannot claim finished work that isn't.
-2. **The view is generated; attention is authored.** A deterministic generator joins the origins with one small authored file, and a freshness gate (`--check`) refuses a stale view.
-3. **Refusals over good intentions.** The generator rejects unknown ids, flags on done items, contradictions between authored claims (a due date past the record's own needed-by week), and half-recorded facts.
-4. **No invented data, anywhere.** The calendar renders only real dates — authored plans, actual record spans, derived waits — and an undated item is absent, not estimated. Deadline markers are labelled as the record's *claim*, never as "due".
+## What the base proved
+
+These are the ideas the product generalises, and they are still the ideas it is built on:
+
+1. **Origins own facts; the board owns attention.** Task state lives in the files that own the work;
+   the board may only say *later / next / in-progress / blocked* about them. `done` is not a legal
+   value on the board — completion is recorded at the origin, so the board cannot claim finished work
+   that isn't.
+2. **The view is generated; attention is authored.** A deterministic generator joins the origins with
+   one small authored file, and a freshness gate (`--check`) refuses a stale view.
+3. **Refusals over good intentions.** The generator rejects unknown ids, flags on done items,
+   contradictions between authored claims (a due date past the record's own needed-by week), and
+   half-recorded facts.
+4. **No invented data, anywhere.** The calendar renders only real dates — authored plans, actual
+   record spans, derived waits — and an undated item is absent, not estimated. Deadline markers are
+   labelled as the record's *claim*, never as "due".
 5. **Checks are proven against planted defects** before they are trusted.
-
-## What the base cannot answer (the brainstorm's job)
-
-The base is one static HTML file over one repository's files, for one user who edits JSON by hand. A *product* must decide: who it is for, how "origins" generalise beyond a monorepo, whether data is hosted or local, how editing works when users won't hand-edit files, collaboration, and what stack any of that implies. None of that is inherited — it is all open.
-
-## Rules
-
-- `reference/` is **frozen**. It is never edited here — corrections happen upstream and get re-snapshotted with a new commit reference.
-- `Features.md` and `test-cases/` follow the workspace conventions from day one.
