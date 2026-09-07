@@ -3380,6 +3380,107 @@ covers which case is also a backup of work derived from it** — an argument for
 nothing to do with the convention's stated purpose.
 
 
+### Verification-method rule 9 (2026-09-07, serial executor) — an extractor that reads the WRONG SHAPE of the source produces a well-formed count about something else, four times in one session
+
+The citation backfill needed to know which catalogue rows name a covering test. A private extractor answered
+that question **four times, wrongly, in four different ways** — and each wrong answer was reported to the
+controller as fact before it was checked.
+
+| # | what the extractor assumed | what the catalogue does | rows hidden |
+|---|---|---|---|
+| 1 | ids look like `- 7.5 ✅` | §13 also uses **marker-first** `- ✅ **13.9 — …**` | 27 in §13 |
+| 2 | ids are single tokens | §03 uses **ranges**: `- **3.89–3.94** ✅` | 50 in §03 |
+| 3 | a row is ONE LINE | rows **WRAP**, and the file is often on the continuation line | **46 in §13** |
+| 4 | a path ends at `.ts` | paths carry **line numbers**: `` `contest-events.test.ts:45` `` | 23 in §12 |
+
+*(A fifth shape — the file named once in a **block header** rather than per row — hid all 36 of §07's remainder.)*
+
+**Every one produced a well-formed number.** None errored. Two of them were reported as "these rows are a
+reading job, not transcription" — a claim that would have written off ~120 mechanically citable rows.
+
+> **The rule: a count is a claim about the SHAPE of the source, not only about its content.** Before believing an
+> extractor, check it against an authority that reads the source independently — here `pnpm check:citations`,
+> whose totals caught defects 1 and 2 — and **when no authority exists for the sub-question you are asking
+> (which rows NAME a file), go and read the raw text.**
+
+**What actually found each one, and it was never more counting.** Defect 3 surfaced only because the executor
+**stopped citing and went to characterise what the "reader job" rows were** — reading six of them verbatim, and
+noticing one ended mid-sentence at *"each refused by name when"*. **A truncated sentence is a shape error you
+can SEE; a wrong total is not.** Prefer, at least once per instrument, reading a handful of raw records beside
+the number the instrument gives for them.
+
+**TWO MORE OF THE SAME CLASS, found after this rule was first written — the shape error is not confined to parsing.**
+
+**6. The GROUPING step, not the parser.** Candidates were clustered with `'invites.test.ts' in row`, which
+substring-matches **`proj-invites.test.ts`** and **`packages/domain/test/events/invites.test.ts`** as well. Three
+different files were collapsed into one cluster, so six rows appeared not to match the tests being read — and
+were written off as "each would have been a guess" — when they simply belonged to two other files. **A
+well-formed set that is about something slightly different from the question asked.** Resolve names to REAL
+paths before grouping by them; a substring is not an identity.
+
+**7. A POSITIONAL reference that was true when measured and false when used.** An inserter refused to write a
+docblock at `events-route.test.ts:79` because that line was no longer an `it(` — an earlier docblock in the same
+file had shifted every line below it. **The assertion turned a would-be misplaced citation into a stopped run.**
+Line numbers gathered before an edit are stale after it; re-read them, or assert on the content at the line.
+
+**And a habit worth naming, because it cost more than any single defect.** Rows were deferred as "ambiguous" or
+"undecidable" eleven times. On re-examination **almost none were**: five lived in a file their candidate list did
+not point at, three were simply further down a file whose head had been skimmed, and two were RECORDS rather than
+assertions — which is a decision about the convention, not an ambiguity in the source. **"I have not decided" and
+"this is undecidable" are different claims, and the first was repeatedly reported as the second.** Deferring
+remained the right call each time — the alternative was citing on a filename rather than on a read — but the
+deferrals were far cheaper to resolve than they looked, and should be revisited rather than accumulated.
+
+*(A record CAN be cited, incidentally: its ✅ means the work was done and verified, so citing it beside the suite
+it describes points a reader at where it applies. Say in the docblock that it is a record. Pretending it is an
+assertion is dishonest; leaving it uncited forever because it is not one is merely incomplete.)*
+
+**Corollary already in this document's spirit:** the totals agreed with the checker at every point after defects
+1 and 2 were fixed, because the checker counts ✅ ids — it has no opinion on which rows name a file. **An
+authority validates only the question it answers.** Agreement with it on totals said nothing about the
+sub-question, and that false comfort is what let defects 3 and 4 survive two more reports.
+
+**8. AN EIGHTH SHAPE, and this one was not an extractor at all — it was a HAND-TYPED LIST beside a table
+derived from a different measurement.** (2026-09-07, the `exec/65` rebuild.)
+
+A restart brief instructed a rebuild by cherry-pick and enumerated the commits to pick: **4 for one branch,
+16 for the other, 20 in total. The branch held 23 content commits.** The three omitted were `52a68d6` (§04
+opened, 45 → 39), `f717189` (§07 driven to ONE uncited) and `45f52fd` (the reader-job correction, which also
+carried rule 9's own record into this document).
+
+**The brief's summary table, printed directly above the lists, asserted §07 = 1 uncited — a state unreachable
+without `f717189`.** The document therefore contradicted itself across four lines, and a restarted executor
+following it faithfully would have produced a branch whose numbers disagreed with the table it was working
+from, most likely discovering this only at the gate, or not at all: dropping `52a68d6` breaks §04's later
+batches by replaying them onto a baseline that never reached 39, which surfaces as a *conflict*, not as a
+missing commit.
+
+**Why it belongs to rule 9 rather than to carelessness.** The list and the table answered different questions
+— *"which commits do I replay"* versus *"where did each section end up"* — and were produced by different
+means, one by hand and one by measurement. **A count is a claim about the shape of a source; a hand-typed
+list is a claim about a set, and neither validates the other.** Sixteen of the twenty entries were right,
+which is precisely the condition rule 4 names: *a decomposition that reconciles almost everywhere reads as
+verified, and the wrong entry hides inside the right ones.*
+
+**The fix, and it is mechanical:** never type a commit list beside a table you measured. Generate it from the
+same tree you are reporting —
+
+```
+git log --reverse --format='%h|%s' <base>..<branch>   # then classify each by files-touched
+```
+
+— which is how the 23 were found, and which also settles the content-versus-handoff classification that a
+hand list has to assert without evidence.
+
+**And the same defect had a sibling in the same brief.** It recorded *"Verified safe: `engine-context.test.ts`
+— 40+ lines apart, clean merge"*. That was true, and it covered **one of the three** test files in the actual
+collision surface. Computing the surface properly — intersecting `git diff --name-only $MB main` with
+`git diff --name-only $MB branch` — showed `projection-order.test.ts`, where **both sides insert at the same
+line**, and `verify-projections.test.ts`, where they insert one line apart. Both were real conflicts; neither
+was mentioned. **Verifying the instance you happened to think of, then generalising to the class, is how the
+other two stayed invisible.** Two commands size the surface, and they cost nothing next to discovering a
+conflict twelve picks into a sequence.
+
 ## Two findings about method, from Lane 2's T3 review (2026-08-28)
 
 Both are about *how* defects were caught rather than what they were, and both bind the controller harder

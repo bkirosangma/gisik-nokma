@@ -212,6 +212,9 @@ describe('inviteAcceptedPayload and inviteRevokedPayload', () => {
    * token the person proved they held — and what it records is that binding,
    * not a claim about who owns an inbox.
    */
+  /**
+   * 6.121 — an address is not an identity, and the schemas keep that STRUCTURAL: `invite.sent` refuses a `userId`, `invite.accepted` refuses an `address`. No single event in the vocabulary can be read as "this address IS this person".
+   */
   it('planted defect: invite.accepted refuses an address, and invite.sent refuses a userId', () => {
     expect(
       rejectionIssues(inviteAcceptedPayload.safeParse({ inviteId: INVITE_ID, userId: newUlid(), address: 'a@b.c' })),
@@ -256,6 +259,9 @@ describe('the invite registrations', () => {
    * names invite B commits cleanly — the projection keys on the payload and
    * revokes B, while A's stream carries the claim, and the ledger is
    * append-only so neither can be taken back.
+   */
+  /**
+   * 6.120 — an invite’s entity id IS its `inviteId`, refused at PARSE when they disagree. Without this, an event filed at invitation A whose payload names B parses cleanly, and the server’s entity↔workspace guard cannot catch it.
    */
   it('planted defect: an invite event whose entity id and inviteId disagree is refused', () => {
     const otherInvite = newUlid();

@@ -30,6 +30,9 @@ describe('parseEvent', () => {
     }
   });
 
+  /**
+   * 3.2 — an event of an UNREGISTERED type is refused `unknown-event-type`, with the type named rather than a generic rejection.
+   */
   it('planted defect: refuses an unknown event type, naming it', () => {
     const raw: Record<string, unknown> = { ...rawWorkspaceCreated(), type: 'shop.opened' };
     const result = parseEvent(raw);
@@ -41,6 +44,9 @@ describe('parseEvent', () => {
     });
   });
 
+  /**
+   * 3.3 — a REGISTERED type at an unregistered version is refused `unknown-event-version`: the version is part of the identity, not a hint.
+   */
   it('planted defect: refuses a known type at an unknown version', () => {
     const raw: Record<string, unknown> = { ...rawWorkspaceCreated(), version: 2 };
     const result = parseEvent(raw);
@@ -52,6 +58,9 @@ describe('parseEvent', () => {
     });
   });
 
+  /**
+   * 3.4 — a payload missing a required field is refused `invalid-payload`. The row’s other half — a payload SMUGGLING extra keys, refused by the strict schemas — is the test below.
+   */
   it('planted defect: refuses a payload missing its required field', () => {
     const raw: Record<string, unknown> = { ...rawWorkspaceCreated(), payload: {} };
     const result = parseEvent(raw);

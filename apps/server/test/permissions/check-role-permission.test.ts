@@ -94,7 +94,14 @@ function ctx(role: EffectiveRole, workspaceExists = false) {
   return { sessionUserId: ACTOR, eff: role, workspaceExists };
 }
 
+/**
+ * 6.6 — cited on the block: the admin-only event types — `workflow.defined`, `ticket-type.defined`, `project.created` and `ticket.workflow_rebound` — are each refused to a plain member under `permission.role` and each allowed for BOTH owner and admin. The row’s closing clause, that ordinary ticket work is let through because the visibility gate owns the rest, is the test at the end of this block.
+ * 6.78 — a RECORD rather than an assertion, kept where it applies: three shipped fixtures were REPAIRED rather than three assertions loosened when this gate landed. Two of the three were in this file. Each had gone red for a reason unrelated to its own subject — "a refusal that fires before the interesting code proves nothing", arriving from the other direction.
+ */
 describe('checkRolePermission — planted defects', () => {
+  /**
+   * 6.7 — a claim submitted as ANOTHER person is refused. The row’s "including from a workspace owner, so the check is identity and not privilege" half is the client-door test further down.
+   */
   it('refuses a claim submitted as another person', () => {
     // Mutation: delete the `env.actorId !== ctx.sessionUserId` branch. This
     // goes green-for-nothing and every other case in this file still passes,
@@ -107,6 +114,9 @@ describe('checkRolePermission — planted defects', () => {
     });
   });
 
+  /**
+   * 6.8 — a client-submitted event wearing the SERVER’s envelope-origin is refused. (Envelope-origin here is the event envelope’s `origin` field, not the HTTP `Origin` header.) The row’s founding-sequence half is asserted in the founding block below.
+   */
   it("refuses a client-submitted event wearing the server's envelope-origin", () => {
     const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {}, origin: 'server' });
     expect(checkRolePermission(e, ctx(eff('admin')))).toEqual({
@@ -134,6 +144,9 @@ describe('checkRolePermission — planted defects', () => {
     expect(checkRolePermission(e, ctx(eff(null), false))).toBeNull();
   });
 
+  /**
+   * 6.43 — the founding bypass cannot be used to SEIZE an existing workspace: a non-member founding a workspace that already exists is refused. The row’s other planted defects — a stranger re-founding, and "already exists" being a question about the WORKSPACE rather than one entity id — are in the founding block below.
+   */
   it('planted defect: refuses a NON-MEMBER founding a workspace that already exists', () => {
     // The bypass's bound, and without it the bypass is a privilege escalation:
     // nothing else refuses a second `workspace.created`, the engine has no case
@@ -515,6 +528,9 @@ async function workspaceStream(workspaceId: string) {
 }
 
 describe('the founding sequence — a new workspace can hold a ticket the moment it exists', () => {
+  /**
+   * 6.24 — founding appends the default workflow, then the four built-in types naming it, then the founder’s owner grant — asserted in that ORDER, not merely as a set.
+   */
   it('appends the default workflow, then the four built-in types, then the grant — in that order', async () => {
     const workspaceId = newUlid();
     const founder = newUlid();
@@ -961,6 +977,9 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
   });
 
+  /**
+   * 6.46 — the gate reads roles through `resolveEffectiveRole`, so a REVOKED member is refused at once rather than at the next cache boundary.
+   */
   it('reads the role through resolveEffectiveRole, so a revoked member is refused at once', async () => {
     const ingest = ingestService();
     const { workspaceId, owner } = await foundedWorkspace(ingest);
@@ -1003,6 +1022,9 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
   });
 
+  /**
+   * 6.45 — project-roster changes are gated on PROJECT-ADMIN rights, not on workspace membership.
+   */
   it('gates the project roster on project-admin rights, not on workspace membership', async () => {
     const ingest = ingestService();
     const { workspaceId, owner } = await foundedWorkspace(ingest);
@@ -1069,6 +1091,9 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
   });
 
+  /**
+   * 6.44 — the gate reads the ingest transaction’s OWN connection, never a second one from the pool.
+   */
   it('planted defect: the gate reads the ingest transaction, never a second connection', async () => {
     // Set up through the ordinary service; only the gated submission runs
     // against the one-connection pool, so the setup cannot itself trip it.

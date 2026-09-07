@@ -167,6 +167,9 @@ describe('phone OTP sign-in', () => {
    * property that holds by accident holds until someone tidies it. This comment
    * is the difference.
    */
+  /**
+   * 6.18 — the session-cookie half of the row: the cookie is HttpOnly (and SameSite=Lax, not Secure over http). The row’s other two paths are proven separately rather than inferred from this one — sign-out invalidating a bearer token, and a pre-set cookie never becoming a session — in `require-session.test.ts` and `routes/security.test.ts`.
+   */
   it('the session cookie is better-auth.session_token, HttpOnly, SameSite=Lax, and not Secure over http', async () => {
     const phone = '+919000000002';
     const send = await app.inject({

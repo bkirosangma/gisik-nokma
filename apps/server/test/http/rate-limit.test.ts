@@ -11,6 +11,9 @@ import { makeFixedWindowLimiter } from '../../src/http/rate-limit.js';
  * no deployment uses — and would then be asserting about a different limiter
  * than the one that ships.
  */
+/**
+ * 13.125 — cited on the block: `makeFixedWindowLimiter` unit coverage — max-then-refuse with bounded retry hints, key independence, and the window reset proven by a CLOCK ARGUMENT rather than by sleeping.
+ */
 describe('fixed-window rate limiter', () => {
   it('allows up to max within the window, then refuses with a retry hint', () => {
     const limiter = makeFixedWindowLimiter(3, 60);

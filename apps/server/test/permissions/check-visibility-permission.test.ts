@@ -211,6 +211,9 @@ describe('check 3 — a visibility.set must name its own ticket', () => {
 // Check 4 — the actor must be able to see the ticket they are acting on.
 // ---------------------------------------------------------------------------
 
+/**
+ * 6.11 — both halves, the HTTP one added by Task 12: a guest acting on a ticket no explicit list names them in is refused `permission.visibility` at the INGEST door, walked over TWO event types (`ticket.transitioned` and `comment.added`) because the refusal is one line covering every ticket event and a single type would not establish that. Both were measured as ADMITTED on `main` first, so the refusal is a change and not a restatement.
+ */
 describe('check 4 — acting on a ticket you cannot see', () => {
   it.each(['ticket.transitioned', 'comment.added'])(
     'planted defect: a guest is refused %s on a ticket not explicitly shared with them',
@@ -284,6 +287,9 @@ describe('check 4 — acting on a ticket you cannot see', () => {
     ).toBeNull();
   });
 
+  /**
+   * 6.76 — a ticket that never existed and one the actor may not see are the SAME answer at the WRITE door too, not only on the read side.
+   */
   it('a ticket that never existed and one the actor may not see answer IDENTICALLY', async () => {
     // The oracle that would otherwise sit one layer below Task 8's 404s: if the
     // gate distinguished "no such ticket" from "not yours", a member could
@@ -345,6 +351,12 @@ describe('check 4 — acting on a ticket you cannot see', () => {
 // `permission.role`: it is authority, not audience.
 // ---------------------------------------------------------------------------
 
+/**
+ * 6.19 — cited on the block: `visibility.set` demands project-admin rights OR ticket creatorship, and the row’s four paths are the tests here — plain member refused, creator allowed (read from the LEDGER, since no projection carries it), project admin allowed, and project-admin rights asked of the TICKET’s project. The row’s "must name the ticket it is attached to" clause is check 3 above.
+ */
+/**
+ * 6.80 — a RECORD rather than an assertion, kept beside the suite it describes: every planted defect in this task was killed by its NAMED mutation, and the counts are recorded rather than claimed. Nine mutations were run against the committed tree, each reverted before the next — including one where deleting the guest branch reddens on the REASON rather than the rule, because the guest then falls through to the project-membership refusal. A case asserting only `rule` would have survived it.
+ */
 describe('check 5 — who may change who sees a ticket', () => {
   it('planted defect: a plain member who is neither project admin nor creator cannot set visibility', async () => {
     // Reached where it can only be itself: the member is ON the project, so
@@ -453,6 +465,9 @@ describe('check 5 — who may change who sees a ticket', () => {
     });
   });
 
+  /**
+   * 6.74 — check 5 must run AFTER check 4, or it is an existence oracle: an unseeable ticket answers the audience refusal, not the authority one. The actor that proves it is an ADMIN, who would otherwise pass check 5.
+   */
   it('check 5 runs AFTER check 4: an unseeable ticket answers the audience refusal, not the authority one', async () => {
     // The ordering that keeps check 5 from being an existence oracle. The actor
     // is a workspace ADMIN, so hasProjectAdminRights is true on every project

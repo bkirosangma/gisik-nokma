@@ -381,6 +381,9 @@ describe('createEngineContext.getEntityState — what the server can honestly se
     }
   });
 
+  /**
+   * 6.132 — `getEntityState('membership')` serves the WHOLE `MembershipState` for EACH granted role, and every way of not being a member answers null: a head with no grant, and a revoked person.
+   */
   it('serves the WHOLE MembershipState for each granted role, and null for a head with no grant and for a revoked person whose roster row survives — inverted by ruling P18', async () => {
     // THE ASSERTION RULING P18 INVERTS. It read `.toBeNull()` under the name
     // "answers null for a membership that HAS a head row — the §9 hazard,
@@ -513,6 +516,9 @@ describe('createEngineContext.getEntityState — what the server can honestly se
     }
   });
 
+  /**
+   * 6.133 — the membership id is decoded FAIL-CLOSED, and the decode is checked by RE-ENCODING it: only an id that re-encodes to itself is served.
+   */
   it('serves a membership only for an id that re-encodes to itself — the fail-closed decode', async () => {
     // `membershipId` is `${workspaceId}:${userId}`, and this method is handed
     // the id as a string, so the pair has to be recovered from it. The decode is
@@ -672,6 +678,9 @@ describe('createEngineContext.getContest — the contest lookup the engine canno
   });
 });
 
+/**
+ * 6.134 — cited on the block: the role gate discriminates on the ROLE, not on having one — refuse, refuse, commit, across one ticket and one edge.
+ */
 describe('a role-gated transition through the shipped server context', () => {
   it('now reaches the role gate and is refused BY IT — §9 observed where §9 predicted', async () => {
     const results = await service().ingestBatch([
@@ -741,6 +750,9 @@ describe('a role-gated transition through the shipped server context', () => {
     });
   });
 
+  /**
+   * 6.50 — closed by the step-10 integration checkpoint: the same move COMMITS for an actor who genuinely holds admin, ruling P18 end to end.
+   */
   it('COMMITS the same move for an actor who genuinely holds admin — ruling P18, end to end', async () => {
     // THE INVERSION, and the half the two refusals above are worthless without.
     // Nothing differs from them but the actor's role: same ticket, same edge,

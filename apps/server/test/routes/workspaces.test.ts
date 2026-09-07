@@ -93,6 +93,9 @@ async function eventsAuthoredBy(userId: string): Promise<number> {
 }
 
 describe('POST /v1/workspaces — the founding door', () => {
+  /**
+   * 6.23 — `POST /v1/workspaces` founds a workspace for any signed-in person and returns its id: a ULID in the Crockford alphabet, and ONLY that.
+   */
   it('founds a workspace and returns its id', async () => {
     const { headers } = await signedIn();
     const res = await app.inject({
@@ -195,6 +198,9 @@ describe('POST /v1/workspaces — the founding door', () => {
     expect(rows[0]?.payload['name']).toBe(' Corner ');
   });
 
+  /**
+   * 6.106 — planted defect, and the founding route’s own half of 6.52: a body that NAMES the workspace it wants to found is REFUSED rather than ignored, and appends nothing.
+   */
   it('planted defect: a body that names the workspace it wants to found is refused, and appends nothing', async () => {
     // THE ROUTE'S HALF OF CASE 6.52. The gate refuses a `workspace.created`
     // naming an already-founded workspace, but that refusal is unreachable from
@@ -369,6 +375,9 @@ describe('POST /v1/workspaces — the founding door', () => {
 });
 
 describe('GET /v1/me/workspaces — the directory', () => {
+  /**
+   * 6.108 — `GET /v1/me/workspaces` lists this person’s own workspace-scope memberships and nothing else.
+   */
   it('lists the workspaces this person belongs to, with names and roles', async () => {
     const { headers } = await signedIn();
     const a = await found(headers, 'Alpha');
@@ -397,6 +406,9 @@ describe('GET /v1/me/workspaces — the directory', () => {
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
   });
 
+  /**
+   * 6.107 — the directory’s name is a LEDGER FOLD ordered by `workspace_seq`, and there is no `proj_workspaces` table: the name follows a rename because it is the last thing anyone said the workspace is called.
+   */
   it('the name follows a rename — it is the LAST thing anyone said the workspace is called', async () => {
     // The instrument, named: `workspaceNameFromLedger` orders by
     // `workspace_seq`, the workspace's own cursor, and not by the per-entity

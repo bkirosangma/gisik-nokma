@@ -50,6 +50,9 @@ describe('determinism (the rebuild-and-diff discipline, spec §3)', () => {
     }
   });
 
+  /**
+   * 3.21 — replaying the fixture ledger twice yields BYTE-IDENTICAL projection rows, with every column of every head row pinned rather than spot-checked.
+   */
   it('replaying the fixture ledger twice yields byte-identical projection rows, with the expected heads', async () => {
     const db = await createTestDatabase();
     try {

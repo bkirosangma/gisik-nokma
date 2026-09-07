@@ -43,6 +43,9 @@ function offlineAuth(): ReturnType<typeof createAuth> {
   });
 }
 
+/**
+ * 13.114 — cited on the block: `/healthz` answers the exact shape `{ status, sha }` — not `{ …, version }` — on BOTH the 200 and the 503 branch, by `toEqual` rather than a partial match. A failing rollout must still say which build is failing.
+ */
 describe('GET /healthz', () => {
   it('answers ok when the database responds', async () => {
     const app = buildApp({

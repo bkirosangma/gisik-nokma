@@ -111,6 +111,9 @@ function poolWithFailingRollback(real: Pool): Pool {
 }
 
 describe('ingestBatch', () => {
+  /**
+   * 3.11 — batch ingest answers PER EVENT and index-aligned: committed with seq and serverTime, invalid with a named code, refused with rule and reason.
+   */
   it('answers per event, in order: committed, unknown type, invalid payload', async () => {
     const valid = submittedWorkspaceCreated();
     const unknownType = { ...submittedWorkspaceCreated(), type: 'shop.opened' };
@@ -194,6 +197,9 @@ describe('ingestBatch', () => {
     });
   });
 
+  /**
+   * 4.41 — an entity already bound to one workspace cannot be re-filed under another: ingest refuses `entity-workspace-mismatch` BEFORE the engine evaluates anything.
+   */
   it('planted defect: an entity already bound to one workspace cannot be re-filed under another', async () => {
     // The other half of coordination doc §11. `workspaceId` is a per-event
     // claim that nothing validated: a second event on this entity naming a
@@ -280,6 +286,9 @@ describe('ingestBatch', () => {
     expect(second).toMatchObject({ status: 'committed', seq: 2 });
   });
 
+  /**
+   * 3.12 — a rule-refused event leaves NO trace in the ledger or the projections, and the refusal is reported verbatim.
+   */
   it('planted defect: a rule refusal is reported verbatim and leaves NO trace in ledger or projections', async () => {
     const refuseAll: typeof evaluateEvent = async () => ({
       refused: true,
@@ -304,6 +313,9 @@ describe('ingestBatch', () => {
     expect(heads.rows[0]).toEqual({ n: 0 });
   });
 
+  /**
+   * 3.13 — a replayed client event id is answered `duplicate-event-id`.
+   */
   it('planted defect: a replayed event id is answered duplicate-event-id', async () => {
     const ingest = service();
     const event = submittedWorkspaceCreated();
@@ -340,6 +352,9 @@ describe('ingestBatch', () => {
     ]);
   });
 
+  /**
+   * 3.14 — projections apply in the SAME transaction as the event. The row’s other clause — that the rule engine judges the world as of the PREVIOUS event, not the one under evaluation — is the test further down this block.
+   */
   it('applies projections in the same transaction as the event', async () => {
     const event = submittedWorkspaceCreated();
     await service().ingestBatch([event]);
@@ -443,6 +458,9 @@ describe('ingestBatch', () => {
   });
 });
 
+/**
+ * 3.15 — cited on the block: the row’s four clauses are its four tests — `onEventCommitted` fires only after commit, never for refused events, unsubscribe stops delivery, and a throwing listener cannot break ingest or starve other listeners.
+ */
 describe('onEventCommitted', () => {
   it('fires after commit with the full envelope, and only for committed events', async () => {
     const ingest = service();

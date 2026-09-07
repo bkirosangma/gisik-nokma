@@ -57,6 +57,9 @@ async function renderListTab(getPreferences: () => Promise<never> | Promise<type
   await userEvent.setup().click(await screen.findByRole('tab', { name: 'List' }));
 }
 
+/**
+ * 3.88 — cited on the block: the list’s preference controls are DISABLED while the preferences document has not loaded and ENABLED once it has, because only then does a write have a document to merge into.
+ */
 describe('the list’s preference controls follow whether a write would actually land', () => {
   it('are DISABLED while the preferences document has not loaded', async () => {
     // A promise that never settles is the window itself: `usePreferences` has

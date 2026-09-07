@@ -95,6 +95,9 @@ describe('docker-compose.dev.yml env contract', () => {
   // services (a bad indent, a YAML anchor gone wrong, a future edit that
   // moves `services` under something else), every assertion below would
   // vacuously pass against an empty object. Fail loudly on that first.
+  /**
+   * 13.157 — the ANTI-VACUITY guard: all six expected service names really parse out of the YAML, so a parser silently returning nothing cannot make every assertion below pass.
+   */
   it(`parses all ${EXPECTED_SERVICES.length} expected services (anti-vacuity guard)`, () => {
     const doc = readCompose();
     expect(doc).toBeTruthy();
@@ -102,6 +105,9 @@ describe('docker-compose.dev.yml env contract', () => {
     expect(Object.keys(doc.services).sort()).toEqual([...EXPECTED_SERVICES].sort());
   });
 
+  /**
+   * 13.158 — project isolation: the dev stack declares an explicit `name:`, and it differs from the root compose file’s. Both halves are the two tests here.
+   */
   describe('project isolation from the root stack', () => {
     // Compose derives its project name from the DIRECTORY unless `name:` says
     // otherwise. Both compose files live here, so without this both resolve to
@@ -136,12 +142,18 @@ describe('docker-compose.dev.yml env contract', () => {
     // values to the same functions the boot path calls. Catches missing keys,
     // malformed values, and any key config.ts gains in future — no
     // hand-maintained list to go stale.
+    /**
+     * 13.159 — the server service’s parsed env satisfies the REAL `loadConfig()`, not a mock, without throwing.
+     */
     it('satisfies loadConfig — every required key present AND well-formed', () => {
       const env = envOf('server');
       expect(Object.keys(env).length, 'parsed an empty server environment').toBeGreaterThan(5);
       expect(() => loadConfig(env)).not.toThrow();
     });
 
+    /**
+     * 13.160 — and the REAL `createObjectStoreFromEnv()` without throwing. That it resolves to `S3ObjectStore` rather than the local-disk fallback is the test below.
+     */
     it('satisfies createObjectStoreFromEnv — the store resolves without throwing', () => {
       expect(() => createObjectStoreFromEnv(envOf('server') as NodeJS.ProcessEnv)).not.toThrow();
     });
@@ -156,6 +168,9 @@ describe('docker-compose.dev.yml env contract', () => {
     });
   });
 
+  /**
+   * 13.161 — cited on the block: the object-store wiring the plan’s defect would have slipped past — `OBJECT_STORE=s3`, `FORCE_PATH_STYLE=true` as MinIO requires, an endpoint pointing at the compose minio service rather than real AWS, a bucket minio-init actually creates, and no bare `S3_*` key.
+   */
   describe('object-store wiring (the assertion that would have caught the plan\'s defect)', () => {
     it('sets OBJECT_STORE to s3', () => {
       expect(envOf('server').OBJECT_STORE).toBe('s3');
@@ -204,6 +219,9 @@ describe('docker-compose.dev.yml env contract', () => {
     // lists exactly the latter pair and not the former, so under turbo 2's
     // envMode:strict the dead names would reach `next build` as undefined even
     // if something did read them.
+    /**
+     * 13.162 — `SERVER_ORIGIN` is passed as a BUILD ARG rather than runtime env, because it binds at build time. That it points at the server service and NOT at localhost is the test below.
+     */
     it('passes SERVER_ORIGIN — the proxy target, which binds at BUILD time', () => {
       // `rewrites()` runs during `next build` and its result is serialised into
       // .next/routes-manifest.json, which the standalone server then reads. A
@@ -231,6 +249,9 @@ describe('docker-compose.dev.yml env contract', () => {
       expect(origin).not.toContain('localhost');
     });
 
+    /**
+     * 13.163 — `NEXT_PUBLIC_SERVER_URL` is passed for the browser-side socket dial. That neither of the plan’s dead names (`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`) is passed is the test below — nothing reads them.
+     */
     it('passes NEXT_PUBLIC_SERVER_URL for the browser-side socket dial', () => {
       // Read by src/providers.tsx for /v1/stream, which the rewrites
       // deliberately do NOT cover (Next does not proxy protocol upgrades).
@@ -246,6 +267,9 @@ describe('docker-compose.dev.yml env contract', () => {
     });
   });
 
+  /**
+   * 13.164 — the Postgres host port, checked on BOTH sides: `54329` (this workspace’s shared cross-lane TEST Postgres) is NOT published, and `54330` IS. One side alone would not catch a collision with the test database.
+   */
   describe('postgres host port', () => {
     function publishedPorts(): string[] {
       const ports: unknown[] = readCompose().services.postgres.ports ?? [];

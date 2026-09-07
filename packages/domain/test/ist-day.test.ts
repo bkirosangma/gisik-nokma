@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { IST_OFFSET_MINUTES, IST_TIME_ZONE, istDayBounds, istDayOf } from '../src/ist-day.js';
 
+/**
+ * 3.27 — cited on the block: the IST day boundary — `18:29:59Z` and `18:30:00Z` fall on different IST days, the one millisecond between them changes the day, and a day’s bounds are the half-open `[startUtc, endUtc)`. Note the block also reads the INSTANT rather than the label, so the same moment stated as `+05:30` and as `Z` lands on one day.
+ */
 describe('istDayOf', () => {
   it('names the zone and the offset once, for everyone', () => {
     expect(IST_TIME_ZONE).toBe('Asia/Kolkata');

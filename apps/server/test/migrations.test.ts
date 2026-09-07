@@ -52,6 +52,9 @@ describe('events and snapshots schema', () => {
     expect(names).toContain('pgmigrations');
   });
 
+  /**
+   * 3.28 — every pooled session reports `Asia/Kolkata`, so an ad-hoc query reads the PRODUCT’s clock rather than the machine’s. The falsifiable half — that `createPool` alone controls this, independent of the database default — is the block at the end of this file.
+   */
   it('every session runs in Asia/Kolkata, so an ad-hoc query reads the product clock', async () => {
     const read = await db.pool.query<{ zone: string }>(
       `SELECT current_setting('TimeZone') AS zone`,
@@ -59,6 +62,9 @@ describe('events and snapshots schema', () => {
     expect(read.rows[0]?.zone).toBe('Asia/Kolkata');
   });
 
+  /**
+   * 3.9 — a stored claim reads back as the SAME instant: jsonb payload intact, `client_time` an absolute `timestamptz`, and both seqs as numbers rather than strings.
+   */
   it('a stored claim reads back as the same instant: jsonb payload intact, client_time absolute, both seqs as numbers', async () => {
     const query = insertEventSql('01J6000000000000000000TT01', 1);
     await db.pool.query(query.text, query.values);
@@ -79,6 +85,9 @@ describe('events and snapshots schema', () => {
     expect(row?.workspace_seq).toBe(1);
   });
 
+  /**
+   * 3.26 — two clients stating one instant with DIFFERENT offsets (`+05:30` and `Z`) store as one instant and compare equal in SQL: the offset is a spelling, not a value.
+   */
   it('planted defect: two clients stating one instant with different offsets store ONE instant and compare equal', async () => {
     // This is exactly what a text column got silently wrong: as text these two
     // strings are unequal and sort apart, though they name the same moment.
@@ -107,6 +116,9 @@ describe('events and snapshots schema', () => {
     expect(compared.rows[0]?.distinct_instants).toBe(1);
   });
 
+  /**
+   * 3.8 — a duplicate `(entity_kind, entity_id, seq)` violates `events_entity_seq_unique`.
+   */
   it('planted defect: a duplicate (entity_kind, entity_id, seq) violates events_entity_seq_unique', async () => {
     // workspace_seq 99 is free, so the entity constraint is the one that fires.
     const query = insertEventSql('01J6000000000000000000TT02', 1, 99);
@@ -116,6 +128,9 @@ describe('events and snapshots schema', () => {
     });
   });
 
+  /**
+   * 3.24 — a duplicate `(workspace_id, workspace_seq)` violates `events_workspace_seq_unique`: the stream cursor cannot fork.
+   */
   it('planted defect: a duplicate (workspace_id, workspace_seq) violates events_workspace_seq_unique — the stream cursor cannot fork', async () => {
     // A different entity in the same workspace, reusing workspace_seq 1: the
     // per-entity constraint is satisfied, and the workspace constraint refuses.
@@ -128,6 +143,9 @@ describe('events and snapshots schema', () => {
     });
   });
 
+  /**
+   * 3.7 — the append-only trigger, first of its three refusals: UPDATE on `events` is refused, because the ledger cannot be rewritten. The DELETE and TRUNCATE halves of the row are the two tests below.
+   */
   it('planted defect: UPDATE on events is refused — the ledger cannot be rewritten', async () => {
     // Exact-rejection convention: pin both the SQLSTATE (P0001, plpgsql's
     // default for an unqualified RAISE EXCEPTION) and the full message

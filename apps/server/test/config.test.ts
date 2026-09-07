@@ -84,6 +84,9 @@ describe('loadConfig', () => {
     expect(config.logLevel).toBe('debug');
   });
 
+  /**
+   * 3.22 — boot refuses a missing `DATABASE_URL` with the variable NAMED. The non-numeric `PORT` half of the row is a test further down this block.
+   */
   it('planted defect: a missing DATABASE_URL is refused with the variable named', () => {
     // Only DATABASE_URL removed, not an empty environment: `toThrowError(string)`
     // matches on substring, so `loadConfig({})` — which now names three missing
@@ -292,6 +295,9 @@ describe('loadConfig', () => {
  * every one of these refuses a malformed value by NAME instead of coercing it.
  */
 describe('loadConfig — the deployment surface', () => {
+  /**
+   * 13.105 — the nine deployment env vars plus `DEPLOY_SHA`, each parsed when the environment sets one — and each refused BY NAME when malformed, in the tests below.
+   */
   it('reads every deployment knob when the environment sets one', () => {
     const config = loadConfig({
       ...VALID_ENV,
@@ -322,6 +328,9 @@ describe('loadConfig — the deployment surface', () => {
    * `.env.example` documents "no webhook". If `''` were read as a VALUE, every
    * one of these would refuse an ordinary deploy. Asserted for all nine at
    * once because the mistake, if it is made, is made in one helper.
+   */
+  /**
+   * 13.106 — an empty string reads as UNSET and falls back to the documented default, which is what a deploy spec actually hands over. Note `WEB_ORIGIN` is deliberately NOT among them and throws instead.
    */
   it('reads an empty string as UNSET, not as a malformed value — that is what a deploy spec hands over', () => {
     const config = loadConfig({
@@ -358,6 +367,9 @@ describe('loadConfig — the deployment surface', () => {
    * caller choose its own source IP, and the rate limiter and the audit trail
    * both believe it.
    */
+  /**
+   * 13.107 — planted defect: `TRUST_PROXY` takes only the literal `'true'`/`'false'` — `'yes'` is refused by name rather than coerced by truthiness.
+   */
   it("planted defect: TRUST_PROXY takes only 'true'/'false' — 'false' is FALSE, and 'yes' is refused by name", () => {
     expect(loadConfig({ ...VALID_ENV, TRUST_PROXY: 'false' }).trustProxy).toBe(false);
     expect(loadConfig({ ...VALID_ENV, TRUST_PROXY: 'true' }).trustProxy).toBe(true);
@@ -375,6 +387,9 @@ describe('loadConfig — the deployment surface', () => {
    * satisfied by one of them working. A zero max refuses every request on the
    * limited routes; a zero window is a division by zero in any limiter that
    * computes a rate.
+   */
+  /**
+   * 13.108 — planted defect: a rate-limit var that is non-integer, zero, negative or fractional is refused with its own name.
    */
   it('planted defect: a non-integer or non-positive rate limit is refused with the variable named', () => {
     expect(() => loadConfig({ ...VALID_ENV, RATE_LIMIT_AUTH_MAX: 'lots' })).toThrowError(ConfigError);
@@ -399,6 +414,9 @@ describe('loadConfig — the deployment surface', () => {
    * server rejects at send, a CA that produces an opaque TLS handshake error
    * on the first query. Boot-time refusal naming the variable is cheaper than
    * every one of those.
+   */
+  /**
+   * 13.109 — planted defect: `ALERT_WEBHOOK_URL` and `SMTP_URL` are scheme-DISCRIMINATED against each other — an http URL rejected as SMTP and vice versa, not merely "any string fails".
    */
   it('planted defect: a malformed ALERT_WEBHOOK_URL, SMTP_URL, MAGIC_LINK_FROM or DATABASE_CA_CERT is refused with the variable named', () => {
     expect(() => loadConfig({ ...VALID_ENV, ALERT_WEBHOOK_URL: 'hooks.example/T/B' })).toThrowError(
@@ -495,6 +513,9 @@ describe('createPool TLS', () => {
     await pool.end();
   });
 
+  /**
+   * 13.110 — the regression pin: a CA cert reaches the real driver through a `?sslmode=require` managed-Postgres-shaped URL. This fails on the code that shipped before it.
+   */
   it('carries the CA even when the URL carries an sslmode — the managed-Postgres case', async () => {
     const pool = createPool(MANAGED_URL, { caCert: 'PEM' });
     // Before the ssl parameters were stripped this was `{}`: the parsed
@@ -505,6 +526,9 @@ describe('createPool TLS', () => {
     await pool.end();
   });
 
+  /**
+   * 13.111 — rewriting the connection string for TLS preserves user, password, host, port and database BYTE-FOR-BYTE — nothing but `ssl` changes.
+   */
   it('changes nothing but ssl when it rewrites the URL', async () => {
     // Stripping query parameters re-serializes the URL, so everything that
     // identifies the database has to be shown to survive it — a rewrite that
@@ -564,6 +588,9 @@ describe('createPool TLS', () => {
     await pool.end();
   });
 
+  /**
+   * 13.113 — an unparseable connection string that ALSO carries an ssl parameter is refused by name, rather than silently discarding the CA.
+   */
   it('refuses, by name, a URL it cannot rewrite but must', () => {
     // Carries an ssl parameter AND cannot be parsed: passing it through would
     // silently hand ssl back to the connection string and drop the CA, which is

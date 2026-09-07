@@ -9,6 +9,9 @@ beforeEach(() => {
 });
 
 describe('ThemeToggle — explicit choice wins, system is the default', () => {
+  /**
+   * 3.83 — the toggle cycles system → light → dark, stamping `data-theme` and persisting ONLY an explicit choice, so `system` stays the default rather than being written down as a preference.
+   */
   it('cycles system → light → dark, stamping data-theme and persisting', async () => {
     const user = userEvent.setup();
     render(<ThemeToggle />);

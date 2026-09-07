@@ -147,6 +147,9 @@ async function shadowSchemaExists(): Promise<boolean> {
   return result.rows[0].n > 0;
 }
 
+/**
+ * 3.20 — cited on the block: verify-projections is clean on honest state, and corrupted and deleted live rows are named with per-direction counts, with the shadow schema dropped afterwards.
+ */
 describe('verifyProjections', () => {
   /**
    * 5.69 — the non-emptiness guard the registry-driven verifier’s clean verdict depends on: a clean verdict over an EMPTY table is the check that cannot fail, so every table the verdict covers is asserted non-empty first.

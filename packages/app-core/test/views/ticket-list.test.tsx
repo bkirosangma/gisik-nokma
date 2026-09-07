@@ -355,6 +355,9 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
    * nobody chose. The two directions are asserted in the same test so a note
    * that fires for both halves, or for the wrong one, cannot pass.
    */
+  /**
+   * 3.65 — the surface names WHICH half nobody chose: a half-set project is told "default grouping — you have not chosen a grouping for this project" and stays SILENT about the chosen half. The mirror case below proves neither note is hard-wired to one side.
+   */
   it('PLANTED DEFECT: a HALF the user never chose is named as a default, and the chosen half is not', () => {
     render(
       <ControlledList

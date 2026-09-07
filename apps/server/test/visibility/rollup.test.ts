@@ -153,6 +153,9 @@ async function seedFamily(): Promise<{
 }
 
 describe('rollupFor — the total is the parent’s, the restriction is the viewer’s', () => {
+  /**
+   * 6.86 — eight viewer classes over ONE fixture, with the honesty claim asserted as a PAIRING: the `total` is the parent’s and identical for everyone, while `restrictedCount` is per-viewer and differs. Either number alone could be satisfied by a wrong implementation.
+   */
   it('every viewer class reports the SAME total over all nine children while the restricted count differs, six distinct values', async () => {
     const { ws, prjA, prjB, parent, guestUser } = await seedFamily();
 

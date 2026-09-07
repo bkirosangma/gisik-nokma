@@ -388,6 +388,9 @@ function expectedListCard(
 }
 
 describe('the world was built through the doors, and the server chose these values', () => {
+  /**
+   * 7.163 — the ticket resolved its type against the FOUNDING sequence — nothing in this test typed the workflow or the state.
+   */
   it('the ticket resolved its type against the FOUNDING sequence — nothing here typed the workflow or the state', () => {
     // What a seeded board test cannot say. `applyCommitted` writes
     // `proj_tickets.workflow_id` and `state_id` from the fixture's own literals,
@@ -408,6 +411,9 @@ describe('the world was built through the doors, and the server chose these valu
 });
 
 describe('GET /v1/me/workspaces — the directory', () => {
+  /**
+   * 7.164 — `GET /v1/me/workspaces` lists the workspace this person founded, over the wire, with the name they claimed.
+   */
   it('lists the workspace this person founded over the wire, with the name they claimed', async () => {
     // UNIQUELY: the `role: 'owner'` here is `proj_memberships` answering, and
     // the row exists because `bootstrapWorkspace` emitted `membership.granted`
@@ -437,6 +443,9 @@ describe('GET /v1/me/workspaces — the directory', () => {
     });
   });
 
+  /**
+   * 7.165 — CONTROL — the outsider’s own directory is empty from the SAME 200 route: this route’s refusal for a non-member IS the emptiness.
+   */
   it("CONTROL — the outsider's own directory is empty, and it is the same 200 route", async () => {
     // This route's refusal for a non-member is an empty list, not a status:
     // the directory is per-caller, so there is no workspace to be refused ABOUT.
@@ -454,6 +463,9 @@ describe('GET /v1/me/workspaces — the directory', () => {
 });
 
 describe('GET /v1/projects/:projectId/board', () => {
+  /**
+   * 7.166 — `GET /v1/projects/:projectId/board` — every state of the workspace’s only workflow is a column, and the two real tickets sit in two of them.
+   */
   it('every state of the workspace workflow is a column, and the two real tickets sit in two of them', async () => {
     // UNIQUELY, three things:
     //   1. The column set is `SIMPLE_KANBAN_TEMPLATE` as the founding sequence
@@ -539,6 +551,9 @@ describe('GET /v1/projects/:projectId/board', () => {
     });
   });
 
+  /**
+   * 7.167 — CONTROL — the outsider is refused 404, byte-for-byte the shared read-surface refusal.
+   */
   it('CONTROL — the outsider is refused 404, byte-for-byte the read surface refusal', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -551,6 +566,9 @@ describe('GET /v1/projects/:projectId/board', () => {
 });
 
 describe('GET /v1/projects/:projectId/tickets — the list', () => {
+  /**
+   * 7.168 — `GET /v1/projects/:projectId/tickets` — the default `flat` grouping holds both real tickets, in ticket_id order.
+   */
   it('the default flat grouping holds both real tickets, in ticket_id order', async () => {
     // UNIQUELY: the two cards here are assembled by the SAME
     // `assembleTicketCards` the board used, over rows the same ingest wrote —
@@ -634,6 +652,9 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
     expect(groups[0]?.cards.map((card) => card.ticketId)).toEqual(byId);
   });
 
+  /**
+   * 7.169 — CONTROL — the outsider is refused 404 with the same frozen body.
+   */
   it('CONTROL — the outsider is refused 404 with the same frozen body', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -646,6 +667,9 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
 });
 
 describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read', () => {
+  /**
+   * 7.170 — the single read: the child’s row names its parent, and the parent is disclosed because this viewer may see it.
+   */
   it("the child's row names its parent, and the parent is disclosed because this viewer may see it", async () => {
     // UNIQUELY: `parent.kind === 'ticket'` is `canSee` answering about a parent
     // that exists because a `ticket.created` naming it went through the gate.
@@ -748,6 +772,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
     });
   });
 
+  /**
+   * 7.171 — CONTROL — the outsider is refused 404 with this surface’s own frozen body.
+   */
   it('CONTROL — the outsider is refused 404 with this surface own frozen body', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -762,6 +789,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
 });
 
 describe('GET /v1/tickets/:id/history — the ledger, filtered', () => {
+  /**
+   * 7.172 — `GET /v1/tickets/:id/history` — the child’s three events come back in DB-minted seq order, with the server clocks the SERVER set.
+   */
   it("the child's three events come back in DB-minted seq order, with server clocks the server set", async () => {
     // UNIQUELY, and this is the sharpest case in the file. `applyCommitted`'s
     // own docblock names "seqs from a process map, not the DB" as one of its
@@ -835,6 +865,9 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered', () => {
     expect(new Set(body.events.map((event) => event['id'])).size).toBe(3);
   });
 
+  /**
+   * 7.173 — CONTROL — the outsider is refused 404 for a ticket they may not see.
+   */
   it('CONTROL — the outsider is refused 404 for a ticket they may not see', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -847,6 +880,9 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered', () => {
 });
 
 describe('GET /v1/search', () => {
+  /**
+   * 7.174 — `GET /v1/search` — a word from a real ticket title finds it, with a snippet cut from the indexed text.
+   */
   it('a word from a real ticket title finds it, with a snippet cut from the indexed text', async () => {
     // UNIQUELY: `proj_search.title` was written by the search projection inside
     // the same ingest transaction as `proj_tickets` and `proj_visibility`, and
@@ -893,6 +929,9 @@ describe('GET /v1/search', () => {
     expect(body.hits[0]?.snippet).toContain('**crates**');
   });
 
+  /**
+   * 7.175 — CONTROL, same run — a term in nothing returns no hits, so the index is not matching everything.
+   */
   it('CONTROL, same run — a term in nothing returns no hits, so the index is not matching everything', async () => {
     // The membership control alone cannot catch a search that answers `hits:[]`
     // for every query: an empty answer for the member and a 404 for the
@@ -907,6 +946,9 @@ describe('GET /v1/search', () => {
     expect(freezeClocks(res.json())).toEqual({ workspaceId, query: 'zzzabsentterm', hits: [] });
   });
 
+  /**
+   * 7.176 — CONTROL — the outsider naming this workspace is refused 404.
+   */
   it('CONTROL — the outsider naming this workspace is refused 404', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -919,6 +961,9 @@ describe('GET /v1/search', () => {
 });
 
 describe('GET /v1/me/work', () => {
+  /**
+   * 7.177 — `GET /v1/me/work` — the assigned child is in `active`, and the unassigned parent is in no group at all.
+   */
   it('the assigned child is in `active`, and the unassigned parent is in no group at all', async () => {
     // UNIQUELY, two facts at once:
     //   - `proj_tickets.assignee_id` holds this person because a
@@ -979,6 +1024,9 @@ describe('GET /v1/me/work', () => {
     });
   });
 
+  /**
+   * 7.178 — CONTROL — the outsider naming this workspace is refused 404.
+   */
   it('CONTROL — the outsider naming this workspace is refused 404', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -991,6 +1039,9 @@ describe('GET /v1/me/work', () => {
 });
 
 describe('GET and PUT /v1/me/preferences', () => {
+  /**
+   * 7.179 — `GET`/`PUT /v1/me/preferences` — a person who has saved nothing reads the empty document, and a PUT comes back on the next GET.
+   */
   it('a person who has saved nothing reads the empty document, and a PUT comes back on the next GET', async () => {
     // UNIQUELY, and it is a NEGATIVE about the ledger: preferences are rows and
     // not events (coordination amendment 14), so this is the one write on the
@@ -1048,6 +1099,9 @@ describe('GET and PUT /v1/me/preferences', () => {
     expect(eventsBefore.rows[0]?.n ?? 0).toBeGreaterThan(0);
   });
 
+  /**
+   * 7.180 — CONTROL — the outsider is refused 404 on BOTH verbs.
+   */
   it('CONTROL — the outsider is refused 404 on both verbs', async () => {
     const get = await app.inject({
       method: 'GET',
@@ -1187,6 +1241,9 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
     await strip.close();
   });
 
+  /**
+   * 7.181 — CONTROL for 7.182, and it is load-bearing: `process.env.TZ` really does change what this process thinks local time is (`new Date(0).getHours()` is 0 under UTC and 5 under Asia/Kolkata). WITHOUT this, 7.182’s three identical bodies would prove nothing — they could be identical because the zone never moved.
+   */
   it('CONTROL — setting process.env.TZ really does change what this process thinks local time is', () => {
     // Without this, the three identical bodies below prove nothing: they would
     // be identical because the knob is inert. `new Date(0)` is midnight UTC, so
@@ -1208,6 +1265,9 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
     }
   });
 
+  /**
+   * 7.182 — the attention surface with the clock frozen thirty days after the child’s transition and its time of day pinned to 20:00Z, asked from UTC, Asia/Kolkata and America/Los_Angeles — the bodies are byte-identical, and 7.181 above is what makes that mean something.
+   */
   it('the child is stale after thirty IST days, and the answer is byte-identical from three time zones', async () => {
     // UNIQUELY: `enteredStateAt` is the `serverTime` the ingest transaction
     // stamped on `ticket.transitioned` — not a fixture instant — and
@@ -1279,6 +1339,9 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
     expect(first.items[0]?.enteredStateAt).toBe(enteredStateAt);
   });
 
+  /**
+   * 7.183 — CONTROL — the outsider is refused 404 by the same frozen-clock app, signed in again through the same real OTP path.
+   */
   it('CONTROL — the outsider is refused 404 by the same frozen-clock app', async () => {
     // The same person, signed in again through the same real OTP path on this
     // app, still belongs to nothing — so the strip that answered a full item

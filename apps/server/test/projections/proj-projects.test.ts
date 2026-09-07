@@ -64,6 +64,9 @@ async function rowsFor(projectId: string) {
 }
 
 describe('projProjects — what a founding records', () => {
+  /**
+   * 6.27 — a `project.created` lands ONE `proj_projects` row scoped to its workspace, carrying its creator and the RECEIVED instant (`event.serverTime`) rather than a client-supplied one.
+   */
   it('a project.created lands one row scoped to its workspace, carrying its creator and the RECEIVED instant', async () => {
     // Mutation: write `event.workspaceId` into created_by, or `new Date()` into
     // created_at — each reddens naming its own field. The clock one matters

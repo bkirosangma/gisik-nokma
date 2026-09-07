@@ -59,6 +59,9 @@ vi.mock('next/navigation', () => ({
 import SignInPage from '../app/sign-in/page.js';
 
 describe('sign-in — all four passwordless methods (spec §6)', () => {
+  /**
+   * 3.84 — sign-in offers all four passwordless methods (phone OTP, magic link, Google, passkey) and nothing password-shaped. The absence is asserted, not merely unmentioned.
+   */
   it('offers phone OTP, magic link, Google and passkey — and nothing password-shaped', () => {
     render(<SignInPage />);
     expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
