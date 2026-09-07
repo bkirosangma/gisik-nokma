@@ -6,13 +6,13 @@ something that could not have been noticed from the source alone.
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Custom 404 page | ☐ not started |
-| 2 | Privacy policy page | ☐ not started |
-| 3 | Terms & conditions page | ☐ not started |
+| 1 | Custom 404 page | ✅ **built** |
+| 2 | Privacy policy page | ✅ **built, unreviewed boilerplate** |
+| 3 | Terms & conditions page | ✅ **built, unreviewed boilerplate** |
 | 4 | No secrets stored in the frontend | ✅ **audited; two gate blind spots found and closed** |
 | 5 | Force HTTPS | ✅ **answered: mostly the platform's job; HSTS was the app's and was missing** |
-| 6 | Colour contrast | ☐ not started |
-| 7 | Mobile-friendly / responsive | ☐ not started |
+| 6 | Colour contrast | ☐ deferred to LAST, by approved reorder |
+| 7 | Mobile-friendly / responsive | ☐ deferred to LAST — **and it needs Playwright, not the browser tool; see below** |
 
 ---
 
@@ -124,10 +124,52 @@ than the standard: emitting it in dev would train every developer's browser to r
 
 ---
 
-## Items 1, 2, 3, 6, 7
+## Items 1–3 — the 404 and the two legal pages
 
-Not started. Items 2 and 3 carry the owner's standing caveat: draft with **bracketed placeholders** for
-entity name, jurisdiction and contact address, mark them in a **code comment** (never on the live page) as
-boilerplate requiring real legal review before the product handles real user data, and never present them
-as verified legal content. Items 6 and 7 route through the `ui-ux-pro-max` skill per the workspace's
-standing instruction, and item 7 is to be checked **in a real viewport**, not by reading the CSS.
+**Built.** The 404's design is not decorative: a generic *"page not found"* asserts one cause for a
+situation with three, which is the tidier-wrong-answer this product refuses everywhere else. And one of
+those causes is a **security property** — `routes/notifications.ts` and Plan 4's ticket reads both answer
+the *same* 404 for "does not exist" and "not yours", precisely so a caller cannot probe for which records
+exist. So the page names all three causes, says it will not guess between them, and explains why.
+
+The legal pages are **unreviewed boilerplate** and say so **in a code comment, never on the rendered
+page** — the owner's instruction, and both halves are now enforced by a test (13.252) that asserts the
+marker is in the source *and* absent from the render. Asserting either alone would pass against the
+opposite failure.
+
+### Verified in a real browser, and one thing that could NOT be
+
+Rendered at `localhost:3007` and measured rather than eyeballed:
+
+- **Contrast, computed from the live DOM** against the actual resolved background: worst ratio **5.6**
+  against a 4.5 requirement; title 15.94, body 6.17. All pass.
+- **Touch targets:** both recovery links measure exactly **44×44**.
+- **No horizontal overflow** at the tested width.
+- **One real finding, fixed:** the closing aside measured **15.2px**, under the 16px floor for body text
+  on a phone — and it is the paragraph telling a locked-out reader who can help them, so exactly the
+  wrong text to shrink. Now `1rem`.
+
+> ### ⚠ The mobile viewport check did NOT happen, and item 7 must not inherit the assumption
+> `resize_window` reported success at 390×844 and the page kept reporting `innerWidth: 1512`; the
+> screenshot afterwards was byte-identical to the desktop one. **So every measurement above is a
+> DESKTOP measurement**, and nothing here has verified the `max-width: 40rem` rules.
+>
+> That is recorded rather than glossed because the checklist's own wording for item 7 is *"actually
+> check in a real viewport, not just visually inspect the code"* — and a resize that reports success
+> while changing nothing is precisely how that instruction gets satisfied on paper. **Item 7 should use
+> Playwright**, which this repo already has configured with real device viewports
+> (`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`).
+
+## Items 6, 7
+
+**Deferred to last by an approved reorder**, so they run once over the whole surface. Between them and
+now, the in-app manual/FAQ surface adds a browsable documentation surface across three clients; auditing
+before that exists means auditing a surface about to grow by a third, then auditing it again. Running them
+last also makes the accessibility treatment one decision applied uniformly rather than something new pages
+inherit unevenly.
+
+The cost, stated so it stays a choice: if 6/7 turn up a systemic problem — a token, a base component — the
+new pages will have been built on it. Judged cheap here because `packages/ui` owns the tokens in one place.
+
+Both route through the `ui-ux-pro-max` skill per the workspace's standing instruction. **Item 7 needs
+Playwright, not the browser automation tool** — see the box above for why.

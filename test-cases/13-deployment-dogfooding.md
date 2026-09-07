@@ -1115,3 +1115,18 @@ the second. No new cases here — the property is enforced by `check:env` itself
 undocumented client-inlined variable; `docs/pre-launch-checklist.md` records the audit and the one risk
 left open for the owner (`EXPO_PUBLIC_DEV_TOKEN` is a real bearer token inlined into any build made with
 it set, and nothing prevents a release build from carrying it).*
+
+
+## Pre-launch checklist — the 404 and the two legal pages (owner-assigned, 2026-09-07)
+
+*Checklist items 1–3. The 404's design comes from the product's own principle: a generic "page not
+found" asserts one cause for a situation with several, which is the tidier-wrong-answer this product
+refuses everywhere else. One of the causes is a SECURITY property — the API answers the same 404 for
+"does not exist" and "not yours", so a caller cannot probe for which records exist — so the page names
+all three and says it will not guess.*
+
+- **13.249** ✅ Names all three causes together and refuses to say which happened — asserting one would pass against the generic 404 this replaces — (`apps/web/test/not-found-and-legal.test.tsx`)
+- **13.250** ✅ Offers a way out; an error without a recovery path is half a message — (`apps/web/test/not-found-and-legal.test.tsx`)
+- **13.251** ✅ Both legal pages carry bracketed placeholders rather than invented party details — (`apps/web/test/not-found-and-legal.test.tsx`)
+- **13.252** ✅ The "not reviewed by a lawyer" marker is in the SOURCE and absent from the RENDER — both ends asserted against both files, because asserting either alone passes against the opposite failure — (`apps/web/test/not-found-and-legal.test.tsx`)
+- **13.253** ✅ The terms state the four things the product does not promise, so a later legal cleanup cannot quietly remove them — (`apps/web/test/not-found-and-legal.test.tsx`)
