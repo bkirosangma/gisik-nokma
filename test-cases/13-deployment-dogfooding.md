@@ -939,20 +939,31 @@ reconciled, never overwritten.
   recorded with the decision:** production drift is not detected continuously — the drill restores a
   ≤1-day-old dump, so what is bounded by a month is DETECTION LATENCY, not dump staleness — and the answer
   if that becomes unacceptable is a read-only continuous checker, not a DDL credential in the deploy spec
-- 13.195 🟡 the plan's Task 16 Step 4 whole-stack smoke is PARTLY run and partly not, and the split is
-  named rather than written off. **Its targets are all LOCAL** — an earlier version of this case said it
-  "requires the production deployment", which is simply false; Step 4 names no production resource. What
-  it does name is four root scripts that **do not exist** (`lint`, `test:fixtures`, `test:dual-client`,
-  `test:e2e`) and a stale Postgres port (54329; the dev stack is on 54330), so it cannot be run verbatim.
-  RUN: the gate half (build/test/typecheck — 30/30, 285 files, 3655 passed) and the E2E half
-  (13.169–13.175, merged with Task 13). **NOT RUN, and owned:** the docker half — `compose up --build`,
-  `check:db-tz` against the compose database, and the in-container `--once` backup. Owner: this lane if it
-  returns, otherwise whoever next runs a full deployment rehearsal
-- 13.196 ❌ `check-runbook-commands.mjs` does not read the CONTENT of the files it names — it asserts
-  `deploy/do/README.md` and `docs/runbook.md` exist, never what is in them, so the recorded DDL decision
-  (13.194) could be deleted wholesale with the check still green. A content assertion — "this file
-  contains the recorded decision" — is the obvious next step and is deliberately not claimed here. Owner:
-  this lane
+- 13.195 ✅ the plan's Task 16 Step 4 whole-stack smoke is now RUN IN FULL, docker half included. **Its
+  targets are all LOCAL** — an earlier version said it "requires the production deployment", which is
+  false; Step 4 names no production resource. It still cannot be run VERBATIM: it names four root scripts
+  that do not exist (`lint`, `test:fixtures`, `test:dual-client`, `test:e2e`) and a stale Postgres port
+  (54329; the dev stack is on 54330). RUN: the gate half (build/test/typecheck) and the E2E half
+  (13.169–13.175). **The docker half, previously NOT RUN, was run 2026-09-07 and found a real defect:**
+  `compose up --build` brings all five services healthy; `check:db-tz` against the compose database on
+  54330 answers `Asia/Kolkata`; and the in-container `node dist/ops/backup-daemon-main.js --once`
+  REFUSED with `backup object storage needs: BACKUP_S3_BUCKET`. That variable had been deliberately
+  omitted from the server service, for a reason that was correct when written — nothing read it, measured
+  as 0 hits in `apps/server/src` — and that **expired when the backup work merged**: the same control
+  re-run at this head gives FIVE hits, and `ops:backup-once` is a real script. Nothing was watching the
+  premise. With the variable wired to the `gisik-backups` bucket `minio-init` already pre-creates, the
+  rehearsal completes and writes both artifacts (`ledger/2026-09-07.ndjson.gz` 25KiB,
+  `pg/2026-09-07T05-36.dump` 149KiB, verified present and non-empty in the bucket rather than trusted
+  from the log line). The wiring is now asserted by `apps/server/test/ci/compose-dev-backup-wiring.test.ts`
+  so the rehearsal does not have to be re-run by hand to notice it break
+- 13.196 ✅ the CONTENT assertion exists now. `check-runbook-commands.mjs` still only asserts
+  that `deploy/do/README.md` and `docs/runbook.md` EXIST — which is its job, and "the commands resolve"
+  and "the documents still say what they decided" are different questions that should not share a
+  resolver. So the content assertion lives in `apps/server/test/docs/recorded-decisions.test.ts`, where
+  the gate runs it and this row can cite it: both files must still carry the three load-bearing clauses of
+  13.194's recorded decision (scope limited to restore scratch databases, never production, no DDL-capable
+  credential). Sentence fragments, not paragraphs — a paragraph breaks on rewrapping and teaches people to
+  delete the test, while a single word like "scratch" would survive the decision being reversed
 
 ## The test-cases <-> test citation check (Lane F Pass 1)
 
