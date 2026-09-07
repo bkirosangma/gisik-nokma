@@ -161,6 +161,30 @@ Had I not read the recipient's pane, PR #285's ruling request would have sat bel
 recipient's pane — not that it sent.** A compact re-send of the same content landed verbatim, so length is
 the variable, not content. For anything longer, write a file and send the path.
 
+**AMENDED — the threshold, measured, because "keep it short" is not actionable and a number is.** It
+happened **three times** on 2026-09-07, and the sizes bracket it:
+
+| message | approx. chars | outcome |
+|---|---|---|
+| ruling request + PR notice + squash verification | ~1,600 | **truncated to its last paragraph** |
+| PR #286 status + three dangling references | ~1,400 | **truncated to its last clause** |
+| retraction of the step-10 claim | ~1,100 | arrived whole |
+| "read this file: `<path>`" + two PR numbers | **~250** | **arrived whole** |
+
+**So: under ~1,000 characters has been reliable here; over ~1,400 has not.** The failure is always the
+same shape — **the HEAD is eaten, the tail survives**, so the recipient reads a fragment that looks like a
+complete short message and answers it confidently. Twice the controller did exactly that; the third time
+it recognised the shape itself (*"that fragment is truncated at the start again"*) and went and read this
+pane, which is the only reason that one was not lost too.
+
+**The working fix is not brevity, it is indirection: write the content to a file and send a one-line
+path.** That is what finally delivered the three dangling references. A path is short enough to survive
+and loses nothing, whereas summarising to fit drops the detail that made the message worth sending.
+
+**And the general form, which is the part worth carrying past tmux:** *a transport that fails by
+truncation rather than by error is indistinguishable, from the sender's side, from one that succeeded.*
+`send-keys` returned 0 every time. Verification has to happen at the RECEIVER.
+
 ## AMENDED 17:0x IST — **THE DISPATCH BRIEF'S SERIAL SEQUENCE IS COMPLETE. ALL 177 TASKS ARE DONE.** Read this before you read the brief.
 
 The section above said "do not start Phase 1–4 of the dispatch brief's serial sequence on your own
