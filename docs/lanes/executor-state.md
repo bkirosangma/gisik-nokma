@@ -79,6 +79,36 @@ passes under two names, neither of which closes the brief's sentence as written,
 gap is shut. **The residual to hand to the owner: the brief's step 10 is not merely stale, it was
 mis-scoped from the start, and the state files still describe it as unfired.**
 
+## THE SQUASH-DROP TRAP FIRED ON ME TODAY, WITH THE MEMORY OF IT LOADED — measured, not suspected
+
+**PR #286 merged at `cff68be`. I pushed `72d6d5a` after that head was captured. It is not on `main`.**
+The dropped commit is the one immediately below — the Plan 9 gap promoted out of a footnote — 18
+insertions, silently absent, while GitHub showed MERGED and every signal on the branch side reported
+success. **This is the third instance in this repo in three days**, and the standing practice named for
+it (`git diff origin/main <branch> -- <the files that mattered>` after any squash of your own work) is
+the only reason it was caught within minutes rather than by a later rebuild.
+
+**The measurement, with a control, because an empty diff is also what a wrong path list returns:**
+
+| probe | `origin/main` | branch `72d6d5a` |
+|---|---|---|
+| `OPEN ITEM FOR THE OWNER` | **0** — dropped | 1 |
+| `Lane F` *(positive control, from the same commit that DID land)* | **18** | 18 |
+
+**And a false alarm inside the same check, worth more than the true one.** My first probe for the
+correction's own heading returned **0 on `main`** and read as *a second, worse drop*. It was my grep: the
+heading is upper-case and the pattern was not. `grep -ci` returns **1**. **A case-sensitive grep is a
+silent-empty mode too** — it produced a well-formed wrong answer that would have had me "restore"
+something already present, on top of a real drop, in the same minute.
+
+**Rebuilt by CHERRY-PICK onto the new `main`, never by rebase** — a rebase re-applies the commits `main`
+already holds in squashed form and manufactures conflicts that read as real ones.
+
+**The practice that actually works, since the fetch-then-merge discipline is necessary and insufficient:**
+after any squash of your own work, diff `origin/main` against the branch over the files that mattered,
+and carry a positive control through the same command shape. *An empty diff is the only proof, and it is
+only proof when something else in the same run proved the command can print.*
+
 ### ⚠ OPEN ITEM FOR THE OWNER — not a footnote, and the reason "safe" was the wrong word to lead with
 
 **Plan 9's notifications fake is witnessed PRODUCER-SIDE ONLY.** The real consumer gateway lives in
