@@ -4,6 +4,14 @@ export type HttpClient = {
   get(path: string): Promise<unknown>;
   post(path: string, body: unknown): Promise<unknown>;
   put(path: string, body: unknown): Promise<unknown>;
+  /**
+   * No body, by design — every DELETE this product ships names its target in
+   * the path. A 404 THROWS here, unlike a GET: the read affordance below is a
+   * read affordance, and a revoke that quietly resolved on "not yours or
+   * already gone" would tell somebody their credential was withdrawn when the
+   * server had done nothing.
+   */
+  del(path: string): Promise<unknown>;
 };
 
 /**
@@ -129,5 +137,6 @@ export function createHttpClient(baseUrl: string, fetchImpl: FetchLike): HttpCli
     get: (path) => send('GET', path),
     post: (path, body) => send('POST', path, body),
     put: (path, body) => send('PUT', path, body),
+    del: (path) => send('DELETE', path),
   };
 }
