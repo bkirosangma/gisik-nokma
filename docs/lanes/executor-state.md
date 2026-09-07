@@ -79,9 +79,24 @@ passes under two names, neither of which closes the brief's sentence as written,
 gap is shut. **The residual to hand to the owner: the brief's step 10 is not merely stale, it was
 mis-scoped from the start, and the state files still describe it as unfired.**
 
-**Residual limit, stated by the Lane F file itself** (`:380-403`): Plan 9's notifications fake is witnessed
-**producer-side only** — the real consumer lives in `apps/web`, outside `apps/server`'s dependency graph.
-Wire contract proven; client gateway not executed end-to-end. Recorded with an owner, not fixed.
+### ⚠ OPEN ITEM FOR THE OWNER — not a footnote, and the reason "safe" was the wrong word to lead with
+
+**Plan 9's notifications fake is witnessed PRODUCER-SIDE ONLY.** The real consumer gateway lives in
+`apps/web`, outside `apps/server`'s dependency graph, so **it has never been executed against a real
+server.** The Lane F file states this itself (`:380-403`) rather than leaving it to be discovered — the
+wire contract is proven, the client gateway is not.
+
+**That is this series' signature failure, still live, in the exact plan the brief flagged.** *A mocked
+contract is the thing that excuses the server from existing.* The owner is being asked to retire the only
+document that points at it.
+
+**Recommendation unchanged — retire the section, it is stale — but record this gap as an owned item
+FIRST, so that retiring the pointer does not retire the gap along with it.** Recorded here with an owner,
+deliberately not fixed: closing it is out of this change's scope and belongs to whoever owns Plan 9.
+
+**Two facts that keep it open rather than merely unrecorded:** `controller-state.md:4485` still says at
+HEAD that *"the integration checkpoint no longer fires"* and was never updated; and the brief's plan list
+(`6a, 8, 9`) was wrong when written — the code named `6, 9 and 10`, and the step-10 commit says so.
 
 ## FOUR ANGLES SPLIT 1–3, AND THE MAJORITY WAS RIGHT — THE ONE I BELIEVED FIRST WAS THE WRONG ONE
 
