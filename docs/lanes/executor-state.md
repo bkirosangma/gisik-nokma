@@ -30,6 +30,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config | **33/33** at `803c42e` |
 | **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
 | **#313** | `exec/103-mcp-task3-device-routes` | MCP Task 3 — device-flow routes (stacks on #312) | **33/33** at `754d834` |
+| **#314** | `exec/104-mcp-task4-require-session` | MCP Task 4 — PAT as a session fallback (stacks on #313) | **33/33** |
 
 All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
 disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
@@ -45,7 +46,7 @@ own build/test/typecheck — the delta is the evidence it is wired in, not merel
 > condition until billing is fixed. Every merge now needs an explicit human decision. The controller
 > session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
 
-**MCP queue after this: Tasks 4–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+**MCP queue after this: Tasks 5–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
 because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
 the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
 Task 12 only.
@@ -62,6 +63,15 @@ red and that any pass at that point means a test "is testing something other tha
 8 failed / 1 passed. The pass was 14.21, asserting `not.toBe(401)` — an unregistered route answers 404,
 which is not 401, so it passed against a route that did not exist. Changed to `toBe(200)` and re-run WHILE
 STILL RED to confirm it then failed. The plan's warning was right; it just did not notice its own test.
+
+**Task 4 disproved one of its own plan's conclusions, and the correction is now a test.** Step 5 says to
+reverse the resolution order, observe that everything still passes, and conclude that a discriminating
+test "would need a value that is valid as both credentials at once, which cannot be constructed" — so the
+order is "held by the docblock and by review". The experiment reproduced exactly (12 of 12 passed
+reversed). The conclusion is false: insert an `mcp_tokens` row whose `token_hash` is the sha256 of a LIVE
+session token, pointed at a DIFFERENT user, and read the resolved identity through the device-approval
+route. That is **case 14.35**, written WHILE the reversal was applied, watched to fail as the only failure
+of five, then passing once restored. It is the only thing in the repo holding that order.
 
 **Three findings carried, all recorded with owners, none fixed:**
 1. **`check:env`'s third blind spot.** It walks `packages/mcp-server` and sees the file, but every

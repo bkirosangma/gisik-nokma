@@ -113,3 +113,47 @@ limiter bucket, `mcp:`, fed by the existing `RATE_LIMIT_AUTH_MAX` — the `invit
 environment variable. Before this, a route under `/v1/mcp/...` matched NO bucket, leaving the 8-character
 user code an unlimited brute-force surface. At 10 per 60s the sustained rate is one per 6s, so a 12s poll
 spends half the budget and leaves room for the mint and a retry, and a 600s TTL is 50 polls.*
+
+## Task 4 — `require-session` learns the personal access token
+
+*A FALLBACK, not a branch. better-auth is asked first, always, and `mcp_tokens` only when it answers
+null. Reversing that would put a second credential system in front of the one that owns sessions — every
+mobile and desktop client, and every test in this repository, authenticates with a better-auth BEARER
+token. They are the same header; only the order keeps them from contending.*
+
+- **14.30** ✅ An MCP token reaches `GET /v1/me/workspaces` as its owner. — (`apps/server/test/mcp/require-session-pat.test.ts`)
+- **14.31** ✅ A better-auth SESSION token still works, unchanged — the regression that is the whole risk
+  of this change. — (`apps/server/test/mcp/require-session-pat.test.ts`)
+- **14.32** ✅ A forged token gets the product-wide contentless 401. — (`apps/server/test/mcp/require-session-pat.test.ts`)
+- **14.33** ✅ A revoked token is refused, indistinguishable from a forged one. — (`apps/server/test/mcp/require-session-pat.test.ts`)
+- **14.35** ✅ **A credential valid as BOTH resolves as better-auth, not as the PAT.** —
+  (`apps/server/test/mcp/require-session-pat.test.ts`)
+- **14.36** ✅ A rejected bearer actually REACHES the fallback and still 401s when it misses — asserted on
+  a recording stub, because the 401 alone is what the route answered before the fallback existed. Also
+  pins that what reaches the query is the sha256, never the credential. —
+  (`apps/server/test/auth/require-session.test.ts`)
+- **14.37** ✅ A request with NO bearer never reaches the fallback at all. Without it, a fallback running
+  on every anonymous probe — one database write apiece — would look identical from outside. —
+  (`apps/server/test/auth/require-session.test.ts`)
+
+> ### The plan said the order could not be tested. It can, and 14.35 is the test.
+>
+> Task 4's Step 5 says to move the PAT lookup above `getSession` and observe that everything still
+> passes — then concludes that a discriminating test "would need a value that is valid as both
+> credentials at once, which cannot be constructed", and that the order is therefore "held by the
+> docblock and by review, not by a test".
+>
+> **The first half is true and was reproduced: with the order reversed, all twelve then-existing cases
+> passed.** The conclusion is not. Such a value IS constructible — insert an `mcp_tokens` row whose
+> `token_hash` is the sha256 of a LIVE better-auth session token, pointed at a DIFFERENT user. That one
+> string is simultaneously a valid session for `owner` and a valid PAT for `impostor`, and which identity
+> the request resolves to is exactly the order under test. The device-approval route is the observation
+> channel, being the one place `currentUserId` becomes visible in a response.
+>
+> Verified in the order that makes it evidence: written WHILE the reversal was still applied, watched to
+> fail as the only failure among five, then the order restored (SHA-256 against `HEAD`) and watched to
+> pass. **14.35 is the only thing in this repository that holds the resolution order.**
+
+*The cost of the fallback, stated rather than hidden: every request that falls THROUGH to the PAT branch
+performs one indexed single-row write, because `resolveMcpToken` stamps `last_used`. A better-auth session
+never reaches it, so web, mobile and desktop pay nothing; only MCP calls do.*

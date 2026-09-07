@@ -1237,7 +1237,7 @@ git commit -m "Device-authorization routes for the MCP server, with the approval
 
   Run `grep -rn "makeRequireSession(" apps/server/src apps/server/test` before editing and confirm the list is still exactly these three; a fourth appearing later is a call site this task must also move.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `apps/server/test/mcp/require-session-pat.test.ts`:
 
@@ -1325,14 +1325,14 @@ describe('a personal access token authenticates a product route', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch 14.30 and 14.33 fail**
+- [x] **Step 2: Run and watch 14.30 and 14.33 fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/require-session-pat.test.ts 2>&1 | tail -20`
 Expected: **14.30 fails with 401** (better-auth does not know this token); 14.31 and 14.32 pass already; 14.33 passes for the wrong reason and will keep passing — that is fine, it is a guard for later, not a discriminator now.
 
 If 14.30 passes at this step, stop: something is resolving the token that should not be.
 
-- [ ] **Step 3: Add the fallback**
+- [x] **Step 3: Add the fallback**
 
 In `apps/server/src/auth/require-session.ts`, replace `makeRequireSession` with:
 
@@ -1392,7 +1392,7 @@ Then move **all three** call sites in this same commit:
 
 `Queryable` is `Pool | PoolClient` (`apps/server/src/db/queryable.ts`), so `resolveMcpToken`'s `UPDATE … RETURNING` on the read path is type-compatible everywhere the preHandler is used. The cost is real and stated rather than hidden: **every authenticated request that falls through to the PAT branch performs one write.** A better-auth session never reaches it, so the web, mobile and desktop clients pay nothing; only MCP calls do, and one indexed single-row update per call is the price of `last_used` being answerable at all.
 
-- [ ] **Step 4: Run the file, then the whole server suite**
+- [x] **Step 4: Run the file, then the whole server suite**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/require-session-pat.test.ts 2>&1 | tail -20`
 Expected: 4 passed.
@@ -1400,7 +1400,7 @@ Expected: 4 passed.
 Run: `pnpm --filter @gisik-nokma/server exec vitest run > /tmp/mcp-t4.log 2>&1; tail -30 /tmp/mcp-t4.log`
 Expected: the whole suite green. This is the step that catches a signature change breaking a call site the grep missed. **Redirect, then read — never pipe into `head`.**
 
-- [ ] **Step 5: Prove the ORDER, not just the outcome**
+- [x] **Step 5: Prove the ORDER, not just the outcome**
 
 Temporarily move the PAT lookup **above** the `getSession` call.
 
@@ -1428,7 +1428,7 @@ Expected: still 4 passed — **the order is NOT observable from these tests alon
 
 **Honest limit, stated rather than hidden:** the assertion above passes under both orders, because a session token has no `mcp_tokens` row to hit. A test that genuinely discriminates the order would need a value that is valid as both credentials at once, which cannot be constructed. So the order is held by the docblock and by review, not by a test — and this step's job was to establish *that*, not to pretend otherwise. Record it in the task-ledger row.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/server/src/auth/require-session.ts apps/server/src/app.ts apps/server/test/mcp/require-session-pat.test.ts
@@ -1436,6 +1436,14 @@ git commit -m "require-session resolves an MCP personal access token, but only a
 ```
 
 ---
+
+> **EXECUTION NOTE — Step 5's conclusion is superseded, its experiment is not.** The experiment was run
+> and reproduced exactly: with the PAT lookup moved above `getSession`, all twelve then-existing cases
+> still passed. But "a value valid as both credentials at once … cannot be constructed" is false. Insert
+> an `mcp_tokens` row whose `token_hash` is the sha256 of a LIVE session token, pointed at a DIFFERENT
+> user, and observe the resolved identity through the device-approval route. That is **case 14.35**,
+> written while the reversal was still applied, watched to fail as the only failure of five, then passing
+> once the order was restored. The order is held by a test, not by review.
 
 ### Task 5: The approval screen
 
