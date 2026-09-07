@@ -23,8 +23,8 @@ MERGED. A resuming executor should not start from them.
 
 | what | value |
 |---|---|
-| `origin/main` | **`c5e3e02`** (PR #285 merged; its squash verified complete, with a control that printed) |
-| branch | `exec/84-step10-ran-and-a-truncated-message` (docs only), off `c5e3e02` |
+| `origin/main` | **`af369c0`** — #285, #286 and the controller's #287 (SERIAL SEQUENCE retired, owner-approved) all merged |
+| branch | `exec/85b-plan9-gap-owned` (docs only), off `af369c0` — rebuilt by cherry-pick after a squash drop, see below |
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
@@ -79,9 +79,58 @@ passes under two names, neither of which closes the brief's sentence as written,
 gap is shut. **The residual to hand to the owner: the brief's step 10 is not merely stale, it was
 mis-scoped from the start, and the state files still describe it as unfired.**
 
-**Residual limit, stated by the Lane F file itself** (`:380-403`): Plan 9's notifications fake is witnessed
-**producer-side only** — the real consumer lives in `apps/web`, outside `apps/server`'s dependency graph.
-Wire contract proven; client gateway not executed end-to-end. Recorded with an owner, not fixed.
+## THE SQUASH-DROP TRAP FIRED ON ME TODAY, WITH THE MEMORY OF IT LOADED — measured, not suspected
+
+**PR #286 merged at `cff68be`. I pushed `72d6d5a` after that head was captured. It is not on `main`.**
+The dropped commit is the one immediately below — the Plan 9 gap promoted out of a footnote — 18
+insertions, silently absent, while GitHub showed MERGED and every signal on the branch side reported
+success. **This is the third instance in this repo in three days**, and the standing practice named for
+it (`git diff origin/main <branch> -- <the files that mattered>` after any squash of your own work) is
+the only reason it was caught within minutes rather than by a later rebuild.
+
+**The measurement, with a control, because an empty diff is also what a wrong path list returns:**
+
+| probe | `origin/main` | branch `72d6d5a` |
+|---|---|---|
+| `OPEN ITEM FOR THE OWNER` | **0** — dropped | 1 |
+| `Lane F` *(positive control, from the same commit that DID land)* | **18** | 18 |
+
+**And a false alarm inside the same check, worth more than the true one.** My first probe for the
+correction's own heading returned **0 on `main`** and read as *a second, worse drop*. It was my grep: the
+heading is upper-case and the pattern was not. `grep -ci` returns **1**. **A case-sensitive grep is a
+silent-empty mode too** — it produced a well-formed wrong answer that would have had me "restore"
+something already present, on top of a real drop, in the same minute.
+
+**Rebuilt by CHERRY-PICK onto the new `main`, never by rebase** — a rebase re-applies the commits `main`
+already holds in squashed form and manufactures conflicts that read as real ones.
+
+**The practice that actually works, since the fetch-then-merge discipline is necessary and insufficient:**
+after any squash of your own work, diff `origin/main` against the branch over the files that mattered,
+and carry a positive control through the same command shape. *An empty diff is the only proof, and it is
+only proof when something else in the same run proved the command can print.*
+
+> **Now also recorded durably by the controller** in `controller-state.md` via #287, with a named owner
+> — *"whoever next touches Plan 9's client-side notification consumer."* Kept here too because **this**
+> file is the restart surface a resuming executor actually reads.
+
+### ⚠ OPEN ITEM FOR THE OWNER — not a footnote, and the reason "safe" was the wrong word to lead with
+
+**Plan 9's notifications fake is witnessed PRODUCER-SIDE ONLY.** The real consumer gateway lives in
+`apps/web`, outside `apps/server`'s dependency graph, so **it has never been executed against a real
+server.** The Lane F file states this itself (`:380-403`) rather than leaving it to be discovered — the
+wire contract is proven, the client gateway is not.
+
+**That is this series' signature failure, still live, in the exact plan the brief flagged.** *A mocked
+contract is the thing that excuses the server from existing.* The owner is being asked to retire the only
+document that points at it.
+
+**Recommendation unchanged — retire the section, it is stale — but record this gap as an owned item
+FIRST, so that retiring the pointer does not retire the gap along with it.** Recorded here with an owner,
+deliberately not fixed: closing it is out of this change's scope and belongs to whoever owns Plan 9.
+
+**Two facts that keep it open rather than merely unrecorded:** `controller-state.md:4485` still says at
+HEAD that *"the integration checkpoint no longer fires"* and was never updated; and the brief's plan list
+(`6a, 8, 9`) was wrong when written — the code named `6, 9 and 10`, and the step-10 commit says so.
 
 ## FOUR ANGLES SPLIT 1–3, AND THE MAJORITY WAS RIGHT — THE ONE I BELIEVED FIRST WAS THE WRONG ONE
 
