@@ -64,6 +64,56 @@ case-sensitive `grep -n 'truncation threshold'` on the merged file returned **no
 dropped commit looks like. `grep -in 'truncat'` returns 16. That is the second time in two days a grep
 flag has manufactured a false drop; the content was never at risk, the instrument was.
 
+## THE STALE-POINTER SWEEP — 10 survivors of 13, and I broke four of my own fixes inside the commit that made them
+
+A 6-agent sweep (4 readers × distinct staleness angles, then 2 adversarial refuters, sonnet throughout)
+over the TRACKED lane and plan docs. 13 findings, **3 refuted, 10 survived**; each reader printed a
+positive control. Refutation earned its place: two "stale" hits were deliberate historical narrative
+under this file's own correct-by-reference convention, and one cited an F5 item that a later line in the
+same file had already marked folded.
+
+**The one that mattered — `TZ`, and it is the same structural miss PR #289 fixed one section over.** The
+coordination doc still claimed, present tense and unflagged, *"no test on `main` varies it… all 48 test
+files… zero vary `TZ`"*. Measured at `7f80048`: **17 of 298 test files vary `TZ` by assignment** (27
+mention it; 298 from `git ls-files`, a different method from the gate's own 298, and they agree; negative
+control returned 0). The dispatch brief carried this exact correction on **2026-09-06**; the coordination
+doc — which the brief's `## READ FIRST` calls *"the interface authority"* and sends a restarting executor
+to **first** — never got it. **Correcting the brief and not the authority it points at is the defect PR
+#289 already fixed for the serial sequence.** It recurred one section over, in the same document, because
+the fix was applied to an instance rather than to the class. The RULE was always fine; only the count died.
+
+**And the named example inside the false aggregate was still TRUE** — `packages/domain/test/ist-day.test.ts`
+still contains zero `TZ`. Correcting a stale total must not quietly retire the live instance it cites.
+
+### The finding I generated myself, which is the most useful one here
+
+I corrected four drifted line citations — and **my own edits, higher in the same file, invalidated all
+four before the commit was even written.** `1036→1062`, `6791→6838`, `2843→2890`, `2608→2655`. The
+offset was **uniform**, which is exactly what proves it: a uniform shift means content was inserted
+above, not that anything at the target changed.
+
+**So a line number into an append-at-top document cannot be "fixed" — it can only be re-broken more
+recently,** and a freshly-corrected number is the most convincing wrong answer available, because it
+carries the authority of having just been checked. All four now lead with the quoted text and label the
+number a dated snapshot. Every one of these citations already quoted its target verbatim, which is the
+only reason any of them was recoverable at all. **Quote the target; treat the number as a hint.**
+
+### Two instrument failures during the sweep, both silent
+
+1. **`rtk` rewrote `grep -n` output into match COUNTS** — `-> "2 matches in 1 files"` where line numbers
+   belonged. Well-formed, plausible, and useless for a line-number audit; it would have had me "verify"
+   citations against a number that was never printed. Re-run through `python3`, proxy-free, the real
+   numbers appeared. **A proxied search is one of this repo's recorded silent-wrong-answer modes and it
+   fired on the one task that is entirely about line numbers.**
+2. **The fable near-escalation.** `controller-state.md` records a **2026-09-06** owner ruling lifting the
+   fable block — later than the brief's 2026-08-31 "fable is out", and I was one step from reporting a
+   live conflict in my own operating instructions. It is not one: that ruling sits under *"⚡ RESUMED
+   2026-09-06 **00:30** — FIVE PARALLEL LANES"*, and a later entry the same day — *"⛔ OWNER INSTRUCTION
+   2026-09-06 **18:41** — BACK TO SERIAL EXECUTION, TOKEN ECONOMY FIRST"* — ends that topology. **A dated
+   quote is not a dated ruling: the entry it lives inside carries its scope, and in an append-at-top file
+   the entry ABOVE is the later one.** The discriminating fact was the heading, not the line. Recorded in
+   the coordination doc beside the fable table so the next reader meets it there.
+
 ## ⚠ FOR THE CONTROLLER — PR #276 is open, unrecorded, and may be the answer you are waiting for
 
 **[#276 "Design spec: gisik-nokma MCP server"](https://github.com/bkirosangma/gisik-nokma/pull/276),
@@ -5858,9 +5908,12 @@ plainly in T14's commit which of the two it is.
   an array and runs no schema check, so it is the seam through which the `toStateId` payload drift
   and the non-ULID seed `actorId`s pass silently (coordination doc §"The validating fake", 2802–2825).
   It is the sibling of the seam Plan 8 T4 hardened (`createFakeGateway`), and T4 does not touch it.
-  **The doc's own assignment — "Owner: Lane 4" at line 2825 — names an owner that no longer exists.**
-  (The review that raised this cited 2826; that line is blank. Measured: 2825, and it is the only
-  `Owner: Lane 4` in the file — the other `Owner: Lane` is Lane 2 / Plan 4 at 2590.)
+  **The doc's own assignment — "Owner: Lane 4" — names an owner that no longer exists.**
+  (The review that raised this cited 2826; that line is blank. Measured 2825 when written; **at
+  2026-09-07 it is 2890, and the other `Owner: Lane` — Lane 2 / Plan 4 — moved 2590 → 2655.** Both
+  drifted by the SAME offset at every measurement, which is itself the evidence: a uniform shift means
+  content was inserted above them, not that either row changed. **Search `Owner: Lane 4`; the number is
+  a snapshot and this one has now been re-measured twice in one day.**)
   Lane 4's own file opens *"execution state at fold-back to serial … written 2026-08-31 when Wave 1
   folded back into serial execution"*, and the last mention of the lane anywhere in the coordination
   doc is line 4001 of 6169 — a back-reference to a dependency version it shipped, inside a 2026-08-31
@@ -6615,8 +6668,9 @@ thing to die under 22.4 GB of orphaned workers. It was a symptom of the crash, n
   `calendar/calendar-view.tsx`; `packages/domain/src/ticket-types.test.ts` → `domain/test/`.
 - `test-cases/README.md` — its §11 passage asserted the bucket did not exist. Task 15 falsifies it.
 - `docs/superpowers/plans/2026-08-20-00-series-coordination.md` — **same problem, one level up.** At
-  its line ~6572 the doc uses "`Features.md` carries no §11 heading" as its EVIDENCE that Task 15 has
-  not run. Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
+  its line **6838** as of 2026-09-07 (written as "~6572", +266 of cumulative drift — the largest measured
+  in this sweep, and it moved again *within this very commit*) the doc uses "`Features.md` carries no §11
+  heading" as its EVIDENCE that Task 15 has not run. **Search that quoted sentence, not the number.** Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
   only its reading changed.
 
 **A claim I wrote and then had to retract, recorded because the retraction is the lesson.** I first
