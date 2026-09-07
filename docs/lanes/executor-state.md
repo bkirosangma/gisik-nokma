@@ -16,6 +16,46 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ▶ MONDAY 2026-09-07 ~22:2x IST — **THREE PRs OPEN, NONE MERGEABLE. CI CANNOT RUN ON THIS REPO AT ALL.**
+
+> **READ THIS FIRST IF YOU LANDED ON `main`.** `origin/main` is still `2859df4` and carries none of the
+> work below. Nothing has merged this session. The handoff is therefore FRAGMENTED ACROSS BRANCHES —
+> each of the three has its own entry, and `main`'s copy is stale by three PRs. That fragmentation is a
+> symptom of the merge blockage, not a mistake to fix by rewriting `main`.
+
+| PR | branch | what | gate |
+|---|---|---|---|
+| **#309** | `exec/99-prelaunch-6-7-contrast-responsive` | pre-launch items 6 + 7 — closes the checklist | 30/30 at `302f1834` |
+| **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin | 30/30 at `77338aa4` |
+| **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config | **33/33** at `803c42e` |
+
+All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
+disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
+own build/test/typecheck — the delta is the evidence it is wired in, not merely present.
+
+> **⚠ THE BLOCKAGE, AND WHY IT IS NOT A CODE PROBLEM.** Run `34141928556`: every job died in 3–4 s with
+> *"The job was not started because recent account payments have failed or your spending limit needs to
+> be increased."* `scope` never starts, so `build`, `typecheck`, `server-tests`, `other-tests`, `e2e`,
+> `check-env`, `check-tasks` all report `skipping`. **No job has executed any branch's code.**
+>
+> The consequence is procedural and worth stating exactly: the coordination doc's **standing auto-merge
+> authorization requires an independent CI run green**, and no branch in this repo can satisfy that
+> condition until billing is fixed. Every merge now needs an explicit human decision. The controller
+> session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
+
+**MCP queue after this: Tasks 2–13.** Task 12's `last_used_at` is still an open OWNER decision and blocks
+Task 12 only.
+
+**Three findings carried, all recorded with owners, none fixed:**
+1. **`check:env`'s third blind spot.** It walks `packages/mcp-server` and sees the file, but every
+   detector needs the literal string `process.env`; `loadMcpConfig` takes `env` as a PARAMETER, so two
+   live config vars are undocumented while the gate reports ok. Same class item 4 closed twice.
+   *Owner: `scripts/check-env-example.mjs`.*
+2. **`harness.ts:19` re-spells `ENTITY_KINDS` and has already drifted** — domain declares seven kinds
+   including `'invite'`, the harness lists six. *Owner: rule-engine fixtures.*
+3. **17 of 24 bordered classes below WCAG 1.4.11's 3:1** in both themes (#309's box). Remedy moves
+   `line`/`lineStrong` product-wide. *Owner: a design pass over `packages/ui`.*
+
 # ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
 
 | what | value |
