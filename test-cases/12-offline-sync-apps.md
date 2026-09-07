@@ -2668,3 +2668,41 @@ mutation sweep through this door: unassigned.*
 - **12.387** ✅ **THE NARROWING NOTE MAY NOT CLAIM A SURFACE IT DOES NOT NARROW.** The control renders on every tab, which 12.385 requires — but it narrows only reads that TAKE a filter, and `useBoard` takes none. An unscoped *"done are excluded"* therefore sat on the **default** tab directly above a Done column holding a done card: an unnarrowed set claiming to be narrowed, the same class of lie as a narrowed one claiming to be whole, which is the reason this control exists at all. The note now names the surfaces and exempts the board. The done card's presence on the board is asserted in the same run — without it the exemption could be excusing a narrowing that had no visible effect there anyway — and the Board tab is asserted `aria-selected` so the case is about what a user sees FIRST. (Planted defect: restoring the unscoped wording kills it.) — `apps/web/test/page-refusals.test.tsx`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
 - **12.388** ✅ **A NARROWED PARENT PICKER SAYS SO, INSIDE THE MODAL.** `parentCandidates` is built from `list.rows`, which became filter-dependent, so narrowing silently removed every done ticket from the New-ticket parent picker — a user filing a sub-task under a finished ticket found it absent with nothing saying why, and could not complete the action. **The claim is the one this component already refuses, one notch quieter:** an EMPTY picker asserts *this project has no possible parent*, a NARROWED one asserts *these are the tickets that could be a parent*; both are claims about the world built from what the caller happened to see, and both are made inside a modal where the page's own `list-filter-note` cannot be read. Kept separate from `parentCandidatesUnavailable` because the facts differ — there the list could not be shown and creation falls back to project root; here it was shown, narrowly, and every offered option is real. A CONTROL asserts no such claim appears unnarrowed, and both halves assert the picker still has its options, so the case cannot be satisfied by a dialog that withholds the control instead of disclosing. **The note is rendered OUTSIDE the `<label>`**: inside, it becomes part of the control's accessible name — `getByLabelText('Parent')` stops resolving and a screen reader announces the whole disclosure as the field's label. Measured, red with *"Unable to find a label with the text of: Parent"* while the field rendered fine. (Planted defect: dropping the span kills the first case; moving it inside the label kills it with the accessible-name error.) — `packages/app-core/test/views/new-ticket-dialog.test.tsx`, `packages/app-core/src/views/new-ticket-dialog.tsx`
 - **12.389** ✅ **A NARROWING MUST NOT TURN A SECTION HEADING INTO A ULID.** `epicTitle` resolves an epic by searching `list.rows` with `?? epicId` as the fallback — safe while those rows were always the COMPLETE set, because any epic a surviving child pointed at was necessarily in them. A narrowing breaks the invariant: an `open` or `terminal` epic is filtered out while its `active` children survive and are correctly rooted by `nestRows`, so the lookup misses and a 26-character ULID appears where a section title belongs. Named instead, and **only when a narrowing can explain it** — with none in force a missing epic means visibility, and saying "outside this narrowing" there would be inventing a reason. The CONTROL runs first in the same render, asserting the real title is the heading unnarrowed, so the case cannot pass against a page that never renders a title at all; the child is asserted still on screen, so the heading is the only thing at issue. (Planted defect: restoring the bare `?? epicId` kills it.) — `apps/web/test/page-refusals.test.tsx`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
+
+## The phone's help screen follows the device appearance (owner-assigned, 2026-09-08)
+
+*Pre-launch item 6 recorded `help-screen.tsx:59` resolving every colour through `colorOf('light', role)`
+— a dark-mode phone got light colours — and left it for the owner because "fixing it means deciding how
+the native app learns the OS preference". The answer is `useColorScheme()` plus one line of Expo config.*
+
+- **12.394** ✅ `themeFor` maps `'dark'` to dark and **everything else to light**, including `null`
+  (what `useColorScheme()` answers when the platform has no opinion), `undefined`, and an unrecognised
+  future string — none of which may silently darken a screen nobody asked to darken. —
+  (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: make anything-but-light mean dark → fails.*
+- **12.395** ✅ The two palettes **differ on every role**, and each is its own theme's token rather than
+  merely different from the other. Until this change every colour came from `colorOf('light', …)`, so a
+  "dark" palette would have been byte-identical to the light one and a case that only checked `themeFor`
+  would still have passed. — (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: pin the palette back to `'light'` → fails.*
+- **12.396** ✅ `app.json` declares `userInterfaceStyle: automatic`. Without it the OS never reports
+  dark, `useColorScheme()` answers light forever, and the screen is a themed screen that can never BE
+  dark — which reads exactly like a themed screen that works. —
+  (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: remove the declaration → fails.*
+
+> ### The deferral reason was not true, and nobody had re-checked it
+>
+> The note beside the pinned theme said doing it "here for one screen would leave the board and ticket
+> screens light while the help screen went dark". **Measured: `board-screen.tsx` and `ticket-screen.tsx`
+> declare no colours at all** — no `StyleSheet`, no `color`, no `backgroundColor`. There was no light
+> theme for this screen to become inconsistent with. A deferral reason that is never re-checked outlives
+> its own justification.
+>
+> **What is asserted and what is not.** The palette is a sibling `.ts` with no React and no
+> `react-native` import, because `apps/mobile/vitest.config.ts` runs in a node environment and its own
+> docblock already states the rule — the first attempt at these cases imported the `.tsx` and failed to
+> parse. So the mapping and the palettes are driven directly. Whether iOS or Android actually reports
+> dark is NOT claimed here: that needs a device, and 12.396 asserts the declaration that makes it
+> possible rather than a rendered result.
+
