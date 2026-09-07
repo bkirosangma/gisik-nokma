@@ -31,15 +31,6 @@ export const HELP_CONTENT: HelpContent = [
             "text": "Where the product cannot do something yet, this manual says so plainly and tells you what to do instead. It will not send you hunting for a button that was never built."
           }
         ]
-      },
-      {
-        "kind": "paragraph",
-        "spans": [
-          {
-            "kind": "text",
-            "text": "---"
-          }
-        ]
       }
     ],
     "sections": [
@@ -126,15 +117,6 @@ export const HELP_CONTENT: HelpContent = [
               {
                 "kind": "text",
                 "text": "None of these five is something you are doing wrong."
-              }
-            ]
-          },
-          {
-            "kind": "paragraph",
-            "spans": [
-              {
-                "kind": "text",
-                "text": "---"
               }
             ]
           }
@@ -297,15 +279,6 @@ export const HELP_CONTENT: HelpContent = [
                   }
                 ]
               ]
-            ]
-          },
-          {
-            "kind": "paragraph",
-            "spans": [
-              {
-                "kind": "text",
-                "text": "---"
-              }
             ]
           }
         ],
@@ -558,15 +531,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " button on the right of the bar at the top of the screen. Signing out really does end it — the next thing you try on that device is refused immediately, not \"at some point later\". That matters if you have signed in on somebody else's laptop."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -706,15 +670,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "If you pick Light or Dark, the product remembers your choice for next time. If you cycle back around to System, it forgets your choice and follows your device again."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -1029,15 +984,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " inside a workspace can rename it — including the most limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -1583,15 +1529,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " removed by some other route, it takes effect immediately — on their very next action. If they are only taken off one project, they lose that project and keep everything else. Their saved settings are kept for about a month in case they come back."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -2040,15 +1977,6 @@ export const HELP_CONTENT: HelpContent = [
                     }
                   ]
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -2438,15 +2366,6 @@ export const HELP_CONTENT: HelpContent = [
                     }
                   ]
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -2820,15 +2739,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "If a stage your job is sitting in gets removed in a later version, whoever removed it had to say where those jobs go, and yours follows that. If nobody said, your job refuses to move rather than the product guessing, and it tells you it is stranded."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -3359,15 +3269,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "You can have it open on a laptop and a desktop at once, but only a small number of connections per person. Past that you are told you have too many, and closing one frees a slot straight away."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -3658,15 +3559,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " For a business where people are in and out all day, plan around that. There is no weekly digest either."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -4002,15 +3894,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "Nor can anybody act under your name. That is refused outright, even for the owner, and it is checked before anything else."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -4627,15 +4510,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "a parent cannot be finished while any of its children is still going."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -4848,15 +4722,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " stage currently in use onto a stage in the new set — the same discipline as dropping a stage. Miss one and it moves nothing and names what you missed."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -5426,15 +5291,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "They do not work. The phone app registers for them and there is nothing on the other end to register with. It reports the feature as unavailable rather than pretending or crashing."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -5804,15 +5660,6 @@ export const HELP_CONTENT: HelpContent = [
             "href": "#still-unknown"
           }
         ]
-      },
-      {
-        "kind": "paragraph",
-        "spans": [
-          {
-            "kind": "text",
-            "text": "---"
-          }
-        ]
       }
     ],
     "sections": [
@@ -5993,15 +5840,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "No. The product remembers where you were headed and sends you back there after you sign in. That is true of any link, not just invitations."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -6179,15 +6017,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -6462,15 +6291,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "No. That is refused outright, even for the owner, and it is checked before anything else."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -6926,15 +6746,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": ": later wins, earlier survives in history, nobody is told."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -7328,15 +7139,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "A dropdown needs its list of options, one per line. Without any it is refused. Same if you give options to a field that is not a dropdown, or reuse a field name."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -7670,15 +7472,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "Unconfirmed. The product keeps a permanent, append-only record of everything, which hints strongly that editing or deleting after the fact is not the design — but nothing directly confirms it. Treat it as an open question rather than a no."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -7980,15 +7773,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " things you lost, or how many."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -8158,15 +7942,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "Known limitation, not something wrong with your account. That screen currently shows people by their raw account identifier rather than looking up the real name, because the piece that would do the lookup has not been built for it yet."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }
@@ -8391,15 +8166,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "You can hide the work; you cannot hide who acted."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -8517,15 +8283,6 @@ export const HELP_CONTENT: HelpContent = [
                       "text": " A phrase that only exists inside a PDF will never be found."
                     }
                   ]
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
                 ]
               }
             ]
@@ -9029,15 +8786,6 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "Its local storage reports being locked, reproducibly, even with nothing else going on. It is measured, it is written down, and it is not fixed."
                   }
                 ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
-                  }
-                ]
               }
             ]
           }
@@ -9348,15 +9096,6 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "That is a team that means it about not inventing facts, and it shows up everywhere else in the product."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "---"
                   }
                 ]
               }

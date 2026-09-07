@@ -1287,7 +1287,9 @@
 .gn-help__tab[aria-pressed='true'] { border-color: var(--gn-accent); background: var(--gn-surface-sunken); font-weight: 600; }
 
 .gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gn-border); }
-.gn-help__toc-link { color: var(--gn-accent); text-decoration: none; font-size: 0.95rem; }
+/* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
+   body text on a phone — and these are the only navigation links on the page. */
+.gn-help__toc-link { color: var(--gn-accent); text-decoration: none; font-size: 1rem; }
 .gn-help__toc-link:hover { text-decoration: underline; }
 
 .gn-help__section { margin-bottom: 2.5rem; }

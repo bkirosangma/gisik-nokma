@@ -97,6 +97,18 @@ const isListItem = (l) => isBullet(l) || isOrdered(l);
 const isQuote = (l) => /^> ?/.test(l);
 const isTableRow = (l) => /^\|/.test(l);
 const isTableRule = (l) => /^\|[\s:|-]+\|?\s*$/.test(l);
+/**
+ * A markdown horizontal rule (`---`, `***`, `___`).
+ *
+ * Dropped rather than modelled. It is a VISUAL separator whose whole job — "a
+ * new part starts here" — is already done by the section headings and their
+ * spacing in every renderer. Without this it fell through to the paragraph
+ * branch and rendered as a literal `---` on the page, which is exactly how it
+ * was found: the real screen showed it between the manual's intro and its first
+ * heading. A block model that carried it would oblige three renderers to draw a
+ * line none of them needs.
+ */
+const isThematicBreak = (l) => /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(l);
 
 /** Markdown's soft-wrap rule: lines inside one paragraph join with a space. */
 const joinWrapped = (lines) => lines.map((l) => l.trim()).join(' ');
@@ -122,7 +134,7 @@ export function parseBlocks(lines) {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    if (line.trim() === '') {
+    if (line.trim() === '' || isThematicBreak(line)) {
       i += 1;
       continue;
     }
@@ -346,6 +358,25 @@ const CASES = [
         blocks[0].kind === 'paragraph' &&
         blocks[0].spans[0].text === 'one line and its continuation'
       );
+    },
+  },
+  {
+    name: 'PLANTED: a horizontal rule is DROPPED, not rendered as a literal ---',
+    run: () => {
+      const blocks = parseBlocks(['Before.', '', '---', '', 'After.']);
+      return (
+        blocks.length === 2 &&
+        blocks.every((b) => b.kind === 'paragraph') &&
+        blocks[0].spans[0].text === 'Before.' &&
+        blocks[1].spans[0].text === 'After.'
+      );
+    },
+  },
+  {
+    name: 'a bulleted item is not swallowed as a rule, and a rule is not read as a bullet',
+    run: () => {
+      const blocks = parseBlocks(['- an item', '- another']);
+      return blocks.length === 1 && blocks[0].kind === 'list' && blocks[0].items.length === 2;
     },
   },
   {
