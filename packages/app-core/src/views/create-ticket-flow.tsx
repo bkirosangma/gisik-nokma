@@ -24,6 +24,8 @@ export type CreateTicketFlowProps = {
   currentUserId: string;
   typeOptions: Array<{ id: string; name: string }>;
   parentCandidates: Array<{ id: string; title: string }>;
+  /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */
+  parentCandidatesUnavailable?: string;
   onCreated: (ticketId: string) => void;
 };
 
@@ -106,6 +108,7 @@ export function CreateTicketFlow({
   currentUserId,
   typeOptions,
   parentCandidates,
+  parentCandidatesUnavailable,
   onCreated,
 }: CreateTicketFlowProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -290,6 +293,7 @@ export function CreateTicketFlow({
         open={dialogOpen}
         typeOptions={typeOptions}
         parentCandidates={parentCandidates}
+        parentCandidatesUnavailable={parentCandidatesUnavailable}
         onCreate={(draft) => {
           void create(draft).catch(report);
         }}

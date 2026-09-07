@@ -7,6 +7,17 @@ export type NewTicketDialogProps = {
   open: boolean;
   typeOptions: Array<{ id: string; name: string }>;
   parentCandidates: Array<{ id: string; title: string }>;
+  /**
+   * Why the parent list could not be loaded, when it could not be.
+   *
+   * Distinguishes "this project has no possible parent" from "we could not find
+   * out" — an EMPTY picker asserts the first, and asserting it falsely inside a
+   * modal is worse than saying nothing, because the sentence that would correct it
+   * is on the page behind. When set, the picker is replaced by this reason and the
+   * draft leaves with `parentId: null`, which is project root: the one creation
+   * that never needed a parent and so should never have been blocked by a list.
+   */
+  parentCandidatesUnavailable?: string;
   onCreate: (draft: NewTicketDraft) => void;
   onClose: () => void;
 };
@@ -30,6 +41,7 @@ export function NewTicketDialog({
   open,
   typeOptions,
   parentCandidates,
+  parentCandidatesUnavailable,
   onCreate,
   onClose,
 }: NewTicketDialogProps) {
@@ -54,14 +66,21 @@ export function NewTicketDialog({
       </label>
       <label className="gn-new-ticket__field">
         Parent
-        <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
-          <option value="">None (project root)</option>
-          {parentCandidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.title}
-            </option>
-          ))}
-        </select>
+        {parentCandidatesUnavailable === undefined ? (
+          <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
+            <option value="">None (project root)</option>
+            {parentCandidates.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p role="status" className="gn-new-ticket__parent-unavailable">
+            This ticket will be created at project root: the list of tickets that could be a
+            parent cannot be shown. {parentCandidatesUnavailable}
+          </p>
+        )}
       </label>
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>

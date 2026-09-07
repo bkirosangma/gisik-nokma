@@ -299,30 +299,35 @@ function ProjectBoard() {
    * and the list all use — and puts the reason where the viewer is already
    * looking.
    *
-   * **The cost, named rather than left to be discovered:** against the server
-   * that ships today `getTickets` refuses, so this control is NOT offered at all
-   * and no ticket can be created from this page — not even at project root, which
-   * needs no parent. That is a true report of this build. Plan 7 owns the list
-   * route's serving gap; the day it lands the control appears with no change
-   * here.
+   * **That cost is no longer paid, and the reason it was accepted expired.** The
+   * note here used to read: against the server that ships today `getTickets`
+   * refuses, so this control is not offered at all and no ticket can be created
+   * from this page — *not even at project root, which needs no parent* — and that
+   * *"Plan 7 owns the list route's serving gap; the day it lands the control
+   * appears with no change here."*
+   *
+   * The premise was that the refusal is TEMPORARY and route-owned. It is not, for
+   * the refusal a real customer meets: `LIST_TOO_LARGE_ABSENCE` is a bound this
+   * CLIENT chose, its own `owner` field says so, and no route change clears it. A
+   * project that grows past it refuses for ever — so "creation returns when Plan 7
+   * lands" was never true for the case that matters (measured as 12.382).
+   *
+   * So the list read no longer gates creation. Types still do, and that asymmetry
+   * is the point: **a ticket cannot be created without a TYPE, and can be created
+   * without a PARENT** — project root is the arm the old text itself flagged as
+   * wrongly blocked. The dialog is told the parent list is unavailable rather than
+   * handed an empty one, because an empty picker asserts this project has no
+   * possible parent, which is the silent claim the rest of this docblock exists to
+   * refuse.
    */
   const createRegion = (() => {
-    if (list.error !== null || ticketTypes.error !== null) {
+    // TYPES still gate creation: a ticket cannot be created without one.
+    if (ticketTypes.error !== null) {
       return (
-        <>
-          {list.error !== null ? (
-            <ShellRefusal
-              what="The tickets that could be a parent, so New ticket is not offered"
-              message={list.error}
-            />
-          ) : null}
-          {ticketTypes.error !== null ? (
-            <ShellRefusal
-              what="This workspace’s ticket types, so New ticket is not offered"
-              message={ticketTypes.error}
-            />
-          ) : null}
-        </>
+        <ShellRefusal
+          what="This workspace’s ticket types, so New ticket is not offered"
+          message={ticketTypes.error}
+        />
       );
     }
     if (session.kind === 'signed-out') {
@@ -332,7 +337,9 @@ function ProjectBoard() {
         </p>
       );
     }
-    if (session.kind === 'loading' || list.rows === null) {
+    // The list refusing no longer withholds the form — it withholds only the
+    // parent picker, which project-root creation never needed.
+    if (session.kind === 'loading' || (list.rows === null && list.error === null)) {
       return (
         <p role="status" className="gn-new-ticket__gate">
           Preparing the New ticket form…
@@ -349,6 +356,7 @@ function ProjectBoard() {
           currentUserId={currentUserId}
           typeOptions={typeOptions}
           parentCandidates={parentCandidates}
+          {...(list.error !== null ? { parentCandidatesUnavailable: list.error } : {})}
           onCreated={openTicket}
         />
         {ticketTypes.data === null ? (

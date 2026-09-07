@@ -16,6 +16,55 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🔴 MONDAY 2026-09-07 ~14:40 IST — **OPTION 4 IS BUILT AND PROVEN, BUT THE BRANCH IS RED. DO NOT MERGE `exec/77-decouple-create` AS IT STANDS.** One test fails; the fix itself is sound.
+
+| what | value |
+|---|---|
+| `main` | `b8877f7` (#267 merged) |
+| branch | **`exec/77-decouple-create`** — **RED, pushed for review only** |
+| suites | `app-core` **green**, `apps/web` **138 passed / 1 FAILED** |
+| the failure | `page-refusals.test.tsx` → *"past the list cap, the refusal renders in the absence's own words"* |
+
+## WHAT IS DONE AND PROVEN
+
+**Option 4 is implemented and works.** `createRegion` no longer gates on the list read:
+
+- `new-ticket-dialog.tsx` gains `parentCandidatesUnavailable?: string`. When set the parent
+  `<select>` is REPLACED by the reason, and the draft leaves with `parentId: null` — project root, the
+  one creation that never needed a parent. **An empty picker was rejected on purpose:** it asserts *this
+  project has no possible parent*, which is the exact silent claim case 3.142 exists to refuse.
+- `create-ticket-flow.tsx` forwards it.
+- `page.tsx`: **types still gate creation** (no type, no ticket); **the list no longer does.**
+
+**Proven by 3.142, which passes.** Its PRINCIPLE was unchanged — *"a refused ticket list is never
+rendered as 'this project has no parents'"* — and only its MECHANISM moved, from withholding the whole
+control to naming the unavailability. Its old text explicitly recorded the cost being removed here:
+creation blocked *"not even at project root, which needs no parent"*, accepted because *"Plan 7 owns the
+list route's serving gap"*. **That premise never applied to the CAP refusal**, which is a client-chosen
+bound no route change clears.
+
+## ⛔ WHAT IS NOT DONE — exactly
+
+`page-refusals.test.tsx`'s 12.382 asserted the OLD behaviour and had to change. **It is not green.** The
+refusal does not appear in that harness even after clicking the List tab and stubbing types and
+preferences. Three attempts: text matcher → element-role matcher → `waitFor` over `role="status"`.
+
+**I do not yet know whether that is a harness problem or a real one**, and that is the honest state.
+**The candidate worth checking first:** with `createRegion` no longer rendering the list refusal, the
+ONLY renderers are the List/Calendar/Timeline tab arms — so if the List arm does not render under these
+stubs, a project past the cap on the BOARD tab now shows **no refusal anywhere**. That would be a real
+regression introduced by this change and is the first thing to test, not the last.
+
+**Do not merge until that question is answered.** A green suite reached by weakening 12.382 would bury it.
+
+## NEXT
+
+1. Answer the question above; fix the test or the page accordingly.
+2. **Then the owner's second half: real filtering, as its own PR.**
+3. Then 13.176 — measurement, then design, then implement.
+
+---
+
 # 🟡 MONDAY 2026-09-07 ~13:45 IST — **12.258's carried half CLOSED, and the pagination cliff is WORSE than 12.322 records. The design decision is OPEN and is the owner's.** PR on `exec/76-pagination-cliff`, gate green.
 
 | what | value |

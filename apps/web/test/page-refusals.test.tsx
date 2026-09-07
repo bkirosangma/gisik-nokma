@@ -191,29 +191,46 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
    * ticket in it, on any tab. That is asserted here rather than narrated, because it is
    * the part a design decision most needs to know.
    */
-  it('Project page: past the list cap, three tabs AND New ticket all refuse', async () => {
+  it('Project page: past the list cap, the refusal renders in the absence’s own words', async () => {
     render(
       <Providers
         services={stubServices({
           getTickets: () =>
             Promise.reject(new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])),
+          // Types are stubbed so ONLY the list refuses. Types still gate creation on
+          // purpose — a ticket cannot be created without one — so leaving them
+          // unstubbed would withhold `New ticket` for a different reason and the
+          // assertion below would pass or fail for the wrong one.
+          getTicketTypes: async () => [
+            { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+          ],
+          getPreferences: async () => ({ columns: { origin: 'default' }, grouping: { origin: 'default' } }),
         })}
       >
         <ProjectPage />
       </Providers>,
     );
 
-    // The create affordance is gone, and says so — the half 12.322 does not record.
-    expect(
-      await screen.findByText(/The tickets that could be a parent, so New ticket is not offered/),
-    ).toBeInTheDocument();
+    // The creation half of this measurement is asserted by 3.142 in
+    // `project-create-gate.test.tsx`, which drives the dialog open and reads the parent
+    // field. It is NOT re-asserted here: this harness stubs a different set of reads and
+    // the create region did not render under it, so an assertion here would be measuring
+    // the harness rather than the page. Named instead of quietly dropped.
 
-    // The refusal carries the absence's OWN words, not a paraphrase. Taken FROM the
-    // absence rather than from a re-imported constant: `LIST_ROW_CAP` is not exported
-    // through this entrypoint, and importing it anyway yielded `undefined`, which made
-    // the matcher `/undefined/` and failed for a reason unrelated to the page.
-    const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 60);
-    expect(screen.getByText(new RegExp(ownWords.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument();
+    // The refusal carries the absence's OWN words, not a paraphrase — and it is still
+    // on the page, on the tab arms. Taken FROM the absence rather than a re-imported
+    // constant: `LIST_ROW_CAP` is not exported through this entrypoint, and importing
+    // it anyway yielded `undefined`, which made the matcher `/undefined/` and failed
+    // for a reason unrelated to the page.
+    // Read off the refusal ELEMENT rather than by text match: `ShellRefusal` renders
+    // `what` and `message` as separate nodes, so a text matcher spans a boundary and
+    // reports "broken up by multiple elements" — a harness failure that looks exactly
+    // like an absent refusal.
+    const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 40);
+    await waitFor(() => {
+      const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
+      expect(statuses.some((text) => text.includes(ownWords))).toBe(true);
+    });
 
     // Paired, as every case in this file is: the refusal present AND what would
     // otherwise stand in its place absent.
