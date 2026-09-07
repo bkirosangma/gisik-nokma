@@ -31,3 +31,38 @@ between them. It also, as a side effect nobody wanted, makes the whole file invi
 at `RATE_LIMIT_AUTH_MAX=10` per `RATE_LIMIT_WINDOW_SEC=60`, i.e. one request per 6 s sustained. Polling
 at 12 s spends half that, leaving room for the code-mint that opened the flow and for a retry. A login
 loop that rate-limits its own polling looks exactly like a server that never approves.*
+
+## Task 2 — the credential store (`apps/server/src/mcp/token-store.ts`)
+
+*Two tables that are deliberately NOT projections and NOT rebuildable, for the same reason
+`invite_tokens` is not: what they hold is absent from the ledger on purpose. Anyone who can read a
+workspace's history can read an event id and a payload, so a credential that was either would be
+readable by every member. **Neither name may ever appear in a projection's `tables` array** — `reset()`
+empties what that array names, and a rebuild that emptied `mcp_tokens` would sign every MCP client out
+with no way to put them back, and the ledger could not.*
+
+- **14.10** ✅ The device code is stored ONLY as a hash — asserted from both sides: the column equals
+  `hashCredential(deviceCode)` AND does not equal the raw code, so storing the plaintext fails twice. —
+  (`apps/server/test/mcp/token-store.test.ts`)
+- **14.11** ✅ Answers `pending` before anyone approves. — (`apps/server/test/mcp/token-store.test.ts`)
+- **14.12** ✅ **Issues a token to the approving user, ONCE.** The replay of the same device code answers
+  `unknown` rather than minting a second token. Single-use is enforced by `DELETE … RETURNING` in the
+  statement that reads the grant — a SELECT-then-DELETE cannot stop two concurrent presentations, and
+  this repo has already had three concurrent invite acceptances all commit against a read-shaped guard. —
+  (`apps/server/test/mcp/token-store.test.ts`)
+- **14.13** ✅ Refuses an expired grant, and DISTINGUISHES it from an unknown one — two different
+  answers, because a client that cannot tell "too late" from "never existed" retries the wrong one. —
+  (`apps/server/test/mcp/token-store.test.ts`)
+- **14.14** ✅ Refuses to approve an expired grant. — (`apps/server/test/mcp/token-store.test.ts`)
+- **14.15** ✅ A personal access token resolves to its user and is stored only as a hash. —
+  (`apps/server/test/mcp/token-store.test.ts`)
+- **14.16** ✅ **Answers `null` for a forged token and for a revoked one, IDENTICALLY.** Deliberate: every
+  distinction here is an oracle somebody can query, the same reasoning `UNAUTHENTICATED_BODY` records for
+  its own contentlessness. — (`apps/server/test/mcp/token-store.test.ts`)
+
+*The migration is reversible, proven rather than assumed: UP creates both tables, DOWN leaves zero `mcp%`
+tables while **24 other tables remain** (the control that says it dropped only its own), and a re-UP
+restores both. The token table carries no `expires_at` by decision, not omission — an invitation link is
+handed to somebody who is not yet a user, so a clock bounds an unknown, whereas an MCP token is minted by
+the account holder for their own machine from an approval they performed. Revocation is a DELETE and takes
+effect at once. Plan Open question 4 if the owner wants a TTL.*

@@ -458,7 +458,7 @@ export async function exchangeDeviceCode(db: Queryable, deviceCode: string, now:
 export async function resolveMcpToken(db: Queryable, rawToken: string, now: Date): Promise<string | null>;
 ```
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 `apps/server/migrations/1788600000000_mcp-device-auth.sql`. The timestamp is later than `1788470000000_snapshot-provenance.sql`, the current last migration; if a newer one has landed by execution time, bump this above it.
 
@@ -524,7 +524,7 @@ DROP TABLE mcp_tokens;
 DROP TABLE mcp_device_codes;
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `apps/server/test/mcp/token-store.test.ts`:
 
@@ -632,14 +632,14 @@ describe('the personal access token', () => {
 });
 ```
 
-- [ ] **Step 3: Run them and watch them fail**
+- [x] **Step 3: Run them and watch them fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/token-store.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../../src/mcp/token-store.js`.
 
 Requires the dev database up: `docker compose up -d` (Postgres 16 on 54329).
 
-- [ ] **Step 4: Write `apps/server/src/mcp/token-store.ts`**
+- [x] **Step 4: Write `apps/server/src/mcp/token-store.ts`**
 
 ```ts
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -787,19 +787,19 @@ export async function resolveMcpToken(
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/token-store.test.ts 2>&1 | tail -20`
 Expected: 7 passed.
 
-- [ ] **Step 6: Prove the migration is reversible**
+- [x] **Step 6: Prove the migration is reversible**
 
 Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate down --migrations-dir migrations --count 1 2>&1 | tail -10`
 Expected: drops both tables cleanly.
 Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate up --migrations-dir migrations 2>&1 | tail -10`
 Expected: re-applies.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/server/migrations/1788600000000_mcp-device-auth.sql apps/server/src/mcp/token-store.ts apps/server/test/mcp/token-store.test.ts
