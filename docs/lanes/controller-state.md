@@ -1,5 +1,27 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 12:0x IST — `main` is `b8877f7`, gate green. 12.258's carried half CLOSED (12.382). The pagination cliff is WORSE than 12.322 recorded — owner ruled BOTH remedies, in order.
+
+PR #267 merged — measurement only, no design decision baked in: the real "past-cap" page now renders with the
+real `LIST_TOO_LARGE_ABSENCE` message rather than a hand-made error, pinning the actual string a user meets.
+`check:citations`: 1537/1537, still zero.
+
+**⚠ The finding that changes scope: 12.322 said a project past the cap "loses three of four tabs." One
+`useTicketList` read feeds FOUR consumers, not three** — Calendar, Timeline, List, AND `createRegion` (ticket
+creation). **A user whose project grows past the cap cannot create a ticket in it, on any tab.** Board survives
+on a separate read. And the message they see is unparaphrased developer/maintainer prose (`ShellRefusal`
+carries `ServingGapError`'s own words, including an `owner:` field addressed to maintainers).
+
+**Owner ruling, given the new finding: do BOTH remedies, in order.** (1) Decouple `createRegion` from the
+`useTicketList` read now — small, independent of everything else, restores ticket creation immediately (the
+executor's own first recommendation, since a user who cannot create is worse off than one who cannot see a
+full list). (2) Then build real filtering as originally decided — the actual fix for viewing/narrowing under
+the cap. Two PRs, each independently verified and gated. **Throwing past the cap remains correct** in both the
+carried rows and the owner's read of them — what's missing is the graceful path, not the guard.
+
+Executor context at 71% when this was sent — told to push a handoff at 80% or after landing remedy (1),
+whichever comes first.
+
 ## 🏁 MONDAY 11:5x IST — THE SATURDAY-CARRIED QUEUE IS 5/5 DONE. `main` is `40a88ee`, gate green. Citations still 1536/1536. Only the two product items remain (measure/design in progress).
 
 **PR #265 merged: `12.321` reframed from a performance question to a real correctness bug** — an older
