@@ -46,6 +46,13 @@ limit". The next run failed with an explicit **429 — for `accountant@…`, whi
 `RATE_LIMIT_AUTH_MAX=60` per `RATE_LIMIT_WINDOW_SEC=60` in the dev stack, and I had spent it on
 back-to-back suite runs. Waiting out the window cleared it and the ratchet held at 6.
 
+**And one gate result that was NOT mine, checked rather than waved past.** The forced gate went 32/33
+with a single failure — `7.151`, a websocket heartbeat timing case — at load average **36**, alongside
+1426 passes. This branch changes CSS and docs, which cannot touch a heartbeat, but that is an argument
+from plausibility. `apps/server/test/stream/` alone on a quiet machine: **42 passed, 0 failed**, with
+7.151 confirmed to live in `stream-route.test.ts` under that directory rather than assumed to. Full
+forced gate re-run at load 3.82: **33/33 EXIT 0**.
+
 
 # ▶ TUESDAY 2026-09-08 ~03:5x IST — **THE SIGNED-IN SHELL'S TAP TARGETS NOW HAVE A GUARD (9 → 7).**
 
