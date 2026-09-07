@@ -26,6 +26,9 @@ importers:
       '@gisik-nokma/sync-client':
         specifier: workspace:*
         version: link:../../packages/sync-client
+      '@gisik-nokma/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tauri-apps/api':
         specifier: ^2.1.1
         version: 2.11.1
@@ -81,6 +84,9 @@ importers:
       '@gisik-nokma/sync-client':
         specifier: workspace:*
         version: link:../../packages/sync-client
+      '@gisik-nokma/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@op-engineering/op-sqlite':
         specifier: ^15.0.0
         version: 15.2.14(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)

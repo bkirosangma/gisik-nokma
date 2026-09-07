@@ -17,6 +17,7 @@
     "@gisik-nokma/domain": "workspace:*",
     "@gisik-nokma/editor": "workspace:*",
     "@gisik-nokma/sync-client": "workspace:*",
+    "@gisik-nokma/ui": "workspace:*",
     "@op-engineering/op-sqlite": "^15.0.0",
     "@react-navigation/native": "^7.0.0",
     "@react-navigation/native-stack": "^7.0.0",

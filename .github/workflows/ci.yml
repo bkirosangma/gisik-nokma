@@ -230,6 +230,30 @@ jobs:
       - name: every checked (✅) case id must still be cited by a live test
         run: pnpm check:citations
 
+  # The manual and FAQ are GENERATED into `packages/app-core` from `docs/*.md`,
+  # and the apps render the generated module. Without this job the generated copy
+  # can drift from its source silently — users reading an old manual while the
+  # document says something else, with no symptom until somebody follows an
+  # instruction that stopped being true. Reads source text only; no database, no
+  # build, same class of gate as check:env.
+  #
+  # `--check` also runs the parser's own self-test (planted defects included)
+  # before it certifies anything, so a broken parser fails here rather than
+  # quietly producing a plausible wrong document.
+  check-help:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: the in-app manual and FAQ must match the documents they are generated from
+        run: pnpm check:help
+
   check-tasks:
     needs: scope
     runs-on: ubuntu-latest
@@ -508,7 +532,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-runbook, check-citations, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, build, typecheck, server-tests, other-tests, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4

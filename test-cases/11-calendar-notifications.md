@@ -250,4 +250,6 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
   rule against renumbering existing ids (`test-cases/README.md`) means a range vacated by a
   renumber stays vacated rather than being reused by a later, unrelated case.
 
-**New cases continue from 11.195.**
+- **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
+
+**New cases continue from 11.196.**

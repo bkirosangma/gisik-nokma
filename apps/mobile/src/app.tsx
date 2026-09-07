@@ -1,3 +1,4 @@
+import { Text } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -5,6 +6,7 @@ import { createReplicaDataSource, type ReplicaDataSource } from '@gisik-nokma/ap
 import { createHttpTransport, createOutbox, createReplica, createSyncEngine, type SyncStatus } from '@gisik-nokma/sync-client';
 import { createOpSqliteStorage } from './storage/op-sqlite-storage.js';
 import { BoardScreen } from './screens/board-screen.js';
+import { HelpScreen } from './screens/help-screen.js';
 import { TicketScreen } from './screens/ticket-screen.js';
 import { registerPushToken } from './push/register-push.js';
 
@@ -60,9 +62,31 @@ export function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator>
-        <Stack.Screen name="Board" options={{ title: 'Gisik Nokma' }}>
+        <Stack.Screen
+          name="Board"
+          options={({ navigation }) => ({
+            title: 'Gisik Nokma',
+            headerRight: () => (
+              <Text
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('Help')}
+                style={{ fontSize: 15, paddingHorizontal: 8 }}
+              >
+                Help
+              </Text>
+            ),
+          })}
+        >
           {() => <BoardScreen ds={ds} workspaceId={workspaceId} status={status} queued={queued} failed={failed} />}
         </Stack.Screen>
+        {/*
+          Registered BEFORE Ticket and reachable from the Board's header, and
+          deliberately not gated on a token or a workspace: the content is
+          bundled, so this screen works signed out and with no signal — which is
+          when the FAQ's answers about signing in and about offline are worth
+          the most.
+        */}
+        <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Manual & FAQ' }} />
         <Stack.Screen name="Ticket">
           {({ route }) => <TicketScreen ds={ds} ticketId={(route.params as { ticketId: string }).ticketId} />}
         </Stack.Screen>
