@@ -16,6 +16,51 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~10:15 IST — **§05 IS AT ZERO. 168 → 141 uncited.** Two PRs open: **#248** (these findings) and **#249** (the 28 citations). Nothing running.
+
+| what | value |
+|---|---|
+| `main` | `725ffaa` (#247 merged, #245 closed) |
+| **#248** | `docs/247-followup-findings` — the three findings #247's squash missed, **plus this section** |
+| **#249** | `exec/67-s05-tail-citations` head **`fcbe350`**, off `725ffaa` — 27 distinct ids, 17 files |
+| gate on #249 | `GATE_EXIT=0` · 30/30 · **3666 \| 5 (3671) / 285** · `check:citations` 0 · zero orphans |
+| diff shape | **84 added lines, ALL comments, 0 removed** |
+
+| § | before | after | | § | before | after |
+|---|---|---|---|---|---|---|
+| §03 | 5 | **2** | | §07 | 1 | 1 *(refused)* |
+| §04 | 29 | 29 | | §12 | 78 | 78 *(not cleared)* |
+| **§05** | **17** | **0** | | §13 | 26 | **24** |
+| §06 | 12 | **7** | | **total** | **168** | **141** |
+
+**`7.199` was REFUSED and that is the finding, not a gap.** Its block header names
+`client-contract.test.ts`; that file's own docblock disclaims the coverage (*"no case in this file ever
+asserted it"*), and the row's closure is evidenced by a **TypeScript compile error**, not a runtime
+assertion. Nothing to cite until someone writes one. **A citation there would have satisfied the checker
+while pointing at a test that asserts nothing of the kind** — which is the entire reason this convention
+reads before it cites.
+
+**Two hazards designed out rather than survived.** Insertions ran **bottom-up within each file** (a line
+number measured before an edit is stale after it — rule 9's seventh shape). And **every anchor was asserted
+to be a real `it`/`describe` before anything was written**; the guard refused **0 of 28**, which is what makes
+them trustworthy rather than merely applied.
+
+**A control caught itself here too:** a first count of "non-comment lines added" returned **70** from a bad
+regex escape; re-parsing the diff properly returned **0 non-comment lines out of 84**. *The number was
+well-formed and wrong, and only re-measuring by a different path found it.*
+
+## NEXT — one item needs no ruling, two do
+
+1. **NO RULING NEEDED: §04's 29 and §13's 24 and §06's 7 and §03's 2** — 62 rows that name **no** test.
+   A **reader pass**: someone must decide what covers them. Not transcription, and not dispatchable from
+   counts.
+2. **§12 — still the big one, and its block `12.380–12.399` is ALLOCATED but NOT CLEARED.** Its citable
+   pool is **67 rows by naming**, not the 31 carried in earlier notes. **ASK before starting.**
+3. **CI cannot run at all** (billing, since `2026-09-06T09:05:54Z`). #247 and everything since merged with
+   the standing authorization's *"independent CI run green"* unsatisfiable. Owner call.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~09:40 IST — **#247 IS MERGED (`725ffaa`), #245 CLOSED AS SUPERSEDED.** The rebuild landed. **This PR carries the three findings the #247 squash did NOT include.**
 
 **Position:** `main` = **`725ffaa`**. The citation backfill is on main: **1362 cited / 168 uncited / 1530**.
