@@ -94,6 +94,10 @@ function ctx(role: EffectiveRole, workspaceExists = false) {
   return { sessionUserId: ACTOR, eff: role, workspaceExists };
 }
 
+/**
+ * 6.6 — cited on the block: the admin-only event types — `workflow.defined`, `ticket-type.defined`, `project.created` and `ticket.workflow_rebound` — are each refused to a plain member under `permission.role` and each allowed for BOTH owner and admin. The row’s closing clause, that ordinary ticket work is let through because the visibility gate owns the rest, is the test at the end of this block.
+ * 6.78 — a RECORD rather than an assertion, kept where it applies: three shipped fixtures were REPAIRED rather than three assertions loosened when this gate landed. Two of the three were in this file. Each had gone red for a reason unrelated to its own subject — "a refusal that fires before the interesting code proves nothing", arriving from the other direction.
+ */
 describe('checkRolePermission — planted defects', () => {
   /**
    * 6.7 — a claim submitted as ANOTHER person is refused. The row’s "including from a workspace owner, so the check is identity and not privilege" half is the client-door test further down.
