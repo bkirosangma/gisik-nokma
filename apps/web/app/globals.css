@@ -213,3 +213,103 @@ a { color: var(--gn-accent); }
 @media (prefers-reduced-motion: reduce) {
   .gn-notfound__link { transition: none; }
 }
+
+/* ── The MCP approval screen ──────────────────────────────────────────────────
+   Tokens only, as everywhere in this file.
+
+   The consent block is `--gn-surface-sunken` with an `--gn-accent` rule, NOT
+   `--gn-danger` or `--gn-warning`, and that is the same decision the 404's
+   reasoning block records: a warning colour "would tell the reader something
+   has gone wrong, when the whole point of the paragraph is that the product is
+   behaving correctly". Approving your own assistant is a normal thing to do.
+   Dressing it as an alarm trains people to click through alarms, which is the
+   opposite of informed consent — the text carries the weight, not the colour. */
+
+.gn-mcp-authorize__card { max-width: 34rem; }
+
+.gn-mcp-authorize__lead { margin: 0 0 1rem; }
+
+.gn-mcp-authorize__consent {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--gn-border);
+  border-left: 3px solid var(--gn-accent);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+}
+
+.gn-mcp-authorize__consent-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  color: var(--gn-text);
+}
+
+.gn-mcp-authorize__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+/* 2.75rem = 44px, the minimum touch target — the same floor the 404's recovery
+   links use. A person typing a code on a phone is the expected case here, not
+   the exceptional one. `font-size: 1rem` is load-bearing too: under 16px, iOS
+   Safari zooms the viewport on focus and the layout jumps under the thumb. */
+.gn-mcp-authorize__input {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--gn-border-strong);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font-family: inherit;
+  font-size: 1rem;
+  /* The code is read aloud and typed in two groups of four; a little tracking
+     makes a mistyped character findable without turning it into a novelty. */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gn-mcp-authorize__input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+.gn-mcp-authorize__hint {
+  display: block;
+  margin: 0.35rem 0 1rem;
+  color: var(--gn-text-muted);
+  font-size: 1rem;
+}
+
+.gn-mcp-authorize__granted {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+  color: var(--gn-text);
+}
+
+.gn-mcp-authorize__what,
+.gn-mcp-authorize__revoke {
+  margin: 0 0 0.6rem;
+  max-width: 68ch;
+}
+
+.gn-mcp-authorize__revoke { color: var(--gn-text-muted); }
+
+.gn-mcp-authorize__signed-out { margin: 0; }
+
+/* A refusal is a first-class rendering, not an error state — the same shape
+   `.gn-shell__refusal` uses. `--gn-danger` on the RULE only, never as the text
+   colour: danger-on-surface is a pair with no declared contrast guarantee, and
+   the sentence has to stay readable in both themes. */
+.gn-mcp-authorize__refusal {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--gn-border);
+  border-left: 3px solid var(--gn-danger);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+}

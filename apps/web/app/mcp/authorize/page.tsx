@@ -1,0 +1,189 @@
+'use client';
+
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { Button, Card } from '@gisik-nokma/ui';
+import { createHttpClient, HttpError } from '@gisik-nokma/app-core/online';
+import { useSessionStatus } from '../../../src/providers.js';
+
+/**
+ * `/mcp/authorize` — the one place a person consents to an assistant acting as
+ * them.
+ *
+ * ## This URL is the SERVER's, not this file's
+ *
+ * `POST /v1/mcp/device/code` hands the CLI
+ * `verificationUri = ${WEB_ORIGIN}/mcp/authorize` — the WEB origin, never the
+ * API's. Renaming this route segment breaks every code already minted, and no
+ * test in this app would notice. It is one half of a contract the server has
+ * already shipped.
+ *
+ * ## Why the approval can only happen HERE, on the web origin
+ *
+ * `/v1/mcp/device/approve` is inside `HTTP_ORIGIN_PROTECTED_ROUTES`, so a
+ * cookie-carrying POST to it must present `Origin: <WEB_ORIGIN>`. Only a page
+ * served from the web origin does that. A server-rendered approval page on the
+ * API origin would be refused by the product's own CSRF control — which is why
+ * this task exists at all, in a plan whose architecture diagram lists no
+ * `apps/web` changes.
+ *
+ * ## The consent has to be LEGIBLE, and that is a styling decision too
+ *
+ * What is being granted is not a scope or a checkbox: it is a credential that
+ * acts AS this person, with THEIR permissions, until they revoke it. The screen
+ * says so in those words, before the button, and again in the confirmation.
+ *
+ * It says it in `--gn-surface-sunken`, NOT in `--gn-danger` or `--gn-warning`,
+ * and that follows the reasoning already recorded on the 404 page: a warning
+ * colour "would tell the reader something has gone wrong, when the whole point
+ * of the paragraph is that the product is behaving correctly". Approving your
+ * own assistant is a normal thing to do. Dressing it as an alarm trains people
+ * to click through alarms, which is the opposite of informed consent.
+ */
+function AuthorizeScreen(): React.JSX.Element {
+  const params = useSearchParams();
+  // The discriminated union, not `useCurrentUser()`: that hook answers `null`
+  // for BOTH 'still loading' and 'signed out', and the invite page records at
+  // length why collapsing those two is a false statement for the whole of the
+  // session request. Here it would flash a sign-in prompt at somebody who is
+  // already signed in, mid-approval.
+  const session = useSessionStatus();
+  // Pre-filled from `?code=` when the CLI could open a browser for the person;
+  // typed by hand when it could not. Both paths reach the same input, so there
+  // is one code path to get right rather than two.
+  const [code, setCode] = useState(params.get('code') ?? '');
+  const [state, setState] = useState<'idle' | 'sending' | 'approved'>('idle');
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const approve = (): void => {
+    setRefusal(null);
+    setState('sending');
+    const http = createHttpClient('', (input, init) => fetch(input, init));
+    void http.post('/v1/mcp/device/approve', { userCode: code.trim().toUpperCase() }).then(
+      () => setState('approved'),
+      (cause: unknown) => {
+        setState('idle');
+        // A PRESENTATION of the server's single-key refusal, not a paraphrase
+        // of a rule: the server says `{error:'unknown_code'}` and this is the
+        // one place in the product where that is rendered as a sentence a
+        // person can act on. Every branch ends in something to DO.
+        if (cause instanceof HttpError && cause.status === 410) {
+          setRefusal('That code has expired. Ask for a new one and try again.');
+          return;
+        }
+        if (cause instanceof HttpError && cause.status === 404) {
+          setRefusal(
+            'That code is not recognised. It may have already been used, or it may have expired — ask for a new one.',
+          );
+          return;
+        }
+        setRefusal(
+          'That approval could not be completed, and the server did not say why. Ask for a new code and try again.',
+        );
+      },
+    );
+  };
+
+  const returnPath = '/mcp/authorize';
+
+  return (
+    <main className="gn-shell gn-mcp-authorize">
+      <h1 className="gn-page-title">Connect an assistant</h1>
+
+      <Card className="gn-mcp-authorize__card">
+        {session.kind === 'loading' ? (
+          <p>Checking your session…</p>
+        ) : session.kind === 'signed-out' ? (
+          /* 401 handled BEFORE the form rather than after a failed POST: asking
+             somebody to type a code and then telling them to sign in wastes the
+             code, which is single-use and short-lived. */
+          <p className="gn-mcp-authorize__signed-out">
+            <Link href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> to approve
+            an assistant — you land back here.
+          </p>
+        ) : state === 'approved' ? (
+          <div data-testid="mcp-authorize-approved" role="status">
+            <p className="gn-mcp-authorize__granted">Approved. The assistant is connected.</p>
+            <p className="gn-mcp-authorize__what">
+              It now acts <strong>as {session.user.name}</strong>, with exactly your permissions — it can see
+              and change whatever you can, and every claim it records will carry your name.
+            </p>
+            <p className="gn-mcp-authorize__revoke">
+              This lasts until you revoke it. You can close this page; the assistant already has
+              what it needs.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="gn-mcp-authorize__lead">
+              Enter the code your assistant is showing you.
+            </p>
+
+            {/* The consent, stated BEFORE the button rather than beside it. */}
+            <p className="gn-mcp-authorize__consent">
+              <span className="gn-mcp-authorize__consent-label">What you are approving</span>
+              An assistant that acts <strong>as {session.user.name}</strong>, with exactly your permissions.
+              It can see and change whatever you can, and every claim it records will carry your
+              name. It lasts until you revoke it.
+            </p>
+
+            <label className="gn-mcp-authorize__label" htmlFor="mcp-user-code">
+              Code from your assistant
+            </label>
+            <input
+              id="mcp-user-code"
+              className="gn-mcp-authorize__input"
+              data-testid="mcp-authorize-code-input"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              // The code is 8 characters from an alphabet with no vowels and no
+              // 0/O/1/I/5/S, formatted XXXX-XXXX to be read aloud. The server
+              // upper-cases and trims, so the browser must not fight the person
+              // over case, and a spell-checker has nothing useful to say about
+              // it. `one-time-code` is the honest autocomplete value: it is
+              // exactly that.
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="XXXX-XXXX"
+              aria-describedby="mcp-user-code-hint"
+            />
+            <span className="gn-mcp-authorize__hint" id="mcp-user-code-hint">
+              Eight characters, shown as two groups of four. Upper or lower case both work.
+            </span>
+
+            <Button
+              data-testid="mcp-authorize-submit"
+              onClick={approve}
+              disabled={state === 'sending' || code.trim() === ''}
+            >
+              {state === 'sending' ? 'Approving…' : 'Approve this assistant'}
+            </Button>
+          </>
+        )}
+
+        {/* `role="alert"` rather than colour alone: a refusal that is only red
+            is silent to a screen reader, and this one always names a next step. */}
+        {refusal !== null ? (
+          <p className="gn-mcp-authorize__refusal" data-testid="mcp-authorize-refused" role="alert">
+            {refusal}
+          </p>
+        ) : null}
+      </Card>
+    </main>
+  );
+}
+
+/**
+ * `useSearchParams` requires a Suspense boundary under Next's app router, and
+ * without one `next build` fails the whole route rather than this component.
+ */
+export default function McpAuthorizePage(): React.JSX.Element {
+  return (
+    <Suspense fallback={<main className="gn-shell" />}>
+      <AuthorizeScreen />
+    </Suspense>
+  );
+}
