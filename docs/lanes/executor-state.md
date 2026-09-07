@@ -16,6 +16,225 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ✅ MONDAY 2026-09-07 ~18:xx IST — **REVIEW FOUND AN IMPORTANT DEFECT THIS BRANCH INTRODUCED, AND TWO OF MY OWN CLAIMS WERE FALSE. ALL FIXED, RE-MEASURED, RE-GATED.** This supersedes the "ready" reading of the section below; its figures are older than this one's.
+
+| what | value |
+|---|---|
+| **gate sha** | **`6bc663c`** — verified REACHABLE with `git branch --contains` (prints the branch), never `cat-file` |
+| gate | `GATE_EXIT=0` · **30/30 tasks, 0 cached (forced)** · **3,735 passed \| 5 skipped / 298 files** · Node **v22.22.2** · **zero orphans** · zero failures |
+| supplementary | `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 → **1,556 cited / 0 uncited** · `check-case-ids` **1,642 unique, highest 13.209** |
+| cases | **7.260–7.265** (route) · **3.159** (mapper) · **3.160–3.162** (view + page) · **13.176 → 🟡** |
+
+## THE IMPORTANT ONE: THE BUTTON DID NOTHING, AND THE GATE COULD NOT SEE IT
+
+`MyWork` renders a title button and calls `onOpenTicket(ticketId)`. The PAGE turns that id into
+`/w/:ws/p/:projectId?ticket=…` by looking the id up in the view to recover its project — the id alone
+cannot build the URL. **That resolver searched `assigned` and `inTransit` and not `shared`.** A shared
+errand is typically not assigned to the viewer — the entire reason the section exists — so `find`
+returned `undefined`, the `if (item !== undefined)` guard swallowed it, and the click did **nothing**:
+no navigation, no error, nothing to distinguish it from a slow page.
+
+> **It shipped green because the defect lived in the half neither layer's tests owned.** No component
+> test can reach the page's resolver, and `MyWork` was already calling its prop correctly. 3.161 clicks
+> a `vi.fn()`, so it certifies only that the button invokes its prop — **it stayed green against the
+> dead click and would have gone on doing so.** That is now written into 3.161 itself.
+
+Closed by **3.162**, at the page, asserting the ROUTER CALL and the SHARED ticket's own project — the
+assigned card's project being the wrong-project answer a resolver falling through to the first list
+would give. Mutation: dropping `shared` from the resolver reddens 3.162 alone.
+
+## MY OWN JUSTIFICATION WAS FALSE, AND THAT IS THE WORSE OF THE TWO
+
+I gated the open affordance on `projectName !== null`, reasoning a viewer who may not be told a
+project's NAME cannot load its page. **`routes/board.ts` says the opposite in writing:** *"A workspace
+member who is NOT on the project passes the gate and gets 200 with whatever their visibility yields."*
+A guest IS a workspace member — that is why `requireMember` lets them through `/v1/me/work` at all —
+and the guest arm of `visibleTicketsWhere` IS the explicit clause, so their shared ticket is on that
+board. Verified by reading the GATE (`workspaceOfProject` then `requireMember`, nothing project-scoped),
+not the docblock.
+
+**So the gate withheld a working affordance from exactly the person the section exists for, and the
+comment justifying it read as measured and was not.** Removed. The same false sentence had been copied
+into 13.176's catalogue rationale and is corrected there too.
+
+> The two findings INTERACT: the gate was accidentally masking the dead click for guests while
+> permitting it for owners and members. Fixing either alone would have left a hole — which is the
+> argument for a reviewer who reads the whole branch rather than the diff of one file.
+
+## ⚠ THE SCOPE OF A MUTATION RUN IS PART OF ITS RESULT
+
+Review caught `stateNames omits shared rows → 7.265 alone` as too narrow. It was: measured over
+`my-work.test.ts` alone, and BEFORE this same change set extended `client-contract`'s totality walk to
+cover shared cards. **A delta measured at one sha, reported as a fact about a later one.** Re-measured
+whole-suite it reddens TWO. Because the scope demonstrably mattered, EVERY server mutation was re-run
+whole-suite rather than patching the one that was caught — and a second understatement surfaced
+(`own_*` reddens four, not three; the fourth is `visible-tickets.test.ts`, the file that OWNS the
+shared clause and cannot appear in a single-file run).
+
+| mutation | whole-suite red |
+|---|---|
+| drop `t.workspace_id` | 6 — 7.108, 7.260, 7.261, 7.263, 7.264, 7.265 |
+| drop the audience test | 5 — 7.27, 7.108, 7.260, 7.262, 7.263 |
+| `own_*` instead of `resolved_*` | **4** — 7.260, 7.262, 7.264, visible-tickets *(was "3")* |
+| `stateNames` omits shared rows | **2** — 7.265, client-contract *(was "1 alone")* |
+| `projectNames` walk drops shared | 1 — 7.265 alone *(holds)* |
+| clause → `TRUE` | 10 — incl. 7.262, real-door |
+| web: resolver drops `shared` | 1 — 3.162 alone |
+| client: bare project line | 1 — 3.161 alone |
+| **control** | **0** |
+
+## `dedupeRows` IS DELETED, NOT DOCUMENTED
+
+Review listed it as a code path no fixture could redden — and it was; its own docblock already admitted
+the response is byte-identical without it. **Untestable code that saves a Map lookup is a worse trade
+than the lookup.** `stateNamesFor` now takes the plain concatenation and may write one key twice with
+the same value, said at the site.
+
+## WHAT THE REVIEW VERIFIED RATHER THAN FAULTED — carry this, it is the load-bearing half
+
+- **The omitted conjunct is CORRECT, unhedged.** `canSeeResolved` returns true for `explicit ∧ listed`
+  on every non-null role, so `visibleTicketsWhere AND explicitAudienceWhere` genuinely reduces to the
+  latter past `requireMember`; the only excluded role (`null`) is refused at the door. **Independently
+  confirmed by me against `visibility/can-see.ts` before the review returned.** Not a disclosure.
+- **Tenancy verified**: `t.workspace_id` is bound to the same id `requireMember` resolved a non-null
+  role in, and no path into `readMyWork` skips it.
+- **Inheritance verified**: `resolved_*` is right, `reResolveSubtree` re-runs on both
+  `ticket.reparented` and `visibility.set`, and the migration's `project_id`-goes-stale note does not
+  reach this query — the read joins `proj_visibility` on `ticket_id` alone and takes `project_id` from
+  `proj_tickets`, never `v.project_id`.
+
+## TWO LIMITATIONS NOW WRITTEN INTO THE CATALOGUE RATHER THAN LEFT TO BE FOUND
+
+1. **3.161 clicks a `vi.fn()`** — certifies only that the button invokes its prop. Stated in the case.
+2. **`real-door-round-trip`'s `shared: []`** is satisfied by any implementation returning a constant
+   `[]`. It falsifies "shared is a copy of groups", NOT "shared is never served"; the positive
+   direction rests on 7.260 and 7.262. Owner: whoever next needs an explicit audience in that world.
+
+---
+
+# 🟢 MONDAY 2026-09-07 ~17:xx IST — **13.176 OPTION B IS BUILT AND GATE-GREEN. PR to open on `exec/81-shared-with-me`.**
+
+| what | value |
+|---|---|
+| `origin/main` | `af3ac34` (docs-only past `ebe5ed8`) |
+| branch | **`exec/81-shared-with-me`**, rebased onto `af3ac34`, **6 commits ahead**, tree CLEAN |
+| **gate sha** | **`9d8a5bc`** — verified REACHABLE with `git branch --contains` (prints the branch), never `cat-file` |
+| HEAD at handoff | `29d9e7b`. **The gate ran at `9d8a5bc`; `git diff 9d8a5bc 29d9e7b -- apps packages scripts turbo.json package.json` is EMPTY** and the only file differing is `docs/lanes/controller-state.md`, so the gate result transfers. A handoff cannot name the commit that writes it, which is why the gate sha is quoted rather than a HEAD that is stale the moment it is typed. |
+| gate | `GATE_EXIT=0` · **30/30 tasks, 0 cached (forced)** · **3,734 passed \| 5 skipped / 297 files** · Node **v22.22.2** · **zero orphans** |
+| supplementary | `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 (14 refs, 12 distinct) · `check:citations` 0 → **1,555 cited / 0 uncited** · `check-case-ids` **1,641 unique, highest 13.209** |
+
+## WHAT IT IS
+
+`MyWorkResponse.shared` — the tickets whose RESOLVED audience names the viewer. The measured gap was
+never the missing link it looked like: a guest ALREADY reaches `/v1/me/work` (the workspaces page
+links it from every workspace card, OUTSIDE the projects list, and 13.175 asserts that link visible
+to a guest). The page answered them three empty groups, because `groups` is *assigned to me* and an
+errand handed to a non-assignee is in none of them. **The gap was a READ, not a route.**
+
+## THE FIVE DECISIONS, so the next reader can check them rather than trust them
+
+1. **Additive key on `/v1/me/work`, NOT a 14th `DataSource` method.** Measured: a new
+   `DataSourceQuery` method costs ten file-touches including a MANDATORY replica refusal and
+   `replica-data-source.test.ts:471`'s exact key-set equality. The replica already refuses
+   `getMyWork` outright — it has **no visibility table at all** — so an additive key on an
+   already-refusing method costs the offline path nothing.
+2. **`explicitAudienceWhere` EXPORTED from `read/visible-where.ts`, not restated.** That module's
+   docblock records how a third copy of the decision table nearly happened; a fourth at column scale
+   is the same mistake.
+3. **`visibleTicketsWhere` is deliberately NOT a third conjunct.** Past `requireMember` every role is
+   non-null, and for every non-null role the explicit clause is already NARROWER than the table, so
+   the conjunction reduces to it — **a clause no fixture could redden, which is a check that cannot
+   fail wearing the costume of defence in depth.** Stated at the site so it is checkable against
+   `can-see.ts`. **This is the claim to attack first if anything here is wrong.**
+4. **Overlap with `groups` is kept.** A ticket both assigned to and shared with the viewer is in
+   both; de-duplicating would drop the only claim a non-assignee can ever have.
+5. **13.176 → 🟡, not ✅**, with the absences enumerated rather than the partiality named. See below.
+
+## ⚠ TWO CHECKS THAT COULD NOT FAIL, FOUND IN MY OWN WORK AND CLOSED
+
+- **Including `shared` in the `projectNames` walk was unfalsifiable** — every shared ticket's project
+  already appeared via a group card. `ownerSharedSibling` (SIBLING project, assigned to nobody) makes
+  that line the only path by which the sibling project's name reaches the map.
+- **7.262's own stated property was unfalsifiable.** "An owner gets only what NAMES them" was
+  satisfied by any implementation returning every `explicit`-mode row, because every other audience in
+  that workspace lists the owner. `memberOnlyShared` (explicit to the MEMBER alone) fixes it.
+  MEASURED both ways: dropping the `= ANY (resolved_user_ids)` test reddened 7.262 **not at all**
+  before that row existed, and reddens it now.
+
+## ⚠ THE MUTATION EXTRACTOR WAS WRONG TWICE, IN TWO DIFFERENT DISGUISES
+
+Round 1 printed vitest's full test LISTING rather than its failures, so all five mutations reported
+the identical 23 "RED" lines. Round 2 (client) used `^ *×`, which never matches because **turbo
+prefixes every line with the package name**, so all four reported `count=0` — *and the control also
+reported 0, which is what a broken extractor returns*, so the control passed for the wrong reason.
+
+> **A control that can only return the expected value is not a control.** The fix was to verify the
+> extractor POSITIVELY — run it over the saved mutation logs and watch it find names — before
+> trusting any zero it printed.
+
+## MUTATION RESULTS — measured, against a control run of 0 through the same extractor
+
+| mutation | reddens |
+|---|---|
+| drop `t.workspace_id` from `sharedWithMeRows` | **6**: 7.108, 7.260, 7.261, 7.263, 7.264, 7.265 |
+| drop the audience test (`= ANY (resolved_user_ids)`) | **5**: 7.27, 7.108, 7.260, 7.262, 7.263 |
+| `own_mode`/`own_user_ids` instead of `resolved_*` | **3**: 7.260, 7.262, 7.264 |
+| `stateNames` omits the shared rows | **7.265 alone** |
+| `projectNames` walk drops `shared` | **7.265 alone** |
+| clause → `TRUE` (shared built on VISIBILITY) | **9**, 7.262 among them |
+| client: bare `{item.projectName}` restored | **3.161 alone** |
+| client: `openable = true` | **3.161 alone** |
+| client: empty-state arm removed | **3.160 alone** |
+| client: `shared` not read off the wire | **3.159 alone** |
+
+The catalogue's first draft said "reddens X **alone**" for the first and second rows. **Both were
+predictions and both were false;** the catalogue now carries the readings.
+
+## PRE-EXISTING DEFECT FOUND AND FIXED (named as pre-existing, not claimed as new)
+
+`WorkItem.projectName`'s contract says a withheld name renders "id-only rather than blank".
+`WorkItemCard` printed `{item.projectName}` — **nothing**. Reachable before this change (a guest
+ASSIGNED a ticket in a project they cannot see, 7.108); it is the NORMAL case for every row a guest
+sees in the new section, which is why it is fixed here, with one rule for every section.
+
+## WHY 13.176 IS 🟡 AND NOT ✅ — the two absences, enumerated
+
+1. **No browser spec.** The e2e suite is structurally off the local gate (13.177: `test:e2e:stack` is
+   a script turbo defines no task for, and `apps/web/vitest.config.ts` collects `test/**` only) and
+   GitHub Actions has had no green run since 2026-09-06 on the account-wide billing block. A spec
+   added now would execute **once, by hand, and never again**. Deliberately NOT written: an
+   unrunnable spec landing beside verified work is how a 🧪 becomes a believed ✅. Docker IS running
+   on this machine and both `gisik-nokma-dev-*` images exist but are STALE relative to this change,
+   so a real run needs `--build` of both. **Owner: whoever runs the stack once CI billing is back.**
+2. **Opening a shared errand still is not possible, for ANYBODY.** `DataSource.getTicket` refuses
+   with `ServingGapError` for every viewer — `mapTicketRead` wants a `title`, a `stateProvenance` and
+   a domain `TicketState`, and the route answers a snake_case `proj_visibility` row — and the sheet
+   lives at `/w/:ws/p/:projectId`, a page a guest gets 404 from. **This predates the change and is
+   not this change's to close.** The view therefore withholds the open affordance on a row whose
+   project name is withheld (3.161), which is honest rather than complete.
+
+## FOR THE CONTROLLER — one thing to confirm BEFORE merge, free now and unfixable after
+
+**ID ALLOCATION.** Cases were minted at **7.260–7.265** and **3.159–3.161**, from ceilings RECOUNTED
+style-aware at this sha (§7 = 7.259, §3 = 3.158) with per-style counts matching
+`scripts/check-case-ids.mjs` exactly (bare 1111, bold 478, marker-first 43) as the control.
+**§3 and §7 are running-max sections; §12 and §13 are BLOCK-allocated and nothing was minted in
+either** — 13.176 is a STATUS FLIP of an existing id, not a mint, and `check-case-ids` still reports
+`highest 13.209`. No block request is needed. Confirm the two running-max mints before merging:
+*never renumber a landed id*, so disagreement is free now and unfixable afterwards.
+
+**A recon subagent asserted the server case belonged in §6.** It reasoned from `Features.md` sections;
+the FILE says otherwise — every my-work route case is §7 (7.26, 7.103–7.113, 7.216–7.218). The
+implementation is the fact. Recorded because the same inference will be made again.
+
+## SEQUENCE POSITION
+
+13.176 (option B) is **done and awaiting merge**. It was the last named item in the controller's
+"what's actually left" list. **Nothing in the Phase 1–4 serial sequence has started** — the next
+executor picks up from the coordination doc's spine, not from this note.
+
+---
+
 # 🔴→🟢 MONDAY 2026-09-07 ~16:0x IST — **REVIEW FOUND A CRITICAL THIS BRANCH INTRODUCED. FIXED, WITNESSED, RE-GATED.** The section below is still accurate about the red; this supersedes its "ready to merge" reading.
 
 | what | value |
@@ -93,6 +312,44 @@ because the edits were minutes old and reproducible from the review's own text.
    asserted nothing. Replaced with one that can be present.
 4. My own comment said **three** `role="status"` nodes stand on the page; it is **two** — the board arm
    unmounts on tab change. The count was inferred from the stubs rather than read off the page.
+
+---
+
+# ✅ MONDAY 2026-09-07 ~20:xx IST — **THE SQUASH AUDIT IS DONE. #274 WAS THE ONLY UNREMEDIATED DROP, AND #278 CLOSED IT.** Starting 13.176 (option B) on `exec/81-shared-with-me`.
+
+**First: #278's own squash was verified before anything else** — the lesson applied to itself. `main` vs the
+branch head for the three files that mattered: **IDENTICAL** (`colour-scan.ts`, `token-discipline.test.ts`,
+`turbo.json`), with `controller-state.md` differing as the positive control. The string-aware stripper, the
+URL case and the `app-core` inputs are all on `main`. **The live gap is closed.**
+
+## THE AUDIT — and two wrong methods before the right one, both worth recording
+
+| method | verdict |
+|---|---|
+| `headRefOid` from the GitHub API | **useless** — it is recorded AS OF MERGE TIME, so it reports #274 as clean and misses the very drop that prompted the audit |
+| branch vs **current** `main` | **too noisy** — later PRs legitimately change the same files, so old branches diverge for innocent reasons |
+| **commits on the branch whose commit-time is after its own squash** | **exact** — it measures the failure mode itself |
+
+**My first audit loop reported "8 clean" and was measuring nothing** — it printed ✓ for `exec/79` while a
+direct check of the same comparison returned "differs". I did not diagnose it from theory; I rewrote it with
+per-branch output and a **built-in control** (`exec/79` vs `cf79d28` MUST flag), and the control fired.
+*An audit that reports all-clean without a control that fires is not evidence.*
+
+## THE RESULT — three PRs pushed commits after their squash; only one was lost
+
+| PR | late commits | outcome |
+|---|---|---|
+| **#274** `exec/79` | `7b61463` (**the false-negative fix**), `83d61cc` | **LOST** — closed by #278 |
+| **#255** `exec/70` | `e48756c` | **re-landed** via #257; `seed-dev-cli.test.ts` on `main` is byte-identical to the branch |
+| **#253** `exec/69` | three commits | **re-landed** via the #255 rebuild; `check-case-citations.mjs`, its tooling test and `view-types-chosen.test.ts` all present on `main` |
+
+The last two are the already-recorded *"#247/#253/#255 each stranded work"* episode, which is what the
+**one branch per work item** rule was adopted for. **Nothing else in the series lost anything.** Branches for
+#263, #249, #244 and #239 are deleted and cannot be audited — stated rather than counted as clean.
+
+> **The standing practice, in one line:** after any squash merge of your own work,
+> `git diff origin/main <branch> -- <the files that mattered>`. Empty is the only proof; every other signal
+> reports success either way.
 
 ---
 

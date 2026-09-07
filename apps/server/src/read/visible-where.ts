@@ -107,23 +107,41 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
     // all, matching canSeeResolved's guest branch, which does not consult
     // eff.projects either.
     case 'guest':
-      return explicitClause(userId, params);
+      return explicitAudienceWhere(userId, params);
 
     // member and admin: identical, because an admin gets no read bypass.
     case 'admin':
     case 'member': {
       const projects = [...eff.projects.keys()];
-      return `(v.resolved_mode = 'workspace' OR (v.resolved_mode = 'project' AND v.project_id = ANY (${params.add(projects)}::text[])) OR ${explicitClause(userId, params)})`;
+      return `(v.resolved_mode = 'workspace' OR (v.resolved_mode = 'project' AND v.project_id = ANY (${params.add(projects)}::text[])) OR ${explicitAudienceWhere(userId, params)})`;
     }
   }
 }
 
 /**
+ * The `'explicit'` COLUMN of the table above, on its own: this ticket's resolved
+ * audience names this user.
+ *
  * `resolved_user_ids` is `text[]` — see the migration, which says why in words:
  * `json` has no equality operator and `verify-projections` diffs with `EXCEPT`,
  * which needs one for every column. So this is `= ANY (...)` and NOT the plan
  * text's `@> to_jsonb(...)`, which would raise 42883 against the shipped column.
+ *
+ * ## Exported for ONE caller, and exported rather than copied
+ *
+ * "Shared with me" (`routes/my-work.ts`'s `shared` key) asks a question no other
+ * read asks: not *may this viewer see the ticket* but *was this ticket handed to
+ * them BY NAME*. That is exactly this clause and nothing else, so it is exported
+ * instead of restated — the module docblock above records that writing the SQL a
+ * second time beside this file is how the third copy of the decision table
+ * nearly happened, and a fourth would be the same mistake at column scale.
+ *
+ * **The resolved column, so an INHERITED audience counts.** A child that
+ * authored no `visibility.set` of its own carries its nearest authoring
+ * ancestor's audience in `resolved_user_ids` (`resolved_from` names whose), and
+ * a person handed a parent errand has been handed its sub-errands with it. Using
+ * `own_user_ids` here would answer a different and wronger question.
  */
-function explicitClause(userId: string, params: SqlParams): string {
+export function explicitAudienceWhere(userId: string, params: SqlParams): string {
   return `(v.resolved_mode = 'explicit' AND ${params.add(userId)} = ANY (v.resolved_user_ids))`;
 }

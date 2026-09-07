@@ -388,6 +388,46 @@ export type MyWorkResponse = {
    * work, and the resolutions have their own surface.
    */
   contested: ContestedClaimView[];
+  /**
+   * Tickets handed to this viewer BY NAME — `proj_visibility.resolved_mode =
+   * 'explicit'` with them in `resolved_user_ids` (case 13.176).
+   *
+   * ## Why this key exists, and why it is not a filter over `groups`
+   *
+   * `groups` is *assigned to me*. A ticket can be shared with somebody who is
+   * not its assignee — that is what an explicit audience IS — so a shared errand
+   * appears in none of the three groups, and before this key the product had no
+   * read that listed one. A guest is the extreme case and the one 13.176 names:
+   * `eff.projects` is built from `proj_memberships` alone
+   * (`permissions/effective-role.ts`), so a guest on no project gets no project
+   * card, hence no link, hence no route to the errands they were handed. They
+   * could already REACH `/v1/me/work` — the workspaces page links it from every
+   * workspace card, outside the projects list — and it answered them three empty
+   * groups. This key is what makes that page tell them the truth.
+   *
+   * ## Overlap with `groups` is real and deliberate
+   *
+   * A ticket both assigned to and explicitly shared with the viewer appears in
+   * BOTH. These are two different claims about one ticket — *you are doing this*
+   * and *you were handed this* — and de-duplicating would silently drop the
+   * second, which is the only one a non-assignee can ever have. The client keys
+   * its sections separately and says so.
+   *
+   * ## The audience is the RESOLVED one, so inheritance counts
+   *
+   * A child that authored no `visibility.set` carries its nearest authoring
+   * ancestor's audience, and somebody handed a parent errand was handed its
+   * sub-errands with it. See `read/visible-where.ts`'s `explicitAudienceWhere`,
+   * which this shares rather than restates.
+   *
+   * `projectNames` and `stateNames` are TOTAL over these cards too — a shared
+   * card is a card, and a guest whose project name is withheld (rulings P32/P38)
+   * gets the id-only render, not a missing state name.
+   *
+   * Additive, like `contested` before it: a client that ignores the key is
+   * unaffected, and nothing above it moved.
+   */
+  shared: TicketCard[];
 };
 
 /**

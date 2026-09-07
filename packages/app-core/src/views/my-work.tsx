@@ -92,6 +92,25 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
           ))
         )}
       </section>
+
+      {/*
+        Case 13.176. For a guest on no project this is the ONLY section that can
+        ever have rows — the other three are assignment- and claim-scoped, and an
+        errand handed to somebody is neither. The section renders unconditionally
+        rather than only when non-empty, so "nothing has been shared with you" is
+        a sentence the product says rather than a section that vanishes; a
+        disappearing section is indistinguishable from one that failed to load.
+      */}
+      <section role="region" aria-label="Shared with me" className="gn-my-work__section">
+        <h3 className="gn-my-work__heading">Shared with me</h3>
+        {view.shared.length === 0 ? (
+          <p className="gn-my-work__empty">Nothing has been shared with you.</p>
+        ) : (
+          view.shared.map((item) => (
+            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
+          ))
+        )}
+      </section>
     </div>
   );
 }
@@ -171,7 +190,38 @@ function WorkItemCard({
       >
         {item.title}
       </button>
-      <span className="gn-my-work__project">{item.projectName}</span>
+      {/*
+        `WorkItem.projectName`'s own contract: a withheld name leaves the viewer
+        holding the `projectId`, "so the item renders id-only rather than blank".
+        This line printed `{item.projectName}` — i.e. NOTHING — whenever the rule
+        applied, so the type promised one register and the renderer delivered
+        another. PRE-EXISTING and reachable before this change (case 7.108's
+        guest), but "Shared with me" is where it becomes the NORMAL case rather
+        than an edge, so it is fixed here with one rule for every section.
+
+        A withheld NAME is not a withheld ticket, and the card is openable
+        either way. An earlier draft of this file gated the open button on
+        `projectName !== null`, reasoning that a viewer who may not be told a
+        project's name cannot load its page — **and that reasoning was false.**
+        `GET /v1/projects/:id/board` gates on WORKSPACE membership
+        (`routes/board.ts`: "A workspace member who is NOT on the project passes
+        the gate and gets 200 with whatever their visibility yields"), a guest IS
+        a workspace member, and the guest arm of `visibleTicketsWhere` IS the
+        explicit clause — so their shared ticket is on that board. The gate
+        withheld a working affordance from exactly the person the section is
+        for. Removed, and recorded here because the comment justifying it read
+        as measured and was not.
+      */}
+      {item.projectName !== null ? (
+        <span className="gn-my-work__project">{item.projectName}</span>
+      ) : (
+        <span
+          className="gn-my-work__project gn-my-work__project--id"
+          title="You have not been told this project’s name."
+        >
+          {item.projectId}
+        </span>
+      )}
       <Chip tone={item.stateCategory} title={formatStateProvenance(item.stateName, item.stateProvenance)}>
         {item.stateName}
       </Chip>

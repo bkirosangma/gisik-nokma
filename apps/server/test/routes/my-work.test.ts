@@ -206,6 +206,46 @@ type MyWorkFixtures = {
    * this person any work".
    */
   adminProjectId: string;
+  /**
+   * NOBODY's assignee, explicit `[owner, guest]` — the errand HANDED to the
+   * guest. Case 13.176's subject: it is in none of the three groups for anybody,
+   * so before `shared` existed no read in the product could return it.
+   */
+  guestSharedParentId: string;
+  /**
+   * Child of `guestSharedParentId`, authoring NO `visibility.set` of its own —
+   * so its audience is INHERITED (`resolved_from` names the parent). Unassigned,
+   * for the same reason as its parent.
+   */
+  guestSharedChildId: string;
+  /**
+   * Explicit to `[member]` and to NOBODY ELSE — the only audience in the seeded
+   * workspace that does not name the owner, and assigned to nobody.
+   *
+   * It exists because without it 7.262 could not mean what its name says.
+   * Every other `explicitTo` here lists the owner, so "the owner's shared holds
+   * only what NAMES them" was satisfied by any implementation that returned
+   * every `explicit`-mode row — the audience half of the clause had no fixture
+   * that could redden it. MEASURED, not suspected: dropping the
+   * `= ANY (resolved_user_ids)` test reddens 7.262 only once this row exists.
+   */
+  memberOnlySharedId: string;
+  /**
+   * In the SIBLING project, explicit `[owner]`, assigned to NOBODY. The owner's
+   * every GROUP card is in the seeded project, so the sibling project's name can
+   * reach `projectNames` through a shared card and through nothing else — which
+   * is what makes including `shared` in that walk a falsifiable claim rather
+   * than a line no fixture could redden.
+   */
+  ownerSharedSiblingId: string;
+  /**
+   * In the NEIGHBOUR workspace, explicit `[neighbour, guest]` — the seeded
+   * guest is NAMED in an audience one tenancy over, while being a member only
+   * here. The tenancy fixture, and it is NOT the one the door already covers:
+   * `requireMember` stops the guest ASKING for the neighbour's workspace, and
+   * stops nothing about this row arriving inside the answer they may ask for.
+   */
+  guestNeighbourSharedId: string;
 };
 
 const OWNER_ORDER_COUNT = 5;
@@ -237,6 +277,11 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
   const ownerOrderIds = Array.from({ length: OWNER_ORDER_COUNT }, (_, i) => myWorkTicketId(9 + i));
   const ownerNeighbourId = myWorkTicketId(9 + OWNER_ORDER_COUNT);
   const adminProjectId = myWorkTicketId(10 + OWNER_ORDER_COUNT);
+  const guestSharedParentId = myWorkTicketId(11 + OWNER_ORDER_COUNT);
+  const guestSharedChildId = myWorkTicketId(12 + OWNER_ORDER_COUNT);
+  const guestNeighbourSharedId = myWorkTicketId(13 + OWNER_ORDER_COUNT);
+  const ownerSharedSiblingId = myWorkTicketId(14 + OWNER_ORDER_COUNT);
+  const memberOnlySharedId = myWorkTicketId(15 + OWNER_ORDER_COUNT);
 
   /** `ticket.created` + `ticket.assigned` for one ticket of type `task`. */
   const assigned = (id: string, title: string, assigneeId: string, inProject: string): LedgerEvent[] => [
@@ -297,6 +342,53 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
     explicitTo(leadExplicitId, [owner, projectLead]),
 
     ...assigned(adminProjectId, 'Audit the petty cash float', world.userIds.admin, projectId),
+
+    // 13.176's errands: HANDED to the guest, assigned to nobody. `assigned()` is
+    // deliberately not used — an assignment would put these in a group and make
+    // `shared` redundant for exactly the case it exists to serve.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: guestSharedParentId },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: null, title: 'Collect the shop keys' },
+    }),
+    explicitTo(guestSharedParentId, [owner, guest]),
+
+    // The owner's own handed errand, in the SIBLING project and assigned to
+    // nobody — see `ownerSharedSiblingId` for why the project matters.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: ownerSharedSiblingId },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'task',
+        projectId: world.sibling.projectId,
+        parentId: null,
+        title: 'Countersign the sibling lease',
+      },
+    }),
+    explicitTo(ownerSharedSiblingId, [owner]),
+
+    // The audience that does NOT name the owner — see `memberOnlySharedId`.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: memberOnlySharedId },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: null, title: 'Reconcile the till float' },
+    }),
+    explicitTo(memberOnlySharedId, [member]),
+    // No `visibility.set` of its own: the audience is its parent's, resolved.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: guestSharedChildId },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'task',
+        projectId,
+        parentId: guestSharedParentId,
+        title: 'Label the spare set',
+      },
+    }),
   ];
 
   // DESCENDING, deliberately: created newest-id-first so a route with no
@@ -342,6 +434,36 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
       type: 'ticket.assigned',
       payload: { assigneeId: world.userIds.neighbour },
     }),
+
+    // THE TENANCY ROW FOR `shared` (7.261). A ticket next door whose audience
+    // NAMES the seeded guest — an id in a `text[]`, which is all
+    // `resolved_user_ids` ever holds, so nothing about this is malformed. The
+    // guest is a member HERE and a stranger THERE, and the only thing keeping
+    // this row out of the answer they are entitled to ask for is the read's own
+    // `t.workspace_id` conjunct.
+    makeCommitted({
+      workspaceId: world.neighbour.workspaceId,
+      actorId: world.userIds.neighbour,
+      entity: { kind: 'ticket', id: guestNeighbourSharedId },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'nb-task',
+        projectId: world.neighbour.projectId,
+        parentId: null,
+        title: 'Next Door stocktake',
+      },
+    }),
+    makeCommitted({
+      workspaceId: world.neighbour.workspaceId,
+      actorId: world.userIds.neighbour,
+      entity: { kind: 'ticket', id: guestNeighbourSharedId },
+      type: 'visibility.set',
+      payload: {
+        ticketId: guestNeighbourSharedId,
+        mode: 'explicit',
+        userIds: [world.userIds.neighbour, guest],
+      },
+    }),
   ]);
 
   return {
@@ -357,6 +479,11 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
     ownerOrderIds,
     ownerNeighbourId,
     adminProjectId,
+    guestSharedParentId,
+    guestSharedChildId,
+    guestNeighbourSharedId,
+    ownerSharedSiblingId,
+    memberOnlySharedId,
   };
 }
 
@@ -449,8 +576,17 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(everyCard.map((c) => c.assigneeId)).toEqual(everyCard.map(() => read.userIds.member));
     expect(everyCard.map((c) => c.ticketId)).not.toContain(read.world.sharedTaskId);
     expect(everyCard.map((c) => c.ticketId)).not.toContain(read.world.epicId);
-    expect(response.body).not.toContain(read.world.sharedTaskId);
-    expect(response.body).not.toContain('Renew the trade licence');
+    // `sharedTask`'s id and title are NO LONGER checked as body substrings, and
+    // that is the SAME correction the epic already carries three lines down
+    // rather than a weakening. `sharedTask` is explicit to `[owner, member]`, so
+    // since `shared` exists it appears in this member's body legitimately — as a
+    // card in the section that says it was handed to them. A body-substring
+    // check cannot tell that from a leak; the card-id check above can, and it is
+    // the one carrying the claim.
+    //
+    // The removal is converted into a STRONGER assertion rather than a silence:
+    // the row is asserted to be exactly where it now belongs.
+    expect(body.shared.map((c) => c.ticketId)).toContain(read.world.sharedTaskId);
     // The EPIC's id is deliberately not checked as a substring, and that is a
     // correction rather than a gap: it is the `parentId` of the card that IS
     // theirs, so it appears in the body as a field OF a card the member owns.
@@ -1006,5 +1142,237 @@ describe('GET /v1/me/work — the door', () => {
     // Positive control: the same route with a well-formed workspaceId is a 200,
     // so the three 400s are the refusal and not the route's only answer.
     expect((await myWork('member')).statusCode).toBe(200);
+  });
+
+  // -------------------------------------------------------------------------
+  // `shared` — the errands handed to this viewer BY NAME (case 13.176)
+  // -------------------------------------------------------------------------
+
+  it('7.260 an errand SHARED with the guest and assigned to nobody is answered — the read that did not exist', async () => {
+    const response = await myWork('guest');
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as MyWorkResponse;
+
+    // The whole of it, as an exact SET: the two handed errands (parent and the
+    // child that inherits its audience), the one that is BOTH assigned to them
+    // and shared with them, and the shared world's own `guestTask`. Exact, not a
+    // `toContain`, so a predicate that widened fails here rather than passing by
+    // inclusion — `guestNarrow`, whose audience was re-set to `[owner]`, is the
+    // row this array is missing on purpose.
+    //
+    // SORTED on both sides because three of the four ids are `newUlid()`s from
+    // the shared world, and this file's own docblock records that `newUlid` is
+    // not monotonic inside a millisecond. An order assertion over them would be
+    // a coin flip that usually lands heads; the ORDER claim is 7.103's, over the
+    // hand-built ids that do sort deterministically.
+    expect([...body.shared.map((card) => card.ticketId)].sort()).toEqual(
+      [
+        read.world.guestTaskId,
+        fx.guestKeepId,
+        fx.guestSharedParentId,
+        fx.guestSharedChildId,
+      ].sort(),
+    );
+
+    // THE POINT OF THE CASE: the handed errands are in NO group, so before this
+    // key the guest's answer named neither of them. `guestKeepId` IS in a group,
+    // which is what makes this a claim about the other two rather than about an
+    // empty response.
+    const grouped = [...body.groups.open, ...body.groups.active, ...body.groups.terminal].map(
+      (card) => card.ticketId,
+    );
+    expect(grouped).not.toContain(fx.guestSharedParentId);
+    expect(grouped).not.toContain(fx.guestSharedChildId);
+    expect(grouped).toContain(fx.guestKeepId);
+
+    // And the overlap is deliberate rather than a bug: a ticket both assigned to
+    // and shared with somebody is two claims about one errand, and `shared`
+    // keeps the second.
+    expect(body.shared.map((card) => card.ticketId)).toContain(fx.guestKeepId);
+  });
+
+  it('7.261 THE TENANCY FIXTURE — an audience naming this viewer NEXT DOOR stays next door', async () => {
+    const response = await myWork('guest');
+    expect(response.statusCode).toBe(200);
+
+    // Not as a card, not as an id, not as a word of its title.
+    expect(response.body).not.toContain(fx.guestNeighbourSharedId);
+    expect(response.body).not.toContain('Next Door stocktake');
+
+    // The row EXISTS and its audience really does name this viewer — read from
+    // the projection directly, so the absence above is the workspace conjunct
+    // and not a seeder that wrote nothing. Without it this row is `explicit` and
+    // names the guest, so it would satisfy `explicitAudienceWhere` outright.
+    const { rows } = await db.pool.query<{ workspace_id: string; resolved_mode: string; resolved_user_ids: string[] }>(
+      `SELECT workspace_id, resolved_mode, resolved_user_ids FROM proj_visibility WHERE ticket_id = $1`,
+      [fx.guestNeighbourSharedId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.workspace_id).toBe(read.neighbour.workspaceId);
+    expect(rows[0]?.resolved_mode).toBe('explicit');
+    expect(rows[0]?.resolved_user_ids).toContain(read.userIds.guest);
+
+    // Positive control for the substring checks: the ids that DID come back are
+    // in the body, so `not.toContain` is not passing against an error page.
+    expect(response.body).toContain(fx.guestSharedParentId);
+
+    // And the door is NOT what covers this: it stops the guest ASKING next door,
+    // which is a different question from what may arrive in the answer they are
+    // entitled to ask for.
+    expect((await request('guest', { workspaceId: read.neighbour.workspaceId })).statusCode).toBe(404);
+  });
+
+  it('7.262 an OWNER gets only what NAMES them — reading everything is not being handed anything', async () => {
+    const response = await myWork('owner');
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as MyWorkResponse;
+    const sharedIds = body.shared.map((card) => card.ticketId);
+
+    // The owner may read every ticket in the workspace — `visibleTicketsWhere`
+    // compiles to `TRUE` for them — so a `shared` built on visibility rather
+    // than on the audience would hand them the WHOLE WORKSPACE under a heading
+    // that says these were shared with them. Their own five project-mode
+    // tickets are the control: visible to them, naming nobody, and absent.
+    for (const id of fx.ownerOrderIds) {
+      expect(sharedIds, 'a project-mode ticket the owner can read is not one shared WITH them').not.toContain(id);
+    }
+    expect(sharedIds).not.toContain(fx.memberOpenId);
+
+    // THE AUDIENCE HALF, and this row is why the case can mean what it says.
+    // Every OTHER explicit audience in this workspace lists the owner, so
+    // "only what NAMES them" was satisfied by any implementation returning
+    // every `explicit`-mode row — the `= ANY (resolved_user_ids)` test had no
+    // fixture that could redden it. This one is explicit to the MEMBER alone.
+    expect(
+      sharedIds,
+      'an explicit ticket that does NOT name the owner is not shared WITH the owner, however visible it is',
+    ).not.toContain(fx.memberOnlySharedId);
+
+    // Read back: the row really is `explicit`, really names the member, and
+    // really does not name the owner — so the absence is the audience test and
+    // not a seeder that wrote a different mode.
+    const audience = await db.pool.query<{ resolved_mode: string; resolved_user_ids: string[] }>(
+      `SELECT resolved_mode, resolved_user_ids FROM proj_visibility WHERE ticket_id = $1`,
+      [fx.memberOnlySharedId],
+    );
+    expect(audience.rows[0]?.resolved_mode).toBe('explicit');
+    expect(audience.rows[0]?.resolved_user_ids).toEqual([read.userIds.member]);
+
+    // And the MEMBER, who is named, does get it — so the absence above is this
+    // viewer not being named rather than the row being unreachable to anybody.
+    const memberShared = ((await myWork('member')).json() as MyWorkResponse).shared.map(
+      (card) => card.ticketId,
+    );
+    expect(memberShared).toContain(fx.memberOnlySharedId);
+
+    // Present-sibling: every audience that DOES name the owner is here — the
+    // shared world's three plus this file's six — so the absences above are the
+    // audience filter answering and not an empty list. Sorted, for the
+    // `newUlid` reason given in 7.260.
+    expect([...sharedIds].sort()).toEqual(
+      [
+        read.world.sharedTaskId,
+        read.world.hiddenTaskId,
+        read.world.guestTaskId,
+        fx.outsiderExplicitId,
+        fx.guestKeepId,
+        fx.guestNarrowId,
+        fx.leadExplicitId,
+        fx.guestSharedParentId,
+        fx.guestSharedChildId,
+        fx.ownerSharedSiblingId,
+      ].sort(),
+    );
+
+    // Read back from the projection: those five really are visible and really
+    // are not `explicit`, so this is a fact about the fixture and not about the
+    // route agreeing with itself.
+    const { rows } = await db.pool.query<{ resolved_mode: string }>(
+      `SELECT DISTINCT resolved_mode FROM proj_visibility WHERE ticket_id = ANY ($1::text[])`,
+      [fx.ownerOrderIds],
+    );
+    expect(rows.map((row) => row.resolved_mode)).toEqual(['project']);
+  });
+
+  it('7.263 a NARROWED audience drops the row, and its twin that was never narrowed stays', async () => {
+    // 7.108's pair, asked of `shared` instead of `groups`. `guestNarrowId` was
+    // authored `[owner, guest]` and re-set to `[owner]`; `guestKeepId` never
+    // was. Both are the same shape, from the same seeder, in the same project —
+    // so the one that leaves is the audience changing and not a fixture that
+    // differed.
+    const body = (await myWork('guest')).json() as MyWorkResponse;
+    const sharedIds = body.shared.map((card) => card.ticketId);
+    expect(sharedIds).toContain(fx.guestKeepId);
+    expect(sharedIds).not.toContain(fx.guestNarrowId);
+
+    // The owner, still named on BOTH, gets both — so the row did not vanish from
+    // the table, it stopped naming this viewer.
+    const ownerShared = ((await myWork('owner')).json() as MyWorkResponse).shared.map(
+      (card) => card.ticketId,
+    );
+    expect(ownerShared).toContain(fx.guestNarrowId);
+    expect(ownerShared).toContain(fx.guestKeepId);
+  });
+
+  it('7.264 an INHERITED audience counts — the child authored no visibility.set of its own', async () => {
+    const sharedIds = ((await myWork('guest')).json() as MyWorkResponse).shared.map(
+      (card) => card.ticketId,
+    );
+    expect(sharedIds).toContain(fx.guestSharedChildId);
+
+    // And it is genuinely inherited rather than separately authored — the
+    // projection names the PARENT as the ticket whose authored mode won, and the
+    // child's own columns claim nothing. Reading `own_user_ids` here is what
+    // makes this a case about inheritance: an implementation switched to
+    // `own_user_ids` would still pass a test that only asserted presence.
+    const { rows } = await db.pool.query<{ resolved_from: string; own_mode: string; own_user_ids: string[] }>(
+      `SELECT resolved_from, own_mode, own_user_ids FROM proj_visibility WHERE ticket_id = $1`,
+      [fx.guestSharedChildId],
+    );
+    expect(rows[0]?.resolved_from).toBe(fx.guestSharedParentId);
+    expect(rows[0]?.own_mode).toBe('inherit');
+    expect(rows[0]?.own_user_ids).toEqual([]);
+  });
+
+  it('7.265 stateNames is TOTAL over shared cards, and a withheld project name is ABSENT rather than wrong', async () => {
+    const body = (await myWork('guest')).json() as MyWorkResponse;
+    expect(body.shared.length).toBeGreaterThan(0);
+
+    // TOTAL: the client's `WorkItem.stateName` is required and its mapper
+    // refuses a missing key, so a shared card with no entry here is a body the
+    // client cannot parse — the failure would land one layer away from its cause.
+    for (const card of body.shared) {
+      expect(Object.keys(body.stateNames), `no state name for shared card ${card.ticketId}`).toContain(
+        card.ticketId,
+      );
+      expect(typeof body.stateNames[card.ticketId]).toBe('string');
+    }
+
+    // The guest is on NO project (rulings P32/P38), so every shared card's
+    // project name is withheld — and withheld means NO ENTRY, never an empty
+    // string or the id wearing a name's clothes.
+    expect(body.projectNames).toEqual({});
+    for (const card of body.shared) {
+      expect(card.projectId.length).toBeGreaterThan(0);
+    }
+
+    // Positive control for the emptiness: the OWNER, who may be told the names,
+    // gets a non-empty map from the same route for overlapping cards — so `{}`
+    // above is the rule applying and not the map never being built.
+    const ownerBody = (await myWork('owner')).json() as MyWorkResponse;
+    expect(Object.keys(ownerBody.projectNames).length).toBeGreaterThan(0);
+    expect(ownerBody.projectNames[read.world.projectId]).toBeDefined();
+
+    // And the SHARED cards are genuinely part of that walk rather than riding on
+    // the groups' coat-tails. Every one of the owner's GROUP cards is in the
+    // seeded project; `ownerSharedSibling` is the only card of theirs in the
+    // SIBLING project, and it is a shared one. So this key is in the map because
+    // the walk includes `shared`, and dropping `shared` from that walk reddens
+    // here and nowhere else.
+    expect(ownerBody.groups.open.map((card) => card.projectId)).not.toContain(
+      read.sibling.projectId,
+    );
+    expect(ownerBody.shared.map((card) => card.projectId)).toContain(read.sibling.projectId);
+    expect(ownerBody.projectNames[read.sibling.projectId]).toBeDefined();
   });
 });

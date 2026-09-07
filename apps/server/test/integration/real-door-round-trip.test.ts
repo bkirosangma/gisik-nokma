@@ -1005,6 +1005,13 @@ describe('GET /v1/me/work', () => {
       // are different claims on this surface — the same argument the
       // `projects` key above makes one route over.
       contested: [],
+      // Empty for the same class of reason as `contested`, and asserted inside
+      // the exact `toEqual` rather than omitted: every ticket in this world is
+      // project-mode, so no `resolved_user_ids` names anybody and "nothing was
+      // handed to you" is the true answer rather than an unserved key. A route
+      // that stopped serving `shared`, or served it as a copy of `groups`,
+      // reddens here at the real door.
+      shared: [],
       groups: {
         open: [],
         active: [

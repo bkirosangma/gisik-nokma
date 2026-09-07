@@ -1498,10 +1498,21 @@ export function mapMyWork(raw: unknown, roster: ReadonlyMap<string, string>): My
     mapContestedClaim(row, `myWork.contested[${index}]`),
   );
 
-  // NOT read off the wire. An online-only shell has no outbox, and a `pending`
-  // or an `inTransit` on the body would be the server asserting something only
-  // the client can know.
-  return { assigned, inTransit: [], contested };
+  // Read off the wire and mapped through the SAME `mapWorkItem` as the groups —
+  // a shared card is a `TicketCard` like any other, so it gets the same
+  // `projectNames` miss-is-the-rule and `stateNames` miss-is-malformed
+  // treatment. Sharing the mapper is what makes a guest's withheld project name
+  // render id-only here for the same reason it does there, rather than by a
+  // second rule that could drift from the first.
+  const shared = asArray(record['shared'], 'myWork.shared').map((card, index) =>
+    mapWorkItem(card, `myWork.shared[${index}]`, roster, projectNames, stateNames),
+  );
+
+  // `inTransit` is NOT read off the wire. An online-only shell has no outbox,
+  // and a `pending` or an `inTransit` on the body would be the server asserting
+  // something only the client can know. `shared` is the opposite case and that
+  // is why it IS read: an audience is a server fact.
+  return { assigned, inTransit: [], contested, shared };
 }
 
 /**
