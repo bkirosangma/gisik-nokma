@@ -912,11 +912,24 @@ only if the handoff is current. So the protocol is:
    handoff thrown away. Wave 1 lost nothing to this only because it was caught in time.
 4. Controller verifies the push, then either signals the owner for the keystroke or relaunches.
 
-### The serial sequence
+### ~~The serial sequence~~ — RETIRED 2026-09-07. ALL 177 TASKS ARE DONE.
+
+> **Do not start work from this section.** It is kept so its reasoning stays readable, exactly as
+> Phase 0 was. **Your position after any restart is `docs/lanes/executor-state.md`, never the phase
+> list below.** The dispatch brief's mirror of this section was retired the same day (owner-approved,
+> PR #287); this is the same retirement applied to the copy that lives in the repo, because the brief
+> tells a restarting executor to READ THIS DOCUMENT FIRST and fixing only the brief leaves the stale
+> figure reachable.
+>
+> **Measured at `c5e3e02`:** `pnpm check:tasks` → **177/177**, zero claimed/in-flight/todo across all
+> 12 plan files. The "~109 remain" below was true 2026-08-31 and is not true now. Every task the phase
+> list names (21 of them) was audited individually against `task-ledger.tsv`: each `merge_sha` is an
+> ancestor of `origin/main` **and** touches real `apps/` or `packages/` source, 21/21 — with a negative
+> control, a docs-only commit, correctly failing that same test.
 
 Derived from the plans' own dependency declarations, not from the wave gates. The spine is
 `1,2 → 3,4 → 5 → {6,7,8,9,10} → 11`; Plan 5 states it itself — *"Runs after Plans 1-4; Plans 6-10 consume
-everything in this plan's Produces blocks."* **~109 of 177 tasks remain.**
+everything in this plan's Produces blocks."* ~~**~109 of 177 tasks remain.**~~ **(stale — 0 remain)**
 
 **Phase 0 — land what exists.** Three branches, all clean against `main` individually; the collisions
 appear only once one lands and the others rebase. Fixture count goes 67 → 84 at step 1, and every later
@@ -965,7 +978,9 @@ assertion is **recounted, never computed**.
 16. **Plan 11** *(T8/T9, T12 floor-list)* — last by construction: its interim-plumbing CI gate fails while
     Plan 10's marked shortcuts are still present.
 
-**Nine floor-list tasks remain ahead**, each keeping an opus implementer and an ~~`fable`~~ **opus** reviewer under the
+**~~Nine floor-list tasks remain ahead~~ — NONE REMAIN (verified 2026-09-07).** All nine are `done` in
+`task-ledger.tsv` with merge shas reachable from `origin/main`. The **class definition survives for any
+future work**: a floor-list task keeps an opus implementer and an ~~`fable`~~ **opus** reviewer under the
 2026-08-31 narrowing. The seven pre-rulings survive as DECISIONS but are moot as OWNERSHIP — one executor
 cannot collide with itself, and the trap is reading "a pre-ruling covers this" and skipping the thought
 when the ruling was about *who*, not *what*.
@@ -1002,7 +1017,9 @@ gate" a second time, further.** The owner has weighed it twice; it is their call
 in the open rather than worked around. The controller argued against the first narrowing and was
 overruled; it is not re-arguing, and the argument below is a cost statement, not an objection.
 
-**The number that forced it.** Measured across the parallel window and the serial start: **$113 per task
+**The number that forced it.** *(Historical — the projection below is spent; all 177 tasks completed.
+Left unedited because it is the reasoning that produced the model ruling, not an instruction.)* Measured
+across the parallel window and the serial start: **$113 per task
 at 17.6 subagents per task**, with **opus 85% of spend, fable 15%, sonnet 0%**. The 109 remaining tasks at
 that shape project to **~$12,400 — 3.3x everything spent on the project to date.** At 31% of a weekly
 quota consumed in two sessions, it does not finish. **Removing Fable entirely saves 15% and leaves ~$10,500,
