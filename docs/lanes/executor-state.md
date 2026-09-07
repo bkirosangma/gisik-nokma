@@ -29,6 +29,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin | 30/30 at `77338aa4` |
 | **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config | **33/33** at `803c42e` |
 | **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
+| **#313** | `exec/103-mcp-task3-device-routes` | MCP Task 3 — device-flow routes (stacks on #312) | **33/33** at `754d834` |
 
 All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
 disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
@@ -44,10 +45,23 @@ own build/test/typecheck — the delta is the evidence it is wired in, not merel
 > condition until billing is fixed. Every merge now needs an explicit human decision. The controller
 > session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
 
-**MCP queue after this: Tasks 3–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+**MCP queue after this: Tasks 4–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
 because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
 the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
 Task 12 only.
+
+**Task 3's lesson, which cost two red gates:** a task that widens a SHARED TYPE or joins a SHARED SET
+cannot be judged by the suite it was written for. `vitest run test/mcp/` was green while the tree did not
+typecheck (making `mcpMax` required broke three construction sites), and green again while case 13.116 —
+the set-equality drift guard — was red because a protected route had no row in the suite that polices
+them. Both were the gate's finds, not the task suite's. Same lesson Task 0 produced from the other
+direction, where a filter to one package hid a sibling's failure.
+
+**A defect in Task 3's OWN specified test, worth inheriting.** Its Step 4 says the file must go entirely
+red and that any pass at that point means a test "is testing something other than what it names". It went
+8 failed / 1 passed. The pass was 14.21, asserting `not.toBe(401)` — an unregistered route answers 404,
+which is not 401, so it passed against a route that did not exist. Changed to `toBe(200)` and re-run WHILE
+STILL RED to confirm it then failed. The plan's warning was right; it just did not notice its own test.
 
 **Three findings carried, all recorded with owners, none fixed:**
 1. **`check:env`'s third blind spot.** It walks `packages/mcp-server` and sees the file, but every
