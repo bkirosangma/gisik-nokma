@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newUlid, serverStreamFrameSchema } from '@gisik-nokma/domain';
+import { STREAM_ERROR_CODES, newUlid, serverStreamFrameSchema } from '@gisik-nokma/domain';
 import type { ServerStreamFrame } from '../../src/data-source.js';
 import {
   BACKOFF_CAP_MS,
@@ -285,6 +285,34 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
     expect(parseFrame(JSON.stringify({ type: 'event', envelope: { ...ENVELOPE, workspaceSeq: '4' } }))).toBeNull();
     // Positive control, same run: the identical envelope WITH the cursor parses.
     expect(parseFrame(JSON.stringify({ type: 'event', envelope: ENVELOPE }))).not.toBeNull();
+  });
+
+  /**
+   * 7.199 — the runtime half the row never had. Its type-level half closed when deleting
+   * the duplicate union turned the divergence into a compile error, but the behaviour it
+   * left behind — the client VALIDATES a wire code against `STREAM_ERROR_CODES` and DROPS
+   * an unrecognised one — was asserted nowhere: every existing error-frame case in this
+   * file sends a code already inside that list, so widening the guard to accept any string
+   * killed nothing.
+   */
+  it('drops an error frame whose code is not in STREAM_ERROR_CODES, and keeps one that is', () => {
+    const BOGUS = 'stream-broke-entirely';
+    // Derived, not assumed: if the enum ever grows this code the negative below would be
+    // testing nothing, and this line fails rather than passing quietly.
+    expect(STREAM_ERROR_CODES as readonly string[]).not.toContain(BOGUS);
+
+    expect(
+      parseFrame(JSON.stringify({ type: 'error', workspaceId: null, code: BOGUS, message: 'x' })),
+    ).toBeNull();
+
+    // The positive control one field apart. Without it, deleting the whole `type === 'error'`
+    // branch would also make the assertion above pass — parseFrame returns null for every
+    // shape it does not recognise, so a bogus-code-only test cannot tell the two apart.
+    const real = parseFrame(
+      JSON.stringify({ type: 'error', workspaceId: null, code: STREAM_ERROR_CODES[0], message: 'x' }),
+    );
+    expect(real).not.toBeNull();
+    expect(real).toMatchObject({ type: 'error', code: STREAM_ERROR_CODES[0] });
   });
 
   it('does not advance the cursor when the consumer callback throws — delivery is not durability', () => {
