@@ -38,6 +38,36 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 **218 (exec/65's tip) − 50 (#244's §05 citations, now underneath) = 168.** The two measurements reconcile.
 
+## 🔴 GITHUB ACTIONS IS DEAD ON BILLING — AND IT BREAKS A PRECONDITION OF THE STANDING MERGE AUTHORIZATION
+
+**PR #247's four "failing" checks did not fail. They never started.** Every job carries the same annotation:
+
+> *The job was not started because recent account payments have failed or your spending limit needs to be
+> increased. Please check the 'Billing & plans' section in your settings*
+
+`check-citations`, `check-runbook`, `gate` and `scope` all "fail" in **2–3 seconds with zero steps executed**;
+the other seven are `SKIPPED` because they depend on those. **A 3-second failure of a suite that takes ninety
+seconds locally is an infrastructure signal, not a content one** — the shape of the failure is the diagnosis.
+
+**This is NOT caused by this branch, and it is not new.** Measured over the last 200 CI runs:
+
+| what | value |
+|---|---|
+| last GREEN run | **`2026-09-06T09:05:54Z`** (14:35 IST) on `exec/40-socket-cut-fixture` |
+| runs since | **every one has failed**, on `main` as well as on every branch |
+| successes in the last 60 runs | **zero** |
+
+**Consequence, and this is the part that needs the owner rather than the controller.** The standing auto-merge
+authorization requires *"PRs that passed the full machinery AND an independent CI run green"*. **That second
+condition has been unsatisfiable for roughly eighteen hours.** Every merge since — #242, #243, #244, #246 —
+landed with these same four jobs red, and their redness meant nothing either way. The only gate that has
+actually run in that window is the **local** one.
+
+**Do not read this as "CI is flaky, merge anyway."** Read it as: *the independent check the authorization
+leans on does not currently exist*, so a merge under that authorization is a merge under one gate, not two.
+Whether that is acceptable is the owner's call. **Fixing it is a billing action in GitHub settings — nothing
+in this repo can clear it.**
+
 ## ⛔ THE PREVIOUS RESTART BRIEF'S SHA LISTS WERE INCOMPLETE — this is the finding of this task
 
 It named **20** content commits (4 + 16). **There are 23.** The three it dropped:
