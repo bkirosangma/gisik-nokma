@@ -90,7 +90,11 @@ const LEDGER = join(REPO_ROOT, 'docs/lanes/task-ledger.tsv');
 
 // Every numbered plan must yield at least one task. A plan that reads as empty
 // means the heading reader drifted, not that the plan has no work in it.
-const PLANS_WITH_TASKS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11'];
+const PLANS_WITH_TASKS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11',
+  // Keyed by slug, not by a number, because it is not part of the retired series.
+  // Listed here so an empty read of it FAILS rather than reporting no backlog --
+  // which is exactly what this gate did until 2026-09-08.
+  'mcp-server'];
 // The two plans a grep-based reader silently returned nothing for. Named
 // explicitly so the control is on the fact that actually broke, not on a
 // neighbouring one that happens to be in the same directory.
@@ -142,9 +146,23 @@ const tasks = new Map();
 const perPlan = new Map();
 
 for (const name of readdirSync(PLANS_DIR).sort()) {
-  const match = name.match(/^2026-08-20-(\d\d)-.*\.md$/);
-  if (!match) continue;
-  const plan = match[1];
+  // The retired 11-plan series, keyed by its series number...
+  const series = name.match(/^2026-08-20-(\d\d)-.*\.md$/);
+  // ...and every plan written after it, keyed by its slug. Without this second
+  // form a new plan is INVISIBLE here: no ledger rows are demanded for it, none
+  // are validated, and the gate stays green while tracking nothing. That is the
+  // 0/0 failure this script's header names, arriving through the door of a
+  // filename convention rather than a broken reader. Measured before the change:
+  // with `2026-09-07-mcp-server.md` present and carrying thirteen `### Task N:`
+  // headings, this gate exited 0 and counted none of them.
+  //
+  // The negative lookahead is what keeps the two forms disjoint: `00-` through
+  // `11-` after the date belong to the retired series and must keep their
+  // two-digit keys, because PLANS_WITH_TASKS, CONTROL_PLANS, PLAN_WITHOUT_TASKS
+  // and every existing ledger row are keyed on them.
+  const dated = name.match(/^\d{4}-\d{2}-\d{2}-(?!\d\d-)(.+)\.md$/);
+  const plan = series?.[1] ?? dated?.[1];
+  if (plan === undefined) continue;
   perPlan.set(plan, perPlan.get(plan) ?? 0);
   for (const line of readFileSync(join(PLANS_DIR, name), 'utf8').split('\n')) {
     const heading = line.match(/^### Task (\d+[a-z]?):\s*(.*)$/);
