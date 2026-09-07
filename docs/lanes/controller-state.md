@@ -1,5 +1,43 @@
 # Cross-lane controller — live state
 
+## 🏁 MONDAY 10:4x IST — THE CITATION BACKFILL IS DONE: 1530/1530, ZERO UNCITED. `main` is `c115a5d`, gate green. Owner's ruling ("write the tests, not a carve-out") applied to all 14 final rows. Now working the Saturday-carried queue plus the two product decisions.
+
+**PR #255 merged: the final 14 rows closed with real tests, no carve-out** — exactly the owner's instruction.
+`check:citations`: **1530 checked ✅ ids, 1530 cited, 0 uncited, 331 test/e2e files scanned** (up from 324 —
+new test files). Gate: `GATE_EXIT=0` · 30/30 · **3688 passed | 5 skipped (3693) / 292 files** (app-core 1107→
+**1114**, server 1346→**1361**) — grew because real tests were written, not because anything regressed.
+`check:tasks`: 177/177 unchanged. **This is the number to trust for "is the citation convention complete":
+1530/1530, repo-wide, from 815 uncited when this file's Sunday-morning anchor was written.**
+
+**How the final 14 actually closed, because it's a genuine engineering result, not busywork:** several rows
+were provable only inside standalone `scripts/*.mjs` files, outside both the citation corpus and `turbo run
+test` — closing them meant giving the SCRIPTS a real API surface (`.d.mts` declarations, exported internals)
+and writing tests that import and exercise that surface directly, not scripts-calling-scripts. **This surfaced
+a real latent bug**: neither gate script had a main-guard, so importing either for a test would have run the
+script's whole body at import time and `process.exit(1)`'d on failure — capable of killing the vitest worker
+mid-run. Both now gated behind `executedDirectly`, verified against byte-identical direct-invocation output
+before trusting the refactor. Two more rows whose closure was a compile error (zero runtime deaths) got a
+runtime case plus an `@ts-expect-error`/exhaustiveness guard so there's something to actually assert.
+
+**⚠ The #247/#253 merge-timing lesson recurred a second time — worth stating as a standing rule now, not just
+a note:** #253 was merged at head `c772bf6` before eight more commits of the same work existed on that branch;
+no harm (the executor rebuilt cleanly onto the new `main`), but **it is now twice in one session.** Standing
+rule for this file and for whoever restarts as controller: **before merging ANY PR, re-fetch its head via `gh
+pr view <N> --json headRefOid` immediately before running `gh pr merge`, never from an earlier message or
+an earlier tool-call result in the same conversation, no matter how many minutes ago.**
+
+**Three tooling lessons from this round, worth the coordination doc if not already there:** a positive control
+that fails FIRST is why it exists (`13.203`'s daemon test was dying on a missing env var before it could ever
+reach the behavior under test — "never announced" was true for the wrong reason until the control caught it);
+an ambient `declare module` for a RELATIVE specifier is inert (TypeScript module augmentation only matches bare
+specifiers) — the fix is a sibling `.d.mts`, not a `declare module './foo'` block; and **export the fixture,
+never copy it** — a copied fixture is a second source of truth that stops matching silently.
+
+**Now working the Saturday-carried queue, owner's stated order:** `13.181` → `13.195`+`13.196` →
+`TicketPullNotFound` → the six `helpers/seed.ts` rows → `12.321` → then the two product items with
+measure/design first (`13.176`'s "Shared with me" view; `12.322`/`12.258`'s real filtering). One cluster at a
+time, same shape as tonight, stop-and-ask on any scope call mid-way — same instruction as before, still standing.
+
 ## ▶ MONDAY 10:1x IST — OWNER SAID "CLOSE THE ENTIRE THING, FULLY 100%." `main` is `446c550`, gate green. Citations at 1516/14. SCOPE EXPANDED to the Saturday-carried items, including two real product decisions the owner made this morning.
 
 **Owner's decisions, this morning, put directly rather than assumed:**
