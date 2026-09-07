@@ -21,7 +21,19 @@ a { color: var(--gn-accent); }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
 .gn-view-tabs { display: flex; gap: 0.4rem; align-items: center; }
 
-.gn-nav { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
+/* `flex-wrap: wrap` is load-bearing, not tidiness. The last child is
+   `Sign out {user.name}`, so this row's width depends on DATA: a no-wrap flex
+   row cannot shrink below its content and pushes that button past the viewport.
+   Measured at 390x844 against the seeded stack: the button ran 338.9 -> 400.1 in
+   a 390px viewport, i.e. `documentElement.scrollWidth` 400 vs `clientWidth` 390,
+   on every page that renders `AppNav` (my-work, members, both settings pages,
+   the board) and on no page that does not (help, privacy, terms, sign-in, 404).
+   The 10px was the seeded owner's name length; a longer name overflows further,
+   which is why the fix is wrapping rather than a width guess. Every other flex
+   row of this shape in the two stylesheets already sets it — this one was the
+   outlier, and `gn-nav__spacer`'s `flex: 1` collapses to zero on a wrapped line,
+   so the wrapped layout stays left-aligned rather than springing apart. */
+.gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
 .gn-nav__spacer { flex: 1; }
 
 .gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }

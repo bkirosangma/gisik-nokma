@@ -180,6 +180,50 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * one thing this file exists to make impossible.
    */
   { fg: 'customMarker', bg: 'surface', minimum: 4.5 },
+
+  /**
+   * ## THE GAP THIS BLOCK CLOSES (pre-launch item 6, 2026-09-07)
+   *
+   * The eight pairs above were the whole declared set, and the docblock over
+   * this array says a role without a pair here "would be a colour with no
+   * guarantee — the one thing this file exists to make impossible". It was not
+   * impossible: nothing checks that a pair which actually CO-OCCURS on screen
+   * has been declared. Eighteen did not. Every one of them was measured and
+   * every one PASSES today — this is a missing guarantee, not a live defect —
+   * but an undeclared pair is exactly the one a future palette edit breaks in
+   * silence, which is the failure this array was built to prevent.
+   *
+   * WHY THE MINIMUMS DIFFER, since a uniform 4.5 would be the tidier-wrong
+   * answer. The status roles reach the screen as `.gn-chip__dot`'s BACKGROUND
+   * (`ui.css:50-56`) — a non-text UI component, which WCAG 1.4.11 holds to 3:1,
+   * not the 4.5 body text earns. They are pinned at 3 rather than relaxed to it:
+   * all seven measure above 5.0 in both themes, so the looser minimum costs no
+   * real margin, and stating 3 keeps the number honest about what the pixel is.
+   * The four text pairs stay at 4.5 because they are read, not merely seen:
+   * `a { color: var(--gn-accent) }` (globals.css:13), the help table header on
+   * `surfaceSunken` (ui.css:1309), and the mobile help screen's muted/accent
+   * lines on a raised card (help-screen.tsx:96-97).
+   *
+   * Smallest margin in the set is `accent on surface` at 5.33 against 4.5.
+   */
+  { fg: 'text', bg: 'surfaceSunken', minimum: 4.5 },
+  { fg: 'textMuted', bg: 'surfaceRaised', minimum: 4.5 },
+  { fg: 'accent', bg: 'surface', minimum: 4.5 },
+  { fg: 'accent', bg: 'surfaceRaised', minimum: 4.5 },
+  { fg: 'categoryOpen', bg: 'surface', minimum: 3 },
+  { fg: 'categoryActive', bg: 'surface', minimum: 3 },
+  { fg: 'categoryTerminal', bg: 'surface', minimum: 3 },
+  { fg: 'blocked', bg: 'surface', minimum: 3 },
+  { fg: 'pending', bg: 'surface', minimum: 3 },
+  { fg: 'restricted', bg: 'surface', minimum: 3 },
+  { fg: 'contested', bg: 'surface', minimum: 3 },
+  { fg: 'categoryOpen', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'categoryActive', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'categoryTerminal', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'blocked', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'pending', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'restricted', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'contested', bg: 'surfaceRaised', minimum: 3 },
 ];
 
 export function colorOf(theme: ThemeName, role: TokenRole): string {
