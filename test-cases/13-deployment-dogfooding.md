@@ -1207,6 +1207,16 @@ close the unambiguous part, defer CSP.*
   failure mode is breaking in production only. — (`apps/web/test/next-config.test.ts`)
   *Mutation: add a CSP to `headers()` → fails.*
 
+- **13.263** ✅ The web app does **not advertise its framework** — `poweredByHeader: false`. Found by
+  CURLING THE RUNNING CONTAINER, not by reading the source: the sweep that produced the rest of this
+  section looked for headers that were MISSING and had no way to notice one that was present and
+  unwanted. `/sign-in` answered with `X-Powered-By: Next.js` and nothing in this repo had recorded it.
+  Not a vulnerability and removing it is not a defence — anyone can fingerprint Next.js from `/_next/`
+  asset paths in the HTML — but it is a header the product never chose to send, naming its framework to
+  every client for no benefit to any of them, and the cost of not sending it is one line. —
+  (`apps/web/test/next-config.test.ts`)
+  *Mutation: set it back to `true` → 13.263 fails.*
+
 > ### 13.248 was a weaker claim wearing a stronger sentence
 >
 > It read *"sends NOTHING for an http `SERVER_ORIGIN`"* and asserted `toEqual([])`. That passes just as

@@ -43,6 +43,23 @@ const serverOrigin = process.env.SERVER_ORIGIN ?? 'http://localhost:3000';
  * socket and does not.
  */
 const nextConfig: NextConfig = {
+  /**
+   * `X-Powered-By: Next.js` off.
+   *
+   * Found by CURLING THE RUNNING APP rather than by reading the source — the
+   * sweep that produced the rest of this block looked for headers that were
+   * MISSING and had no way to notice one that was present and unwanted. The
+   * running web container answered `/sign-in` with `X-Powered-By: Next.js`,
+   * and nothing in this repo had recorded it.
+   *
+   * It is not a vulnerability and removing it is not a defence: anyone can
+   * fingerprint Next.js from `/_next/` asset paths in the HTML. It is removed
+   * because it is a header the product did not choose to send, naming its
+   * framework to every client for no benefit to any of them — and because the
+   * cost of not sending it is one line.
+   */
+  poweredByHeader: false,
+
   // Standalone server output for the Docker image (apps/web/Dockerfile):
   // bundles a minimal server.js plus only the node_modules it needs, at
   // apps/web/.next/standalone/apps/web/server.js in this monorepo layout.

@@ -226,6 +226,16 @@ describe('the unconditional security headers', () => {
     }
   });
 
+  it('13.263 does not advertise the framework — X-Powered-By is off', async () => {
+    vi.resetModules();
+    const fresh = (await import('../next.config.js')).default;
+    // The config flag, not a header assertion: Next strips the header itself
+    // when this is false, so there is nothing in `headers()` to look for. Found
+    // by curling the running container — a sweep for MISSING headers cannot
+    // notice one that is present and unwanted.
+    expect(fresh.poweredByHeader).toBe(false);
+  });
+
   it('13.261 sends NO Content-Security-Policy — deferred, and pinned so adding one is deliberate', async () => {
     const headers = await headersUnder('https://pm-api.artsourced.in');
     const keys = headers.map((header) => header.key);
