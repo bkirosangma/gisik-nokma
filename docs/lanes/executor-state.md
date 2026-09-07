@@ -80,6 +80,26 @@ a ratio failure) · tap targets, which **ratchet** in the suite rather than asse
 (`e2e-viewport/tap-target-baseline.json`, count may fall never rise) because the reading is identical at
 390, 768 and 1512 and so is not a responsive finding at all.
 
+> **⚠ `e2e-stack` WILL START FAILING AFTER ENOUGH SIGN-INS, AND IT LOOKS LIKE A PRODUCT BUG.** The
+> magic-link endpoint is rate limited (`apps/server/src/app.ts:423`, `makeFixedWindowLimiter`). After a
+> session's worth of probing plus a few suite runs, `POST /api/auth/sign-in/magic-link` answers **429
+> "Too many requests"** — measured, for BOTH seeded users — and the spec's symptom is a 15 s timeout
+> waiting for "Check your inbox", which reads exactly like a broken send. `visibility.spec.ts` failed
+> this way at the end of this session while `smoke` and the new `viewport` spec had already passed in the
+> same run, purely because they ran first and spent the window. **It is not a defect and not a
+> regression: wait for the window, or restart the server container.** Diagnosed by calling the endpoint
+> directly and reading the 429 rather than by re-running the suite and guessing.
+
+**A gate caveat, since a red gate that is really a flake is worth naming precisely.** The first full run
+after all of this landed reported **29/30** — `@gisik-nokma/server#test` failed on
+`seed-dev.test.ts > lands, and a re-run is a no-op` at a 30 s timeout. Load average was **11.01** at the
+time, with a docker image build and a Playwright suite running alongside it. **The same test passes alone
+(`SEED_EXIT=0`), so that was contention, not a defect** — but "the gate was red and I decided it was
+flaky" is exactly the reasoning this repo distrusts, so it was re-run forced on a quiet machine rather
+than argued away. Also worth knowing: `which pnpm` resolves to the **v24.11.1** prefix even with v22
+first on PATH, because pnpm is only installed there; the node that actually runs is still v22.22.2, and
+turbo's error text naming a v24 path is about where the launcher lives, not which runtime executed.
+
 **Two environment facts worth inheriting.** `webkit` does NOT run here — only `webkit-2272` is installed
 and Playwright 1.62.1 wants `webkit-2336`, so all three viewport projects are chromium (independently
 correct: a cross-width comparison across two engines cannot attribute a difference to the width). And the
