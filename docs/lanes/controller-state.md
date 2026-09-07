@@ -1,5 +1,36 @@
 # Cross-lane controller — live state
 
+## 🏁 MONDAY 11:5x IST — THE SATURDAY-CARRIED QUEUE IS 5/5 DONE. `main` is `40a88ee`, gate green. Citations still 1536/1536. Only the two product items remain (measure/design in progress).
+
+**PR #265 merged: `12.321` reframed from a performance question to a real correctness bug** — an older
+in-flight load could overwrite a newer one's answer because the key guard alone didn't order same-key
+resolutions by issue time, only by identity. Fixed with a sequence number bumped on issue, checked on resolve;
+`use-live-query.ts` is shared by ~20 files, full `app-core` suite (1116 tests) green afterward. **The
+amplification question the row originally asked stays explicitly unmeasured and owned**, not quietly folded
+into "done."
+
+**Carried queue, final:** 13.181 (CLI coverage) → 13.195+13.196 (a live stale-premise defect) →
+`TicketPullNotFound` (negative finding + a real narrower silence bug) → six `helpers/seed.ts` rows (all
+re-measured, one scope call raised) → `12.321` (correctness, not perf). **Five for five, and at least three of
+the five turned up something other than what was asked for** — worth remembering next time a carried item's
+one-line description gets treated as the whole scope.
+
+**⚠ Near-miss worth its own line, because the guard that almost caused damage looked identical to a working
+one:** resolving #265's real merge conflict, the executor's own script asserted `"=======" not in text` to
+confirm conflict markers were gone — but `=======` is also a legitimate Markdown setext heading underline, so
+the assertion tripped on VALID content, the file was never actually written, and `git cherry-pick --continue`
+committed the STILL-CONFLICTED file while reporting a clean `unmerged: []`. Caught only by grepping the
+committed blob for `^<<<<<<< ` / `^>>>>>>> ` anchored at line start, never bare `=======`, and never trusting a
+cherry-pick's own summary over reading what actually landed. **This controller independently hit the identical
+false-positive on the same file for the same reason while sanity-checking the merge** (bare-`grep`, not
+anchored) — resolved the same way, but it's a second confirmation this shape is easy to fall into with
+Markdown specifically.
+
+**Now on the two product items, measure/design first per standing instruction:** `13.176` (guest navigation —
+owner ruled: dedicated "Shared with me" view) and `12.322`/`12.258` (pagination cap cliff — owner ruled: real
+filtering, not a raised cap). Neither has code yet; both are explicitly told to come back with a design sketch
+before writing anything UI-shaped, and to stop and ask on any scope surprise.
+
 ## ▶ MONDAY 11:4x IST — `main` is `e72dd02`. Six `helpers/seed.ts` rows settled (docs-only, gate carries from `e8d0cce`). ONE ITEM SCHEDULED, NOT DONE: `wf-errand`, a fixture id production would refuse, deliberately deferred by owner ruling.
 
 PR #263 merged: Lane A's Saturday classification of seven borderline rows was **re-measured, not adopted** —
