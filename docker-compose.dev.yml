@@ -44,14 +44,23 @@
 #      OBJECT_STORE=local (its default) and attachments would silently sit
 #      on the container-local disk store instead of reaching MinIO.
 #
-#   3. BACKUP_S3_BUCKET is intentionally OMITTED from the server service:
-#      nothing reads it on this branch (0 hits in apps/server/src at this
-#      HEAD). It belongs to Lane C's backup work, branch
-#      exec/30-plan11-backups, Plan 11 Task 11/12 — setting a variable no
-#      code reads would be exactly the kind of undocumented-intent env var
-#      this task is trying to avoid. The `gisik-backups` bucket is still
-#      pre-created below (a bucket is cheap and Lane C's restore drill will
-#      need it already existing).
+#   3. BACKUP_S3_BUCKET is SET on the server service, pointed at the
+#      `gisik-backups` bucket minio-init pre-creates below.
+#
+#      It used to be intentionally omitted, and the reason was good: nothing
+#      read it (measured, 0 hits in apps/server/src), and setting a variable
+#      no code reads is exactly the undocumented-intent env var this file
+#      avoids. That premise expired when Lane C's backup work merged —
+#      re-running the comment's own control at this HEAD gives FIVE hits
+#      (`backup-daemon-main.ts`, `fetch-backup.ts`, `object-sink.ts`), and
+#      `ops:backup-once` is a real script. Without the variable, the
+#      runbook's in-container rehearsal
+#      (`node dist/ops/backup-daemon-main.js --once`) refuses with
+#      "backup object storage needs: BACKUP_S3_BUCKET" — which is how case
+#      13.195's unrun docker half surfaced it.
+#
+#      A comment that names its own measurement is worth more than one that
+#      states a conclusion: this one could be re-run and was.
 #
 #   4. Every image tag is pinned, including minio, mailpit and minio/mc,
 #      which the plan left floating (minio/minio:latest, axllent/mailpit,
@@ -132,9 +141,9 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    # gisik-backups (Deviation 3): pre-created for Lane C's backup work
-    # (exec/30-plan11-backups, Plan 11 T11/T12) even though nothing on this
-    # branch writes to it yet.
+    # gisik-backups (Deviation 3): the backup daemon writes here now that
+    # Lane C's work has merged — `BACKUP_S3_BUCKET` on the server service
+    # names this bucket.
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 gisik gisik-dev-secret &&
@@ -187,7 +196,9 @@ services:
       OBJECT_STORE_S3_ACCESS_KEY_ID: gisik
       OBJECT_STORE_S3_SECRET_ACCESS_KEY: gisik-dev-secret
       OBJECT_STORE_S3_FORCE_PATH_STYLE: "true"
-      # Deviation 3: BACKUP_S3_BUCKET deliberately absent — see header comment.
+      # Deviation 3: the backup daemon's sink, deliberately a DISTINCT bucket
+      # from OBJECT_STORE_S3_BUCKET — backups and attachments never share one.
+      BACKUP_S3_BUCKET: gisik-backups
     ports:
       - "3000:3000"
     volumes:
