@@ -151,11 +151,35 @@ refuses unfiltered answers filtered.
 may be a smaller first step than a general filter bar. Not designed here — the owner asked for measurement
 first, and this is the measurement.
 
+## MEASURED FOR 13.176: IT LANDS ON A RULING THE OWNER ALREADY HOLDS
+
+13.176 says *"a guest has NO NAVIGATION to the four errands explicitly shared with them"*. The measurement
+says why, and the why matters more than the symptom: **there is no read that could serve it, and the one
+that would is already held with the owner over this exact question.**
+
+- **No `DataSource` method lists "tickets shared with me."** All thirteen enumerated at
+  `packages/app-core/src/data-source.ts:132-143`; the closest is `getMyWork(workspaceId)`.
+- **`getMyWork` cannot serve it.** `apps/server/src/routes/my-work.ts:120` filters
+  `t.assignee_id = <viewer>`, and `MyWorkView` is `{assigned, inTransit, contested}`
+  (`view-types.ts:238`). A ticket shared with a guest who is not its **assignee** appears in none of the
+  three. The route's own docblock (`:56`) names *"a ticket explicitly shared with somebody else"* as a case
+  it is measured against — it is deliberately not this read's job.
+- **`getMyWorkspaces` — the natural entry point for a guest with no project — REFUSES**, and
+  `online-data-source.ts:92-95` says it is **HELD with the owner** because *"serving them means deciding
+  what a project-scoped guest sees of a workspace's other projects, and there is no shipped project-list
+  read at all."*
+
+**That last line IS 13.176.** So this is not a fresh UX question to design and build; it is the client-side
+face of a ruling already sitting with the owner, and designing a guest navigation before that ruling lands
+would be picking the answer to the held question by implementing one. **Recommend it be raised as part of
+the `getMyWorkspaces`/`getMyWork` hold rather than opened as its own design item.** Recorded, not decided.
+
 ## NEXT
 
 1. **The owner's second half: real filtering, as its own PR** — see the measurement directly above, which
    says it is a client-side change against a pipeline that already works, not a route change.
-2. **13.176** — guest navigation to explicitly-shared tickets. Measurement, then design, then code.
+2. **13.176** — guest navigation to explicitly-shared tickets. **Measured below; it is NOT an independent
+   design decision.**
 3. Still open and still the owner's: which of the four cliff remedies (raise the cap / paged view type /
    filter affordance) follows. **Remedy 4 — this branch — is done.**
 
