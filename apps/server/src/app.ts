@@ -22,6 +22,7 @@ import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
+import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
@@ -810,6 +811,8 @@ export function buildApp(
   registerNotificationRoutes(app, { pool: deps.pool }, requireSession);
 
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
+
+  registerMcpTokenRoutes(app, { pool: deps.pool }, requireSession);
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears
   // about a change. The hub is created HERE, beside the ingest service whose

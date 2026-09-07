@@ -3281,20 +3281,20 @@ area); the data model is settled by Task 2 (`mcp_tokens`, hashed at rest, no exp
 the load-bearing architectural question — whether `apps/web` is in scope at all — was ruling 2, answered
 yes, with Task 5's approval page already establishing the pattern.
 
-- [ ] **Step 1 — the list.** A settings screen listing this user's own MCP tokens. **It cannot show the
+- [x] **Step 1 — the list.** A settings screen listing this user's own MCP tokens. **It cannot show the
       token**: Task 2 stores `sha256(token)` and the raw value exists only in the response that minted
       it. So each row shows what is honestly available — a label, and when it was approved. A row that
       implied it could show the credential would be a lie about the storage.
-- [ ] **Step 2 — the revoke.** `DELETE /v1/me/mcp-tokens/:id`, scoped to
+- [x] **Step 2 — the revoke.** `DELETE /v1/me/mcp-tokens/:id`, scoped to
       `request.currentUserId` the way every `/v1/me/*` route is, so a caller cannot revoke somebody
       else's. **Answer the same 404 for "not yours" and "does not exist"**, matching
       `routes/notifications.ts` — otherwise this route becomes an oracle for which token ids exist.
       Cookie-authenticated and mutating, so it joins `HTTP_ORIGIN_PROTECTED_ROUTES` (`http-origin.ts:151`)
       with a planted-defect test, exactly as Task 3's approval POST does.
-- [ ] **Step 3 — say what revoking does.** Deleting the row ends access at the next request, because
+- [x] **Step 3 — say what revoking does.** Deleting the row ends access at the next request, because
       `resolveMcpToken` finds nothing. The screen should say that plainly rather than implying a
       session is being killed mid-flight.
-- [ ] **Step 4 — the catalogue.** §14 cases for the list, the revoke, the cross-user refusal and the
+- [x] **Step 4 — the catalogue.** §14 cases for the list, the revoke, the cross-user refusal and the
       HTTP-Origin protection.
 
 > #### ⚠ ONE SUB-QUESTION FOR THE OWNER, not for the executor
@@ -3313,6 +3313,43 @@ yes, with Task 5's approval page already establishing the pattern.
 > **If ruled otherwise:** one column, one `UPDATE` on the token-resolution path, one test, and a
 > sentence on the screen saying the product records it.
 
+
+
+> **Execution note (2026-09-08).** Three departures, each measured rather than chosen.
+>
+> **The screen is `apps/web/app/mcp/tokens/`, not a fourth `w/[workspaceId]/settings/` screen.** The
+> three that exist there are workspace-scoped; an MCP token is not — it is minted for a person and
+> carries their permissions in every workspace they belong to. A path with a workspace in it would say
+> something false about what revoking does, and would leave one credential reachable from three URLs in
+> a three-workspace account. It sits beside `/mcp/authorize`, which already established `app/mcp/` as
+> the per-user MCP surface.
+>
+> **`:id` is the token hash.** `mcp_tokens` has no surrogate key — its primary key is `token_hash` —
+> and Step 2's route signature presumes an id that does not exist. Minting one would be a migration
+> plus a backfill against a table that already shipped, to buy a property the hash already has: unique,
+> stable, hex (URL-safe as a path segment — checked against `hashCredential`, not assumed), and useless
+> without the preimage, which is 32 bytes from `randomBytes` that exist only in the response that
+> minted them.
+>
+> **The CSRF control could not see a DELETE.** `httpOriginRefused` opened with
+> `if (input.method !== 'POST') return false;` under a comment reading "mutations only". Every route in
+> `HTTP_ORIGIN_PROTECTED_ROUTES` was a POST, so the control looked complete while being unable to
+> protect the route Step 2 tells you to add to it. The forged-`Origin` DELETE reached `requireSession`,
+> which answered **401** — a refusal, for the wrong reason, that reads as a pass. Widened to all four
+> mutating methods, which admits nothing previously refused; and `security-middleware.test.ts`'s route
+> table gained a method column, because a table that cannot express a non-POST route cannot catch that.
+>
+> **On the fenced sub-question: its premise was stale, and the owner has now ruled.**
+> `mcp_tokens.last_used` **exists** and `resolveMcpToken` writes it on every successful resolution, so
+> the recording half was decided and shipped in Task 2 — what was ever open is only whether the product
+> SURFACES it, a much smaller question than the plan priced. Built without it first, because the fence
+> is the signal; **added on the owner's ruling of 2026-09-08**, cases 14.102–14.103. Declaring the new
+> `textMuted` on `surfaceSunken` combination in `CONTRAST_PAIRS` was part of that change: the list is
+> self-declared enforcement, so a pair nobody lists is a pair nobody checks.
+>
+> Cases 14.90–14.99. Ten mutations run, ten killed — **two only after the cases were rewritten**: 14.98
+> rendered one token, so "revoke the row you clicked" and "revoke the first row" were the same
+> assertion; 14.97 claimed to pin `Asia/Kolkata` while running on a machine already in IST.
 
 ## Open questions
 

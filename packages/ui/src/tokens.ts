@@ -208,6 +208,11 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    */
   { fg: 'text', bg: 'surfaceSunken', minimum: 4.5 },
   { fg: 'textMuted', bg: 'surfaceRaised', minimum: 4.5 },
+  // Added 2026-09-08 with `/mcp/tokens`, whose rows put muted secondary text
+  // on a sunken row. CONTRAST_PAIRS is SELF-DECLARED enforcement — a pair
+  // nobody lists is a pair nobody checks — so a new fg-on-bg combination
+  // shipping without its row here is the gap, not a formality.
+  { fg: 'textMuted', bg: 'surfaceSunken', minimum: 4.5 },
   { fg: 'accent', bg: 'surface', minimum: 4.5 },
   { fg: 'accent', bg: 'surfaceRaised', minimum: 4.5 },
   { fg: 'categoryOpen', bg: 'surface', minimum: 3 },

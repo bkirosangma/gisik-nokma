@@ -1,5 +1,37 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 22:2x IST — MCP PLAN COMPLETE: TASKS 11 AND 12 LANDED. `main` is `267c104`, own forced gate GREEN. The 13-task MCP server plan is now fully implemented and merged.
+
+**PR #323 (Task 11) — owner explicitly approved the task-ledger.tsv change first**, since new rows
+touching that file are this controller's own hard trigger regardless of confidence they're legitimate.
+Adds 13 new rows for the `mcp-server` plan (tasks 0–12), correctly and honestly attributing each: which
+PR it actually merged through, and for the five that auto-closed during the earlier stacked-PR incident,
+explicit language — *"content reached main inside #321"* — rather than citing the closed PR as if it
+had landed cleanly. Extends `check-task-ledger.mjs` to recognize dated (non-series) plan files, closing
+the exact 0/0 blind spot the original plan predicted.
+
+**PR #324 (Task 12, revoke surface) auto-closed the same way as #313/#315/#317/#319** — same root cause,
+now well understood, no surprise. Reviewed its actual content directly off the orphaned branch before
+recovery, independent of the executor's own account. **Found a real latent security gap along the way:**
+`httpOriginRefused` checked `method !== 'POST'` only — every route in `HTTP_ORIGIN_PROTECTED_ROUTES` had
+so far happened to be a POST, so the gap had no symptom until this task's `DELETE /v1/me/mcp-tokens/:id`
+would have been the first mutating non-POST route in the set. Fixed to check all four mutating methods.
+The revoke route itself: probe-resistant 404 for "not yours" and "doesn't exist" alike (matching
+`notifications.ts`'s established pattern), scoped by `request.currentUserId` never a caller-supplied id,
+CSRF membership asserted by a planted-defect test rather than a read of the list. **Recovered as PR #329**
+(the executor's own reopening, base correctly `main`), independently re-verified (4 core files
+checksummed) before merging — matched everything already reviewed off the closed #324.
+
+**Own forced gate at `267c104`** (fresh install, `pnpm-lock.yaml` unchanged this time): `GATE_EXIT=0` ·
+`Tasks: 33 successful, 33 total` · node `v22.22.2` · no `Unsupported engine` · **3,894 passed | 5 skipped,
+317 test files** (4+27+12+15+8+8+74+3+142+21+3 files; 85+464+282+178+43+90+1152+8+1427+145+20 tests).
+Zero orphaned vitest workers. Both merges verified via the corrected method (base-branch check before,
+`gh api repos/.../branches/main` reachability check after) — no repeat of the earlier incident.
+
+**MCP server implementation is now complete, all 13 tasks (0–12).** Remaining from the pre-launch
+checklist: items 6/7 (contrast, mobile-responsive, deferred to last by design) plus the still-in-flight
+security-headers, mobile-dev-token-guard, dark-theme and tap-target work (#325–#328).
+
 ## ✅ MONDAY 21:5x IST — RECOVERED: FIVE "MERGED" PRs HAD NEVER TOUCHED MAIN. PR #321 lands the full, verified MCP server (Tasks 0–10) directly on `main`. `main` is `60a4a1e`, own forced gate GREEN. This entry is an honest account of a real controller error, not just its fix.
 
 **What actually happened, in order.** The executor built the MCP implementation as eleven PRs
