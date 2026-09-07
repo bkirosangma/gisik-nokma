@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { HELP_CONTENT as HELP_CONTENT_DOCS } from '../src/help/content.generated.js';
+import { entryText } from '../src/help/types.js';
 import { IST_TIME_ZONE, NOTIFICATION_KINDS, notificationPayloadSchemaByKind } from '@gisik-nokma/domain';
 
 /**
@@ -200,9 +202,83 @@ describe('the scans can see what they forbid (controls — without these, every 
   });
 });
 
+/**
+ * The one file `11.180` excuses, and the text it renders. Named once so the
+ * exclusion and its compensating control (`11.196`) cannot drift apart.
+ */
+const HELP_CONTENT = 'packages/app-core/src/help/content.generated.ts';
+const HELP_CONTENT_TEXT = HELP_CONTENT_DOCS.flatMap((d) =>
+  d.sections.flatMap((sec) => sec.entries.map((e) => entryText(e))),
+).join('\n');
+
 describe('reporting v1 scope guard (spec §7: nothing the record does not contain)', () => {
   it('11.180 no client or server source speaks the estimation vocabulary', () => {
-    expect(offendersWhere((line) => FORBIDDEN.test(line), false)).toEqual([]);
+    expect(
+      offendersWhere((line) => FORBIDDEN.test(line), false).filter(
+        (site) => !site.startsWith(HELP_CONTENT),
+      ),
+    ).toEqual([]);
+  });
+
+  /**
+   * 11.196 — THE ONE EXCLUSION, and why it makes this guard stronger rather
+   * than weaker.
+   *
+   * `help/content.generated.ts` is the manual and FAQ compiled for the in-app
+   * help surface, and it trips `FORBIDDEN` — on a FAQ question whose slug reads
+   * `where-s-the-burndown-chart-the-velocity-sprint-reports`. That question is
+   * the product being ASKED for the features this guard exists to keep out, and
+   * answering no. Rewording the documentation to dodge the scanner would mean a
+   * product that refuses to build a burndown chart and also refuses to say so,
+   * which is the opposite of what §7 is protecting.
+   *
+   * **An exclusion with nothing behind it is how a guard gets hollowed out**, so
+   * this case is the compensating control and it is deliberately harder to
+   * satisfy than the line it excuses:
+   *
+   * 1. The vocabulary must still APPEAR in that file — if it stops, the
+   *    exclusion is dead weight and should be deleted rather than left standing
+   *    as a permanent hole nobody re-examines.
+   * 2. Every occurrence must sit inside a JSON string, which is what the file is:
+   *    a `velocity` IDENTIFIER appearing here would be real code and is caught.
+   * 3. The documentation must still DENY the feature. That is a claim about the
+   *    product, not about a scanner, and nothing else in this repository asserts
+   *    it.
+   */
+  it('11.196 the help content may SAY these words, and only because it says the product has none of them', () => {
+    const file = join(REPO_ROOT, HELP_CONTENT);
+    const lines = readFileSync(file, 'utf8').split('\n');
+    const hits = lines.filter((line) => FORBIDDEN.test(line));
+
+    // (1) not vacuous
+    expect(hits.length, 'the exclusion no longer excuses anything — delete it').toBeGreaterThan(0);
+
+    // (2) prose, not code: every hit is inside a double-quoted JSON string.
+    for (const line of hits) {
+      expect(
+        /^\s*"[^"]*"\s*:\s*"/.test(line) || /^\s*"/.test(line.trimStart()),
+        `a hit outside a JSON string is real code, not documentation: ${line.trim().slice(0, 80)}`,
+      ).toBe(true);
+    }
+
+    // (3) the product still says no — asserted on the ENTRY that raises the
+    // subject, not on the whole document, so a denial living somewhere else
+    // entirely could not satisfy it.
+    //
+    // The wording below was READ from the content rather than guessed. The first
+    // draft of this assertion looked for "there is no burndown" and failed: the
+    // FAQ actually says "There are none, and that is a deliberate decision
+    // rather than an oversight". Guessing at a sentence and asserting the guess
+    // is how a test comes to check the author's memory instead of the product.
+    const asked = HELP_CONTENT_DOCS.flatMap((d) => d.sections.flatMap((sec) => sec.entries)).find(
+      (entry) => /burndown/i.test(entry.title),
+    );
+    expect(asked, 'no help entry raises the estimation vocabulary at all').toBeDefined();
+    const answer = asked === undefined ? '' : entryText(asked).toLowerCase();
+    expect(answer).toContain('there are none');
+    expect(answer).toContain('deliberate');
+    // And the promise underneath it, which is the actual product commitment.
+    expect(answer).toContain('will not forecast');
   });
 
   it('11.181 the notification vocabulary is closed over exactly the five kinds — no room for a computed-urgency kind to creep in', () => {

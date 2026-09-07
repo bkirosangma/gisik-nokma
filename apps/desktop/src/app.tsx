@@ -7,6 +7,7 @@ import {
   type SyncStatus,
 } from '@gisik-nokma/sync-client';
 import {
+  HelpBrowser,
   createReplicaDataSource,
   type ReplicaDataSource,
   type TicketSummary,
@@ -27,6 +28,14 @@ export function App() {
   const [status, setStatus] = useState<SyncStatus>('offline');
   const [queued, setQueued] = useState(0);
   const [failed, setFailed] = useState(0);
+  /**
+   * The help view is state on the shell rather than a route, because this app
+   * has no router — and it is deliberately readable in BOTH branches below,
+   * including the signed-out one. The FAQ's answer to "why can't I sign in" is
+   * worth least behind a sign-in, and the desktop app's signed-out branch is
+   * exactly where somebody stuck at that question ends up.
+   */
+  const [showHelp, setShowHelp] = useState(false);
   const workspaceId = useMemo(() => localStorage.getItem('gisik.workspaceId') ?? '', []);
   const token = useMemo(() => localStorage.getItem('gisik.token') ?? '', []);
 
@@ -77,8 +86,28 @@ export function App() {
     };
   }, [workspaceId, token]);
 
+  const helpToggle = (
+    <button type="button" className="gn-help__tab" onClick={() => setShowHelp((v) => !v)}>
+      {showHelp ? 'Back' : 'Manual & FAQ'}
+    </button>
+  );
+
   if (workspaceId === '' || token === '') {
-    return <p className="app-signin-hint">Sign in on the web app, then paste your token in Settings (interim flow — see plan Open questions).</p>;
+    return (
+      <div className="app-shell">
+        <p className="app-signin-hint">Sign in on the web app, then paste your token in Settings (interim flow — see plan Open questions).</p>
+        {helpToggle}
+        {showHelp ? <HelpBrowser /> : null}
+      </div>
+    );
+  }
+  if (showHelp) {
+    return (
+      <div className="app-shell">
+        {helpToggle}
+        <HelpBrowser />
+      </div>
+    );
   }
   return (
     <div className="app-shell">
@@ -87,6 +116,7 @@ export function App() {
         <span>queued: {queued}</span>
         <span>failed: {failed}</span>
       </div>
+      {helpToggle}
       {/* Plan 6's Board/List/ticket views mount here with ds as their DataSource.
           Until they land, the shell renders the sync status strip and a minimal
           ticket list driven by ds.query.listTicketSummaries — enough to see

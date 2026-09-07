@@ -43,6 +43,10 @@ describe('ci.yml job graph', () => {
     // The positive control: `gate` really is the fan-in, not an empty job whose needs
     // list happens to contain one name. check-runbook is the sibling this shape came from.
     expect(needsOf('gate')).toContain('check-runbook');
+    // A gate job that exists but that `gate` does not wait for is a check that
+    // cannot fail the build — the exact shape this repository keeps meeting.
+    expect(workflow.jobs['check-help']).toBeDefined();
+    expect(needsOf('gate')).toContain('check-help');
     expect(needsOf('gate').length).toBeGreaterThan(2);
   });
 });
