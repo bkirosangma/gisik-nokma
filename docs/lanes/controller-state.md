@@ -1,5 +1,33 @@
 # Cross-lane controller — live state
 
+## ⚠ MONDAY 14:2x IST — A SYSTEMIC GATE-INTEGRITY BUG FOUND, EXPLAINS THE `4f89591` RED. `token-discipline.test.ts` (the check #274 just fixed) declares no turbo `inputs`, so its cache scope is `packages/ui/**` — but the check reads `apps/web/**` etc. FROM DISK at runtime. Fix in progress; `main` is currently `e4a77df`, still green (this is about a check's RELIABILITY, not a new break).
+
+**What this means, precisely:** turbo can replay a stale cache HIT for `packages/ui#test` — reporting the
+color-discipline check as passing — even when a real violation was just introduced in `apps/web` or another
+client root, because `packages/ui`'s own declared inputs (implicitly its own source tree) never changed. **This
+is why PR #272's own branch-level gate came back green** despite the `#270` comment already existing at that
+point: `packages/ui` itself was untouched by #272, so turbo served a cached pass from before the comment
+existed. **Confirmed empirically** (a planted real color literal in `apps/web` reproduced: direct run fails and
+names the file, cached run reports success) — not reasoned about.
+
+**Why this controller's own forced gate was never fooled by it:** `gate.sh` runs `pnpm turbo run build test
+typecheck --force --concurrency=1` — `--force` bypasses turbo's cache entirely, which is exactly why the
+`4f89591` red was caught here and not earlier, on a branch's own (non-forced) gate run. **The executor's
+dispatch brief apparently runs its own pre-merge gate WITHOUT `--force`** — a real discrepancy between the two
+gate commands, flagged by the executor itself. **Ruling (this controller, not escalated — a process/tooling
+fix, not a product decision):** fix the root cause (declare correct turbo `inputs` for `token-discipline` and
+any other test task with the same class of bug — reading outside its own package) rather than paper over it
+with `--force` everywhere, since `--force` disables caching rather than correcting it. The executor's own
+pre-merge gate keeps running `--force` as a safety net until the `inputs` fix is verified complete.
+
+**Also found while building the fix: PR #274's `stripComments` (already merged) is not string-aware** — a `//`
+inside a string literal (e.g. a URL) is misread as a line-comment start and swallows the rest of the line,
+including a real color literal that would follow it on the same line. A genuine false-negative in already-shipped
+code. **#274 is MERGED and CLOSED — this cannot be folded into it; it lands as its own follow-up PR.**
+
+**Not yet landed:** the string-awareness fix and the turbo-`inputs` correctness fix, likely as one or two
+follow-up PRs. `13.176` (option B) queued behind both, per standing order.
+
 ## ✅ MONDAY 14:1x IST — GATE RECOVERED. `main` is `2b36128`, gate GREEN (30/30, 1546/1546 citations, zero orphans). The red window was `4f89591`→`2b36128` only, three commits, never left uncorrected for more than one dispatch cycle.
 
 **PR #274 merged: the token-discipline scanner rewritten to be genuinely comment-and-context-aware**, not a
