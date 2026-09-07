@@ -103,8 +103,8 @@ because the edits were minutes old and reproducible from the review's own text.
 | the red | `@gisik-nokma/ui#test` → `token-discipline.test.ts` matched **`#270`** in a prose comment (`page.tsx:479`, *"createRegion was making until PR #270"*) as a 3-digit hex colour |
 | why no pattern fix works | **`#270` and `#fff` are the same token.** Three hex digits is a legal CSS shorthand colour. Shape cannot separate them; only position can. |
 | landed by | **#272**, which I wrote — the comment and the gate are both mine |
-| gate | `GATE_EXIT=0` · **30/30** · **3720 \| 5 skipped (3725) / 297 files** · Node **v22.22.2** · four doc checks 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
-| delta | **+5 cases, +0 files** vs `main`'s 3715/297 — the scanner's own new cases |
+| gate | `GATE_EXIT=0` **run with `--force`** · **30/30** · **3721 \| 5 skipped (3726) / 297 files** · Node **v22.22.2** · four doc checks 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| delta | **+6 cases, +0 files** vs `main`'s 3715/297 — the scanner's own new cases, including the URL false-negative one |
 
 ## THE TWO CHANGES, AND WHY THE FIRST IS THE ONE THAT BITES
 
@@ -138,6 +138,44 @@ three planted against the REAL trees, since the unit cases prove the pattern and
 
 **P3 plants `#abc`, which is a VALID hex shorthand**, in a comment — so it tests the discrimination and not
 merely that digits-starting-with-2 are ignored.
+
+## ⚠ THE FIRST FIX HAD A FALSE NEGATIVE IN IT — caught before merge, and the direction is the point
+
+`findColourLiterals("const u = 'https://a.com'; const c = '#fff';", 'script')` returned **`[]`**. The
+identical line without the URL returns `['#fff']`. Stripping `//…` by regex treats the `//` in a **URL** as
+a comment opener and blanks the rest of the line, taking any colour after it along.
+
+> **A false red is loud and someone fixes it within the hour** — that is exactly what happened to `#270`.
+> **A false GREEN is a gate quietly not doing its job, and nothing surfaces it.** The change written to
+> remove a false positive introduced a false negative in the same stroke.
+
+The stripper now walks the text once tracking quote state and opens a comment only outside a string,
+honouring escapes. Mutation: restoring the regex version kills the new case (`expected [] to deeply equal
+[ '#fff' ]`).
+
+## ⚠⚠ AND THE GATE COULD NOT SEE ANY OF IT — `exec/80-gate-cache-blindspot`
+
+**The token-discipline suite reads every client tree from disk, and `turbo.json` declared no `inputs` for
+`test`.** So the cache is scoped to `packages/ui/**`, and a colour literal added anywhere it polices leaves
+the cache VALID.
+
+| measurement | result |
+|---|---|
+| cache warm, real `#b3261e` planted in `apps/web/src/shell-refusal.tsx`, `turbo run test --filter=@gisik-nokma/ui` | **`cache hit, replaying logs` · FULL TURBO · EXIT 0** |
+| the same violation under direct `vitest` (control, same run) | **EXIT 1**, names `shell-refusal.tsx:36` |
+
+**The scanner was never wrong; the gate could not see it.** That is how `#270` reached `main` — the gate on
+its own PR was genuinely green because `packages/ui#test` never re-ran after `page.tsx` changed. The
+controller's FORCED gate is the only reason it surfaced at all.
+
+**Fixed on `exec/80` and verified in both directions with the cache warm:** with `$TURBO_ROOT$` inputs
+declared, a planted literal turns the gate RED through turbo, and a PR-number comment passes **while still
+invalidating** (`Cached: 0`), so the pass is a real run and not a replay.
+
+**⚠ A DOCUMENT CONFLICT worth a ruling:** `turbo.json`'s own comment says *"this lane's gate runs `--force`
+and would never see such a hit"* — but this brief's gate command is `pnpm turbo run build test typecheck`,
+with no `--force`. One of the two is wrong. Declaring inputs makes the cache CORRECT rather than disabled,
+which is why it is the recommended fix, but the discrepancy should be settled either way.
 
 ## RECORDED, NOT FIXED
 
