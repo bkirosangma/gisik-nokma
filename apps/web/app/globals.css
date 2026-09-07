@@ -392,3 +392,74 @@ a { color: var(--gn-accent); }
   background: var(--gn-surface-sunken);
   color: var(--gn-text);
 }
+
+/* ── /mcp/tokens — the revoke surface (MCP plan Task 12) ────────────────────
+   Same restraint as the approval screen one directory over: `surface-sunken`
+   and `border`, never `--gn-danger`. Revoking your own assistant is a normal,
+   reversible-by-re-approving thing to do, and dressing it as a destructive
+   action trains people to flinch at a control they are supposed to use. The
+   sentence above the list carries the weight, not the colour. */
+
+.gn-mcp-tokens__card { max-width: 34rem; }
+
+.gn-mcp-tokens__lead { margin: 0 0 1.25rem; }
+
+.gn-mcp-tokens__list {
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* `wrap` for the same measured reason `.gn-nav` carries it: at 390px a date and
+   a 44px button do not fit on one line, and without wrapping the button leaves
+   the viewport rather than the row growing. */
+.gn-mcp-tokens__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+}
+
+.gn-mcp-tokens__row + .gn-mcp-tokens__row { margin-top: 0.6rem; }
+
+.gn-mcp-tokens__when {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: var(--gn-text);
+  font-size: 1rem;
+}
+
+/* The secondary line, and it stays at 1rem rather than shrinking: this is the
+   fact a person reads to decide whether to revoke, and the pre-launch review
+   already recorded 12.5px labels as a type-scale finding. `text-muted` on
+   `surface-sunken` is a declared pair in CONTRAST_PAIRS. */
+.gn-mcp-tokens__used {
+  color: var(--gn-text-muted);
+  font-size: 1rem;
+}
+
+.gn-mcp-tokens__empty,
+.gn-mcp-tokens__what {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 1rem;
+}
+
+.gn-mcp-tokens__empty { margin-bottom: 1.25rem; }
+
+.gn-mcp-tokens__signed-out { margin: 0; }
+
+.gn-mcp-tokens__refusal {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gn-border-strong);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+}
