@@ -44,6 +44,22 @@ export function useLiveQuery<T>(
   loadRef.current = load;
   const keyRef = useRef(queryKey);
   keyRef.current = queryKey;
+  /**
+   * Which load is the current question's answer. Bumped when a load is ISSUED and
+   * compared when it RESOLVES, so only the most recent one may apply.
+   *
+   * Guarding the key alone was not enough, and the gap was measured rather than
+   * argued: with two loads in flight for the SAME key, whichever the network
+   * answered second won, so a slow OLDER request overwrote a newer one with an
+   * answer describing a moment that had passed. Reachable rather than theoretical —
+   * `getTickets` walks paginated round trips through a recursive CTE and the refetch
+   * debounce is 200ms, so a walk slower than the debounce overlaps two loads, and
+   * the slower of the two is the more likely to be the older.
+   *
+   * The symptom is not a flicker: nothing re-renders until the next stream event,
+   * so the stale answer stays on screen for as long as the workspace is quiet.
+   */
+  const issuedRef = useRef(0);
 
   const reload = useCallback(() => {
     // An answer is only an answer to the question that was asked. If the key
@@ -51,20 +67,22 @@ export function useLiveQuery<T>(
     // query nobody is showing any more, and rendering it is the difference
     // between a stale view and a WRONG one.
     //
-    // This does NOT order two loads for the SAME key: overlapping reloads
-    // still resolve last-one-wins, and a failed reload still leaves the last
-    // successful `data` in place with no staleness flag on `LiveQueryResult`
-    // to say so. Both are recorded as F6 against this file — owner Plan 6
-    // Task 7/8, when a real transport makes them reachable.
+    // Two loads for the SAME key are now ordered by ISSUE, not by arrival: see
+    // `issuedRef`. What is still NOT handled is that a failed reload leaves the
+    // last successful `data` in place with no staleness flag on
+    // `LiveQueryResult` to say so — recorded as F6 against this file, owner
+    // Plan 6 Task 7/8.
     const askedFor = keyRef.current;
+    const issued = (issuedRef.current += 1);
+    const isCurrent = (): boolean => keyRef.current === askedFor && issued === issuedRef.current;
     loadRef.current().then(
       (value) => {
-        if (keyRef.current !== askedFor) return;
+        if (!isCurrent()) return;
         setData(value);
         setError(null);
       },
       (cause: unknown) => {
-        if (keyRef.current !== askedFor) return;
+        if (!isCurrent()) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       },
     );

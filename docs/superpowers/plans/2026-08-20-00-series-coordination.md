@@ -3511,6 +3511,31 @@ smallest-correct-change and several of those assertions would have to be re-reas
 substituted. **Owner: the controller/owner to schedule as its own item.** Raised as a scope call rather
 than taken, per the standing instruction to ask when a change reaches shared test infrastructure.
 
+### SCHEDULED FOLLOW-UP (owner ruling 2026-09-07): the `wf-errand` fixture-realism rename
+
+**Its own branch and PR, careful per-assertion review, deliberately NOT folded into a sweep.** The owner
+scheduled this rather than taking it, after the measurement below was raised as a scope call. It is
+recorded here in full so nobody has to re-derive it.
+
+**The defect.** `workflowDefSchema.id` is only `z.string().min(1)`, so the DEF type admits `wf-errand`.
+But a `workflow.defined` event carries `entity: { kind: 'workflow', id }`, and the envelope tests
+`ULID_REGEX` on `entity.id` for every non-membership kind. **Measured:** `ULID_REGEX.test('wf-errand')` is
+`false`, `ULID_REGEX.test('user_anselma')` is `false`, a real ULID passes. `actorId` is typed `ulidString`
+outright. **So no `workflow.defined` naming `wf-errand` can exist, and the fixtures carrying it model a
+state production refuses at the door.**
+
+**The size, measured rather than estimated.** `wf-errand` appears **139 times across 23 files**. **133 are
+in tests.** The **4 in `src` are inside a docblock quoting a different string (`wf-errands`)**, so
+**nothing in production depends on it** — this is a test-fixture change end to end.
+
+**Why it is not mechanical.** Many of the 133 are assertions ON the literal. Substituting a ULID
+everywhere would leave assertions that still pass while asserting something weaker or different, which is
+the failure this repo keeps finding. Each site needs reading, not replacing.
+
+**Where to start:** `packages/app-core/test/helpers/seed.ts` (`WF_ERRAND`, `ticketStateSeed`) is the
+origin; the other files consume it. `user_anselma` and any other non-ULID actor id belong to the same
+item.
+
 ## Two findings about method, from Lane 2's T3 review (2026-08-28)
 
 Both are about *how* defects were caught rather than what they were, and both bind the controller harder

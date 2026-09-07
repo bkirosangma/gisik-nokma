@@ -16,6 +16,84 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~13:00 IST — **CARRIED QUEUE: 5 of 5 DONE. 12.321 was a correctness bug, not amplification.** PR on `exec/75-live-query-refetch`, gate green. Nothing running.
+
+| what | value |
+|---|---|
+| `main` | **`030244d`** (#263 merged; rebuilt onto it after a REAL content conflict — see below) |
+| branch | **`exec/75-live-query-refetch`**, rebuilt off `030244d`, force-pushed |
+| gate | `GATE_EXIT=0` · 30/30 · **3702 \| 5 (3707) / 296 files** · **1536 ids, 1536 cited, 0 uncited** · all checks 0 · zero orphans |
+
+## THE CARRIED QUEUE, ALL FIVE CLOSED
+
+| item | PR | outcome |
+|---|---|---|
+| 13.181 | #257 ✅merged | CLI coverage; its docker half was already fixed in the runbook |
+| 13.195 + 13.196 | #259 ✅merged | **running the unrun rehearsal found a stale premise** |
+| TicketPullNotFound | #261 ✅merged | **the reported bug does not exist**; the real defect was silence |
+| six `helpers/seed.ts` rows | #263 ✅merged | all seven re-measured; one scope call raised |
+| **12.321** | **open** | **a correctness bug, not amplification** |
+
+## 12.321 — what the measurement found
+
+The row carried refetch AMPLIFICATION as a performance question. **The reachable defect is
+CORRECTNESS**, and `use-live-query.ts`'s own docblock described it without drawing the conclusion:
+*"overlapping reloads still resolve last-one-wins"* — last to **RESOLVE**, not last to be **ISSUED**. Two
+loads for one key raced and a slow OLDER request overwrote a newer one. Fixed with a sequence number
+bumped on issue, compared on resolve; asserted at **12.381**.
+
+**Still genuinely unmeasured: the amplification itself** — walk duration against observed stream event
+rate. Recorded on 12.321 with an owner, not quietly dropped.
+
+## ⚠ THE PATTERN OF THE WHOLE NIGHT, IN ONE LINE
+
+**Four times a control failed first and that was the finding**, not a nuisance:
+13.203's daemon died on a missing `OBJECT_STORE_S3_ENDPOINT` before reaching the scheduler · 13.181's
+end-to-end case proved nothing because the owner resolves before `readPlanSeries` · TicketPullNotFound's
+`unhandledRejection` assertion passed either way until I tested it against a real leak · **12.381's
+control failed WITH its case, which said the HARNESS was broken (a fresh `DataSource` per render) and not
+the subject.** *A control that fails alongside its case is never evidence about the subject.*
+
+## SCHEDULED, NOT DONE (owner ruling 2026-09-07)
+
+**The `wf-errand` fixture-realism rename** — its own branch and PR, per-assertion review, deliberately not
+folded into a sweep. Full measurement recorded in the coordination doc so nobody re-derives it: **139
+occurrences / 23 files, 133 in tests, the 4 in `src` are a docblock quoting a different string**, and
+`ULID_REGEX` rejects both `wf-errand` and `user_anselma` while the envelope types `actorId` as
+`ulidString`.
+
+## ⚠ A REAL CONTENT CONFLICT, AND A NEAR-MISS RESOLVING IT
+
+#263 and this branch each added a section to the coordination doc **at the same anchor**, so this was a
+genuine content conflict rather than the stranding shape that bit three times earlier. Both writeups are
+KEPT and ordered as a sequence: the settlement raised the scope call, the schedule is the owner's answer.
+
+**The near-miss is the part worth recording.** The resolving script asserted `"=======" not in text` to
+prove the markers were gone — but `=======` is also a legitimate **markdown setext underline**, so the
+assertion tripped on valid content, the file was never written, `git add` staged the STILL-CONFLICTED
+file, and `cherry-pick --continue` committed it. Git then reported `picked 2/2, unmerged: []`, which is
+exactly what a clean resolution looks like. **The conflict markers were in the commit.**
+
+Caught by grepping the COMMITTED blob (`git show HEAD:<path>`) for `^<<<<<<< ` and `^>>>>>>> `
+specifically, rather than trusting the cherry-pick's own summary. *An over-broad guard that fires on
+valid content is not a safe guard — it fails the write and leaves the unsafe state behind.* Match
+markers at line-start with their trailing space; never bare `=======` in a Markdown file.
+
+## NEXT — the two product items, owner-unblocked, measure/design FIRST
+
+1. **13.176** — guest navigation to explicitly-shared tickets. A real UX gap; needs a design decision on
+   what the navigation should look like before any code.
+2. **12.322 + 12.258** — the pagination-cap cliff. `ticket-list.tsx` hardcodes the filter as `{}` so a
+   user cannot narrow under the bound, and the project page routes `list.error` to `ShellRefusal` on
+   **List, Calendar and Timeline** — three of four tabs gone past the cap, Board surviving on a separate
+   read. **Throwing remains right**; what is missing is a graceful path. Owner says: measure/design first,
+   then implement + test + PR; smallest correct change; **stop and ask if a scope call appears.**
+
+**One branch per work item** — the rule adopted after #247/#253/#255 each stranded work. It has held for
+five PRs since.
+
+---
+
 # 🏁 MONDAY 2026-09-07 ~14:05 IST — **THE CITATION BACKFILL IS CLOSED. 815 → 0 UNCITED. EVERY SECTION AT ZERO.** PR on `exec/69-residual-audit`, gate green. Nothing running.
 
 | what | value |
