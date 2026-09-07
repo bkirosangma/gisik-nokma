@@ -169,31 +169,52 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
    * check from any single route reddens exactly the row for that route and
    * nothing else.
    */
-  const PROTECTED: Array<[name: string, url: string, pattern: string]> = [
-    ['POST /v1/events', '/v1/events', '/v1/events'],
-    ['POST /v1/sync', '/v1/sync', '/v1/sync'],
-    ['POST /v1/attachments', '/v1/attachments', '/v1/attachments'],
+  /**
+   * The METHOD is a column because it stopped being always-POST. Until MCP plan
+   * Task 12 every protected route was reached by POST, so the three loops below
+   * hard-coded it — and that assumption is the same one that hid a hole in
+   * `httpOriginRefused`, which returned early on `method !== 'POST'` and could
+   * therefore not protect a PUT, a PATCH or a DELETE that had been added to the
+   * set. A table that cannot express a non-POST route cannot catch that.
+   */
+  const PROTECTED: Array<[name: string, url: string, pattern: string, method: string]> = [
+    ['POST /v1/events', '/v1/events', '/v1/events', 'POST'],
+    ['POST /v1/sync', '/v1/sync', '/v1/sync', 'POST'],
+    ['POST /v1/attachments', '/v1/attachments', '/v1/attachments', 'POST'],
     [
       'the invite MINT',
       '/v1/workspaces/01JQ0000000000000000000000/invites',
       '/v1/workspaces/:workspaceId/invites',
+      'POST',
     ],
-    ['POST /v1/workspaces', '/v1/workspaces', '/v1/workspaces'],
+    ['POST /v1/workspaces', '/v1/workspaces', '/v1/workspaces', 'POST'],
     [
       'the ticket-type MIGRATION',
       '/v1/workspaces/01JQ0000000000000000000000/ticket-types/01JT0000000000000000000000/migrate',
       '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate',
+      'POST',
     ],
     [
       'mark notification read',
       '/v1/me/notifications/01JN0000000000000000000000/read',
       '/v1/me/notifications/:id/read',
+      'POST',
     ],
     // Added by MCP plan Task 3, and added HERE because the drift guard below
     // REQUIRED it: protecting the route without a row reddens 13.116, which is
     // precisely what that guard is for. A cookie-authenticated POST that mints
     // a credential, so it belongs to the same category as the invite MINT.
-    ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve'],
+    ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve', 'POST'],
+    // MCP plan Task 12, and the FIRST non-POST row. It is what found
+    // `httpOriginRefused`'s `method !== 'POST'` early return: the forged-Origin
+    // DELETE sailed past the hook to `requireSession`, which answered 401 —
+    // a refusal, for entirely the wrong reason, that reads as a pass.
+    [
+      'the MCP token REVOKE',
+      `/v1/me/mcp-tokens/${'a'.repeat(64)}`,
+      '/v1/me/mcp-tokens/:id',
+      'DELETE',
+    ],
   ];
 
   /**
@@ -222,10 +243,10 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 
   it.each(PROTECTED)(
     '%s: a cookie-carrying mutation with a FORGED HTTP-Origin is refused 403 forbidden_origin',
-    async (_name, url) => {
+    async (_name, url, _pattern, method) => {
       const { app, recorder } = build(HTTP_ORIGIN_ON);
       const response = await app.inject({
-        method: 'POST',
+        method: method as 'POST',
         url,
         headers: { ...COOKIE, origin: 'https://evil.example' },
       });
@@ -239,18 +260,18 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 
   it.each(PROTECTED)(
     '%s: a cookie-carrying mutation with NO HTTP-Origin at all is refused — require, not just validate',
-    async (_name, url) => {
+    async (_name, url, _pattern, method) => {
       const { app } = build(HTTP_ORIGIN_ON);
-      const response = await app.inject({ method: 'POST', url, headers: COOKIE });
+      const response = await app.inject({ method: method as 'POST', url, headers: COOKIE });
       await app.close();
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: 'forbidden_origin' });
     },
   );
 
-  it.each(PROTECTED)('%s: the configured WEB_ORIGIN is allowed through', async (_name, url) => {
+  it.each(PROTECTED)('%s: the configured WEB_ORIGIN is allowed through', async (_name, url, _pattern, method) => {
     const { app, recorder } = build(HTTP_ORIGIN_ON);
-    await app.inject({ method: 'POST', url, headers: { ...COOKIE, origin: WEB_ORIGIN } });
+    await app.inject({ method: method as 'POST', url, headers: { ...COOKIE, origin: WEB_ORIGIN } });
     await app.close();
     expect(recorder.passed).toHaveLength(1);
   });

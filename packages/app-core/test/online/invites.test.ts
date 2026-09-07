@@ -28,6 +28,7 @@ function fakeHttp(answers: Record<string, unknown>): HttpClient & { calls: strin
       return answer ?? null;
     },
     put: async () => undefined,
+    del: async () => undefined,
   };
 }
 

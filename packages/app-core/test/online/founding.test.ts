@@ -19,6 +19,7 @@ function fakeHttp(answer: unknown): HttpClient & { calls: Call[] } {
       return answer;
     },
     put: async () => undefined,
+    del: async () => undefined,
   };
 }
 

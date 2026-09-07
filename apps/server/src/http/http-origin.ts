@@ -162,6 +162,14 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/workspaces', // creates a workspace and appends its founding events
   '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', // admin bulk migration, envelope-origin 'web'
   '/v1/me/notifications/:id/read', // per-user write
+  // A cookie-authenticatable mutation that DESTROYS a credential. The same
+  // category as the approve POST that mints one, and it needs the control for
+  // the mirror-image reason: without it, a page the victim visits can revoke
+  // their assistant's access with their ambient cookie. Denial of service
+  // rather than escalation, which is why it is easy to leave out — and
+  // `SameSite=Lax` does not close it, because the product and the API are
+  // same-site siblings of one registrable domain (see this file's own notes).
+  '/v1/me/mcp-tokens/:id',
   // A cookie-authenticated POST that MINTS A CREDENTIAL — the same category as
   // the invite route three lines up, and the reason that one is here.
   '/v1/mcp/device/approve',
@@ -196,6 +204,8 @@ export function normalizeOrigin(webOrigin: string): string {
  *
  * Returns `true` when the request must be REFUSED.
  */
+const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export function httpOriginRefused(input: {
   method: string;
   /** `request.routeOptions.url` — the route PATTERN, `undefined` for an unmatched path. */
@@ -209,7 +219,20 @@ export function httpOriginRefused(input: {
 }): boolean {
   // Mutations only. A preflight (`OPTIONS`) carries an `Origin` and changes
   // nothing, and `routeOptions.url` is `undefined` for it anyway — measured.
-  if (input.method !== 'POST') return false;
+  //
+  // ALL FOUR mutating methods, not just POST. This read `input.method !== 'POST'`
+  // until 2026-09-08, and it was a hole with no symptom: every route in the set
+  // above happened to be a POST, so the control looked complete while being
+  // unable to protect a PUT, a PATCH or a DELETE that was added to the set. It
+  // was found the only way it could be — by adding `DELETE /v1/me/mcp-tokens/:id`
+  // to the set and watching the forged-Origin request sail through to the
+  // session gate, which answered 401 for the wrong reason and would have read as
+  // a refusal to anyone not looking closely.
+  //
+  // This change refuses nothing that was previously admitted: every one of the
+  // eight routes in the set is reached by POST alone, so widening the method
+  // gate alters behaviour for exactly one route — the new one.
+  if (!MUTATING_METHODS.has(input.method)) return false;
   if (input.routeUrl === undefined) return false;
   if (!HTTP_ORIGIN_PROTECTED_ROUTES.has(input.routeUrl)) return false;
   // No ambient credential, nothing to forge. A bearer client lands here.
