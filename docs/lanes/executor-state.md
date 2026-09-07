@@ -96,6 +96,46 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# ⚠ MONDAY 2026-09-07 ~19:xx IST — **THE #274 SQUASH DROPPED TWO COMMITS, AND ONE OF THEM WAS A FIX. `main` carries a live false negative it believes is fixed.**
+
+`exec/80` was rebuilt onto `cf79d28` by cherry-pick. **The conflict was never about the anchor PRs.**
+
+| what | measured |
+|---|---|
+| `main`'s `colour-scan.ts` and `token-discipline.test.ts` | **byte-identical to `ada9879`** |
+| `exec/79`'s head | `83d61cc` — **two commits past that** |
+| dropped by the squash | `7b61463` (**the false-negative fix**) and `83d61cc` (handoff) |
+| consequence on `main` today | the **REGEX** comment stripper, and **zero** occurrences of the URL case |
+
+**So on `main` right now, a `//` inside a URL still swallows a real colour literal after it** —
+`findColourLiterals("const u = 'https://a.com'; const c = '#fff';")` returns `[]`. The gate is green and the
+hole is open. #274 was merged in the belief that fix was in it.
+
+> **This is the recorded squash-merge shape:** the merge captures the branch AS OF MERGE TIME, and every
+> signal on the branch side still reports success — the branch is green, the PR says merged, and nothing
+> anywhere says two commits stayed behind. **It surfaced only because a rebuild forced a diff of `main`
+> against the branch.** Worth auditing whether any earlier squash in this series lost a late push the same
+> way.
+
+**The rebuild is a CHERRY-PICK of six commits, not a rebase** — the two dropped `exec/79` ones plus
+`exec/80`'s four. All six applied with **zero conflicts**, because only what `main` lacked was replayed; a
+rebase would have re-applied commits `main` already holds in squashed form, which is exactly the "real
+conflict in `colour-scan.ts`" that was reported.
+
+## ⚠ A CONTAMINATED CONTROL, CAUGHT — worth more than the fix it nearly hid
+
+Re-verifying cache invalidation after the rebuild, touching `packages/ui/src/ui.css` produced
+**`cache hit`** — apparently a failure. It was not. The earlier round had appended the **identical**
+`/* probe */` string and run the same task, so that exact tree state was already cached: a legitimate hit
+on a hash seen before.
+
+> **A cache experiment repeated with an identical mutation measures the cache's MEMORY, not the
+> invalidation.** Re-run with a unique marker and both flip `cache hit` → `cache miss` as they should.
+> Had this been read as a real failure it would have sent a session chasing a bug that was not there; read
+> the other way — an identical-mutation HIT taken as proof of correctness — it would have certified nothing.
+
+---
+
 # 🔴→🟢 MONDAY 2026-09-07 ~18:xx IST — **MAIN WAS RED OVER A PR NUMBER. The colour scanner now judges POSITION, not shape.** `exec/79-colour-scanner-context` off `4f89591`.
 
 | what | value |
@@ -103,8 +143,8 @@ because the edits were minutes old and reproducible from the review's own text.
 | the red | `@gisik-nokma/ui#test` → `token-discipline.test.ts` matched **`#270`** in a prose comment (`page.tsx:479`, *"createRegion was making until PR #270"*) as a 3-digit hex colour |
 | why no pattern fix works | **`#270` and `#fff` are the same token.** Three hex digits is a legal CSS shorthand colour. Shape cannot separate them; only position can. |
 | landed by | **#272**, which I wrote — the comment and the gate are both mine |
-| gate | `GATE_EXIT=0` · **30/30** · **3720 \| 5 skipped (3725) / 297 files** · Node **v22.22.2** · four doc checks 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
-| delta | **+5 cases, +0 files** vs `main`'s 3715/297 — the scanner's own new cases |
+| gate | `GATE_EXIT=0` **run with `--force`** · **30/30** · **3721 \| 5 skipped (3726) / 297 files** · Node **v22.22.2** · four doc checks 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| delta | **+6 cases, +0 files** vs `main`'s 3715/297 — the scanner's own new cases, including the URL false-negative one |
 
 ## THE TWO CHANGES, AND WHY THE FIRST IS THE ONE THAT BITES
 
@@ -138,6 +178,81 @@ three planted against the REAL trees, since the unit cases prove the pattern and
 
 **P3 plants `#abc`, which is a VALID hex shorthand**, in a comment — so it tests the discrimination and not
 merely that digits-starting-with-2 are ignored.
+
+## ⚠ THE FIRST FIX HAD A FALSE NEGATIVE IN IT — caught before merge, and the direction is the point
+
+`findColourLiterals("const u = 'https://a.com'; const c = '#fff';", 'script')` returned **`[]`**. The
+identical line without the URL returns `['#fff']`. Stripping `//…` by regex treats the `//` in a **URL** as
+a comment opener and blanks the rest of the line, taking any colour after it along.
+
+> **A false red is loud and someone fixes it within the hour** — that is exactly what happened to `#270`.
+> **A false GREEN is a gate quietly not doing its job, and nothing surfaces it.** The change written to
+> remove a false positive introduced a false negative in the same stroke.
+
+The stripper now walks the text once tracking quote state and opens a comment only outside a string,
+honouring escapes. Mutation: restoring the regex version kills the new case (`expected [] to deeply equal
+[ '#fff' ]`).
+
+## ⚠⚠ THE GATE COULD NOT SEE ANY OF IT — and FOUR packages were blind, not one (`exec/80`)
+
+**The token-discipline suite reads every client tree from disk, and `turbo.json` declared no `inputs` for
+`test`.** So the cache is scoped to `packages/ui/**`, and a colour literal added anywhere it polices leaves
+the cache VALID.
+
+| measurement | result |
+|---|---|
+| cache warm, real `#b3261e` planted in `apps/web/src/shell-refusal.tsx`, `turbo run test --filter=@gisik-nokma/ui` | **`cache hit, replaying logs` · FULL TURBO · EXIT 0** |
+| the same violation under direct `vitest` (control, same run) | **EXIT 1**, names `shell-refusal.tsx:36` |
+
+**The scanner was never wrong; the gate could not see it.** That is how `#270` reached `main` — the gate on
+its own PR was genuinely green because `packages/ui#test` never re-ran after `page.tsx` changed. The
+controller's FORCED gate is the only reason it surfaced at all.
+
+**Fixed on `exec/80` and verified in both directions with the cache warm:** with `$TURBO_ROOT$` inputs
+declared, a planted literal turns the gate RED through turbo, and a PR-number comment passes **while still
+invalidating** (`Cached: 0`), so the pass is a real run and not a replay.
+
+**⚠ THE DOCUMENT CONFLICT IS RULED (controller, 2026-09-07):** `turbo.json`'s comment says *"this lane's
+gate runs `--force`"*; the brief's gate command has none. **Ruling: fix the root cause with declared
+inputs, do NOT mandate `--force` in the brief** — correct beats disabled. **Until the inputs fix is verified
+complete across every client-source-reading task, the executor keeps running its own pre-merge gate with
+`--force` as a safety net.** That is what the gate figures on this branch were measured with.
+
+### `exec/80` gate — recounted at the sha pushed, run WITH `--force` per the ruling
+
+`GATE_EXIT=0` · **30/30** · **3725 passed | 5 skipped (3730) / 297 files** · Node **v22.22.2** ·
+`check:env`/`check:tasks`/`check:runbook`/`check:citations` all 0 · **zero orphans** (positive control: the
+sweep sees 9 node processes). **+4 cases** over `exec/79`'s 3721 — the turbo-inputs guards.
+
+## THE SWEEP THE RULING ASKED FOR — `packages/ui` was not special, only caught
+
+**Four packages read outside themselves, not one.** Every one was cached against a stale world:
+
+| package | what its tests read that turbo could not see |
+|---|---|
+| `ui` | every client source tree, **and `turbo.json` itself** |
+| `app-core` | `reporting-scope-guard` walks **seven** trees; three CSS-binding suites read `packages/ui/src/ui.css` |
+| `web` | `next-config.test.ts` reads `apps/server/src` |
+| `server` | `scripts/`, `docs/`, `.github/workflows/ci.yml`, `docker-compose.dev.yml` — **case 13.208 parses `ci.yml` and asserts its job graph**, so a CI edit breaking that graph reported green |
+
+**Verified per package with an explicit before/after control**, because replayed logs print test output and
+look exactly like a run — the `✓` line is not evidence, only the `cache miss, executing` line is:
+
+| touched | package | before | after |
+|---|---|---|---|
+| `packages/ui/src/ui.css` | `app-core` | `cache hit, replaying logs` | **`cache miss, executing`** |
+| `apps/server/src/index.ts` | `web` | `cache hit, replaying logs` | **`cache miss, executing`** |
+| `.github/workflows/ci.yml` | `server` | `cache hit` | **`cache miss`** |
+
+**`turbo.json` is now an input of the task that checks `turbo.json`.** Undeclared, editing the inputs list
+would not invalidate the guard over the inputs list — it would replay a green log describing the
+configuration it used to have.
+
+**And the CLASS is asserted, not today's four**, so the next test that reaches outside its package is caught
+when it is written: if a package's tests escape to the repo root, its `#test` task must declare
+`$TURBO_ROOT$` inputs and keep `$TURBO_DEFAULT$`. That sweep carries a **positive control naming the four
+known escapers** — without it a renamed helper or a regex that stopped matching leaves the undeclared list
+trivially empty and the case passes measuring nothing.
 
 ## RECORDED, NOT FIXED
 
