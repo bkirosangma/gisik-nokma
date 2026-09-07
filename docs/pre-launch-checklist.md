@@ -304,8 +304,9 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.257.
   and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
   fixed**, because it is a design decision rather than a defect with one obvious remedy.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
-  measure under 24×24 — but almost all are *wide and 23px tall* (e.g. 249×23), failing WCAG 2.5.8's 24px
-  by a single pixel, plus one genuine 13×13 input. Small text is real but mostly legitimate labels
+  measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
+  `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,
+  plus one genuine `13×13` input. Only 2 of the 50 fall between 24 and 44. Small text is real but mostly legitimate labels
   (`gn-board-card__provenance` at 12.5px ×25, chips at 12.8px); the counts are identical at 768 and 1512,
   so it is a type-scale question, not a responsive one. Both are **owner calls about the design**, not
   contrast or overflow defects, and neither was in items 6/7's wording.
