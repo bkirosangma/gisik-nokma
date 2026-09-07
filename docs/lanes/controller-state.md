@@ -1,5 +1,25 @@
 # Cross-lane controller — live state
 
+## 🔴 MONDAY 13:5x IST — `main` (`4f89591`) IS GATE-RED. PR #272 merged (real filtering, remedy 2), but the forced gate at that exact head failed for the first time all night. Confirmed root cause; fix dispatched, not yet landed. Do not trust "gate green" claims for `4f89591` from anywhere else in this file — this is the correction.
+
+**`@gisik-nokma/ui#test` fails: `token-discipline.test.ts`'s color-literal scanner (coordination amendment
+11, "no color literal outside `packages/ui/src/tokens.ts`") matches the text `#270` in a docblock comment —
+`` `createRegion` was making until PR #270 `` at `page.tsx:479` — as a valid 3-digit CSS hex color. Confirmed
+by reading the line directly: it is prose citing a PR number, not styling. Same shape as several other findings
+tonight (an instrument matching structurally-valid-looking text from an unrelated source) — the scanner needs
+real CSS/style context, not a bare hex-length token anywhere in a client source file.**
+
+**Owner ruling: fix now, dispatched as the next item, priority over `13.176`.** Tighten the scanner with a
+positive control proving it still catches a real color literal; re-gate; PR; merge. **Until that PR lands and
+this controller re-verifies with its own forced gate, treat `main` as broken** — every prior "gate green"
+anchor in this file up through `4f89591` is still true for what it measured, but `4f89591` itself is NOT green
+and should not be cited as a clean point to branch from or restart at.
+
+**This is exactly the scenario controller rule 4 names** ("the gate is RED — but first check the log has a
+`Tasks:` line"): the `Tasks:` line was present (`2 successful, 6 total`), confirming the gate genuinely ran and
+genuinely failed — not a wrong command. Put to the owner before any fix was dispatched, per that rule; owner
+said proceed.
+
 ## ▶ MONDAY 13:0x IST — REMEDY 4 (createRegion decoupled from the list read) MERGED and reviewed. `main` is `c3404af`, gate green, citations 1539/1539. Ticket creation past the pagination cap WORKS AGAIN. Remedy 2 (real filtering) is next, then `13.176`.
 
 **PR #270 merged** after a full review cycle that found real defects, not nitpicks:
