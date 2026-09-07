@@ -162,6 +162,9 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/workspaces', // creates a workspace and appends its founding events
   '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', // admin bulk migration, envelope-origin 'web'
   '/v1/me/notifications/:id/read', // per-user write
+  // A cookie-authenticated POST that MINTS A CREDENTIAL — the same category as
+  // the invite route three lines up, and the reason that one is here.
+  '/v1/mcp/device/approve',
 ]);
 
 /**
