@@ -1213,7 +1213,27 @@ same ratchet, against `e2e-stack/tap-target-baseline.json`.
 | signed-in `/my-work` at 390px | offenders | smallest examined |
 |---|---|---|
 | with `.gn-button` fixed (first reading) | 9 | `89x23` — the nav's links |
-| after `.gn-nav a, .gn-nav button` → 44px | **7** | `249x23` — `button.gn-attention__title` |
+| after `.gn-nav a, .gn-nav button` → 44px | 7 | `249x23` — `button.gn-attention__title` |
+| after the nav MIN-WIDTH and the title buttons → 24px | **6** | `249x24` |
+
+**Forcing the ratchet to 0 to print all seven, instead of re-reading the smallest, is what finished
+this.** The list was not what the previous fix assumed:
+
+```
+ 39x44  a.gn-nav__inbox "Inbox"          <- tall enough, six pixels too NARROW
+249x23  button.gn-attention__title  (x4)
+249x23  button.gn-my-work__title    (x2)
+```
+
+`.gn-nav a, .gn-nav button` had only `min-height`. **A tap target is a box**, a short word is a narrow
+target, and re-reading the COUNT would never have shown it — the count was 7 either way. Same shape as
+the `340x38` miss earlier in this section, one axis over.
+
+The six title buttons went to 24px, WCAG 2.5.8's floor, and deliberately not 2.5.5's 44: they are bare
+text buttons sharing a baseline with a chip and a reason on the same row (`.gn-attention__item` is
+`align-items: baseline`), and 44px would break that alignment and turn a compact strip into a list of
+slabs. `inline-flex` is the load-bearing half — `padding: 0` means the button's height IS its line box,
+so `min-height` alone does nothing to it.
 
 The sweep is IMPORTED from `e2e-viewport/tap-targets.ts`, a plain module. The first attempt imported it
 from `responsive.spec.ts` and **Playwright loaded that spec's `test()` registrations into the stack
