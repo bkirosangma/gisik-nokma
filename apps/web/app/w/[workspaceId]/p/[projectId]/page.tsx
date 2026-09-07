@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { BUILTIN_TICKET_TYPE_SEEDS } from '@gisik-nokma/domain';
+import { BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
@@ -124,9 +124,35 @@ function ProjectBoard() {
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
   const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
+  /**
+   * The list's narrowing, and the reason there is one at all.
+   *
+   * `getTickets` walks up to `LIST_PAGE_CAP` pages and REFUSES past it, because a
+   * `TicketListView` is defined as the complete row set and serving the pages it
+   * already had would present a truncated list as the whole project (12.258).
+   * That refusal is right and stays. What was missing is any way for the person
+   * who meets it to ask a smaller question — `ticket-list.tsx` sent `{}` and
+   * nothing could change it, so a project past the bound refused for ever.
+   *
+   * **`active` is one axis and that is deliberate.** It is chosen for whether it
+   * RELIEVES the bound, not for whether it is useful: excluding terminal work
+   * removes monotonically more rows the older a project gets, which is exactly
+   * what makes a mature project large. A text search narrows nothing reliably —
+   * it can match anything — so it would not shorten the walk. More axes are a
+   * scope call, not a free addition.
+   *
+   * Local state, not preferences: writing this through `usePreferences` is a
+   * whole-document PUT gated on `canSetPrefs`, and the user who most needs the
+   * control may be unable to persist anything. Persisting is its own change.
+   */
+  const [activeOnly, setActiveOnly] = useState(false);
+  const listFilter = useMemo(
+    () => (activeOnly ? { stateCategories: ['open', 'active'] as StateCategory[] } : {}),
+    [activeOnly],
+  );
 
   const board = useBoard(dataSource, workspaceId, projectId);
-  const list = useTicketList(dataSource, workspaceId, projectId, currentUserId);
+  const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
   const attention = useAttention(dataSource, workspaceId);
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
@@ -408,6 +434,37 @@ function ProjectBoard() {
               <AttentionStrip items={attention.data} onOpenTicket={openTicket} />
             ) : null}
 
+            {/*
+              ABOVE the tab arms, and that placement is the whole point rather than
+              a layout choice. Every renderer of the list lives inside
+              `list.error === null` — put the narrowing control there and it is
+              reachable by everyone EXCEPT the person who needs it, because past the
+              cap those arms render a refusal instead. That is the identical mistake
+              `createRegion` was making until PR #270, and it has the identical fix:
+              gate an affordance on what it actually needs, not on the read that
+              happens to sit beside it. This control needs nothing.
+            */}
+            <div className="gn-list-filter">
+              <label className="gn-list-filter__control">
+                <input
+                  type="checkbox"
+                  checked={activeOnly}
+                  onChange={(event) => setActiveOnly(event.target.checked)}
+                />
+                Hide done tickets
+              </label>
+              {/*
+                Said here as well as in the list's own summary, because past the cap
+                there IS no list to carry a summary — the arms are refusing — and
+                this is the only place the state of the question is visible.
+              */}
+              {activeOnly ? (
+                <span className="gn-list-filter__note" data-testid="list-filter-note">
+                  asking only for tickets that are not done
+                </span>
+              ) : null}
+            </div>
+
             <div className="gn-view-tabs" role="tablist">
               <button
                 role="tab"
@@ -520,6 +577,10 @@ function ProjectBoard() {
               <ShellRefusal what="The ticket list" message={list.error} />
             ) : list.rows !== null ? (
               <TicketList
+                // The words, not a flag: the summary has to say WHICH narrowing,
+                // and `undefined` here is what makes the unnarrowed count still
+                // read as the project's own.
+                {...(activeOnly ? { narrowing: 'tickets that are not done' } : {})}
                 rows={list.rows}
                 // `''` while the session resolves or when signed out, and here
                 // that is harmless and deliberate: this prop drives only the

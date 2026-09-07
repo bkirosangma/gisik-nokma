@@ -7,6 +7,7 @@ import {
   DEFAULT_LIST_COLUMNS,
   DEFAULT_VIEW_PREFS,
   prefsOriginOf,
+  type FilterSpec,
   type Grouping,
   type ListColumnId,
   type ListRow,
@@ -56,6 +57,23 @@ export type TicketListProps = {
   prefs: ProjectViewPrefs;
   onPrefsChange: (prefs: ProjectViewPrefs) => void;
   /**
+   * What narrowing produced `rows`, in words, or `undefined` when they are the
+   * project's whole visible set.
+   *
+   * **The summary is a claim about the project, so it may not be left alone when
+   * the rows stop being all of it.** `{total} tickets · {terminal} done` over a
+   * filtered set says the project holds `total` tickets, which is 12.258's defect
+   * — a partial list presented as whole — wearing a different costume. That case
+   * is why `getTickets` refuses past the cap rather than serving the pages it
+   * already has; serving a NARROWED set silently would give back exactly what the
+   * refusal was protecting.
+   *
+   * Carried as words rather than a boolean because a reader needs to know WHICH
+   * narrowing: "3 tickets" under an unnamed filter is no more honest than "3
+   * tickets" presented as the project.
+   */
+  narrowing?: string;
+  /**
    * False while the preferences document has not loaded. The controls are
    * DISABLED rather than silently inert, because a write in that window cannot
    * merge into a document this client has not read — see `useTicketList`.
@@ -101,6 +119,7 @@ export function TicketList({
   prefsEditable = true,
   labels,
   onOpenTicket,
+  narrowing,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const counts = countRows(rows); // ALWAYS from the flat set — sections cannot alter it
@@ -134,8 +153,27 @@ export function TicketList({
     <div className="gn-list">
       <div className="gn-list__controls">
         <span data-testid="list-summary" className="gn-list__summary">
-          {counts.total} tickets · {counts.terminal} done
+          {narrowing === undefined
+            ? `${counts.total} tickets · ${counts.terminal} done`
+            : `${counts.total} matching · ${counts.terminal} done`}
         </span>
+        {/*
+          The narrowing is stated in the SUMMARY ROW and not only by the control
+          that set it, because a control scrolled out of view leaves a bare count
+          behind — and a bare count is read as the project's size. The same
+          argument `list-prefs-origin` above makes for a stock arrangement: what
+          produced what is on screen belongs on screen.
+
+          `matching` rather than `tickets` in the count above is the other half.
+          A note saying "narrowed" beside the words "12 tickets" still leaves the
+          number claiming to be the project's, and the number is what a person
+          reads first.
+        */}
+        {narrowing === undefined ? null : (
+          <span className="gn-list__narrowing" data-testid="list-narrowing">
+            narrowed to {narrowing} — not the whole project
+          </span>
+        )}
         <label className="gn-list__control">
           Group by
           <select
@@ -429,11 +467,25 @@ export function useTicketList(
   workspaceId: string,
   projectId: string,
   currentUserId: string,
+  filter: FilterSpec = {},
 ): TicketListState {
-  // `projectId` is the query key for the same reason the board's is: it is
-  // exactly what changes when the list is pointed somewhere else.
-  const list = useLiveQuery(source, workspaceId, projectId, () =>
-    source.query.getTickets(projectId, {}, 'flat'),
+  // `projectId` AND the filter are the query key, for the same reason the board's
+  // is its project: the key is exactly what changes when the list is pointed at a
+  // different question. Keyed on the project alone, changing the filter would send
+  // no new request at all — `useLiveQuery`'s load effect depends on the key — and
+  // the old rows would sit under the new control claiming to answer it.
+  //
+  // Serialised through the ENTRIES, sorted, rather than `JSON.stringify(filter)`:
+  // object key order is insertion order, so two specs that mean the same thing
+  // stringify differently and would rekey — clearing the list and re-walking every
+  // page for a question already answered.
+  const filterKey = JSON.stringify(
+    Object.entries(filter)
+      .filter(([, value]) => value !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : 1)),
+  );
+  const list = useLiveQuery(source, workspaceId, `${projectId}\u0000${filterKey}`, () =>
+    source.query.getTickets(projectId, filter, 'flat'),
   );
   const preferences = usePreferences(source, workspaceId);
   const stored = preferences.document?.projects[projectId];
