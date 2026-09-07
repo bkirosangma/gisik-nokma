@@ -14,6 +14,7 @@ import {
   createHttpFoundingGateway,
   createHttpInviteAdminGateway,
   createHttpInviteGateway,
+  createHttpNotificationsGateway,
   createOnlineDataSource,
   type FoundingGateway,
   type InviteAdminGateway,
@@ -21,7 +22,6 @@ import {
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
-import { createHttpNotificationsGateway } from './notifications-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
 
 /**

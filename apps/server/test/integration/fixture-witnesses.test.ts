@@ -394,12 +394,37 @@ describe('the notifications cursor, against the real route', () => {
    *
    * **The honest limit of this case, stated rather than left to be discovered:**
    * `apps/server` has no dependency on `apps/web`, where the only real
-   * `NotificationsGateway` adapter lives (`apps/web/src/notifications-gateway.ts`),
-   * so the client CONSUMER cannot be executed from here the way `getTickets` and
-   * the founding gateway are above. This case pins the PRODUCER's end of the
-   * contract; the fake's rule is witnessed by copying a rule that is now pinned,
-   * not by a round trip. Naming both ends is the point — **a witness that cannot
-   * reach its consumer says so instead of implying it did.**
+   * `NotificationsGateway` adapter lived, so the client CONSUMER could not be
+   * executed from here the way `getTickets` and the founding gateway are above.
+   * This case pins the PRODUCER's end of the contract; the fake's rule is
+   * witnessed by copying a rule that is now pinned, not by a round trip. Naming
+   * both ends is the point — **a witness that cannot reach its consumer says so
+   * instead of implying it did.**
+   *
+   * **CLOSED 2026-09-07 — and the stated limit was true about the graph while
+   * being wrong about the cause.** The adapter was not web-specific: it imports
+   * `NotificationsGateway`, `HttpClient` and `parseNotification` and touches no
+   * React, no Next, no DOM, and its own docblock named the three gateways in
+   * `packages/app-core/src/online/` as the pattern it follows — while it alone
+   * sat in `apps/web/src/`. `apps/server` already devDepends on
+   * `@gisik-nokma/app-core`, so every sibling was reachable from here and this
+   * one was not. Moving it (no new dependency edge, no interface change) made
+   * the round trip possible, and
+   * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts` now
+   * drives the real adapter over the real `createHttpClient` against this route,
+   * the real store and real Postgres, and one of its cases asserts the cursor's
+   * VALUE — the keyset claim this case could only pin producer-side. Four
+   * mutations confirm it measures: `nextCursor` reporting the first row of the
+   * page, the route discarding the caller's cursor, and the adapter failing to
+   * send one all redden that case by name; `markRead` swallowing the 404 reddens
+   * the mark-read case.
+   *
+   * *(Case ids deliberately not spelled out here. `check-case-citations.mjs`
+   * matches an id against the WHOLE corpus, so an id named in this docblock would
+   * keep its checkmark alive after the test that proves it was deleted — the very
+   * hole that checker exists to close. The filename is the durable pointer.)* **The blocker was a misfiled file wearing an architectural
+   * constraint's clothing** — worth remembering the next time a dependency graph
+   * appears to forbid a witness.
    *
    * The value is read as `.at(-1)`, not `[0]`. At `limit=1` the two are the same
    * row and an assertion on `[0]` would be accidentally correct; it would go

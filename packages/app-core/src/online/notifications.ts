@@ -1,5 +1,5 @@
-import type { NotificationsGateway, NotificationsPage } from '@gisik-nokma/app-core';
-import type { HttpClient } from '@gisik-nokma/app-core/online';
+import type { NotificationsGateway, NotificationsPage } from '../inbox/gateway.js';
+import type { HttpClient } from './http.js';
 import { parseNotification } from '@gisik-nokma/domain';
 
 /**

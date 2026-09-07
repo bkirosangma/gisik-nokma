@@ -46,6 +46,18 @@ export {
   createHttpFoundingGateway,
   type FoundingGateway,
 } from './founding.js';
+/**
+ * The inbox adapter, moved here 2026-09-07 from `apps/web/src/`. It belongs
+ * beside the three above — it takes an `HttpClient` exactly as they do, imports
+ * no React, no Next and no DOM, and its own docblock already named them as the
+ * pattern it follows. Sitting in `apps/web` made it the ONE real gateway that
+ * `apps/server`'s integration tests could not reach, which is the whole reason
+ * Plan 9's consumer contract went unwitnessed while every sibling's was proven.
+ * Unlike the three onboarding gateways, this one IS an interface Plan 10's
+ * replica must also satisfy (`inbox/gateway.ts`), so it is an adapter for a
+ * produced contract rather than a one-shot action.
+ */
+export { createHttpNotificationsGateway } from './notifications.js';
 export {
   MappingError,
   LIST_PAGE_CAP,

@@ -804,7 +804,7 @@ reason on record, not an oversight:*
   executed, never restated as a literal) against the SHIPPED route via an `inject()`-backed
   `FetchLike`, carrying the server's own values between calls. Covers the founding refusal's sentence
   (7.221), the list route's treatment of an unrecognised cursor and the shipped paging loop
-  (12.323–12.324), and the notifications keyset cursor's value (12.325). Reading a server constant
+  (12.323–12.324), and the notifications keyset cursor's value (12.325 — pinned producer-side there; its CONSUMER end is now closed by 11.190–11.195 in `notifications-consumer-roundtrip.test.ts`). Reading a server constant
   into a client-side assertion is deliberately NOT counted as a witness — that agrees with source
   text, not with a running producer. `apps/server/test/integration/fixture-witnesses.test.ts`
 - ⚙️ **The mapper cluster, witnessed (7.222–7.229).** Eight further `app-core` mapper entry points now
@@ -832,7 +832,7 @@ reason on record, not an oversight:*
   engine version emits, carried by two client files under a comment and an identifier naming the
   producer. **A second was found and RECORDED, not corrected** (7.246): a migration rule name from the
   wrong family, where the real vocabulary lives in `apps/server` and the client must not depend on it.
-  Not buildable from a server test and recorded with owners: the web notifications gateway (7.243),
+  Recorded with owners as not buildable from a server test: the web notifications gateway (7.243) — **BUILT 2026-09-07 and the premise was wrong**: the adapter was not web-specific, it was merely misfiled in `apps/web/src/`, and moving it to `packages/app-core/src/online/` (no new dependency edge) made the round trip ordinary — see 11.190–11.195 —,
   the contest round trip (7.244), the ergonomics of `rule-engine`'s refusal words (7.245 — the bytes
   ARE reachable through the `./fixtures` subpath; the function is not), and one `sync-client` mirror
   (7.248, reduced from five to one on review — three of the cited sites were not mirrors at all).
@@ -1787,7 +1787,7 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 - ⚙️ **IST day boundaries everywhere a day is decided** — calendar cell assignment, timeline day columns, the today ring, the sweep's warning horizon and staleness window, and the inbox's "since" all resolve a day through the domain's `istDayOf`/`istDayBounds`; day-vs-instant comparisons are half-open `[startUtc, endUtc)`. Rendered clocks use `IST_TIME_ZONE` from the domain, never a literal and never the device. `packages/app-core/src/claims/`, `apps/server/src/notifications/sweep.ts`, `packages/app-core/src/inbox/format.ts`
 - ⚙️ **Notification storage + API** — per-user `notifications` rows (server-owned, NOT ledger events, NOT a projection — replay can never re-invent a nag); `GET /v1/me/notifications` (cursor), unread count, mark-read; strict payload schemas with no field for invented urgency. `apps/server/src/notifications/store.ts`, `apps/server/src/routes/notifications.ts`
 - ⚙️ **NotificationTransport seam** — at-least-once per (user, dedupeKey); in-app transport ships here, web push (Plan 10) and native push (Plan 11) implement the same interface. `apps/server/src/notifications/transport.ts`
-- ✅ **Inbox** — notification list with per-kind icons, deep links, unread badge, mark-read; headlines are the claims' own attributed wording. `packages/app-core/src/inbox/`, `apps/web/app/inbox/`
+- ✅ **Inbox** — notification list with per-kind icons, deep links, unread badge, mark-read; headlines are the claims' own attributed wording. Its HTTP adapter is `packages/app-core/src/online/notifications.ts` — moved there from `apps/web/src/` on 2026-09-07 to sit with its three siblings, which is what made the consumer round-trippable from a server test at all. `packages/app-core/src/inbox/`, `apps/web/app/inbox/`
 - ⚙️ **Saved filters** — named FilterSpecs stored via `/v1/me/preferences`; applying one is a view act, never a data act. **⚙️ and not ✅ deliberately: nothing mounts `SavedFiltersMenu` and no `PreferencesGateway` implementation exists outside the test fake**, which `saved-filters.ts`'s own docblock already concedes — so the store, the schema and the menu are all real and tested, and no user can reach any of them yet. *Owner: whoever mounts the menu and writes the gateway against Plan 5's whole-document `GET`/`PUT /v1/me/preferences`.* `packages/app-core/src/preferences/`
 - ⚙️ **Reporting scope guard** — an executable scan across seven client and server source trees (`packages/app-core/src`, `packages/domain/src`, `packages/rule-engine/src`, `packages/ui/src`, `apps/server/src`, `apps/web/src`, `apps/web/app` — the last two added because that is where days are finally drawn) keeps velocity/burndown/forecast vocabulary out of every one of them, and keeps the zone string and the day regex to their single origin in the domain. `packages/app-core/test/reporting-scope-guard.test.ts`
 

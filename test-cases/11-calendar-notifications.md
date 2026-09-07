@@ -123,23 +123,34 @@ computed "now".
 - **11.120** ✅ The block names no colour of its own and adds no role — (`saved-filters-css-binding.test.tsx`)
 - **11.121** ✅ Every control a person can tab to is covered by the focus-ring rule, and the reverse — (`saved-filters-css-binding.test.tsx`)
 
-## Notification gateway (`apps/web`)
-- **11.130** ✅ Asks for the first page with no query string, and parses every row through the domain schema — (`notifications-gateway.test.ts`)
-- **11.131** ✅ Sends the paging cursor back encoded, and only when there is one — (`notifications-gateway.test.ts`)
-- **11.132** ✅ Treats `null` and `undefined` as the same first-page request — (`notifications-gateway.test.ts`)
-- **11.133** ✅ Carries `nextCursor` through verbatim — the one paging fact the fake could not lose — (`notifications-gateway.test.ts`)
-- **11.134** ✅ Refuses a page whose payload does not match its declared kind, rather than handing it to the view — (`notifications-gateway.test.ts`)
-- **11.135** ✅ Reads the unread total off the route that actually serves it — (`notifications-gateway.test.ts`)
-- **11.136** ✅ Turns a 401 on either read into an `HttpError` that still names the status — (`notifications-gateway.test.ts`)
-- **11.137** ✅ `markRead` POSTs to the row and accepts the route's empty 204 — (`notifications-gateway.test.ts`)
-- **11.138** ✅ `markRead` THROWS on the route's 404 — the seam where a stub gateway used to be looser — (`notifications-gateway.test.ts`)
-- **11.139** ✅ Names the path when a GET answers the transport's `null` instead of a page — (`notifications-gateway.test.ts`)
-- **11.140** ✅ Reads `project_id` off the `proj_visibility` row the route serves — (`notifications-gateway.test.ts`)
-- **11.141** ✅ Answers `null` for the route's one 404, without deciding which of its two causes it was — (`notifications-gateway.test.ts`)
-- **11.142** ✅ Answers `null` rather than building `/w/ws/p/?ticket=` when the row carries no project — (`notifications-gateway.test.ts`)
-- **11.143** ✅ Lets a 401 through as a session event rather than flattening it to `null` — (`notifications-gateway.test.ts`)
-- **11.175** ✅ Names the path when the list route answers a 200 of the wrong shape — (`notifications-gateway.test.ts`)
-- **11.176** ✅ Does the same for the unread-count route, rather than badging `undefined` — (`notifications-gateway.test.ts`)
+## Notification gateway (`packages/app-core`)
+
+*Moved 2026-09-07 from `apps/web/src/notifications-gateway.ts` to
+`packages/app-core/src/online/notifications.ts`, beside the three sibling HTTP gateways whose pattern its
+docblock already named. The cases did not change; the file they live in did. The ticket-locator cases
+that shared the old file are split out below, because `createHttpTicketLocator` did NOT move.*
+- **11.130** ✅ Asks for the first page with no query string, and parses every row through the domain schema — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.131** ✅ Sends the paging cursor back encoded, and only when there is one — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.132** ✅ Treats `null` and `undefined` as the same first-page request — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.133** ✅ Carries `nextCursor` through verbatim — the one paging fact the fake could not lose — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.134** ✅ Refuses a page whose payload does not match its declared kind, rather than handing it to the view — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.135** ✅ Reads the unread total off the route that actually serves it — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.136** ✅ Turns a 401 on either read into an `HttpError` that still names the status — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.137** ✅ `markRead` POSTs to the row and accepts the route's empty 204 — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.138** ✅ `markRead` THROWS on the route's 404 — the seam where a stub gateway used to be looser — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.139** ✅ Names the path when a GET answers the transport's `null` instead of a page — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.175** ✅ Names the path when the list route answers a 200 of the wrong shape — (`packages/app-core/test/online/notifications.test.ts`)
+- **11.176** ✅ Does the same for the unread-count route, rather than badging `undefined` — (`packages/app-core/test/online/notifications.test.ts`)
+
+## Ticket locator (`apps/web`)
+
+*Split out of the gateway file 2026-09-07: `ticketSheetPath` builds this shell's own
+`/w/:ws/p/:project?ticket=:id` URL shape, which means nothing to the replica or to another client, so
+it stayed in `apps/web` when the gateway left.*
+- **11.140** ✅ Reads `project_id` off the `proj_visibility` row the route serves — (`apps/web/test/ticket-location.test.ts`)
+- **11.141** ✅ Answers `null` for the route's one 404, without deciding which of its two causes it was — (`apps/web/test/ticket-location.test.ts`)
+- **11.142** ✅ Answers `null` rather than building `/w/ws/p/?ticket=` when the row carries no project — (`apps/web/test/ticket-location.test.ts`)
+- **11.143** ✅ Lets a 401 through as a session event rather than flattening it to `null` — (`apps/web/test/ticket-location.test.ts`)
 
 ## Inbox page (`apps/web`)
 - **11.144** ✅ Says "Loading…" while the first page is in flight, NOT that the inbox is empty — (`inbox-page.test.tsx`)
@@ -211,6 +222,20 @@ empty scan result would be indistinguishable from a stale or vacuous scanner.
   `\b`-anchored pattern could not see `velocityChart` at all, which is why the needle is now a
   substring match — (`reporting-scope-guard.test.ts`)
 
+## Notification consumer round trip — real client, real route, real database (`apps/server`)
+
+*Plan 9's consumer-side residual, closed 2026-09-07. Every case above this section measures the adapter
+against bodies a test wrote by hand; these six measure it against bodies the ROUTE served out of Postgres.
+The distinction is the whole point — a hand-copied body cannot notice the route changing, and 12.325 had
+pinned this contract's producer end while stating that its consumer was out of reach.*
+
+- **11.190** ✅ Parses a page the route actually served — the domain parser meets a row no test wrote by hand — (`notifications-consumer-roundtrip.test.ts`)
+- **11.191** ✅ Reports NO cursor when the page is the last one, rather than the id of its final row — (`notifications-consumer-roundtrip.test.ts`)
+- **11.192** ✅ Walks a real multi-page cursor to exhaustion, and `nextCursor` IS the last row of the page — the keyset value the fake could only copy — (`notifications-consumer-roundtrip.test.ts`)
+- **11.193** ✅ Reads the unread total off the real store, counting neither read rows nor another user's — (`notifications-consumer-roundtrip.test.ts`)
+- **11.194** ✅ `markRead` actually marks it: the count the client re-reads moves, and a second mark is still idempotent — (`notifications-consumer-roundtrip.test.ts`)
+- **11.195** ✅ `markRead` THROWS on another user's row, and that row is still unread when measured at the store — (`notifications-consumer-roundtrip.test.ts`)
+
 ## Permanently unused id ranges
 
 Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
@@ -225,4 +250,4 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
   rule against renumbering existing ids (`test-cases/README.md`) means a range vacated by a
   renumber stays vacated rather than being reused by a later, unrelated case.
 
-**New cases continue from 11.189.**
+**New cases continue from 11.195.**
