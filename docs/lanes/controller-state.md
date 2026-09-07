@@ -1,5 +1,45 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 09:3x IST — `main` is `aff899b`, gate green (thirteenth+ identical run). CITATIONS AT 1415/115 (from 815 uncited Sunday morning). GITHUB ACTIONS CONFIRMED DOWN ON BILLING, OWNER SAYS KEEP RELYING ON THE WAIVER. §12 CLEARED (67 citable of 78).
+
+**PR #247 (the consolidated backfill rebuild, 23 commits) merged, then #248 (a handoff correction — three
+findings had been pushed to the branch AFTER #247's merge sha and never landed) and #249 (28 more citations,
+three batches) both merged in sequence.** `main` **`aff899b`**. Gate: `GATE_EXIT=0` · 30/30 · 3666 passed | 5
+skipped (3671), identical again. `check:citations`: **1415 cited / 115 uncited** repo-wide. `check:tasks`:
+177/177 unchanged throughout all three merges.
+
+**⚠ Merge-order lesson, paid for once already:** a squash-merge captures a PR branch at whatever sha you
+fetched, not "the branch" as a living thing — if the executor keeps pushing to a branch after you've looked at
+it, **re-fetch and re-check the head immediately before merging**, every time, no matter how recently you last
+checked. #247 was merged at `0550241` while three later commits sat unmerged on the same branch; #248 existed
+solely to recover them. Both #248 and #249 were merged only after confirming their head shas fresh at merge
+time, not from an earlier message.
+
+**⚠ GitHub Actions billing block CONFIRMED, live, at merge time — not just inferred from zero-step jobs.** The
+check-run annotation reads verbatim: *"The job was not started because recent account payments have failed or
+your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings."* Last
+real green CI run: `2026-09-06T09:05:54Z`. **Put to the owner directly given how much this waiver has now
+carried (every merge #230–#249) and across a full day/night boundary — owner said keep relying on it.** This
+is a standing decision, not a one-off; do not re-ask unless the situation changes (e.g., CI starts running
+again, or a merge's local gate is NOT clean).
+
+**§12 is CLEARED to start** — block `12.380–12.399` allocated tonight, no longer just reserved. Its
+"citable-by-naming" count was corrected across several passes tonight (2 → 31 → 67) as the executor kept
+finding its own extraction bugs; **67 of 78 is the number to trust**, arrived at by importing the checker's own
+`extractCheckedIds`/`isCited` rather than re-deriving them, with every section cross-checked against
+`check:citations` itself.
+
+**The "reader job" claim itself needed three separate corrections tonight** — worth stating plainly so a
+future restart doesn't inherit an early, wrong version of it from earlier in this file: rows that name a
+FIXTURE runner (not a `*.test.ts` file) still count as named and citable (§04's fixture-runner miss cost 24
+rows before being caught); a substring-matching "already cited" check can silently skip a row whose id is a
+prefix of another on the same line (`4.3` inside `4.34` — recurred in fresh code written the SAME session,
+after the shape had already been named as rule 9's sixth case); and a row naming a source file, script, or CI
+yaml — not a test — is a different, genuinely uncitable class, not evidence of a reader-pass backlog. After all
+three corrections, the accounting is: of 115 uncited rows repo-wide, most of what's left outside §12 has
+actually been read and found either citable (already cited) or genuinely type-level/record-only with no
+runtime assertion (e.g. `7.199`, `3.62`, `13.177` — refused on the merits, not left uncited by oversight).
+
 ## ⏩ MONDAY 08:5x IST — THE WEEKLY RESET HAPPENED FOR REAL AT 06:30. `main` is `686ab85`, gate green (twelfth identical run). Executor RESTARTED fresh (was at 89% context) and is finishing Task 1 of its own handoff. Owner authorized "keep going through it all" — no more per-section asking tonight.
 
 **What happened between the last anchor and now, compressed:** the owner, told the remaining backfill was
