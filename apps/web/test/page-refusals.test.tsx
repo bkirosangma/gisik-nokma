@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, LIST_TOO_LARGE_ABSENCE, ServingGapError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
@@ -184,12 +185,13 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
    * error, so the case pins the string a user actually meets and reddens if that prose
    * changes.
    *
-   * **And it measures more than 12.322 records.** That row says a project past the cap
-   * *"loses three of four tabs"*. One `useTicketList` read feeds all four consumers on
-   * this page — the create region, Calendar, Timeline and List — so **`New ticket` is
-   * not offered either.** A user whose project grew past the bound cannot create a
-   * ticket in it, on any tab. That is asserted here rather than narrated, because it is
-   * the part a design decision most needs to know.
+   * **It measured more than 12.322 records, and the measurement has since been acted
+   * on.** That row says a project past the cap *"loses three of four tabs"*. One
+   * `useTicketList` read fed all four consumers on this page — the create region,
+   * Calendar, Timeline and List — so `New ticket` was not offered either, and a user
+   * whose project grew past the bound could not create a ticket in it on any tab. The
+   * create region no longer gates on that read (project-root creation never needed a
+   * parent), so what remains here is the LIST half, on the tabs that show a list.
    */
   it('Project page: past the list cap, the refusal renders in the absence’s own words', async () => {
     render(
@@ -204,7 +206,6 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
           getTicketTypes: async () => [
             { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
           ],
-          getPreferences: async () => ({ columns: { origin: 'default' }, grouping: { origin: 'default' } }),
         })}
       >
         <ProjectPage />
@@ -213,28 +214,58 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
 
     // The creation half of this measurement is asserted by 3.142 in
     // `project-create-gate.test.tsx`, which drives the dialog open and reads the parent
-    // field. It is NOT re-asserted here: this harness stubs a different set of reads and
-    // the create region did not render under it, so an assertion here would be measuring
-    // the harness rather than the page. Named instead of quietly dropped.
+    // field. It is NOT re-asserted here: that case owns the dialog's contents and this
+    // one owns the refusal, and splitting them keeps each failure naming one thing.
 
-    // The refusal carries the absence's OWN words, not a paraphrase — and it is still
-    // on the page, on the tab arms. Taken FROM the absence rather than a re-imported
-    // constant: `LIST_ROW_CAP` is not exported through this entrypoint, and importing
-    // it anyway yielded `undefined`, which made the matcher `/undefined/` and failed
-    // for a reason unrelated to the page.
+    // **The tab click is load-bearing, and this is the behaviour change it pins.**
+    // `view` starts at `'board'`, and past the cap the BOARD tab now carries no list
+    // refusal at all: the only renderers of `list.error` are the List, Calendar and
+    // Timeline arms. It used to be tab-independent, because `createRegion` — which sits
+    // inside the tablist and renders on every tab — refused there. Decoupling creation
+    // from the list read removed that renderer, deliberately: its `what` read *"The
+    // tickets that could be a parent, so New ticket is not offered"*, and that sentence
+    // is now FALSE — `New ticket` IS offered, at project root. A refusal cannot be left
+    // standing on a tab to say something untrue.
+    //
+    // Nothing false replaces it on the board: the board tab draws the BOARD read, which
+    // is a different query, and no spinner and no empty table stand in the list's place
+    // there. The user learns of the cap on the three tabs that show the list, and in the
+    // create dialog's parent field, which names the unavailability (3.142). Recorded as
+    // a design call the owner can reverse in a sentence, not as an accident.
+    await userEvent.setup().click(await screen.findByRole('tab', { name: 'List' }));
+
+    // The refusal carries the absence's OWN words, not a paraphrase. Taken FROM the
+    // absence rather than a re-imported constant: `LIST_ROW_CAP` is not exported through
+    // this entrypoint, and importing it anyway yielded `undefined`, which made the
+    // matcher `/undefined/` and failed for a reason unrelated to the page.
     // Read off the refusal ELEMENT rather than by text match: `ShellRefusal` renders
     // `what` and `message` as separate nodes, so a text matcher spans a boundary and
     // reports "broken up by multiple elements" — a harness failure that looks exactly
     // like an absent refusal.
+    //
+    // And the matched node must be the LIST's refusal, not merely SOME refusal carrying
+    // the cap's prose: three `role="status"` nodes are on this page under these stubs
+    // (attention, board, list). A bare `.some(includes(ownWords))` would pass if the cap
+    // text ever leaked into another read's message, which is the sort of pass that
+    // survives the defect it was written to catch.
     const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 40);
     await waitFor(() => {
       const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
-      expect(statuses.some((text) => text.includes(ownWords))).toBe(true);
+      expect(
+        statuses.some(
+          (text) => text.includes('The ticket list cannot be shown yet.') && text.includes(ownWords),
+        ),
+      ).toBe(true);
     });
 
     // Paired, as every case in this file is: the refusal present AND what would
-    // otherwise stand in its place absent.
+    // otherwise stand in its place absent. `Loading…` alone would NOT be that pair —
+    // it is absent on the board tab too, under these stubs, so keeping only it would
+    // let the case pass without ever depending on the click above. `TicketList`'s own
+    // summary is the thing the List arm renders when the read answers, so its absence
+    // is what says the refusal took the arm rather than sitting beside a drawn list.
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('list-summary')).not.toBeInTheDocument();
   });
 
   it('Project page: the board tab shows the board read’s own failure, not "Loading…"', async () => {
