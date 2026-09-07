@@ -159,9 +159,9 @@ describe('root onRequest hooks reach every route (wiring)', () => {
 // ── HTTP-Origin: the CSRF ruling's item 2 ────────────────────────────────────
 
 /**
- * 13.117 — each of the seven protected routes: a FORGED HTTP-Origin on a cookie-carrying mutation is refused `403 { error: 'forbidden_origin' }`.
- * 13.118 — each of the seven: a cookie-carrying mutation with NO HTTP-Origin header at all is also refused — the rule REQUIRES the header, it does not merely validate one when present.
- * 13.119 — each of the seven: the correctly-configured `WEB_ORIGIN` is let through. (Throughout this block "origin" is the HTTP `Origin` HEADER — the CSRF control — not the event envelope's `origin` provenance field.)
+ * 13.117 — each of the eight protected routes: a FORGED HTTP-Origin on a cookie-carrying mutation is refused `403 { error: 'forbidden_origin' }`.
+ * 13.118 — each of the eight: a cookie-carrying mutation with NO HTTP-Origin header at all is also refused — the rule REQUIRES the header, it does not merely validate one when present.
+ * 13.119 — each of the eight: the correctly-configured `WEB_ORIGIN` is let through. (Throughout this block "origin" is the HTTP `Origin` HEADER — the CSRF control — not the event envelope's `origin` provenance field.)
  */
 describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   /**
@@ -189,6 +189,11 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/me/notifications/01JN0000000000000000000000/read',
       '/v1/me/notifications/:id/read',
     ],
+    // Added by MCP plan Task 3, and added HERE because the drift guard below
+    // REQUIRED it: protecting the route without a row reddens 13.116, which is
+    // precisely what that guard is for. A cookie-authenticated POST that mints
+    // a credential, so it belongs to the same category as the invite MINT.
+    ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve'],
   ];
 
   /**
