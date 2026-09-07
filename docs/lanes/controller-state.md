@@ -1,5 +1,36 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 13:0x IST — REMEDY 4 (createRegion decoupled from the list read) MERGED and reviewed. `main` is `c3404af`, gate green, citations 1539/1539. Ticket creation past the pagination cap WORKS AGAIN. Remedy 2 (real filtering) is next, then `13.176`.
+
+**PR #270 merged** after a full review cycle that found real defects, not nitpicks:
+
+1. **The Board-tab question this file asked is answered and judged correct, not a regression:** `createRegion`
+   was the ONLY renderer of the past-cap refusal on every tab (it lived in the shared tablist), so removing its
+   gate means the Board tab now shows no refusal at all past the cap — verified from rendered DOM, not
+   inferred. Judged right because nothing false replaced it (the board's own read still renders normally) and
+   the three tabs that actually show a list still refuse correctly.
+2. **The branch's earlier red (12.382) was a test-harness bug, not a product regression** — a hand-typed stub
+   passed the wrong shape to `getPreferences`, which `typecheck` catches but the two vitest runs that were
+   actually run did not, because **the gate is `build test typecheck` and only the test half had been run.**
+   Lesson recorded plainly: a passing suite is not the gate.
+3. **An independent review then caught a REAL defect the branch's own tests missed**: an empty-picker false
+   claim ("no possible parent") was reachable and **1255 existing tests never exercised
+   `parentCandidatesUnavailable` at all** — zero references. Fixed with submit-site enforcement (checked at the
+   `onCreate` handler, not just at what the picker renders, because hiding a control does not clear state set
+   before it appeared) plus a second, independently-discovered bug (3.158): keying the "parent unavailable"
+   signal on `list.error !== null` instead of `list.rows === null` would have blamed an unrelated preferences
+   failure for hiding parents that were sitting right there in `list.rows`.
+4. **A `git checkout --` during the fix-cycle silently destroyed both uncommitted source fixes** — caught only
+   by an unrelated baseline re-run, not by the tooling. Rule already in this file (commit before mutating)
+   applies equally here: commit a real fix before touching the tree again for any reason.
+
+Gate: `GATE_EXIT=0` · 30/30 · 3706 passed (+3 new cases) / 297 files (+1). `check:citations`: 1539/1539.
+`check:tasks`: 177/177 unchanged (client-side product work, no ledger row).
+
+**Next: remedy (2), real filtering for `ticket-list.tsx`'s hard-coded `{}`** — the owner's original decision,
+still the fix for VIEWING/narrowing under the cap (remedy 4 only restored creation). Then `13.176`'s
+measurement and design, unstarted.
+
 ## ⏸ MONDAY 12:1x IST — EXECUTOR RESTARTED at 89% context with remedy (1) BUILT BUT RED, deliberately unmerged. `main` is `11779b1`, unchanged since the last anchor. Read `docs/lanes/executor-state.md` on `exec/77-decouple-create` for the actual restart brief — this section is context, not a substitute.
 
 **Remedy (1) — decoupling `createRegion` from `useTicketList` — is implemented and 3.142 (its own governing
