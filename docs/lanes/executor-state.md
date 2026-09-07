@@ -42,6 +42,100 @@ Cases 12.394–12.396, three mutations, three killed. Gate **33/33 EXIT 0, `Cach
 **v22.22.2**; five checks EXIT 0. Pre-launch item 6's "recorded for the owner, not fixed" note is now
 marked CLOSED with what replaced it.
 
+# ▶ TUESDAY 2026-09-08 ~04:0x IST — **#324 WAS AUTO-CLOSED, NOT MERGED. THE SAME TRAP, A SECOND TIME.**
+
+> **READ THIS FIRST.** `origin/main` is `94f1f18` — **#323 (MCP Task 11) merged**. Merging it deleted
+> `exec/111-mcp-task11-catalogue`, which was **#324's base**, so GitHub closed #324 as **closed, NOT
+> merged**. Task 12 — the revoke surface and the `last_used` column — is **not on `main`**, and its
+> branch `exec/112-mcp-task12-revoke` still holds all of it.
+>
+> This is the identical failure that took out #313/#315/#317/#319 earlier tonight, and the PR that was
+> closed carried an explicit warning not to delete the base branch. **The lesson is not "warn harder":
+> merge a stack TIP-FIRST as one PR into `main`, or merge without deleting branches.** A warning in a
+> description is not a mechanism.
+
+Recovered by merging `main` into `exec/112` and reopening against `main`. Three narrative conflicts, all
+additive (this branch adds, `main` adds nothing at that point) — `Features.md`, this file, and the
+ledger's Task 12 row, where `main` carries the pre-implementation `todo` and this branch the built one.
+
+Task 11's ledger row is corrected to `done 323 94f1f18` in the same change: it merged, and a row still
+reading `in-flight` is the restart surface lying about what shipped.
+
+
+# ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE PLAN IS FINISHED AND THE OWNER RULED ON FIVE OPEN FINDINGS.**
+
+> **READ THIS FIRST.** `origin/main` is `f200cb0`. **#323** (Task 11) and **#324** (Task 12 + the
+> `last_used` column) are open and mergeable, stacked in that order. **Merge #323 first and do NOT
+> delete its branch** — deleting the base of a stacked PR is what auto-closed four PRs unmerged
+> earlier tonight. CI cannot run: every Actions job dies in 3–4 s on the account billing failure.
+
+**The backlog was empty and is now five items again.** The ledger reads 188/190 `done` with only the
+two in-flight PRs outstanding; the MCP plan is 13/13 tasks with zero unticked steps; the pre-launch
+checklist is 7/7. Everything that remained had been recorded as an OWNER DECISION rather than a defect,
+and minting work from that list is not the executor's call — so it was put to the owner instead, who
+ruled on 2026-09-08:
+
+| finding | ruling | state |
+|---|---|---|
+| show `last_used` on `/mcp/tokens` | **yes** | **done**, in #324, cases 14.102–14.103 |
+| HTTP security headers | **executor's recommendation** — `nosniff` + `X-Frame-Options`/`frame-ancestors` + `Referrer-Policy` on both apps, **CSP deferred** | next |
+| `EXPO_PUBLIC_DEV_TOKEN` build guard | **take it** | queued |
+| mobile help screen dark theme | **take it** | queued |
+| tap targets / type scale at 390px | **take it** | queued |
+
+**Only HSTS ships today.** Verified by sweep, not recalled: `apps/server/src` and
+`apps/web/next.config.ts` contain no CSP, `X-Content-Type-Options`, `X-Frame-Options`,
+`Referrer-Policy` or `Permissions-Policy`. CSP is deferred deliberately — a policy for a Next.js app on
+webpack with `output: 'standalone'` and rewrite-based same-origin proxying is a design decision that
+breaks the app in production only, and it should be measured against the live stack rather than guessed.
+
+**Two id lessons from the `last_used` change.** `14.100` was already spent on Task 5's manual
+end-to-end case — minted out of band when an earlier collision was fixed — so the new cases sit at
+`14.102–14.103`. `check-case-ids` caught it; reading the file did not. And `CONTRAST_PAIRS` needed the
+new `textMuted`-on-`surfaceSunken` row: it is self-declared enforcement, so a pair nobody lists is a
+pair nobody checks.
+
+Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**; `check-case-ids` 1760 unique ids.
+
+
+# ▶ TUESDAY 2026-09-08 ~03:1x IST — **THE MCP PLAN IS FINISHED. ALL THIRTEEN TASKS, ZERO UNTICKED STEPS.**
+
+> **READ THIS FIRST.** `origin/main` is `f200cb0`; Tasks 0–10 landed in #321 at `60a4a1e`. Two PRs are
+> open and both are mergeable: **#323** (Task 11 — the catalogue, the ledger gate, the case-id reader)
+> and **#324** (Task 12 — the revoke surface), stacked in that order. **Merge #323 first, and do NOT
+> delete its branch on merge** — deleting the base of a stacked PR is what auto-closed four PRs
+> unmerged earlier tonight. CI still cannot run: every Actions job dies in 3–4 s on the account billing
+> failure.
+
+| plan | state |
+|---|---|
+| MCP Tasks 0–10 | on `main` at `60a4a1e` (#321) |
+| MCP Task 11 | **#323**, mergeable |
+| MCP Task 12 | **#324**, mergeable, stacked on #323 |
+| the plan itself | **0 unticked steps across all 13 tasks** |
+
+**Task 12 found the CSRF control could not see a DELETE.** `httpOriginRefused` opened with
+`method !== 'POST'` under a comment reading "mutations only". Every route in
+`HTTP_ORIGIN_PROTECTED_ROUTES` happened to be a POST, so the control looked complete while being unable
+to protect a PUT, PATCH or DELETE added to it — in the one control this repo calls "not defence in
+depth here, it is the defence". Found by adding the route and watching the forged-`Origin` DELETE reach
+`requireSession`, which answered **401**: a refusal, for the wrong reason, that reads as a pass.
+
+**Ten mutations on Task 12, ten killed — two only after the cases were rewritten.** 14.98 rendered one
+token, so "revoke the row you clicked" and "revoke the first row" were the same assertion; 14.97 claimed
+to pin `Asia/Kolkata` while running on a machine already in IST. Neither was visible by reading.
+
+**THE ONE THING STILL OWED TO THE OWNER.** The plan fenced a sub-question off from the executor —
+*should the token list show when each token was last used?* — and its premise is stale:
+`mcp_tokens.last_used` **already exists** and `resolveMcpToken` writes it on every resolution, so the
+recording half shipped in Task 2. What is open is only whether the product SURFACES it. Built without
+it. **Adding it is one column in one query and one cell.**
+
+Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**; seven checks EXIT 0 (`check:env`,
+`check:tasks`, `check:runbook`, `check:citations`, `check:help`, `check:db-tz` against the dev stack,
+`check-case-ids` — 1758 unique ids).
+
+
 # ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE MCP SERVER IS ON `main`. TASK 11 DONE; ONLY TASK 12 REMAINS.**
 
 > **READ THIS FIRST.** `origin/main` is `f200cb0`. **#321 landed the whole MCP server (plan Tasks

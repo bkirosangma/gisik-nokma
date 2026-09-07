@@ -228,11 +228,11 @@ The instruction goes to the process's **stderr**, which most clients write to a 
 typed at `WEB_ORIGIN + /mcp/authorize`, so if that page 404s the server's `WEB_ORIGIN` is wrong — the
 same setting behind *Sign-in refused with "Invalid origin"* below.
 
-**Revoke** — one statement, effective on the next call:
+**Revoke.** People do it themselves at `WEB_ORIGIN + /mcp/tokens` — *Connected assistants* — which is
+`DELETE /v1/me/mcp-tokens/:id`, scoped to the caller. Effective on that assistant's next call. From the
+database, for one person's every connection:
 
-    DELETE FROM mcp_tokens WHERE user_id = '<user id>';
-
-There is no revoke UI yet. `mcp_tokens.last_used` says whether the token is still being used; it is an
+    DELETE FROM mcp_tokens WHERE user_id = '<user id>'; `mcp_tokens.last_used` says whether the token is still being used; it is an
 observation and no code path reads it to authorise anything. `mcp_tokens` has no `expires_at` on
 purpose — see the header of `apps/server/migrations/1788600000000_mcp-device-auth.sql`.
 
