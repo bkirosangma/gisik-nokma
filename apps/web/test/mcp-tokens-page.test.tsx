@@ -83,6 +83,7 @@ describe('14.96 signed out', () => {
 
 describe('14.97 the list shows what is honestly available', () => {
   it('names the approval date and NEVER anything resembling the credential', async () => {
+    const zone = vi.spyOn(Date.prototype, 'toLocaleDateString');
     fetchStub(() => ({
       status: 200,
       body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z' }] },
@@ -90,10 +91,14 @@ describe('14.97 the list shows what is honestly available', () => {
     mount();
 
     await screen.findByTestId('mcp-tokens-list');
-    // Asia/Kolkata, not the runner locale. This instant is 19:51Z on the 7th,
-    // which renders "7 Sept 2026" in UTC and "8 Sept 2026" in IST — measured
-    // both ways — so the day itself is what pins the timezone here.
+    // The rendered day, and then the thing the rendered day CANNOT prove here.
+    // This instant is 19:51Z on the 7th: "7 Sept 2026" in UTC, "8 Sept 2026" in
+    // IST. Asserting the day alone looked like it pinned the timezone — and
+    // measured, it did not: removing `timeZone: 'Asia/Kolkata'` left this case
+    // green, because THIS RUNNER IS ALREADY IN IST and the ambient default
+    // agreed. The options object is what makes the claim falsifiable anywhere.
     expect(screen.getByText(/Approved 8 Sept 2026/)).toBeInTheDocument();
+    expect(zone.mock.calls[0]?.[1]).toMatchObject({ timeZone: 'Asia/Kolkata' });
     // `mcp_tokens` stores only sha256(token). A row that printed the id would
     // be showing a hash while implying it had the credential.
     expect(document.body.textContent ?? '').not.toContain(ID);
@@ -113,23 +118,30 @@ describe('14.97 the list shows what is honestly available', () => {
 
 describe('14.98 revoking', () => {
   it('DELETEs that row’s id and reloads the list from the server', async () => {
+    // TWO rows, and the SECOND is the one revoked. With one row the assertion
+    // below cannot fail: `tokens[0].id` and the clicked row's id are the same
+    // string, so a handler that always revoked the first token passed — checked
+    // by mutation, and it did.
+    const both = [
+      { id: ID, createdAt: '2026-09-07T19:51:44.951Z' },
+      { id: OTHER, createdAt: '2026-09-06T10:00:00.000Z' },
+    ];
     fetchStub((call) => {
       if (call.method === 'DELETE') return { status: 204 };
-      // Second GET answers empty — the row is gone.
       const already = calls.some((c) => c.method === 'DELETE');
-      return { status: 200, body: { tokens: already ? [] : [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z' }] } };
+      return { status: 200, body: { tokens: already ? [both[0]] : both } };
     });
     mount();
     await screen.findByTestId('mcp-tokens-list');
 
-    await userEvent.click(screen.getByTestId(`mcp-tokens-revoke-${ID}`));
+    await userEvent.click(screen.getByTestId(`mcp-tokens-revoke-${OTHER}`));
 
-    await waitFor(() => expect(screen.getByTestId('mcp-tokens-empty')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId(`mcp-tokens-revoke-${OTHER}`)).toBeNull());
     const del = calls.filter((c) => c.method === 'DELETE');
     expect(del).toHaveLength(1);
-    // THAT row's id, not the first token in some list the component kept.
-    expect(del[0]?.url).toBe(`/v1/me/mcp-tokens/${ID}`);
-    expect(del[0]?.url).not.toContain(OTHER);
+    // THAT row's id, not whichever token the component happened to hold first.
+    expect(del[0]?.url).toBe(`/v1/me/mcp-tokens/${OTHER}`);
+    expect(del[0]?.url).not.toContain(ID);
     // Reloaded from the server rather than spliced locally: a client that only
     // removed the row would keep showing a stale list after any other change.
     expect(calls.filter((c) => c.method === 'GET')).toHaveLength(2);
