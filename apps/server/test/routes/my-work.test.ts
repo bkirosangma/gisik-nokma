@@ -219,6 +219,18 @@ type MyWorkFixtures = {
    */
   guestSharedChildId: string;
   /**
+   * Explicit to `[member]` and to NOBODY ELSE — the only audience in the seeded
+   * workspace that does not name the owner, and assigned to nobody.
+   *
+   * It exists because without it 7.262 could not mean what its name says.
+   * Every other `explicitTo` here lists the owner, so "the owner's shared holds
+   * only what NAMES them" was satisfied by any implementation that returned
+   * every `explicit`-mode row — the audience half of the clause had no fixture
+   * that could redden it. MEASURED, not suspected: dropping the
+   * `= ANY (resolved_user_ids)` test reddens 7.262 only once this row exists.
+   */
+  memberOnlySharedId: string;
+  /**
    * In the SIBLING project, explicit `[owner]`, assigned to NOBODY. The owner's
    * every GROUP card is in the seeded project, so the sibling project's name can
    * reach `projectNames` through a shared card and through nothing else — which
@@ -269,6 +281,7 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
   const guestSharedChildId = myWorkTicketId(12 + OWNER_ORDER_COUNT);
   const guestNeighbourSharedId = myWorkTicketId(13 + OWNER_ORDER_COUNT);
   const ownerSharedSiblingId = myWorkTicketId(14 + OWNER_ORDER_COUNT);
+  const memberOnlySharedId = myWorkTicketId(15 + OWNER_ORDER_COUNT);
 
   /** `ticket.created` + `ticket.assigned` for one ticket of type `task`. */
   const assigned = (id: string, title: string, assigneeId: string, inProject: string): LedgerEvent[] => [
@@ -355,6 +368,15 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
       },
     }),
     explicitTo(ownerSharedSiblingId, [owner]),
+
+    // The audience that does NOT name the owner — see `memberOnlySharedId`.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: memberOnlySharedId },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: null, title: 'Reconcile the till float' },
+    }),
+    explicitTo(memberOnlySharedId, [member]),
     // No `visibility.set` of its own: the audience is its parent's, resolved.
     makeCommitted({
       ...ws,
@@ -461,6 +483,7 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
     guestSharedChildId,
     guestNeighbourSharedId,
     ownerSharedSiblingId,
+    memberOnlySharedId,
   };
 }
 
@@ -1214,6 +1237,33 @@ describe('GET /v1/me/work — the door', () => {
       expect(sharedIds, 'a project-mode ticket the owner can read is not one shared WITH them').not.toContain(id);
     }
     expect(sharedIds).not.toContain(fx.memberOpenId);
+
+    // THE AUDIENCE HALF, and this row is why the case can mean what it says.
+    // Every OTHER explicit audience in this workspace lists the owner, so
+    // "only what NAMES them" was satisfied by any implementation returning
+    // every `explicit`-mode row — the `= ANY (resolved_user_ids)` test had no
+    // fixture that could redden it. This one is explicit to the MEMBER alone.
+    expect(
+      sharedIds,
+      'an explicit ticket that does NOT name the owner is not shared WITH the owner, however visible it is',
+    ).not.toContain(fx.memberOnlySharedId);
+
+    // Read back: the row really is `explicit`, really names the member, and
+    // really does not name the owner — so the absence is the audience test and
+    // not a seeder that wrote a different mode.
+    const audience = await db.pool.query<{ resolved_mode: string; resolved_user_ids: string[] }>(
+      `SELECT resolved_mode, resolved_user_ids FROM proj_visibility WHERE ticket_id = $1`,
+      [fx.memberOnlySharedId],
+    );
+    expect(audience.rows[0]?.resolved_mode).toBe('explicit');
+    expect(audience.rows[0]?.resolved_user_ids).toEqual([read.userIds.member]);
+
+    // And the MEMBER, who is named, does get it — so the absence above is this
+    // viewer not being named rather than the row being unreachable to anybody.
+    const memberShared = ((await myWork('member')).json() as MyWorkResponse).shared.map(
+      (card) => card.ticketId,
+    );
+    expect(memberShared).toContain(fx.memberOnlySharedId);
 
     // Present-sibling: every audience that DOES name the owner is here — the
     // shared world's three plus this file's six — so the absences above are the
