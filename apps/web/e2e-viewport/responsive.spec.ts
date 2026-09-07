@@ -6,6 +6,11 @@ import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * ITEM 7 — RESPONSIVE, MEASURED IN A REAL VIEWPORT
+ *
+ * Case 13.255 — the signed-out surface holds its layout at 390, 768 and 1512,
+ * and the three are measurably DIFFERENT. (13.254, the signed-in shell, lives
+ * in `apps/web/e2e-stack/viewport.spec.ts`: it needs a real session, and the
+ * overflow that motivated all of this was on the authenticated pages only.)
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * `playwright.viewport.config.ts`'s docblock carries the WHY (the
