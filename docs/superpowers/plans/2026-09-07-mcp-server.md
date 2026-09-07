@@ -3339,11 +3339,13 @@ yes, with Task 5's approval page already establishing the pattern.
 > mutating methods, which admits nothing previously refused; and `security-middleware.test.ts`'s route
 > table gained a method column, because a table that cannot express a non-POST route cannot catch that.
 >
-> **On the fenced sub-question:** its premise is stale. `mcp_tokens.last_used` **exists** and
-> `resolveMcpToken` writes it on every successful resolution, so the recording half was decided and
-> shipped in Task 2 — what is still open is only whether the product SURFACES it. Built without it,
-> because the fence is the signal and that remains the owner's call. Adding it is one column in one
-> query and one cell.
+> **On the fenced sub-question: its premise was stale, and the owner has now ruled.**
+> `mcp_tokens.last_used` **exists** and `resolveMcpToken` writes it on every successful resolution, so
+> the recording half was decided and shipped in Task 2 — what was ever open is only whether the product
+> SURFACES it, a much smaller question than the plan priced. Built without it first, because the fence
+> is the signal; **added on the owner's ruling of 2026-09-08**, cases 14.102–14.103. Declaring the new
+> `textMuted` on `surfaceSunken` combination in `CONTRAST_PAIRS` was part of that change: the list is
+> self-declared enforcement, so a pair nobody lists is a pair nobody checks.
 >
 > Cases 14.90–14.99. Ten mutations run, ten killed — **two only after the cases were rewritten**: 14.98
 > rendered one token, so "revoke the row you clicked" and "revoke the first row" were the same

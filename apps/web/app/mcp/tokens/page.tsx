@@ -35,7 +35,7 @@ import { useSessionStatus } from '../../../src/providers.js';
  * screen says that rather than implying a session is being torn down.
  */
 
-type TokenRow = { id: string; createdAt: string };
+type TokenRow = { id: string; createdAt: string; lastUsedAt: string | null };
 
 /**
  * The approval date, in the product's timezone.
@@ -145,6 +145,14 @@ export default function McpTokensPage(): React.JSX.Element {
                   <li className="gn-mcp-tokens__row" key={token.id}>
                     <span className="gn-mcp-tokens__when">
                       Approved {approvedOn(token.createdAt)}
+                      {/* The honest answer for a token nothing has used yet, rather
+                          than a date picked to fill the column. `last_used` is NULL
+                          until the first resolution. */}
+                      <span className="gn-mcp-tokens__used">
+                        {token.lastUsedAt === null
+                          ? 'Never used'
+                          : `Last used ${approvedOn(token.lastUsedAt)}`}
+                      </span>
                     </span>
                     <Button
                       data-testid={`mcp-tokens-revoke-${token.id}`}
@@ -163,7 +171,9 @@ export default function McpTokensPage(): React.JSX.Element {
                 more honest than a masked string implying it could. */}
             <p className="gn-mcp-tokens__what">
               The connection itself is never shown — only a one-way hash of it is stored, so there is
-              nothing here to copy or leak.
+              nothing here to copy or leak. &ldquo;Last used&rdquo; is the day the assistant last made
+              a request as you; the product records that so you can tell a live connection from a
+              forgotten one before revoking it.
             </p>
           </>
         )}

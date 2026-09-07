@@ -12,6 +12,12 @@ scaffold lands and a catalogue that omits shipped tests is out of sync with the 
 convention is that `test-cases/` moves in the SAME change set as the code. Task 11 continues from this
 file's then-highest id rather than renumbering, exactly as §13 records doing for its own reservation gap.*
 
+*The decade blocks are contiguous — config `14.1–14.9` through the revoke surface `14.90–14.99` — with
+one exception a reader will otherwise trip on: **`14.100` is Task 5's manual end-to-end case**, minted
+out of band when a Task 5/Task 6 id collision was fixed. The `last_used` column added on the owner's
+2026-09-08 ruling therefore sits at `14.102–14.103`, not `14.100–14.101`. That collision was caught by
+`check-case-ids`, not by reading. **Next free: `14.104`.***
+
 ## Task 1 — configuration (`packages/mcp-server`)
 
 *`loadMcpConfig(env, home)` takes the environment as a PARAMETER rather than reading `process.env`
@@ -504,6 +510,13 @@ test wrote, not that it shows the credential the CLI is holding.*
 - **14.99** ✅ A 404 on revoke is reported as "already gone" — the only thing true of both meanings the
   server deliberately refuses to distinguish — with `role="alert"`, and the list is re-read. —
   (`apps/web/test/mcp-tokens-page.test.tsx`)
+- **14.102** ✅ `lastUsedAt` is **null until the token is used** and an instant after — driven through
+  the real PAT path, which is what writes the column. A token minted and never used has no last use,
+  and inventing one would make a forgotten connection look active in the one column a person reads
+  before revoking. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
+- **14.103** ✅ The screen says **"Never used"** for one and names the day for the other, asserted in
+  ONE case with both rows present — either half alone passes for a component that renders one string
+  unconditionally. — (`apps/web/test/mcp-tokens-page.test.tsx`)
 
 > ### The CSRF control could not see a DELETE
 >
@@ -534,7 +547,7 @@ test wrote, not that it shows the credential the CLI is holding.*
 > the case green. The `toLocaleDateString` options object is now asserted too, which is falsifiable
 > wherever it runs.
 
-> ### The fenced sub-question, and what execution found about its premise
+> ### The fenced sub-question, its stale premise, and the ruling
 >
 > The plan reserved one question for the owner: **should the list show when each token was last used?**
 > It records the honest cost — *"it is a log of when a person's assistant acted on their behalf, kept
@@ -543,8 +556,10 @@ test wrote, not that it shows the credential the CLI is holding.*
 > **It is.** `mcp_tokens.last_used` exists, and `resolveMcpToken` writes it on **every** successful
 > resolution (`UPDATE mcp_tokens SET last_used = $2 … RETURNING user_id`); the live end-to-end run in
 > Task 10 observed it being written. So the recording half was decided and shipped in Task 2, and what
-> remains open is only whether the product **surfaces** it.
+> was ever open is only whether the product **surfaces** it — a much smaller question than the plan
+> priced, and the reason for surfacing the difference rather than deciding it.
 >
-> Built without it, deliberately, because that is still the owner's call and the fence is the signal.
-> `listMcpTokens` does not select the column and the screen has no cell for it. **Adding it is one
-> column in one query and one `<td>`.**
+> **Built without it first, then added on the owner's ruling (2026-09-08).** Cases 14.100 and 14.101
+> cover it. Declaring the new `textMuted` on `surfaceSunken` combination in `CONTRAST_PAIRS` was part
+> of the change: that list is self-declared enforcement, so a pair nobody lists is a pair nobody
+> checks, and shipping a new fg-on-bg without its row is the gap rather than a formality.

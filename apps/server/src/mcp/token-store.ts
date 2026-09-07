@@ -139,22 +139,31 @@ export async function exchangeDeviceCode(
  * can present. This is the same reasoning the migration records for storing a
  * plain hash rather than a password KDF, read in the other direction.
  *
- * `last_used` is NOT selected. The column exists and is written on every
- * resolution, but whether the PRODUCT SURFACES a per-token log of when a
- * person's assistant acted for them is an open owner decision (MCP plan Task 12,
- * the fenced sub-question). Recording it in a server-owned table nobody reads
- * and putting it on a screen are different acts. Adding it here is one column
- * and one cell.
+ * `last_used` IS selected, and that was a ruling rather than a default. The
+ * plan fenced the question off from the executor — surfacing a per-token log of
+ * when a person's assistant acted for them is a privacy-shaped decision, not a
+ * technical one — and the owner ruled to show it (2026-09-08). What made it a
+ * smaller question than the plan thought: the column already existed and
+ * `resolveMcpToken` already wrote it on every resolution, so only the DISPLAY
+ * was ever open.
+ *
+ * `null` for a token that has never been used, and the screen says "Never used"
+ * rather than picking a date. It is an observation and never an authorisation
+ * input — no code path reads it to decide anything.
  */
 export async function listMcpTokens(
   db: Queryable,
   userId: string,
-): Promise<{ id: string; createdAt: string }[]> {
-  const { rows } = await db.query<{ token_hash: string; created_at: Date }>(
-    'SELECT token_hash, created_at FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
+): Promise<{ id: string; createdAt: string; lastUsedAt: string | null }[]> {
+  const { rows } = await db.query<{ token_hash: string; created_at: Date; last_used: Date | null }>(
+    'SELECT token_hash, created_at, last_used FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
     [userId],
   );
-  return rows.map((r) => ({ id: r.token_hash, createdAt: r.created_at.toISOString() }));
+  return rows.map((r) => ({
+    id: r.token_hash,
+    createdAt: r.created_at.toISOString(),
+    lastUsedAt: r.last_used === null ? null : r.last_used.toISOString(),
+  }));
 }
 
 /**

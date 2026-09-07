@@ -20,6 +20,42 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE PLAN IS FINISHED AND THE OWNER RULED ON FIVE OPEN FINDINGS.**
+
+> **READ THIS FIRST.** `origin/main` is `f200cb0`. **#323** (Task 11) and **#324** (Task 12 + the
+> `last_used` column) are open and mergeable, stacked in that order. **Merge #323 first and do NOT
+> delete its branch** — deleting the base of a stacked PR is what auto-closed four PRs unmerged
+> earlier tonight. CI cannot run: every Actions job dies in 3–4 s on the account billing failure.
+
+**The backlog was empty and is now five items again.** The ledger reads 188/190 `done` with only the
+two in-flight PRs outstanding; the MCP plan is 13/13 tasks with zero unticked steps; the pre-launch
+checklist is 7/7. Everything that remained had been recorded as an OWNER DECISION rather than a defect,
+and minting work from that list is not the executor's call — so it was put to the owner instead, who
+ruled on 2026-09-08:
+
+| finding | ruling | state |
+|---|---|---|
+| show `last_used` on `/mcp/tokens` | **yes** | **done**, in #324, cases 14.102–14.103 |
+| HTTP security headers | **executor's recommendation** — `nosniff` + `X-Frame-Options`/`frame-ancestors` + `Referrer-Policy` on both apps, **CSP deferred** | next |
+| `EXPO_PUBLIC_DEV_TOKEN` build guard | **take it** | queued |
+| mobile help screen dark theme | **take it** | queued |
+| tap targets / type scale at 390px | **take it** | queued |
+
+**Only HSTS ships today.** Verified by sweep, not recalled: `apps/server/src` and
+`apps/web/next.config.ts` contain no CSP, `X-Content-Type-Options`, `X-Frame-Options`,
+`Referrer-Policy` or `Permissions-Policy`. CSP is deferred deliberately — a policy for a Next.js app on
+webpack with `output: 'standalone'` and rewrite-based same-origin proxying is a design decision that
+breaks the app in production only, and it should be measured against the live stack rather than guessed.
+
+**Two id lessons from the `last_used` change.** `14.100` was already spent on Task 5's manual
+end-to-end case — minted out of band when an earlier collision was fixed — so the new cases sit at
+`14.102–14.103`. `check-case-ids` caught it; reading the file did not. And `CONTRAST_PAIRS` needed the
+new `textMuted`-on-`surfaceSunken` row: it is self-declared enforcement, so a pair nobody lists is a
+pair nobody checks.
+
+Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**; `check-case-ids` 1760 unique ids.
+
+
 # ▶ TUESDAY 2026-09-08 ~03:1x IST — **THE MCP PLAN IS FINISHED. ALL THIRTEEN TASKS, ZERO UNTICKED STEPS.**
 
 > **READ THIS FIRST.** `origin/main` is `f200cb0`; Tasks 0–10 landed in #321 at `60a4a1e`. Two PRs are

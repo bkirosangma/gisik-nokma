@@ -373,7 +373,19 @@ a { color: var(--gn-accent); }
 .gn-mcp-tokens__row + .gn-mcp-tokens__row { margin-top: 0.6rem; }
 
 .gn-mcp-tokens__when {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   color: var(--gn-text);
+  font-size: 1rem;
+}
+
+/* The secondary line, and it stays at 1rem rather than shrinking: this is the
+   fact a person reads to decide whether to revoke, and the pre-launch review
+   already recorded 12.5px labels as a type-scale finding. `text-muted` on
+   `surface-sunken` is a declared pair in CONTRAST_PAIRS. */
+.gn-mcp-tokens__used {
+  color: var(--gn-text-muted);
   font-size: 1rem;
 }
 

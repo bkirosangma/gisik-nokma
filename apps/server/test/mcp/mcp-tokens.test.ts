@@ -6,7 +6,7 @@ import { signInWithPhone } from '../helpers/session.js';
 import { HTTP_ORIGIN_PROTECTED_ROUTES } from '../../src/http/http-origin.js';
 
 /**
- * Plan: MCP server, Task 12. Cases 14.90–14.95.
+ * Plan: MCP server, Task 12. Cases 14.90–14.95, and 14.102 (owner ruling, 2026-09-08).
  *
  * Every token here is minted through the REAL device flow — mint, approve,
  * exchange — rather than inserted. A row this file wrote itself would prove the
@@ -91,6 +91,31 @@ describe('GET /v1/me/mcp-tokens', () => {
     // Disjoint in BOTH directions. One direction alone passes for a list that
     // returns everything to one caller and nothing to the other.
     expect(mineIds.some((id) => theirIds.includes(id))).toBe(false);
+  });
+
+  it('14.102 reports lastUsedAt — null until the token is used, an instant after', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009008');
+
+    const before = ((await list(app, a.session)).json() as { tokens: { lastUsedAt: string | null }[] })
+      .tokens[0];
+    // NULL, not the approval time and not "now". A token minted and never used
+    // has no last use, and inventing one would make an unused connection look
+    // active in the one column a person reads before revoking.
+    expect(before?.lastUsedAt).toBeNull();
+
+    // Use it — the real PAT path, which is what writes the column.
+    const used = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: { authorization: `Bearer ${a.mcpToken}` },
+    });
+    expect(used.statusCode).toBe(200);
+
+    const after = ((await list(app, a.session)).json() as { tokens: { lastUsedAt: string | null }[] })
+      .tokens[0];
+    expect(after?.lastUsedAt).not.toBeNull();
+    expect(Number.isNaN(Date.parse(after?.lastUsedAt ?? ''))).toBe(false);
   });
 
   it('14.92 needs a session', async () => {

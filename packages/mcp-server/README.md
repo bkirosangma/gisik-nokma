@@ -81,8 +81,10 @@ Open **`/mcp/tokens`** — *Connected assistants* — sign in, and click **Revok
 assistant's next request: the token stops resolving, the server answers 401, and the client clears its
 cached copy and starts a fresh device flow. Nothing is interrupted mid-task.
 
-The list shows when each connection was approved and nothing else, because that is all there is:
-`mcp_tokens` stores `sha256(token)` and the raw value existed only in the response that minted it.
+The list shows when each connection was approved and when it was last used — so you can tell a live
+connection from a forgotten one before revoking it. It never shows the connection itself, because that
+is all there is: `mcp_tokens` stores `sha256(token)` and the raw value existed only in the response that
+minted it.
 
 If you would rather do it against the database — every connection for one person, in one statement:
 
@@ -94,5 +96,5 @@ Deleting the row is the whole revocation. `mcp_tokens` has no `expires_at`, deli
 `apps/server/migrations/1788600000000_mcp-device-auth.sql`), because a token you minted for your own
 machine should not sign your assistant out mid-task on a timer nobody chose.
 
-`mcp_tokens.last_used` records whether a token is still being used. It is an observation only — no code
-path reads it to decide anything, and the screen does not show it.
+`mcp_tokens.last_used` is what the *Last used* column reads. It is an observation only — no code path
+reads it to decide anything.

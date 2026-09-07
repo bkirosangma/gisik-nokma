@@ -6,7 +6,7 @@ import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * Plan: MCP server, Task 12. Cases 14.96–14.99.
+ * Plan: MCP server, Task 12. Cases 14.96–14.99, and 14.103 (owner ruling, 2026-09-08).
  *
  * The revoke screen is the ONLY way a person withdraws an assistant's access
  * until somebody gives them a `psql` prompt, so it gets gate coverage rather
@@ -86,7 +86,7 @@ describe('14.97 the list shows what is honestly available', () => {
     const zone = vi.spyOn(Date.prototype, 'toLocaleDateString');
     fetchStub(() => ({
       status: 200,
-      body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z' }] },
+      body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null }] },
     }));
     mount();
 
@@ -123,8 +123,8 @@ describe('14.98 revoking', () => {
     // string, so a handler that always revoked the first token passed — checked
     // by mutation, and it did.
     const both = [
-      { id: ID, createdAt: '2026-09-07T19:51:44.951Z' },
-      { id: OTHER, createdAt: '2026-09-06T10:00:00.000Z' },
+      { id: ID, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null },
+      { id: OTHER, createdAt: '2026-09-06T10:00:00.000Z', lastUsedAt: null },
     ];
     fetchStub((call) => {
       if (call.method === 'DELETE') return { status: 204 };
@@ -152,7 +152,7 @@ describe('14.99 a revoke the server refuses', () => {
   it('reports the 404 as “already gone” — the only thing true of both its meanings', async () => {
     fetchStub((call) => {
       if (call.method === 'DELETE') return { status: 404, body: { error: 'not_found' } };
-      return { status: 200, body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z' }] } };
+      return { status: 200, body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null }] } };
     });
     mount();
     await screen.findByTestId('mcp-tokens-list');
@@ -167,5 +167,26 @@ describe('14.99 a revoke the server refuses', () => {
     // And it re-read the list rather than leaving a row the server may have
     // already dropped.
     await waitFor(() => expect(calls.filter((c) => c.method === 'GET')).toHaveLength(2));
+  });
+});
+
+describe('14.103 last used', () => {
+  it('says “Never used” for a token nothing has touched, and names the day for one that has', async () => {
+    fetchStub(() => ({
+      status: 200,
+      body: {
+        tokens: [
+          { id: ID, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null },
+          { id: OTHER, createdAt: '2026-09-06T10:00:00.000Z', lastUsedAt: '2026-09-07T19:52:00.000Z' },
+        ],
+      },
+    }));
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+
+    // Both halves, in one case, because either alone passes for a component
+    // that renders one string unconditionally.
+    expect(screen.getByText('Never used')).toBeInTheDocument();
+    expect(screen.getByText('Last used 8 Sept 2026')).toBeInTheDocument();
   });
 });
