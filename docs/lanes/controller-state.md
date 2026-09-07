@@ -1,5 +1,29 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 11:1x IST — `main` is `8fc9eb1`, gate green. 13.195+13.196 CLOSED — running the previously-UNRUN docker rehearsal found a REAL, currently-live defect, not a documentation gap.
+
+PR #259 merged. `check:citations`: 1533/1533, still zero uncited. **13.195's finding is worth reading in full,
+not just noting as closed:** `docker-compose.dev.yml` had documented, correctly at the time, that
+`BACKUP_S3_BUCKET` was deliberately omitted from the server service because nothing read it (measured: 0 hits
+in `apps/server/src`). **That premise expired the moment Lane C's backup work merged** — re-running the same
+measurement today found 5 hits and a real `ops:backup-once` script, and the in-container backup rehearsal
+(never run before, because the docker half of T16 was never executed) refused outright with "backup object
+storage needs: BACKUP_S3_BUCKET". Fixed: the variable is now set, wired to the `gisik-backups` bucket, verified
+by writing and reading back real non-zero-byte backup artifacts (25KiB/149KiB) from the bucket itself, not
+trusted from a log line. **The lesson: a correct decision with a recorded, measured reason can go stale
+silently when something else merges — nobody was watching this premise, and the only reason it surfaced now is
+that someone finally ran the untested path.** `13.196` closed alongside it: the runbook checker asserted
+referenced files *exist*, never that they still *say* what they're cited for — a new content-assertion test
+now checks the decision's own sentence fragments survive a rewrite, not just the file's existence.
+
+**Docker environment note, no action needed from a future reader:** the executor found the Docker VM's disk at
+literal zero (unrelated to available host disk) mid-rehearsal, reclaimed 10.65GB of BUILD CACHE ONLY (no
+images/volumes/containers touched, four unrelated containers stayed up), and explicitly left ~39GB of
+reclaimable images alone as a machine-level decision outside this project's scope.
+
+Next in the owner's order: `TicketPullNotFound`, then the six `helpers/seed.ts` rows, then `12.321`, then the
+two product items.
+
 ## ▶ MONDAY 10:5x IST — `main` is `78e647d`, gate green. 13.181 CLOSED (❌→✅, seed:dev now has CLI coverage). Working the carried queue, one item per branch/PR now (executor's own fix after three stranding incidents this session).
 
 PR #257 merged. `check:citations`: 1531/1531, zero uncited, still holds. `check:tasks`: 177/177. **13.181's
