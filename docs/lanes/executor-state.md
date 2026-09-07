@@ -96,6 +96,70 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# 🟢 MONDAY 2026-09-07 ~17:xx IST — **THE FILTER PR: the cliff has a way out, and the summary stops claiming to be the project.** `exec/78-list-filter`, off `7d24716`. Fresh off main, not stacked.
+
+| what | value |
+|---|---|
+| `main` | `7d24716` (#270 merged as `c3404af`, #271 anchored) |
+| branch | **`exec/78-list-filter`** |
+| owner ruling used | remedy 4 landed; this is the **second half** the owner authorised. **13.176 = option B confirmed**, queued behind this PR. |
+
+## WHAT IT DOES
+
+`getTickets` walks ten pages and refuses past them — right, and it stays. What was missing is any way for
+the person who meets that refusal to ask something smaller: `ticket-list.tsx` sent `{}` and nothing could
+change it, so a project past the bound refused **for ever**.
+
+- `useTicketList` takes a `FilterSpec` (defaulted, so every existing caller is unchanged).
+- **The control sits ABOVE the tab arms** — every list renderer lives inside `list.error === null`, so a
+  control placed among them is reachable by everyone *except* the person past the cap. Same mistake
+  `createRegion` made until #270, same fix.
+- **The summary stops wearing the project's count when narrowed** (`matching`, plus the narrowing named).
+
+## ⚠ THE WIRE IS NARROWER THAN THE CLIENT TYPE — found by a test failing, not by reading
+
+The control first asked for `['open','active']` — *"hide done"*, the narrowing a person actually wants.
+`toServerFilterSpec` (`mappers.ts:838-853`) **throws `UnexpressibleFilterError`**: every `FilterSpec` axis
+is a LIST client-side while `filterSpecSchema` takes exactly **ONE** value. So `stateCategory` can say
+`open` OR `active` OR `terminal` and **never "not terminal"**.
+
+**The guard is right** — an unexpressible filter refuses loudly instead of being dropped and silently
+answering a different question — so this was a label change, not a bug. **Recorded for the fuller filter
+surface: "not done" needs a plural `stateCategory` or a negation term on the route, and has neither.**
+
+> The client type is plural and *looks* as though it composes. Reading it would have produced a wrong
+> design confidently; only running it said otherwise.
+
+## FIVE MUTATIONS, AND THE ONE THAT SURVIVED
+
+| mutation | result |
+|---|---|
+| **F1** query string hoisted out of the walk (page 1 narrowed, rest wide) | **12.383 kills** |
+| **F2** summary wears the project's count over a narrowed set | **12.384 kills** |
+| **F3** the narrowing never named beside the count | **12.384 kills** |
+| **F4** the filter dropped from the query key | **SURVIVED — see below** |
+| **F5′** control gated on the list having answered | **12.385 kills** |
+
+**F4 survived, and that was the finding.** The key's docblock claimed the filter must be in it and *nothing
+tested it* — nobody had ever changed a filter on a mounted hook. The failure it guards is silent and worse
+than a stale render: `useLiveQuery`'s load effect depends on the key while its `load` closure is refreshed
+through a ref every render, so with the filter outside the key the component re-renders, **issues no request
+at all**, and leaves the old rows under a control saying they were narrowed — with 12.384's summary then
+naming a narrowing that was never applied. **12.386 was written for it and now kills it.**
+
+**An F5 was discarded rather than counted** — moving the control's JSX produced a transform error, so it
+killed at a shape gate and measured no property. Replaced with F5′, which gates the control on
+`list.rows !== null` and is valid code.
+
+## NEXT
+
+1. **13.176 — option B, confirmed by the owner**: a *"Shared with me"* surface listing tickets directly,
+   never via a project. Needs a new read: `my-work.ts:120` filters `t.assignee_id`, and `visibleProjects`
+   filters on `eff.projects`, which is built only from `proj_memberships`.
+2. Still the owner's: whether remedies 1 (raise the cap) or 2 (a paged view type) follow.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~15:1x IST — **THE RED IS RESOLVED AND THE OPEN QUESTION IS ANSWERED. `exec/77-decouple-create` is GREEN.** PR open; the Board-tab change is a design call recorded for reversal.
 
 | what | value |
