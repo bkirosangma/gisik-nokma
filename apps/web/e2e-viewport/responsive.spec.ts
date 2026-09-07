@@ -861,7 +861,8 @@ for (const route of UNAUTHED_ROUTES) {
      * and the standing debt does not hold the gate hostage. Same pattern as
      * `check:citations`, which this repo already runs as an exact ratchet.
      *
-     * The baseline file is committed. To re-baseline after a genuine
+     * The baseline file is committed, and a MISSING entry FAILS rather than
+     * seeding itself (see the guard below). To re-baseline after a genuine
      * improvement, delete it and run once — it is rewritten from observation,
      * which is only ever safe in the falling direction because a RISE fails
      * before it can be recorded.
@@ -870,7 +871,31 @@ for (const route of UNAUTHED_ROUTES) {
     const tapBaseline = readTapBaseline();
     const allowed = tapBaseline[tapKey];
     if (allowed === undefined) {
-      recordTapBaseline(tapKey, taps.offenders.length);
+      /**
+       * A MISSING BASELINE FAILS. It must not silently record.
+       *
+       * The first version of this recorded whatever it saw and asserted
+       * nothing, which an adversarial review caught immediately: a fresh clone
+       * or a CI checkout without the file would seed the baseline from the
+       * current breakage and report full green with ZERO enforcement, on every
+       * first run. That is a check that cannot fail — the exact class this repo
+       * keeps a catalogue of — and it is worse than no check, because it prints
+       * a tick.
+       *
+       * Recording is now an explicit act: `UPDATE_TAP_BASELINE=1`. The file is
+       * committed, so the normal path never takes this branch.
+       */
+      if (process.env['UPDATE_TAP_BASELINE'] === '1') {
+        recordTapBaseline(tapKey, taps.offenders.length);
+      } else {
+        expect(
+          allowed,
+          `no tap-target baseline for "${tapKey}" in e2e-viewport/tap-target-baseline.json, and this ` +
+            `suite refuses to invent one: seeding from the current run would record whatever is ` +
+            `broken today and report green. Observed ${taps.offenders.length} offenders. If this is a ` +
+            `genuinely new route, re-run once with UPDATE_TAP_BASELINE=1 and COMMIT the file.`,
+        ).toBeDefined();
+      }
     } else {
       expect
         .soft(
