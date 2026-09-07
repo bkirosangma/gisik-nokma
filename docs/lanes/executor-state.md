@@ -20,6 +20,45 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE MCP SERVER IS ON `main`. TASK 11 DONE; ONLY TASK 12 REMAINS.**
+
+> **READ THIS FIRST.** `origin/main` is `f200cb0`. **#321 landed the whole MCP server (plan Tasks
+> 0–10) at `60a4a1e`**, #322 anchored the account of how the stacked chain broke, and #310/#311 are
+> closed. There are no other open PRs from this lane. CI still cannot run on this repo — every
+> GitHub Actions job dies in 3–4 s on the account billing failure — so the standing auto-merge
+> precondition remains unsatisfiable and every merge here is a human one.
+
+| plan | state |
+|---|---|
+| MCP Tasks 0–10 | **on `main`** at `60a4a1e` (#321) |
+| MCP Task 11 (catalogue, baselines, the gate) | **this branch**, `exec/111-mcp-task11-catalogue` |
+| MCP Task 12 (the revoke surface) | **todo** — the only task left. Its `last_used_at` sub-question is an OPEN OWNER DECISION |
+
+**Task 11 found three things the plan did not know, and two of them were live reds.**
+
+1. **`scripts/check-case-ids.mjs` was exiting 1 on `main`.** `ID_LINE` captured `(\d+\.\d+)`, so
+   `14.27b` read as `14.27` and `14.88b` as `14.88` — two pairs of distinct, separately-cited cases
+   called duplicates. The limitation was written down in prose
+   (`test-cases/13-deployment-dogfooding.md:274`) and never fixed. Ids now take an optional letter,
+   matching what `check-task-ledger.mjs` already reads for task ids. Union 1746 < sum 1748 → 1748 ==
+   1748.
+2. **The task-ledger gate could not see this plan at all** — its discovery matched only
+   `2026-08-20-NN-*.md`. Measured on `main`: **"177 tasks across 12 plan files", EXIT 0, with the
+   thirteen-task plan sitting right there**, and renaming that plan away changed nothing. Now 190
+   tasks across 13 files.
+3. **The plan asks for eleven ledger rows; there are thirteen tasks** — owner rulings 1 and 5 added
+   Tasks 0 and 12 after Task 11's text was written.
+
+**A gate summary is only evidence if it names its instrument.** Gate **33/33 EXIT 0, `Cached: 0`**
+(forced), Node **v22.22.2**. `check:env` · `check:tasks` · `check:runbook` · `check:citations` ·
+`check:help` · `check:db-tz` (against the dev stack, `Asia/Kolkata`) · `check-case-ids` — all EXIT 0.
+
+**One process note worth inheriting.** The first run of Step 5's Control A copied `main`'s script to
+a scratch directory and ran it there. The script derives `REPO_ROOT` from its own file location, so
+it died on ENOENT before reaching the check — a control that measured nothing and would have been
+read as a result. Run a borrowed script from inside the repo it is meant to inspect.
+
+
 # ▶ TUESDAY 2026-09-08 ~02:1x IST — **THE STACK IS CONSOLIDATED ON ONE BRANCH. TASKS 0–10 ARE ALL HERE.**
 
 > **READ THIS FIRST.** `origin/main` is `876a364` — #309 (pre-launch 6 + 7) merged at 19:44Z and
