@@ -379,6 +379,9 @@ describe('check 5 — who may change who sees a ticket', () => {
     });
   });
 
+  /**
+   * 6.75 — creatorship is read from the LEDGER because no projection carries it: `proj_tickets` does not exist and `proj_visibility` has no creator column, so `getTicketCreator` selects `events.actor_id` on the ticket's own `ticket.created` row. The fixture change with teeth is asserted here too — `seedTicket` appends to the ledger, and without it this is the one line that reddens.
+   */
   it('the ticket creator may set visibility — read from the LEDGER, since no projection carries it', async () => {
     // The case that proves creatorship is sourced at all: `proj_tickets` does
     // not exist and `proj_visibility` has no creator column, so getTicketCreator
