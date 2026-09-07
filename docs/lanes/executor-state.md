@@ -31,6 +31,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
 | **#313** | `exec/103-mcp-task3-device-routes` | MCP Task 3 — device-flow routes (stacks on #312) | **33/33** at `754d834` |
 | **#314** | `exec/104-mcp-task4-require-session` | MCP Task 4 — PAT as a session fallback (stacks on #313) | **33/33** |
+| **#315** | `exec/105-mcp-task5-approval-screen` | MCP Task 5 — the approval screen (stacks on #314) | **33/33** |
 
 All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
 disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
@@ -46,7 +47,7 @@ own build/test/typecheck — the delta is the evidence it is wired in, not merel
 > condition until billing is fixed. Every merge now needs an explicit human decision. The controller
 > session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
 
-**MCP queue after this: Tasks 5–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+**MCP queue after this: Tasks 6–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
 because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
 the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
 Task 12 only.
@@ -73,6 +74,17 @@ session token, pointed at a DIFFERENT user, and read the resolved identity throu
 route. That is **case 14.35**, written WHILE the reversal was applied, watched to fail as the only failure
 of five, then passing once restored. It is the only thing in the repo holding that order.
 
+**Task 5 is why the plan asks for a real drive.** The end-to-end run reported OK — and inside that
+success the consent confirmation read "It now acts as , with exactly your permissions", naming nobody in
+the sentence whose whole job is naming somebody. `useSessionStatus` uses `user.name ?? user.id`, and a
+magic-link account's name is `''`, which `??` does not catch. No status-code or testid assertion would
+have seen it; the page rendered perfectly. Fixed in the page; the shared-hook defect is recorded below.
+
+**Two environment facts from Task 5.** Docker's VM disk filled during repeated image rebuilds and the
+server container died with *"No space left on device"* mid-migration — which looks exactly like a broken
+migration and is not one. Reclaimed 9.5GB of BUILD CACHE only (never images, never volumes: the volumes
+hold the seeded world). The cost is honest: subsequent rebuilds are slow because that cache is gone.
+
 **Three findings carried, all recorded with owners, none fixed:**
 1. **`check:env`'s third blind spot.** It walks `packages/mcp-server` and sees the file, but every
    detector needs the literal string `process.env`; `loadMcpConfig` takes `env` as a PARAMETER, so two
@@ -80,7 +92,10 @@ of five, then passing once restored. It is the only thing in the repo holding th
    *Owner: `scripts/check-env-example.mjs`.*
 2. **`harness.ts:19` re-spells `ENTITY_KINDS` and has already drifted** — domain declares seven kinds
    including `'invite'`, the harness lists six. *Owner: rule-engine fixtures.*
-3. **17 of 24 bordered classes below WCAG 1.4.11's 3:1** in both themes (#309's box). Remedy moves
+3. **`useSessionStatus` renders an empty display name.** `user.name ?? user.id` — `??` catches only
+   null and undefined, and a magic-link account's name is `''`. Every surface showing a name is affected.
+   *Owner: whoever next touches `apps/web/src/providers.tsx`.*
+4. **17 of 24 bordered classes below WCAG 1.4.11's 3:1** in both themes (#309's box). Remedy moves
    `line`/`lineStrong` product-wide. *Owner: a design pass over `packages/ui`.*
 
 # ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**

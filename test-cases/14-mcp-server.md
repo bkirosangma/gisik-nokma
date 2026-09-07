@@ -157,3 +157,30 @@ token. They are the same header; only the order keeps them from contending.*
 *The cost of the fallback, stated rather than hidden: every request that falls THROUGH to the PAT branch
 performs one indexed single-row write, because `resolveMcpToken` stamps `last_used`. A better-auth session
 never reaches it, so web, mobile and desktop pay nothing; only MCP calls do.*
+
+## Task 5 — the approval screen (`apps/web/app/mcp/authorize/page.tsx`)
+
+*The one place a person consents to an assistant acting as them. It must live in `apps/web` and nowhere
+else: `/v1/mcp/device/approve` is inside `HTTP_ORIGIN_PROTECTED_ROUTES`, so a cookie-carrying POST must
+present `Origin: <WEB_ORIGIN>`, and only a page served from the web origin does.*
+
+- **14.40** 🧪 **End-to-end, driven against the real compose stack** — mint with `curl`, approve in a real
+  browser as a real signed-in person, exchange with `curl`, and use the issued token on a real product
+  route. Manual rather than a committed spec, per the plan's Step 3, and the exact readings are recorded
+  in the commit: `?code=` prefill matched the minted code, approval and refusal both rendered, exchange
+  answered `issued`, and the token authenticated `GET /v1/me/workspaces` → 200 with the seeded
+  Convenience Corner workspace.
+  *This is the case that FOUND something. The confirmation rendered "It now acts as , with exactly your
+  permissions" — naming nobody, in the sentence whose whole job is naming somebody. No status-code or
+  testid assertion in this plan would have caught it: the page rendered perfectly.*
+
+> **The origin control, measured rather than argued.** Attempting the approval from a page served on a
+> non-`WEB_ORIGIN` port answers **403 `forbidden_origin`**; the identical request from the real web
+> origin passes the origin check and fails on its bogus cookie instead (**401**). That pair is why this
+> page exists in `apps/web`, and it is why verifying it on a spare port is impossible by construction.
+
+> **Recorded, not fixed — a defect in a SHARED hook.** `useSessionStatus` builds the display name as
+> `user.name ?? user.id`, and `??` catches only null and undefined. A magic-link account's name is `''`
+> — an empty string, confirmed by reading the column — so the fallback never fires. This page defends
+> itself with `actingAs()`, which answers "you" rather than a ULID, because an id has technically named
+> the person and actually told them nothing. *Owner: whoever next touches `useSessionStatus`.*

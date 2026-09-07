@@ -1457,14 +1457,14 @@ git commit -m "require-session resolves an MCP personal access token, but only a
 
 **Read Open question 2 before starting.** The spec never mentions `apps/web`; its architecture diagram lists only `apps/server` changes. This task exists because the flow it *does* describe ("the user opens the URL in their already-authenticated browser session and approves") cannot terminate anywhere else: an approval POST must carry `Origin: <WEB_ORIGIN>` to pass `httpOriginRefused`, and only a page served from the web origin does that. A server-rendered page on the API origin would be refused by the product's own CSRF control.
 
-- [ ] **Step 1: Read the neighbours first**
+- [x] **Step 1: Read the neighbours first**
 
 Run: `ls apps/web/app && ls apps/web/src`
 Then read one existing page that performs an authenticated POST, and one that renders a refusal. Match those patterns exactly — component structure, the fetch helper, the error surface, and the `data-testid` convention (`docs/superpowers/plans/2026-08-20-11-deployment-dogfooding.md` pins the product's testid contract; add `mcp-authorize-*` ids in the same style).
 
 **Also invoke `ui-ux-pro-max`** for this task — it is UI work, and the workspace conventions require it alongside the workflow skill.
 
-- [ ] **Step 2: Write the page**
+- [x] **Step 2: Write the page**
 
 Behaviour, exactly:
 - A single text input for the user code, pre-filled from `?code=` when present, `data-testid="mcp-authorize-code-input"`.
@@ -1474,14 +1474,14 @@ Behaviour, exactly:
 - On 410: "That code has expired. Ask for a new one." — same testid.
 - On 401: send the person to the existing sign-in route with a return path back here.
 
-- [ ] **Step 3: Test it against the compose stack**
+- [x] **Step 3: Test it against the compose stack**
 
 Run: `docker compose -f docker-compose.dev.yml up -d --build --wait`
 Then drive the page end to end: mint a code with `curl`, approve it in the browser, exchange it with `curl`, and confirm the token authenticates `GET /v1/me/workspaces`.
 
 Record the exact commands and their output in the task-ledger row. A screenshot of the approval screen is worth more than a sentence claiming it renders.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/app/mcp/authorize apps/web/e2e-stack
