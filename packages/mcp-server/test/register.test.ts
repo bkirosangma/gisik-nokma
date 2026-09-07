@@ -138,6 +138,13 @@ describe('the nine tools, registered', () => {
     // `ticketId` is required and absent.
     const refused = await client.callTool({ name: 'get_ticket', arguments: { workspaceId: 'w' } });
     expect(refused.isError).toBe(true);
+    // The PREFIX is the whole point. Every handler re-parses its own arguments,
+    // so a tool registered with `inputSchema: {}` still refuses this call —
+    // from inside the handler, with a raw zod error. Asserting only
+    // `toContain('ticketId')` would pass either way and this case would be
+    // claiming a property it never measured. `-32602` is the SDK's own
+    // invalid-params answer, and only the schema reaching the SDK produces it.
+    expect(textOf(refused)).toMatch(/^MCP error -32602: Input validation error:/);
     expect(textOf(refused)).toContain('ticketId');
     expect(touched, 'the handler ran despite invalid arguments').toBe(0);
   });
