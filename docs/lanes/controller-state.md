@@ -1,5 +1,55 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 18:1x IST — THE RETIREMENT'S DANGLING REFERENCES CLOSED. PRs #288/#289 merged. `main` is `72a8e68`, docs-only since `4d5dd39` (still the operative gate figures — re-confirmed `check:tasks` 177/177, `check:runbook` 14/14 this entry).
+
+**My own #287 was incomplete, and the executor caught it before it caused harm.** Retiring the brief's
+SERIAL SEQUENCE struck the phase list itself but left three live sections pointing INTO it — a reader
+hitting those sections first would have landed on struck-through text or a stale count and had no reason
+to doubt it. All three fixed directly in the untracked brief (owner's standing approval from earlier this
+entry-chain covers completing the same retirement correctly, not a new ruling):
+
+1. **The serious one.** `## TWO KNOWN GAPS`'s item 1 said *"replacement trigger is step 10 above"* — step
+   10 is the retired text itself, under an explicit "do not start work from any item below." A live
+   "do not assume this away" instruction pointed at something the same document forbade acting on.
+   Replaced with the corrected step-10/Lane-F story (from #286) and a pointer to the owned residual in
+   this file (#287) instead of a dead trigger.
+2. `## MODEL & EFFORT`'s "Nine floor-list tasks remain" — this section is the one the brief declares wins
+   over the coordination doc, so it read as live even after the phase list was struck. All nine confirmed
+   `done` in `task-ledger.tsv`; struck, with the floor-list CLASS DEFINITION kept for future work.
+3. `## START HERE`'s Step 3 told a restarting executor to work "the sequence below" — technically saved by
+   "per the handoff's position" but still naming the retired list as a source. Reworded to name only the
+   handoff.
+
+**PR #289 — the copy that actually matters more, structurally.** The brief's own `## READ FIRST` sends a
+restarting executor to `docs/superpowers/plans/2026-08-20-00-series-coordination.md` first, calling it
+"the interface authority." That document carries its own copy of the same serial sequence and the same
+"~109 remain" / "nine floor-list tasks remain" claims — version-controlled, in this repo, structurally the
+FIRST stale figure a restart would hit, before ever reaching the brief. **Retiring only the brief would
+have left the more authoritative copy untouched.** Same treatment applied: the sequence struck and marked
+retired, the floor-list line struck with the class kept, and the $113/task cost paragraph marked
+explicitly historical (left unedited — it's the reasoning behind the still-valid model ruling, not an
+instruction) rather than struck, since deleting a ruling's own rationale would be a different kind of loss.
+
+**Method note, since it's the same shape as several entries above:** the executor's sweep for other
+dangling copies hit a false negative first — an unquoted `--include=*.md` glob returned 0 files, which
+looked like "class closed" and was actually a broken instrument. Requoted, the real sweep found the class
+genuinely closed: every remaining hit is a citation of the stale figure while flagging it stale (this
+file's own new entries included), confirmed against a positive control (5 files matching "floor-list").
+
+**A live squash-drop, caught in real time and durably recorded (PR #288):** the executor pushed a follow-up
+commit to `exec/84-...` after I'd already captured that PR's (#286) head sha and merged — standard
+fetch-immediately-before-merge discipline is necessary but not sufficient once a branch is still being
+pushed to concurrently. Caught within minutes via `git diff origin/main <branch>` with a positive control,
+not assumed from GitHub's "MERGED" status. Rebuilt by cherry-pick, never rebase. **A second false alarm
+inside the same check, worth recording on its own:** a case-sensitive `grep -ci` first read as a SECOND
+drop; it wasn't — `grep -ci` (case-insensitive) found it. A wrong grep flag is a silent-empty mode with the
+same shape as an eaten glob or an unquoted loop variable, just not previously named on this list.
+
+**Delivery, still the theme of this whole session:** the executor's long tmux messages kept truncating
+(confirmed again — two more today, mid-turn). It adapted: wrote findings to a file
+(`gisik-nokma-lanes/PROPOSED-brief-dangling-refs.md`) and sent a short pointer instead of pasting content.
+**That worked whole**, first try. Worth keeping as the default pattern for anything longer than a few lines.
+
 ## ✅ MONDAY 17:5x IST — DISPATCH BRIEF'S STALE SERIAL SEQUENCE RETIRED (owner-approved). PRs #285/#286 merged. `main` is `0d93bc1`, docs-only since the last real gate (`4d5dd39`, still the operative figures). **One durable residual recorded here, not left to die with the retired pointer: Plan 9's notifications fake is witnessed producer-side only — the client consumer in `apps/web` has never been executed end-to-end. Owned, not fixed.**
 
 **What was wrong and what I did.** `dispatch-executor-serial.md` (untracked, outside this repo, at
