@@ -61,7 +61,16 @@ describe('the header on real responses from the real app', () => {
     // can substitute for it: without a second app there is no way to reach the
     // https branch at all, and a single-app test would silently only ever
     // measure the http one.
-    proxied = buildTestApp(db, { security: { trustProxy: true } }).app;
+    // `webOrigin: null` and `rateLimit: null` are how a test says those two
+    // controls are not its subject — the convention `SecurityOptions.webOrigin`'s
+    // own docblock names, and what the rate-limit tests already do. Both fields
+    // are required-but-nullable, so they cannot simply be omitted: the type
+    // refuses, which is the point. (It refused this file first, in `typecheck`,
+    // after both suites had gone green — the tests could not see it because
+    // JavaScript does not check a shape it never reads.)
+    proxied = buildTestApp(db, {
+      security: { trustProxy: true, webOrigin: null, rateLimit: null },
+    }).app;
     direct = buildTestApp(db).app;
     await proxied.ready();
     await direct.ready();
