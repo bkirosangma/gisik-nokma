@@ -1,5 +1,51 @@
 # Cross-lane controller — live state
 
+## ⏩ MONDAY 08:5x IST — THE WEEKLY RESET HAPPENED FOR REAL AT 06:30. `main` is `686ab85`, gate green (twelfth identical run). Executor RESTARTED fresh (was at 89% context) and is finishing Task 1 of its own handoff. Owner authorized "keep going through it all" — no more per-section asking tonight.
+
+**What happened between the last anchor and now, compressed:** the owner, told the remaining backfill was
+~265 rows across five sections, said keep going through all of it, hand or dispatch, executor's judgment,
+check in only on a scope surprise or the wall. The executor ran §05 (67→17, by hand) as **PR #244**, merged
+clean. §06 (63→28) and §03 (45→24) went out as **PR #245** (still open — see hazard below) and a stacked
+branch `exec/65-s03-backfill` (29 commits, includes further §06/§13/§04 progress, no PR yet). **Repo-wide
+citations are now 815 → 218 uncited since Sunday morning**, once #245 and `exec/65` land.
+
+**⚠ A real instrument-correction, not just process color: the executor's own "reader-job" counts for §12/§13
+were WRONG for three sessions running** (missed wrapped continuation lines, backtick-closed paths with a line
+number, and block-header-named files). Corrected: **§12 has 31 of 78 citable** (not 2), **§13 has 46 of 72**
+citable (not 0). The transcribable pool across §12/§13/§06/§03/§04 is **~127 rows**, genuinely dispatch-shaped.
+**Do not trust an old "X is almost entirely reader-job" claim for §12/§13 from earlier in this file** — this
+correction supersedes it. §07/§09/§10/§11 remainders are still genuinely reader-job; that part held up.
+
+**⚠ MERGE-ORDER HAZARD, active right now:** `exec/64` (#245) and the now-merged `exec/63` (#244) both edited
+adjacent lines of the SAME ratchet-baseline JSON off the same `main`. #244 landed first; **#245 now shows
+CONFLICTING/DIRTY on GitHub and needs a cherry-pick rebuild, not a rebase** — same shape #237/#240 already
+proved. The restarted executor's Task 1 (from its own handoff, `docs/lanes/executor-state.md` on
+`exec/65-s03-backfill` at commit `5f3783a`) is exactly this: cherry-pick `fb68f97 30ecc0f 36a8326 b8e8765`
+onto the new `main`, verify, gate, reopen. Task 2 is opening `exec/65`'s own PR (sixteen content commits) once
+Task 1 lands. Task 3 is §12 (block `12.380–12.399` allocated, now worth doing at 31 citable rows) — cleared by
+the owner's blanket authorization, no further ask needed.
+
+**Why the restart happened:** the executor's context hit 89%, past this brief's ~80% threshold, mid-way through
+extending the coordination doc's citation rule 9. Told to stop, push everything (confirmed: `exec/64` local =
+remote `2340dae`, `exec/65` local = remote `5f3783a`, worktree clean, zero background jobs), write a complete
+three-task restart brief into the handoff, then killed and relaunched fresh (`gisik-nokma-exec-65`, Ctx back to
+single digits). **The fresh session correctly caught that `main`'s copy of `docs/lanes/executor-state.md` was
+stale and read the one on `exec/65` instead** — the exact "read from the branch, not main" rule this file's own
+header states, working as designed on the SECOND hop (controller → executor) as well as the first.
+
+**Nine citation-method rules are now written into
+`docs/superpowers/plans/2026-08-20-00-series-coordination.md`** (rules 5–9 are new since the §09-closed anchor;
+rule 9 covers the instrument-correction class above). The two worth repeating here because they'll recur: **a
+row appearing in a file's candidate list is not evidence that file asserts it** (candidate lists come from
+filename mentions, which happen for several unrelated reasons) — five deferrals this session, five later
+confirmed exactly where predicted; and **a section's citation cost is set by the catalogue's writing style, not
+the code** (§03's terse rows needed zero deferrals across three batches, §06's narrative rows needed six).
+
+**Owner's standing authorization, still in force:** hand vs. dispatch is the executor's call per section size
+(~10 hand-sized, ~100 dispatch-sized, cross-check the private counting instrument against `check:citations`
+itself before trusting it to brief a dispatch). No more per-section clearance needed tonight — only a genuine
+scope surprise or the weekly/session wall comes back to the controller.
+
 ## ⏸ MONDAY 01:0x IST (weekly reset ~4.5h away at 06:30) — `main` is `3ffc9f7`, gate green (eleventh identical run). §13 AND §07 BOTH DONE to the limit of what naming allows. Controller holds again, pending an owner scope check on §12/§05/§06/§03/§04.
 
 **PR #242 merged: §13 (153→72 uncited, one subagent, 77 rows/13 files) and §07 (78→36, more by-hand clusters
