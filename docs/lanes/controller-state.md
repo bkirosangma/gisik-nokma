@@ -1,5 +1,46 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 19:0x IST — MCP SERVER PLAN LANDED (as a document, not executed). PRs #296/#297 merged. `main` is `a32c3bf`. The checksum rule from #295 already had a hole, found within hours by the executor and closed here.
+
+**PR #296 — `docs/superpowers/plans/2026-09-07-mcp-server.md`, 11 tasks.** Not self-certified: the
+executor re-verified all 32 line-anchored citations itself (none out of range), re-read the four
+"already exists, do not rebuild" claims at their cited lines including the security-critical
+`http-origin.ts:213` — **independently spot-checked by this controller too, verbatim match**
+(`if (input.cookie === undefined) return false;`, confirming a bearer-only MCP caller is untouched by
+the CSRF control). One claim was found STRONGER than stated (`invite_tokens` is not merely absent from
+projections, `proj-invites.ts` forbids naming it at all). The gate hole the plan itself flagged was
+reproduced empirically, not just cited: `check:tasks` mentions "mcp" zero times on this branch while
+still reporting 177/177 — Task 11 fixes the ledger-checker's regex to see dated (non-series) plans at all.
+
+**SEVEN owner rulings named, not six as first reported** — corrected count, all deliberately left
+undecided rather than guessed: (1) MCP writes have no envelope-origin value and currently claim `'web'`,
+so the ledger can't distinguish a person's action from their assistant's — in a product whose stated
+purpose is a board that cannot lie about its own history; (2) the approval flow needs a page in `apps/web`
+the spec's diagram never mentions, forced by the CSRF control itself; (3) whether `list_projects` should
+exist as a client-side filter with no real route behind it; (4) whether personal access tokens should
+expire (written against: no); (5) whether v1 needs any revoke UI beyond a raw `DELETE` (written against:
+no — flagged as a real asymmetry worth agreeing to knowingly); (6) filename/series-numbering choice; (7)
+the spec's "nine write tools" phrasing is read as a typo (four writes, five reads), flagged so nobody
+executes against the larger reading. Each has a stated default and a named fallout if ruled otherwise.
+
+**PR #297 — my own dispatch message (the pre-launch checklist) reached the executor with its head
+truncated**, past the ~1,000–1,400 char threshold already measured today. **Correct response, worth
+naming as the standard**: it recorded the actionable fragment as scope, recorded the missing context AS
+MISSING rather than inferring it from surrounding sentences, and refused to guess specifically because
+the gap touched compliance-adjacent instructions (the legal-page caveat). Resent in full via a file
+(`CTL-NOTE-checklist-full.md`) — the same indirection fix as before, now standard practice for anything
+approaching that length in either direction.
+
+**The checksum rule's own hole, found the same session it was adopted:** `e3b0c44298fc1c14…` is the
+SHA-256 of EMPTY input. `git show <ref>:<path>` on a path absent from that ref prints nothing to stdout
+(the error goes to stderr) and hashes to exactly that constant — so a checksum "match" against that value
+means **"not found in that ref,"** never "content confirmed identical." Both sides being wrong the same
+way (e.g. an identical typo'd path) would pass as a match while verifying nothing. **Amended rule: confirm
+both paths resolve first** (`git cat-file -e <ref>:<path>`, both sides) **and confirm neither hash equals
+the empty constant, before trusting a match.** Retroactively checked: this controller's two prior uses of
+the rule (#295) hashed to real content, not the empty constant — those checks stand. All four checksum
+verifications since (this entry's own two) used the corrected two-step form.
+
 ## ✅ MONDAY 18:2x IST — PLAN 9'S RESIDUAL CLOSED. PRs #293/#294 merged. `main` is `61b3aca`, own forced gate GREEN. **Also: a genuinely new tooling-reliability finding, checksum-verified, that changes how squash-merge integrity gets checked from here on.**
 
 **PR #293 — the owner-assigned residual (Plan 9's notifications consumer), real code.** The blocker was
