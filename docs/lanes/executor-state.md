@@ -16,6 +16,54 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~10:50 IST — **§05 at ZERO, §04 at 5. 168 → 117 uncited.** #249 head **`527c22c`**, gate green. Nothing running.
+
+| § | before | after | | § | before | after |
+|---|---|---|---|---|---|---|
+| §03 | 5 | **2** | | §07 | 1 | 1 *(refused)* |
+| **§04** | **29** | **5** | | §12 | 78 | 78 *(not cleared)* |
+| **§05** | **17** | **0** | | §13 | 26 | **24** |
+| §06 | 12 | **7** | | **total** | **168** | **117** |
+
+Gate `GATE_EXIT=0` · 30/30 · **3666 \| 5 (3671) / 285** · `check:citations` 0 · zero orphans ·
+diff **156 added lines, ALL comments, 0 removed**.
+
+## ⛔ THE "62 ROWS NAME NO TEST" FIGURE WAS WRONG, AND THE TOOL WAS MINE
+
+**24 of them name a real FIXTURE**, all §04 — and my extractor matched only `*.test.ts`. **Rule 9's own
+diagnosis turned on the instrument measuring it:** *a count is a claim about the SHAPE of a source*, and
+mine asserted a shape the catalogue does not have. **Found by reading raw records during a cheap probe, not
+by counting again** — which is exactly what rule 9 says finds these every time.
+
+**Why the fixture runner is an honest home** (not merely a convenient one): it does `it(fx.name)`, so each
+fixture is **its own named test**; fixture JSONs sit OUTSIDE the citation corpus (`isTestPath` requires a
+`test/` directory), so the runner is the only available home; and **`4.34` was already cited there in
+exactly this shape** by an earlier session. Each row's claim was checked against its fixture's `expected`
+outcome before citing.
+
+## ⚠ THE SUBSTRING BUG RECURRED — in code written AFTER recording it as rule 9's sixth shape
+
+My skip-if-already-cited test was `rid in src`. **`4.3` was silently skipped because it is a substring of
+`4.34`**, which sits at the top of that very file. Twenty-three landed; the twenty-fourth vanished **with no
+error**. The fix is the checker's own boundary rule, which reports `4.3` as substring-present and
+boundary-absent — **and that disagreement IS the bug, visible in one line.**
+
+**Recording the recurrence matters more than the fix.** Rule 9's sixth shape was written down this same
+session, and the next instrument reproduced it. *Knowing the shape does not stop you writing it; only a
+boundary-guarded check does.*
+
+## NEXT — what is genuinely left
+
+1. **§12: 67 citable rows by naming. Block `12.380–12.399` ALLOCATED but NOT CLEARED. ASK.** This is now by
+   far the largest remaining pool.
+2. **38 rows outside §12 still name no test** (§03 2 · §04 5 · §06 7 · §13 24), down from 62. Of the probe I
+   read: §03's `3.62`/`3.66` are **TYPE-LEVEL with no runtime death** — genuinely uncitable, same class as
+   `7.199`. §06's remainder are largely **RECORDS** (mutation sweeps, "closed by 6.127"). §13's look like
+   e2e-stack claims. **A reader pass, and a real one — but the §04 lesson says measure before believing it.**
+3. **CI still cannot run** (billing, since `2026-09-06T09:05:54Z`).
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~10:15 IST — **§05 IS AT ZERO. 168 → 141 uncited.** Two PRs open: **#248** (these findings) and **#249** (the 28 citations). Nothing running.
 
 | what | value |
