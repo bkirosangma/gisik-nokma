@@ -1,5 +1,27 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 14:1x IST — GATE RECOVERED. `main` is `2b36128`, gate GREEN (30/30, 1546/1546 citations, zero orphans). The red window was `4f89591`→`2b36128` only, three commits, never left uncorrected for more than one dispatch cycle.
+
+**PR #274 merged: the token-discipline scanner rewritten to be genuinely comment-and-context-aware**, not a
+pattern tweak — the executor's own diagnosis was that no tightening of the hex-shape regex could work, since
+`#270` and `#fff` are syntactically the same token; only POSITION (inside a comment vs. inside an applied CSS
+value) can distinguish them. Two real bugs fixed at once: comments must be stripped file-wide, not per line
+(the offending line carried no comment marker of its own — it was the MIDDLE line of a multi-line block
+comment); and a literal only counts where a color is actually APPLIED (a CSS declaration value or a
+string/template literal), which also caught a second latent false-positive (a CSS ID selector `#abc { }` was
+being read as a color). **Verified with paired real-vs-planted controls, not just "stopped matching":** every
+unit case is paired with the real color it must still catch in the same position, plus three controls run
+against the real source trees (P1/P2 real colors still catch red, P3 a comment containing TWO PR-shaped hex
+tokens, including one that's ALSO a valid hex color, stays green — testing the discrimination, not just token
+shape).
+
+**The window this was open, precisely:** `4f89591` (PR #272's merge, red) → `f54c0f7` (this controller's
+first anchor of the red state, still red — a docs-only commit, correctly not attempting to fix it) → `2b36128`
+(PR #274's merge, green again). Two forced-gate runs at exact heads, one red one green, both independently
+verified by this controller rather than trusted from either PR's own report.
+
+Executor is now proceeding to `13.176` (option B, the "Shared with me" view) as queued.
+
 ## 🔴 MONDAY 13:5x IST — `main` (`4f89591`) IS GATE-RED. PR #272 merged (real filtering, remedy 2), but the forced gate at that exact head failed for the first time all night. Confirmed root cause; fix dispatched, not yet landed. Do not trust "gate green" claims for `4f89591` from anywhere else in this file — this is the correction.
 
 **`@gisik-nokma/ui#test` fails: `token-discipline.test.ts`'s color-literal scanner (coordination amendment
