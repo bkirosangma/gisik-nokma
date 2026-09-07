@@ -6,7 +6,17 @@ import type { Session } from '../src/session.js';
 /**
  * Plan: MCP server, Task 9. Cases 14.70–14.77.
  */
-const USER = '01J0USER0000000000000000AA';
+/**
+ * A REAL ULID. The plan's constants were `01J0USER…`, `01J0PROJ…` and
+ * `01J0TICK…` — readable, and three of them are not ULIDs: Crockford base32
+ * excludes I, L, O and U, so USER, PROJ and TICK each carry an illegal
+ * character. Nothing caught it, because the one assertion that would have
+ * (`parseEvent`) was written as `'error' in parsed`, and `parseEvent` returns
+ * `{ok:true,…}` or `{ok:false,code,message,eventId}` — no `error` key in
+ * EITHER shape, so it could not fail. Corrected together: the constants, and
+ * the assertion that should have refused them.
+ */
+const USER = '01J0A5ER0000000000000000AA';
 
 function sessionCapturing(result: unknown): { session: Session; sent: unknown[][] } {
   const sent: unknown[][] = [];
@@ -31,7 +41,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('create_ticket', session).handler({
       workspaceId: '01J0WS000000000000000000AA',
-      projectId: '01J0PROJ00000000000000000A',
+      projectId: '01J0PRJ000000000000000000A',
       typeId: 'task',
       title: 'Renew the trade licence',
       parentId: null,
@@ -42,14 +52,23 @@ describe('every write builds an envelope the SERVER would accept', () => {
     // package guessed wrong fails HERE rather than as an `invalid-payload`
     // result after a round trip.
     const parsed = parseEvent({ ...(envelope as object), serverTime: '2026-09-07T10:00:00.000Z', seq: 1 }, domainRegistry);
-    expect('error' in (parsed as object)).toBe(false);
+    // `parsed.ok`, NOT `'error' in parsed` — which is what the plan wrote and
+    // what this line replaced. `parseEvent` returns `{ok:true,event}` or
+    // `{ok:false,code,message,eventId}`; NEITHER shape has an `error` key, so
+    // `'error' in parsed` is false unconditionally and the assertion could not
+    // fail. Measured: with `'mcp'` removed from ORIGINS and the domain dist
+    // genuinely rebuilt to four members, all eight cases in this file still
+    // passed. The plan calls this "the strongest available check short of a
+    // live server"; as written it was not a check at all.
+    if (!parsed.ok) throw new Error(`${parsed.code}: ${parsed.message}`);
+    expect(parsed.ok).toBe(true);
     expect(envelope).toMatchObject({
       type: 'ticket.created',
       version: 1,
       actorId: USER,
       origin: 'mcp',
       entity: { kind: 'ticket' },
-      payload: { typeId: 'task', projectId: '01J0PROJ00000000000000000A', parentId: null, title: 'Renew the trade licence' },
+      payload: { typeId: 'task', projectId: '01J0PRJ000000000000000000A', parentId: null, title: 'Renew the trade licence' },
     });
     expect((envelope as { entity: { id: string } }).entity.id).toMatch(ULID_REGEX);
   });
@@ -57,7 +76,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
   it('14.71 create_ticket sends parentId as an explicit null, never an absent key', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('create_ticket', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PROJ00000000000000000A',
+      workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PRJ000000000000000000A',
       typeId: 'task', title: 'x',
     });
     const payload = (sent[0]?.[0] as { payload: Record<string, unknown> }).payload;
@@ -69,7 +88,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
   it('14.72 transition_ticket uses the key `to`, not `toStateId`', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('transition_ticket', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A',
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A',
       toStateId: undefined, to: 'in-progress', comment: 'starting',
     });
     expect((sent[0]?.[0] as { payload: unknown }).payload).toEqual({ to: 'in-progress', comment: { text: 'starting' } });
@@ -78,7 +97,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
   it('14.73 transition_ticket omits comment entirely when none is given', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('transition_ticket', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A', to: 'done',
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', to: 'done',
     });
     expect((sent[0]?.[0] as { payload: unknown }).payload).toEqual({ to: 'done' });
   });
@@ -86,7 +105,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
   it('14.74 add_comment sends a document object, not a string', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('add_comment', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A', text: 'hello',
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', text: 'hello',
     });
     const payload = (sent[0]?.[0] as { payload: { body: unknown } }).payload;
     expect(typeof payload.body).toBe('object');
@@ -96,7 +115,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
   it('14.75 assign_ticket sends an explicit null to unassign', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('assign_ticket', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A', assigneeId: null,
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', assigneeId: null,
     });
     expect((sent[0]?.[0] as { payload: unknown }).payload).toEqual({ assigneeId: null });
   });
@@ -109,7 +128,7 @@ describe('a refusal arrives with its own words', () => {
     });
     await expect(
       tool('transition_ticket', session).handler({
-        workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A', to: 'done',
+        workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', to: 'done',
       }),
     ).rejects.toThrow('Moving to done needs a comment saying what was done.');
     // Verbatim, not paraphrased: the refusal's own words are the product's
@@ -117,7 +136,7 @@ describe('a refusal arrives with its own words', () => {
     // inventing a rule the product does not have.
     await expect(
       tool('transition_ticket', session).handler({
-        workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TICK00000000000000000A', to: 'done',
+        workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', to: 'done',
       }),
     ).rejects.toThrow('require-comment');
   });
@@ -128,7 +147,7 @@ describe('a refusal arrives with its own words', () => {
     });
     await expect(
       tool('create_ticket', session).handler({
-        workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PROJ00000000000000000A', typeId: 'task', title: 'x',
+        workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PRJ000000000000000000A', typeId: 'task', title: 'x',
       }),
     ).rejects.toThrow(/invalid-payload/);
   });
