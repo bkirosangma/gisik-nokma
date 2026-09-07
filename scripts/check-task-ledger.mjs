@@ -322,6 +322,54 @@ try {
   unciteedPrs = null; // gh unavailable or offline; reported as unknown, never as clean
 }
 
+/**
+ * The matcher, as a pure function of (rows, never-merged map), so the rule can
+ * be exercised on known inputs before it is trusted on the real ledger. Its
+ * siblings do the same for the same reason — `check-runbook-commands.mjs`,
+ * `check-case-ids.mjs` and `check-case-citations.mjs` all refuse to certify
+ * anything until their own instrument has fired on planted defects. A matcher
+ * that silently matched nothing would report "no bad citations" on every run,
+ * which is indistinguishable from success.
+ */
+function citationsOfNeverMergedPrs(rows, neverMerged) {
+  return rows
+    .filter((r) => r.pr && r.pr !== '-' && neverMerged.has(r.pr))
+    .map(
+      (r) =>
+        `${r.key}  ${r.at}  (status ${r.status}) cites #${r.pr}, which was CLOSED WITHOUT MERGING: ` +
+        `${(neverMerged.get(r.pr) ?? '').slice(0, 54)}`
+    );
+}
+
+{
+  // ── SELF-TEST: four inputs with known answers, run before the real sweep.
+  const never = new Map([['324', 'MCP Task 12: the revoke surface']]);
+  const row = (pr, status) => ({ pr, status, key: 'x/1', at: 'ledger:1' });
+  const cases = [
+    // The defect this guard was built for: a row still pointing at #324.
+    [[row('324', 'in-flight')], 1, 'a row citing a never-merged PR'],
+    // A MERGED pr must not fire whatever the status is — otherwise this is
+    // "any non-done row fails", a different check wearing this one's name.
+    [[row('329', 'in-flight')], 0, 'a row citing a merged PR, non-done status'],
+    // `-` is how every todo/in-flight row without a PR is written.
+    [[row('-', 'todo')], 0, 'a row with no PR at all'],
+    // And it must find the offender among rows that are fine.
+    [[row('329', 'done'), row('324', 'done'), row('-', 'todo')], 1, 'one offender among three rows'],
+  ];
+  const failures = [];
+  for (const [rows, expected, what] of cases) {
+    const got = citationsOfNeverMergedPrs(rows, never).length;
+    if (got !== expected) failures.push(`${what}: expected ${expected}, got ${got}`);
+  }
+  if (failures.length > 0) {
+    console.error('task ledger gate: SELF-TEST FAILED on the never-merged-PR matcher.');
+    for (const f of failures) console.error(`  ${f}`);
+    console.error('  A matcher that fires on nothing reports "no bad citations" on every run, which');
+    console.error('  is indistinguishable from success. Refusing to certify the ledger.');
+    process.exit(1);
+  }
+}
+
 // ------------------------------------------- rows citing a PR that never merged
 // A row whose `pr` names a CLOSED, UNMERGED pull request.
 //
@@ -358,9 +406,7 @@ if (mergedPrs === null) {
     const neverMerged = new Map(
       all.filter((pr) => pr.mergedAt === null).map((pr) => [String(pr.number), pr.title])
     );
-    closedCitations = ledgerRows
-      .filter((r) => r.pr && r.pr !== '-' && neverMerged.has(r.pr))
-      .map((r) => `${r.key}  ${r.at}  (status ${r.status}) cites #${r.pr}, which was CLOSED WITHOUT MERGING: ${(neverMerged.get(r.pr) ?? '').slice(0, 54)}`);
+    closedCitations = citationsOfNeverMergedPrs(ledgerRows, neverMerged);
   } catch {
     closedCitations = null;
   }
