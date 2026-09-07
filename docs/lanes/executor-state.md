@@ -16,46 +16,55 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-> **BOTH ENTRIES BELOW ARE LIVE — this file conflicted at the Task 0 merge and both halves were KEPT.**
-> The stack (Tasks 1–9) and Task 0 were written on sibling branches off `main`, so each wrote its own
-> entry here. Task 9 is the first task that consumes Task 0, so the branches meet at Task 9 and the
-> narratives meet here. Neither is stale; they describe different work.
+> **THREE NARRATIVES MEET IN THIS FILE AND ALL OF THEM ARE LIVE.** Task 0, the Tasks 1–10 stack, and
+> pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
+> its own entry here. Nothing below is stale; they describe different work.
 
-# ▶ TUESDAY 2026-09-08 ~01:5x IST — **#309 HAS MERGED. ELEVEN PRs OPEN, THE STACK'S TWO ROOTS NOW CONFLICT.**
+# ▶ TUESDAY 2026-09-08 ~02:1x IST — **THE STACK IS CONSOLIDATED ON ONE BRANCH. TASKS 0–10 ARE ALL HERE.**
 
-> **READ THIS FIRST IF YOU LANDED ON `main`.** `origin/main` moved to `876a364` when **#309 merged**
-> (pre-launch 6 + 7). It carries none of the MCP work below. CI still cannot run on this repo at all —
-> every GitHub Actions job dies in 3–4 seconds with *"The job was not started because recent account
-> payments have failed or your spending limit needs to be increased"* — so the coordination doc's
-> standing auto-merge precondition ("an independent CI run green") remains unsatisfiable for every
-> branch here.
+> **READ THIS FIRST.** `origin/main` is `876a364` — #309 (pre-launch 6 + 7) merged at 19:44Z and
+> carries none of the MCP work. CI still cannot run on this repo at all: every GitHub Actions job dies
+> in 3–4 seconds with *"The job was not started because recent account payments have failed or your
+> spending limit needs to be increased"*, so the coordination doc's standing auto-merge precondition
+> ("an independent CI run green") is unsatisfiable for every branch here.
 >
-> **What #309's merge changed for this stack.** #309 touched `Features.md`,
-> `docs/lanes/executor-state.md` and `.env.example` — the same shared files the MCP branches touch — so
-> GitHub now reports **#310 and #311 CONFLICTING** against `main`. The other nine report MERGEABLE, but
-> that is measured against their own stacked bases, not against `main`: resolving the two roots is what
-> unblocks the chain. Do it by **cherry-picking what `main` lacks onto a fresh branch off `876a364`,
-> never by rebasing** — a rebase re-applies commits `main` already holds in squashed form and
-> manufactures conflicts that read as real. The conflicts are in narrative prose only (two entries in
-> this file, two bullets in `Features.md`, two blocks in `.env.example`); no source file is contested.
+> **The stacked PR chain collapsed while it was being merged, and it cost nothing.** Merging a stacked
+> PR with *delete branch* removes the head branch — which is the BASE of the next PR up — and GitHub
+> then auto-closes that next PR as **closed, not merged**. So #312, #314, #316, #318 and #320 merged
+> while #313, #315, #317 and #319 closed unmerged, and `exec/102/104/106/108/110` are gone.
+>
+> **Nothing was lost, and that is measured rather than assumed.** `exec/109-mcp-task9-write-tools` is a
+> superset of every surviving branch: it holds Tasks 1–9 as its own history, Task 0 merged in at
+> `26e06c3`, and Task 10 squashed on at `89eed49`. Each surviving branch carries exactly one commit
+> `exec/109` lacks — its own squash of the even-numbered PR — and **every source and test file in those
+> four squashes is byte-identical to `exec/109`'s copy**, checked file by file with `git diff` between
+> the squash commit and the branch tip. The only differences are the cumulative narrative files and
+> `packages/mcp-server/src/index.ts`, where `exec/109` is AHEAD because later tasks export more.
+>
+> So `exec/109` → `main` is the one PR that carries the whole MCP server. `exec/100`/#310 and
+> `exec/101`/#311 are now **subsets of it**, kept open only because the controller had already reviewed
+> #310's content; merging them first is harmless but redundant.
 
-| PR | branch | what | gate |
-|---|---|---|---|
-| ~~#309~~ | `exec/99-prelaunch-6-7-contrast-responsive` | pre-launch items 6 + 7 — **MERGED 2026-09-07 19:44Z, `main` is now `876a364`** | 30/30 at `302f1834` |
-| **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin — **CONFLICTING with `main` since #309** | 30/30 at `77338aa4` |
-| **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config — **CONFLICTING with `main` since #309** | **33/33** at `803c42e` |
-| **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
-| **#313** | `exec/103-mcp-task3-device-routes` | MCP Task 3 — device-flow routes (stacks on #312) | **33/33** at `754d834` |
-| **#314** | `exec/104-mcp-task4-require-session` | MCP Task 4 — PAT as a session fallback (stacks on #313) | **33/33** |
-| **#315** | `exec/105-mcp-task5-approval-screen` | MCP Task 5 — the approval screen (stacks on #314) | **33/33** |
-| **#316** | `exec/106-mcp-task6-http-client` | MCP Task 6 — client token cache + HTTP layer (stacks on #315) | **33/33** |
-| **#317** | `exec/107-mcp-task7-login-driver` | MCP Task 7 — device-login + session (stacks on #316) | **33/33** |
-| **#318** | `exec/108-mcp-task8-read-tools` | MCP Task 8 — the five read tools (stacks on #317) | **33/33** |
-| **#319** | `exec/109-mcp-task9-write-tools` | MCP Task 9 — the four write tools, **merges Task 0/#310 in** | **33/33** |
-| **#320** | `exec/110-mcp-task10-entrypoint` | MCP Task 10 — stdio entrypoint + nine-tool registration (stacks on #319) | **33/33** |
+| branch | what it holds | state |
+|---|---|---|
+| `main` = `876a364` | everything through #309 (pre-launch 6 + 7) | merged |
+| **`exec/109-mcp-task9-write-tools`** | **MCP Tasks 0–10 — the whole server**, `main` merged in | **the PR to review** |
+| `exec/100-mcp-task0-origin` (#310) | Task 0 only, `main` merged in at `58bc5a8` | MERGEABLE, redundant |
+| `exec/101-mcp-task1-scaffold` (#311) | Tasks 1–2 only | CONFLICTING, redundant |
+| `exec/103` · `exec/105` · `exec/107` | Tasks 1–4 · 1–6 · 1–8 | orphaned mid-stack, redundant |
 
-All of them: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. #311's 33 rather than 30 is the new package contributing its
-own build/test/typecheck — the delta is the evidence it is wired in, not merely present.
+Gate on the consolidated branch: **33/33 EXIT 0, `Cached: 0`** (forced, nothing replayed), Node
+**v22.22.2**, five repo checks EXIT 0 (`check:db-tz` additionally green against the dev stack, which
+reports `Asia/Kolkata`).
+
+**Task 10 was driven end to end against the live compose stack** — magic-link sign-in, `dist/main.js`
+launched as a child process by a real MCP client, `initialize` answered with nine tools and NO
+credential, the stderr prompt carrying user code `57XK-2HCW`, `POST /v1/mcp/device/approve` →
+`200 {"approved":true}`, `create_ticket` committed at seq 1, `add_comment` at seq 2, a bad transition
+refused verbatim, and the ledger reading `origin = mcp` on both events (`web 123 · server 6 · mcp 2`).
+
+**Queue: MCP plan Tasks 11–13.** Task 12's `last_used_at` remains an open OWNER decision.
+
 
 > **⚠ THE BLOCKAGE, AND WHY IT IS NOT A CODE PROBLEM.** Run `34141928556`: every job died in 3–4 s with
 > *"The job was not started because recent account payments have failed or your spending limit needs to
@@ -174,6 +183,102 @@ catalogue respectively.
 
 # ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
 
+# ▶ MONDAY 2026-09-07 ~21:0x IST — **PRE-LAUNCH 6 AND 7 ARE DONE AND MEASURED. THE WHOLE CHECKLIST IS CLOSED. MCP IMPLEMENTATION IS THE ONLY THING LEFT.**
+
+| what | value |
+|---|---|
+| `origin/main` | **`2859df4`** — #306 (MCP rulings), #307 (handoff), #308 merged since the entry below |
+| branch | `exec/99-prelaunch-6-7-contrast-responsive`, off `2859df4` |
+| in flight | that branch — items 6 and 7 |
+| **queue** | **MCP implementation** — the plan is landed and all 7 rulings are in it. Task 12's `last_used_at` sub-question is still an open OWNER decision. Nothing else is outstanding. |
+| substrate | the **full dev stack was up and seeded** for this work (`docker-compose.dev.yml`, Convenience Corner seed, 123 tickets). `pnpm test:e2e:stack` passed 3/3 against it. |
+| gate | `turbo build test typecheck` **30/30 EXIT 0** at `b69ace0`, Node **v22.22.2**; all five repo checks exit 0. The two grep hits for "failed" in that log are test NAMES containing the word, both ✓ — checked, not assumed. |
+
+> **⚠ THE BRIEF ITSELF CARRIES A DEAD CITATION.** The dispatch brief's "TWO KNOWN GAPS" §2 cites
+> `apps/web/test/contests.test.tsx:97` as the TZ-took-effect precedent. **That file does not exist.**
+> The real precedent is `apps/web/test/ist-today.test.ts` (which does assert `TZ` took effect). Found
+> because a subagent was asked to model an assertion on it and reported it missing; verified here with a
+> positive control listing what `apps/web/test/` actually holds. The RULE that section states is sound —
+> only its pointer is dead.
+
+**What was measured, so a restart does not redo it:** 60 page-loads — 12 routes × 3 viewports (390/768/
+1512) in light, 12 × 2 in dark — against the real authenticated stack. **Zero contrast failures** with
+real alpha compositing. **One responsive defect**, fixed. Both passes assert the instrument took effect
+(`innerWidth` read inside the page; dark verified by `body` background resolving to `coal`).
+
+**Three findings, all in the branch:**
+1. `.gn-nav` was a no-wrap flex row whose last child is `Sign out {user.name}` → 10px horizontal overflow
+   at 390px on every page rendering `AppNav`, none on pages that do not. **The overflow scales with the
+   user's name.** Fixed with `flex-wrap: wrap`; verified 10→0 on five routes with a negative control that
+   stayed at 10.
+2. `CONTRAST_PAIRS` declared 8 pairs while 18 more co-occur on screen. All 18 pass today; added so the
+   existing test enforces them. 21 → 57 tests; mutation reddens exactly one named assertion.
+3. **`apps/desktop` shipped with every design token undefined** — `ui.css` defines none of them and only
+   `apps/web` ever called `themeStylesheet()`. Confirmed in the built artifact (24 usages, 0 definitions).
+   Fixed via `installTheme()`, case 15.17.
+
+4. **`p.gn-legal__meta` rendered at 15.2px** on `/privacy` and `/terms` — the *same* 0.95rem body-copy
+   floor items 1–3 already fixed on the 404's aside, missed there because that pass measured one page at
+   desktop width. Found by the new viewport suite on its first run. Now `1rem`.
+
+**The instruments, both committed.** `apps/web/e2e-viewport/` (five signed-out routes × three viewports,
+own `next dev` on port 3021 with `reuseExistingServer: false`) and `apps/web/e2e-stack/viewport.spec.ts`
+(case 13.254, the signed-in shell). **The second exists because the first would have stayed green through
+the entire bug** — the overflow was on authenticated pages only, and even `/workspaces` did not reproduce
+it because `AppNav` grows a longer row once a workspace is in scope. Ids minted from THIS lane's own
+`13.241` block (items 1–3 used it through `13.253`), never from the file maximum.
+
+> **⚠ THE BIG ONE, and it reverses a sentence I wrote earlier in this same entry.** "Zero contrast
+> failures" was TRUE and SCOPED: the instrument walked **text only**. Non-text contrast — WCAG 1.4.11,
+> the borders and rings that identify a control — was never in it. Measured properly: **17 of 24 distinct
+> bordered classes fall below 3:1 in both themes**, `.gn-button--ghost` worst-defensible at 2.49/2.30
+> with a fill of 1.09 against the page, so the border is the only thing marking it as a control. The
+> number I had used as a *known-failing control* (`line` on `paper` = 1.34) turned out to be a pair the
+> product ships on `.gn-card`, `.gn-chip`, `td`, `th`. **RECORDED, NOT FIXED** — the remedy moves
+> `line`/`lineStrong` across every surface in both themes (owner's design call), the pairs cannot be
+> declared first because that reddens the gate in the same commit that would fix them, and the
+> `surfaceOverlay` pairs cannot be enforced at all until `relativeLuminance` composites (it ignores alpha
+> by design: `text` on `surfaceOverlay` computes 1.00 against a true 6.43 — a false red — while `border`
+> on it reads 11.87 against a true 1.85, the false green). Full table in the checklist.
+
+**Recorded for the OWNER, deliberately not fixed:** the border finding above · `apps/mobile/src/screens/help-screen.tsx:59`
+hardcodes `colorOf('light', …)` so the mobile help screen ignores dark mode (a theme-support decision, not
+a ratio failure) · tap targets, which **ratchet** in the suite rather than assert a floor
+(`e2e-viewport/tap-target-baseline.json`, count may fall never rise) because the reading is identical at
+390, 768 and 1512 and so is not a responsive finding at all.
+
+> **⚠ `e2e-stack` WILL START FAILING AFTER ENOUGH SIGN-INS, AND IT LOOKS LIKE A PRODUCT BUG.** The
+> magic-link endpoint is rate limited (`apps/server/src/app.ts:423`, `makeFixedWindowLimiter`). After a
+> session's worth of probing plus a few suite runs, `POST /api/auth/sign-in/magic-link` answers **429
+> "Too many requests"** — measured, for BOTH seeded users — and the spec's symptom is a 15 s timeout
+> waiting for "Check your inbox", which reads exactly like a broken send. `visibility.spec.ts` failed
+> this way at the end of this session while `smoke` and the new `viewport` spec had already passed in the
+> same run, purely because they ran first and spent the window. **It is not a defect and not a
+> regression: wait for the window, or restart the server container.** Diagnosed by calling the endpoint
+> directly and reading the 429 rather than by re-running the suite and guessing.
+
+**A gate caveat, since a red gate that is really a flake is worth naming precisely.** The first full run
+after all of this landed reported **29/30** — `@gisik-nokma/server#test` failed on
+`seed-dev.test.ts > lands, and a re-run is a no-op` at a 30 s timeout. Load average was **11.01** at the
+time, with a docker image build and a Playwright suite running alongside it. **The same test passes alone
+(`SEED_EXIT=0`), so that was contention, not a defect** — but "the gate was red and I decided it was
+flaky" is exactly the reasoning this repo distrusts, so it was re-run forced on a quiet machine rather
+than argued away. Also worth knowing: `which pnpm` resolves to the **v24.11.1** prefix even with v22
+first on PATH, because pnpm is only installed there; the node that actually runs is still v22.22.2, and
+turbo's error text naming a v24 path is about where the launcher lives, not which runtime executed.
+
+**Two environment facts worth inheriting.** `webkit` does NOT run here — only `webkit-2272` is installed
+and Playwright 1.62.1 wants `webkit-2336`, so all three viewport projects are chromium (independently
+correct: a cross-width comparison across two engines cannot attribute a difference to the width). And the
+compose web container serves a **pre-built image**, so a source edit is invisible to it until rebuilt —
+which is why 13.254 correctly reports RED against the stale container and needs the image rebuilt to go
+green. That is the test failing on the bug it was written for, not a defect in the test.
+
+**Still open from earlier, unchanged:** `EXPO_PUBLIC_DEV_TOKEN` can be inlined into a release build, and
+there is no `helmet`/CSP/`X-Content-Type-Options`/`X-Frame-Options` anywhere.
+
+# ▶ MONDAY 2026-09-07 ~20:4x IST *(superseded by the entry above)* — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
+
 | what | value |
 |---|---|
 | `origin/main` | **`065f3c3`** — #302 (pre-launch 1–3), #304 (in-app help), plus the controller's #303/#305 anchors |
@@ -196,8 +301,14 @@ DESKTOP measurement, and nothing has exercised any `max-width: 40rem` rule.
 
 Item 7's own wording is *"actually check in a real viewport, not just visually inspect the code"* — and a
 resize that reports success while changing nothing is exactly how that instruction gets satisfied on
-paper. **Use Playwright**, which this repo already has configured with real device viewports
-(`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`).
+paper. **Use Playwright.**
+
+**CORRECTED 2026-09-07 (item 7, done):** the rest of that sentence used to read *"which this repo already
+has configured with real device viewports (`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`)"*, and
+it was false — the same false claim also sat in `docs/pre-launch-checklist.md`. Measured across both
+configs and every spec: **zero** occurrences of `devices`, `projects`, `viewport` or `setViewportSize`,
+against a positive control of 4 `defineConfig`/`use:` hits in the same files. Playwright and the browser
+binaries were installed; the viewport configuration had to be written, and now is.
 
 ## The three defects the in-app help work produced that no test would have caught
 

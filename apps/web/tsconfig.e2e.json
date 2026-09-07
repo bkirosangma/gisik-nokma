@@ -9,8 +9,10 @@
   "include": [
     "e2e/**/*",
     "e2e-stack/**/*",
+    "e2e-viewport/**/*",
     "playwright.config.ts",
-    "playwright.stack.config.ts"
+    "playwright.stack.config.ts",
+    "playwright.viewport.config.ts"
   ],
   "exclude": [
     "node_modules",

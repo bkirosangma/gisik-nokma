@@ -21,7 +21,24 @@ a { color: var(--gn-accent); }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
 .gn-view-tabs { display: flex; gap: 0.4rem; align-items: center; }
 
-.gn-nav { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
+/* `flex-wrap: wrap` is load-bearing, not tidiness. The last child is
+   `Sign out {user.name}`, so this row's width depends on DATA: a no-wrap flex
+   row cannot shrink below its content and pushes that button past the viewport.
+   Measured at 390x844 against the seeded stack: the button ran 338.9 -> 400.1 in
+   a 390px viewport, i.e. `documentElement.scrollWidth` 400 vs `clientWidth` 390,
+   on every page that renders `AppNav` (my-work, members, both settings pages,
+   the board) and on no page that does not (help, privacy, terms, sign-in, 404).
+   The 10px was the seeded owner's name length; a longer name overflows further,
+   which is why the fix is wrapping rather than a width guess. Every other flex
+   row of this shape in the two stylesheets already sets it — this one was the
+   outlier.
+
+   MEASURED BEFORE AND AFTER, because a fix that removed the overflow by CLIPPING
+   the button would read as success on a scrollWidth check too. Before: the nav
+   box was 88px tall and `Sign out` was the one child whose rect crossed the
+   viewport edge. After: 104px, every child fully inside, scrollWidth equal to
+   clientWidth. The button wraps onto another line; it is not hidden. */
+.gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
 .gn-nav__spacer { flex: 1; }
 
 .gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
@@ -150,11 +167,18 @@ a { color: var(--gn-accent); }
   font-size: 1rem;
 }
 
+/* 1rem for the same reason `.gn-notfound__aside` above is, and it is the same
+   0.95rem — 15.2px on a phone, under the 16px floor for body copy. Items 1–3
+   caught it on the 404 and missed it here, because that pass measured one page
+   and measured it at desktop width; item 7's viewport suite found it on both
+   legal pages at 390px, which is the whole argument for having the suite. This
+   line carries the pages' "Last updated · Operated by · Governed by" — the
+   party and jurisdiction facts a reader is most likely to have come for. */
 .gn-legal__meta {
   max-width: 68ch;
   margin: 0 0 2rem;
   color: var(--gn-text-muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .gn-legal__section {
