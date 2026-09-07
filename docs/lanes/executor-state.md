@@ -16,6 +16,51 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ▶ MONDAY 2026-09-07 ~20:4x IST — **MCP PLAN LANDED (PR #296). ONE OWNER INSTRUCTION ARRIVED TRUNCATED AND IS RECORDED AS PARTIAL — DO NOT ACT ON THE MISSING HALF.**
+
+| what | value |
+|---|---|
+| `origin/main` | **`e260d99`** — #293, #294, #295 merged; #276 merged earlier |
+| in flight | **PR #296** `exec/91-mcp-server-plan` — the MCP implementation plan, verified and landed as a document, NOT executed |
+| branch | `exec/92-inapp-manual-scope` (docs only), off `e260d99` |
+| **queue** | MCP plan → owner rulings pending (7 questions). Then: persona-driven README/manual/FAQ synthesis, **not yet handed over** — hold until the drafts land. |
+| verification rule | **NEW, from the controller (#295): prove a squash dropped nothing with `git show <ref>:<path> \| shasum -a 256` on BOTH sides, ONE FILE PER CALL. Not `git diff` — not even with a captured exit code.** Three false git-diff readings in 20 minutes: a fabricated diff, a masked exit-128 read as success, and a false non-empty diff on byte-identical content. |
+
+**Adopted the shasum rule immediately and it works** — #293/#294 verified file-by-file that way. **One
+gotcha of the new method, worth knowing before it bites:** `e3b0c44298fc1c14…` is the SHA-256 of EMPTY
+INPUT. `git show` on a path absent from that ref prints nothing and hashes to it, so **that constant is
+the method's own silent-empty signature** — read it as "the file was not in that ref", never as a match.
+
+## ⚠ AN OWNER INSTRUCTION ARRIVED WITH ITS HEAD MISSING. HALF IS ACTIONABLE; HALF IS UNKNOWN.
+
+The message began mid-sentence — *"in a real viewport, not just visually inspect the code"* — and
+referenced **"the legal-page caveat above"** and **"#6/#7's UI work"**, neither of which appears anywhere
+in this session. **This is the truncation failure this file measured this afternoon, arriving from the
+other direction: truncation eats the HEAD, so the fragment is indistinguishable from a complete short
+message.** It was recognised only because the first word was mid-sentence.
+
+**What is unambiguous and recorded as scope:**
+- **The manual/FAQ must be a REAL IN-APP FEATURE**, reachable from the web app **and** the native
+  mobile/desktop apps — *not* markdown files in the repo. Factor into scope when the synthesis drafts
+  arrive.
+- **Do not start building the in-app surface yet** — the drafts have not been handed over.
+- It must not collide with whatever "#6/#7's UI work" is.
+- Standing: escalate genuine ambiguity; do not guess where there are user-facing or compliance
+  consequences.
+
+**What is MISSING and must not be reconstructed by inference:**
+- The **legal-page caveat** — referenced as already given, never received here. Anything touching legal
+  or compliance copy is blocked on it. Guessing at a compliance instruction is the single worst place to
+  fill a gap from context.
+- What **"#6/#7"** identifies, and what UI work they carry.
+- What the *"in a real viewport"* sentence attaches to. The plain reading is: **verify UI by rendering it
+  in a real browser viewport, not by reading the code** — which is a good rule and this machine has Chrome
+  automation available. **But it is a reading of a fragment, and it is not being treated as an order
+  until confirmed.**
+
+**Asked for the head rather than inferring it.** Recorded here so a restart inherits the gap as a gap
+instead of inheriting a confident guess — which is how a fragment becomes a fact.
+
 # ▶ MONDAY 2026-09-07 ~20:1x IST — **THE QUEUE IS NO LONGER EMPTY. Owner assigned the Plan 9 residual; it is DONE and in flight as PR #293.**
 
 **This supersedes the `queue: EMPTY` / `HOLD` rows in every entry below.** A restart that reads them
