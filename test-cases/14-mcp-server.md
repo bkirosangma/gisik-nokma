@@ -191,3 +191,33 @@ assignments rather than the file's maximum, which is exactly what §12's header 
 > — an empty string, confirmed by reading the column — so the fallback never fires. This page defends
 > itself with `actingAs()`, which answers "you" rather than a ULID, because an id has technically named
 > the person and actually told them nothing. *Owner: whoever next touches `useSessionStatus`.*
+
+## Task 6 — the client's token cache and HTTP layer (`packages/mcp-server`)
+
+- **14.40** ✅ Answers `null` when nothing is cached. — (`packages/mcp-server/test/token-cache.test.ts`)
+- **14.41** ✅ Round-trips the token and the user id. — (`packages/mcp-server/test/token-cache.test.ts`)
+- **14.42** ✅ **Writes the file `0600` and its directory `0700`.** A personal access token any process on
+  a shared machine can read is not cached, it is published — so the mask is asserted, not assumed, and
+  `mkdir` is given the mode explicitly rather than trusting the process umask, which is not this module's
+  to assume. — (`packages/mcp-server/test/token-cache.test.ts`)
+  *Mutation: drop both mode arguments and rely on umask — the tempting shortcut — and **exactly 14.42
+  fails**, 1 of 11. Nothing else notices a world-readable credential.*
+- **14.43** ✅ Answers `null` for a CORRUPT cache rather than throwing. Absent, unreadable and corrupt all
+  mean the same thing to a caller — there is no usable credential — and one of them is recoverable by the
+  device flow. Throwing would turn a truncated file into a permanent failure only a human deleting a
+  dotfile could clear. — (`packages/mcp-server/test/token-cache.test.ts`)
+- **14.44** ✅ Sends the token as a bearer credential, returns the parsed body, and **sends no cookie** —
+  the absence is asserted. A bearer-only caller sits outside the HTTP-Origin check by construction, and a
+  cookie would put this client inside a CSRF control it has no business being inside. —
+  (`packages/mcp-server/test/http-client.test.ts`)
+- **14.45** ✅ Throws `HttpError` carrying the server's body **verbatim**, not a summary of it — whoever
+  surfaces this to an assistant shows what the server actually said. —
+  (`packages/mcp-server/test/http-client.test.ts`)
+- **14.46** ✅ **Turns an unreachable server into a `TransportError` and does NOT retry**, asserted by
+  counting the calls. A write retried against a server that becomes reachable mid-retry double-submits,
+  and a double-submitted ticket is worse than a failure the person is told about once. —
+  (`packages/mcp-server/test/http-client.test.ts`)
+  *Mutation: add a single retry in the catch — **exactly 14.46 fails**, 1 of 11.*
+- **14.47** ✅ Posts with no token when there is none, which the device flow requires: the two
+  unauthenticated doors are reached before any credential exists. —
+  (`packages/mcp-server/test/http-client.test.ts`)

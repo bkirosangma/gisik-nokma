@@ -1524,7 +1524,7 @@ export type GisikClient = {
 export function createGisikClient(serverUrl: string, fetchImpl?: typeof fetch): GisikClient;
 ```
 
-- [ ] **Step 1: Write the failing token-cache tests**
+- [x] **Step 1: Write the failing token-cache tests**
 
 `packages/mcp-server/test/token-cache.test.ts`:
 
@@ -1575,12 +1575,12 @@ describe('the token cache', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/token-cache.js`.
 
-- [ ] **Step 3: Write `src/token-cache.ts`**
+- [x] **Step 3: Write `src/token-cache.ts`**
 
 ```ts
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -1633,7 +1633,7 @@ export async function clearCachedToken(path: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Write the failing http-client tests**
+- [x] **Step 4: Write the failing http-client tests**
 
 `packages/mcp-server/test/http-client.test.ts`:
 
@@ -1702,7 +1702,7 @@ describe('the HTTP client', () => {
 });
 ```
 
-- [ ] **Step 5: Write `src/http-client.ts`**
+- [x] **Step 5: Write `src/http-client.ts`**
 
 ```ts
 export class TransportError extends Error {
@@ -1783,7 +1783,7 @@ export * from './token-cache.js';
 export * from './http-client.js';
 ```
 
-- [ ] **Step 6: Run everything in the package**
+- [x] **Step 6: Run everything in the package**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 11 passed (3 from Task 1, 4 + 4 here).
@@ -1791,7 +1791,7 @@ Expected: 11 passed (3 from Task 1, 4 + 4 here).
 Run: `pnpm turbo run typecheck --filter @gisik-nokma/mcp-server 2>&1 | tail -10`
 Expected: green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server/src packages/mcp-server/test
