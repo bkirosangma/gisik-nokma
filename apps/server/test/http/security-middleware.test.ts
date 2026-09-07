@@ -390,7 +390,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   it('webOrigin: null disables the HTTP-Origin check as well as CORS — one fact, one switch', async () => {
     const { app, recorder } = build({
       webOrigin: null,
-      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
     });
     const response = await app.inject({
       method: 'POST',
@@ -420,7 +420,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 describe('rate limiting', () => {
   const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
     webOrigin: null,
-    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, windowSec: 60, ...over },
+    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60, ...over },
   });
 
   it('429s the request over the auth limit, names the refusal, sets retry-after', async () => {
@@ -547,7 +547,7 @@ describe('rate limiting', () => {
   it('an OPTIONS preflight is not charged to the auth bucket', async () => {
     const { app } = build({
       webOrigin: WEB_ORIGIN,
-      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
     });
     await app.inject({
       method: 'OPTIONS',

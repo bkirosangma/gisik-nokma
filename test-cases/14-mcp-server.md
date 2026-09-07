@@ -66,3 +66,50 @@ restores both. The token table carries no `expires_at` by decision, not omission
 handed to somebody who is not yet a user, so a clock bounds an unknown, whereas an MCP token is minted by
 the account holder for their own machine from an approval they performed. Revocation is a DELETE and takes
 effect at once. Plan Open question 4 if the owner wants a TTL.*
+
+## Task 3 — the three device-flow routes (`apps/server/src/routes/mcp-device.ts`)
+
+*Two of the three doors are unauthenticated BY DESIGN — the point of a device flow is that the thing
+asking for a credential does not have one yet. Neither gives anything away: the mint hands back a code
+that authorises nothing until a signed-in person approves it, and the exchange answers `pending` forever
+unless somebody with a session approved that exact grant. **The credential is created by the APPROVAL**,
+which is the door that requires identity, and therefore the door that needs CSRF protection.*
+
+- **14.20** ✅ Mints a grant and never returns the device code in a form it stored — shape-checked to the
+  wire contract (43-char base64url code, `XXXX-XXXX` from the unambiguous alphabet, the WEB origin's
+  `/mcp/authorize`, and the TTL/interval constants). — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.21** ✅ Needs no session. **Asserts `toBe(200)`, not the plan's `not.toBe(401)`** — see the note
+  below. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.22** ✅ Refuses an unauthenticated approval with the product-wide `{ error: 'unauthenticated' }`. —
+  (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.23** ✅ Approves as the signed-in person, and the exchange issues THAT person a token. The
+  `userId` is in the response because the MCP client cannot build a valid envelope without it —
+  `actorId` must equal the session user or the permission gate refuses every write. —
+  (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.24** ✅ An unknown user code is refused, and says only that. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.25** ✅ Answers `pending` until somebody approves. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.26** ✅ A device code is single-use over the WIRE too — the second exchange gets 404
+  `unknown_code`, not a second token. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.27** ✅ `/v1/mcp/device/approve` is in `HTTP_ORIGIN_PROTECTED_ROUTES`. —
+  (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.27b** ✅ A cookie-carrying approval with a forged `Origin` is refused 403 `forbidden_origin`, and
+  the SAME approval bearer-authenticated succeeds — the control without which a route that 403'd
+  everything would pass the first half. — (`apps/server/test/mcp/device-flow.test.ts`)
+  *Planted defect, run: deleting the route from `HTTP_ORIGIN_PROTECTED_ROUTES` fails **both** 14.27 and
+  14.27b — 2 failed / 7 passed. Two failures and not one is the requirement; if only 14.27 had failed,
+  14.27b would not be testing what it claims. Restored and verified by SHA-256 against `HEAD`.*
+
+> **A defect in this task's own specified test, worth keeping because of how it was caught.** The plan's
+> Step 4 says the file must go entirely red and that any pass at that point means a test "is testing
+> something other than what it names". It went **8 failed / 1 passed**. The pass was 14.21, asserting
+> `not.toBe(401)` — and an unregistered route answers **404**, which is not 401, so it passed against a
+> route that did not exist at all. A negative assertion about a status code cannot distinguish "reachable
+> and unauthenticated" from "not there", which is the whole claim. Changed to `toBe(200)` and re-run
+> WHILE STILL RED to confirm it then failed (9 of 9), so the strengthening is falsifiable rather than
+> asserted. The plan's warning was right; it just did not notice the test it had written.
+
+*The two numbers the spec left open are DERIVED, not picked. All three routes are charged to a fourth
+limiter bucket, `mcp:`, fed by the existing `RATE_LIMIT_AUTH_MAX` — the `inviteMax` precedent, no new
+environment variable. Before this, a route under `/v1/mcp/...` matched NO bucket, leaving the 8-character
+user code an unlimited brute-force surface. At 10 per 60s the sustained rate is one per 6s, so a 12s poll
+spends half the budget and leaves room for the mint and a retry, and a 600s TTL is 50 polls.*

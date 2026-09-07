@@ -820,13 +820,13 @@ git commit -m "MCP credential store: device-code grants and personal access toke
 - Consumes: `mintDeviceCode`, `approveDeviceCode`, `exchangeDeviceCode`, `DEVICE_CODE_TTL_SEC`, `POLL_INTERVAL_SEC`, `hashCredential` (Task 2); `Queryable`; `preHandlerHookHandler`.
 - Produces: `registerMcpDeviceRoutes(app, deps: { pool: Queryable; webOrigin: string; now?: () => Date }, requireSession: preHandlerHookHandler): void`, and the three routes pinned in **The wire contract** above. Task 6 and Task 7 code against those paths and bodies; Task 5 codes against `POST /v1/mcp/device/approve`.
 
-- [ ] **Step 1: Decide the bucket before writing the route — it is what fixes the TTL and the interval**
+- [x] **Step 1: Decide the bucket before writing the route — it is what fixes the TTL and the interval**
 
 The spec leaves "exact device-code TTL and polling interval" open. It is not a free choice: `app.ts`'s limiter classifies by exact route pattern and a route under `/v1/mcp/...` matches **no** bucket today, which would make an 8-character user code an unlimited brute-force surface. Mounting the routes in the existing `authLimiter` bucket instead would make the CLI's polling contend with the person's own browser sign-in on the same client key, on a `RATE_LIMIT_AUTH_MAX=10`-per-60s budget.
 
 So: a **fourth bucket**, `mcpMax`, fed by the existing `RATE_LIMIT_AUTH_MAX` — no new environment variable. This is exactly the precedent `inviteMax` set (`app.ts`'s `SecurityOptions.rateLimit` docblock: a field rather than a constant, "No new environment variable is introduced for it"; `.env.example:174` records `invite … at RATE_LIMIT_AUTH_MAX`). With 10 requests per 60s the sustained rate is one per 6s, so **`POLL_INTERVAL_SEC = 12`** spends half the budget and leaves room for the mint and one retry, and **`DEVICE_CODE_TTL_SEC = 600`** is 50 polls — an unhurried browser trip that does not leave an abandoned grant lying around for an hour.
 
-- [ ] **Step 2: Widen `buildTestApp` to accept security options — FIRST, because a test needs it**
+- [x] **Step 2: Widen `buildTestApp` to accept security options — FIRST, because a test needs it**
 
 Case 14.27b below drives the HTTP-Origin check, and `buildTestApp` cannot assemble an app with the security controls on today. Do this before writing the tests, so no test in this task is ever written in a shape that cannot fail.
 
@@ -848,7 +848,7 @@ and forward it to `buildApp`'s options object. Import `SecurityOptions` from `..
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/app.test.ts 2>&1 | tail -10`
 Expected: green — the widening is additive and absent-means-off is unchanged.
 
-- [ ] **Step 3: Write the failing route tests**
+- [x] **Step 3: Write the failing route tests**
 
 `apps/server/test/mcp/device-flow.test.ts`:
 
@@ -1017,12 +1017,12 @@ describe('the approval route is CSRF-protected, because it mints a credential', 
 });
 ```
 
-- [ ] **Step 4: Run them and watch them fail**
+- [x] **Step 4: Run them and watch them fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/device-flow.test.ts 2>&1 | tail -30`
 Expected: FAIL — cannot resolve `../../src/routes/mcp-device.js`. Every test in the file fails for that one reason; a file that reports some passes at this point is testing something other than what it names.
 
-- [ ] **Step 5: Write `apps/server/src/routes/mcp-device.ts`**
+- [x] **Step 5: Write `apps/server/src/routes/mcp-device.ts`**
 
 ```ts
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
@@ -1155,7 +1155,7 @@ export function registerMcpDeviceRoutes(
 }
 ```
 
-- [ ] **Step 6: Wire it, protect it, bucket it**
+- [x] **Step 6: Wire it, protect it, bucket it**
 
 In `apps/server/src/http/http-origin.ts`, inside `HTTP_ORIGIN_PROTECTED_ROUTES`, add after the `'/v1/me/notifications/:id/read'` entry:
 
@@ -1198,12 +1198,12 @@ In `apps/server/src/app.ts`:
 4. Beside the other `register*Routes` calls: `registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);`
 5. In `apps/server/src/index.ts`, pass `mcpMax: config.rateLimitAuthMax` wherever `inviteMax` is passed.
 
-- [ ] **Step 7: Run the whole file**
+- [x] **Step 7: Run the whole file**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/ 2>&1 | tail -30`
 Expected: all pass. **Read the output.** A suite that reports 0 tests run is not a pass; confirm the count.
 
-- [ ] **Step 8: Plant the CSRF defect and watch it caught**
+- [x] **Step 8: Plant the CSRF defect and watch it caught**
 
 Temporarily delete the `'/v1/mcp/device/approve'` line from `HTTP_ORIGIN_PROTECTED_ROUTES`.
 
@@ -1212,7 +1212,7 @@ Expected: **14.27 AND 14.27b both fail** — 14.27 on the set membership, 14.27b
 
 Restore the line. Re-run: all pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/server/src/routes/mcp-device.ts apps/server/src/http/http-origin.ts apps/server/src/app.ts apps/server/src/index.ts apps/server/test/helpers/app.ts apps/server/test/mcp/device-flow.test.ts

@@ -185,9 +185,9 @@ async function main(): Promise<void> {
           // its own knob, `RATE_LIMIT_INVITE_MAX` lands on this line and on
           // `.env.example`, and nothing else moves.
           inviteMax: config.rateLimitAuthMax,
-        // Same knob as invites, for the reason `SecurityOptions.rateLimit` gives:
-        // a fourth bucket, no fourth environment variable.
-        mcpMax: config.rateLimitAuthMax,
+          // Same knob as invites, for the reason `SecurityOptions.rateLimit`
+          // gives: a fourth bucket, no fourth environment variable.
+          mcpMax: config.rateLimitAuthMax,
           windowSec: config.rateLimitWindowSec,
         },
         // Without this, `request.ip` behind App Platform's router is the ROUTER
