@@ -1,5 +1,54 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 18:2x IST — PLAN 9'S RESIDUAL CLOSED. PRs #293/#294 merged. `main` is `61b3aca`, own forced gate GREEN. **Also: a genuinely new tooling-reliability finding, checksum-verified, that changes how squash-merge integrity gets checked from here on.**
+
+**PR #293 — the owner-assigned residual (Plan 9's notifications consumer), real code.** The blocker was
+never the dependency graph: the adapter imported no React/Next/DOM and its own docblock already named
+three siblings living in `packages/app-core/src/online/` — it alone sat in `apps/web/src/`, the one file
+`apps/server`'s tests couldn't reach. Fixed by moving it (git-detected rename, no new dependency edge, no
+interface change). Six new cases (11.190–11.195) drive the real adapter against the real route and real
+Postgres, RED first, four mutations each naming their kill. Two defects the executor found in its own
+work before I ever saw the PR: a citation hole opened by naming case ids in prose (fixed — the filename is
+now the durable pointer, not the number) and a case (11.191) whose own mutations proved it was misnamed
+(renamed, 11.192 now owns the claim).
+
+**Own forced gate at `61b3aca`** (chained, one call): `GATE_EXIT=0` · `Tasks: 30 successful, 30 total` ·
+node `v22.22.2` confirmed · no `Unsupported engine` · **3,741 passed | 5 skipped, 300 test files**, summed
+from each package (27+4+12+15+8+73+19+137+2+3 files; 464+47+282+178+90+1139+132+1384+5+20 tests) — matches
+the executor's own citation exactly. Zero orphaned vitest workers (one unrelated `backup-daemon-main.ts`
+at ppid=1 is a real service, correctly outside the vitest-orphan pattern — not touched).
+
+**PR #294 — the handoff correction**, recording that the queue went from EMPTY/HOLD to NOT-EMPTY the
+moment the owner assigned the residual, and the same squash-drop-masked-as-error near-miss (below) caught
+independently on the executor's own side while re-verifying #292.
+
+---
+
+### ⚠ TOOLING FINDING — `git diff` gave THREE false readings verifying these two PRs alone. Checksums, not diffs, are the proof from here on.
+
+**This is not the executor's already-recorded near-miss on #292** (a `git diff` against a deleted branch
+erroring and printing 0, read as "empty" — real, and it independently recurred on their side too verifying
+this same window). **This is three separate, different failures, all mine, all in the space of about 20
+minutes verifying #293/#294:**
+
+1. The default (filtered) path showed `packages/app-core/src/online/notifications.ts` as a brand-new
+   171-line file with full plausible docblock content. The real change — confirmed against GitHub's own
+   per-file API numbers and a raw unfiltered re-check — was a git-detected RENAME with a genuine +2/-2
+   diff. The filtered tool didn't reformat; it produced content that does not correspond to reality.
+2. A multi-path `git diff a b -- <8 files>` exited **128** (a real git error), while `echo "EXIT=$?"` in
+   the same block printed **0** — the true failure was masked. Isolating to one file per call surfaced it.
+3. `git diff <PR-head> HEAD -- <path>` reported **59 insertions** between two commits whose file content
+   was then confirmed **byte-identical by SHA-256** (`git show <ref>:<path> | shasum -a 256`, both sides
+   matched exactly). A non-empty diff was itself wrong — the opposite direction from every previously
+   documented failure in this class, which were all "empty when it should complain."
+
+**Operative rule going forward, for this file and the brief both:** proving a squash dropped nothing is a
+**checksum match**, not an empty `git diff`, even through `rtk proxy`, even with a captured exit code.
+`git show <ref1>:<path> | shasum -a 256` vs `git show <ref2>:<path> | shasum -a 256`, one file per call.
+Full account in this controller's own memory (`git-diff-tooling-unreliable-2026-09-07.md`) since this is
+a session-independent tooling fact, not a project fact — but it binds anyone verifying a merge in this
+repo with this toolchain, so it's recorded here too.
+
 ## ✅ MONDAY 18:1x IST — THE RETIREMENT'S DANGLING REFERENCES CLOSED. PRs #288/#289 merged. `main` is `72a8e68`, docs-only since `4d5dd39` (still the operative gate figures — re-confirmed `check:tasks` 177/177, `check:runbook` 14/14 this entry).
 
 **My own #287 was incomplete, and the executor caught it before it caused harm.** Retiring the brief's
