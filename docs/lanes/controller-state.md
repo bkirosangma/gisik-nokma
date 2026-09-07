@@ -1,5 +1,15 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 15:4x IST — NEW CONTROLLER SESSION RESUMED. Restarted the executor (the one unmet step the previous handoff left open); `main` unchanged at `ebe5ed8`. No merge happened this entry — this is a restart anchor, not a step close.
+
+**This session's own verification, not carried forward from the prior entry's text:** `git diff --stat 486cdb6 ebe5ed8` → one file, `docs/lanes/controller-state.md`, 40 insertions, zero other files — the only commit since the last independently-verified gate (`486cdb6`: 30/30, 1546/1546 citations, zero orphans, node v22.22.2) is docs-only. The gate result transfers to `ebe5ed8` on that basis (measured empty non-docs delta, not cited from the prior anchor's claim). Fresh `pnpm check:tasks` re-run this session: `CHECK_EXIT=0`, 177 tasks / 177 done across all 12 plan files, zero claimed/in-flight/todo anywhere — unchanged.
+
+**Executor restarted:** the prior handoff (line above, now superseded) named this as the first action after #278 merged and was never done before that controller's context ran out. Killed `gisik:1`, relaunched with `dispatch-executor-serial.md` (no override), confirmed delivery by watching the pane — it read `executor-state.md` per its own Step 1, is self-orienting (correctly caught and requoted a zsh glob-eating bug on its own), and is proceeding toward the next incomplete item per the handoff's position. Per the brief's own design the handoff carries the position, not this brief and not this entry — not re-stating `13.176` (option B, "Shared with me" view) as an explicit dispatch, since `executor-state.md` already names it as next, cleared, unblocked, not started, and re-asserting it here risks exactly the stale-position trap the brief documents (§"This section deliberately names no task").
+
+**PR #276 (MCP server design spec) still open, still AWAITING THE OWNER'S REVIEW** — untouched this entry, per standing instruction; it is not part of the executor's queue.
+
+**No orphaned processes at this restart** — `ps` checked directly for gate.sh/turbo/vitest, zero; `/tmp/gisik-gate.lock` absent.
+
 ## ✅ MONDAY 15:2x IST — THE LIVE GAP IS CLOSED. `main` is `486cdb6`, gate GREEN and independently re-verified (30/30, 1546/1546, zero orphans, node v22.22.2) — trust this one, unlike the brief window after `2b36128`. Controller `gisik-nokma-0c` restarting now (context full); this is a clean handoff, nothing is broken or in flight.
 
 **PR #278 merged, closing the gap the previous handoff flagged as urgent.** The URL-in-a-string false negative
