@@ -48,5 +48,20 @@ anything: a parser reporting "224 entries" tells you it ran, not that it was rig
 - **15.14** ❌ Web `/help` renders the browser and its search — *no test yet; the shared model and search are covered above, and the DOM rendering is not.*
 - **15.15** ❌ Desktop reaches the same component, including from the signed-out branch.
 - **15.16** ❌ Mobile's React Native screen renders the same parsed content.
+- **15.17** ✅ **The desktop window DEFINES the design tokens it draws with, rather than only referencing
+  them.** `apps/desktop/src/theme.test.ts` calls `installTheme` and asserts what it appended: one
+  stylesheet carrying every role in `TOKEN_ROLES`, plus the dark theme and the OS-preference default.
+  Found by pre-launch item 6 — `ui.css` has 321 `var(--gn-…)` usages and **zero** definitions, and until
+  this landed only `apps/web/app/layout.tsx:32` ever emitted `themeStylesheet()`, so the desktop help
+  browser rendered on browser defaults. Confirmed in the shipped artifact before it was fixed:
+  `apps/desktop/dist/assets/index-*.css` carried 24 distinct `var(--gn-…)` usages and no definitions,
+  the 24 serving as the positive control for the zero.
+  *Why the two existing guards could not see it: `tokens.test.ts` proves every `var()` NAMES a declared
+  role and `token-discipline.test.ts` proves no colour literal escapes `tokens.ts` — both are claims
+  about the TypeScript and the CSS text, and neither says any stylesheet defining those variables is
+  ever installed in a given app, which is a property of an entry point.*
+  *Mutation: drop one role from what `installTheme` installs (`--gn-surface-sunken`) → red, and the
+  failure names its own site — `expected [ 'surfaceSunken' ] to deeply equal []`. Restored and verified
+  by SHA-256 against `HEAD`, not by a shell `diff`.*
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
