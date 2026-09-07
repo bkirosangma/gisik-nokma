@@ -357,4 +357,41 @@ describe('sweepUserPreferences — retention after revocation', () => {
     expect(report.deleted).toBe(0);
     expect(await preferenceRowExists(user, ws)).toBe(true);
   });
+
+  /**
+   * 6.149 — the race the row says "is not driven by any test", now driven. The hook it
+   * lacked is a query double: intercept the ledger read for the revocation (step 2, after
+   * `resolveEffectiveRole` has already fixed the candidate set) and let a `membership.granted`
+   * commit before forwarding it. The DELETE re-states the membership condition rather than
+   * trusting a TypeScript variable read three round-trips earlier, so the re-granted member's
+   * row survives — and `swept` still names them while `deleted` does not count them. The two
+   * numbers disagreeing IS the honest report of a race, rather than a claim the row went.
+   */
+  it('keeps a membership granted mid-sweep, and says so by swept and deleted disagreeing', async () => {
+    const ws = newUlid();
+    const user = newUlid();
+    await grantThroughLedger(ws, user);
+    await revokeThroughLedger(ws, user);
+    await seedPreferences(user, ws);
+    const revokedAt = await assertRevocationInLedger(ws, user);
+    const past = new Date(revokedAt.getTime() + REVOKED_MEMBER_PREFERENCE_RETENTION_MS + 1000);
+
+    let raced = false;
+    const racing = {
+      query: async (text: string, params?: unknown[]) => {
+        if (!raced && typeof text === 'string' && text.includes("'membership.revoked'")) {
+          raced = true;
+          await grantThroughLedger(ws, user);
+        }
+        return params === undefined ? db.pool.query(text) : db.pool.query(text, params);
+      },
+    } as unknown as typeof db.pool;
+
+    const report = await sweepUserPreferences(racing, { now: past, dryRun: false });
+
+    expect(raced).toBe(true);
+    expect(report.swept).toEqual([{ userId: user, workspaceId: ws }]);
+    expect(report.deleted).toBe(0);
+    expect(await preferenceRowExists(user, ws)).toBe(true);
+  });
 });

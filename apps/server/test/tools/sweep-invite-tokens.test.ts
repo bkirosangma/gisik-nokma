@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
-import { sweepInviteTokens } from '../../src/tools/sweep-invite-tokens.js';
+import {
+  SWEEPABLE_INVITE_TOKENS,
+  sweepInviteTokens,
+} from '../../src/tools/sweep-invite-tokens.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
@@ -218,5 +221,38 @@ describe('sweepInviteTokens', () => {
     expect(report.deleted).toBe(0);
     expect(await tokenIds()).toEqual(before);
     expect(await tokenIds()).toContain(lapsed);
+  });
+
+  /**
+   * 6.149 — the predicate is PARENTHESISED, and this composes exactly the thing the
+   * comment warns about to prove it. Its top level is an `OR` and `AND` binds tighter,
+   * so an unparenthesised version appended with `AND …` would bind as
+   * `expires_at <= now() OR (EXISTS(…) AND …)` — a statement that still parses, still
+   * runs, and sweeps every lapsed token the filter was meant to exclude.
+   */
+  it('stays correctly scoped when a caller ANDs a filter onto it — the OR is parenthesised', async () => {
+    const ws = newUlid();
+    const wanted = newUlid();
+    const other = newUlid();
+    await seedInvite({ workspaceId: ws, inviteId: wanted, expiresAt: AN_HOUR_AGO() });
+    await seedInvite({ workspaceId: ws, inviteId: other, expiresAt: AN_HOUR_AGO() });
+
+    const { rows } = await db.pool.query<{ invite_id: string }>(
+      `SELECT invite_id FROM invite_tokens
+        WHERE ${SWEEPABLE_INVITE_TOKENS}
+          AND invite_id = $1
+        ORDER BY invite_id`,
+      [wanted],
+    );
+
+    // Both rows are sweepable; only the filtered one may come back. Without the
+    // parentheses the lapsed `other` satisfies the bare first disjunct and leaks in.
+    expect(rows.map((r) => r.invite_id)).toEqual([wanted]);
+    // Positive control from the same run: the predicate really did match both, so the
+    // assertion above is about the AND binding and not about an empty result set.
+    const both = await db.pool.query<{ invite_id: string }>(
+      `SELECT invite_id FROM invite_tokens WHERE ${SWEEPABLE_INVITE_TOKENS} ORDER BY invite_id`,
+    );
+    expect(both.rows.map((r) => r.invite_id).sort()).toEqual([wanted, other].sort());
   });
 });
