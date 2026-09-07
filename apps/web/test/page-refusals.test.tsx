@@ -199,10 +199,12 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
         services={stubServices({
           getTickets: () =>
             Promise.reject(new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])),
-          // Types are stubbed so ONLY the list refuses. Types still gate creation on
-          // purpose — a ticket cannot be created without one — so leaving them
-          // unstubbed would withhold `New ticket` for a different reason and the
-          // assertion below would pass or fail for the wrong one.
+          // Types are stubbed so ONLY the list refuses, keeping the page in the state
+          // this case names. **It is not load-bearing for any assertion here** —
+          // deleting it leaves all ten cases green, measured — because nothing below
+          // reads `New ticket`; the creation half is 3.142's, in its own harness. Kept
+          // so the fixture describes one refusing read rather than two, and said
+          // plainly rather than claimed to protect an assertion it does not.
           getTicketTypes: async () => [
             { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
           ],
@@ -244,8 +246,12 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // like an absent refusal.
     //
     // And the matched node must be the LIST's refusal, not merely SOME refusal carrying
-    // the cap's prose: three `role="status"` nodes are on this page under these stubs
-    // (attention, board, list). A bare `.some(includes(ownWords))` would pass if the cap
+    // the cap's prose. **Two** `role="status"` nodes stand at each assertion point, not
+    // three — attention plus whichever tab arm is mounted, since the board arm unmounts
+    // when the tab changes. (This comment said three until it was measured; the count
+    // was inferred from the stubs rather than read off the page, which is the habit the
+    // rest of this file exists to refuse.) The compound matcher is load-bearing
+    // regardless of the number: a bare `.some(includes(ownWords))` would pass if the cap
     // text ever leaked into another read's message, which is the sort of pass that
     // survives the defect it was written to catch.
     const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 40);

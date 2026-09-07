@@ -208,7 +208,25 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     // all, so nothing can assert "this project has no parents". The reason stands
     // in its place. Measured before the original fix, when the picker DID render:
     // `PARENT OPTIONS: ['None (project root)']` — a lie with one option.
-    expect(screen.queryByLabelText('Parent')?.querySelector('select') ?? null).toBeNull();
+    //
+    // **This assertion used to be one that could not fail**, and it is worth naming
+    // because it looked like the strictest spelling available:
+    //
+    //     screen.queryByLabelText('Parent')?.querySelector('select') ?? null
+    //
+    // `queryByLabelText('Parent')` returns the `<select>` ITSELF (the label wraps the
+    // control), so `.querySelector('select')` looks INSIDE it and finds nothing when
+    // the picker is present — and the optional chain yields null when it is absent.
+    // `null` in both states, for opposite reasons. Restoring the empty picker left it
+    // green, and so did rendering the picker AND the reason together, which is the
+    // one arrangement this case exists to forbid.
+    //
+    // Counted instead, over the dialog, because the number differs between the two
+    // states where the old expression did not: Title has no select, Type has one, and
+    // Parent adds a second only when the picker renders.
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryAllByRole('combobox')).toHaveLength(1);
+    expect(within(dialog).queryByRole('option', { name: 'None (project root)' })).toBeNull();
     expect(
       screen.getByText(/the list of tickets that could be a parent cannot be shown/),
     ).toBeInTheDocument();
@@ -234,7 +252,49 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     );
     await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
     expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
-    expect(screen.queryByText(/could be a parent, so New ticket is not offered/)).not.toBeInTheDocument();
+    // The paired absence is the REASON, not the old refusal. `"…could be a parent, so
+    // New ticket is not offered"` was deleted with `createRegion`'s list arm and is
+    // produced by no source file now, so asserting it absent asserted nothing — it
+    // could not have been present. This string can be.
+    expect(
+      screen.queryByText(/the list of tickets that could be a parent cannot be shown/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('3.158 a preferences failure does not claim the parent list cannot be shown', () => {
+  /**
+   * `parentCandidates` is built from `list.rows`; `list.error` is
+   * `list.error ?? preferences.error` (`ticket-list.ts`). Keyed on the error, the
+   * dialog told a user the tickets that could be a parent *"cannot be shown"* — and
+   * offered a **preferences** 500 as the reason — while the rows sat there intact and
+   * the very same page could have shown them. Two false statements at once, and the
+   * state the stale-parent submit fired from.
+   *
+   * Keyed on `list.rows === null` it says only what it can see.
+   */
+  it('the rows are intact, so the picker is offered and the preferences error is not misused', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD,
+          getTickets: async () => LIST,
+          getTicketTypes: async () => WORKSPACE_TYPES,
+          getPreferences: () =>
+            Promise.reject(new HttpError(500, '/v1/me/preferences?workspaceId=w1')),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
+
+    // The true thing present...
+    expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
+    // ...and the false one absent. Paired, as every case in this file is.
+    expect(
+      screen.queryByText(/the list of tickets that could be a parent cannot be shown/),
+    ).not.toBeInTheDocument();
   });
 });
 

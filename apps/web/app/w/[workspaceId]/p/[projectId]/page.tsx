@@ -346,6 +346,28 @@ function ProjectBoard() {
         </p>
       );
     }
+    /**
+     * Keyed on `rows === null`, NOT on `error !== null` — those are different facts
+     * and only the first one is about parents.
+     *
+     * `parentCandidates` above is built from `list.rows`. `list.error` is
+     * `list.error ?? preferences.error` (`ticket-list.ts`'s `useTicketList`), so an
+     * ordinary preferences 500 — or a `setPrefs` PUT the user triggered themselves —
+     * sets it while the rows sit there intact. Keyed on the error alone, this told a
+     * user that the tickets which could be a parent *"cannot be shown"*, and offered a
+     * PREFERENCES failure as the reason, while the very same page could have listed
+     * them. Two false sentences at once, and the state a stale parent could be
+     * submitted from. Witnessed at 3.158.
+     *
+     * Keyed on the rows it says only what it can see: either there are candidates or
+     * there are not. The dialog refuses the stale parent independently
+     * (`new-ticket-dialog.tsx`), because a component may not depend on its callers
+     * getting this right.
+     */
+    const parentsUnavailable =
+      list.rows === null && list.error !== null
+        ? { parentCandidatesUnavailable: list.error }
+        : {};
     return (
       <>
         <CreateTicketFlow
@@ -356,7 +378,7 @@ function ProjectBoard() {
           currentUserId={currentUserId}
           typeOptions={typeOptions}
           parentCandidates={parentCandidates}
-          {...(list.error !== null ? { parentCandidatesUnavailable: list.error } : {})}
+          {...parentsUnavailable}
           onCreated={openTicket}
         />
         {ticketTypes.data === null ? (
