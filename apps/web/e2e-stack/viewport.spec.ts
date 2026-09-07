@@ -1,11 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
+// The plain MODULE, never the spec: Playwright loads an imported spec's
+// `test()` registrations too, and importing `responsive.spec.ts` here made this
+// config try to run all six unauthed cases — six `project "" has no entry in
+// VIEWPORTS` failures. A spec is not a library.
 import {
   measureTapTargets,
   readTapBaseline,
   recordTapBaseline,
-} from '../e2e-viewport/responsive.spec.js';
+} from '../e2e-viewport/tap-targets.js';
 
 /**
  * ## THE ONE VIEWPORT CASE THAT CANNOT LIVE IN `e2e-viewport/`
