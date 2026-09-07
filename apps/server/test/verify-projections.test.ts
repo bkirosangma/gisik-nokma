@@ -147,6 +147,9 @@ async function shadowSchemaExists(): Promise<boolean> {
   return result.rows[0].n > 0;
 }
 
+/**
+ * 3.20 — cited on the block: verify-projections is clean on honest state, and corrupted and deleted live rows are named with per-direction counts, with the shadow schema dropped afterwards.
+ */
 describe('verifyProjections', () => {
   it('the seed is NON-EMPTY in every table the clean verdict below covers', async () => {
     // A clean verdict over empty tables is the check that cannot fail, and this
