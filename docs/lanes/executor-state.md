@@ -28,6 +28,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#309** | `exec/99-prelaunch-6-7-contrast-responsive` | pre-launch items 6 + 7 — closes the checklist | 30/30 at `302f1834` |
 | **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin | 30/30 at `77338aa4` |
 | **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config | **33/33** at `803c42e` |
+| **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
 
 All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
 disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
@@ -43,7 +44,9 @@ own build/test/typecheck — the delta is the evidence it is wired in, not merel
 > condition until billing is fixed. Every merge now needs an explicit human decision. The controller
 > session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
 
-**MCP queue after this: Tasks 2–13.** Task 12's `last_used_at` is still an open OWNER decision and blocks
+**MCP queue after this: Tasks 3–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
+the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
 Task 12 only.
 
 **Three findings carried, all recorded with owners, none fixed:**
