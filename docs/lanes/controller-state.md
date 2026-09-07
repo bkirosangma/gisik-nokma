@@ -1,5 +1,17 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 10:5x IST — `main` is `78e647d`, gate green. 13.181 CLOSED (❌→✅, seed:dev now has CLI coverage). Working the carried queue, one item per branch/PR now (executor's own fix after three stranding incidents this session).
+
+PR #257 merged. `check:citations`: 1531/1531, zero uncited, still holds. `check:tasks`: 177/177. **13.181's
+"docker half" turned out to already be documented fact** (the runbook already states neither seed can run
+inside the production image, and why — `.dockerignore` excludes `docs/`), not an open defect; the real gap was
+CLI-entry-point coverage (argv/env), now five spawned test cases. **Executor adopted a standing rule after the
+#247/#253/#255 stranding pattern recurred a third time: one work item = one branch = one PR from here on** —
+should eliminate the re-fetch-before-merge risk going forward rather than just mitigating it per-merge.
+
+Next in the owner's stated order: `13.195`+`13.196`, `TicketPullNotFound`, the six `helpers/seed.ts` rows,
+`12.321`, then the two product items (`13.176`, `12.322`/`12.258`) with measure/design first.
+
 ## 🏁 MONDAY 10:4x IST — THE CITATION BACKFILL IS DONE: 1530/1530, ZERO UNCITED. `main` is `c115a5d`, gate green. Owner's ruling ("write the tests, not a carve-out") applied to all 14 final rows. Now working the Saturday-carried queue plus the two product decisions.
 
 **PR #255 merged: the final 14 rows closed with real tests, no carve-out** — exactly the owner's instruction.
