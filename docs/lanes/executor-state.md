@@ -23,8 +23,8 @@ MERGED. A resuming executor should not start from them.
 
 | what | value |
 |---|---|
-| `origin/main` | **`c5e3e02`** (PR #285 merged; its squash verified complete, with a control that printed) |
-| branch | `exec/84-step10-ran-and-a-truncated-message` (docs only), off `c5e3e02` |
+| `origin/main` | **`af369c0`** — #285, #286 and the controller's #287 (SERIAL SEQUENCE retired, owner-approved) all merged |
+| branch | `exec/85b-plan9-gap-owned` (docs only), off `af369c0` — rebuilt by cherry-pick after a squash drop, see below |
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
@@ -108,6 +108,10 @@ already holds in squashed form and manufactures conflicts that read as real ones
 after any squash of your own work, diff `origin/main` against the branch over the files that mattered,
 and carry a positive control through the same command shape. *An empty diff is the only proof, and it is
 only proof when something else in the same run proved the command can print.*
+
+> **Now also recorded durably by the controller** in `controller-state.md` via #287, with a named owner
+> — *"whoever next touches Plan 9's client-side notification consumer."* Kept here too because **this**
+> file is the restart surface a resuming executor actually reads.
 
 ### ⚠ OPEN ITEM FOR THE OWNER — not a footnote, and the reason "safe" was the wrong word to lead with
 
