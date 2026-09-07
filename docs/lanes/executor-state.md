@@ -16,6 +16,61 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🔵 MONDAY 2026-09-07 ~11:50 IST — **§12 IS CLEARED AND IN FLIGHT.** Branch `exec/68-s12-backfill` off `aff899b`. #248 and #249 both MERGED. Repo-wide **115 uncited**.
+
+| what | value |
+|---|---|
+| `main` | **`aff899b`** (#249 merged; #248 merged as `7a3c275`) |
+| branch | **`exec/68-s12-backfill`** off `aff899b`, no commits yet |
+| repo-wide | **1415 cited / 115 uncited / 1530** |
+| §12 | **78 uncited** — the last substantial pool |
+| **IN FLIGHT** | **read-only 5-agent adjudication of all 78 §12 rows** (sonnet). Edits nothing |
+
+**OWNER RULINGS RECEIVED (controller relayed, 2026-09-07 ~11:40):**
+1. **CI waiver: KEEP RELYING ON THE LOCAL GATE.** The billing block is real and current; controller
+   re-confirmed the annotation independently. Merge on **forced-gate green + independent verification**.
+   **This is now authorized, not a gap** — stop reporting it as a blocker; report only if it CHANGES.
+2. **§12 CLEARED**, block `12.380–12.399` allocated, hand-vs-dispatch left to executor judgement.
+
+## §12's SHAPE — measured at `aff899b`, and it is NOT what "67 citable of 78" implied
+
+Control passed first: my lister agrees with the checker on **all ten sections**, and matched **78 rows to
+78 ids**.
+
+| kind | ids |
+|---|---|
+| names a test **in the row** | **67** |
+| names a **source file with a sibling test** | **1** |
+| names nothing — **POINTER ROWS** | **10** |
+| | **78** |
+
+**The 10 are not uncoverable — they are SUPERSEDED rows.** Every one reads *"→ **landed 12.NNN**"*, handing
+its coverage to a successor id, usually with a `:line`. And §12 frequently puts the id **in the test name**
+(`it('12.103 DOOR TEST: …')`), so the successors are findable. **So all 78 are candidates, not 67** — the
+figure I gave the controller was itself another instrument artefact, the fourth this session.
+
+**The catalogue is precise about clause attribution and a citation must respect it** — e.g. 12.8 lands on
+12.104/12.105/12.106, and the row states outright that *"12.104 contains no contest assertion; 'exactly one
+contest' is 12.105's."* **Citing 12.8 on 12.104 alone would be wrong in a way the checker cannot see.**
+
+## WHY DISPATCH HERE, WHEN 28 AND 24 WERE DONE BY HAND
+
+**78 rows across 32 distinct named files.** The threshold that has held all session: *a subagent is the cheap
+option at ~100 rows, not at ~10* — 32 files each needing its own read puts this firmly past it. Five sonnet
+agents, read-only, one per cluster (contest-core 17 · contest-routes 20 · storage-apps 15 · server-sync 16 ·
+pointers 10), each reading its own assignment file so no prompt carries a document.
+
+## NEXT
+
+1. Place the adjudicated citations **by hand, bottom-up per file, with the anchor guard** — the two hazards
+   that have already bitten (stale line numbers; and the substring check, which must use the checker's
+   boundary rule, never `in`).
+2. Baseline from **the checker's printed numbers**. Gate. PR.
+3. After §12: **36 rows outside it name no test** and are structural/record claims — characterised by
+   reading, not inherited.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~11:20 IST — **168 → 115 uncited. §05 at ZERO, §04 at 5.** #249 head **`fb3255d`**, gate green. **BLOCKED on the controller for the only two things left.**
 
 | § | start | now | | § | start | now |
