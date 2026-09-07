@@ -230,7 +230,7 @@ The distinction is the whole point — a hand-copied body cannot notice the rout
 pinned this contract's producer end while stating that its consumer was out of reach.*
 
 - **11.190** ✅ Parses a page the route actually served — the domain parser meets a row no test wrote by hand — (`notifications-consumer-roundtrip.test.ts`)
-- **11.191** ✅ A full page with nothing beyond it reports `nextCursor: null`, not the last id — (`notifications-consumer-roundtrip.test.ts`)
+- **11.191** ✅ Reports NO cursor when the page is the last one, rather than the id of its final row — (`notifications-consumer-roundtrip.test.ts`)
 - **11.192** ✅ Walks a real multi-page cursor to exhaustion, and `nextCursor` IS the last row of the page — the keyset value the fake could only copy — (`notifications-consumer-roundtrip.test.ts`)
 - **11.193** ✅ Reads the unread total off the real store, counting neither read rows nor another user's — (`notifications-consumer-roundtrip.test.ts`)
 - **11.194** ✅ `markRead` actually marks it: the count the client re-reads moves, and a second mark is still idempotent — (`notifications-consumer-roundtrip.test.ts`)

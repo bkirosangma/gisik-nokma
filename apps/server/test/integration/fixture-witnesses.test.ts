@@ -410,14 +410,19 @@ describe('the notifications cursor, against the real route', () => {
    * `@gisik-nokma/app-core`, so every sibling was reachable from here and this
    * one was not. Moving it (no new dependency edge, no interface change) made
    * the round trip possible, and
-   * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
-   * (11.190–11.195) now drives the real adapter over the real `createHttpClient`
-   * against this route, the real store and real Postgres. **11.192 asserts the
-   * cursor's VALUE** — the keyset claim this case could only pin producer-side.
-   * Four mutations confirm it measures: `nextCursor` reporting the first row of
-   * the page, the route discarding the caller's cursor, and the adapter failing
-   * to send one all redden 11.192 by name; `markRead` swallowing the 404 reddens
-   * 11.195. **The blocker was a misfiled file wearing an architectural
+   * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts` now
+   * drives the real adapter over the real `createHttpClient` against this route,
+   * the real store and real Postgres, and one of its cases asserts the cursor's
+   * VALUE — the keyset claim this case could only pin producer-side. Four
+   * mutations confirm it measures: `nextCursor` reporting the first row of the
+   * page, the route discarding the caller's cursor, and the adapter failing to
+   * send one all redden that case by name; `markRead` swallowing the 404 reddens
+   * the mark-read case.
+   *
+   * *(Case ids deliberately not spelled out here. `check-case-citations.mjs`
+   * matches an id against the WHOLE corpus, so an id named in this docblock would
+   * keep its checkmark alive after the test that proves it was deleted — the very
+   * hole that checker exists to close. The filename is the durable pointer.)* **The blocker was a misfiled file wearing an architectural
    * constraint's clothing** — worth remembering the next time a dependency graph
    * appears to forbid a witness.
    *

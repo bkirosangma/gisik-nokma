@@ -199,20 +199,21 @@ describe("Plan 9's notifications consumer, against the real door", () => {
   });
 
   /**
-   * 11.191 — **the cursor's VALUE, which nothing had ever checked.**
+   * 11.191 — **the TERMINAL shape: a last page reports no cursor at all.**
    *
-   * 12.325 pinned this on the producer's side and named the consumer as out of
-   * reach. `notifications.test.ts` walks the cursor but asserts only that it is
-   * non-null. The fake COPIES the rule ("`nextCursor` is the last row of the
-   * page") from `store.ts`. This is the first time the rule is read back
-   * through the real client from the real store.
+   * Deliberately NOT the last-row claim, which is 11.192's. An earlier draft of
+   * this case was named for the last-row rule while its body asserted only the
+   * terminal one, and the mutations proved the name wrong rather than the body:
+   * breaking `nextCursor` to report the FIRST row of the page reddened 11.192
+   * and left this case GREEN. **A case that survives a mutation of the rule it
+   * claims to test is misnamed, and the name is the part a catalogue quotes.**
    *
-   * Read as `.at(-1)`, not `[0]`: at a page size of 1 the two are the same row
-   * and an assertion on `[0]` would be accidentally correct — it would pass
-   * against a server that reported the FIRST row of the page and break every
-   * caller that paged with it.
+   * What it does measure is worth its own case: a server that reported the last
+   * row UNCONDITIONALLY — dropping the `rows.length > limit` lookahead — would
+   * hand the client a cursor for a page that does not exist, and the walk in
+   * 11.192 would still terminate correctly because it never reaches this branch.
    */
-  it('11.191 reports nextCursor as the LAST row of the page, read back through the real client', async () => {
+  it('11.191 reports NO cursor when the page is the last one, rather than the id of its final row', async () => {
     // Three rows, page size 2 by the route's `limit`... which this client never
     // sends. So instead: insert three and let the DEFAULT page size (30) hold
     // them all, then assert the terminating shape; and separately drive a real
@@ -249,8 +250,13 @@ describe("Plan 9's notifications consumer, against the real door", () => {
     });
     const first = seeded.json() as { notifications: { id: string }[]; nextCursor: string | null };
     expect(first.notifications.map((n) => n.id)).toEqual(newestFirst.slice(0, 2));
-    // THE VALUE: the last row OF THE PAGE, not the first, and not the last row
-    // overall. `.at(-1)` for the reason in 11.191's docblock.
+    // THE VALUE, and this case owns the claim: `nextCursor` is the last row OF
+    // THE PAGE — not the first, and not the last row overall. Read as `.at(-1)`
+    // and never `[0]`, because at a page size of 1 the two are the same row: an
+    // assertion on `[0]` would be accidentally correct here and would pass
+    // against a server that reported the FIRST row, breaking every real caller
+    // that paged with it. This is the keyset rule the fake could only COPY from
+    // `store.ts`, and the rule three separate mutations redden by name.
     expect(first.nextCursor).toBe(first.notifications.at(-1)?.id);
 
     const calls: string[] = [];

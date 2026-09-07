@@ -25,9 +25,11 @@ import { createHttpNotificationsGateway } from '../../src/online/notifications.j
  *
  * **A hand-copied body cannot notice the route changing**, and that is the
  * honest limit of every case in this file. The round trip that CAN notice is
- * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
- * (11.190–11.195), which drives this same adapter against the real route and a
- * real database. These two files are complements: this one pins the transport
+ * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`, which
+ * drives this same adapter against the real route and a real database. (Its case
+ * ids are deliberately not repeated here: `check-case-citations.mjs` matches ids
+ * against the whole corpus, so naming them would keep their checkmarks alive if
+ * that file were ever deleted.) These two files are complements: this one pins the transport
  * seams a real server cannot easily produce (a 200 of the wrong shape, a 404 on
  * a GET), that one pins the contract.
  */
