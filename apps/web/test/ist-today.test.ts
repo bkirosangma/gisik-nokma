@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { istToday } from '../src/ist-today.js';
 
+/**
+ * 3.85 — cited on the block: `istToday()` answers the IST day an instant falls in and ROLLS at IST midnight, so a late-evening instant is already tomorrow. The block below also pins that the day does not move with the machine that asks, which is what makes this more than a restatement of the runner’s zone.
+ */
 describe('istToday — the day the shell hands the calendar', () => {
   it('is the IST day the given instant falls in', () => {
     expect(istToday(() => new Date('2026-08-20T12:00:00.000Z'))).toBe('2026-08-20');
