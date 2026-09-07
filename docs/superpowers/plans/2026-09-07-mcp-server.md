@@ -2478,7 +2478,7 @@ git commit -m "The five MCP read tools: passthroughs of routes that already exis
 - Consumes: `Session` (Task 7); `ToolDefinition` (Task 8); from `@gisik-nokma/domain`: `newUlid`, `newSubmittedEvent`, `ticketCreatedPayload`, `ticketTransitionedPayloadSchema`, `commentAddedPayload`, `ticketAssignedPayload`, `plainTextToDoc`.
 - Produces: `writeTools(session: Session): ToolDefinition[]`.
 
-- [ ] **Step 1: Pin the four event shapes, verified against `packages/domain`**
+- [x] **Step 1: Pin the four event shapes, verified against `packages/domain`**
 
 **These differ from the spec's prose. The spec is loose here; the code below is the tree.**
 
@@ -2496,7 +2496,7 @@ Four traps, each of which produces a refusal a long way from its cause:
 3. **`comment.added`'s `body` is a document OBJECT, not a string** — `z.record(z.string(), z.unknown())`. `plainTextToDoc(text)` from `@gisik-nokma/domain` builds the shape.
 4. **`origin` is `'web'` and `actorId` is `session.userId()`.** `ORIGINS` has no `'mcp'` (Open question 1) and `origin: 'server'` is refused outright at the client door (`check-permission.ts:403`), as is any envelope whose `actorId` is not the session user (`:400`).
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `packages/mcp-server/test/write-tools.test.ts`:
 
@@ -2638,12 +2638,12 @@ describe('a refusal arrives with its own words', () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/write-tools.test.ts 2>&1 | tail -30`
 Expected: FAIL — cannot resolve `../src/tools/write-tools.js`.
 
-- [ ] **Step 4: Write `src/tools/write-tools.ts`**
+- [x] **Step 4: Write `src/tools/write-tools.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -2823,7 +2823,7 @@ export function writeTools(session: Session): ToolDefinition[] {
 
 **Verify `newSubmittedEvent`'s signature before writing this** — read `packages/domain/src/submit.ts:9`. The call above assumes it fills `id`, `version` (default 1) and `clientTime`. If its parameter names differ, follow the source, not this block, and say so in the ledger row.
 
-- [ ] **Step 5: Run, then plant the two traps and watch them caught**
+- [x] **Step 5: Run, then plant the two traps and watch them caught**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/write-tools.test.ts 2>&1 | tail -30`
 Expected: 8 passed.
@@ -2835,7 +2835,7 @@ Now plant, one at a time, re-running between each:
 
 Restore after each. Record which planted defect produced which failure in the ledger row — an exit code alone is not evidence.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/mcp-server/src/tools/write-tools.ts packages/mcp-server/test/write-tools.test.ts

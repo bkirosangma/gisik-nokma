@@ -293,3 +293,56 @@ instead of silently matching nothing. The tool descriptions carry the traps an a
 learn by failing: search is capped at 50 with no pagination (`SEARCH_LIMIT = 50`, verified in
 `routes/search.ts`), the project list is deliberately partial for a non-owner, `parentId: "root"` means
 top-level only, and a ticket you cannot see is indistinguishable from one that does not exist.*
+
+## Task 9 — the four write tools (`packages/mcp-server/src/tools/write-tools.ts`)
+
+*Every write carries `origin: 'mcp'` — owner ruling 1, and the reason Task 0 exists. A ledger that
+cannot tell a person's claim from their assistant's is a ledger lying about who acted.*
+
+- **14.70** ✅ `create_ticket` builds a `ticket.created` that **`parseEvent` accepts**, run through the
+  product's OWN parser with the product's OWN registry — so a payload key this package guessed wrong
+  fails here rather than as an `invalid-payload` result after a round trip. —
+  (`packages/mcp-server/test/write-tools.test.ts`)
+  *Mutation: remove `'mcp'` from `ORIGINS` and rebuild the domain dist — **exactly 14.70 fails**, with
+  `malformed-envelope … at origin: Invalid enum value … received 'mcp'`. That is the proof Task 0 is a
+  real dependency of Task 9 and not bookkeeping.*
+- **14.71** ✅ `parentId` is sent as an **explicit null, never an absent key** — asserted with
+  `Object.hasOwn`, which an absent key fails while `payload.parentId === null` alone would not. The
+  domain schema is `.nullable()`, not `.optional()`. — (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.72** ✅ `transition_ticket` uses the key **`to`**, not `toStateId` (`workflow.ts:137`). An
+  executor guessing the other spelling gets `invalid-payload` on every transition. —
+  (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.73** ✅ Omits `comment` entirely when none is given. — (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.74** ✅ `add_comment` sends a document **object**, not a string — `plainTextToDoc` builds it. —
+  (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.75** ✅ `assign_ticket` sends an explicit null to unassign. — (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.76** ✅ A rule-engine refusal is thrown with **rule and reason verbatim**. `POST /v1/events`
+  answers **200** for a refusal — refusals ride inside `results[]`, index-aligned — so a caller checking
+  the status code alone would report every refusal as a success. —
+  (`packages/mcp-server/test/write-tools.test.ts`)
+- **14.77** ✅ An `invalid` result carries its code and message. — (`packages/mcp-server/test/write-tools.test.ts`)
+
+> ### The check that could not fail, and the three invalid ULIDs it was hiding
+>
+> The plan calls 14.70 "the strongest available check short of a live server". As written it was
+> `expect('error' in parsed).toBe(false)` — and `parseEvent` returns `{ok:true,event}` or
+> `{ok:false,code,message,eventId}`. **Neither shape has an `error` key**, so the expression was false
+> unconditionally. Measured before touching it: with `'mcp'` removed from `ORIGINS` and the domain dist
+> genuinely rebuilt to four members — verified by reading the built JS rather than trusting turbo — all
+> eight cases still passed.
+>
+> Corrected to `parsed.ok`, it failed at once with `malformed at actorId: must be a ULID`. **The plan's
+> own fixtures are not ULIDs.** Crockford base32 excludes I, L, O and U, and `01J0USER…`, `01J0PROJ…`
+> and `01J0TICK…` carry one each — eleven occurrences across three constants. The envelopes these cases
+> claimed the server "would accept" would have been refused at the door.
+>
+> Replacements were validated against `ULID_REGEX` **before** substitution, so the fix could not repeat
+> the defect it was fixing. Both halves were corrected together: fixing the constants alone would leave
+> the next wrong fixture equally invisible.
+
+> ### The plan's trap 4 is stale, and following it would have defeated Task 0
+>
+> It says *"`origin` is `'web'` … `ORIGINS` has no `'mcp'` (Open question 1)"*. Owner ruling 1 resolved
+> that question the other way — which is why Task 0 exists — and Task 0's closing line reads "This task
+> comes BEFORE Task 9, **which sends the value**." The plan's own test and implementation both already
+> said `'mcp'`; only the prose table was left behind.
