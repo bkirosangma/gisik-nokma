@@ -16,7 +16,6 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-<<<<<<< HEAD
 > **BOTH ENTRIES BELOW ARE LIVE — this file conflicted at the Task 0 merge and both halves were KEPT.**
 > The stack (Tasks 1–9) and Task 0 were written on sibling branches off `main`, so each wrote its own
 > entry here. Task 9 is the first task that consumes Task 0, so the branches meet at Task 9 and the
