@@ -115,6 +115,9 @@ function silentSmtpServer(): Promise<{ url: string; close: () => Promise<void> }
 }
 
 describe('SmtpMagicLinkSender', () => {
+  /**
+   * 13.140 — `SmtpMagicLinkSender` composes ONE message to the address, from the configured sender — envelope and raw headers alike.
+   */
   it('composes one message to the address, from the configured sender', async () => {
     const { transporter, messages } = capturingTransport();
     const sender = new SmtpMagicLinkSender('smtp://unused.invalid:1025', FROM, transporter);
@@ -135,6 +138,9 @@ describe('SmtpMagicLinkSender', () => {
     expect(message.headers.split('\r\n')).toContain(`Subject: ${MAGIC_LINK_SUBJECT}`);
   });
 
+  /**
+   * 13.141 — the link survives quoted-printable transfer encoding BYTE-FOR-BYTE and stands alone on its own decoded line, tested with a URL over 76 characters so the encoder must actually wrap.
+   */
   it('carries the link through the body byte-for-byte, after the transfer encoding', async () => {
     const { transporter, messages } = capturingTransport();
     const sender = new SmtpMagicLinkSender('smtp://unused.invalid:1025', FROM, transporter);
@@ -155,6 +161,9 @@ describe('SmtpMagicLinkSender', () => {
     expect(message.body.split(/\r?\n/)).toContain(url);
   });
 
+  /**
+   * 13.142 — one plain-text part only, so no client is invited to rewrite the link.
+   */
   it('sends one plain-text part, so no client is invited to rewrite the link', async () => {
     const { transporter, messages } = capturingTransport();
     const sender = new SmtpMagicLinkSender('smtp://unused.invalid:1025', FROM, transporter);
@@ -172,6 +181,9 @@ describe('SmtpMagicLinkSender', () => {
     expect(message.raw).not.toContain('text/html');
   });
 
+  /**
+   * 13.143 — negative control: constructing the sender alone sends nothing.
+   */
   it('sends nothing when nobody asked it to', async () => {
     // The negative control for the tests above: `messages` is empty until
     // `send` is called, so "toHaveLength(1)" is evidence of THIS send and not
@@ -181,6 +193,9 @@ describe('SmtpMagicLinkSender', () => {
     expect(messages).toEqual([]);
   });
 
+  /**
+   * 13.144 — an unreachable mail host that never speaks — a real TCP listener that accepts and never sends a banner — is given up on in seconds rather than hanging.
+   */
   it(
     'gives up on a mail host that never speaks, in seconds and not the default minutes',
     async () => {
