@@ -20,6 +20,33 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~05:0x IST — **SIGNED-IN TAP TARGETS 7 → 6, AND A TARGET IS A BOX.**
+
+*Folded into `exec/116-tap-targets` / PR #328 rather than opened as a fifth PR — same item, same files,
+one merge instead of two. #328's sha moved from `a107ba2` to `5924f5c`; it needs re-confirming.*
+
+**Forcing the ratchet to 0 to print all seven offenders, instead of re-reading the smallest, is what
+finished this.** The list was not what the previous fix assumed:
+
+```
+ 39x44  a.gn-nav__inbox "Inbox"          <- tall enough, six pixels too NARROW
+249x23  button.gn-attention__title  (x4)
+249x23  button.gn-my-work__title    (x2)
+```
+
+`.gn-nav a, .gn-nav button` had only `min-height`. **A tap target is a box**, a short word is a narrow
+target, and the COUNT was 7 either way — same shape as the `340x38` miss, one axis over. The six title
+buttons went to 24px (2.5.8) and deliberately not 44: bare text buttons on a shared baseline with a
+chip and a reason, where 44px turns a compact strip into slabs.
+
+**A control that used a different input than the measurement, again.** A stack run timed out at
+sign-in; I probed `/api/auth/sign-in/magic-link` directly, got **200**, and reported "not the rate
+limit". The next run failed with an explicit **429 — for `accountant@…`, while I had probed
+`kiro@…`**, which still had budget. Same endpoint, different input, so the control certified nothing.
+`RATE_LIMIT_AUTH_MAX=60` per `RATE_LIMIT_WINDOW_SEC=60` in the dev stack, and I had spent it on
+back-to-back suite runs. Waiting out the window cleared it and the ratchet held at 6.
+
+
 # ▶ TUESDAY 2026-09-08 ~03:5x IST — **THE SIGNED-IN SHELL'S TAP TARGETS NOW HAVE A GUARD (9 → 7).**
 
 *Same branch as the signed-out work, `exec/116-tap-targets` / PR #328.*
