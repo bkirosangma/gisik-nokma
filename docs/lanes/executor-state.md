@@ -153,7 +153,7 @@ The stripper now walks the text once tracking quote state and opens a comment on
 honouring escapes. Mutation: restoring the regex version kills the new case (`expected [] to deeply equal
 [ '#fff' ]`).
 
-## ⚠⚠ AND THE GATE COULD NOT SEE ANY OF IT — `exec/80-gate-cache-blindspot`
+## ⚠⚠ THE GATE COULD NOT SEE ANY OF IT — and FOUR packages were blind, not one (`exec/80`)
 
 **The token-discipline suite reads every client tree from disk, and `turbo.json` declared no `inputs` for
 `test`.** So the cache is scoped to `packages/ui/**`, and a colour literal added anywhere it polices leaves
@@ -172,10 +172,47 @@ controller's FORCED gate is the only reason it surfaced at all.
 declared, a planted literal turns the gate RED through turbo, and a PR-number comment passes **while still
 invalidating** (`Cached: 0`), so the pass is a real run and not a replay.
 
-**⚠ A DOCUMENT CONFLICT worth a ruling:** `turbo.json`'s own comment says *"this lane's gate runs `--force`
-and would never see such a hit"* — but this brief's gate command is `pnpm turbo run build test typecheck`,
-with no `--force`. One of the two is wrong. Declaring inputs makes the cache CORRECT rather than disabled,
-which is why it is the recommended fix, but the discrepancy should be settled either way.
+**⚠ THE DOCUMENT CONFLICT IS RULED (controller, 2026-09-07):** `turbo.json`'s comment says *"this lane's
+gate runs `--force`"*; the brief's gate command has none. **Ruling: fix the root cause with declared
+inputs, do NOT mandate `--force` in the brief** — correct beats disabled. **Until the inputs fix is verified
+complete across every client-source-reading task, the executor keeps running its own pre-merge gate with
+`--force` as a safety net.** That is what the gate figures on this branch were measured with.
+
+### `exec/80` gate — recounted at the sha pushed, run WITH `--force` per the ruling
+
+`GATE_EXIT=0` · **30/30** · **3725 passed | 5 skipped (3730) / 297 files** · Node **v22.22.2** ·
+`check:env`/`check:tasks`/`check:runbook`/`check:citations` all 0 · **zero orphans** (positive control: the
+sweep sees 9 node processes). **+4 cases** over `exec/79`'s 3721 — the turbo-inputs guards.
+
+## THE SWEEP THE RULING ASKED FOR — `packages/ui` was not special, only caught
+
+**Four packages read outside themselves, not one.** Every one was cached against a stale world:
+
+| package | what its tests read that turbo could not see |
+|---|---|
+| `ui` | every client source tree, **and `turbo.json` itself** |
+| `app-core` | `reporting-scope-guard` walks **seven** trees; three CSS-binding suites read `packages/ui/src/ui.css` |
+| `web` | `next-config.test.ts` reads `apps/server/src` |
+| `server` | `scripts/`, `docs/`, `.github/workflows/ci.yml`, `docker-compose.dev.yml` — **case 13.208 parses `ci.yml` and asserts its job graph**, so a CI edit breaking that graph reported green |
+
+**Verified per package with an explicit before/after control**, because replayed logs print test output and
+look exactly like a run — the `✓` line is not evidence, only the `cache miss, executing` line is:
+
+| touched | package | before | after |
+|---|---|---|---|
+| `packages/ui/src/ui.css` | `app-core` | `cache hit, replaying logs` | **`cache miss, executing`** |
+| `apps/server/src/index.ts` | `web` | `cache hit, replaying logs` | **`cache miss, executing`** |
+| `.github/workflows/ci.yml` | `server` | `cache hit` | **`cache miss`** |
+
+**`turbo.json` is now an input of the task that checks `turbo.json`.** Undeclared, editing the inputs list
+would not invalidate the guard over the inputs list — it would replay a green log describing the
+configuration it used to have.
+
+**And the CLASS is asserted, not today's four**, so the next test that reaches outside its package is caught
+when it is written: if a package's tests escape to the repo root, its `#test` task must declare
+`$TURBO_ROOT$` inputs and keep `$TURBO_DEFAULT$`. That sweep carries a **positive control naming the four
+known escapers** — without it a renamed helper or a regex that stopped matching leaves the undeclared list
+trivially empty and the case passes measuring nothing.
 
 ## RECORDED, NOT FIXED
 
