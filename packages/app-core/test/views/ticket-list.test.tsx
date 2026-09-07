@@ -654,6 +654,74 @@ function eventFrame(source: FakeDataSource): void {
   });
 }
 
+/**
+ * 12.386 — CHANGING THE FILTER ASKS THE QUESTION AGAIN.
+ *
+ * **This case exists because its mutation SURVIVED.** Dropping the filter from
+ * `useLiveQuery`'s key — leaving it as the bare `projectId` — broke nothing in the
+ * suite, so the docblock claiming the key must carry it was an unwitnessed claim.
+ * Recorded rather than quietly covered, because a survivor with no explanation is the
+ * thing this series keeps finding, and here the explanation was simply that nobody had
+ * ever changed a filter on a mounted hook.
+ *
+ * The failure it guards is silent and worse than a stale render: `useLiveQuery`'s load
+ * effect depends on the KEY, and its `load` closure is refreshed through a ref on every
+ * render. So with the filter outside the key the component re-renders with the new
+ * filter, issues NO request, and leaves the previous rows on screen underneath a
+ * control that says they were narrowed. Nothing throws and nothing spins — the list
+ * simply answers the wrong question, and 12.384's summary would then name a narrowing
+ * that had not been applied.
+ *
+ * Both halves: the read is re-issued WITH the new filter, and the rows on screen become
+ * the narrowed ones. The first alone would pass if the answer were discarded; the
+ * second alone would pass if the fake ignored its argument.
+ */
+describe('12.386 useTicketList — a filter change re-issues the read', () => {
+  function FilterHarness({ source }: { source: FakeDataSource }) {
+    const [narrow, setNarrow] = useState(false);
+    const list = useTicketList(
+      source,
+      WS,
+      PROJECT,
+      'me',
+      narrow ? { stateCategories: ['active'] } : {},
+    );
+    return (
+      <div>
+        <span data-testid="rows">{list.rows === null ? 'loading' : `rows:${list.rows.length}`}</span>
+        <button type="button" onClick={() => setNarrow(true)}>
+          narrow
+        </button>
+      </div>
+    );
+  }
+
+  it('re-asks with the new filter, and the narrowed rows reach the screen', async () => {
+    const asked: unknown[] = [];
+    const source = createFakeDataSource({
+      getTickets: async (_projectId: string, filter: unknown) => {
+        asked.push(filter);
+        const wide = (filter as { stateCategories?: string[] }).stateCategories === undefined;
+        return {
+          projectId: PROJECT,
+          rows: wide ? [ROWS[0]!, ROWS[1]!, ROWS[2]!] : [ROWS[0]!],
+        };
+      },
+    });
+    render(<FilterHarness source={source} />);
+    await waitFor(() => expect(screen.getByTestId('rows')).toHaveTextContent('rows:3'));
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'narrow' }));
+
+    // The rows on screen are the narrowed ones — the half a user sees.
+    await waitFor(() => expect(screen.getByTestId('rows')).toHaveTextContent('rows:1'));
+    // And the read was actually re-issued, with the filter, rather than the view
+    // being filtered client-side out of rows it already had. Printed whole so a
+    // failure says what was asked instead of only how many times.
+    expect(asked).toEqual([{}, { stateCategories: ['active'] }]);
+  });
+});
+
 describe('3.53 useTicketList — preferences round-trip through the DataSource (amendment 14)', () => {
   it('loads stored prefs and writes changes back via putPreferences, workspace and all', async () => {
     const putPreferences = vi.fn(async () => {});
