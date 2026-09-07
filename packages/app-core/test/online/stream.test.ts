@@ -138,6 +138,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * 3.33 — the WIRE half of the online stream subscriber: `streamUrl` turns an http/https origin into ws/wss + `/v1/stream`, and `backoffDelayMs` doubles from 500ms, caps at 30s, and jitters within ±20%.
+ */
 describe('streamUrl and backoff', () => {
   it('translates the HTTP origin to ws and appends /v1/stream', () => {
     expect(streamUrl('http://server.test')).toBe('ws://server.test/v1/stream');
@@ -155,6 +158,9 @@ describe('streamUrl and backoff', () => {
   });
 });
 
+/**
+ * 3.34 — the RESUME and lifecycle half: the subscribe frame carries the CURRENT cursor on every (re)connect, the cursor advances by the envelope `workspaceSeq` and never by the per-entity `seq`, and it is never dragged backwards by an at-least-once replay.
+ */
 describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', () => {
   it('sends the subscribe frame on open and delivers event, purge, caught-up and error frames', () => {
     const { subscribe, socketAt, sentFrame } = harness();

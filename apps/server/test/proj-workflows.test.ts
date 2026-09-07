@@ -82,6 +82,9 @@ async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<
   }
 }
 
+/**
+ * 4.30 — cited on the block: `proj_workflows` serves the latest version by default and historical versions on request, ignores foreign events, and replay and reset-then-reapply are both idempotent. Each clause is its own test here.
+ */
 describe('proj_workflows', () => {
   beforeEach(async () => {
     await withClient((client) => workflowsProjection.reset(client));
@@ -121,6 +124,9 @@ describe('proj_workflows', () => {
     expect(stored?.stateMapping).toEqual({ doing: 'todo' });
   });
 
+  /**
+   * 4.39 — `getWorkflowDefFromProjection` answers AS OF a ledger position: the version in force at that `workspace_seq`, not the newest one.
+   */
   it('answers as of a ledger position — the version in force there, not the newest', async () => {
     await withClient(async (client) => {
       await workflowsProjection.apply(V1, client);
