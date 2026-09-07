@@ -1,5 +1,22 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 11:2x IST — `main` is `e8d0cce`, gate green. `TicketPullNotFound` CLOSED — a negative finding: the reported crash never existed, but a real, narrower silent-failure defect did, and is now fixed.
+
+PR #261 merged. `check:citations`: 1534/1534, still zero. **Measured, not assumed:** `Promise.race` subscribes
+to every input, so an abandoned per-ticket pull's later rejection was never unhandled (a standalone probe
+confirmed no `unhandledRejection` fires). The REAL defect: an abandoned pull is not cancelled, may still fail
+later, and that later failure was invisible — nothing recorded it, which is exactly what would explain a
+ticket that keeps coming back owed. Fixed with a new `lastAbandonedPull()` on `SyncEngine`, purely additive,
+attached inside the timeout's timer callback specifically so a pull that resolves on its own first is never
+mis-recorded as an abandonment. **Caught its own weak test**: the first mutation run killed on the wrong
+assertion, meaning the real regression guard could never fail either way — rewritten and re-verified by
+reproducing the leak with a hand-built promise before trusting the guard. **Left its own wrong first commit in
+the history rather than amending it** ("asserted the crash was real before measuring it") — the sequence is
+kept as the record.
+
+Next: A's six `helpers/seed.ts` borderline rows (Saturday 17:35 classification), then `12.321`, then the two
+product items (`13.176`, `12.322`/`12.258`).
+
 ## ▶ MONDAY 11:1x IST — `main` is `8fc9eb1`, gate green. 13.195+13.196 CLOSED — running the previously-UNRUN docker rehearsal found a REAL, currently-live defect, not a documentation gap.
 
 PR #259 merged. `check:citations`: 1533/1533, still zero uncited. **13.195's finding is worth reading in full,
