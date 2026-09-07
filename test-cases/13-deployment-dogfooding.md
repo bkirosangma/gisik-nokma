@@ -810,10 +810,24 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   from that event and nowhere else, so an empty project list is the product working. Asserted as
   absent-with-a-present-sibling (the workspace heading is visible in the same render), never a bare
   `toHaveCount(0)`, which passes on a blank, 500'd or redirected page
-- 13.176 ❌ **a guest has NO NAVIGATION to the four errands explicitly shared with them** — the only path
-  to a ticket is through a project they cannot see (13.175). Explicit per-ticket visibility exists and is
-  unreachable from the UI. **13.175 passing does NOT mean the shared tickets were verified reachable —
-  none was ever reached.** Owner: Plan 6 / visibility
+- 13.176 🟡 **a guest has NO NAVIGATION to the four errands explicitly shared with them** — the read and
+  the surface now exist; the BROWSER assertion does not. **What is served and witnessed:**
+  `MyWorkResponse.shared` carries the tickets whose RESOLVED audience names the viewer
+  (`explicitAudienceWhere`, exported from `read/visible-where.ts` rather than restated), a guest already
+  reaches `/v1/me/work` — 13.175 asserts that very link is visible to them — and the My Work page renders
+  a "Shared with me" section for it. Witnessed by 7.260–7.265 at the route, 3.159 at the mapper and
+  3.160/3.161 at the view, each with measured mutations, plus both integration doors
+  (`client-contract`, `real-door-round-trip`) whose exact-shape assertions now name the key.
+  **What is NOT done, enumerated rather than called "partial":** (1) no Playwright spec asserts a real
+  guest reaching a real errand in a real browser — this suite is structurally off the local gate (13.177)
+  and GitHub Actions has had no green run since 2026-09-06, so a spec added now would execute once, by
+  hand, and never again; deliberately NOT written, because an unrunnable spec landing beside verified
+  work is how a 🧪 becomes a believed ✅. (2) OPENING a shared errand into a ticket sheet is still not
+  possible — `DataSource.getTicket` refuses with `ServingGapError` for EVERY viewer, not only a guest, and
+  the sheet lives on a project page a guest gets 404 from; the view therefore does not offer an openable
+  affordance on a row whose project name is withheld (3.161), which is honest rather than complete.
+  Owner of (1): whoever runs the stack once CI billing is restored. Owner of (2): the `getTicket` serving
+  gap, which predates this and is not this change's to close
 - 13.177 ✅ the suite is off the LOCAL gate structurally, for two independent reasons: it is reached by
   `test:e2e:stack`, a script name turbo defines no task for, AND `apps/web/vitest.config.ts` includes
   `test/**` only, so `e2e-stack/` is not collected by the gate's runner either. Measured before and after

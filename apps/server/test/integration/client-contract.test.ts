@@ -969,6 +969,14 @@ describe('GET /v1/me/work vs MyWorkView', () => {
       'contested',
       'groups',
       'projectNames',
+      // `shared` (case 13.176) — the tickets whose RESOLVED audience names this
+      // viewer, a top-level key beside `groups` for the same reason `contested`
+      // is one: `groups` is *assigned to me*, and a ticket can be handed to
+      // somebody who is not its assignee, so a shared errand is in none of the
+      // three. It is in this EXACT key list deliberately — the list is what
+      // noticed the key arriving, which is the whole point of asserting a real
+      // door's shape by enumeration rather than by presence checks.
+      'shared',
       'stateNames',
       'workspaceId',
     ]);
@@ -977,8 +985,13 @@ describe('GET /v1/me/work vs MyWorkView', () => {
     // so a single missing key is a mapping failure. Asserted by enumeration
     // rather than by a count, and with the value pinned: a map that answered
     // the state ID would satisfy a presence check.
-    const cards = Object.values(full['groups'] as Record<string, Array<Record<string, unknown>>>)
-      .flat();
+    // `shared` cards are in this walk too, because the route's totality claim
+    // now covers them: a shared card with no `stateNames` entry is a body the
+    // client cannot map, and the failure would land a layer from its cause.
+    const cards = [
+      ...Object.values(full['groups'] as Record<string, Array<Record<string, unknown>>>).flat(),
+      ...(full['shared'] as Array<Record<string, unknown>>),
+    ];
     const stateNames = full['stateNames'] as Record<string, string>;
     expect(cards.length).toBeGreaterThan(0);
     for (const each of cards) {
