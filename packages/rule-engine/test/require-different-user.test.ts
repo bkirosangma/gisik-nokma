@@ -116,6 +116,9 @@ const watchesReview = { kind: 'require-different-user', thanActorOf: { to: 'revi
 const UNREADABLE_HISTORY =
   'This step needs a second person, and this ticket\'s history cannot be read against its current workflow, so who last performed the move to "done" is unknown. Ask an admin to check this workflow\'s version history.';
 
+/**
+ * 4.52 — cited on the block: four-eyes fails CLOSED on a history it cannot read. It refuses on the FIRST unresolvable entry even when a later one resolves and matches, and still skips an entry from a workflow the ticket has left.
+ */
 describe('require-different-user fails CLOSED on a history it cannot read', () => {
   it('refuses when a log entry cannot be resolved forward, while the ticket itself resolves cleanly', async () => {
     // The shape Plan 3's refresh-on-publish makes routine: the ticket's row has
@@ -202,6 +205,9 @@ describe('require-different-user fails CLOSED on a history it cannot read', () =
   });
 });
 
+/**
+ * 4.53 — cited on the block: four-eyes reads the log in ascending `seq`, not array order — it compares the actor of the greatest-`seq` match, and it sorts a COPY, so the caller’s log comes back in the order it arrived.
+ */
 describe('require-different-user orders the log by `seq`, not by array position', () => {
   // One version only: nothing here is about version walking. The two entries
   // both match the watched state and disagree about who moved last, and the

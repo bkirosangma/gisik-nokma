@@ -29,6 +29,9 @@ function codes(d: WorkflowDef): string[] {
 }
 
 describe('adviseWorkflowDef', () => {
+  /**
+   * 4.33 — `adviseWorkflowDef` is SILENT on canonical four-eyes, where the approval is only reachable through review. Its other half — warning `rdu-bypassable` when a fast-track edge reaches the guarded move without entering the watched state — is the test below.
+   */
   it('is silent on canonical four-eyes: the approval is only reachable through review', () => {
     expect(adviseWorkflowDef(reviewDef())).toEqual([]);
   });
