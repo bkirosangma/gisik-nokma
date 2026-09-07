@@ -2,7 +2,20 @@
    variable from tokens.ts (the one origin). No literal colours here: the
    token-discipline test scans this file. */
 
+/* `min-height: 2.75rem` = 44px, WCAG 2.5.5's enhanced target size and the floor
+   this product already used for its 404 recovery links and the MCP code input.
+   Measured at 390px before this: `340x38` — the shared button was SIX PIXELS
+   short, everywhere it is used, which made it the single largest source of
+   tap-target offenders across the product.
+
+   `inline-flex` + centring is what makes the min-height do anything on a button
+   whose height was previously its padding plus one line of text. The padding
+   stays for the horizontal rhythm; the vertical is now the floor's job. */
 .gn-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
   font: inherit;
   border-radius: 6px;
   padding: 0.4rem 0.85rem;
@@ -1289,7 +1302,23 @@
 .gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gn-border); }
 /* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
    body text on a phone — and these are the only navigation links on the page. */
-.gn-help__toc-link { color: var(--gn-accent); text-decoration: none; font-size: 1rem; }
+/* `inline-flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. Measured at
+   390px before this: `179x23` — wide, and missing the floor by ONE pixel, which
+   is what ten of this page's tap-target offenders were. An inline `<a>` ignores
+   `min-height` entirely, so the display change is the load-bearing half.
+
+   24px and not 44px, deliberately: the TOC is a dense wrapped list, and 2.5.5's
+   enhanced floor would make nineteen entries 836px tall on a phone. Standalone
+   controls (`.gn-view-tabs button`, the 404's recovery links, the MCP code
+   input) use 44px; in-list links use 24px. */
+.gn-help__toc-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  color: var(--gn-accent);
+  text-decoration: none;
+  font-size: 1rem;
+}
 .gn-help__toc-link:hover { text-decoration: underline; }
 
 .gn-help__section { margin-bottom: 2.5rem; }

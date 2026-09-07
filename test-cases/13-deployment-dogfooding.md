@@ -1169,3 +1169,48 @@ is the next free id IN THAT BLOCK, not derived from the file's maximum.*
   every first run. Recording is now `UPDATE_TAP_BASELINE=1`, an explicit act. Proven by hiding the
   committed file and running: EXIT 1, one error per route naming the key and its observed count;
   restored by SHA-256 against `HEAD` and re-run green.*
+
+## Tap targets, measured and moved (owner-assigned, 2026-09-08)
+
+*Pre-launch item 6/7 recorded tap targets as "reported, not fixed — an owner call about the design".
+Assigned 2026-09-08. No new case ids: the viewport suite's ratchet (13.254–13.255) already IS the test,
+and minting cases that restate a committed baseline would be numbering the same evidence twice. What
+changed is the baseline, and this is the reading behind it.*
+
+| route × viewport | before | after |
+|---|---|---|
+| `/sign-in` × phone-390 · tablet-768 · desktop-1512 | 6 each | **0 each** |
+| `/help` × phone-390 | 10 | 10 |
+| `/help` × tablet-768 · desktop-1512 | 16 each | 16 each |
+| **total** | **60** | **42** — 18 removed |
+
+**Three fixes, each traced to a measurement rather than a guess:**
+
+- `.gn-button` was **`340x38`** — six pixels short of 44, *everywhere it is used*, which made the shared
+  button the single largest source of offenders in the product. `display: inline-flex` is the
+  load-bearing half: a button whose height was padding plus one line of text ignores `min-height`
+  otherwise.
+- `.gn-view-tabs button` was **`55x21`**. The same class carries the board's view tabs, which the
+  pre-launch review measured at `52x21` — one rule, both surfaces.
+- `.gn-sign-in__method label input` was **`340x21`**. Unclassed `<input>`s inside their labels, so the
+  label is the only handle. `font-size: 1rem` went with the height: under 16px iOS Safari zooms the
+  viewport on focus.
+
+**`/help` does not move, and that is a decision rather than a leftover.** Its offenders are
+`a.gn-help__toc-link`, raised from **23px to 24px** — WCAG **2.5.8**'s floor, which they now meet. The
+suite enforces **2.5.5**'s enhanced 44px, and a nineteen-entry table of contents at 44px each is 836px
+tall on a 390px phone. Dense in-list links stay at 24; standalone controls use 44. The ratchet holds the
+count so it can fall again but never rise.
+
+> ### Two process notes from this run
+>
+> **A `python3` `.replace()` with no assertion is a silent no-op.** The first attempt at the
+> `.gn-button` fix matched against whitespace-collapsed text that only existed in my own earlier
+> `print`, so nothing was edited — and the re-measurement, unchanged at `340x38`, is what said so before
+> the assertion did. Every edit in this change asserts its anchor is present first.
+>
+> **`UPDATE_TAP_BASELINE=1` does not lower a number.** `recordTapBaseline` writes only ABSENT keys, on
+> purpose, so a branch that made things worse cannot re-baseline itself upward — the file's own docblock
+> says falling numbers are re-recorded by deleting it. Two runs reported "0 removed" before that was
+> read rather than assumed.
+

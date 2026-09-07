@@ -19,7 +19,22 @@ a { color: var(--gn-accent); }
 }
 .gn-page-title { margin: 1.2rem 0 0.4rem; }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
-.gn-view-tabs { display: flex; gap: 0.4rem; align-items: center; }
+.gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+/* 2.75rem = 44px, the floor this product already uses for standalone controls
+   (the 404's recovery links, the MCP code input). Measured at 390px before
+   this: `55x21` on the sign-in method tabs — six of that page's six
+   tap-target offenders, and the same class carries the board's view tabs, which
+   the pre-launch review measured at `52x21`. One rule, both surfaces.
+
+   `flex-wrap` above for the reason `.gn-nav` carries it: three 44px tabs and a
+   gap do not always share a line at 390px, and without wrapping the last one
+   leaves the viewport rather than the row growing. */
+.gn-view-tabs button,
+.gn-view-tabs [role='tab'] {
+  min-height: 2.75rem;
+  padding-inline: 0.75rem;
+}
 
 /* `flex-wrap: wrap` is load-bearing, not tidiness. The last child is
    `Sign out {user.name}`, so this row's width depends on DATA: a no-wrap flex
@@ -44,6 +59,30 @@ a { color: var(--gn-accent); }
 .gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 .gn-sign-in__method label { display: flex; flex-direction: column; gap: 0.3rem; }
+
+/* Measured at 390px before this: `340x21` — the sign-in inputs were the last
+   four tap-target offenders on this page after the method tabs were fixed. They
+   are unclassed `<input>`s inside their labels, so the label is the only handle.
+
+   `font-size: 1rem` is load-bearing and not cosmetic: under 16px, iOS Safari
+   zooms the viewport on focus and the layout jumps under the thumb — the same
+   note the MCP code input carries. The tokens and the 0.4rem radius match every
+   other input this product ships. */
+.gn-sign-in__method label input {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--gn-border-strong);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.gn-sign-in__method label input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--gn-border); padding-top: 0.9rem; }
 
 /* A refusal is a first-class rendering, not an error state: six of the twelve

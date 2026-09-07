@@ -311,6 +311,12 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   rather than a contrast failure — the light palette is internally consistent, so nothing fails a ratio —
   and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
   fixed**, because it is a design decision rather than a defect with one obvious remedy.
+- **Tap targets: PARTLY CLOSED 2026-09-08** (owner-assigned). The shared `.gn-button` (`340x38`), the
+  view tabs (`55x21`) and the sign-in inputs (`340x21`) now meet 44px, taking the signed-out ratchet
+  from **60 offenders to 42** and `/sign-in` to **0** on all three viewports. `/help`'s table-of-contents
+  links went 23px → 24px — WCAG 2.5.8's floor — and deliberately not to 44px, because nineteen entries
+  at 44px is 836px tall on a phone. The board's own counts still need the authenticated stack. Original
+  note kept below.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,

@@ -20,6 +20,38 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~03:4x IST — **TAP TARGETS: 60 OFFENDERS TO 42, `/sign-in` TO ZERO (owner-assigned).**
+
+*Off `main`, independent of #323–#327. Overlap is narrative only.*
+
+| route × viewport | before | after |
+|---|---|---|
+| `/sign-in` × all three | 6 each | **0 each** |
+| `/help` × phone / tablet / desktop | 10 / 16 / 16 | unchanged, deliberately |
+| **total** | **60** | **42** |
+
+Three fixes, each from a reading: `.gn-button` was **`340x38`** — six pixels short *everywhere it is
+used*, the single largest source of offenders in the product; `.gn-view-tabs button` **`55x21`** (the
+same class carries the board's view tabs, measured at `52x21` in the pre-launch review — one rule, both
+surfaces); `.gn-sign-in__method label input` **`340x21`**.
+
+`/help` stays. Its offenders are TOC links raised **23px → 24px**, which is WCAG **2.5.8**'s floor; the
+suite enforces **2.5.5**'s enhanced 44px, and nineteen TOC entries at 44px is 836px tall on a phone.
+Dense in-list links use 24, standalone controls 44.
+
+**Two things that cost a round each, worth inheriting:**
+
+1. **A `python3` `.replace()` with no assertion is a silent no-op.** The first `.gn-button` attempt
+   matched whitespace-collapsed text that existed only in my own earlier `print`. Nothing was edited,
+   and the RE-MEASUREMENT — unchanged at `340x38` — is what said so before the assertion did.
+2. **`UPDATE_TAP_BASELINE=1` does not lower a number.** `recordTapBaseline` writes only ABSENT keys, by
+   design, so a branch that made things worse cannot re-baseline upward; falling numbers need the file
+   DELETED first, which its own docblock says. Two runs reported "0 removed" before that was read.
+
+Gate **33/33 EXIT 0, `Cached: 0`**, Node **v22.22.2**; five checks EXIT 0. Viewport suite 19 passed at
+the new baseline. The board's own counts still need the authenticated stack.
+
+
 # ▶ TUESDAY 2026-09-08 ~02:1x IST — **THE STACK IS CONSOLIDATED ON ONE BRANCH. TASKS 0–10 ARE ALL HERE.**
 
 > **READ THIS FIRST.** `origin/main` is `876a364` — #309 (pre-launch 6 + 7) merged at 19:44Z and
