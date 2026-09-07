@@ -16,6 +16,65 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ▶ MONDAY 2026-09-07 ~20:1x IST — **THE QUEUE IS NO LONGER EMPTY. Owner assigned the Plan 9 residual; it is DONE and in flight as PR #293.**
+
+**This supersedes the `queue: EMPTY` / `HOLD` rows in every entry below.** A restart that reads them
+will stop while work is open. #292 merged; `main` is `4636404`.
+
+| what | value |
+|---|---|
+| `origin/main` | **`4636404`** — #292 (anchor refresh + stale-pointer sweep) and #276 (MCP design spec) merged |
+| branch | `exec/90-handoff-residual-in-flight` (docs only), off `4636404` |
+| in flight | **PR #293** `exec/89-plan9-consumer-roundtrip` — the Plan 9 consumer residual, CLOSED and gate-green, awaiting controller merge |
+| **queue** | **NOT empty.** The owner assigned "fix the residual thing" (Plan 9's consumer-side notifications gap). It is done; only the merge remains. |
+| standing instruction | Work continues. The earlier HOLD ended when the owner assigned the residual. |
+| gate | at `be56a3b`: `turbo build test typecheck` **30/30 EXIT 0**, changed packages **cache miss, executing** (not replayed); `check:tasks` 177/177, `check:runbook` 14/14, `check:citations` ratchet exact, `check:env` — Node **v22.22.2** |
+
+**PR #276 was merged by the owner** — the flag two entries down did its job; it is no longer open.
+
+## The residual, and why it was never a dependency-graph problem
+
+Lane F recorded the gap accurately and reasoned from it to the wrong cause: *"`apps/server` has no
+dependency on `apps/web`, where the only real `NotificationsGateway` adapter lives … so the client
+CONSUMER cannot be executed from here."* True about the graph. **But the adapter was not web-specific**
+— no React, no Next, no DOM — and its own docblock named three sibling gateways as the pattern it
+follows, **all three of which live in `packages/app-core/src/online/` while it alone sat in
+`apps/web/src/`.** `apps/server` already devDepends on `@gisik-nokma/app-core`, so every sibling was
+reachable and this one was not.
+
+**A misfiled file wearing an architectural constraint's clothing.** The fix was a move: no new dependency
+edge, no extraction, no interface change. Cases 11.190–11.195 then drove the real adapter over the real
+`createHttpClient` against the real route, real store and real Postgres, using the `app.inject` seam Lane
+F already had. RED first — all six failed with `createHttpNotificationsGateway is not a function` while
+the database setup ran clean, which is what distinguishes *unreachable* from *environment broken*.
+
+**Four mutations, four kills, each naming one case.** `nextCursor` reporting the first row of the page,
+the route discarding the caller's cursor, and the adapter never sending one all redden **11.192** — the
+keyset value the fake could only COPY from `store.ts`. `markRead` swallowing the 404 reddens **11.195**.
+
+### Two defects found in my own work, by review rather than by any check
+
+1. **I opened a citation hole with prose.** `check-case-citations.mjs` matches an id against the WHOLE
+   corpus, so spelling `11.190–11.195` into two *other* test files' docblocks meant those ids stayed
+   "cited" from three places — delete the round-trip file and their checkmarks survive their proof. That
+   is verbatim the failure that checker exists to prevent. Numerals removed; the filename is the pointer.
+2. **A case whose name the mutations had already refuted.** 11.191 was named for the last-row rule while
+   its body asserted only the terminal one — and breaking the last-row rule reddened 11.192 and left
+   11.191 GREEN. **A case that survives a mutation of the rule it claims to test is misnamed**, and the
+   name is what the catalogue quotes. Renamed in all three places; 11.192 now owns the claim. Fixing that
+   docblock then left 11.192's comment pointing at reasoning that no longer existed — **a dangling
+   reference created in the act of fixing the thing above it**, the same class #292 spent the afternoon on.
+
+## The false green I nearly filed, in the squash-drop check itself
+
+Verifying #292 landed, `git diff origin/main exec/88-… -- <files>` printed **0 lines** — and it printed 0
+because the command **errored** (`bad revision`: the branch was deleted at merge), not because the diff
+was empty. `wc -l` reported 0 either way. **My positive control ran against a valid revision, so it
+traversed a different path and certified nothing** — which is precisely the rule already written down
+here: *a control must traverse the SAME PATH as the measurement.* Re-run against the sha with a control
+that had to print, it printed 154 lines, and the 0 became real evidence. Confirmed independently by
+reading the merged content off `main`.
+
 # ⏸ MONDAY 2026-09-07 ~19:5x IST — **ANCHOR REFRESH. STILL NOTHING QUEUED. `main` IS `7f80048`, NOT `af369c0`.**
 
 **This entry supersedes the anchor table below it**, which is four merges behind and whose `branch` row
