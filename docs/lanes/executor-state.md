@@ -16,6 +16,77 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~04:50 IST — **SESSION CONSOLIDATED. Gate green (17th identical run). Nothing running. `exec/65` holds SIXTEEN commits behind two open PRs — that backlog is now the main risk.**
+
+## STATE
+
+| branch | state | contains |
+|---|---|---|
+| `exec/63` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64` | **PR #245 OPEN** | §06 63 → 37 |
+| **`exec/65`** | pushed, **NO PR**, stacked on `exec/64` | §03 45→22 · §06 →28 · §04 45→39 · **§07 78→1** · **§13 153→30** |
+
+Gate at `386092b`: `GATE_EXIT=0` · 30/30 · 0 cached · **3666 \| 5 (3671) / 285** · `check:env` 0 ·
+`check:citations` 0 · `check-case-ids` 0 (1620) · `check:runbook` 0 · `check:tasks` 0 · zero orphans.
+
+## THE BACKFILL, FINAL
+
+| § | start | now | citable left |
+|---|---|---|---|
+| §09 | 219 | **0** | — |
+| §10 | 66 | **0** | — |
+| §11 | — | **0** | — |
+| **§07** | 78 | **1** | 0 (7.199 only) |
+| **§13** | 153 | **30** | **4** |
+| §05 | 67 | 17 | 17 (on #244) |
+| §06 | 63 | 28 | 21 |
+| §03 | 45 | 22 | 19 |
+| §04 | 45 | 39 | 10 |
+| §12 | 78 | 78 | 31 — **block not cleared** |
+
+**Repo-wide 815 → 267 uncited.** Of the 267, **~165 name no covering test at all.**
+
+## WHERE I STOPPED, AND WHY — the same line every time
+
+**§06's `invites` cluster is the last thing I looked at and I did NOT cite it.** 6.117 is verify-projections
+territory, 6.118 and 6.121 read as schema/parse tests in other files, 6.113's claim is about a COLUMN's
+reachability. **Each would have been a guess.** A wrong citation satisfies the checker while pointing at a test
+that does not assert the case — the exact failure this convention exists to prevent, and the reason five
+deferrals this session all turned out right.
+
+Everything else remaining is 1–4 rows per file. **The threshold held in every section: §05's tail, §06's, §03's,
+§13's, and now §06's invites.**
+
+## ⚠ MERGE — the dominant risk now
+
+`exec/65` carries **sixteen commits** of verified, gated citations behind two PRs open for hours.
+**#244 and #245 both edit adjacent lines of `check-case-citations-baseline.json`; the second to merge needs a
+CHERRY-PICK, not a rebase.** Then cherry-pick `exec/65` (it is stacked on `exec/64`, so its baseline edits are
+linear). **Verified:** `engine-context.test.ts` takes §05 citations in #244 at lines 340/842/890/917 and §06 ones
+here at 381/513/672/741 — 40+ lines apart, clean merge.
+
+## THE NINE RULES — the durable output of this work
+
+1. **A row in a file's candidate list is not evidence that file asserts it.** Five deferrals, five confirmed.
+2. **Rows often name their own covering test in their prose** — then the placement is the catalogue's.
+3. **Never let a docblock imply one test proves a whole row.** Four honest shapes (block · stacked · primary
+   clause · named control).
+4. **A mutation RECORD is not an assertion** (6.78, 6.80).
+5. **Two files can share a base name** — a bare filename is not an address.
+6. **Make a private instrument agree with the CHECKER first** — and note it validates only ITS question.
+7. **Run the control, READ it, then write the prose SEPARATELY.** Four wrong counts came from doing both in one
+   step, so the number was always a prediction.
+8. **A section's citation cost is set by the CATALOGUE's writing style, not the code.**
+9. **A count is a claim about the SHAPE of a source.** My extractor was wrong five ways (marker-first ids ·
+   range ids · **multi-line rows** · `:line`-suffixed paths · header-named blocks), each a clean number about
+   the wrong thing, two reported upstream as fact. **What found them was reading raw records, never more
+   counting.** Use `/tmp/cite2.py`.
+
+## OPEN ASKS — thirteenth time
+
+1. **Merge order for #244/#245.** 2. **A subagent** for the ~85 citable rows. 3. **§12's block** (31 citable).
+
+
 # 🔴 MONDAY 2026-09-07 ~04:15 IST — **CORRECTION: my "reader job" figures were WRONG. ~127 rows are citable, not ~90-mostly-unreachable. §07 is at 1 uncited.** Three branches in flight; nothing running.
 
 ## ⛔ THE CORRECTED PICTURE — supersedes every earlier estimate in this file
