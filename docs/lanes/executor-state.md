@@ -96,6 +96,44 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# ✅ MONDAY 2026-09-07 ~20:xx IST — **THE SQUASH AUDIT IS DONE. #274 WAS THE ONLY UNREMEDIATED DROP, AND #278 CLOSED IT.** Starting 13.176 (option B) on `exec/81-shared-with-me`.
+
+**First: #278's own squash was verified before anything else** — the lesson applied to itself. `main` vs the
+branch head for the three files that mattered: **IDENTICAL** (`colour-scan.ts`, `token-discipline.test.ts`,
+`turbo.json`), with `controller-state.md` differing as the positive control. The string-aware stripper, the
+URL case and the `app-core` inputs are all on `main`. **The live gap is closed.**
+
+## THE AUDIT — and two wrong methods before the right one, both worth recording
+
+| method | verdict |
+|---|---|
+| `headRefOid` from the GitHub API | **useless** — it is recorded AS OF MERGE TIME, so it reports #274 as clean and misses the very drop that prompted the audit |
+| branch vs **current** `main` | **too noisy** — later PRs legitimately change the same files, so old branches diverge for innocent reasons |
+| **commits on the branch whose commit-time is after its own squash** | **exact** — it measures the failure mode itself |
+
+**My first audit loop reported "8 clean" and was measuring nothing** — it printed ✓ for `exec/79` while a
+direct check of the same comparison returned "differs". I did not diagnose it from theory; I rewrote it with
+per-branch output and a **built-in control** (`exec/79` vs `cf79d28` MUST flag), and the control fired.
+*An audit that reports all-clean without a control that fires is not evidence.*
+
+## THE RESULT — three PRs pushed commits after their squash; only one was lost
+
+| PR | late commits | outcome |
+|---|---|---|
+| **#274** `exec/79` | `7b61463` (**the false-negative fix**), `83d61cc` | **LOST** — closed by #278 |
+| **#255** `exec/70` | `e48756c` | **re-landed** via #257; `seed-dev-cli.test.ts` on `main` is byte-identical to the branch |
+| **#253** `exec/69` | three commits | **re-landed** via the #255 rebuild; `check-case-citations.mjs`, its tooling test and `view-types-chosen.test.ts` all present on `main` |
+
+The last two are the already-recorded *"#247/#253/#255 each stranded work"* episode, which is what the
+**one branch per work item** rule was adopted for. **Nothing else in the series lost anything.** Branches for
+#263, #249, #244 and #239 are deleted and cannot be audited — stated rather than counted as clean.
+
+> **The standing practice, in one line:** after any squash merge of your own work,
+> `git diff origin/main <branch> -- <the files that mattered>`. Empty is the only proof; every other signal
+> reports success either way.
+
+---
+
 # ⚠ MONDAY 2026-09-07 ~19:xx IST — **THE #274 SQUASH DROPPED TWO COMMITS, AND ONE OF THEM WAS A FIX. `main` carries a live false negative it believes is fixed.**
 
 `exec/80` was rebuilt onto `cf79d28` by cherry-pick. **The conflict was never about the anchor PRs.**
