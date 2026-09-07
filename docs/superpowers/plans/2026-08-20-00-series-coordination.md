@@ -3440,6 +3440,47 @@ assertion is dishonest; leaving it uncited forever because it is not one is mere
 authority validates only the question it answers.** Agreement with it on totals said nothing about the
 sub-question, and that false comfort is what let defects 3 and 4 survive two more reports.
 
+**8. AN EIGHTH SHAPE, and this one was not an extractor at all — it was a HAND-TYPED LIST beside a table
+derived from a different measurement.** (2026-09-07, the `exec/65` rebuild.)
+
+A restart brief instructed a rebuild by cherry-pick and enumerated the commits to pick: **4 for one branch,
+16 for the other, 20 in total. The branch held 23 content commits.** The three omitted were `52a68d6` (§04
+opened, 45 → 39), `f717189` (§07 driven to ONE uncited) and `45f52fd` (the reader-job correction, which also
+carried rule 9's own record into this document).
+
+**The brief's summary table, printed directly above the lists, asserted §07 = 1 uncited — a state unreachable
+without `f717189`.** The document therefore contradicted itself across four lines, and a restarted executor
+following it faithfully would have produced a branch whose numbers disagreed with the table it was working
+from, most likely discovering this only at the gate, or not at all: dropping `52a68d6` breaks §04's later
+batches by replaying them onto a baseline that never reached 39, which surfaces as a *conflict*, not as a
+missing commit.
+
+**Why it belongs to rule 9 rather than to carelessness.** The list and the table answered different questions
+— *"which commits do I replay"* versus *"where did each section end up"* — and were produced by different
+means, one by hand and one by measurement. **A count is a claim about the shape of a source; a hand-typed
+list is a claim about a set, and neither validates the other.** Sixteen of the twenty entries were right,
+which is precisely the condition rule 4 names: *a decomposition that reconciles almost everywhere reads as
+verified, and the wrong entry hides inside the right ones.*
+
+**The fix, and it is mechanical:** never type a commit list beside a table you measured. Generate it from the
+same tree you are reporting —
+
+```
+git log --reverse --format='%h|%s' <base>..<branch>   # then classify each by files-touched
+```
+
+— which is how the 23 were found, and which also settles the content-versus-handoff classification that a
+hand list has to assert without evidence.
+
+**And the same defect had a sibling in the same brief.** It recorded *"Verified safe: `engine-context.test.ts`
+— 40+ lines apart, clean merge"*. That was true, and it covered **one of the three** test files in the actual
+collision surface. Computing the surface properly — intersecting `git diff --name-only $MB main` with
+`git diff --name-only $MB branch` — showed `projection-order.test.ts`, where **both sides insert at the same
+line**, and `verify-projections.test.ts`, where they insert one line apart. Both were real conflicts; neither
+was mentioned. **Verifying the instance you happened to think of, then generalising to the class, is how the
+other two stayed invisible.** Two commands size the surface, and they cost nothing next to discovering a
+conflict twelve picks into a sequence.
+
 ## Two findings about method, from Lane 2's T3 review (2026-08-28)
 
 Both are about *how* defects were caught rather than what they were, and both bind the controller harder

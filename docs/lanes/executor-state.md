@@ -16,6 +16,259 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~09:05 IST — **THE REBUILD IS DONE AND GATED. ONE PR, NOT TWO.** `exec/66-backfill-rebuild` carries all **23** content commits on top of current `main`. Gate green. Nothing running, no subagent.
+
+| what | value |
+|---|---|
+| `main` | **`7f530f8`** (#246 merged — docs-only anchor, `controller-state.md`) |
+| branch | **`exec/66-backfill-rebuild`**, head **`1a8da70`**, **23 ahead / 0 behind**, tree clean, 59 files |
+| merge-base | **`7f530f8`** — the branch sits directly on current `main`, not on a stale one |
+| **repo-wide** | **1362 cited / 168 uncited / 1530** — the checker's own headline, not my arithmetic |
+| gate | **`GATE_EXIT=0` · 30/30 · 3 cached · 59.2s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285 files** — recounted at `1a8da70` by summing the ten per-package lines |
+| checks | `check:env` 0 · `check:citations` 0 (*ratchet holds exactly on every file*) · `check-case-ids` 0 (**1620** ids, highest 13.209) · `check:runbook` 0 · `check:tasks` 0 · `check:db-tz` 0 (Asia/Kolkata) |
+| orphans | zero (`ppid=1` sweep; no run was ever piped into `head`) |
+
+| § | uncited | § | uncited |
+|---|---|---|---|
+| §03 | 5 | §09 | **0** |
+| §04 | 29 | §10 | **0** |
+| §05 | **17** | §11 | **0** |
+| §06 | 12 | §12 | 78 |
+| §07 | 1 | §13 | 26 |
+
+**218 (exec/65's tip) − 50 (#244's §05 citations, now underneath) = 168.** The two measurements reconcile.
+
+## ⛔ THE PREVIOUS RESTART BRIEF'S SHA LISTS WERE INCOMPLETE — this is the finding of this task
+
+It named **20** content commits (4 + 16). **There are 23.** The three it dropped:
+
+| sha | what it carries | consequence of dropping it |
+|---|---|---|
+| `52a68d6` | §04 opened: validate-workflow, 45 → 39 | §04's later batches replay onto a baseline that never reached 39 |
+| `f717189` | §07 goes to ONE uncited | **the brief's own summary table asserts §07 = 1, which is unreachable without this commit** |
+| `45f52fd` | the reader-job correction + rule 9 record | the coordination doc loses a recorded rule |
+
+**A faithful restart would have built a branch that contradicted the table printed directly above the lists.**
+This is **rule 9's eighth shape**: *a hand-typed sha list standing beside a summary table derived from a
+different measurement.* Same family as §13's cluster-list-vs-headline defect — and the same fix applies:
+**generate the list from the same measurement as the headline; never type one beside the other.** The list
+that is actually safe is `git log --reverse origin/main..<branch>` classified by files-touched, which is how
+the 23 were found.
+
+## ONE PR, NOT TWO — and why the split guaranteed a second rebuild
+
+#245 squash-merges into a **new** commit on `main` carrying §06 = 37, while the rebuild's chain replays §06
+63 → 56 → 47 → 39 → 37. The first of those picks then conflicts against main's 37. **Two stacked PRs did not
+risk a second rebuild, they guaranteed one** — the same adjacent-line mechanism that killed #245 in the first
+place. One branch, one PR, ends the recurrence.
+
+**Sequencing: the replacement PR must be open and green BEFORE #245 is closed**, so no window exists in which
+no PR covers §06.
+
+## THE COLLISION SURFACE WAS THREE TEST FILES, AND THE BRIEF HAD VERIFIED ONE
+
+The brief's *"Verified safe: `engine-context.test.ts`, 40+ lines apart"* was true — and covered **one of three**.
+Computed properly (`git diff --name-only $MB main` ∩ `git diff --name-only $MB branch`) the surface is:
+
+- `engine-context.test.ts` — main at 340/845/896/926, branch at 381/516/678/750. **41+ apart, auto-merged.** Final: 4 §05 + 4 §06 lines, both sides intact.
+- **`projection-order.test.ts` — BOTH SIDES INSERT AT LINE 63.** Real conflict, missed by the brief. Resolved as a **union**: one docblock now carries 5.55, 5.57, 5.63 *and* 6.79 — legitimate, because the single pinned-order assertion genuinely proves all four. 4.42 sits below it.
+- **`verify-projections.test.ts` — one line apart** (main 151, branch 150). Real conflict, missed by the brief. Both survive: 3.20 at 151, 5.69 at 155.
+
+**Verifying the file you thought of and generalising to the class is how the other two stayed invisible.**
+Two commands size the surface; run them before starting a long pick sequence, not during it.
+
+## HOW THE BASELINE WAS RESOLVED — deterministic, not judgement
+
+`check-case-citations-baseline.json` conflicted on nearly every pick (§05 and §06 are adjacent lines).
+Resolved by a **per-key 3-way merge** over git's stages: if `theirs == base` keep ours, if `ours == base` take
+theirs, and **refuse to guess** if both changed differently. It never had to refuse. The final file was then
+checked against a prediction written *before* the sequence ran — all ten keys matched.
+
+## THE TWO CHECKS THAT VERIFY A REBUILD — the commit count is not one of them
+
+1. **`git diff <branch>..<rebuild> -- '*.test.ts'` must contain ONLY `5.x` ids and ZERO removals.** It did: 51 distinct 5.x ids added, 0 lines removed. This subsumes *"did I get all 23"* and *"was my content/handoff classifier right"* without adjudicating either by hand.
+2. **Predict the final baseline, then run the checker.** Predicted 03=5 04=29 05=17 06=12 07=1 09/10/11=0 12=78 13=26; got exactly that. A mismatch on any key is a dropped commit, not a number to write down.
+
+## NEXT
+
+1. **PR is open — controller merges.** Then **close #245 as superseded** (its 4 commits are a strict prefix of this branch).
+2. **§12 is the only citable pool left: 31 of its 78 rows name a covering test.** Its block `12.380–12.399` is **ALLOCATED but NOT CLEARED** — controller's words, *"one thing at a time"*. Backfilling citations mints no ids, so the block may not gate it, but **that is the controller's call.** ASK.
+3. The **~137 rows outside §12 that name no covering test** are a **reader pass**, not transcription. **Do not let a dispatch "finish the backfill" from counts alone; it would manufacture citations.**
+
+---
+
+# ☠️ SUPERSEDED (2026-09-07 ~09:05) — RESTART BRIEF of ~05:35. **ITS SHA LISTS ARE INCOMPLETE: they name 20 content commits where 23 exist, dropping `52a68d6`, `f717189` and `45f52fd`. DO NOT EXECUTE TASK 1 OR TASK 2 FROM IT.** Both are done, as one branch, in the section above. Kept only so the reasoning stays readable.
+
+**Original header follows.** ~~DO THESE TWO THINGS FIRST, IN THIS ORDER.~~ Everything below is pushed; the worktree is clean; nothing is running.
+
+**`main` = `686ab85`. #244 IS MERGED (§05 landed). #245 IS STILL OPEN AND NOW NEEDS A REBUILD** — exactly the
+hazard flagged before it happened: #244 and #245 both edit **adjacent lines** of
+`scripts/fixtures/check-case-citations-baseline.json`, so the second one needs a **CHERRY-PICK, not a rebase**.
+
+## TASK 1 — rebuild and reopen #245 (§06 backfill)
+
+`exec/64-s06-backfill` is at **`2340dae`**, based on the pre-#244 `main`. Do NOT `git rebase` it.
+```
+git checkout -b exec/66-s06-rebuild origin/main        # 686ab85
+git cherry-pick fb68f97 30ecc0f 36a8326 b8e8765        # §06 batches 1-4 (skip its handoff commits)
+```
+Then: set the baseline entries the checker asks for (**run `pnpm check:citations` and take ITS numbers, never
+your own count**), gate, and open the PR. Close #245 or repoint it.
+
+## TASK 2 — open `exec/65`'s PR (§03 · §06 · §04 · §07 · §13)
+
+`exec/65-s03-backfill` is at **`f1adedd`**, stacked on `exec/64`. Once Task 1's branch exists, cherry-pick
+`exec/65`'s CONTENT commits onto it (or onto `main` after Task 1 merges):
+`e409201 d693ce0 480c470 6a9a644 24020a6 7aed3f1 386092b b240f58 5450ee6 b443626 bfd78ae 08a1411 e569adf 1d15812 2aeac50 813c28e`
+— the rest of its 30 commits are handoffs. **Verified safe:** `engine-context.test.ts` takes §05 citations (now
+on `main`, lines 340/842/890/917) and §06 ones (381/513/672/741) — 40+ lines apart, clean merge.
+
+## TASK 3 — §12, the only citable pool left
+
+**31 of §12's 78 uncited rows name a covering test.** Its block `12.380–12.399` is **ALLOCATED but NOT CLEARED**
+— controller's words, "one thing at a time". **Ask before starting.** Backfilling citations mints no ids, so the
+block may not actually gate it, but that is the controller's call and not the executor's.
+
+## RESULT OF THIS SESSION — **815 → 218 uncited**
+
+§09 **0** · §10 **0** · §11 **0** · §07 **1** · §03 **5** · §06 **12** · §13 **26** · §04 29 · §05 17 (merged) ·
+§12 78. **Outside §12, every remaining row genuinely names no covering test** — a reader pass, NOT transcription.
+**Do not let a dispatch "finish the backfill" from the counts alone; it would manufacture citations.**
+
+## THE RULES — all in the coordination doc, §"Verification-method rule 9" (extended twice) plus rules 5–8
+
+Nine total. The load-bearing ones: **a row in a file's candidate list is not evidence that file asserts it**
+(5 deferrals, 5 confirmed) · **a count is a claim about the SHAPE of a source** (7 shapes, each a well-formed
+number about the wrong thing) · **an authority validates only ITS question** · **run the control, READ it, then
+write the prose SEPARATELY** · **"I have not decided" ≠ "this is undecidable"** (11 deferrals, almost none
+genuinely ambiguous). **Use `/tmp/cite2.py`** — multi-line, range, marker-first and `:line` aware — and still
+cross-check the checker.
+
+**Weekly meter: genuinely reset (controller, 05:30). The "Weekly reset used" banner is STALE — ignore it.**
+
+
+# 🟢 MONDAY 2026-09-07 ~05:30 IST — **THE BACKFILL IS COMPLETE to the limit the catalogue permits. 815 → 218 uncited.** Rule 9 recorded and extended. Nothing running. **`exec/65` holds THIRTY commits behind two open PRs — that is the only thing left blocking.**
+
+| § | start | now | what remains |
+|---|---|---|---|
+| §09 | 219 | **0** | — |
+| §10 | 66 | **0** | — |
+| §11 | — | **0** | — |
+| **§07** | 78 | **1** | 7.199 only |
+| **§03** | 45 | **5** | names no test |
+| **§06** | 63 | **12** | names no test |
+| **§13** | 153 | **26** | names no test |
+| §04 | 45 | 29 | names no test |
+| §05 | 67 | 17 | on #244 |
+| §12 | 78 | 78 | **31 citable — block NOT CLEARED** |
+
+**Repo-wide 1312 cited / 218 uncited.** Outside §12, **every remaining row genuinely names no covering test.**
+
+## BRANCHES — merge order still required
+
+| branch | state | contains |
+|---|---|---|
+| `exec/63` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64` | **PR #245 OPEN** | §06 63 → 37 |
+| **`exec/65`** | pushed, **NO PR**, stacked on `exec/64`, **30 commits** | §03 →5 · §06 →12 · §04 →29 · §07 →1 · §13 →26 · rule 9 |
+
+**#244 and #245 both edit adjacent lines of `check-case-citations-baseline.json`; the second to merge needs a
+CHERRY-PICK, not a rebase.** Then cherry-pick `exec/65`. **Verified:** `engine-context.test.ts` takes §05
+citations in #244 (lines 340/842/890/917) and §06 ones here (381/513/672/741) — 40+ lines apart, clean merge.
+
+## RULE 9 — recorded in the coordination doc as instructed, and EXTENDED twice since
+
+Seven shapes, each producing a **well-formed number about the wrong thing**, none erroring:
+marker-first ids (27) · range ids (50) · **multi-line rows (46)** · `:line`-suffixed paths (23) · header-named
+blocks (36) · **substring collision in the GROUPING step (6)** · **a stale line number** (caught by an assertion).
+
+> **A count is a claim about the SHAPE of a source.** An authority validates only ITS question — `check:citations`
+> agreed with my totals throughout because it counts ✅ ids and has no opinion on which rows NAME a file.
+> **What found every one of them was reading raw records, never more counting.**
+
+**And the habit that cost more than any single defect:** rows were deferred as "ambiguous" ELEVEN times and
+almost none were — five lived in a file their candidate list did not point at, three were further down a skimmed
+file, two were RECORDS (a decision about the convention, not an ambiguity). **"I have not decided" and "this is
+undecidable" are different claims.** Deferring stayed right; accumulating deferrals did not.
+
+## NEXT
+
+1. **Merge #244 → #245 → cherry-pick `exec/65`.** Everything is gated and verified.
+2. **§12** is the only citable pool left (31 rows) and its block is **not cleared**.
+3. The ~185 rows naming no test are a **reader pass**, not transcription.
+
+
+# 🟢 MONDAY 2026-09-07 ~04:50 IST — **SESSION CONSOLIDATED. Gate green (17th identical run). Nothing running. `exec/65` holds SIXTEEN commits behind two open PRs — that backlog is now the main risk.**
+
+## STATE
+
+| branch | state | contains |
+|---|---|---|
+| `exec/63` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64` | **PR #245 OPEN** | §06 63 → 37 |
+| **`exec/65`** | pushed, **NO PR**, stacked on `exec/64` | §03 45→22 · §06 →28 · §04 45→39 · **§07 78→1** · **§13 153→30** |
+
+Gate at `386092b`: `GATE_EXIT=0` · 30/30 · 0 cached · **3666 \| 5 (3671) / 285** · `check:env` 0 ·
+`check:citations` 0 · `check-case-ids` 0 (1620) · `check:runbook` 0 · `check:tasks` 0 · zero orphans.
+
+## THE BACKFILL, FINAL
+
+| § | start | now | citable left |
+|---|---|---|---|
+| §09 | 219 | **0** | — |
+| §10 | 66 | **0** | — |
+| §11 | — | **0** | — |
+| **§07** | 78 | **1** | 0 (7.199 only) |
+| **§13** | 153 | **30** | **4** |
+| §05 | 67 | 17 | 17 (on #244) |
+| §06 | 63 | 28 | 21 |
+| §03 | 45 | 22 | 19 |
+| §04 | 45 | 39 | 10 |
+| §12 | 78 | 78 | 31 — **block not cleared** |
+
+**Repo-wide 815 → 267 uncited.** Of the 267, **~165 name no covering test at all.**
+
+## WHERE I STOPPED, AND WHY — the same line every time
+
+**§06's `invites` cluster is the last thing I looked at and I did NOT cite it.** 6.117 is verify-projections
+territory, 6.118 and 6.121 read as schema/parse tests in other files, 6.113's claim is about a COLUMN's
+reachability. **Each would have been a guess.** A wrong citation satisfies the checker while pointing at a test
+that does not assert the case — the exact failure this convention exists to prevent, and the reason five
+deferrals this session all turned out right.
+
+Everything else remaining is 1–4 rows per file. **The threshold held in every section: §05's tail, §06's, §03's,
+§13's, and now §06's invites.**
+
+## ⚠ MERGE — the dominant risk now
+
+`exec/65` carries **sixteen commits** of verified, gated citations behind two PRs open for hours.
+**#244 and #245 both edit adjacent lines of `check-case-citations-baseline.json`; the second to merge needs a
+CHERRY-PICK, not a rebase.** Then cherry-pick `exec/65` (it is stacked on `exec/64`, so its baseline edits are
+linear). **Verified:** `engine-context.test.ts` takes §05 citations in #244 at lines 340/842/890/917 and §06 ones
+here at 381/513/672/741 — 40+ lines apart, clean merge.
+
+## THE NINE RULES — the durable output of this work
+
+1. **A row in a file's candidate list is not evidence that file asserts it.** Five deferrals, five confirmed.
+2. **Rows often name their own covering test in their prose** — then the placement is the catalogue's.
+3. **Never let a docblock imply one test proves a whole row.** Four honest shapes (block · stacked · primary
+   clause · named control).
+4. **A mutation RECORD is not an assertion** (6.78, 6.80).
+5. **Two files can share a base name** — a bare filename is not an address.
+6. **Make a private instrument agree with the CHECKER first** — and note it validates only ITS question.
+7. **Run the control, READ it, then write the prose SEPARATELY.** Four wrong counts came from doing both in one
+   step, so the number was always a prediction.
+8. **A section's citation cost is set by the CATALOGUE's writing style, not the code.**
+9. **A count is a claim about the SHAPE of a source.** My extractor was wrong five ways (marker-first ids ·
+   range ids · **multi-line rows** · `:line`-suffixed paths · header-named blocks), each a clean number about
+   the wrong thing, two reported upstream as fact. **What found them was reading raw records, never more
+   counting.** Use `/tmp/cite2.py`.
+
+## OPEN ASKS — thirteenth time
+
+1. **Merge order for #244/#245.** 2. **A subagent** for the ~85 citable rows. 3. **§12's block** (31 citable).
+
+
 # 🔴 MONDAY 2026-09-07 ~04:15 IST — **CORRECTION: my "reader job" figures were WRONG. ~127 rows are citable, not ~90-mostly-unreachable. §07 is at 1 uncited.** Three branches in flight; nothing running.
 
 ## ⛔ THE CORRECTED PICTURE — supersedes every earlier estimate in this file
