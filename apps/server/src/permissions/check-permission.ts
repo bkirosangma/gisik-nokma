@@ -209,7 +209,7 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
 
 /**
  * **`origin` in this module is the event envelope's provenance enum — `'web' |
- * 'mobile' | 'desktop' | 'server'` (`EventEnvelope.origin`). It is NOT the
+ * 'mobile' | 'desktop' | 'server' | 'mcp'` (`EventEnvelope.origin`). It is NOT the
  * browser `Origin` header.** Nothing here concerns CSRF, cross-site requests or
  * any HTTP header; a reader who conflates the two writes a header check and
  * believes the envelope-origin forgery window is closed. Every name, comment

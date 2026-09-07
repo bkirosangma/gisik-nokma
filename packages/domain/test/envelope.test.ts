@@ -154,7 +154,7 @@ describe('submittedEventSchema', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['origin'],
-      message: "Invalid enum value. Expected 'web' | 'mobile' | 'desktop' | 'server', received 'carrier-pigeon'",
+      message: "Invalid enum value. Expected 'web' | 'mobile' | 'desktop' | 'server' | 'mcp', received 'carrier-pigeon'",
     });
   });
 

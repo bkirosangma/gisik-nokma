@@ -16,7 +16,7 @@ import { signInWithPhone } from '../helpers/session.js';
  * The envelope-origin gate at the client door.
  *
  * TERMINOLOGY: "envelope-origin" throughout means the event envelope's `origin`
- * field — the provenance enum `'web' | 'mobile' | 'desktop' | 'server'`. It is
+ * field — the provenance enum `'web' | 'mobile' | 'desktop' | 'server' | 'mcp'`. It is
  * NOT the browser `Origin` header, and this file tests nothing about CSRF or
  * cross-site requests.
  *
