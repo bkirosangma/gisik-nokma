@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CLIENT_SOURCE_ROOTS,
   REPO_ROOT,
   existingClientSourceRoots,
   findColourLiterals,
@@ -124,6 +125,94 @@ describe('the scanner itself is proven against planted defects before it is trus
     expect(hits.map((hit) => ({ line: hit.line, match: hit.match }))).toEqual([
       { line: 3, match: '#b3261e' },
     ]);
+  });
+});
+
+/**
+ * THE GATE MUST BE ABLE TO SEE WHAT THE SCANNER POLICES.
+ *
+ * This suite reads every client source tree from disk, which makes its true inputs
+ * files in OTHER packages. `turbo.json` therefore declares them explicitly with
+ * `$TURBO_ROOT$` — without that, turbo scopes the hash to `packages/ui/**` and a
+ * colour literal added anywhere this suite polices leaves the cache VALID.
+ *
+ * **Measured 2026-09-07 before the inputs existed:** cache warm, a real `#b3261e`
+ * planted in `apps/web/src/shell-refusal.tsx` → `cache hit, replaying logs`, FULL
+ * TURBO, exit 0. The same violation under direct `vitest` exits 1 and names the
+ * file. **The scanner was never wrong; the gate could not see it** — which is how
+ * `#270` reached `main`, since the gate on its own PR was genuinely green.
+ *
+ * That declaration is a COPY of `CLIENT_SOURCE_ROOTS`, and a copy that stops
+ * matching silently is the defect this repo names elsewhere ("export the fixture,
+ * never copy it"). It cannot be exported — `turbo.json` is config, read by a tool
+ * that does not import TypeScript — so the next best thing is asserted here: the
+ * two are compared as SETS, and adding a tree to one without the other is red.
+ *
+ * Follows case 13.208's shape: parse the config and assert the parsed structure,
+ * never its text, so reformatting does not fail and a real change does.
+ */
+describe('the gate can see every tree the scanner polices', () => {
+  /** `turbo.json` is JSONC. Strips comments while respecting strings — the `$schema` value contains `//`. */
+  function parseJsonc(text: string): unknown {
+    let out = '';
+    let quote: string | null = null;
+    for (let i = 0; i < text.length; i += 1) {
+      const c = text[i]!;
+      if (quote !== null) {
+        out += c;
+        if (c === '\\') {
+          out += text[i + 1] ?? '';
+          i += 1;
+        } else if (c === quote) quote = null;
+        continue;
+      }
+      if (c === '"') {
+        quote = c;
+        out += c;
+        continue;
+      }
+      if (c === '/' && text[i + 1] === '*') {
+        const end = text.indexOf('*/', i + 2);
+        i = end === -1 ? text.length : end + 1;
+        continue;
+      }
+      if (c === '/' && text[i + 1] === '/') {
+        const end = text.indexOf('\n', i);
+        i = end === -1 ? text.length : end - 1;
+        continue;
+      }
+      out += c;
+    }
+    return JSON.parse(out);
+  }
+
+  it('turbo.json declares every CLIENT_SOURCE_ROOT as an input of this package’s test task', () => {
+    const config = parseJsonc(readFileSync(join(REPO_ROOT, 'turbo.json'), 'utf8')) as {
+      tasks: Record<string, { inputs?: string[] } | undefined>;
+    };
+    const inputs = config.tasks['@gisik-nokma/ui#test']?.inputs ?? [];
+    // The control that keeps the assertion honest: if the task or its inputs ever
+    // vanish, `declared` is empty and the comparison below would pass against a
+    // CLIENT_SOURCE_ROOTS that had also been emptied. Neither may be empty.
+    expect(inputs.length, 'turbo.json declares no inputs for @gisik-nokma/ui#test').toBeGreaterThan(0);
+    expect(CLIENT_SOURCE_ROOTS.length).toBeGreaterThan(0);
+
+    const declared = inputs
+      .filter((input) => input.startsWith('$TURBO_ROOT$/'))
+      .map((input) => input.slice('$TURBO_ROOT$/'.length).replace(/\/\*\*$/, ''));
+    // Compared as sorted lists rather than sets, so a failure PRINTS both sides and
+    // names the tree that is missing instead of only that the counts differ.
+    expect(declared.slice().sort()).toEqual(CLIENT_SOURCE_ROOTS.slice().sort());
+  });
+
+  it('and it keeps its own package’s files too, so a change to the scanner still invalidates', () => {
+    const config = parseJsonc(readFileSync(join(REPO_ROOT, 'turbo.json'), 'utf8')) as {
+      tasks: Record<string, { inputs?: string[] } | undefined>;
+    };
+    // Without `$TURBO_DEFAULT$` the foreign trees REPLACE the package's own files,
+    // so editing colour-scan.ts itself would no longer invalidate the cache — the
+    // same blindness one level in.
+    expect(config.tasks['@gisik-nokma/ui#test']?.inputs).toContain('$TURBO_DEFAULT$');
   });
 });
 
