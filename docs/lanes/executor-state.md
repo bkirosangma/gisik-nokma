@@ -16,6 +16,40 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~11:20 IST — **168 → 115 uncited. §05 at ZERO, §04 at 5.** #249 head **`fb3255d`**, gate green. **BLOCKED on the controller for the only two things left.**
+
+| § | start | now | | § | start | now |
+|---|---|---|---|---|---|---|
+| §03 | 5 | **2** | | §07 | 1 | 1 |
+| §04 | 29 | **5** | | §12 | 78 | **78 — NOT CLEARED** |
+| §05 | 17 | **0** | | §13 | 26 | **23** |
+| §06 | 12 | **6** | | **total** | **168** | **115** |
+
+Gate `GATE_EXIT=0` · 30/30 · **3666 \| 5 (3671) / 285** · `check:citations` 0 · zero orphans.
+
+## THE RESIDUAL IS NOW CHARACTERISED BY EVIDENCE, NOT INHERITED
+
+The 38 non-§12 rows naming no test were about to be filed as "a reader pass" **on the authority of a
+sentence that had already been wrong twice today.** Measured instead: they name **source files, scripts,
+configs and CI yaml — the thing under test, not the test.** That is a different CLASS, not a leftover.
+**Only 4 of 38 had a sibling test file; 2 were citable** (`6.75`, `13.188` — the latter went into a docblock
+that already argued the row without naming its id). **`3.62` and `13.177` are genuinely uncitable**: the
+first is TYPE-LEVEL and kills zero runtime tests (same class as `7.199`), the second is a measurement
+RECORD. **36 remain, and the claim about them now rests on reading them.**
+
+## ⛔ I AM BLOCKED. Two things, both yours or the owner's
+
+1. **§12's block `12.380–12.399` — ALLOCATED, NOT CLEARED. 67 citable rows by naming.** By far the largest
+   remaining pool and the only substantial citable work left anywhere. **I will not start without a word.**
+2. **CI cannot run at all** (billing, since `2026-09-06T09:05:54Z`). #247/#248/#249 all rest on the LOCAL
+   gate alone, and the standing authorization's *"independent CI run green"* is unsatisfiable until it is
+   fixed in GitHub settings.
+
+**Merge #248 at its CURRENT head** — #247 was merged at `0550241` and three findings pushed afterwards never
+landed. A squash captures the branch at the moment of merge, not as it later stands.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~10:50 IST — **§05 at ZERO, §04 at 5. 168 → 117 uncited.** #249 head **`527c22c`**, gate green. Nothing running.
 
 | § | before | after | | § | before | after |
