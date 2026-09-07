@@ -1,5 +1,46 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 20:4x IST — IN-APP MANUAL/FAQ LANDED, ALL THREE SURFACES. PR #304 merged, own forced gate GREEN (fresh install, lockfile changed). `main` is `e6b19a7`. Owner has ruled all 7 MCP plan questions; plan update queued next.
+
+**One parse, two renderers, three apps.** `scripts/help-content.mjs` parses `docs/manual.md` +
+`docs/faq.md` once into `packages/app-core/src/help/content.generated.ts` (9,226 of this PR's 11,098
+lines — regenerated, not hand-written). Web and desktop share one React DOM renderer
+(`help-browser.tsx`); mobile draws the same parsed object natively, since React Native cannot render
+HTML. Reachable at `/help` on web, a header button on the phone's board, a desktop toggle **including
+the signed-out branch**. `pnpm check:help` wired into CI as a dependency of `gate` itself, with a
+workflow-shape test asserting the wiring holds.
+
+**The finding worth repeating, because it's this session's recurring lesson in a new costume:**
+retention measured 99.69%, every test passed, and the real screen still showed a literal `---` where a
+markdown horizontal rule should have rendered. **Nothing but opening the page found it.** Three more
+content defects — the manual's entire opening section dropped, 65 numbered steps not rendering as a
+list, a hard-coded "2 planted defects" count that was wrong within the hour — came from the same
+source: the *retention instrument itself* was wrong three times before the content was. Fixed with a
+planted-defect test (`the horizontal rule is DROPPED, not rendered as a literal ---`) independently
+confirmed present in the merged branch before this controller merged it.
+
+**A scope-guard correctly fired, and the fix is the interesting part.** The FAQ legitimately mentions
+"burndown"/"velocity" — in the sentence explaining the product does NOT have them. The exclusion added
+is not a blanket allow: case 11.196 asserts the words still appear, every hit is prose rather than code,
+and the documentation still denies the feature — a control **harder to satisfy than the line it excuses**,
+not an escape hatch.
+
+**Own forced gate at `e6b19a7`** (fresh `pnpm install --frozen-lockfile`, since `pnpm-lock.yaml` and two
+`package.json`s changed): `GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · node `v22.22.2` · no
+`Unsupported engine` · **3,766 passed | 5 skipped, 303 test files**
+(27+4+15+12+8+74+20+3+2+138 files; 464+47+178+282+90+1152+139+20+5+1389 tests). Zero orphaned vitest
+workers. All 24 changed files checksum-verified individually.
+
+**All 7 MCP plan questions ruled by the owner.** Two change the plan's written-against default: (1) MCP
+writes get a distinct `'mcp'` envelope-origin value rather than claiming `'web'` — the plan's own text
+already scoped this as "a new Task 0... sweeps every consumer." (5) A simple revoke UI, not raw SQL —
+the executor's own assessment (checked, not just asserted): this does NOT need a fresh planning pass,
+since the settings surface already exists as a fourth screen and the token schema (`mcp_tokens`, hashed,
+no expiry) is already decided by Task 2 per the owner's Q4 answer. About a page added as Task 12. One
+sub-question flagged rather than decided: whether to record **last-used** on the revoke list — a
+privacy-edged log of when someone's assistant acted, not in Task 2's schema today. The other five
+rulings (2,3,4,6,7) all confirmed the plan's existing text; no changes needed there.
+
 ## ✅ MONDAY 20:1x IST — PRE-LAUNCH 1–3 CLOSED (404, privacy, terms). PR #302 merged, own forced gate GREEN. Two findings worth carrying forward, one closed the same PR, one open until item 7.
 
 **404, privacy and terms pages landed**, all reviewed. The 404 page extends the product's own existing
