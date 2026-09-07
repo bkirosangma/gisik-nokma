@@ -1,22 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { createHttpClient, HttpError, type FetchLike } from '@gisik-nokma/app-core/online';
-import { createHttpNotificationsGateway } from '../src/notifications-gateway.js';
-import { createHttpTicketLocator, ticketSheetPath } from '../src/ticket-location.js';
+import { HttpError, createHttpClient, type FetchLike } from '../../src/online/http.js';
+import { createHttpNotificationsGateway } from '../../src/online/notifications.js';
 
 /**
  * ## The transport under test is the REAL one
  *
- * Same reason `data-source-gateway.test.ts` gives: the behaviour these cases are
- * about IS `createHttpClient`'s — a 404 answers `null` on a GET and THROWS on a
- * POST, a 204 answers `undefined`, a non-2xx carries its body. A hand-written
- * `HttpClient` stub would let this file decide those, and they are exactly what
- * the gateway is built on.
+ * The behaviour these cases are about IS `createHttpClient`'s — a 404 answers
+ * `null` on a GET and THROWS on a POST, a 204 answers `undefined`, a non-2xx
+ * carries its body. A hand-written `HttpClient` stub would let this file decide
+ * those, and they are exactly what the gateway is built on.
  *
  * The scripted bodies below are the SERVER'S, copied from the routes that serve
  * them (`apps/server/src/routes/notifications.ts`,
- * `apps/server/src/notifications/store.ts`, `apps/server/src/routes/tickets.ts`)
- * rather than from the plan's sketch — cases 11.130–11.139.
+ * `apps/server/src/notifications/store.ts`) rather than from the plan's sketch —
+ * cases 11.130–11.139, 11.175–11.176.
+ *
+ * ## Moved here from `apps/web/test/` on 2026-09-07, with the adapter
+ *
+ * These cases did not change. What changed is that the thing they test now
+ * lives beside its three siblings in `src/online/`, so they import it by
+ * RELATIVE path (`../../src/online/notifications.js`) rather than across a
+ * package boundary — which is the import style that lets a mutation of the
+ * source redden them, instead of resolving through a stale `dist`.
+ *
+ * **A hand-copied body cannot notice the route changing**, and that is the
+ * honest limit of every case in this file. The round trip that CAN notice is
+ * `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
+ * (11.190–11.195), which drives this same adapter against the real route and a
+ * real database. These two files are complements: this one pins the transport
+ * seams a real server cannot easily produce (a 200 of the wrong shape, a 404 on
+ * a GET), that one pins the contract.
  */
+
 function scriptedHttp(routes: Record<string, { status: number; body?: unknown }>) {
   const seen: Array<{ method: string; path: string; hadBody: boolean }> = [];
   const fetchImpl: FetchLike = async (input, init) => {
@@ -213,60 +228,5 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     await expect(createHttpNotificationsGateway(http).unreadCount()).rejects.toThrow(
       /unread-count answered 200 with a body this client cannot read/,
     );
-  });
-});
-
-describe('createHttpTicketLocator — the deep link the plan’s /tickets/:id could not make', () => {
-  const ticketRoute = '/v1/workspaces/ws_1/tickets/t_7';
-
-  it('11.140 reads project_id off the proj_visibility row the route serves', async () => {
-    const { http, seen } = scriptedHttp({
-      [`GET ${ticketRoute}`]: {
-        status: 200,
-        body: {
-          ticket: {
-            ticket_id: 't_7',
-            workspace_id: 'ws_1',
-            project_id: 'p_corner',
-            parent_id: null,
-            own_mode: 'inherit',
-            resolved_mode: 'workspace',
-            seq: 12,
-          },
-          parent: null,
-          rollup: null,
-        },
-      },
-    });
-    const location = await createHttpTicketLocator(http).locate('ws_1', 't_7');
-    expect(location).toEqual({ workspaceId: 'ws_1', projectId: 'p_corner' });
-    expect(seen[0]?.path).toBe(ticketRoute);
-    expect(ticketSheetPath(location!, 't_7')).toBe('/w/ws_1/p/p_corner?ticket=t_7');
-  });
-
-  it('11.141 answers null for the route’s one 404, without deciding which of its two causes it was', async () => {
-    const { http } = scriptedHttp({
-      [`GET ${ticketRoute}`]: { status: 404, body: { error: 'not_found' } },
-    });
-    expect(await createHttpTicketLocator(http).locate('ws_1', 't_7')).toBeNull();
-  });
-
-  it('11.142 answers null rather than building /w/ws/p/?ticket= when the row carries no project', async () => {
-    const { http } = scriptedHttp({
-      [`GET ${ticketRoute}`]: {
-        status: 200,
-        body: { ticket: { ticket_id: 't_7', workspace_id: 'ws_1' }, parent: null, rollup: null },
-      },
-    });
-    expect(await createHttpTicketLocator(http).locate('ws_1', 't_7')).toBeNull();
-  });
-
-  it('11.143 lets a 401 through as a session event rather than flattening it to null', async () => {
-    const { http } = scriptedHttp({
-      [`GET ${ticketRoute}`]: { status: 401, body: { error: 'unauthenticated' } },
-    });
-    await expect(createHttpTicketLocator(http).locate('ws_1', 't_7')).rejects.toMatchObject({
-      status: 401,
-    });
   });
 });
