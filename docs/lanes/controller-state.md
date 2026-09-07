@@ -1,5 +1,42 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 20:1x IST — PRE-LAUNCH 1–3 CLOSED (404, privacy, terms). PR #302 merged, own forced gate GREEN. Two findings worth carrying forward, one closed the same PR, one open until item 7.
+
+**404, privacy and terms pages landed**, all reviewed. The 404 page extends the product's own existing
+honesty-about-absence principle rather than writing a generic one: it refuses to guess whether a missing
+ticket doesn't exist or isn't yours, matching the API's own deliberate 404-for-both shape
+(`routes/notifications.ts`'s own stated reasoning — telling the two apart would let someone probe for
+which records exist). Privacy/terms follow the owner's caveat exactly: boilerplate warning **in a code
+comment only**, never on the live page; every real claim (region, storage, timezone) grounded in the
+actual `deploy/do/app.yaml`, not invented; the rendered page tested to never leak the internal
+"BOILERPLATE"/"NOT LEGAL ADVICE" markers.
+
+**Finding 1, closed in this PR — a real hole in the exact safety mechanism this content depends on.** The
+first version of the placeholder-coverage test used `toContain` per placeholder. A self-run mutation
+replaced `[JURISDICTION]` with an invented "Karnataka, India" and the suite stayed GREEN — `toContain`
+only asks whether a placeholder survives ANYWHERE on the page, and the other nine were still standing, so
+one being silently filled with fabricated content went undetected. **This is precisely the failure mode
+the placeholder discipline exists to prevent** — a reader trusting the page would have no way to know one
+clause was quietly no longer a placeholder. Fixed: every placeholder now counted individually per page,
+asserted by exact count (`expect(count(text, placeholder)).toBe(n)`), so any placeholder disappearing —
+filled with real text or fabricated text alike — reddens the test by name.
+
+**Finding 2, open until item 7 — the mobile-viewport check did not happen.** The interactive browser
+tool's `resize_window` reported success at 390×844, but the page kept reporting `innerWidth: 1512` and the
+screenshot was pixel-identical to desktop. **Every contrast/touch-target measurement taken under an
+assumed mobile viewport so far was actually a desktop measurement.** Recorded in
+`docs/pre-launch-checklist.md`: item 7 needs Playwright's real viewport emulation, not the interactive
+browser tool, which does not actually resize the page in this environment. Nothing was claimed as
+mobile-verified on the strength of the broken check — this was caught before any claim shipped, not after.
+
+**Own forced gate at `667cd53`**: `GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · node `v22.22.2` · no
+`Unsupported engine` · matches the executor's own web-test figure exactly (20 files / 139 tests). Zero
+orphaned vitest workers. All 8 changed files checksum-verified individually (existence-checked, neither
+hash the empty-input constant).
+
+**Next per the approved reorder: the in-app manual/FAQ surface** (web + mobile + desktop), then checklist
+6/7 last, once.
+
 ## ✅ MONDAY 19:5x IST — PRE-LAUNCH ITEMS 4/5 CLOSED, README + IN-REPO DOCS LANDED. PRs #299/#300 merged. `main` is `396828e`, own forced gate GREEN. Reorder approved (below). **Checklist item 4 found a real risk, recorded not fixed — for the owner.**
 
 **PR #299 — items 4 (secrets) and 5 (HTTPS), both genuinely audited against artifacts, not source-read.**
