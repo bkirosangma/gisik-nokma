@@ -2202,7 +2202,7 @@ export type ToolDefinition = {
 
 Task 10 registers these with the MCP SDK. Keeping the definition SDK-agnostic is deliberate: the tools are testable without a transport, and the one place that knows the SDK's registration API is `tools/register.ts`.
 
-- [ ] **Step 1: Pin the routes each tool calls, from the live contract**
+- [x] **Step 1: Pin the routes each tool calls, from the live contract**
 
 Verified against the tree; do not re-derive these from the spec's table, which names them loosely.
 
@@ -2216,7 +2216,7 @@ Verified against the tree; do not re-derive these from the spec's table, which n
 
 `FilterSpec` is `filterSpecSchema` from `@gisik-nokma/domain` (`packages/domain/src/filter-spec.ts:119`) — **`.strict()`, and its assignee/collaborator keys are SINGULAR** (`assigneeId`, `collaboratorId`, not arrays). It is passed as `filter=<JSON.stringify(spec) URL-encoded>`. Import the schema; do not restate its shape.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `packages/mcp-server/test/read-tools.test.ts` — one test per tool plus the two traps:
 
@@ -2321,12 +2321,12 @@ describe('the read tools', () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/read-tools.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/tools/read-tools.js`.
 
-- [ ] **Step 4: Write `src/tools/read-tools.ts`**
+- [x] **Step 4: Write `src/tools/read-tools.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -2454,12 +2454,12 @@ export function readTools(session: Session): ToolDefinition[] {
 }
 ```
 
-- [ ] **Step 5: Run**
+- [x] **Step 5: Run**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 25 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/mcp-server/src/tools/read-tools.ts packages/mcp-server/test/read-tools.test.ts

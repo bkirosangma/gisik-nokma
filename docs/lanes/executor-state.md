@@ -34,6 +34,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#315** | `exec/105-mcp-task5-approval-screen` | MCP Task 5 — the approval screen (stacks on #314) | **33/33** |
 | **#316** | `exec/106-mcp-task6-http-client` | MCP Task 6 — client token cache + HTTP layer (stacks on #315) | **33/33** |
 | **#317** | `exec/107-mcp-task7-login-driver` | MCP Task 7 — device-login + session (stacks on #316) | **33/33** |
+| **#318** | `exec/108-mcp-task8-read-tools` | MCP Task 8 — the five read tools (stacks on #317) | **33/33** |
 
 All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
 disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
@@ -49,7 +50,7 @@ own build/test/typecheck — the delta is the evidence it is wired in, not merel
 > condition until billing is fixed. Every merge now needs an explicit human decision. The controller
 > session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
 
-**MCP queue after this: Tasks 8–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+**MCP queue after this: Tasks 9–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
 because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
 the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
 Task 12 only.
