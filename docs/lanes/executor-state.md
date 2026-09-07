@@ -16,6 +16,54 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
+
+| what | value |
+|---|---|
+| `origin/main` | **`065f3c3`** — #302 (pre-launch 1–3), #304 (in-app help), plus the controller's #303/#305 anchors |
+| in flight | **PR #306** `exec/97-mcp-plan-rulings` — the owner's seven MCP rulings, plan-document only |
+| branch | `exec/98-handoff-post-help` (docs only), off `065f3c3` |
+| **queue** | 1. **pre-launch 6 (colour contrast) and 7 (responsive)** — LAST by approved reorder, run ONCE over the whole surface. 2. MCP implementation, only after #306 merges and the owner answers Task 12's last-used sub-question. |
+| gate | at `7516a49`: `turbo build test typecheck` **30/30 EXIT 0** — app-core 1152, web 139, ui 47, mobile 20, desktop 5; `check:tasks` 177/177, `check:citations`, `check:runbook`, `check:env`, **`check:help`** all exit 0. Node **v22.22.2** |
+
+**Merges verified with the #295 shasum rule**, five files, one call per side: `content.generated.ts`,
+`help-browser.tsx`, `help-screen.tsx`, `not-found.tsx`, `privacy/page.tsx` — all byte-identical between
+`origin/main` and the branch tips. *Reminder: `e3b0c44298fc1c14…` is the hash of EMPTY input and means
+"not in that ref", never "match".*
+
+## ⚠ WHAT ITEM 7 MUST NOT INHERIT — the browser tool cannot change the viewport here
+
+`resize_window` reports success at 390×844 while the page keeps reporting `innerWidth: 1512`, and the
+screenshot afterwards is byte-identical to the desktop one. **Measured twice, on two different days'
+work.** So every contrast and touch-target number recorded for the 404, the legal pages and `/help` is a
+DESKTOP measurement, and nothing has exercised any `max-width: 40rem` rule.
+
+Item 7's own wording is *"actually check in a real viewport, not just visually inspect the code"* — and a
+resize that reports success while changing nothing is exactly how that instruction gets satisfied on
+paper. **Use Playwright**, which this repo already has configured with real device viewports
+(`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`).
+
+## The three defects the in-app help work produced that no test would have caught
+
+1. **A literal `---` rendered on the page.** A markdown horizontal rule fell through to the paragraph
+   branch. Every test passed, retention was 99.69%, and the content was all there — the rule IS in the
+   source, so rendering it is arguably correct and unarguably wrong. **Found by opening the page.**
+2. **The manual's entire opening was dropped**, and **65 numbered steps were not a list** — both found
+   by measuring word retention against the source, not by reading output that looked entirely
+   reasonable.
+3. **My measurement instrument was wrong three times before the content was**: a lowercase probe against
+   a capitalised sentence, a fragment match defeated by whitespace, and a probe that did not strip the
+   list markers the parser correctly removes. Each looked exactly like a content bug. The word-multiset
+   comparison with a sentinel control is the one that held.
+
+## Two findings carried forward, both with owners
+
+- **`EXPO_PUBLIC_DEV_TOKEN` is a real bearer token inlined into any build made with it set.** Nothing
+  prevents a release build from carrying it, and a published credential looks identical, from inside the
+  running app, to one that was never set. Remedy is a build-time refusal in `apps/mobile`.
+- **No `helmet`, no CSP, no `X-Content-Type-Options`, no `X-Frame-Options` anywhere.** Item 5 named
+  HTTPS, so that is what was done; this is a known absence, not an oversight.
+
 # ▶ MONDAY 2026-09-07 ~20:4x IST — **MCP PLAN LANDED (PR #296). ONE OWNER INSTRUCTION ARRIVED TRUNCATED AND IS RECORDED AS PARTIAL — DO NOT ACT ON THE MISSING HALF.**
 
 | what | value |
