@@ -13,7 +13,7 @@ import type { Refusal } from '@gisik-nokma/rule-engine';
  * **"envelope-origin" vs "HTTP-Origin".** Nothing in this module concerns the
  * browser `Origin` header, CSRF, or cross-site requests. Where it says
  * envelope-origin it means `EventEnvelope.origin`, the provenance enum
- * `'web' | 'mobile' | 'desktop' | 'server'`. The two are routinely conflated in
+ * `'web' | 'mobile' | 'desktop' | 'server' | 'mcp'`. The two are routinely conflated in
  * this area of the repo and the conflation is how someone writes a header check
  * and believes this window is closed.
  *

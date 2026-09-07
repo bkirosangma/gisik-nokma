@@ -183,23 +183,23 @@ one thing the whole design exists to prevent.
 **Scope, MEASURED at `8190507` rather than estimated.** This plan originally called it *"more than
 this plan's scope"*; it is not. See the ruling table above for the full measurement.
 
-- [ ] **Step 1 — add the member.** `packages/domain/src/envelope.ts:26`:
+- [x] **Step 1 — add the member.** `packages/domain/src/envelope.ts:26`:
       `export const ORIGINS = ['web', 'mobile', 'desktop', 'server', 'mcp'] as const;`
       `Origin` (`:27`) and `z.enum(ORIGINS)` (`:182`) both derive from it and need no edit.
       **No migration:** the column is `origin text NOT NULL` with no `CHECK` and no Postgres enum
       (`migrations/1787841717635_events-and-snapshots.sql:12`), verified across every migration.
-- [ ] **Step 2 — kill the second authority.** `packages/rule-engine/src/fixtures/harness.ts:53`
+- [x] **Step 2 — kill the second authority.** `packages/rule-engine/src/fixtures/harness.ts:53`
       re-spells the list as `z.enum(['web', 'mobile', 'desktop', 'server'])`. **Import `ORIGINS` and
       use `z.enum(ORIGINS)`** — do not add a fifth string. A second list of what the origins are is
       precisely the drift `check-permission.test.ts:33-36` warns about in prose, and it is sitting one
       package away from the file that warns about it. Fixing it by hand would leave the same trap set
       for the sixth member.
-- [ ] **Step 3 — read what Step 1 switched on for free.** `check-permission.test.ts:38` derives
+- [x] **Step 3 — read what Step 1 switched on for free.** `check-permission.test.ts:38` derives
       `CLIENT_ORIGINS` from `ORIGINS` and runs `it.each(CLIENT_ORIGINS)`, so `'mcp'` gains a
       permission-gate case the moment Step 1 lands: *the gate must admit an `mcp`-origin client
       submission.* Run that suite and confirm the new case passes. **If it fails, stop** — the gate
       refusing `'mcp'` is a real finding about the ingest door, not a test to adjust.
-- [ ] **Step 4 — a case that says why the value exists.** Assert an `'mcp'` envelope round-trips the
+- [x] **Step 4 — a case that says why the value exists.** Assert an `'mcp'` envelope round-trips the
       ingest door and comes back out of the ledger as `'mcp'`. The point is not that the enum accepts
       a fifth string; it is that a reader of the history can tell a person's claim from their
       assistant's. A case asserting only `ORIGINS.includes('mcp')` would test the constant.

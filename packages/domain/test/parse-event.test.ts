@@ -143,7 +143,7 @@ describe('parseEvent', () => {
       ok: false,
       code: 'malformed-envelope',
       message:
-        "event envelope is malformed at origin: Invalid enum value. Expected 'web' | 'mobile' | 'desktop' | 'server', received 'carrier-pigeon'",
+        "event envelope is malformed at origin: Invalid enum value. Expected 'web' | 'mobile' | 'desktop' | 'server' | 'mcp', received 'carrier-pigeon'",
       eventId: raw['id'],
     });
   });
