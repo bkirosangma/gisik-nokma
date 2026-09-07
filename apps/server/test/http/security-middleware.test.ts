@@ -158,6 +158,11 @@ describe('root onRequest hooks reach every route (wiring)', () => {
 
 // ── HTTP-Origin: the CSRF ruling's item 2 ────────────────────────────────────
 
+/**
+ * 13.117 — each of the seven protected routes: a FORGED HTTP-Origin on a cookie-carrying mutation is refused `403 { error: 'forbidden_origin' }`.
+ * 13.118 — each of the seven: a cookie-carrying mutation with NO HTTP-Origin header at all is also refused — the rule REQUIRES the header, it does not merely validate one when present.
+ * 13.119 — each of the seven: the correctly-configured `WEB_ORIGIN` is let through. (Throughout this block "origin" is the HTTP `Origin` HEADER — the CSRF control — not the event envelope's `origin` provenance field.)
+ */
 describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   /**
    * One case per protected route, so a failure NAMES ITS OWN SITE. Removing the
@@ -201,6 +206,9 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
    * Set-equality in BOTH directions on purpose: a missing row means an
    * unprotected route with no test, and an extra row means a test asserting a
    * protection that no longer ships.
+   */
+  /**
+   * 13.116 — the set-equality drift guard: every protected route has a row in this suite AND every row is a protected route in production. Neither direction alone would catch a route added without a row.
    */
   it('every protected route has a row in this suite, and every row is a protected route', () => {
     const inTable = new Set(PROTECTED.map(([, , pattern]) => pattern));
@@ -251,6 +259,9 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
    * run**. `raw.url` carries the query string; `routeOptions.url` does not.
    * Switching either hook in `app.ts` back to `raw.url` reddens this and its
    * rate-limit twin below.
+   */
+  /**
+   * 13.120 — a query string does not buy a CSRF bypass: `/v1/events?x=1` is refused identically to `/v1/events`, pinning `routeOptions.url` rather than the raw URL.
    */
   it('a query string does not buy a bypass — /v1/events?x=1 is refused exactly as /v1/events is', async () => {
     const { app } = build(HTTP_ORIGIN_ON);
@@ -596,6 +607,9 @@ describe('rate limiting', () => {
     expect(b.statusCode).not.toBe(429);
   });
 
+  /**
+   * 13.123 — `POST /v1/attachments` is charged to the SHARED events bucket rather than left unlimited: spending the attachments budget also refuses a subsequent event.
+   */
   it('POST /v1/attachments is charged to the events bucket, not left unlimited', async () => {
     // It was in no bucket at all — the most byte-expensive write this server
     // takes, bounded by nothing. Charged to `events:` now, so spending that
@@ -636,6 +650,9 @@ describe('rate limiting', () => {
    * constant — one client behind one proxy, lying — and requires that it be
    * limited exactly as an honest caller is.
    */
+  /**
+   * 13.121 — the regression pin: a caller-PREPENDED `X-Forwarded-For` entry does NOT buy a fresh rate-limit bucket.
+   */
   it('a caller-prepended X-Forwarded-For entry does NOT buy a fresh bucket', async () => {
     const { app } = build({ ...limits({ eventsMax: 1 }), trustProxy: true });
     const statuses: number[] = [];
@@ -655,6 +672,9 @@ describe('rate limiting', () => {
     expect(statuses.slice(1)).toEqual([429, 429, 429]);
   });
 
+  /**
+   * 13.122 — the inverse of 13.121, and required by it: two genuinely different clients behind the same proxy still get their own buckets, so the keying cannot be satisfied by ignoring the header entirely.
+   */
   it('two genuinely different clients behind the same proxy still get their own buckets', async () => {
     // The inverse, so the fix above cannot be satisfied by keying on something
     // constant (the proxy's own address, say) and calling every client one.
@@ -715,6 +735,9 @@ describe('rate limiting', () => {
  * browser client served from `WEB_ORIGIN` directly.
  */
 describe('CORS', () => {
+  /**
+   * 13.124 — CORS answers preflight for the configured origin with both the allow-origin and allow-credentials headers. The row’s other half — a foreign origin getting no allow header — is the test below.
+   */
   it('answers preflight for the configured web origin', async () => {
     const { app } = build(HTTP_ORIGIN_ON);
     const response = await app.inject({
