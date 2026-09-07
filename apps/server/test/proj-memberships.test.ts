@@ -208,6 +208,9 @@ describe('membershipsProjection.apply', () => {
     expect(await rows()).toEqual([]);
   });
 
+  /**
+   * 6.49 — project.member_added with no projectAdmin flag is refused at parse rather than written as undefined ('the schema refuses a scope that disagrees with its project id' and reset/verify-projections hygiene are proven by the neighbouring it()s at lines 244, 268 and 388 of this file).
+   */
   it('refuses a payload it cannot honestly store rather than writing undefined', async () => {
     // project.member_added's projectAdmin is required with no default
     // (events/membership.ts: "a project-admin flag is a claim, not a default").
@@ -299,6 +302,9 @@ describe('membershipsProjection.apply', () => {
  * verify-projections' EXCEPT diff reports drift on a table nobody corrupted.
  * Re-add `AND scope_kind = 'workspace'`'s removal to the DELETE and this goes
  * red.
+ */
+/**
+ * 6.5 — the determinism half: live application of the membership/roster ledger and a rebuild from it in a different apply order agree, the property the row calls load-bearing (grant/re-grant/revoke and project-roster clauses are proven individually by the sibling it()s in this file and in effective-role.test.ts).
  */
 describe('proj_memberships is a pure function of the ledger, not of arrival order', () => {
   it('live application and a rebuild from the ledger agree, though the two orders differ', async () => {

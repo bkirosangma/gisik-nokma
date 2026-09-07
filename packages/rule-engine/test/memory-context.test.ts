@@ -234,6 +234,9 @@ describe('buildMemoryContext', () => {
     expect(await ctx.getWorkflowDef(SCOPE, 'wf-basic')).toEqual(WF);
   });
 
+  /**
+   * 5.31 — buildMemoryContext's getWorkflowDef answers an explicit version with that version rather than the latest, so the shared in-memory context used by the fixture suite cannot disagree with the server about a ticket's category.
+   */
   it('getWorkflowDef answers an explicit version with THAT version, not the latest', async () => {
     const wfV2: PublishedWorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
     const ctx = buildMemoryContext([WF], [published(wfV2)]);

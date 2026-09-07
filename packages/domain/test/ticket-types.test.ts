@@ -12,6 +12,9 @@ import {
 import * as ticketTypesModule from '../src/ticket-types.js';
 import { IST_DAY_REGEX, istDayBounds } from '../src/ist-day.js';
 
+/**
+ * 5.1 — Five refusals across customFieldDefSchema and ticketTypeDefSchema prove the row's five clauses: select-without-options, options-on-non-select, duplicate field ids, built-in-field-id shadowing, and rank below 1.
+ */
 describe('customFieldDefSchema', () => {
   it('accepts a plain text field', () => {
     expect(customFieldDefSchema.parse({ id: 'notes', name: 'Notes', type: 'text' })).toEqual({
@@ -67,6 +70,9 @@ describe('ticketTypeDefSchema', () => {
   });
 });
 
+/**
+ * 5.2 — Asserts the shipped ladder's ranks (epic1/story2/task3/sub-task4), that DEEPEST_RANK equals the ladder's real computed maximum (not just the literal 4), and that builtinTicketTypeDefs materialises all four types bound to the given default workflow.
+ */
 describe('built-in seeds', () => {
   it('ships the ladder epic(1) story(2) task(3) sub-task(4)', () => {
     expect(BUILTIN_TICKET_TYPE_SEEDS.map((t) => [t.id, t.rank])).toEqual([

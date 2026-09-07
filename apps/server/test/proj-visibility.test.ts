@@ -495,6 +495,9 @@ describe('proj_visibility keys every write on the entity the event was filed aga
     });
   });
 
+  /**
+   * 6.56 — visibility.set with mode explicit and no userIds is refused at parse rather than stored as an audience of nobody (the per-entity-seq-not-workspace-cursor double-pin, the non-explicit-mode-drops-a-planted-list guard, reset, and the verify-projections report-not-fix hygiene are proven by the neighbouring it()s at lines 427, 474, 528 and further down this file).
+   */
   it('refuses a payload it cannot honestly store rather than writing undefined', async () => {
     const client = await db.pool.connect();
     try {
@@ -575,6 +578,9 @@ describe('proj_visibility keys every write on the entity the event was filed aga
  * measured and recorded as case 6.58 with its owner, not fixed here. The next
  * describe pins only what this projection genuinely provides about a cycle,
  * which is termination.
+ */
+/**
+ * 6.10 — the determinism describe block: canonical-order rebuild agrees with live application across a child-before-parent arrival, a mid-chain prune, and a reparent-plus-set-back-to-inherit, which the row calls load-bearing (re-resolution propagation, prune-stops-at-authored-descendant, reparent, and reparent-to-root are proven individually by the sibling describe/it blocks at lines 281-386 of this file).
  */
 describe('proj_visibility is a pure function of the ledger, not of arrival order — while the parent graph is acyclic', () => {
   type Row = {

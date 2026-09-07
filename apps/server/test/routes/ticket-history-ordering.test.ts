@@ -118,6 +118,9 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * 5.75 — the route's ORDER BY seq is falsified against the query planner (not a naive out-of-order fixture): index/bitmap/index-only scans are disabled on the test database so a sequential scan exposes true out-of-heap-order rows, and deleting the route's ORDER BY reddens exactly the two cases here.
+ */
 describe('GET /v1/tickets/:id/history — the ordering is the route decision, not the plan', () => {
   it('answers seq-ascending under a plan that emits rows newest-stored-first', async () => {
     const { second, third, fourth } = stored;

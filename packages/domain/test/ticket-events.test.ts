@@ -45,6 +45,9 @@ function refusalMessage(type: string, payload: unknown): string {
   return result.ok ? '' : result.message;
 }
 
+/**
+ * 5.3 — Every ticket vocabulary event round-trips through parseEvent; malformed payloads, an unknown event type, and a ticket event filed against the wrong entity kind are each refused at the door.
+ */
 describe('ticket event vocabulary', () => {
   it('accepts every event in the vocabulary', () => {
     roundTrips('ticket-type.defined', 'ticket-type', {
@@ -212,6 +215,9 @@ describe('ticket.field_set value is required', () => {
  * for a workspace name. The refusal itself is the sibling's, in the sibling's
  * words with the noun it is about: one answer across the series, not two.
  */
+/**
+ * 5.48 — A whitespace-only ticket.created title is refused at the door, while a padded real title is accepted and stored byte-for-byte verbatim (not trimmed).
+ */
 describe('ticket.created title must not be blank', () => {
   function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
     const result = ticketCreatedPayload.safeParse(payload);
@@ -251,6 +257,9 @@ describe('ticket.created title must not be blank', () => {
     expect(ticketCreatedPayload.safeParse(created('Reconcile the till')).success).toBe(true);
   });
 
+  /**
+   * 5.53 — parseEvent's exact refusal message for a whitespace-only ticket.created title is pinned character-for-character (the message half of Ruling P15's residuals; the fixture end-to-end half lives in packages/rule-engine/fixtures/created-blank-title.json and its consuming engine test, not in this file).
+   */
   it('the door inherits it: parseEvent refuses a ticket.created whose title is only spaces', () => {
     expect(refuses('ticket.created', 'ticket', created('   '))).toBe('invalid-payload');
     // The MESSAGE, not only the code. Until now this sentence was verified by a

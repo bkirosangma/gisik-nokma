@@ -7,6 +7,9 @@ const fixtures = loadFixtures();
 /**
  * 4.34 — advisories never gate publish: a definition that trips only `rdu-bypassable` is ACCEPTED by the engine. Proven by the fixture `workflow-defined-accepts-a-def-the-advisory-warns-about.json`, which this loop executes by name — the acceptance lives here rather than in `advise-workflow.test.ts`, which only asserts that the advisory is emitted.
  */
+/**
+ * 5.14 — every fixture in packages/rule-engine/fixtures/ runs as its own it(fx.name) test in this one file, auditing that each refusal fixture has an accepting twin directly off the directory rather than via a single generic property test.
+ */
 describe('planted-defect fixtures', () => {
   // The count gate `loadFixtures` names as its compensating control for the
   // non-recursive scan: a fixture filed into a subdirectory, or saved with the

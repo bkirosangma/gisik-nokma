@@ -172,6 +172,9 @@ describe('resolveCurrentStateId', () => {
     expect(workflowIdsAsked()).toEqual(['wf']);
   });
 
+  /**
+   * 5.68 — resolveCurrentStateId asks getWorkflowDef inside the CALLER's (event's) workspace, never the ticket's own — ticketAt sits in a different workspace than SCOPE on purpose, and the scopes actually asked are asserted to equal [SCOPE] and to exclude the ticket's workspace.
+   */
   it("asks inside the CALLER's workspace, not the ticket's — the scope is the event's (ruling P14)", async () => {
     // `ticketAt` sits in `ws_1`; `SCOPE` is `ws_event`. The two differ on
     // purpose. Reading the tenancy off the ticket — `resolveStateIdForward(ticket, …)`

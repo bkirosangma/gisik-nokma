@@ -172,6 +172,9 @@ describe('proj_ticket_types', () => {
    * red: live keeps the rank-6 definition, the rebuild keeps the rank-2 one, and
    * `tools/verify-projections.ts` would report the pair as drift in production.
    */
+  /**
+   * 5.54 — "last definition wins" for proj_ticket_types is resolved on workspace stream position (defined_workspace_seq), not application order: staging the later definition at the smaller entity ULID inverts replay order (observed, not assumed, and confirmed to be the same two events), yet live and a canonical-order rebuild land on the identical surviving row.
+   */
   it('a rebuild in canonical replay order reproduces what live holds, though the two orders differ', async () => {
     // Valid ULIDs by ULID_REGEX (`^[0-7][0-9A-HJKMNP-TV-Z]{25}$`), chosen so
     // that entity-id order is the REVERSE of arrival order.

@@ -23,6 +23,9 @@ describe('checkTicketTypeDefined', () => {
    * `DEEPEST_RANK` is 4 *because* the built-in sub-task's rank is — while the
    * type builder went on displaying the lock it had no server behind.
    */
+  /**
+   * 5.36 — a built-in type's rank is locked at the server: redefining sub-task at rank 3 is refused type.builtin-rank, naming the type and its true rank.
+   */
   it('planted defect: the built-in sub-task re-ranked to 3, which releases every sub-task from the parent rule', async () => {
     const env = typeDefined(def({ id: 'sub-task', name: 'Sub-task', rank: 3 }));
     expect(await checkTicketTypeDefined(env, ctx())).toEqual({
