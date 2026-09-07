@@ -1163,3 +1163,9 @@ is the next free id IN THAT BLOCK, not derived from the file's maximum.*
   *Tap targets ratchet rather than assert a floor (`e2e-viewport/tap-target-baseline.json`): the reading
   is real but it does not move with the viewport, so it is a type-and-spacing decision recorded for the
   owner in the pre-launch checklist, not a responsive defect. The count may fall, never rise.*
+  *A MISSING baseline entry FAILS rather than seeding itself, and that guard exists because the first
+  version did seed itself — an adversarial review caught that a fresh clone or CI checkout with no
+  baseline would record whatever was broken that day and report full green with zero enforcement, on
+  every first run. Recording is now `UPDATE_TAP_BASELINE=1`, an explicit act. Proven by hiding the
+  committed file and running: EXIT 1, one error per route naming the key and its observed count;
+  restored by SHA-256 against `HEAD` and re-run green.*
