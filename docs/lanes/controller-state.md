@@ -1,5 +1,26 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 22:5x IST — A PREVENTATIVE GATE LANDED FOR THE EXACT STACKED-PR-COLLAPSE FAILURE CLASS. PR #331 merged. `main` is `df3f48f`, `check:tasks` clean (190 tasks / 13 plan files, 0 stale citations).
+
+**`check-task-ledger.mjs` now hard-fails on a ledger row citing a PR that closed without merging** —
+exactly the shape `mcp-server/12` had for a few hours tonight (`in-flight 324 -` while the real content
+had shipped through #329). Ships with a proper self-test (four known-input cases, run before the real
+sweep) matching this project's own established discipline for every other citation-style gate
+(`check-runbook-commands.mjs`, `check-case-ids.mjs`, `check-case-citations.mjs`) — none of them trust
+their own matcher until it has fired on planted defects first. Correctly distinguishes a `gh` outage from
+a genuinely clean ledger (never silently reports success on either). A hard failure, not a printed note:
+unlike an uncited merged PR (often legitimately a docs PR that closes no task), a row citing a
+never-merged PR is always one of two real problems — the row is stale, or the work never reached `main`.
+
+**Verified on the real ledger, not just the self-test:** `pnpm check:tasks` after merging — `CHECK_EXIT=0`,
+190 tasks across 13 plan files, zero `NEVER MERGED` hits. The one prior citation this would have caught
+(`mcp-server/12` → `#324`) was already corrected in the same PR.
+
+**Own process note:** hit `git reset --hard origin/main` against a stale local tracking ref once this
+entry, because `fetch` had not been re-run first — caught immediately (the resulting HEAD didn't match
+the sha `gh api .../branches/main` had just confirmed) rather than trusted. `fetch` before `reset --hard
+origin/<branch>`, always — the tracking ref only moves on an explicit fetch.
+
 ## ✅ MONDAY 22:2x IST — MCP PLAN COMPLETE: TASKS 11 AND 12 LANDED. `main` is `267c104`, own forced gate GREEN. The 13-task MCP server plan is now fully implemented and merged.
 
 **PR #323 (Task 11) — owner explicitly approved the task-ledger.tsv change first**, since new rows
