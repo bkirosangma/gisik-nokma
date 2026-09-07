@@ -257,3 +257,39 @@ microseconds under test and a reader can see there is no hidden clock.*
 > file rather than carried forward: a docblock naming a case no test defines is exactly what
 > `check-case-citations.mjs` exists to catch, and this catalogue would otherwise have inherited a ✅ with
 > nothing behind it. The id is left unused; §13's rule is never to renumber around a gap.
+
+## Task 8 — the five read tools (`packages/mcp-server/src/tools/read-tools.ts`)
+
+*Passthroughs of routes that already exist. The interesting decisions are all about what these tools do
+NOT do: invent routes, normalise the server's shapes, or restate the domain's schema.*
+
+- **14.60** ✅ `list_workspaces` passes the server body through unchanged. — (`packages/mcp-server/test/read-tools.test.ts`)
+- **14.61** ✅ **`list_projects` reads the WORKSPACES route, because no projects route exists.** Verified
+  against the tree rather than taken from the plan: `/v1/projects/:projectId/*` serves `board` and
+  `tickets` and nothing else. — (`packages/mcp-server/test/read-tools.test.ts`)
+  *Mutation: point it at an invented `/v1/workspaces/:id/projects` — **exactly 14.61 fails**, 1 of 7. It
+  is the only thing standing between this tool and a 404 against a route the server never promised.*
+- **14.62** ✅ Answers an empty list for a workspace the person cannot see — not an error, because the
+  workspace directory is already the visibility answer. — (`packages/mcp-server/test/read-tools.test.ts`)
+- **14.63** ✅ `search_tickets` encodes `q` and `workspaceId` and omits an absent filter. —
+  (`packages/mcp-server/test/read-tools.test.ts`)
+- **14.64** ✅ **Refuses a filter carrying `text` BEFORE the network** — the assertion is that no request
+  was made at all. The server answers `400 {error:'invalid_filter'}`, which does not say which of the two
+  text terms is the problem; this is the difference between an assistant being told to pass one or the
+  other and being told "invalid_filter". — (`packages/mcp-server/test/read-tools.test.ts`)
+  *Mutation: drop the guard and let the server answer — **exactly 14.64 fails**, 1 of 7.*
+- **14.65** ✅ `list_tickets` JSON-encodes the `FilterSpec` into ONE `filter` parameter. The expectation
+  is built with the same `URLSearchParams` construction the handler uses, so parameter ORDER cannot drift
+  between test and code and turn a correct handler red — what is asserted is the encoding. —
+  (`packages/mcp-server/test/read-tools.test.ts`)
+- **14.66** ✅ `get_ticket` passes **both casings** through untouched — `ticket` snake_case beside
+  `ticketState` camelCase. The mixed casing is the SERVER's contract; normalising it here would be this
+  package inventing a shape. — (`packages/mcp-server/test/read-tools.test.ts`)
+
+*`filter` is `filterSpecSchema` imported from `@gisik-nokma/domain`, never restated. Probed rather than
+assumed: it parses `{stateCategory:'open'}` and REFUSES `{assigneeIds:['x']}`, because it is `.strict()`
+and its assignee/collaborator keys are SINGULAR — so a caller passing an array is refused by the schema
+instead of silently matching nothing. The tool descriptions carry the traps an assistant would otherwise
+learn by failing: search is capped at 50 with no pagination (`SEARCH_LIMIT = 50`, verified in
+`routes/search.ts`), the project list is deliberately partial for a non-owner, `parentId: "root"` means
+top-level only, and a ticket you cannot see is indistinguishable from one that does not exist.*
