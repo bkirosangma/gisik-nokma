@@ -303,6 +303,9 @@ if (unreachable.length > 0) {
 // because this is the direction that catches implementation work landing on
 // main without ever reaching the board.
 let unciteedPrs = [];
+/** The merged-PR list, hoisted so the closed-citation guard below can tell a
+ *  `gh` outage from a genuine answer rather than silently reporting clean. */
+let mergedPrs = null;
 try {
   const merged = JSON.parse(
     execFileSync('gh', ['pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'number,title,mergeCommit'], {
@@ -310,12 +313,60 @@ try {
       encoding: 'utf8',
     })
   );
+  mergedPrs = merged;
   const cited = new Set(ledgerRows.map((r) => r.pr).filter(Boolean));
   unciteedPrs = merged
     .filter((pr) => !cited.has(String(pr.number)))
     .map((pr) => `#${pr.number}  ${(pr.mergeCommit?.oid ?? '').slice(0, 8)}  ${pr.title.slice(0, 66)}`);
 } catch {
   unciteedPrs = null; // gh unavailable or offline; reported as unknown, never as clean
+}
+
+// ------------------------------------------- rows citing a PR that never merged
+// A row whose `pr` names a CLOSED, UNMERGED pull request.
+//
+// This is not hypothetical and it is not cosmetic. On 2026-09-08 `mcp-server/12`
+// read `in-flight  324  -` while the work had landed through **#329**: merging
+// #323 deleted `exec/111`, which was #324's base, so GitHub auto-closed #324 as
+// closed-not-merged. The row survived saying "in flight, see #324" — pointing
+// whoever restarts from this file at a closed PR, for work that had shipped
+// hours earlier. The same branch-deletion mechanic had already closed
+// #313/#315/#317/#319 the same night.
+//
+// Nothing above could see it. `done` rows are validated by sha reachability,
+// but a NON-done row requires no evidence by design (that is the whole point of
+// the split), so a wrong status with a stale PR number is invisible to every
+// other check here — and the ledger is the restart surface.
+//
+// A HARD failure rather than a printed note, unlike the reverse-drift list
+// below: an unciteed merged PR is often a docs PR that legitimately closes no
+// task, but a row citing a PR that never merged is always one of two real
+// problems — the row is stale, or the work is not on main at all.
+let closedCitations = [];
+if (mergedPrs === null) {
+  closedCitations = null; // gh unavailable; reported as unknown, never as clean
+} else {
+  try {
+    const all = JSON.parse(
+      execFileSync('gh', ['pr', 'list', '--state', 'closed', '--limit', '300', '--json', 'number,mergedAt,title'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      })
+    );
+    // `--state closed` returns merged PRs too; `mergedAt === null` is the ones
+    // that were closed WITHOUT merging, which is the set this cares about.
+    const neverMerged = new Map(
+      all.filter((pr) => pr.mergedAt === null).map((pr) => [String(pr.number), pr.title])
+    );
+    closedCitations = ledgerRows
+      .filter((r) => r.pr && r.pr !== '-' && neverMerged.has(r.pr))
+      .map((r) => `${r.key}  ${r.at}  (status ${r.status}) cites #${r.pr}, which was CLOSED WITHOUT MERGING: ${(neverMerged.get(r.pr) ?? '').slice(0, 54)}`);
+  } catch {
+    closedCitations = null;
+  }
+}
+if (closedCitations !== null && closedCitations.length > 0) {
+  note('LEDGER ROWS CITING A PR THAT NEVER MERGED', closedCitations);
 }
 
 // -------------------------------------------------------------------- report
