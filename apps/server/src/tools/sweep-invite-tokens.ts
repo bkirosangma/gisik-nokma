@@ -63,7 +63,12 @@ import type { Queryable } from '../db/queryable.js';
  * sentence in both statements — survive being composed with anything, which is
  * the only form in which "safe in both callers" means something.
  */
-const SWEEPABLE_INVITE_TOKENS = `
+/**
+ * Exported so a test can compose `AND …` onto it against real rows. The parentheses
+ * are the property: the top level is an OR and AND binds tighter, so an unparenthesised
+ * version would still parse, still run, and sweep every lapsed token in every workspace.
+ */
+export const SWEEPABLE_INVITE_TOKENS = `
   (
     expires_at <= now()
     OR EXISTS (

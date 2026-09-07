@@ -51,6 +51,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_CASES_DIR = join(REPO_ROOT, 'test-cases');
@@ -267,175 +268,184 @@ export function checkRatchet(actual, baseline) {
   return violations;
 }
 
-// ------------------------------------------------------------------- self-test
-//
-// PLANTED, in the check-runbook-commands.mjs shape: one defect per SHAPE the
-// mechanism claims to catch, not one per matcher, plus the mirror positive
-// control of every legitimate shape this repo actually uses. A run that
-// finds nothing on the real files must be distinguishable from a run whose
-// matchers never fired at all.
-const FIXTURE_TEXT = readFileSync(FIXTURE_PATH, 'utf8');
-const extracted = extractCheckedIds(FIXTURE_TEXT);
-const selfTestFailures = [];
 
-const EXPECTED_CHECKED = ['90.1', '90.2', '90.3', '90.4', '90.6', '90.7', '90.8'].sort();
-if (JSON.stringify([...extracted.ids].sort()) !== JSON.stringify(EXPECTED_CHECKED)) {
-  selfTestFailures.push(
-    `extraction: expected checked ids ${JSON.stringify(EXPECTED_CHECKED)}, got ${JSON.stringify([...extracted.ids].sort())} -- ` +
-      'a status-marker style (bare/bold/marker-first/range) is not firing, or a non-✅/prose/absorbed line leaked in',
-  );
-}
-const malformedRaw = extracted.malformed.map((m) => m.raw);
-if (
-  extracted.malformed.length !== 2 ||
-  !malformedRaw.some((r) => r.includes('90.5.1')) ||
-  !malformedRaw.some((r) => r.includes('90.30–91.2'))
-) {
-  selfTestFailures.push(
-    `malformed-id guard: expected exactly two malformed lines (90.5.1, a 90.30-91.2 cross-section ` +
-      `range), got ${JSON.stringify(extracted.malformed)}`,
-  );
-}
+// Importable without running: a test that wants `check`/`extractCheckedIds` must not
+// also execute the CLI. Without this the whole sweep runs on import and, on a repo in
+// a failing state, `process.exit(1)` would kill the importing vitest worker mid-run.
+const executedDirectly =
+  process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
 
-// Citation matching: a real comment citation, a real test-name citation, an
-// absent id, the near-miss (99.9990 must not satisfy 99.999), and a THIRD
-// numeric segment extending the id the way a dependency version string does
-// (found by review: "zod 3.25.76" was satisfying id 3.25 with no real
-// citation anywhere) -- a trailing sentence period with no digit after it
-// must still count, or the fix would over-correct and break the ordinary
-// "case 5.18." shape real prose actually uses. All deliberately NOT real
-// case ids anywhere in this repo, so a reader never has to wonder whether
-// the number means something.
-const CITED_CORPUS = [
-  '// case 90.1 is covered here, in a comment',
-  "it('90.2 the thing it proves', () => {})",
-  'const nearMiss = 90.10; // must not satisfy 90.1 above via prefix match',
-  'the fix landed for case 90.40. so did the test',
-].join('\n');
-if (!isCited('90.1', CITED_CORPUS)) selfTestFailures.push('isCited: a comment citation was not detected');
-if (!isCited('90.2', CITED_CORPUS)) selfTestFailures.push('isCited: a test-name citation was not detected');
-if (isCited('90.3', CITED_CORPUS)) selfTestFailures.push('isCited: a false positive -- 90.3 is not in the corpus at all');
-if (!isCited('90.40', CITED_CORPUS)) {
-  selfTestFailures.push('isCited: a sentence-ending "90.40." (period, no following digit) was wrongly rejected');
-}
-const NEAR_MISS_ONLY = 'const x = 99.9990;';
-if (isCited('99.999', NEAR_MISS_ONLY)) {
-  selfTestFailures.push('isCited: 99.999 matched inside 99.9990 -- the digit-boundary guard is not firing');
-}
-const VERSION_STRING_ONLY = 'devDependency "some-lib": "90.50.3"';
-if (isCited('90.50', VERSION_STRING_ONLY)) {
-  selfTestFailures.push('isCited: 90.50 matched inside the version string 90.50.3 -- the third-segment guard is not firing');
-}
+if (executedDirectly) {
+  // ------------------------------------------------------------------- self-test
+  //
+  // PLANTED, in the check-runbook-commands.mjs shape: one defect per SHAPE the
+  // mechanism claims to catch, not one per matcher, plus the mirror positive
+  // control of every legitimate shape this repo actually uses. A run that
+  // finds nothing on the real files must be distinguishable from a run whose
+  // matchers never fired at all.
+  const FIXTURE_TEXT = readFileSync(FIXTURE_PATH, 'utf8');
+  const extracted = extractCheckedIds(FIXTURE_TEXT);
+  const selfTestFailures = [];
 
-// Ratchet: an increase (deleted citing test / new uncited case) must fail
-// with reason 'increased'; a stale ceiling (baseline higher than reality --
-// the "a baseline that went up [relative to truth]" shape) must fail with
-// reason 'stale'; an exact match must pass; a file with no baseline entry
-// at all must fail, named.
-const ratchetIncrease = checkRatchet({ 'fake.md': { uncited: 5 } }, { 'fake.md': 3 });
-if (ratchetIncrease.length !== 1 || ratchetIncrease[0].reason !== 'increased') {
-  selfTestFailures.push(`ratchet: an increase (5 actual vs baseline 3) was not caught as 'increased' -- got ${JSON.stringify(ratchetIncrease)}`);
-}
-const ratchetStale = checkRatchet({ 'fake.md': { uncited: 2 } }, { 'fake.md': 5 });
-if (ratchetStale.length !== 1 || ratchetStale[0].reason !== 'stale') {
-  selfTestFailures.push(`ratchet: a stale ceiling (2 actual vs baseline 5) was not caught as 'stale' -- got ${JSON.stringify(ratchetStale)}`);
-}
-const ratchetExact = checkRatchet({ 'fake.md': { uncited: 4 } }, { 'fake.md': 4 });
-if (ratchetExact.length !== 0) {
-  selfTestFailures.push(`ratchet: an exact match (4 == 4) was wrongly flagged -- got ${JSON.stringify(ratchetExact)}`);
-}
-const ratchetMissing = checkRatchet({ 'new-file.md': { uncited: 0 } }, {});
-if (ratchetMissing.length !== 1 || ratchetMissing[0].reason !== 'missing-baseline') {
-  selfTestFailures.push(`ratchet: a file with no baseline entry was not caught -- got ${JSON.stringify(ratchetMissing)}`);
-}
-
-if (selfTestFailures.length > 0) {
-  console.error('check-case-citations: SELF-TEST FAILED:');
-  for (const f of selfTestFailures) console.error(`  ${f}`);
-  console.error(
-    '  This script does not trust a result from the real files until every shape it claims to ' +
-      'catch (an uncited ✅, a deleted-citing-test-shaped increase, a stale/too-generous baseline, ' +
-      'a malformed id) has fired on a fixture with a known answer, alongside a positive control ' +
-      'proving legitimate input is left alone.',
-  );
-  process.exit(1);
-}
-console.log(
-  `check-case-citations: self-test passed (7 checked ids extracted across bare/bold/marker-first/range ` +
-    `styles, 2 malformed lines caught (a truncated three-part id, a cross-section range), ` +
-    `non-✅/absorbed/prose lines excluded, citation matching -- including the version-string and ` +
-    `sentence-period edge cases -- and the ratchet's four shapes all fired correctly)`,
-);
-
-// ----------------------------------------------------------------- real sweep
-if (!existsSync(TEST_CASES_DIR)) {
-  console.error(`check-case-citations: ${TEST_CASES_DIR} does not exist`);
-  process.exit(1);
-}
-const caseFiles = readdirSync(TEST_CASES_DIR).filter((f) => /^\d+-.*\.md$/.test(f));
-if (caseFiles.length === 0) {
-  console.error('check-case-citations: no test-cases/NN-*.md files found -- the detector is broken');
-  process.exit(1);
-}
-
-const caseFilesMap = {};
-let totalMalformed = 0;
-for (const file of caseFiles) {
-  const text = readFileSync(join(TEST_CASES_DIR, file), 'utf8');
-  const { ids, malformed } = extractCheckedIds(text);
-  caseFilesMap[file] = ids;
-  if (malformed.length > 0) {
-    totalMalformed += malformed.length;
-    console.error(`check-case-citations: MALFORMED id-shaped line(s) in ${file}, not counted either way:`);
-    for (const m of malformed) console.error(`  ${file}:${m.line}: ${m.raw}`);
+  const EXPECTED_CHECKED = ['90.1', '90.2', '90.3', '90.4', '90.6', '90.7', '90.8'].sort();
+  if (JSON.stringify([...extracted.ids].sort()) !== JSON.stringify(EXPECTED_CHECKED)) {
+    selfTestFailures.push(
+      `extraction: expected checked ids ${JSON.stringify(EXPECTED_CHECKED)}, got ${JSON.stringify([...extracted.ids].sort())} -- ` +
+        'a status-marker style (bare/bold/marker-first/range) is not firing, or a non-✅/prose/absorbed line leaked in',
+    );
   }
-}
+  const malformedRaw = extracted.malformed.map((m) => m.raw);
+  if (
+    extracted.malformed.length !== 2 ||
+    !malformedRaw.some((r) => r.includes('90.5.1')) ||
+    !malformedRaw.some((r) => r.includes('90.30–91.2'))
+  ) {
+    selfTestFailures.push(
+      `malformed-id guard: expected exactly two malformed lines (90.5.1, a 90.30-91.2 cross-section ` +
+        `range), got ${JSON.stringify(extracted.malformed)}`,
+    );
+  }
 
-const { text: corpusText, fileCount } = buildCorpus();
-if (fileCount === 0) {
-  console.error('check-case-citations: zero test files matched -- the corpus builder is broken');
-  process.exit(1);
-}
+  // Citation matching: a real comment citation, a real test-name citation, an
+  // absent id, the near-miss (99.9990 must not satisfy 99.999), and a THIRD
+  // numeric segment extending the id the way a dependency version string does
+  // (found by review: "zod 3.25.76" was satisfying id 3.25 with no real
+  // citation anywhere) -- a trailing sentence period with no digit after it
+  // must still count, or the fix would over-correct and break the ordinary
+  // "case 5.18." shape real prose actually uses. All deliberately NOT real
+  // case ids anywhere in this repo, so a reader never has to wonder whether
+  // the number means something.
+  const CITED_CORPUS = [
+    '// case 90.1 is covered here, in a comment',
+    "it('90.2 the thing it proves', () => {})",
+    'const nearMiss = 90.10; // must not satisfy 90.1 above via prefix match',
+    'the fix landed for case 90.40. so did the test',
+  ].join('\n');
+  if (!isCited('90.1', CITED_CORPUS)) selfTestFailures.push('isCited: a comment citation was not detected');
+  if (!isCited('90.2', CITED_CORPUS)) selfTestFailures.push('isCited: a test-name citation was not detected');
+  if (isCited('90.3', CITED_CORPUS)) selfTestFailures.push('isCited: a false positive -- 90.3 is not in the corpus at all');
+  if (!isCited('90.40', CITED_CORPUS)) {
+    selfTestFailures.push('isCited: a sentence-ending "90.40." (period, no following digit) was wrongly rejected');
+  }
+  const NEAR_MISS_ONLY = 'const x = 99.9990;';
+  if (isCited('99.999', NEAR_MISS_ONLY)) {
+    selfTestFailures.push('isCited: 99.999 matched inside 99.9990 -- the digit-boundary guard is not firing');
+  }
+  const VERSION_STRING_ONLY = 'devDependency "some-lib": "90.50.3"';
+  if (isCited('90.50', VERSION_STRING_ONLY)) {
+    selfTestFailures.push('isCited: 90.50 matched inside the version string 90.50.3 -- the third-segment guard is not firing');
+  }
 
-const actual = computeUncited(caseFilesMap, corpusText);
-const totalChecked = Object.values(actual).reduce((n, r) => n + r.total, 0);
-const totalCited = Object.values(actual).reduce((n, r) => n + r.cited, 0);
-const totalUncited = Object.values(actual).reduce((n, r) => n + r.uncited, 0);
+  // Ratchet: an increase (deleted citing test / new uncited case) must fail
+  // with reason 'increased'; a stale ceiling (baseline higher than reality --
+  // the "a baseline that went up [relative to truth]" shape) must fail with
+  // reason 'stale'; an exact match must pass; a file with no baseline entry
+  // at all must fail, named.
+  const ratchetIncrease = checkRatchet({ 'fake.md': { uncited: 5 } }, { 'fake.md': 3 });
+  if (ratchetIncrease.length !== 1 || ratchetIncrease[0].reason !== 'increased') {
+    selfTestFailures.push(`ratchet: an increase (5 actual vs baseline 3) was not caught as 'increased' -- got ${JSON.stringify(ratchetIncrease)}`);
+  }
+  const ratchetStale = checkRatchet({ 'fake.md': { uncited: 2 } }, { 'fake.md': 5 });
+  if (ratchetStale.length !== 1 || ratchetStale[0].reason !== 'stale') {
+    selfTestFailures.push(`ratchet: a stale ceiling (2 actual vs baseline 5) was not caught as 'stale' -- got ${JSON.stringify(ratchetStale)}`);
+  }
+  const ratchetExact = checkRatchet({ 'fake.md': { uncited: 4 } }, { 'fake.md': 4 });
+  if (ratchetExact.length !== 0) {
+    selfTestFailures.push(`ratchet: an exact match (4 == 4) was wrongly flagged -- got ${JSON.stringify(ratchetExact)}`);
+  }
+  const ratchetMissing = checkRatchet({ 'new-file.md': { uncited: 0 } }, {});
+  if (ratchetMissing.length !== 1 || ratchetMissing[0].reason !== 'missing-baseline') {
+    selfTestFailures.push(`ratchet: a file with no baseline entry was not caught -- got ${JSON.stringify(ratchetMissing)}`);
+  }
 
-console.log(
-  `check-case-citations: real sweep -- ${totalChecked} checked (✅) ids across ${caseFiles.length} ` +
-    `files, ${fileCount} test/e2e files scanned, ${totalCited} cited, ${totalUncited} uncited` +
-    (totalMalformed > 0 ? `, ${totalMalformed} malformed id line(s) (see above)` : ''),
-);
-for (const [file, r] of Object.entries(actual)) {
-  console.log(`  ${file}: ${r.cited} cited / ${r.uncited} uncited / ${r.total} total`);
-}
+  if (selfTestFailures.length > 0) {
+    console.error('check-case-citations: SELF-TEST FAILED:');
+    for (const f of selfTestFailures) console.error(`  ${f}`);
+    console.error(
+      '  This script does not trust a result from the real files until every shape it claims to ' +
+        'catch (an uncited ✅, a deleted-citing-test-shaped increase, a stale/too-generous baseline, ' +
+        'a malformed id) has fired on a fixture with a known answer, alongside a positive control ' +
+        'proving legitimate input is left alone.',
+    );
+    process.exit(1);
+  }
+  console.log(
+    `check-case-citations: self-test passed (7 checked ids extracted across bare/bold/marker-first/range ` +
+      `styles, 2 malformed lines caught (a truncated three-part id, a cross-section range), ` +
+      `non-✅/absorbed/prose lines excluded, citation matching -- including the version-string and ` +
+      `sentence-period edge cases -- and the ratchet's four shapes all fired correctly)`,
+  );
 
-if (!existsSync(BASELINE_PATH)) {
-  console.error(`check-case-citations: no baseline at ${BASELINE_PATH} -- run once to bootstrap it, then commit it`);
-  process.exit(1);
-}
-const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  // ----------------------------------------------------------------- real sweep
+  if (!existsSync(TEST_CASES_DIR)) {
+    console.error(`check-case-citations: ${TEST_CASES_DIR} does not exist`);
+    process.exit(1);
+  }
+  const caseFiles = readdirSync(TEST_CASES_DIR).filter((f) => /^\d+-.*\.md$/.test(f));
+  if (caseFiles.length === 0) {
+    console.error('check-case-citations: no test-cases/NN-*.md files found -- the detector is broken');
+    process.exit(1);
+  }
 
-const violations = checkRatchet(actual, baseline);
-if (violations.length > 0) {
-  console.error(`check-case-citations: ${violations.length} ratchet violation(s):`);
-  for (const v of violations) {
-    if (v.reason === 'missing-baseline') {
-      console.error(`  ${v.file}: no baseline entry -- add one (currently ${v.actual} uncited)`);
-    } else if (v.reason === 'increased') {
-      console.error(
-        `  ${v.file}: uncited count REGRESSED -- baseline ${v.baseline}, now ${v.actual}. ` +
-          `A citing test was likely deleted, or a new ✅ case shipped without a citation. Uncited ids:`,
-      );
-      for (const id of actual[v.file]?.uncitedIds ?? []) console.error(`    ${id}`);
-    } else {
-      console.error(
-        `  ${v.file}: baseline is STALE -- committed ${v.baseline}, reality is ${v.actual}. ` +
-          `Tighten scripts/fixtures/check-case-citations-baseline.json's "${v.file}" entry to ${v.actual}.`,
-      );
+  const caseFilesMap = {};
+  let totalMalformed = 0;
+  for (const file of caseFiles) {
+    const text = readFileSync(join(TEST_CASES_DIR, file), 'utf8');
+    const { ids, malformed } = extractCheckedIds(text);
+    caseFilesMap[file] = ids;
+    if (malformed.length > 0) {
+      totalMalformed += malformed.length;
+      console.error(`check-case-citations: MALFORMED id-shaped line(s) in ${file}, not counted either way:`);
+      for (const m of malformed) console.error(`  ${file}:${m.line}: ${m.raw}`);
     }
   }
-  process.exit(1);
+
+  const { text: corpusText, fileCount } = buildCorpus();
+  if (fileCount === 0) {
+    console.error('check-case-citations: zero test files matched -- the corpus builder is broken');
+    process.exit(1);
+  }
+
+  const actual = computeUncited(caseFilesMap, corpusText);
+  const totalChecked = Object.values(actual).reduce((n, r) => n + r.total, 0);
+  const totalCited = Object.values(actual).reduce((n, r) => n + r.cited, 0);
+  const totalUncited = Object.values(actual).reduce((n, r) => n + r.uncited, 0);
+
+  console.log(
+    `check-case-citations: real sweep -- ${totalChecked} checked (✅) ids across ${caseFiles.length} ` +
+      `files, ${fileCount} test/e2e files scanned, ${totalCited} cited, ${totalUncited} uncited` +
+      (totalMalformed > 0 ? `, ${totalMalformed} malformed id line(s) (see above)` : ''),
+  );
+  for (const [file, r] of Object.entries(actual)) {
+    console.log(`  ${file}: ${r.cited} cited / ${r.uncited} uncited / ${r.total} total`);
+  }
+
+  if (!existsSync(BASELINE_PATH)) {
+    console.error(`check-case-citations: no baseline at ${BASELINE_PATH} -- run once to bootstrap it, then commit it`);
+    process.exit(1);
+  }
+  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+
+  const violations = checkRatchet(actual, baseline);
+  if (violations.length > 0) {
+    console.error(`check-case-citations: ${violations.length} ratchet violation(s):`);
+    for (const v of violations) {
+      if (v.reason === 'missing-baseline') {
+        console.error(`  ${v.file}: no baseline entry -- add one (currently ${v.actual} uncited)`);
+      } else if (v.reason === 'increased') {
+        console.error(
+          `  ${v.file}: uncited count REGRESSED -- baseline ${v.baseline}, now ${v.actual}. ` +
+            `A citing test was likely deleted, or a new ✅ case shipped without a citation. Uncited ids:`,
+        );
+        for (const id of actual[v.file]?.uncitedIds ?? []) console.error(`    ${id}`);
+      } else {
+        console.error(
+          `  ${v.file}: baseline is STALE -- committed ${v.baseline}, reality is ${v.actual}. ` +
+            `Tighten scripts/fixtures/check-case-citations-baseline.json's "${v.file}" entry to ${v.actual}.`,
+        );
+      }
+    }
+    process.exit(1);
+  }
+  console.log('check-case-citations: ok (ratchet holds exactly on every file)');
 }
-console.log('check-case-citations: ok (ratchet holds exactly on every file)');

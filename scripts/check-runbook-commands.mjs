@@ -23,6 +23,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const RUNBOOK = join(ROOT, 'docs/runbook.md');
@@ -86,7 +87,7 @@ function collect(text) {
   return found;
 }
 
-function check(text, label) {
+export function check(text, label) {
   const dirs = packageDirs();
   const rootScripts = scriptsOf('.') ?? {};
   const found = collect(text);
@@ -141,16 +142,14 @@ function check(text, label) {
   return { problems, counted: refs.length, unique: new Set(refs).size };
 }
 
-// SELF-TEST FIRST, against planted defects, so a run that finds nothing is
-// distinguishable from a run whose matchers never fired. Without this, deleting
-// a regex would make the real sweep report a clean zero.
-// ONE PLANTED DEFECT PER SHAPE THE MATCHERS CLAIM TO COVER — not one per
-// matcher. Review's point: with four defects that all used `scripts/….sh`,
-// dropping `deploy/` from the path prefixes or `yaml` from its extensions left
-// every planted defect still caught and the control still accepted, while
-// `deploy/do/README.md` silently stopped being checked. A self-test that
-// exercises one shape per matcher licenses exactly that.
-const PLANTED = [
+
+// Importable without running: a test that wants `check`/`extractCheckedIds` must not
+// also execute the CLI. Without this the whole sweep runs on import and, on a repo in
+// a failing state, `process.exit(1)` would kill the importing vitest worker mid-run.
+const executedDirectly =
+  process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
+
+export const PLANTED = [
   'pnpm --filter @gisik-nokma/server run ops:definitely-not-a-script',
   'pnpm --filter=@gisik-nokma/server run also:not-a-script',
   'pnpm --filter @gisik-nokma/server exec not-an-exec-script',
@@ -165,18 +164,10 @@ const PLANTED = [
   '`docs/definitely-not-a-file.md`',
   'node dist/ops/definitely-not-a-file.js',
 ].join('\n');
-const EXPECTED_PLANTED = 13;
-const selfTest = check(PLANTED, 'self-test');
-if (selfTest.problems.length !== EXPECTED_PLANTED) {
-  console.error(
-    `check-runbook-commands: SELF-TEST FAILED — expected ${EXPECTED_PLANTED} planted defects, caught ${selfTest.problems.length}.`,
-  );
-  for (const p of selfTest.problems) console.error(`  ${p}`);
-  console.error('  The matchers are not firing; a clean real sweep would mean nothing.');
-  process.exit(1);
-}
+export const EXPECTED_PLANTED = 13;
+
 // And the positive control's mirror: the real commands must PASS the same matchers.
-const PLANTED_OK = [
+export const PLANTED_OK = [
   'pnpm --filter @gisik-nokma/server run seed:cc',
   'pnpm --filter=@gisik-nokma/server run seed:dev',
   'pnpm check:env',
@@ -185,29 +176,50 @@ const PLANTED_OK = [
   '`scripts/restore.sh`',
   '`deploy/do/app.yaml`',
 ].join('\n');
-if (check(PLANTED_OK, 'self-test').problems.length !== 0) {
-  console.error('check-runbook-commands: SELF-TEST FAILED — known-good commands were reported as broken.');
-  process.exit(1);
-}
-console.log(
-  `check-runbook-commands: self-test passed (${EXPECTED_PLANTED} planted defects caught, 7 known-good accepted)`,
-);
 
-if (!existsSync(RUNBOOK)) {
-  console.error(`check-runbook-commands: ${RUNBOOK} does not exist`);
-  process.exit(1);
+if (executedDirectly) {
+  // SELF-TEST FIRST, against planted defects, so a run that finds nothing is
+  // distinguishable from a run whose matchers never fired. Without this, deleting
+  // a regex would make the real sweep report a clean zero.
+  // ONE PLANTED DEFECT PER SHAPE THE MATCHERS CLAIM TO COVER — not one per
+  // matcher. Review's point: with four defects that all used `scripts/….sh`,
+  // dropping `deploy/` from the path prefixes or `yaml` from its extensions left
+  // every planted defect still caught and the control still accepted, while
+  // `deploy/do/README.md` silently stopped being checked. A self-test that
+  // exercises one shape per matcher licenses exactly that.
+  const selfTest = check(PLANTED, 'self-test');
+  if (selfTest.problems.length !== EXPECTED_PLANTED) {
+    console.error(
+      `check-runbook-commands: SELF-TEST FAILED — expected ${EXPECTED_PLANTED} planted defects, caught ${selfTest.problems.length}.`,
+    );
+    for (const p of selfTest.problems) console.error(`  ${p}`);
+    console.error('  The matchers are not firing; a clean real sweep would mean nothing.');
+    process.exit(1);
+  }
+  if (check(PLANTED_OK, 'self-test').problems.length !== 0) {
+    console.error('check-runbook-commands: SELF-TEST FAILED — known-good commands were reported as broken.');
+    process.exit(1);
+  }
+  console.log(
+    `check-runbook-commands: self-test passed (${EXPECTED_PLANTED} planted defects caught, 7 known-good accepted)`,
+  );
+
+  if (!existsSync(RUNBOOK)) {
+    console.error(`check-runbook-commands: ${RUNBOOK} does not exist`);
+    process.exit(1);
+  }
+  const { problems, counted, unique } = check(readFileSync(RUNBOOK, 'utf8'), 'docs/runbook.md');
+  console.log(
+    `check-runbook-commands: real sweep -- ${counted} references, ${unique} distinct, in docs/runbook.md`,
+  );
+  if (counted === 0) {
+    console.error('check-runbook-commands: the runbook named ZERO commands — the matchers found nothing to check.');
+    process.exit(1);
+  }
+  if (problems.length > 0) {
+    for (const p of problems) console.error(`  ${p}`);
+    console.error(`check-runbook-commands: ${problems.length} problem(s)`);
+    process.exit(1);
+  }
+  console.log(`check-runbook-commands: ok (all ${counted} references resolve, ${unique} distinct)`);
 }
-const { problems, counted, unique } = check(readFileSync(RUNBOOK, 'utf8'), 'docs/runbook.md');
-console.log(
-  `check-runbook-commands: real sweep -- ${counted} references, ${unique} distinct, in docs/runbook.md`,
-);
-if (counted === 0) {
-  console.error('check-runbook-commands: the runbook named ZERO commands — the matchers found nothing to check.');
-  process.exit(1);
-}
-if (problems.length > 0) {
-  for (const p of problems) console.error(`  ${p}`);
-  console.error(`check-runbook-commands: ${problems.length} problem(s)`);
-  process.exit(1);
-}
-console.log(`check-runbook-commands: ok (all ${counted} references resolve, ${unique} distinct)`);
