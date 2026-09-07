@@ -93,15 +93,68 @@ export function sourceKindOf(path: string): SourceKind {
 /**
  * Blank out comment bodies, keeping every newline so line numbers survive.
  *
- * `//` is only treated as a line comment for scripts — in CSS it is not a
- * comment at all, and more importantly a URL (`url(https://…)`) would otherwise
- * swallow the rest of the line.
+ * **String-aware, and that is not fussiness — the naive version had a false
+ * NEGATIVE and it was measured.** Replacing `//…` by regex treats the `//` in a
+ * URL as a comment opener, so
+ *
+ *     const u = 'https://a.com'; const c = '#fff';
+ *
+ * had everything from `//a.com…` blanked and the REAL colour literal after it
+ * disappeared — `[]` where the same line without the URL yields `['#fff']`.
+ *
+ * That direction is the dangerous one. A false red is loud and someone fixes it
+ * within the hour, which is exactly what happened to `#270`; a false GREEN is a
+ * gate quietly not doing its job, and nothing surfaces it. The first version of
+ * this file was written to remove a false positive and introduced a false
+ * negative in the same stroke.
+ *
+ * So the scan walks the text once, tracking whether it is inside `'`, `"` or a
+ * backtick, and only opens a comment outside one. Escapes are honoured so
+ * `'a\\'b // c'` does not end early. `//` is a line comment for SCRIPTS only —
+ * in CSS it is not a comment at all.
  */
 export function stripComments(content: string, kind: SourceKind): string {
-  const blank = (text: string): string => text.replace(/[^\n]/g, ' ');
-  let out = content.replace(/\/\*[\s\S]*?\*\//g, blank);
-  if (kind === 'script') out = out.replace(/\/\/[^\n]*/g, blank);
-  return out;
+  const out = content.split('');
+  let index = 0;
+  let quote: string | null = null;
+  const blankTo = (end: number): void => {
+    for (let i = index; i < end && i < out.length; i += 1) {
+      if (out[i] !== '\n') out[i] = ' ';
+    }
+  };
+  while (index < content.length) {
+    const char = content[index]!;
+    if (quote !== null) {
+      // A backslash escapes the next character, so a quote cannot close here.
+      if (char === '\\') index += 2;
+      else {
+        if (char === quote) quote = null;
+        index += 1;
+      }
+      continue;
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === '/' && content[index + 1] === '*') {
+      const end = content.indexOf('*/', index + 2);
+      const stop = end === -1 ? content.length : end + 2;
+      blankTo(stop);
+      index = stop;
+      continue;
+    }
+    if (kind === 'script' && char === '/' && content[index + 1] === '/') {
+      const newline = content.indexOf('\n', index);
+      const stop = newline === -1 ? content.length : newline;
+      blankTo(stop);
+      index = stop;
+      continue;
+    }
+    index += 1;
+  }
+  return out.join('');
 }
 
 /**

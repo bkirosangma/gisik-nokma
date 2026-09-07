@@ -71,6 +71,35 @@ describe('the scanner itself is proven against planted defects before it is trus
       expect(findColourLiterals('#abc { color: #abc; }', 'css')).toEqual(['#abc']);
     });
 
+    /**
+     * THE FALSE NEGATIVE THE FIRST FIX INTRODUCED, measured before it shipped.
+     *
+     * Stripping `//…` by regex treats the `//` in a URL as a comment opener, so a
+     * real colour literal AFTER a URL on the same line was blanked away with it.
+     * `[]` where the identical line without the URL yields `['#fff']`.
+     *
+     * **That direction is the dangerous one.** A false red is loud and gets fixed
+     * within the hour — it is what brought this whole file into being. A false
+     * green is a gate quietly not doing its job, and nothing surfaces it. The fix
+     * for a false positive introduced a false negative in the same stroke, which
+     * is why every case in this describe is paired.
+     */
+    it('a URL does not swallow a colour literal later on the same line', () => {
+      expect(
+        findColourLiterals("const u = 'https://a.com'; const c = '#fff';", 'script'),
+      ).toEqual(['#fff']);
+      // The pair: the same line with no URL, proving the matcher was live either way.
+      expect(findColourLiterals("const c = '#fff';", 'script')).toEqual(['#fff']);
+      // And a real line comment after a URL still IS a comment.
+      expect(
+        findColourLiterals("const u = 'https://a.com'; // see PR #270", 'script'),
+      ).toEqual([]);
+      // An escaped quote must not end the string early and re-open comment scanning.
+      expect(findColourLiterals("const s = 'a\\'b // c'; const d = '#b3261e';", 'script')).toEqual([
+        '#b3261e',
+      ]);
+    });
+
     it('an unquoted hex-shaped token in script is not a colour', () => {
       expect(findColourLiterals('const issue = 270; // see #270', 'script')).toEqual([]);
       expect(findColourLiterals("const bg = '#fff';", 'script')).toEqual(['#fff']);
