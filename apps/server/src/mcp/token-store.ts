@@ -124,6 +124,61 @@ export async function exchangeDeviceCode(
 }
 
 /**
+ * The caller's own tokens, newest first.
+ *
+ * ## `id` IS the hash, and that is not a leak
+ *
+ * `mcp_tokens` has no surrogate key: its primary key is `token_hash`, and
+ * inventing an `id` column would mean a migration against a table that already
+ * shipped, plus a backfill, to buy a property the hash already has — unique,
+ * stable and meaningless to anyone who does not hold the credential.
+ *
+ * The hash is not the token. `resolveMcpToken` needs the PREIMAGE, which is 32
+ * bytes from `randomBytes` and exists only in the response that minted it; a
+ * sha256 digest of 256 bits of uniform entropy hands an attacker nothing they
+ * can present. This is the same reasoning the migration records for storing a
+ * plain hash rather than a password KDF, read in the other direction.
+ *
+ * `last_used` is NOT selected. The column exists and is written on every
+ * resolution, but whether the PRODUCT SURFACES a per-token log of when a
+ * person's assistant acted for them is an open owner decision (MCP plan Task 12,
+ * the fenced sub-question). Recording it in a server-owned table nobody reads
+ * and putting it on a screen are different acts. Adding it here is one column
+ * and one cell.
+ */
+export async function listMcpTokens(
+  db: Queryable,
+  userId: string,
+): Promise<{ id: string; createdAt: string }[]> {
+  const { rows } = await db.query<{ token_hash: string; created_at: Date }>(
+    'SELECT token_hash, created_at FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId],
+  );
+  return rows.map((r) => ({ id: r.token_hash, createdAt: r.created_at.toISOString() }));
+}
+
+/**
+ * Revoke one, scoped to its owner IN THE STATEMENT.
+ *
+ * `user_id = $2` is part of the DELETE rather than a check around it: there is
+ * no window in which the row is found and then authorised, and no code path
+ * that could read someone else's row on the way to refusing. A token that is
+ * not this caller's simply does not match, so the delete affects zero rows and
+ * the route answers the same 404 it answers for one that never existed —
+ * without which this route becomes an oracle for which token hashes exist.
+ *
+ * Deleting the row ends access at the NEXT request, because `resolveMcpToken`
+ * then finds nothing. Nothing is killed mid-flight, and the screen says so.
+ */
+export async function revokeMcpToken(db: Queryable, userId: string, id: string): Promise<boolean> {
+  const { rows } = await db.query<{ token_hash: string }>(
+    'DELETE FROM mcp_tokens WHERE token_hash = $1 AND user_id = $2 RETURNING token_hash',
+    [id, userId],
+  );
+  return rows.length === 1;
+}
+
+/**
  * The whole read path for a personal access token: hash, look up, answer the
  * user id or null. `null` is the answer for a forged token AND for a revoked
  * one, deliberately and identically — every distinction here is an oracle
