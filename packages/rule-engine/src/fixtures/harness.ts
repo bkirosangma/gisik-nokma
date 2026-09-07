@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
   CONTEST_EVENT_TYPES,
+  ORIGINS,
   membershipId,
   stateCategorySchema,
   ticketTypeDefSchema,
@@ -50,7 +51,12 @@ const partialEnvelopeSchema = z
       .unknown()
       .refine((value) => value !== undefined, 'is required — an event with no payload is not a claim'),
     actorId: z.string().optional(),
-    origin: z.enum(['web', 'mobile', 'desktop', 'server']).optional(),
+    // `z.enum(ORIGINS)`, not a re-spelling. This line used to restate the list
+    // as four literals, which is the second-authority drift
+    // `check-permission.test.ts:33-36` warns about in prose — sitting one
+    // package away from the file that warns about it. Deriving it means the
+    // SIXTH origin needs no edit here either.
+    origin: z.enum(ORIGINS).optional(),
     clientTime: z.string().optional(),
     serverTime: z.string().optional(),
     seq: z.number().int().optional(),

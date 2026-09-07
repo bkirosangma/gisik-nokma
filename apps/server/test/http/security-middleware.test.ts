@@ -159,9 +159,9 @@ describe('root onRequest hooks reach every route (wiring)', () => {
 // ── HTTP-Origin: the CSRF ruling's item 2 ────────────────────────────────────
 
 /**
- * 13.117 — each of the seven protected routes: a FORGED HTTP-Origin on a cookie-carrying mutation is refused `403 { error: 'forbidden_origin' }`.
- * 13.118 — each of the seven: a cookie-carrying mutation with NO HTTP-Origin header at all is also refused — the rule REQUIRES the header, it does not merely validate one when present.
- * 13.119 — each of the seven: the correctly-configured `WEB_ORIGIN` is let through. (Throughout this block "origin" is the HTTP `Origin` HEADER — the CSRF control — not the event envelope's `origin` provenance field.)
+ * 13.117 — each of the eight protected routes: a FORGED HTTP-Origin on a cookie-carrying mutation is refused `403 { error: 'forbidden_origin' }`.
+ * 13.118 — each of the eight: a cookie-carrying mutation with NO HTTP-Origin header at all is also refused — the rule REQUIRES the header, it does not merely validate one when present.
+ * 13.119 — each of the eight: the correctly-configured `WEB_ORIGIN` is let through. (Throughout this block "origin" is the HTTP `Origin` HEADER — the CSRF control — not the event envelope's `origin` provenance field.)
  */
 describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   /**
@@ -189,6 +189,11 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/me/notifications/01JN0000000000000000000000/read',
       '/v1/me/notifications/:id/read',
     ],
+    // Added by MCP plan Task 3, and added HERE because the drift guard below
+    // REQUIRED it: protecting the route without a row reddens 13.116, which is
+    // precisely what that guard is for. A cookie-authenticated POST that mints
+    // a credential, so it belongs to the same category as the invite MINT.
+    ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve'],
   ];
 
   /**
@@ -390,7 +395,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   it('webOrigin: null disables the HTTP-Origin check as well as CORS — one fact, one switch', async () => {
     const { app, recorder } = build({
       webOrigin: null,
-      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
     });
     const response = await app.inject({
       method: 'POST',
@@ -420,7 +425,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 describe('rate limiting', () => {
   const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
     webOrigin: null,
-    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, windowSec: 60, ...over },
+    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60, ...over },
   });
 
   it('429s the request over the auth limit, names the refusal, sets retry-after', async () => {
@@ -547,7 +552,7 @@ describe('rate limiting', () => {
   it('an OPTIONS preflight is not charged to the auth bucket', async () => {
     const { app } = build({
       webOrigin: WEB_ORIGIN,
-      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
     });
     await app.inject({
       method: 'OPTIONS',

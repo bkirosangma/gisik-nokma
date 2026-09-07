@@ -102,7 +102,7 @@ export type SyncService = {
  * ## Envelope-origin, not HTTP-Origin
  *
  * Every mention of "origin" in this module is `EventEnvelope.origin`, the
- * provenance enum `'web' | 'mobile' | 'desktop' | 'server'`. Nothing here
+ * provenance enum `'web' | 'mobile' | 'desktop' | 'server' | 'mcp'`. Nothing here
  * concerns the browser `Origin` header, CSRF or cross-site requests. The two
  * are routinely conflated in this area of the repo, and the conflation is how
  * someone writes a header check and believes the forgery window is closed.

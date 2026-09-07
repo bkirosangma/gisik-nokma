@@ -44,7 +44,7 @@ import { signInWithPhone } from '../helpers/session.js';
  * ## "envelope-origin", not HTTP-Origin
  *
  * `origin` throughout is `EventEnvelope.origin`, the provenance enum
- * `'web' | 'mobile' | 'desktop' | 'server'`. Nothing in this file concerns the
+ * `'web' | 'mobile' | 'desktop' | 'server' | 'mcp'`. Nothing in this file concerns the
  * browser `Origin` header or CSRF. `POST /v1/sync` is bearer-authenticated like
  * every other product route here.
  *

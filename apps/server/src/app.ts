@@ -20,6 +20,7 @@ import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
@@ -200,7 +201,21 @@ export type SecurityOptions = {
    * line to land on. No new environment variable is introduced for it: see
    * `index.ts` for which existing knob feeds it and why.
    */
-  rateLimit: { authMax: number; eventsMax: number; inviteMax: number; windowSec: number } | null;
+  rateLimit: {
+    authMax: number;
+    eventsMax: number;
+    inviteMax: number;
+    /**
+     * The device-flow bucket. Fed by `RATE_LIMIT_AUTH_MAX` at the wire site, not
+     * by a new environment variable — the `inviteMax` precedent exactly. Its own
+     * bucket rather than sharing `auth:` because the two contend in both
+     * directions: a CLI polling every 12s must not lock a person out of signing
+     * in from the same machine, and a sweep of the 8-character user code must
+     * not be able to spend the sign-in budget.
+     */
+    mcpMax: number;
+    windowSec: number;
+  } | null;
   /**
    * Whether Fastify may believe `X-Forwarded-For` — i.e. whether `request.ip`
    * is the CLIENT or the last hop.
@@ -421,7 +436,7 @@ export function buildApp(
   // request for a different reason.
   const security = options.security;
   if (security?.rateLimit) {
-    const { authMax, eventsMax, inviteMax, windowSec } = security.rateLimit;
+    const { authMax, eventsMax, inviteMax, mcpMax, windowSec } = security.rateLimit;
     const now = security.now ?? Date.now;
     // Three INDEPENDENT limiters, not one keyed by prefix. A sign-in storm must
     // not spend the invite budget, and an offline client flushing a sync batch
@@ -429,6 +444,7 @@ export function buildApp(
     const authLimiter = makeFixedWindowLimiter(authMax, windowSec);
     const eventsLimiter = makeFixedWindowLimiter(eventsMax, windowSec);
     const inviteLimiter = makeFixedWindowLimiter(inviteMax, windowSec);
+    const mcpLimiter = makeFixedWindowLimiter(mcpMax, windowSec);
     app.addHook('onRequest', async (request, reply) => {
       const routeUrl = request.routeOptions.url;
       const method = request.method;
@@ -486,6 +502,16 @@ export function buildApp(
         // seam (a `preHandler` on that one route) and a different control; this
         // one bounds the door, which is what a limiter is for.
         verdict = inviteLimiter.check(`invite:${clientKey}`, now());
+      } else if (
+        method === 'POST' &&
+        (routeUrl === '/v1/mcp/device/code' ||
+          routeUrl === '/v1/mcp/device/approve' ||
+          routeUrl === '/v1/mcp/device/token')
+      ) {
+        // The device flow's own bucket. Without this branch a route under
+        // `/v1/mcp/...` matches NO bucket at all, which would leave the
+        // 8-character user code an unlimited brute-force surface.
+        verdict = mcpLimiter.check(`mcp:${clientKey}`, now());
       }
       // `/v1/stream` is deliberately absent, and this is a decision rather than
       // an omission. It is a GET WebSocket UPGRADE, and this hook does fire on
@@ -654,7 +680,7 @@ export function buildApp(
   // preHandler that writes it — the rule `require-session.ts` states, made
   // structural: `registerEventRoutes` takes the preHandler as an argument, so
   // there is no version of this line that forgets it and still compiles.
-  const requireSession = makeRequireSession(deps.auth);
+  const requireSession = makeRequireSession(deps.auth, deps.pool);
   registerEventRoutes(app, deps.ingest, requireSession);
   // The contests read surface (Plan 10 Task 4). It takes the same preHandler by
   // parameter for the same reason the events door does: a route that reads
@@ -772,6 +798,8 @@ export function buildApp(
   // here it is a read-enforcement surface: another user's notification id
   // must read as `not_found`, never as a different, more informative refusal.
   registerNotificationRoutes(app, { pool: deps.pool }, requireSession);
+
+  registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears
   // about a change. The hub is created HERE, beside the ingest service whose

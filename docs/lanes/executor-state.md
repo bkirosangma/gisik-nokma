@@ -16,6 +16,173 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+> **THREE NARRATIVES MEET IN THIS FILE AND ALL OF THEM ARE LIVE.** Task 0, the Tasks 1–10 stack, and
+> pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
+> its own entry here. Nothing below is stale; they describe different work.
+
+# ▶ TUESDAY 2026-09-08 ~02:1x IST — **THE STACK IS CONSOLIDATED ON ONE BRANCH. TASKS 0–10 ARE ALL HERE.**
+
+> **READ THIS FIRST.** `origin/main` is `876a364` — #309 (pre-launch 6 + 7) merged at 19:44Z and
+> carries none of the MCP work. CI still cannot run on this repo at all: every GitHub Actions job dies
+> in 3–4 seconds with *"The job was not started because recent account payments have failed or your
+> spending limit needs to be increased"*, so the coordination doc's standing auto-merge precondition
+> ("an independent CI run green") is unsatisfiable for every branch here.
+>
+> **The stacked PR chain collapsed while it was being merged, and it cost nothing.** Merging a stacked
+> PR with *delete branch* removes the head branch — which is the BASE of the next PR up — and GitHub
+> then auto-closes that next PR as **closed, not merged**. So #312, #314, #316, #318 and #320 merged
+> while #313, #315, #317 and #319 closed unmerged, and `exec/102/104/106/108/110` are gone.
+>
+> **Nothing was lost, and that is measured rather than assumed.** `exec/109-mcp-task9-write-tools` is a
+> superset of every surviving branch: it holds Tasks 1–9 as its own history, Task 0 merged in at
+> `26e06c3`, and Task 10 squashed on at `89eed49`. Each surviving branch carries exactly one commit
+> `exec/109` lacks — its own squash of the even-numbered PR — and **every source and test file in those
+> four squashes is byte-identical to `exec/109`'s copy**, checked file by file with `git diff` between
+> the squash commit and the branch tip. The only differences are the cumulative narrative files and
+> `packages/mcp-server/src/index.ts`, where `exec/109` is AHEAD because later tasks export more.
+>
+> So `exec/109` → `main` is the one PR that carries the whole MCP server. `exec/100`/#310 and
+> `exec/101`/#311 are now **subsets of it**, kept open only because the controller had already reviewed
+> #310's content; merging them first is harmless but redundant.
+
+| branch | what it holds | state |
+|---|---|---|
+| `main` = `876a364` | everything through #309 (pre-launch 6 + 7) | merged |
+| **`exec/109-mcp-task9-write-tools`** | **MCP Tasks 0–10 — the whole server**, `main` merged in | **the PR to review** |
+| `exec/100-mcp-task0-origin` (#310) | Task 0 only, `main` merged in at `58bc5a8` | MERGEABLE, redundant |
+| `exec/101-mcp-task1-scaffold` (#311) | Tasks 1–2 only | CONFLICTING, redundant |
+| `exec/103` · `exec/105` · `exec/107` | Tasks 1–4 · 1–6 · 1–8 | orphaned mid-stack, redundant |
+
+Gate on the consolidated branch: **33/33 EXIT 0, `Cached: 0`** (forced, nothing replayed), Node
+**v22.22.2**, five repo checks EXIT 0 (`check:db-tz` additionally green against the dev stack, which
+reports `Asia/Kolkata`).
+
+**Task 10 was driven end to end against the live compose stack** — magic-link sign-in, `dist/main.js`
+launched as a child process by a real MCP client, `initialize` answered with nine tools and NO
+credential, the stderr prompt carrying user code `57XK-2HCW`, `POST /v1/mcp/device/approve` →
+`200 {"approved":true}`, `create_ticket` committed at seq 1, `add_comment` at seq 2, a bad transition
+refused verbatim, and the ledger reading `origin = mcp` on both events (`web 123 · server 6 · mcp 2`).
+
+**Queue: MCP plan Tasks 11–13.** Task 12's `last_used_at` remains an open OWNER decision.
+
+
+> **⚠ THE BLOCKAGE, AND WHY IT IS NOT A CODE PROBLEM.** Run `34141928556`: every job died in 3–4 s with
+> *"The job was not started because recent account payments have failed or your spending limit needs to
+> be increased."* `scope` never starts, so `build`, `typecheck`, `server-tests`, `other-tests`, `e2e`,
+> `check-env`, `check-tasks` all report `skipping`. **No job has executed any branch's code.**
+>
+> The consequence is procedural and worth stating exactly: the coordination doc's **standing auto-merge
+> authorization requires an independent CI run green**, and no branch in this repo can satisfy that
+> condition until billing is fixed. Every merge now needs an explicit human decision. The controller
+> session was also **offline** (`ListAgents`) throughout, so there was no one to hand them to.
+
+**MCP queue after this: Tasks 10–13.** Task 2's branch STACKS on `exec/101` rather than `main`,
+because its cases 14.10–14.16 extend the §14 catalogue Task 1 opened — the code is independent but
+the catalogue is not, and a second §14 file created off `main` would collide at merge. Task 12's `last_used_at` is still an open OWNER decision and blocks
+Task 12 only.
+
+**Task 3's lesson, which cost two red gates:** a task that widens a SHARED TYPE or joins a SHARED SET
+cannot be judged by the suite it was written for. `vitest run test/mcp/` was green while the tree did not
+typecheck (making `mcpMax` required broke three construction sites), and green again while case 13.116 —
+the set-equality drift guard — was red because a protected route had no row in the suite that polices
+them. Both were the gate's finds, not the task suite's. Same lesson Task 0 produced from the other
+direction, where a filter to one package hid a sibling's failure.
+
+**A defect in Task 3's OWN specified test, worth inheriting.** Its Step 4 says the file must go entirely
+red and that any pass at that point means a test "is testing something other than what it names". It went
+8 failed / 1 passed. The pass was 14.21, asserting `not.toBe(401)` — an unregistered route answers 404,
+which is not 401, so it passed against a route that did not exist. Changed to `toBe(200)` and re-run WHILE
+STILL RED to confirm it then failed. The plan's warning was right; it just did not notice its own test.
+
+**Task 4 disproved one of its own plan's conclusions, and the correction is now a test.** Step 5 says to
+reverse the resolution order, observe that everything still passes, and conclude that a discriminating
+test "would need a value that is valid as both credentials at once, which cannot be constructed" — so the
+order is "held by the docblock and by review". The experiment reproduced exactly (12 of 12 passed
+reversed). The conclusion is false: insert an `mcp_tokens` row whose `token_hash` is the sha256 of a LIVE
+session token, pointed at a DIFFERENT user, and read the resolved identity through the device-approval
+route. That is **case 14.35**, written WHILE the reversal was applied, watched to fail as the only failure
+of five, then passing once restored. It is the only thing in the repo holding that order.
+
+**Task 5 is why the plan asks for a real drive.** The end-to-end run reported OK — and inside that
+success the consent confirmation read "It now acts as , with exactly your permissions", naming nobody in
+the sentence whose whole job is naming somebody. `useSessionStatus` uses `user.name ?? user.id`, and a
+magic-link account's name is `''`, which `??` does not catch. No status-code or testid assertion would
+have seen it; the page rendered perfectly. Fixed in the page; the shared-hook defect is recorded below.
+
+**Two environment facts from Task 5.** Docker's VM disk filled during repeated image rebuilds and the
+server container died with *"No space left on device"* mid-migration — which looks exactly like a broken
+migration and is not one. Reclaimed 9.5GB of BUILD CACHE only (never images, never volumes: the volumes
+hold the seeded world). The cost is honest: subsequent rebuilds are slow because that cache is gone.
+
+**An ID collision I created, and how it was caught.** The plan gives each task a DECADE — Task 2 the
+14.10s, Task 3 the 14.20s, Task 4 the 14.30s, Task 6 the 14.40s, Task 7 the 14.50s — with Task 11 owning
+each `x9`. **Task 5 has no decade**, because the plan never numbers it. Minting `14.40` for Task 5's
+manual case therefore took Task 6's FIRST case. Moved to `14.100` before Task 6 was written, found by
+reading the PLAN's assignments rather than this file's maximum — the maximum would have said 14.40 was
+free and been wrong, which is the exact failure §12's header records twice.
+
+**Three findings carried, all recorded with owners, none fixed:**
+1. **`check:env`'s third blind spot.** It walks `packages/mcp-server` and sees the file, but every
+   detector needs the literal string `process.env`; `loadMcpConfig` takes `env` as a PARAMETER, so two
+   live config vars are undocumented while the gate reports ok. Same class item 4 closed twice.
+   *Owner: `scripts/check-env-example.mjs`.*
+2. **`harness.ts:19` re-spells `ENTITY_KINDS` and has already drifted** — domain declares seven kinds
+   including `'invite'`, the harness lists six. *Owner: rule-engine fixtures.*
+3. **`useSessionStatus` renders an empty display name.** `user.name ?? user.id` — `??` catches only
+   null and undefined, and a magic-link account's name is `''`. Every surface showing a name is affected.
+   *Owner: whoever next touches `apps/web/src/providers.tsx`.*
+4. **17 of 24 bordered classes below WCAG 1.4.11's 3:1** in both themes (#309's box). Remedy moves
+   `line`/`lineStrong` product-wide. *Owner: a design pass over `packages/ui`.*
+
+# ▶ MONDAY 2026-09-07 ~21:5x IST — **MCP TASK 0 DONE. PRE-LAUNCH 6/7 IS PR #309, UNMERGED — AND CI CANNOT RUN ON ANY BRANCH.**
+
+*This branch (`exec/100-mcp-task0-origin`) is off `main`, so the pre-launch 6/7 narrative lives on
+`exec/99-...` and PR #309, not here. Both are in flight; they share no files.*
+
+| what | value |
+|---|---|
+| `origin/main` | `2859df4` — unchanged; nothing merged this session |
+| in flight | **PR #309** (pre-launch 6+7) · **`exec/100-mcp-task0-origin`** (MCP Task 0) |
+| **queue** | MCP plan **Tasks 1–13**. Task 0 done. Task 12's `last_used_at` is still an open OWNER decision, and it blocks Task 12 only. |
+| gate | Task 0 at `0c65a1a5`: **30/30 EXIT 0**, `Cached: 0` (forced, nothing replayed), Node **v22.22.2**; five repo checks exit 0 |
+
+> **⚠ CI IS RED FOR BILLING ON EVERY BRANCH, AND IT LOOKS LIKE A CODE FAILURE.** Run `34141928556`:
+> every job died in 3–4 s with *"The job was not started because recent account payments have failed or
+> your spending limit needs to be increased."* `scope` never ran, so `build`, `typecheck`,
+> `server-tests`, `other-tests`, `e2e`, `check-env`, `check-tasks` all report `skipping`. **No job has
+> executed any branch's code.** The coordination doc's standing auto-merge authorization requires an
+> independent CI run green, and **no branch can meet that condition until billing is fixed** — so every
+> merge now needs an explicit human decision, PR #309 included.
+
+## MCP Task 0 — `'mcp'` is an envelope-origin of its own (owner ruling 1)
+
+- The member is one line; `Origin` and `z.enum(ORIGINS)` derive from it, and the column is
+  `origin text NOT NULL` with no `CHECK` and no Postgres enum, so **no migration**. The plan's own
+  "more than this plan's scope" estimate was measured and found wrong.
+- `rule-engine`'s fixture harness re-spelled the list; it now imports `ORIGINS`. Swept after: the only
+  literal spelling left in source is the declaration itself.
+- **Step 3 is what deriving buys.** `CLIENT_ORIGINS` derives from `ORIGINS`, so `it.each` gained *"still
+  admits an ordinary mcp-origin client submission"* the moment the member landed — passing unedited.
+- **Case 3.163 is a PAIR on purpose, and the mutation proves it earns its place:** folding only `'mcp'`
+  into `'web'` at the insert kills **exactly one test out of 1,396** — this one. Nothing else in the
+  suite catches an assistant's write being disguised as a person's, which is the entire ruling.
+
+**What the plan did not name, and what it cost.** Two tests pin the zod refusal message verbatim
+(`envelope.test.ts:157`, `parse-event.test.ts:146`) and went red; eight docblocks stated the enum as four
+members and became false. All fixed. **The red gate came from running
+`turbo test --filter=./apps/server` and reading it as done — a filter to one package cannot see a sibling
+it does not build.**
+
+**RECORDED, NOT FIXED — the same defect one line above the one I was sent to fix.** `harness.ts:19` also
+re-spells `ENTITY_KINDS`, and it has **already drifted**: the domain declares seven kinds including
+`'invite'`, the harness lists six. Latent (no fixture uses an invite entity yet), and deriving it would
+change which envelopes the harness accepts, which is beyond this task. *Owner: whoever next touches the
+rule-engine fixtures.* **Also left alone deliberately:** the coordination doc and
+`test-cases/12-offline-sync-apps.md` still say four origins — a historical record and another lane's
+catalogue respectively.
+
+# ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
+
 # ▶ MONDAY 2026-09-07 ~21:0x IST — **PRE-LAUNCH 6 AND 7 ARE DONE AND MEASURED. THE WHOLE CHECKLIST IS CLOSED. MCP IMPLEMENTATION IS THE ONLY THING LEFT.**
 
 | what | value |

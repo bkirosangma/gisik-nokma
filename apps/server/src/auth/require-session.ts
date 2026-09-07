@@ -1,6 +1,8 @@
 import { fromNodeHeaders } from 'better-auth/node';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Auth } from './auth.js';
+import type { Queryable } from '../db/queryable.js';
+import { resolveMcpToken } from '../mcp/token-store.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -51,17 +53,52 @@ export const UNAUTHENTICATED_BODY = { error: 'unauthenticated' } as const;
  * that is a 5xx through the app's error handler, not a 401 — answering
  * "unauthenticated" to a database outage would tell every signed-in user they
  * had been signed out.
+ *
+ * ## The MCP personal access token is a FALLBACK, and the order is the design
+ *
+ * better-auth is asked first, always, and the token table is consulted only
+ * when it answers `null`. Reversing that — or branching on the header shape
+ * before calling `getSession` — would put a second credential system in front
+ * of the one that owns sessions, and every mobile and desktop client, plus
+ * every test in this repository, authenticates with a better-auth BEARER
+ * token. They are the same header. Only the order keeps them from contending.
+ *
+ * The fallback runs on the raw `Authorization: Bearer <value>` and nothing
+ * else: an MCP token is never a cookie, so a cookie-carrying request that
+ * better-auth rejected falls straight through to the same 401 it always got.
+ *
+ * **The order is held by a test, not only by this paragraph** — see case 14.35,
+ * which mints a value that is valid as BOTH credentials at once (an
+ * `mcp_tokens` row keyed on the hash of a live session token, pointed at a
+ * DIFFERENT user) and asserts the request resolves as better-auth's user. The
+ * plan for this task judged such a value impossible to construct and settled
+ * for review; it is constructible, and the order is now falsifiable.
+ *
+ * The cost, stated rather than hidden: every request that FALLS THROUGH to the
+ * PAT branch performs one indexed single-row write, because `resolveMcpToken`
+ * stamps `last_used`. A better-auth session never reaches it, so web, mobile
+ * and desktop pay nothing; only MCP calls do.
  */
-export function makeRequireSession(auth: Auth) {
+export function makeRequireSession(auth: Auth, db: Queryable, now: () => Date = () => new Date()) {
   return async function requireSession(
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<void> {
     const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) {
-      await reply.code(401).send(UNAUTHENTICATED_BODY);
+    if (session) {
+      request.currentUserId = session.user.id;
       return;
     }
-    request.currentUserId = session.user.id;
+
+    const header = request.headers.authorization;
+    if (header !== undefined && header.startsWith('Bearer ')) {
+      const userId = await resolveMcpToken(db, header.slice('Bearer '.length), now());
+      if (userId !== null) {
+        request.currentUserId = userId;
+        return;
+      }
+    }
+
+    await reply.code(401).send(UNAUTHENTICATED_BODY);
   };
 }

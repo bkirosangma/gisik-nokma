@@ -183,23 +183,23 @@ one thing the whole design exists to prevent.
 **Scope, MEASURED at `8190507` rather than estimated.** This plan originally called it *"more than
 this plan's scope"*; it is not. See the ruling table above for the full measurement.
 
-- [ ] **Step 1 — add the member.** `packages/domain/src/envelope.ts:26`:
+- [x] **Step 1 — add the member.** `packages/domain/src/envelope.ts:26`:
       `export const ORIGINS = ['web', 'mobile', 'desktop', 'server', 'mcp'] as const;`
       `Origin` (`:27`) and `z.enum(ORIGINS)` (`:182`) both derive from it and need no edit.
       **No migration:** the column is `origin text NOT NULL` with no `CHECK` and no Postgres enum
       (`migrations/1787841717635_events-and-snapshots.sql:12`), verified across every migration.
-- [ ] **Step 2 — kill the second authority.** `packages/rule-engine/src/fixtures/harness.ts:53`
+- [x] **Step 2 — kill the second authority.** `packages/rule-engine/src/fixtures/harness.ts:53`
       re-spells the list as `z.enum(['web', 'mobile', 'desktop', 'server'])`. **Import `ORIGINS` and
       use `z.enum(ORIGINS)`** — do not add a fifth string. A second list of what the origins are is
       precisely the drift `check-permission.test.ts:33-36` warns about in prose, and it is sitting one
       package away from the file that warns about it. Fixing it by hand would leave the same trap set
       for the sixth member.
-- [ ] **Step 3 — read what Step 1 switched on for free.** `check-permission.test.ts:38` derives
+- [x] **Step 3 — read what Step 1 switched on for free.** `check-permission.test.ts:38` derives
       `CLIENT_ORIGINS` from `ORIGINS` and runs `it.each(CLIENT_ORIGINS)`, so `'mcp'` gains a
       permission-gate case the moment Step 1 lands: *the gate must admit an `mcp`-origin client
       submission.* Run that suite and confirm the new case passes. **If it fails, stop** — the gate
       refusing `'mcp'` is a real finding about the ingest door, not a test to adjust.
-- [ ] **Step 4 — a case that says why the value exists.** Assert an `'mcp'` envelope round-trips the
+- [x] **Step 4 — a case that says why the value exists.** Assert an `'mcp'` envelope round-trips the
       ingest door and comes back out of the ledger as `'mcp'`. The point is not that the enum accepts
       a fifth string; it is that a reader of the history can tell a person's claim from their
       assistant's. A case asserting only `ORIGINS.includes('mcp')` would test the constant.
@@ -225,7 +225,7 @@ without editing it; no migration added.
 - Consumes: nothing.
 - Produces: the workspace member `@gisik-nokma/mcp-server`; `McpConfig` and `loadMcpConfig(env: NodeJS.ProcessEnv, home: string): McpConfig` — every later task in this package imports these.
 
-- [ ] **Step 1: Write `packages/mcp-server/package.json`**
+- [x] **Step 1: Write `packages/mcp-server/package.json`**
 
 Copied from `packages/rule-engine/package.json` with the name and dependencies swapped. `bin` is what makes Task 10's entrypoint launchable by an MCP client config.
 
@@ -265,7 +265,7 @@ Copied from `packages/rule-engine/package.json` with the name and dependencies s
 
 `@modelcontextprotocol/sdk@1.30.0` declares `zod: '^3.25 || ^4.0'` in both `dependencies` and `peerDependencies` — verified against the registry, so the repo's pinned `zod ^3.25.0` satisfies it and no second zod copy is installed.
 
-- [ ] **Step 2: Write the three config files, verbatim from `packages/rule-engine`**
+- [x] **Step 2: Write the three config files, verbatim from `packages/rule-engine`**
 
 `tsconfig.json`:
 
@@ -306,7 +306,7 @@ export default defineConfig({
 
 No `pnpm-workspace.yaml` edit — the `packages/*` glob already covers it. No `turbo.json` entry — that is only needed when a package's tests read files **outside** its own directory, and none of this package's tests do. (If a later task adds such a test it MUST add a `"@gisik-nokma/mcp-server#test"` block with `$TURBO_DEFAULT$` plus the foreign `$TURBO_ROOT$/…` inputs, or turbo serves a stale green — the failure measured on 2026-09-07 that let `#270` reach `main`.)
 
-- [ ] **Step 3: Write the failing test for `loadMcpConfig`**
+- [x] **Step 3: Write the failing test for `loadMcpConfig`**
 
 `packages/mcp-server/test/config.test.ts`:
 
@@ -336,12 +336,12 @@ describe('loadMcpConfig', () => {
 });
 ```
 
-- [ ] **Step 4: Run it and watch it fail for the right reason**
+- [x] **Step 4: Run it and watch it fail for the right reason**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: FAIL — `Failed to resolve import "../src/config.js"`. A failure naming anything else means the scaffold is wrong, not the test.
 
-- [ ] **Step 5: Write `src/config.ts` and `src/index.ts`**
+- [x] **Step 5: Write `src/config.ts` and `src/index.ts`**
 
 ```ts
 import { join } from 'node:path';
@@ -387,7 +387,7 @@ export function loadMcpConfig(env: NodeJS.ProcessEnv, home: string): McpConfig {
 export * from './config.js';
 ```
 
-- [ ] **Step 6: Run the tests and the whole gate**
+- [x] **Step 6: Run the tests and the whole gate**
 
 Run: `pnpm install`
 Expected: succeeds, links `@gisik-nokma/mcp-server`, updates `pnpm-lock.yaml`.
@@ -398,7 +398,7 @@ Expected: 3 passed.
 Run: `pnpm turbo run build typecheck --filter @gisik-nokma/mcp-server 2>&1 | tail -20`
 Expected: both green.
 
-- [ ] **Step 7: Register the package with the one gate that hardcodes a list**
+- [x] **Step 7: Register the package with the one gate that hardcodes a list**
 
 `scripts/check-runbook-commands.mjs:69-71` enumerates package directories by hand. Every other gate discovers packages dynamically (`check-case-citations.mjs:189` walks `apps` and `packages`; CI's `other-tests` job runs `turbo run test --filter='!@gisik-nokma/server'` and picks a new package up automatically). This one does not, and a hardcoded list that stops matching the tree is the defect PR #278 was opened for ("the gate could not see the trees its own tests police — four packages, not one").
 
@@ -422,7 +422,7 @@ with:
 Run: `pnpm check:runbook 2>&1 | tail -10`
 Expected: ok. (It stays ok either way today — `docs/runbook.md` names no `@gisik-nokma/mcp-server` script until Task 10. The line is added **now** so Task 10's runbook entry cannot land against a list that does not know this package exists.)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/mcp-server scripts/check-runbook-commands.mjs pnpm-lock.yaml
@@ -458,7 +458,7 @@ export async function exchangeDeviceCode(db: Queryable, deviceCode: string, now:
 export async function resolveMcpToken(db: Queryable, rawToken: string, now: Date): Promise<string | null>;
 ```
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 `apps/server/migrations/1788600000000_mcp-device-auth.sql`. The timestamp is later than `1788470000000_snapshot-provenance.sql`, the current last migration; if a newer one has landed by execution time, bump this above it.
 
@@ -524,7 +524,7 @@ DROP TABLE mcp_tokens;
 DROP TABLE mcp_device_codes;
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `apps/server/test/mcp/token-store.test.ts`:
 
@@ -632,14 +632,14 @@ describe('the personal access token', () => {
 });
 ```
 
-- [ ] **Step 3: Run them and watch them fail**
+- [x] **Step 3: Run them and watch them fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/token-store.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../../src/mcp/token-store.js`.
 
 Requires the dev database up: `docker compose up -d` (Postgres 16 on 54329).
 
-- [ ] **Step 4: Write `apps/server/src/mcp/token-store.ts`**
+- [x] **Step 4: Write `apps/server/src/mcp/token-store.ts`**
 
 ```ts
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -787,19 +787,19 @@ export async function resolveMcpToken(
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/token-store.test.ts 2>&1 | tail -20`
 Expected: 7 passed.
 
-- [ ] **Step 6: Prove the migration is reversible**
+- [x] **Step 6: Prove the migration is reversible**
 
 Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate down --migrations-dir migrations --count 1 2>&1 | tail -10`
 Expected: drops both tables cleanly.
 Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate up --migrations-dir migrations 2>&1 | tail -10`
 Expected: re-applies.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/server/migrations/1788600000000_mcp-device-auth.sql apps/server/src/mcp/token-store.ts apps/server/test/mcp/token-store.test.ts
@@ -820,13 +820,13 @@ git commit -m "MCP credential store: device-code grants and personal access toke
 - Consumes: `mintDeviceCode`, `approveDeviceCode`, `exchangeDeviceCode`, `DEVICE_CODE_TTL_SEC`, `POLL_INTERVAL_SEC`, `hashCredential` (Task 2); `Queryable`; `preHandlerHookHandler`.
 - Produces: `registerMcpDeviceRoutes(app, deps: { pool: Queryable; webOrigin: string; now?: () => Date }, requireSession: preHandlerHookHandler): void`, and the three routes pinned in **The wire contract** above. Task 6 and Task 7 code against those paths and bodies; Task 5 codes against `POST /v1/mcp/device/approve`.
 
-- [ ] **Step 1: Decide the bucket before writing the route — it is what fixes the TTL and the interval**
+- [x] **Step 1: Decide the bucket before writing the route — it is what fixes the TTL and the interval**
 
 The spec leaves "exact device-code TTL and polling interval" open. It is not a free choice: `app.ts`'s limiter classifies by exact route pattern and a route under `/v1/mcp/...` matches **no** bucket today, which would make an 8-character user code an unlimited brute-force surface. Mounting the routes in the existing `authLimiter` bucket instead would make the CLI's polling contend with the person's own browser sign-in on the same client key, on a `RATE_LIMIT_AUTH_MAX=10`-per-60s budget.
 
 So: a **fourth bucket**, `mcpMax`, fed by the existing `RATE_LIMIT_AUTH_MAX` — no new environment variable. This is exactly the precedent `inviteMax` set (`app.ts`'s `SecurityOptions.rateLimit` docblock: a field rather than a constant, "No new environment variable is introduced for it"; `.env.example:174` records `invite … at RATE_LIMIT_AUTH_MAX`). With 10 requests per 60s the sustained rate is one per 6s, so **`POLL_INTERVAL_SEC = 12`** spends half the budget and leaves room for the mint and one retry, and **`DEVICE_CODE_TTL_SEC = 600`** is 50 polls — an unhurried browser trip that does not leave an abandoned grant lying around for an hour.
 
-- [ ] **Step 2: Widen `buildTestApp` to accept security options — FIRST, because a test needs it**
+- [x] **Step 2: Widen `buildTestApp` to accept security options — FIRST, because a test needs it**
 
 Case 14.27b below drives the HTTP-Origin check, and `buildTestApp` cannot assemble an app with the security controls on today. Do this before writing the tests, so no test in this task is ever written in a shape that cannot fail.
 
@@ -848,7 +848,7 @@ and forward it to `buildApp`'s options object. Import `SecurityOptions` from `..
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/app.test.ts 2>&1 | tail -10`
 Expected: green — the widening is additive and absent-means-off is unchanged.
 
-- [ ] **Step 3: Write the failing route tests**
+- [x] **Step 3: Write the failing route tests**
 
 `apps/server/test/mcp/device-flow.test.ts`:
 
@@ -1017,12 +1017,12 @@ describe('the approval route is CSRF-protected, because it mints a credential', 
 });
 ```
 
-- [ ] **Step 4: Run them and watch them fail**
+- [x] **Step 4: Run them and watch them fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/device-flow.test.ts 2>&1 | tail -30`
 Expected: FAIL — cannot resolve `../../src/routes/mcp-device.js`. Every test in the file fails for that one reason; a file that reports some passes at this point is testing something other than what it names.
 
-- [ ] **Step 5: Write `apps/server/src/routes/mcp-device.ts`**
+- [x] **Step 5: Write `apps/server/src/routes/mcp-device.ts`**
 
 ```ts
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
@@ -1155,7 +1155,7 @@ export function registerMcpDeviceRoutes(
 }
 ```
 
-- [ ] **Step 6: Wire it, protect it, bucket it**
+- [x] **Step 6: Wire it, protect it, bucket it**
 
 In `apps/server/src/http/http-origin.ts`, inside `HTTP_ORIGIN_PROTECTED_ROUTES`, add after the `'/v1/me/notifications/:id/read'` entry:
 
@@ -1198,12 +1198,12 @@ In `apps/server/src/app.ts`:
 4. Beside the other `register*Routes` calls: `registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);`
 5. In `apps/server/src/index.ts`, pass `mcpMax: config.rateLimitAuthMax` wherever `inviteMax` is passed.
 
-- [ ] **Step 7: Run the whole file**
+- [x] **Step 7: Run the whole file**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/ 2>&1 | tail -30`
 Expected: all pass. **Read the output.** A suite that reports 0 tests run is not a pass; confirm the count.
 
-- [ ] **Step 8: Plant the CSRF defect and watch it caught**
+- [x] **Step 8: Plant the CSRF defect and watch it caught**
 
 Temporarily delete the `'/v1/mcp/device/approve'` line from `HTTP_ORIGIN_PROTECTED_ROUTES`.
 
@@ -1212,7 +1212,7 @@ Expected: **14.27 AND 14.27b both fail** — 14.27 on the set membership, 14.27b
 
 Restore the line. Re-run: all pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/server/src/routes/mcp-device.ts apps/server/src/http/http-origin.ts apps/server/src/app.ts apps/server/src/index.ts apps/server/test/helpers/app.ts apps/server/test/mcp/device-flow.test.ts
@@ -1237,7 +1237,7 @@ git commit -m "Device-authorization routes for the MCP server, with the approval
 
   Run `grep -rn "makeRequireSession(" apps/server/src apps/server/test` before editing and confirm the list is still exactly these three; a fourth appearing later is a call site this task must also move.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `apps/server/test/mcp/require-session-pat.test.ts`:
 
@@ -1325,14 +1325,14 @@ describe('a personal access token authenticates a product route', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch 14.30 and 14.33 fail**
+- [x] **Step 2: Run and watch 14.30 and 14.33 fail**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/require-session-pat.test.ts 2>&1 | tail -20`
 Expected: **14.30 fails with 401** (better-auth does not know this token); 14.31 and 14.32 pass already; 14.33 passes for the wrong reason and will keep passing — that is fine, it is a guard for later, not a discriminator now.
 
 If 14.30 passes at this step, stop: something is resolving the token that should not be.
 
-- [ ] **Step 3: Add the fallback**
+- [x] **Step 3: Add the fallback**
 
 In `apps/server/src/auth/require-session.ts`, replace `makeRequireSession` with:
 
@@ -1392,7 +1392,7 @@ Then move **all three** call sites in this same commit:
 
 `Queryable` is `Pool | PoolClient` (`apps/server/src/db/queryable.ts`), so `resolveMcpToken`'s `UPDATE … RETURNING` on the read path is type-compatible everywhere the preHandler is used. The cost is real and stated rather than hidden: **every authenticated request that falls through to the PAT branch performs one write.** A better-auth session never reaches it, so the web, mobile and desktop clients pay nothing; only MCP calls do, and one indexed single-row update per call is the price of `last_used` being answerable at all.
 
-- [ ] **Step 4: Run the file, then the whole server suite**
+- [x] **Step 4: Run the file, then the whole server suite**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/require-session-pat.test.ts 2>&1 | tail -20`
 Expected: 4 passed.
@@ -1400,7 +1400,7 @@ Expected: 4 passed.
 Run: `pnpm --filter @gisik-nokma/server exec vitest run > /tmp/mcp-t4.log 2>&1; tail -30 /tmp/mcp-t4.log`
 Expected: the whole suite green. This is the step that catches a signature change breaking a call site the grep missed. **Redirect, then read — never pipe into `head`.**
 
-- [ ] **Step 5: Prove the ORDER, not just the outcome**
+- [x] **Step 5: Prove the ORDER, not just the outcome**
 
 Temporarily move the PAT lookup **above** the `getSession` call.
 
@@ -1428,7 +1428,7 @@ Expected: still 4 passed — **the order is NOT observable from these tests alon
 
 **Honest limit, stated rather than hidden:** the assertion above passes under both orders, because a session token has no `mcp_tokens` row to hit. A test that genuinely discriminates the order would need a value that is valid as both credentials at once, which cannot be constructed. So the order is held by the docblock and by review, not by a test — and this step's job was to establish *that*, not to pretend otherwise. Record it in the task-ledger row.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/server/src/auth/require-session.ts apps/server/src/app.ts apps/server/test/mcp/require-session-pat.test.ts
@@ -1436,6 +1436,14 @@ git commit -m "require-session resolves an MCP personal access token, but only a
 ```
 
 ---
+
+> **EXECUTION NOTE — Step 5's conclusion is superseded, its experiment is not.** The experiment was run
+> and reproduced exactly: with the PAT lookup moved above `getSession`, all twelve then-existing cases
+> still passed. But "a value valid as both credentials at once … cannot be constructed" is false. Insert
+> an `mcp_tokens` row whose `token_hash` is the sha256 of a LIVE session token, pointed at a DIFFERENT
+> user, and observe the resolved identity through the device-approval route. That is **case 14.35**,
+> written while the reversal was still applied, watched to fail as the only failure of five, then passing
+> once the order was restored. The order is held by a test, not by review.
 
 ### Task 5: The approval screen
 
@@ -1449,14 +1457,14 @@ git commit -m "require-session resolves an MCP personal access token, but only a
 
 **Read Open question 2 before starting.** The spec never mentions `apps/web`; its architecture diagram lists only `apps/server` changes. This task exists because the flow it *does* describe ("the user opens the URL in their already-authenticated browser session and approves") cannot terminate anywhere else: an approval POST must carry `Origin: <WEB_ORIGIN>` to pass `httpOriginRefused`, and only a page served from the web origin does that. A server-rendered page on the API origin would be refused by the product's own CSRF control.
 
-- [ ] **Step 1: Read the neighbours first**
+- [x] **Step 1: Read the neighbours first**
 
 Run: `ls apps/web/app && ls apps/web/src`
 Then read one existing page that performs an authenticated POST, and one that renders a refusal. Match those patterns exactly — component structure, the fetch helper, the error surface, and the `data-testid` convention (`docs/superpowers/plans/2026-08-20-11-deployment-dogfooding.md` pins the product's testid contract; add `mcp-authorize-*` ids in the same style).
 
 **Also invoke `ui-ux-pro-max`** for this task — it is UI work, and the workspace conventions require it alongside the workflow skill.
 
-- [ ] **Step 2: Write the page**
+- [x] **Step 2: Write the page**
 
 Behaviour, exactly:
 - A single text input for the user code, pre-filled from `?code=` when present, `data-testid="mcp-authorize-code-input"`.
@@ -1466,14 +1474,14 @@ Behaviour, exactly:
 - On 410: "That code has expired. Ask for a new one." — same testid.
 - On 401: send the person to the existing sign-in route with a return path back here.
 
-- [ ] **Step 3: Test it against the compose stack**
+- [x] **Step 3: Test it against the compose stack**
 
 Run: `docker compose -f docker-compose.dev.yml up -d --build --wait`
 Then drive the page end to end: mint a code with `curl`, approve it in the browser, exchange it with `curl`, and confirm the token authenticates `GET /v1/me/workspaces`.
 
 Record the exact commands and their output in the task-ledger row. A screenshot of the approval screen is worth more than a sentence claiming it renders.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/app/mcp/authorize apps/web/e2e-stack
@@ -1516,7 +1524,7 @@ export type GisikClient = {
 export function createGisikClient(serverUrl: string, fetchImpl?: typeof fetch): GisikClient;
 ```
 
-- [ ] **Step 1: Write the failing token-cache tests**
+- [x] **Step 1: Write the failing token-cache tests**
 
 `packages/mcp-server/test/token-cache.test.ts`:
 
@@ -1567,12 +1575,12 @@ describe('the token cache', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/token-cache.js`.
 
-- [ ] **Step 3: Write `src/token-cache.ts`**
+- [x] **Step 3: Write `src/token-cache.ts`**
 
 ```ts
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -1625,7 +1633,7 @@ export async function clearCachedToken(path: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Write the failing http-client tests**
+- [x] **Step 4: Write the failing http-client tests**
 
 `packages/mcp-server/test/http-client.test.ts`:
 
@@ -1694,7 +1702,7 @@ describe('the HTTP client', () => {
 });
 ```
 
-- [ ] **Step 5: Write `src/http-client.ts`**
+- [x] **Step 5: Write `src/http-client.ts`**
 
 ```ts
 export class TransportError extends Error {
@@ -1775,7 +1783,7 @@ export * from './token-cache.js';
 export * from './http-client.js';
 ```
 
-- [ ] **Step 6: Run everything in the package**
+- [x] **Step 6: Run everything in the package**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 11 passed (3 from Task 1, 4 + 4 here).
@@ -1783,7 +1791,7 @@ Expected: 11 passed (3 from Task 1, 4 + 4 here).
 Run: `pnpm turbo run typecheck --filter @gisik-nokma/mcp-server 2>&1 | tail -10`
 Expected: green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server/src packages/mcp-server/test
@@ -1826,7 +1834,7 @@ export async function createSession(deps: {
 }): Promise<Session>;
 ```
 
-- [ ] **Step 1: Write the failing device-login tests**
+- [x] **Step 1: Write the failing device-login tests**
 
 `packages/mcp-server/test/device-login.test.ts`:
 
@@ -1921,12 +1929,12 @@ describe('the device flow', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/device-login.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/device-login.js`.
 
-- [ ] **Step 3: Write `src/device-login.ts`**
+- [x] **Step 3: Write `src/device-login.ts`**
 
 ```ts
 import type { GisikClient } from './http-client.js';
@@ -1983,7 +1991,7 @@ export async function runDeviceLogin(deps: {
 }
 ```
 
-- [ ] **Step 4: Write the failing session tests**
+- [x] **Step 4: Write the failing session tests**
 
 `packages/mcp-server/test/session.test.ts`:
 
@@ -2086,7 +2094,7 @@ describe('the session', () => {
 });
 ```
 
-- [ ] **Step 5: Write `src/session.ts`**
+- [x] **Step 5: Write `src/session.ts`**
 
 ```ts
 import type { McpConfig } from './config.js';
@@ -2159,12 +2167,12 @@ export async function createSession(deps: {
 
 Extend `src/index.ts` with `export * from './device-login.js';` and `export * from './session.js';`.
 
-- [ ] **Step 6: Run the package suite**
+- [x] **Step 6: Run the package suite**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 18 passed. Confirm the count — a suite reporting 0 files is not a pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server/src packages/mcp-server/test
@@ -2194,7 +2202,7 @@ export type ToolDefinition = {
 
 Task 10 registers these with the MCP SDK. Keeping the definition SDK-agnostic is deliberate: the tools are testable without a transport, and the one place that knows the SDK's registration API is `tools/register.ts`.
 
-- [ ] **Step 1: Pin the routes each tool calls, from the live contract**
+- [x] **Step 1: Pin the routes each tool calls, from the live contract**
 
 Verified against the tree; do not re-derive these from the spec's table, which names them loosely.
 
@@ -2208,7 +2216,7 @@ Verified against the tree; do not re-derive these from the spec's table, which n
 
 `FilterSpec` is `filterSpecSchema` from `@gisik-nokma/domain` (`packages/domain/src/filter-spec.ts:119`) — **`.strict()`, and its assignee/collaborator keys are SINGULAR** (`assigneeId`, `collaboratorId`, not arrays). It is passed as `filter=<JSON.stringify(spec) URL-encoded>`. Import the schema; do not restate its shape.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `packages/mcp-server/test/read-tools.test.ts` — one test per tool plus the two traps:
 
@@ -2313,12 +2321,12 @@ describe('the read tools', () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/read-tools.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/tools/read-tools.js`.
 
-- [ ] **Step 4: Write `src/tools/read-tools.ts`**
+- [x] **Step 4: Write `src/tools/read-tools.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -2446,12 +2454,12 @@ export function readTools(session: Session): ToolDefinition[] {
 }
 ```
 
-- [ ] **Step 5: Run**
+- [x] **Step 5: Run**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 25 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/mcp-server/src/tools/read-tools.ts packages/mcp-server/test/read-tools.test.ts
@@ -2470,7 +2478,7 @@ git commit -m "The five MCP read tools: passthroughs of routes that already exis
 - Consumes: `Session` (Task 7); `ToolDefinition` (Task 8); from `@gisik-nokma/domain`: `newUlid`, `newSubmittedEvent`, `ticketCreatedPayload`, `ticketTransitionedPayloadSchema`, `commentAddedPayload`, `ticketAssignedPayload`, `plainTextToDoc`.
 - Produces: `writeTools(session: Session): ToolDefinition[]`.
 
-- [ ] **Step 1: Pin the four event shapes, verified against `packages/domain`**
+- [x] **Step 1: Pin the four event shapes, verified against `packages/domain`**
 
 **These differ from the spec's prose. The spec is loose here; the code below is the tree.**
 
@@ -2488,7 +2496,7 @@ Four traps, each of which produces a refusal a long way from its cause:
 3. **`comment.added`'s `body` is a document OBJECT, not a string** — `z.record(z.string(), z.unknown())`. `plainTextToDoc(text)` from `@gisik-nokma/domain` builds the shape.
 4. **`origin` is `'web'` and `actorId` is `session.userId()`.** `ORIGINS` has no `'mcp'` (Open question 1) and `origin: 'server'` is refused outright at the client door (`check-permission.ts:403`), as is any envelope whose `actorId` is not the session user (`:400`).
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `packages/mcp-server/test/write-tools.test.ts`:
 
@@ -2630,12 +2638,12 @@ describe('a refusal arrives with its own words', () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/write-tools.test.ts 2>&1 | tail -30`
 Expected: FAIL — cannot resolve `../src/tools/write-tools.js`.
 
-- [ ] **Step 4: Write `src/tools/write-tools.ts`**
+- [x] **Step 4: Write `src/tools/write-tools.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -2815,7 +2823,7 @@ export function writeTools(session: Session): ToolDefinition[] {
 
 **Verify `newSubmittedEvent`'s signature before writing this** — read `packages/domain/src/submit.ts:9`. The call above assumes it fills `id`, `version` (default 1) and `clientTime`. If its parameter names differ, follow the source, not this block, and say so in the ledger row.
 
-- [ ] **Step 5: Run, then plant the two traps and watch them caught**
+- [x] **Step 5: Run, then plant the two traps and watch them caught**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/write-tools.test.ts 2>&1 | tail -30`
 Expected: 8 passed.
@@ -2827,7 +2835,7 @@ Now plant, one at a time, re-running between each:
 
 Restore after each. Record which planted defect produced which failure in the ledger row — an exit code alone is not evidence.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/mcp-server/src/tools/write-tools.ts packages/mcp-server/test/write-tools.test.ts
@@ -2849,7 +2857,7 @@ git commit -m "The four MCP write tools: real domain events, and refusals surfac
 - Consumes: `readTools`, `writeTools`, `createSession`, `loadMcpConfig`, `createGisikClient`.
 - Produces: the `gisik-nokma-mcp` bin, and `registerTools(server, session)`.
 
-- [ ] **Step 1: Verify the SDK's registration API against the installed package**
+- [x] **Step 1: Verify the SDK's registration API against the installed package**
 
 Do not write against recall. Run:
 
@@ -2860,7 +2868,7 @@ ls node_modules/@modelcontextprotocol/sdk/dist/esm/server/
 
 Read the `McpServer` class's `registerTool`/`tool` signature in the installed `.d.ts` and confirm whether `inputSchema` takes a **zod raw shape** (an object of zod validators) or a JSON Schema. `@modelcontextprotocol/sdk@1.30.0` declares `zod: '^3.25 || ^4.0'` as a dependency and a peer, and ships `zod-to-json-schema`, which strongly suggests a raw shape — but **confirm it, and if it takes JSON Schema instead, convert with `zod-to-json-schema` in `register.ts` and nowhere else.** The `ToolDefinition.inputSchema` type from Task 8 is the seam that makes that a one-file change.
 
-- [ ] **Step 2: Write `src/tools/register.ts`**
+- [x] **Step 2: Write `src/tools/register.ts`**
 
 One wiring point. Every tool's handler result is returned as MCP content; every thrown error becomes an MCP tool error carrying the message verbatim.
 
@@ -2907,7 +2915,7 @@ export function registerTools(server: McpServer, session: Session): void {
 
 Adjust the exact `registerTool` call to whatever Step 1 established. `test/register.test.ts` asserts `allTools(fakeSession)` yields exactly the nine names, in a stable order — that is the test that catches a tool silently dropped.
 
-- [ ] **Step 3: Write `src/main.ts`**
+- [x] **Step 3: Write `src/main.ts`**
 
 ```ts
 #!/usr/bin/env node
@@ -2957,7 +2965,7 @@ main().catch((error: unknown) => {
 });
 ```
 
-- [ ] **Step 4: Write `packages/mcp-server/README.md`**
+- [x] **Step 4: Write `packages/mcp-server/README.md`**
 
 Answer the spec's packaging open question by taking the **repo-local script** option for v1, and say why in one paragraph: this is a private workspace package (`"private": true` like every other), publishing to npm is a decision nobody has taken, and an MCP client config can point at a built path today. Include a copy-pasteable client config:
 
@@ -2975,14 +2983,14 @@ Answer the spec's packaging open question by taking the **repo-local script** op
 
 State plainly what the assistant can then do (create, move, comment on and assign tickets **as you**) and that revoking access is `DELETE FROM mcp_tokens WHERE user_id = …` until a revoke surface exists (Open question 5).
 
-- [ ] **Step 5: Add it to the runbook**
+- [x] **Step 5: Add it to the runbook**
 
 `docs/runbook.md` gains a short "MCP server" section: build, configure, authorize, and revoke. `pnpm check:runbook` will now resolve any `pnpm --filter @gisik-nokma/mcp-server run <script>` the section names — Task 1 Step 7 added the package to that gate's directory list, which is why this can land at all.
 
 Run: `pnpm check:runbook 2>&1 | tail -10`
 Expected: ok.
 
-- [ ] **Step 6: Drive it end to end against the compose stack**
+- [x] **Step 6: Drive it end to end against the compose stack**
 
 Run: `docker compose -f docker-compose.dev.yml up -d --build --wait`
 Run: `pnpm turbo run build --filter @gisik-nokma/mcp-server 2>&1 | tail -5`
@@ -2990,7 +2998,7 @@ Then launch the built `dist/main.js` from a real MCP client, complete the device
 
 **Record the actual transcript in the ledger row** — tool name, arguments, and the server's answer. "It worked" is not evidence; a refusal reproduced verbatim is.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server docs/runbook.md
@@ -2998,6 +3006,44 @@ git commit -m "The stdio entrypoint, the nine-tool registration, and how a perso
 ```
 
 ---
+
+
+> **Execution note (2026-09-08).** Step 1 answered from the installed
+> `@modelcontextprotocol/sdk@1.30.0` `.d.ts`, not recalled: `registerTool(name, config, cb)` types
+> `inputSchema` as `ZodRawShapeCompat | AnySchema` where `ZodRawShapeCompat = Record<string, AnySchema>`
+> — a zod RAW SHAPE, exactly what Task 8's `ToolDefinition` carries. No `zod-to-json-schema` conversion
+> was needed anywhere. Confirmed at runtime through a real client: `list_workspaces`'s empty shape
+> becomes `{type:'object',properties:{}}` and the imported `.strict()` FilterSpec becomes
+> `additionalProperties: false` three levels deep.
+>
+> **Step 3 departs from the snippet, and had to.** As written, `main.ts` awaited `createSession` before
+> `server.connect(...)`. `createSession` authenticates eagerly and `readCachedToken` returns `null` on a
+> fresh install, so that await runs the device flow and blocks up to its ten-minute deadline before the
+> transport exists — `initialize` is never answered and the MCP client reports a server that failed to
+> start, with the sign-in instruction sitting in a stderr log nobody is reading. Measured against a stub
+> that mints a code and never approves it: **as shipped, `initialize` answered in 107 ms with nine tools
+> and zero HTTP requests; with the plan's ordering, it had not answered after 8 seconds** and the server
+> was already polling. `src/lazy-session.ts` is the fix and `registerTools` awaits `ready()` before
+> dispatching, which is what keeps the synchronous `session.userId()` safe inside a write handler.
+>
+> **Step 6 ran end to end against the live compose stack.** Magic-link sign-in, `dist/main.js` launched
+> as a child process by a real MCP client, `initialize` + nine tools with no credential, the stderr
+> prompt carrying user code `57XK-2HCW`, `POST /v1/mcp/device/approve` → `200 {"approved":true}`, and
+> the waiting `list_workspaces` returning Convenience Corner. Then `create_ticket` committed at seq 1
+> (ticket `01M1YPTE147N7MCHNHM3JRVG5G`), `add_comment` at seq 2, `transition_ticket … to:
+> "no-such-state"` refused as `refused by unknown-state: The workflow "Errand with waits" has no state
+> "no-such-state".`, and `get_ticket` on an invisible ticket answering 404. The ledger reads
+> `origin = mcp` on both committed events — workspace-wide `web 123 · server 6 · mcp 2` — and
+> `mcp_tokens.last_used` was written.
+>
+> The FIRST attempt refused every write with `malformed-envelope: … at origin: Invalid enum value.
+> Expected 'web' | 'mobile' | 'desktop' | 'server', received 'mcp'`: the running container predated
+> Task 0. Not a defect in this task, and the sharpest available proof that Task 0 is load-bearing.
+> Rebuilding the server service, which is what Step 6 already tells you to run, fixed it.
+>
+> Cases 14.80–14.88 (plus 14.88b) are in `test-cases/14-mcp-server.md`; nine mutations were run and all
+> nine were killed by the case that names the property. One of them exposed 14.83 as a check that could
+> not fail; it was rewritten before the mutation was accepted as passing.
 
 ### Task 11: The catalogue, the baselines, and the gate that cannot see this plan
 

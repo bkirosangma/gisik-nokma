@@ -34,7 +34,7 @@ import { applyAll, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
  *
  * TERMINOLOGY, because two unrelated things are called "origin" and they meet
  * in this file: **envelope-origin** is `EventEnvelope.origin`, the provenance
- * enum `'web' | 'mobile' | 'desktop' | 'server'`. **HTTP-Origin** is the
+ * enum `'web' | 'mobile' | 'desktop' | 'server' | 'mcp'`. **HTTP-Origin** is the
  * browser `Origin` header, which is CSRF and appears nowhere in this file.
  *
  * NO `// test-cases N.N` MARKERS, deliberately, and this is the one thing to
