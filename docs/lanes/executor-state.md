@@ -21,18 +21,29 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > entry here. Task 9 is the first task that consumes Task 0, so the branches meet at Task 9 and the
 > narratives meet here. Neither is stale; they describe different work.
 
-# ▶ MONDAY 2026-09-07 ~22:2x IST — **THREE PRs OPEN, NONE MERGEABLE. CI CANNOT RUN ON THIS REPO AT ALL.**
+# ▶ TUESDAY 2026-09-08 ~01:5x IST — **#309 HAS MERGED. ELEVEN PRs OPEN, THE STACK'S TWO ROOTS NOW CONFLICT.**
 
-> **READ THIS FIRST IF YOU LANDED ON `main`.** `origin/main` is still `2859df4` and carries none of the
-> work below. Nothing has merged this session. The handoff is therefore FRAGMENTED ACROSS BRANCHES —
-> each of the three has its own entry, and `main`'s copy is stale by three PRs. That fragmentation is a
-> symptom of the merge blockage, not a mistake to fix by rewriting `main`.
+> **READ THIS FIRST IF YOU LANDED ON `main`.** `origin/main` moved to `876a364` when **#309 merged**
+> (pre-launch 6 + 7). It carries none of the MCP work below. CI still cannot run on this repo at all —
+> every GitHub Actions job dies in 3–4 seconds with *"The job was not started because recent account
+> payments have failed or your spending limit needs to be increased"* — so the coordination doc's
+> standing auto-merge precondition ("an independent CI run green") remains unsatisfiable for every
+> branch here.
+>
+> **What #309's merge changed for this stack.** #309 touched `Features.md`,
+> `docs/lanes/executor-state.md` and `.env.example` — the same shared files the MCP branches touch — so
+> GitHub now reports **#310 and #311 CONFLICTING** against `main`. The other nine report MERGEABLE, but
+> that is measured against their own stacked bases, not against `main`: resolving the two roots is what
+> unblocks the chain. Do it by **cherry-picking what `main` lacks onto a fresh branch off `876a364`,
+> never by rebasing** — a rebase re-applies commits `main` already holds in squashed form and
+> manufactures conflicts that read as real. The conflicts are in narrative prose only (two entries in
+> this file, two bullets in `Features.md`, two blocks in `.env.example`); no source file is contested.
 
 | PR | branch | what | gate |
 |---|---|---|---|
-| **#309** | `exec/99-prelaunch-6-7-contrast-responsive` | pre-launch items 6 + 7 — closes the checklist | 30/30 at `302f1834` |
-| **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin | 30/30 at `77338aa4` |
-| **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config | **33/33** at `803c42e` |
+| ~~#309~~ | `exec/99-prelaunch-6-7-contrast-responsive` | pre-launch items 6 + 7 — **MERGED 2026-09-07 19:44Z, `main` is now `876a364`** | 30/30 at `302f1834` |
+| **#310** | `exec/100-mcp-task0-origin` | MCP Task 0 — `'mcp'` envelope-origin — **CONFLICTING with `main` since #309** | 30/30 at `77338aa4` |
+| **#311** | `exec/101-mcp-task1-scaffold` | MCP Task 1 — package scaffold + config — **CONFLICTING with `main` since #309** | **33/33** at `803c42e` |
 | **#312** | `exec/102-mcp-task2-token-store` | MCP Task 2 — credential store (stacks on #311) | **33/33** at `bdff71a` |
 | **#313** | `exec/103-mcp-task3-device-routes` | MCP Task 3 — device-flow routes (stacks on #312) | **33/33** at `754d834` |
 | **#314** | `exec/104-mcp-task4-require-session` | MCP Task 4 — PAT as a session fallback (stacks on #313) | **33/33** |
@@ -41,9 +52,9 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | **#317** | `exec/107-mcp-task7-login-driver` | MCP Task 7 — device-login + session (stacks on #316) | **33/33** |
 | **#318** | `exec/108-mcp-task8-read-tools` | MCP Task 8 — the five read tools (stacks on #317) | **33/33** |
 | **#319** | `exec/109-mcp-task9-write-tools` | MCP Task 9 — the four write tools, **merges Task 0/#310 in** | **33/33** |
+| **#320** | `exec/110-mcp-task10-entrypoint` | MCP Task 10 — stdio entrypoint + nine-tool registration (stacks on #319) | **33/33** |
 
-All three: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. They touch
-disjoint files and can merge in any order. #311's 33 rather than 30 is the new package contributing its
+All of them: `Cached: 0` (forced, nothing replayed), Node **v22.22.2**, five repo checks EXIT 0. #311's 33 rather than 30 is the new package contributing its
 own build/test/typecheck — the delta is the evidence it is wired in, not merely present.
 
 > **⚠ THE BLOCKAGE, AND WHY IT IS NOT A CODE PROBLEM.** Run `34141928556`: every job died in 3–4 s with
