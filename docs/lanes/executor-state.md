@@ -16,6 +16,72 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🏁 MONDAY 2026-09-07 ~14:05 IST — **THE CITATION BACKFILL IS CLOSED. 815 → 0 UNCITED. EVERY SECTION AT ZERO.** PR on `exec/69-residual-audit`, gate green. Nothing running.
+
+| what | value |
+|---|---|
+| `main` | `0773a82` (#251, #252 merged) |
+| branch | **`exec/69-residual-audit`** off `0773a82` |
+| **repo-wide** | **1530 cited / 0 uncited / 1530** |
+| baseline | **every entry 0** |
+| gate | `GATE_EXIT=0` · 30/30 · **3688 \| 5 (3693) / 292 files** · `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 · `check:runbook` 0 · `check:tasks` 0 · zero orphans |
+
+**The owner's ruling was to WRITE THE MISSING TESTS rather than document a carve-out** — *"go with what
+is safer and more stable"*. Fourteen rows had no covering test; all fourteen now do, and **every one was
+mutation-checked**.
+
+## WHAT THE LAST FOURTEEN NEEDED
+
+| rows | what was missing | what closed it |
+|---|---|---|
+| 13.190 · 13.191 · 13.192 · 13.204 · 13.205 · 13.207 · 13.209 | proven only by self-tests inside `scripts/*.mjs`, which is **outside the citation corpus and outside `turbo run test`** | nine cases in `apps/server/test/tooling/`, importing the scripts' own exported functions and fixtures |
+| 13.208 | a CI job-graph claim nothing asserted | parses `ci.yml` and asserts the **parsed graph**, so it survives reformatting |
+| 3.62 · 3.66 · 7.199 | closure was a **compile error**; zero runtime deaths | runtime cases, plus `@ts-expect-error` and an exhaustiveness guard for the type halves |
+| 6.149 | the row said the race *"is not driven by any test"* | a **query double** that lets a grant commit between the read and the write |
+| 13.193 · 13.203 | CLI/daemon behaviour nothing spawned | child-process tests with positive controls |
+
+## THE ENABLING FIX WAS A LATENT LANDMINE
+
+**Neither gate script had a main-guard.** Both ran their entire body at import and called `process.exit(1)`
+on failure — so a test importing one would have executed the whole sweep and, on a repo in a failing state,
+**killed the vitest worker mid-run**. Both now sit behind `executedDirectly`. **The control was that each
+script's direct output stayed byte-identical**, and both were verified so before anything else was built on
+them.
+
+## THREE THINGS THIS ROUND TAUGHT, ALL THE SAME SHAPE
+
+1. **A positive control failed FIRST, and that is why it exists.** 13.203's daemon test: on the first run
+   BOTH cases failed — the daemon was dying on a missing `OBJECT_STORE_S3_ENDPOINT` long before reaching the
+   scheduler, so *"never announced"* was being satisfied by an unrelated crash. **Without the control that
+   would have been a green test asserting nothing.**
+2. **An ambient `declare module` for a RELATIVE specifier is inert.** TypeScript matches those only against
+   bare specifiers, so the declaration typechecked as a file and did nothing; TS7016 fired on the very
+   import it was written for. The fix is a **sibling `.d.mts`**. It failed loudly at the gate — unlike the
+   other checks-that-cannot-fail collected here.
+3. **Export the fixture, never copy it.** `check-runbook-commands`'s planted defects are exported and shared
+   with its own self-test. A copy is a second source of truth that stops matching silently — the
+   cluster-list-beside-a-headline shape again.
+
+**Honest note on 13.203's mutation:** splitting the scheduler in two killed both cases, but **by HANG rather
+than a clean assertion** — the mutation also orphans timers `SIGTERM` no longer stops, so the daemon never
+exits. A real kill with a noisy mechanism; recorded rather than dressed up.
+
+## NEXT — the Saturday-carried queue, owner-approved, none of it started
+
+1. **13.181** — `seed:dev` has no runtime coverage and cannot run the plan's way.
+2. **13.195 + 13.196** — 13.195's docker half left incomplete after T16 (PR #221); 13.196 says
+   `check-runbook-commands.mjs` does not read the CONTENT of the files it names.
+3. **TicketPullNotFound** — unhandled rejection after `withTimeout` abandonment (`sync-client`,
+   `sync-engine.ts:491/513`). Fix properly, not swallow; regression test.
+4. **The six `helpers/seed.ts` borderline fixture rows** A classified 2026-09-06 17:35 — find that
+   classification in `controller-state.md` / git history and settle each.
+5. **12.321** — refetch cancellation in `use-live-query.ts`; MEASURE first, then decide.
+6. **UNBLOCKED since:** **13.176** (guest navigation to explicitly-shared tickets) and **12.322 + 12.258**
+   (the pagination-cap cliff). Owner says measure/design first, then implement + test + PR; smallest correct
+   change; **stop and ask if a scope call appears mid-way.**
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~13:15 IST — **THE BACKFILL IS AT 14 UNCITED, FROM 815. SIX SECTIONS AT ZERO.** PR on `exec/69-residual-audit`, gate green. Nothing running.
 
 | what | value |
