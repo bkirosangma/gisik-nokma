@@ -37,8 +37,22 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // (`- **7.1, 7.2 — written by this task.**`), extracting 7.2 as the id
 // when the line's own first-listed number is 7.1 -- found by this script's
 // own real sweep, not invented). Group 2: 0-2 asterisks. Group 3: the id
-// itself, N.M.
-const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+)/;
+// itself, N.M with an OPTIONAL LETTER SUFFIX.
+//
+// The suffix was added 2026-09-08 and it fixed a live red. `(\d+\.\d+)`
+// truncated `14.27b` to `14.27` and `14.88b` to `14.88`, so two pairs of
+// genuinely distinct, separately-cited cases were reported as DUPLICATE case
+// ids and this script exited 1 on `main`. The limitation was even documented
+// in prose (`test-cases/13-deployment-dogfooding.md:274`) without being fixed.
+// A letter suffix is the same shape the plans' own task ids use (`4a`, `12c`,
+// read by `check-task-ledger.mjs` as `\d+[a-z]?`), so this makes the two
+// readers agree rather than inventing a convention.
+//
+// Note the direction the old bug failed in: it INVENTED duplicates, which is
+// the loud direction. A matcher that silently dropped the suffixed line
+// entirely would have been worse, and the fixture below now pins both — the
+// suffixed id must be present AND distinct.
+const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/;
 
 function extract(lines) {
   const byStyle = { bare: 0, bold: 0, markerFirst: 0 };
@@ -62,7 +76,11 @@ const fixtureResult = extract(fixtureLines);
 const fixtureSum = fixtureResult.byStyle.bare + fixtureResult.byStyle.bold + fixtureResult.byStyle.markerFirst;
 const fixtureUnion = new Set(fixtureResult.ids).size;
 
-const EXPECTED = { bare: 1, bold: 1, markerFirst: 2, sum: 4, union: 4 };
+// bold is 2 and both totals are 5 because of the `13.91b` line. If the suffix
+// is ever dropped from ID_LINE again, that line collapses onto `13.91`, union
+// falls to 4 while sum stays 5, and this self-test fails BEFORE the real sweep
+// runs — which is the whole point of having it.
+const EXPECTED = { bare: 1, bold: 2, markerFirst: 2, sum: 5, union: 5 };
 const selfTestFailures = [];
 if (fixtureResult.byStyle.bare !== EXPECTED.bare) {
   selfTestFailures.push(`bare: expected ${EXPECTED.bare}, got ${fixtureResult.byStyle.bare}`);
@@ -78,6 +96,12 @@ if (fixtureSum !== EXPECTED.sum) {
 }
 if (fixtureUnion !== EXPECTED.union) {
   selfTestFailures.push(`union: expected ${EXPECTED.union}, got ${fixtureUnion} (the 13.99 prose citation may have leaked in, or two ids were miscounted as one)`);
+}
+if (!fixtureResult.ids.includes('13.91b')) {
+  selfTestFailures.push(
+    "the letter-suffixed id 13.91b was not extracted -- ID_LINE has lost its `[a-z]?`, so 14.27b " +
+      'and 14.88b will be read as 14.27 and 14.88 and reported as duplicates they are not',
+  );
 }
 if (fixtureResult.ids.includes('13.99')) {
   selfTestFailures.push('the mid-sentence prose citation of 13.99 was counted as a case id -- the line-head anchor is not working');
