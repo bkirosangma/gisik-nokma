@@ -266,3 +266,4 @@ export { ContestBanner } from './contests/contest-banner.js';
 export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
 export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
 export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
+export * from './help/index.js';

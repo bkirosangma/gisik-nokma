@@ -14,7 +14,9 @@
     "check:db-tz": "node scripts/check-db-timezone.mjs",
     "test:e2e:stack": "pnpm --filter @gisik-nokma/web run test:e2e:stack",
     "check:runbook": "node scripts/check-runbook-commands.mjs",
-    "check:citations": "node scripts/check-case-citations.mjs"
+    "check:citations": "node scripts/check-case-citations.mjs",
+    "help:generate": "node scripts/help-content.mjs",
+    "check:help": "node scripts/help-content.mjs --check"
   },
   "devDependencies": {
     "pg": "^8.13.0",
