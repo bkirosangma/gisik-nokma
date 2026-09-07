@@ -16,6 +16,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~09:40 IST — **#247 IS MERGED (`725ffaa`), #245 CLOSED AS SUPERSEDED.** The rebuild landed. **This PR carries the three findings the #247 squash did NOT include.**
+
+**Position:** `main` = **`725ffaa`**. The citation backfill is on main: **1362 cited / 168 uncited / 1530**.
+Sections at ZERO: §09 · §10 · §11. `exec/64`, `exec/65` and `exec/66-backfill-rebuild` are all spent —
+their content is merged; do not start work from them.
+
+**Why this PR exists.** #247 was merged at commit `0550241`, but three findings were pushed to its branch
+*after* that commit and are therefore **absent from main's handoff**: the GitHub-Actions billing stop, the
+expired serial sequence, and the 95-of-168 measurement. Rule 9's eighth shape *did* land (it was in
+`0550241`). **A squash merge captures the branch at the moment it is merged, not the branch as it later
+stands** — so a handoff pushed after a merge decision is a handoff that did not land. Check, do not assume.
+
+**OPEN WITH THE CONTROLLER, both still unanswered:**
+1. **Merging while CI cannot run at all** — Actions has been billing-dead since `2026-09-06T09:05:54Z`, so
+   the standing authorization's *"independent CI run green"* has been unsatisfiable for ~18h. #247 itself
+   merged under that condition. Owner call, not the controller's.
+2. **§12's block `12.380–12.399`** — allocated, NOT cleared. Its citable pool is **67 rows by naming**, not
+   the 31 carried in earlier notes.
+
+**IN FLIGHT:** read-only 4-agent adjudication of the **28 non-§12 rows that name a test** — does the named
+test actually *assert* the row. It edits nothing; §12 excluded pending clearance. Results become hand-placed
+citations, in small verified batches, never a bulk dispatch.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~09:05 IST — **THE REBUILD IS DONE AND GATED. ONE PR, NOT TWO.** `exec/66-backfill-rebuild` carries all **23** content commits on top of current `main`. Gate green. Nothing running, no subagent.
 
 | what | value |
@@ -37,6 +62,106 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | §07 | 1 | §13 | 26 |
 
 **218 (exec/65's tip) − 50 (#244's §05 citations, now underneath) = 168.** The two measurements reconcile.
+
+## 🔴 MEASURED: **95 of the 168 uncited rows NAME a test file, not 31** — and this file contradicted itself
+
+The claim carried forward all session — *"outside §12, every remaining row genuinely names no covering
+test"*, with §12's 31 as the only citable pool — **is false.** Measured at `84060ac` against the checker's
+own uncited ids:
+
+| § | uncited | names a test **in the row** | names one in a **block header** | names **none** |
+|---|---|---|---|---|
+| §03 | 5 | 3 | 0 | 2 |
+| §04 | 29 | 0 | 0 | 29 |
+| **§05** | **17** | **17** | 0 | **0** |
+| §06 | 12 | 5 | 0 | 7 |
+| §07 | 1 | 0 | 1 | 0 |
+| §12 | 78 | 67 | 0 | 11 |
+| §13 | 26 | 2 | 0 | 24 |
+| **total** | **168** | **94** | **1** | **73** |
+
+**28 of those 95 are outside §12** — so they need no block clearance and no dispatch authorization; by-hand
+work never did. §12's citable pool is **67 by naming, not 31**.
+
+**How the instrument was kept honest.** It imports `extractCheckedIds` and `isCited` **from the checker
+itself** rather than re-deriving them — no ninth shape of rule 9 — and rebuilds only the corpus walk. The
+control: its per-section uncited counts must equal the checker's printed counts. **All ten agreed
+(5/29/17/12/1/0/0/0/78/26, total 168)**, and the row extractor independently matched 168 rows to 168 ids.
+
+**The contradiction was inside this file the whole time.** Its §05 section says, in its own words, that
+§05's tail is *"a scattered tail, mapped but NOT done"* and lists them: *ticket-state (5.6, 5.30, 5.50) ·
+ticket-events (5.3, 5.48, 5.53) · ticket-types (5.1, 5.2) · harness (5.51, 5.52)* and six singletons. **That
+is sixteen rows explicitly recorded as naming their files** — and a later section of the same document then
+asserted no such rows existed. My measurement reproduces that list exactly, plus `5.12`, which is how I know
+the instrument is reading the same thing the earlier session read.
+
+**This is the sha-list defect again, one section further on:** a summary sentence and a detailed list, written
+at different times from different measurements, standing in the same document and disagreeing. **Rule 9's
+eighth shape covers it.** *(Do not over-correct: naming a test is still NOT evidence the test asserts the
+row — five refusals this session were exactly that case. 95 rows deserve a READ, not 95 citations.)*
+
+**In flight:** a **read-only** four-agent adjudication of the 28 non-§12 rows — does the named test actually
+assert the row — producing evidence and drafted citations for me to place by hand. It edits nothing. §12 is
+deliberately excluded until its block is cleared.
+
+## 🔴 THE DISPATCH BRIEF'S "SERIAL SEQUENCE" HAS EXPIRED — the ledger says 177/177, 0 todo
+
+The executor dispatch brief states *"~109 of 177 tasks remain"* and lays out steps 4–16 beginning at
+**Plan 4 T4 → T5**. Measured now with `pnpm check:tasks` (EXIT 0):
+
+```
+plan  tasks  done  claimed  in-flight  todo
+  01..11  177   177        0          0     0
+  done (merge sha verified on origin/main) : 177
+  todo                                     : 0
+```
+
+**Every one of the twelve plans is complete and merge-verified.** The instrument is not taking anyone's word
+for it: `scripts/check-task-ledger.mjs` validates each `done` row with `git merge-base --is-ancestor <sha>
+origin/main` — deliberately `origin/main` and not `main`, deliberately not `git cat-file` ("worktrees share
+one object store"), and it documents its own 2026-09-02 correction about rebase- versus squash-merge. It is
+the same discipline this file demands of narrative shas, applied by a program.
+
+**So steps 4 through 16 of the dispatch brief are all done, and a restart that obeyed it would begin by
+re-implementing Plan 4 T4 — merged work — against a sequence that no longer describes the repo.** This is the
+brief's own diagnosis turned on itself: *"A brief that names a position is a brief that expires."* Its
+`START HERE` section deliberately names no task and has held up perfectly; `THE SERIAL SEQUENCE` names
+fifteen and has not. The brief also says its arithmetic is **advisory** — that sentence is now the only part
+of the section that is still true.
+
+**What this means for the role.** There is no plan work outstanding, which is why this session's work has
+been the citation/quality track rather than the sequence. The executor's remaining candidates are exactly
+the three in NEXT below, and two of the three need the controller.
+
+## 🔴 GITHUB ACTIONS IS DEAD ON BILLING — AND IT BREAKS A PRECONDITION OF THE STANDING MERGE AUTHORIZATION
+
+**PR #247's four "failing" checks did not fail. They never started.** Every job carries the same annotation:
+
+> *The job was not started because recent account payments have failed or your spending limit needs to be
+> increased. Please check the 'Billing & plans' section in your settings*
+
+`check-citations`, `check-runbook`, `gate` and `scope` all "fail" in **2–3 seconds with zero steps executed**;
+the other seven are `SKIPPED` because they depend on those. **A 3-second failure of a suite that takes ninety
+seconds locally is an infrastructure signal, not a content one** — the shape of the failure is the diagnosis.
+
+**This is NOT caused by this branch, and it is not new.** Measured over the last 200 CI runs:
+
+| what | value |
+|---|---|
+| last GREEN run | **`2026-09-06T09:05:54Z`** (14:35 IST) on `exec/40-socket-cut-fixture` |
+| runs since | **every one has failed**, on `main` as well as on every branch |
+| successes in the last 60 runs | **zero** |
+
+**Consequence, and this is the part that needs the owner rather than the controller.** The standing auto-merge
+authorization requires *"PRs that passed the full machinery AND an independent CI run green"*. **That second
+condition has been unsatisfiable for roughly eighteen hours.** Every merge since — #242, #243, #244, #246 —
+landed with these same four jobs red, and their redness meant nothing either way. The only gate that has
+actually run in that window is the **local** one.
+
+**Do not read this as "CI is flaky, merge anyway."** Read it as: *the independent check the authorization
+leans on does not currently exist*, so a merge under that authorization is a merge under one gate, not two.
+Whether that is acceptable is the owner's call. **Fixing it is a billing action in GitHub settings — nothing
+in this repo can clear it.**
 
 ## ⛔ THE PREVIOUS RESTART BRIEF'S SHA LISTS WERE INCOMPLETE — this is the finding of this task
 
@@ -93,7 +218,7 @@ checked against a prediction written *before* the sequence ran — all ten keys 
 
 1. **PR is open — controller merges.** Then **close #245 as superseded** (its 4 commits are a strict prefix of this branch).
 2. **§12 is the only citable pool left: 31 of its 78 rows name a covering test.** Its block `12.380–12.399` is **ALLOCATED but NOT CLEARED** — controller's words, *"one thing at a time"*. Backfilling citations mints no ids, so the block may not gate it, but **that is the controller's call.** ASK.
-3. The **~137 rows outside §12 that name no covering test** are a **reader pass**, not transcription. **Do not let a dispatch "finish the backfill" from counts alone; it would manufacture citations.**
+3. **CORRECTED BELOW — see the measurement section.** The figure I first wrote here ("~137 rows outside §12") was mis-scoped: there are **90** uncited rows outside §12, not 137. 137 was the count of rows naming no test *across all sections including §12*, and even that turns out to be wrong.
 
 ---
 
