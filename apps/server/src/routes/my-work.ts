@@ -169,12 +169,14 @@ export async function readMyWork(
     workspaceId,
     groups,
     projectNames,
-    // TOTAL over every card this answer carries, `shared` included. The rows are
-    // deduplicated by ticket id first because a ticket that is both assigned to
-    // and shared with the viewer appears in both lists by design, and
-    // `stateNamesFor` would otherwise fold the same workflow twice to write the
-    // same key twice.
-    stateNames: await stateNamesFor(db, workspaceId, dedupeRows([...rows, ...sharedRows])),
+    // TOTAL over every card this answer carries, `shared` included. The two
+    // lists OVERLAP by design — a ticket both assigned to and shared with the
+    // viewer is in both — so `stateNamesFor` may see one ticket twice and write
+    // the same key twice with the same value. That is harmless and it is left
+    // that way deliberately: a dedupe helper here changed no byte of the
+    // response, which made it a code path no fixture in this suite could redden.
+    // Untestable code that saves a Map lookup is a worse trade than the lookup.
+    stateNames: await stateNamesFor(db, workspaceId, [...rows, ...sharedRows]),
     contested: await contestedFor(db, viewerId, workspaceId),
     shared,
   };
@@ -235,24 +237,6 @@ async function sharedWithMeRows(
   return rows;
 }
 
-/**
- * One row per ticket id, first occurrence winning — for `stateNames`, whose keys
- * are ticket ids and whose contract is one entry per card.
- *
- * **Stated honestly: the RESPONSE is identical without this.** A ticket that is
- * both assigned to and shared with the viewer appears in both lists, and
- * `stateNamesFor` would write the same key twice with the same value. What this
- * saves is the fold — `foldedWorkflowDefs` being asked for a definition it has
- * already been asked for — so no fixture can redden its removal, and no test
- * here pretends to. It is a cost, not a contract.
- */
-function dedupeRows(rows: readonly ProjTicketRow[]): ProjTicketRow[] {
-  const byId = new Map<string, ProjTicketRow>();
-  for (const row of rows) {
-    if (!byId.has(row.ticket_id)) byId.set(row.ticket_id, row);
-  }
-  return [...byId.values()];
-}
 
 /**
  * This viewer's own OPEN contested claims, with the contested ticket's title
