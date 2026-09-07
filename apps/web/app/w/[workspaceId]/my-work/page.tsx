@@ -26,10 +26,22 @@ export default function MyWorkPage() {
   const expired = useSignInOnExpiredSession([attention.error, myWork.error]);
 
   const openTicket = (ticketId: string) => {
-    // My Work is cross-project; the sheet lives on the project page.
+    // My Work is cross-project; the sheet lives on the project page, so opening
+    // one needs the ticket's `projectId` — which is why this resolves the id
+    // against the view rather than pushing a path built from the id alone.
+    //
+    // **`shared` IS searched, and leaving it out was a dead click on the one
+    // section that most needs the affordance.** A shared errand is typically NOT
+    // assigned to the viewer — that is the whole reason the section exists — so
+    // it is in neither `assigned` nor `inTransit`, `find` answered `undefined`,
+    // the guard swallowed it and the button did nothing at all: no navigation,
+    // no error, no way for the user to tell the difference from a slow page.
+    // Every section this component renders a title button for must be resolvable
+    // here, and that is now all four.
     const item =
       myWork.data?.assigned.find((candidate) => candidate.ticketId === ticketId) ??
-      myWork.data?.inTransit.find((candidate) => candidate.ticketId === ticketId);
+      myWork.data?.inTransit.find((candidate) => candidate.ticketId === ticketId) ??
+      myWork.data?.shared.find((candidate) => candidate.ticketId === ticketId);
     if (item !== undefined) router.push(`/w/${workspaceId}/p/${item.projectId}?ticket=${ticketId}`);
   };
 

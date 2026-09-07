@@ -107,7 +107,7 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
           <p className="gn-my-work__empty">Nothing has been shared with you.</p>
         ) : (
           view.shared.map((item) => (
-            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} shared />
+            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} />
           ))
         )}
       </section>
@@ -176,52 +176,41 @@ function WorkItemCard({
   item,
   onOpenTicket,
   pending = false,
-  shared = false,
 }: {
   item: WorkItem;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
-  shared?: boolean;
 }) {
-  /**
-   * The ticket sheet lives at `/w/:ws/p/:projectId?ticket=…` — through the
-   * PROJECT page — so opening one needs a project this viewer may actually
-   * load, and `projectName === null` is exactly the register that says they may
-   * not be told the project even exists by name (rulings P32/P38). A guest
-   * holding a shared errand is that viewer for every row in this section.
-   *
-   * So the affordance is gated on the thing it NEEDS, not on the section it sits
-   * in: a member whose shared ticket is in a project they are on still gets the
-   * button. Offering it to the guest would push them to a page that answers 404
-   * while the card said "open" — a control that reads as working and is not,
-   * which is the shape `new-ticket-dialog`'s withheld parent picker was fixed
-   * for. Only `shared` rows are gated: the other sections' rows reach this state
-   * too (a guest ASSIGNED an invisible-project ticket, case 7.108) and that dead
-   * click is a real, PRE-EXISTING defect — recorded, not silently widened into
-   * here, because changing those sections is not this change's job.
-   */
-  const openable = !shared || item.projectName !== null;
   return (
     <Card className="gn-my-work__item">
-      {openable ? (
-        <button
-          type="button"
-          className="gn-my-work__title"
-          onClick={() => onOpenTicket(item.ticketId)}
-        >
-          {item.title}
-        </button>
-      ) : (
-        <span className="gn-my-work__title gn-my-work__title--unopenable">{item.title}</span>
-      )}
+      <button
+        type="button"
+        className="gn-my-work__title"
+        onClick={() => onOpenTicket(item.ticketId)}
+      >
+        {item.title}
+      </button>
       {/*
         `WorkItem.projectName`'s own contract: a withheld name leaves the viewer
         holding the `projectId`, "so the item renders id-only rather than blank".
         This line printed `{item.projectName}` — i.e. NOTHING — whenever the rule
         applied, so the type promised one register and the renderer delivered
         another. PRE-EXISTING and reachable before this change (case 7.108's
-        guest), but this section is where it becomes the NORMAL case rather than
-        an edge, so it is fixed here with one rule for every section.
+        guest), but "Shared with me" is where it becomes the NORMAL case rather
+        than an edge, so it is fixed here with one rule for every section.
+
+        A withheld NAME is not a withheld ticket, and the card is openable
+        either way. An earlier draft of this file gated the open button on
+        `projectName !== null`, reasoning that a viewer who may not be told a
+        project's name cannot load its page — **and that reasoning was false.**
+        `GET /v1/projects/:id/board` gates on WORKSPACE membership
+        (`routes/board.ts`: "A workspace member who is NOT on the project passes
+        the gate and gets 200 with whatever their visibility yields"), a guest IS
+        a workspace member, and the guest arm of `visibleTicketsWhere` IS the
+        explicit clause — so their shared ticket is on that board. The gate
+        withheld a working affordance from exactly the person the section is
+        for. Removed, and recorded here because the comment justifying it read
+        as measured and was not.
       */}
       {item.projectName !== null ? (
         <span className="gn-my-work__project">{item.projectName}</span>

@@ -823,9 +823,15 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   and GitHub Actions has had no green run since 2026-09-06, so a spec added now would execute once, by
   hand, and never again; deliberately NOT written, because an unrunnable spec landing beside verified
   work is how a 🧪 becomes a believed ✅. (2) OPENING a shared errand into a ticket sheet is still not
-  possible — `DataSource.getTicket` refuses with `ServingGapError` for EVERY viewer, not only a guest, and
-  the sheet lives on a project page a guest gets 404 from; the view therefore does not offer an openable
-  affordance on a row whose project name is withheld (3.161), which is honest rather than complete.
+  possible — `DataSource.getTicket` refuses with `ServingGapError` for EVERY viewer, not only a guest — the
+  route answers a snake_case `proj_visibility` row with no title, no `stateProvenance` and no domain
+  `TicketState` — so the SHEET is a refusal for everybody on every surface, which predates this change.
+  **A claim that stood here and was FALSE is corrected rather than deleted:** this said a guest "gets 404
+  from" the project page, and `routes/board.ts` says in writing that a workspace member who is not on the
+  project *"passes the gate and gets 200 with whatever their visibility yields"*. A guest IS a workspace
+  member and the guest arm of `visibleTicketsWhere` is the explicit clause, so the project page loads for
+  them with their shared ticket on the board. The view's open affordance was gated on that false claim and
+  the gate is now GONE (3.161); navigation works to exactly the degree it works for anybody.
   Owner of (1): whoever runs the stack once CI billing is restored. Owner of (2): the `getTicket` serving
   gap, which predates this and is not this change's to close
 - 13.177 ✅ the suite is off the LOCAL gate structurally, for two independent reasons: it is reached by

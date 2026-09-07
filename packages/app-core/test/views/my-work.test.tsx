@@ -244,14 +244,23 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     expect(within(assigned).queryByText('File the GST return')).not.toBeInTheDocument();
   });
 
-  it('3.161 a shared errand whose project NAME is withheld shows the project ID and is not offered as openable', async () => {
-    // The guest this key exists for is on no project, so `projectName` is null
-    // for every row they will ever see here. Two properties, both of which were
-    // wrong before this change and only one of which is new.
+  it('3.161 a shared errand whose project NAME is withheld shows the project ID, not a blank — and is still openable', async () => {
+    // `WorkItem.projectName`'s own contract says a withheld name leaves the
+    // viewer holding the id, "so the item renders id-only rather than blank" —
+    // and the renderer printed `{item.projectName}`, i.e. NOTHING. PRE-EXISTING
+    // and reachable before this change (a guest ASSIGNED a ticket in a project
+    // they cannot see, 7.108); "Shared with me" is where it becomes the normal
+    // case, which is why it is fixed here.
     //
-    // The two rows carry DIFFERENT titles and ids on purpose: given the same
-    // title, the control's button would satisfy the negative's query and the
-    // "no button" assertion would be about the wrong row.
+    // The second half is a CORRECTION recorded rather than quietly dropped. An
+    // earlier version of this case asserted the withheld row was NOT openable,
+    // on the reasoning that a viewer who may not be told a project's name cannot
+    // load its page. Review measured that against `routes/board.ts`, which says
+    // in writing that a workspace member who is not on the project "passes the
+    // gate and gets 200" — a guest IS a workspace member, and the guest arm of
+    // `visibleTicketsWhere` is the explicit clause, so their shared ticket is on
+    // that board. The gate withheld a WORKING affordance from exactly the person
+    // the section is for, so it is gone and this case pins the opposite.
     const withheld: WorkItem = {
       ...GST,
       ticketId: 't-withheld',
@@ -268,28 +277,19 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     );
     const region = screen.getByRole('region', { name: 'Shared with me' });
 
-    // 1. THE ID, NOT A BLANK. `WorkItem.projectName`'s own contract says a
-    //    withheld name leaves the viewer holding the id, "so the item renders
-    //    id-only rather than blank" — and the renderer printed nothing at all.
+    // THE ID, NOT A BLANK.
     expect(within(region).getByText('prj_withheld')).toBeInTheDocument();
 
-    // 2. NOT OPENABLE. The sheet lives at /w/:ws/p/:projectId, so a viewer who
-    //    may not be told the project exists cannot load the page the button
-    //    would send them to. Offering it would be a control that reads as
-    //    working and is not. The title is still THERE — withholding the
-    //    affordance is not withholding the errand.
-    expect(
-      within(region).queryByRole('button', { name: 'Collect the shop keys' }),
-    ).not.toBeInTheDocument();
-    expect(within(region).getByText('Collect the shop keys')).toBeInTheDocument();
+    // OPENABLE, and it really opens — the row whose name is withheld is the one
+    // that must work, since it is the only kind a guest ever has here.
+    await userEvent.click(within(region).getByRole('button', { name: 'Collect the shop keys' }));
+    expect(onOpenTicket).toHaveBeenCalledWith('t-withheld');
 
-    // The CONTROL, in the same render and the same section: the row that DOES
-    // carry a project name keeps its button and still opens. Without this the
-    // assertion above passes on a section that renders no buttons at all.
-    const openable = within(region).getByRole('button', { name: 'File the GST return' });
-    await userEvent.click(openable);
+    // The named row beside it, same section, same render: the assertion above
+    // is about the WITHHELD row rather than about buttons existing at all.
+    await userEvent.click(within(region).getByRole('button', { name: 'File the GST return' }));
     expect(onOpenTicket).toHaveBeenCalledWith('t1');
-    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+    expect(onOpenTicket).toHaveBeenCalledTimes(2);
   });
 
   it('the assigned section has its own honest empty state', () => {
