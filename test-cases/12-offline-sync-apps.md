@@ -2213,6 +2213,20 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   and no apply failure. *Dropping `withTimeout` reddens this case ALONE — as a 7 ms assertion, not a
   runner timeout, so the case DETECTS the hang rather than surviving it. The author's own prediction said
   "vitest timeout" and is corrected here against the measurement.*
+- 12.380 ✅ **the reported unhandled rejection after an abandoned pull DOES NOT EXIST, and the real defect
+  was silence.** `withTimeout` races the per-ticket pull against a timer; when the timer wins the pull is
+  abandoned in flight and may still fail. That failure was reported as an unhandled rejection, fatal under
+  Node's default. **Measured, it is not:** `Promise.race` subscribes to EVERY input, so the abandoned loser
+  always carries a handler — reproduced with a standalone probe before anything was changed, and no
+  `unhandledRejection` fires. What was real is that the later failure was INVISIBLE, which is what explains
+  a ticket that keeps coming back owed. `lastAbandonedPull()` now reports it, naming the ticket, and the
+  handler is attached INSIDE the timer callback so a pull that rejects on its own — a genuine
+  `TicketPullNotFound` — wins the race first, has its timer cleared, and is never mis-recorded as an
+  abandonment. The `unhandledRejection` assertion is kept as a REGRESSION GUARD rather than as a
+  reproduction: the safety rests on a subtle property of `race`, and rewriting `withTimeout` as a
+  hand-built promise with a success-only `work.then(resolve)` makes the leak real and reddens it —
+  verified by doing exactly that. Sibling of 12.308, whose pull never settles and so can never reach this
+  path — `packages/sync-client/test/sync-engine.test.ts`
 - 12.289 ✅ **6.104's residual actually closes, by the CLIENT-PRESENTED path.** *(Not "end to end" — that word was here until the branch review measured it. The rig's transport RESTATES the route's rule in-process rather than calling it, the same way it restates `bootstrapTicket`; the ROUTE is covered by 12.284-12.286 through `app.inject`. **No single case runs the client and the real route together**, so a drift between them is caught by nothing until closure 5b points the rig at `inject()`.)* The residual is
   witnessed first — after a narrowing B still holds the ticket, its history and its searchable title, and
   no tombstone ever arrived — then `engine.reconcile` removes it: `getTicket` null, `listEntityEvents`

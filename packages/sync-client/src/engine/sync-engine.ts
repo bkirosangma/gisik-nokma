@@ -389,13 +389,16 @@ export function createSyncEngine(deps: {
    * What an ABANDONED per-ticket pull said when it finally answered, or null.
    *
    * `withTimeout` races the pull against a timer, and when the timer wins the
-   * pull promise is left with nothing attached to it. A promise in that state
-   * that later REJECTS is an unhandled rejection, which is fatal under Node's
-   * default `--unhandled-rejections=throw` — a background pull losing a race
-   * could take the process down. So the abandoned pull is still observed, and
-   * what it said is kept here rather than discarded: "we stopped waiting" and
-   * "it later failed, and here is why" are different facts, and the second is
-   * the one that explains a ticket that keeps coming back owed.
+   * pull is abandoned in flight — it is not cancelled, and it may still fail.
+   *
+   * That later failure was INVISIBLE, which is what this fixes. It was never a
+   * crash: `Promise.race` subscribes to every input, so the abandoned loser
+   * always has a handler and its rejection is never "unhandled" (measured
+   * directly — a standalone probe reproduces the shape and no
+   * `unhandledRejection` fires). The engine was therefore safe and simply
+   * silent, and the silence is the defect worth closing: "we stopped waiting"
+   * and "it later failed, and here is why" are different facts, and the second
+   * is the one that explains a ticket that keeps coming back owed.
    */
   let abandonedPull: { ticketId: string; message: string } | null = null;
   /** Single-flight latch for `reconcile`, modelled on `flushing` — see `reconcile`. */
@@ -545,11 +548,13 @@ export function createSyncEngine(deps: {
             // runs — so a genuine `TicketPullNotFound` is still handled by the
             // caller and is never mis-recorded as an abandonment.
             //
-            // Attaching it matters because `Promise.race` does not cancel the
-            // loser. Once the rejection below wins, nothing is left attached to
-            // `work`, and a promise that rejects with no handler is an
-            // UNHANDLED rejection — fatal under Node's default. Observing it is
-            // not swallowing it: the reason is kept for `lastAbandonedPull()`.
+            // `Promise.race` does not CANCEL the loser, so the pull is still
+            // in flight and may still fail. It is not left unhandled — `race`
+            // subscribes to both inputs — so this is not a crash fix; the
+            // failure was simply invisible, and a pull that quietly failed
+            // after being abandoned is the thing that explains a ticket which
+            // keeps coming back owed. Observing is not swallowing: the reason
+            // is kept for `lastAbandonedPull()` rather than discarded.
             void work.catch((cause: unknown) => {
               abandonedPull = {
                 ticketId,
