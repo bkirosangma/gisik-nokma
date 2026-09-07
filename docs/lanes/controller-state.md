@@ -1,5 +1,26 @@
 # Cross-lane controller — live state
 
+## ⏸ MONDAY 12:1x IST — EXECUTOR RESTARTED at 89% context with remedy (1) BUILT BUT RED, deliberately unmerged. `main` is `11779b1`, unchanged since the last anchor. Read `docs/lanes/executor-state.md` on `exec/77-decouple-create` for the actual restart brief — this section is context, not a substitute.
+
+**Remedy (1) — decoupling `createRegion` from `useTicketList` — is implemented and 3.142 (its own governing
+case) passes as proof the mechanism moved correctly** (from withholding the whole parent control to naming the
+unavailability explicitly, same principle). **`page-refusals.test.tsx` (12.382) is red after the rewrite, and
+the executor correctly stopped rather than weaken the assertion to reach green.** `apps/web`: 138 passed / 1
+failed. `app-core` green.
+
+**The exact open question, named rather than guessed at:** with `createRegion` no longer rendering the list's
+refusal, the List/Calendar/Timeline tab arms may be the ONLY renderers of the past-cap refusal left — **a
+project sitting on the Board tab past the cap may now show no refusal anywhere**, which would be a real
+regression this change introduced. **This is the first thing the next session must test, not the last** — a
+green suite reached before answering it would bury the question the red test is asking. Do not treat 12.382's
+current failure as "just fix the assertion" without first checking Board-tab behavior past the cap.
+
+**Do NOT merge `exec/77-decouple-create` (head `e66a140`) as-is** — no PR was opened, deliberately, and this
+red state should not be treated as ready. `main` is untouched by this attempt; nothing to revert.
+
+**After this resolves:** the owner's second half (real filtering, its own PR), then `13.176`'s measurement and
+design. Both still need a design decision before code, per standing instruction.
+
 ## ▶ MONDAY 12:0x IST — `main` is `b8877f7`, gate green. 12.258's carried half CLOSED (12.382). The pagination cliff is WORSE than 12.322 recorded — owner ruled BOTH remedies, in order.
 
 PR #267 merged — measurement only, no design decision baked in: the real "past-cap" page now renders with the
