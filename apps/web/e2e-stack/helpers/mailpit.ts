@@ -32,6 +32,9 @@ export async function purgeInbox(): Promise<void> {
  * Wait for exactly one message to `email` and return the first URL in its body.
  * Requires a `purgeInbox()` immediately before the send.
  */
+/**
+ * 13.171 — fetchMagicLink requires the inbox be purged immediately before send and demands EXACTLY ONE message after settling; two after a purge raises rather than silently picking messages[0], which under an unknown sort order could be an already-spent link that a stale session cookie would mask.
+ */
 export async function fetchMagicLink(email: string, timeoutMs = 20_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   let seen = 0;

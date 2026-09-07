@@ -340,6 +340,9 @@ beforeAll(async () => {
 /**
  * 5.37 — cited on the block: the server’s `EngineContext` answers HONESTLY about what it can serve while ticket state does not exist yet — `null` for a ticket nothing created, and `null` for a membership that HAS a head but no grant. Each clause is a test in this block.
  */
+/**
+ * 6.135 — a RECORD rather than an assertion, kept beside the suite it describes: the P18 round's mutation sweep (four mutations before the fix, two more after it, each run against the full 66-file/720-test server suite and restored one at a time with a verified marker) is recorded here rather than re-asserted — M1-M4 killed 6.132/6.133/6.134's cases in this file, and the fix round's M5-M6 killed 6.137 and 6.132; the counts are as measured in the catalogue row, not re-derived by any test.
+ */
 describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
   it('serves the WHOLE TicketState for a ticket the projections hold — inverted by Task 12', async () => {
     // THE FIRST OF THE TWO ASSERTIONS THIS TASK INVERTS. It read

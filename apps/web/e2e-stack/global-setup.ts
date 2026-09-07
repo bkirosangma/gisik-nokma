@@ -78,6 +78,9 @@ export default async function globalSetup(): Promise<void> {
   await createUser(OWNER_EMAIL);
   await createUser(ACCOUNTANT_EMAIL);
 
+  /**
+   * 13.180 — globalSetup runs seed:cc via `docker compose exec ... server node dist/seed/...` — inside the DEV compose container, on every e2e-stack run — and asserts the seed's own report names 'guest configured'; the corrected reasoning (reference/ is absent from the runtime image, present in dev only via docker-compose.dev.yml's bind mount) lives in this file's header docblock, not in the app image.
+   */
   const output = execFileSync(
     'docker',
     [

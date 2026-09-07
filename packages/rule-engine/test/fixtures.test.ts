@@ -68,6 +68,21 @@ const fixtures = loadFixtures();
  * 4.23 — A parent cannot enter a terminal state while any child is non-terminal — open or active alike; it may once every child is terminal. Proven by the fixtures `invariant-accepts-terminal-parent-when-children-are-terminal.json` (accepted), `invariant-refuses-terminal-parent-with-active-child.json` (refused/parent-terminal-with-open-children), `invariant-refuses-terminal-parent-with-open-child.json` (refused/parent-terminal-with-open-children), which this loop executes as its own it(fx.name).
  */
 /**
+ * 4.24 — require-comment refuses bare and whitespace-only comments; a real comment passes. Proven by the fixtures `rule-require-comment-refuses-a-bare-move.json` (refused/require-comment), `rule-require-comment-refuses-a-blank-comment.json` (refused/require-comment), `rule-require-comment-accepts-a-commented-move.json` (accepted), which this loop executes as its own it(fx.name).
+ */
+/**
+ * 4.25 — require-evidence refuses without an attachment id; with one it passes. Proven by the fixtures `rule-require-evidence-refuses-without-attachment.json` (refused/require-evidence), `rule-require-evidence-accepts-with-attachment.json` (accepted), which this loop executes as its own it(fx.name).
+ */
+/**
+ * 4.26 — require-field wants the field set before the move, not with it. Proven by the fixtures `rule-require-field-refuses-unset-field.json` (refused/require-field), `rule-require-field-accepts-set-field.json` (accepted — the field is a prior `ticket.field_set` event, not part of the candidate move), which this loop executes as its own it(fx.name).
+ */
+/**
+ * 4.27 — restrict-to: assignee, roles (via membership), and named people OR-combine; missing membership refuses; a planted empty restriction refuses everyone. Proven by the fixtures `rule-restrict-to-accepts-the-assignee.json`, `rule-restrict-to-refuses-non-assignee.json`, `rule-restrict-to-accepts-the-role.json`, `rule-restrict-to-refuses-missing-role.json`, `rule-restrict-to-refuses-without-membership.json`, `rule-restrict-to-accepts-a-listed-user.json`, `rule-restrict-to-refuses-unlisted-user.json`, `rule-restrict-to-accepts-any-one-criterion.json` (OR-combine), `rule-restrict-to-refuses-when-no-criterion-matches.json`, `rule-restrict-to-refuses-when-planted-empty.json`, which this loop executes as its own it(fx.name) — the eleventh `rule-restrict-to-*` fixture, `rule-restrict-to-refuses-through-a-from-any-edge.json`, belongs to case 4.50.
+ */
+/**
+ * 4.28 — require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. Proven by the fixtures `rule-rdu-refuses-the-same-person.json` (refused/require-different-user), `rule-rdu-accepts-a-second-person.json` (accepted), `rule-rdu-accepts-vacuously-on-a-bypassable-workflow.json` (accepted), `rule-rdu-counts-only-the-latest-performer.json` (refused/require-different-user), which this loop executes as its own it(fx.name) — three further `rule-rdu-*` fixtures belong to other rows already cited elsewhere: `rule-rdu-refuses-across-a-remap.json` to 4.35, `rule-rdu-ignores-an-entry-from-a-workflow-the-ticket-has-left.json` to 4.37, `rule-rdu-refuses-a-history-it-cannot-read.json` to 4.52.
+ */
+/**
  * 4.29 — Rules run in authored order and the first refusal wins — proven with the same violated pair in both orders. Proven by the fixtures `rules-first-refusal-wins.json` (refused/require-comment), `rules-order-comes-from-the-definition.json` (refused/require-evidence), which this loop executes as its own it(fx.name).
  */
 /**

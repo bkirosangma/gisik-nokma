@@ -175,6 +175,9 @@ describe('sweepInviteTokens', () => {
     expect(await tokenIds()).toEqual([]);
   });
 
+  /**
+   * 6.147 — both retention sweeps are safe to run twice (a second run reports and deletes nothing more) and a dry run writes nothing; each claim is asserted against the underlying table and not only the report, in this file for sweep-invite-tokens and in the identical pair of tests in sweep-user-preferences.test.ts (lines 312, 337) for the other sweep.
+   */
   it('is idempotent — a second run finds nothing left to do', async () => {
     const ws = newUlid();
     const lapsed = newUlid();

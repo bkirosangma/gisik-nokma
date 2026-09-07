@@ -20,6 +20,9 @@ import { ACCOUNTANT_EMAIL, signIn } from './helpers/sign-in.js';
  * positive from the same render, so "the guest sees nothing at all" fails.
  */
 
+/**
+ * 13.175 — a guest (accountant, seeded with workspace role guest and no project.member_added) sees the Convenience Corner workspace heading but zero occurrences of 'Shop operations', paired with a present My Work link in the same render — absent-with-a-present-sibling, never a bare toHaveCount(0) that would also pass on a blank or redirected page.
+ */
 test('a guest sees the workspace and NOT its projects — the partial workspace, from a browser', async ({
   page,
 }) => {

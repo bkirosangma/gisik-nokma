@@ -1132,6 +1132,8 @@ describe('the promised projects (cases 6.126, 6.127)', () => {
   });
 
   /**
+   * 6.122 — CLOSED by 6.127, proven by this same test: the half-landed accept-then-500 failure this row recorded (membership committed before a cross-workspace project guard threw) is superseded — the invitation is now refused at issuance, before any credential exists, so the failure mode this row named can no longer occur.
+   *
    * 6.127 — a promised project that does not exist in this workspace is refused
    * at ISSUANCE, before a credential is ever minted.
    *
