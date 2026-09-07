@@ -16,6 +16,61 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~02:25 IST — **§05: 67 → 17 uncited in SEVEN hand batches. Branch `exec/63-s05-backfill` pushed, PR pending the final gate.** Weekly reset ~4h away.
+
+| what | value |
+|---|---|
+| `main` | `4f26f21` |
+| branch | **`exec/63-s05-backfill`**, head `8b67e5b`, pushed, 7 commits |
+| **§05** | **56 cited / 17 uncited / 73** (was 6/67). Baseline **17** |
+| repo-wide | **1174 cited / 356 uncited** (was **815** Sunday morning) |
+| sections at ZERO | §09 · §10 · §11 |
+| gate | green at `fd5de0f` (twelfth identical run, 3666 \| 5 (3671) / 285); **final gate for batch 7 was running when this was written — if no result is recorded below, RE-RUN IT** |
+
+## §05's remaining 17 — a scattered tail, mapped but NOT done
+
+All 16 my instrument sees name a test, but they are **1–4 rows across TEN files**, so each needs its own file read:
+`ticket-state` (5.6, 5.30, 5.50) · `ticket-events` (5.3, 5.48, 5.53) · `ticket-types` (5.1, 5.2) ·
+`harness` (5.51, 5.52) · and singletons `5.14` fixtures · `5.31` memory-context · `5.36` ticket-type ·
+`5.54` proj-ticket-types · `5.68` version-map · `5.75` ticket-history-ordering.
+
+**I stopped here deliberately rather than push through it.** Ten files of careful mapping is where a rushed
+citation gets made, and **a wrong citation is worse than an uncited row** — it satisfies the checker while
+pointing at a test that does not assert the case. The tail is cheap to resume; a false citation is not.
+
+## What made the placements right, and it was rarely my judgement
+
+**Rows frequently name their own covering test in their prose** (5.9, 5.10, 5.15, 5.22, 5.42, 5.47, 5.62).
+Where they do, the placement is the catalogue's and not mine. **Read the row to the end before deciding.**
+
+**Three deferrals this session all proved correct:** `7.72` (named `compile-filter`, actually
+`projections/search:305`), `13.45–13.47` (bare `doc-text.test.ts` — the SERVER seed file, not the domain one),
+`5.40` (in `hierarchy`'s candidate list, belongs to `reparent`). **A row appearing in a file's candidate list is
+not evidence that file asserts it** — the list comes from filename mentions, and rows mention files for several
+reasons.
+
+**Citation shapes, and never let one imply a test proves a whole row:** on a `describe` when the row's clauses are
+one test apiece (5.37, 5.55/5.57/5.63, 5.71, 5.72, 5.74); stacked in one docblock when one test genuinely carries
+several ids and the CATALOGUE says so (5.15+5.29, 5.17+5.62, 5.55+5.57+5.63); on the primary clause naming where
+the rest live (5.7, 5.11, 5.19, 5.34, 5.38, 5.40, 5.60).
+
+## The process fix that finally worked
+
+Four times I quoted a line count the control had not printed. It was not carelessness: **the commit message was
+composed in the SAME tool call that ran the control**, so the number was always a prediction written before the
+output existed. **The fix is ORDERING — run the control, READ it, then write the prose in a separate step.** Held
+for four consecutive batches since. Generalises: *when a claim and its evidence are produced in one atomic step,
+the claim is authored blind.*
+
+## NEXT
+
+1. **§05's tail** — the ten files above. No ruling needed.
+2. **§06 (56 named) and §03 (40 named)** — measure with the both-styles + range-form instrument, cross-check the
+   checker, then choose hand vs dispatch.
+3. **OPEN ASKS:** a subagent for the ~120 remaining named rows across §05/§06/§03; and **§12's block
+   `12.380–12.399` is allocated but NOT cleared** — only **2 of §12's 78** are transcribable regardless.
+
+
 # 🟢 MONDAY 2026-09-07 ~01:50 IST — **§07 AND §13 ARE BACKFILLED TO THE LIMIT OF WHAT NAMING ALLOWS. PR open. Nothing in flight, no subagent. Weekly reset ~4.5h away.**
 
 | what | value |

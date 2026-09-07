@@ -271,6 +271,10 @@ describe('proj_rollups', () => {
    * and a reader who takes the column for the invariant's number would then
    * ship a parent that refuses closes it should allow.
    */
+  /**
+   * 5.17 — `proj_rollups` counts DIRECT children per category; the seeded GRANDCHILD is what makes that say "direct" rather than "the subtree".
+   * 5.62 — and on the same row: `open_children` is NOT the parent-terminal invariant’s "open children". The column is the `open` category alone, while the invariant reads `total_children - terminal_children` (open PLUS active). Both are asserted off the SAME row at the one arrangement where they disagree — 1 versus 2 — because a fixture with nothing `active` cannot tell them apart. This is the test 5.62’s own row names.
+   */
   it('counts DIRECT children per category — a grandchild belongs to the parent above it, never to this one', async () => {
     // ONE ledger applied in prefixes, never two overlapping ones: a second
     // `ticket.created` for a ticket that exists rebuilds it from scratch
@@ -349,6 +353,9 @@ describe('proj_rollups', () => {
    * root (`newParentId` is nullable), which no plan text exercises: the ticket
    * becomes a child of nobody, and nobody is not a key.
    */
+  /**
+   * 5.64 — a reparent to project ROOT (`ticketReparentedPayload.newParentId` is nullable, and no plan text exercises it) removes the ticket from its parent’s counts, empties the row it left, and keys nothing on null.
+   */
   it('a reparent moves the counts between parents, empties the row it left, and detaching to root keys nothing on null', async () => {
     const ledger = asLedger([
       ...SEED,
@@ -394,6 +401,9 @@ describe('proj_rollups', () => {
    * stating a distribution that no longer exists — and would keep the
    * parent-terminal invariant refusing a close the new version has just made
    * legitimate.
+   */
+  /**
+   * 5.60 — every write to `proj_rollups` is keyed on a parent whose OWN entity stream never authors it: here the writer is a workflow publish, moving the parent counts in the same transaction as the ticket fold with nobody moving a ticket. The other writer — a CHILD’s stream, via a rebind — is the test below.
    */
   it('a re-categorising v2 moves the parent counts in the SAME transaction as the ticket fold, with nobody moving a ticket', async () => {
     const ledger = asLedger([...SEED, moved(CHILD_A, 'doing'), WF_BASIC_V2_RECATEGORISED]);
@@ -498,6 +508,9 @@ describe('proj_rollups', () => {
    *     none of them anywhere. That control is weak on its own — nothing reads
    *     payloads here — and it is the point: it is the assertion that stays red
    *     if a later change ever starts.
+   */
+  /**
+   * 5.61 — derived progress is NEVER authored, and a STALE row breaks that as badly as an invented one: every stored row is compared whole against an INDEPENDENT recount of `proj_tickets`, and a payload that spells rollup numbers puts none of them here.
    */
   it('every row equals an independent recount of proj_tickets, and a payload that spells rollup numbers puts none of them here', async () => {
     // One ledger, applied in two prefixes: the field claim is the LAST event,

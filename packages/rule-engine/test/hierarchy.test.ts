@@ -47,6 +47,9 @@ describe('checkTicketCreated', () => {
     expect(await checkTicketCreated(created(NEW, 'task', null), baseCtx())).toEqual({ refused: false });
   });
 
+  /**
+   * 5.7 — rank violations refused on create with the exact plain-language reason. The equal-ranks-cannot-nest half of the row is the test below; the reparent path is in `reparent.test.ts`.
+   */
   it('planted defect: an epic under a story — rank must exceed the parent rank', async () => {
     expect(await checkTicketCreated(created(NEW, 'epic', PARENT), baseCtx())).toEqual({
       refused: true,
@@ -64,6 +67,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.8 — a ticket whose type sits at or BELOW the deepest rank is refused without a parent, named as its own type rather than as `sub-task`.
+   */
   it('planted defect: a sub-task without a parent — the deepest rank always belongs to something', async () => {
     expect(await checkTicketCreated(created(NEW, 'sub-task', null), baseCtx())).toEqual({
       refused: true,
@@ -73,6 +79,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.10 — cross-project parents refused on create. This is the test 5.10’s own row names; its reparent half is in `reparent.test.ts`.
+   */
   it('planted defect: a parent from another project', async () => {
     const ctx = buildMemoryContext(
       [WF],
@@ -93,6 +102,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.11 — the first of the four forced preconditions the row lists (unknown type). The other three — unknown parent, unknown ticket, and a type whose workflow is undefined — are the neighbouring tests in this block.
+   */
   it('planted defect: a type nobody defined', async () => {
     expect(await checkTicketCreated(created(NEW, 'ghost-type', PARENT), baseCtx())).toEqual({
       refused: true,
@@ -110,6 +122,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.21 — live work under a TERMINAL parent is refused toward the offered reopen, with the parent’s title and state named in the reason.
+   */
   it('planted defect: creating live work under a finished parent — the remedy named is the reopen', async () => {
     const ctx = buildMemoryContext(
       [WF],
@@ -155,6 +170,9 @@ describe('checkTicketCreated', () => {
       [typeDefined(STORY), typeDefined(CHECKLIST), typeDefined(MICRO_STEP), created(PARENT, 'story', null)],
     );
 
+  /**
+   * 5.23 — a CUSTOM type defined at the deepest rank is refused at project root exactly as the built-in `sub-task` is, and named as ITSELF in the reason: the rule follows the rank, not the id.
+   */
   it('planted defect: a CUSTOM type at the deepest rank, cast at project root — the rule follows the rank, not the id', async () => {
     expect(await checkTicketCreated(created(NEW, 'checklist-item', null), checklistCtx())).toEqual({
       refused: true,
@@ -174,6 +192,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.24 — the same custom deepest-rank type is ACCEPTED once it names a parent, so the rule is about depth rather than about that type.
+   */
   it('accepts the same custom deepest-rank type once it names a parent', async () => {
     expect(await checkTicketCreated(created(NEW, 'checklist-item', PARENT), checklistCtx())).toEqual({
       refused: false,
@@ -202,6 +223,9 @@ describe('checkTicketCreated', () => {
     });
   });
 
+  /**
+   * 5.49 — a malformed-payload refusal names the FIELD it is about, and refuses rather than throwing out of the engine.
+   */
   it('planted defect: a malformed payload REFUSES rather than throwing out of the engine', async () => {
     const env = makeEnvelope({
       type: 'ticket.created',
@@ -224,6 +248,9 @@ describe('checkTicketCreated', () => {
    * it silently resets the fold, wiping the ticket's status, its collaborators,
    * its field claims and its whole transition log — the evidence four-eyes
    * reads. Nothing shipped refused it. This check does.
+   */
+  /**
+   * 5.38 — a second `ticket.created` for a ticket that already exists is refused `ticket.already-exists`. The row’s other half — that this fires AHEAD of every question about the payload — is the precedence test below.
    */
   it('planted defect: creating a ticket that already exists — a second create silently resets the fold', async () => {
     expect(await checkTicketCreated(created(PARENT, 'story', null), baseCtx())).toEqual({
@@ -260,6 +287,9 @@ describe('checkTicketCreated', () => {
    * asserted that sentence as a literal, so the suite certified copy that is
    * false on the only path that reaches it: the candidate's own type
    * (`task`) resolves in this very context. Controller ruling P11.
+   */
+  /**
+   * 5.39 — one of the two refusals that used to fire with somebody else’s sentence and now tells the truth on the path that reaches it: a parent that EXISTS but whose type does not, the guard the reducer cannot stage.
    */
   it('refuses when the PARENT exists but its type does not — the guard the reducer cannot stage', async () => {
     const orphanParent: TicketState = {

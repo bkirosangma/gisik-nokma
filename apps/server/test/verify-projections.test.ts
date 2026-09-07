@@ -148,6 +148,9 @@ async function shadowSchemaExists(): Promise<boolean> {
 }
 
 describe('verifyProjections', () => {
+  /**
+   * 5.69 — the non-emptiness guard the registry-driven verifier’s clean verdict depends on: a clean verdict over an EMPTY table is the check that cannot fail, so every table the verdict covers is asserted non-empty first.
+   */
   it('the seed is NON-EMPTY in every table the clean verdict below covers', async () => {
     // A clean verdict over empty tables is the check that cannot fail, and this
     // file's own seed comment says so about proj_workflows. Asserted rather than

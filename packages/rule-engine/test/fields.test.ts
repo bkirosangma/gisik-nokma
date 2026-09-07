@@ -222,6 +222,9 @@ describe('checkTicketFieldSet', () => {
    * a title change on this same ticket is still accepted, which is the half
    * that pins the order rather than merely the branch.
    */
+  /**
+   * 5.46 — a custom-field claim on a ticket whose TYPE is no longer defined refuses `ticket.unknown-type`, while a title change on that same ticket is still accepted.
+   */
   it('planted defect: a custom field on a ticket whose type is no longer defined', async () => {
     expect(await checkTicketFieldSet(fieldSet('amount', 1200), ctxWithoutTheTicketsType())).toEqual({
       refused: true,
@@ -243,6 +246,9 @@ describe('checkTicketFieldSet', () => {
    * which is the only door those two ever pass. The coalesce is gone as well —
    * `ticket-state.ts:211` reads `claim(p.value, env)`, because once the key is
    * required the fold could only restate the closed hole as the design.
+   */
+  /**
+   * 5.44 — a `ticket.field_set` whose payload omits `value` entirely is refused at the door, not folded into a clearing: `z.unknown()` does not require the key to be present.
    */
   it('planted defect: a field_set carrying no value at all is refused, not folded into a clearing', async () => {
     expect(await checkTicketFieldSet(fieldSetWithNoValue('amount'), ctx())).toEqual({
@@ -276,6 +282,9 @@ describe('checkTicketFieldSet', () => {
  * the ones that clear a title and the ones that name a field no type declared.
  */
 describe('evaluateEvent dispatches ticket.field_set', () => {
+  /**
+   * 5.45 — `evaluateEvent` ROUTES `ticket.field_set`. Every other field test calls `checkTicketFieldSet` directly, so without this assertion deleting the dispatcher case would go unnoticed.
+   */
   it('routes the event to checkTicketFieldSet rather than passing it through', async () => {
     expect(await evaluateEvent(fieldSet('title', null), ctx())).toEqual({
       refused: true,

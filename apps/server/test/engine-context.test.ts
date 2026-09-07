@@ -337,6 +337,9 @@ beforeAll(async () => {
   ]);
 });
 
+/**
+ * 5.37 — cited on the block: the server’s `EngineContext` answers HONESTLY about what it can serve while ticket state does not exist yet — `null` for a ticket nothing created, and `null` for a membership that HAS a head but no grant. Each clause is a test in this block.
+ */
 describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
   it('serves the WHOLE TicketState for a ticket the projections hold — inverted by Task 12', async () => {
     // THE FIRST OF THE TWO ASSERTIONS THIS TASK INVERTS. It read
@@ -839,6 +842,9 @@ describe('createEngineContext — the tenancy predicate on the two ACTOR-supplie
     ]);
   });
 
+  /**
+   * 5.65 — ruling P14 on the WORKFLOW lookup: `ctx.getWorkflowDef` resolves an id inside the workspace the EVENT names, never inside the one that owns the workflow.
+   */
   it('resolves a workflow id inside the ASKING workspace, never inside the one that owns it', async () => {
     // Three ways, mirroring case 5.16's control shape: found in the workspace
     // that holds it, NOT found from another, and not found anywhere for an id
@@ -887,6 +893,9 @@ describe('createEngineContext — the tenancy predicate on the two ACTOR-supplie
     expect(own).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 5.66 — ruling P14 on the TICKET-TYPE lookup, the create path’s instance of the same shape: a `ticket.created` naming a type key another workspace defined is refused, and the same key commits where it was defined.
+   */
   it('a create naming a type key ANOTHER workspace defined is refused, and the same key commits where it was defined', async () => {
     // The create path's instance of the same shape — `getTicketTypeDef(ctx, p.typeId)`
     // resolving an actor-chosen slug. `gadget` exists in OTHER_WS and nowhere
@@ -914,6 +923,9 @@ describe('createEngineContext — the tenancy predicate on the two ACTOR-supplie
     expect(nowhere).toMatchObject({ status: 'refused', rule: 'ticket.unknown-type' });
   });
 
+  /**
+   * 5.67 — the server’s ticket lookup is GLOBAL on purpose: a parent in another workspace RESOLVES, and ruling P12’s guard is what refuses it — which is why the lookup stays global rather than being narrowed.
+   */
   it("a parent in another workspace RESOLVES, and P12's guard is what refuses it — which is why the ticket lookup stays global", async () => {
     // The other side of the same ruling, and the reason `getEntityState` takes
     // no scope. The foreign parent is FOUND here — that is the point — and
