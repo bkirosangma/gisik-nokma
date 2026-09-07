@@ -35,3 +35,181 @@ a { color: var(--gn-accent); }
    rather than a spinner that never stops. */
 .gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--gn-border); border-radius: 0.4rem; color: var(--gn-text-muted); }
 .gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }
+
+/* ── The 404, and the two legal pages ────────────────────────────────────────
+   Colours are tokens only, as everywhere in this file — `apps/web/app` is one
+   of the token-discipline scan's declared roots, so a literal here reddens that
+   suite rather than this one.
+
+   `max-width: 68ch` on the prose blocks is the one non-obvious number: these are
+   the only three pages in the product that are mostly PARAGRAPHS rather than
+   cards and tables, and an unbounded measure across a wide monitor is genuinely
+   hard to read back to the start of the next line. 68 characters sits inside the
+   65–75 that legibility research settles on. The shell's own `max-width: 80rem`
+   is right for a board and wrong for a policy. */
+
+.gn-notfound,
+.gn-legal {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+.gn-notfound__title,
+.gn-legal__title {
+  max-width: 68ch;
+  margin: 0 0 0.75rem;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+.gn-notfound__lead {
+  max-width: 68ch;
+  margin: 0 0 1.5rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-notfound__causes {
+  max-width: 68ch;
+  margin: 0 0 1.75rem;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.gn-notfound__cause {
+  font-weight: 600;
+  color: var(--gn-text);
+}
+
+/* The reasoning block is `--gn-surface-sunken` rather than a callout colour on
+   purpose: it is an explanation, not a warning. `--gn-warning` here would tell
+   the reader something has gone wrong, when the whole point of the paragraph is
+   that the product is behaving correctly. */
+.gn-notfound__why {
+  max-width: 68ch;
+  margin: 0 0 1.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+}
+
+.gn-notfound__why-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  color: var(--gn-text);
+}
+
+.gn-notfound__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+}
+
+/* 2.75rem = 44px, the minimum touch target. These are the only controls on the
+   page, and on a phone they are what a lost reader reaches for first. */
+.gn-notfound__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--gn-border-strong);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-raised);
+  color: var(--gn-accent);
+  text-decoration: none;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.gn-notfound__link:hover {
+  background: var(--gn-surface-sunken);
+  border-color: var(--gn-accent);
+}
+
+/* Focus is drawn with an outline and an offset rather than a background swap:
+   a keyboard user needs the ring to be visible against BOTH resting and hover
+   states, and a background-only cue disappears under the pointer. */
+.gn-notfound__link:focus-visible,
+.gn-legal a:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 1rem, not the 0.95rem this first shipped with. Measured in a real browser at
+   15.2px, which is under the 16px floor for body text on a phone — and this
+   paragraph is the one telling a locked-out reader who can help them, so it is
+   exactly the wrong text to shrink. */
+.gn-notfound__aside {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 1rem;
+}
+
+.gn-legal__meta {
+  max-width: 68ch;
+  margin: 0 0 2rem;
+  color: var(--gn-text-muted);
+  font-size: 0.95rem;
+}
+
+.gn-legal__section {
+  max-width: 68ch;
+  margin: 0 0 1.75rem;
+}
+
+.gn-legal__section h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.gn-legal__section p,
+.gn-legal__section li {
+  margin: 0 0 0.7rem;
+}
+
+.gn-legal__section ul {
+  padding-left: 1.1rem;
+}
+
+/* The one place a legal page raises its voice, and it earns it: the
+   append-only-history/erasure tension is a real unresolved question, not a
+   formality, and a reader skimming for the deletion section should not be able
+   to miss it. `--gn-warning` on the rule only — not as a text colour, which
+   would fail contrast against this surface. */
+.gn-legal__flag {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--gn-border);
+  border-left: 3px solid var(--gn-warning);
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+}
+
+.gn-legal__flag-label {
+  font-weight: 600;
+  color: var(--gn-text);
+}
+
+.gn-legal__footer {
+  max-width: 68ch;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gn-border);
+  color: var(--gn-text-muted);
+}
+
+@media (max-width: 40rem) {
+  .gn-notfound__title,
+  .gn-legal__title { font-size: 1.35rem; }
+  .gn-notfound__actions { flex-direction: column; align-items: stretch; }
+  .gn-notfound__link { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-notfound__link { transition: none; }
+}
