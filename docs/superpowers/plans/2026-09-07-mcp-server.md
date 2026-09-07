@@ -1834,7 +1834,7 @@ export async function createSession(deps: {
 }): Promise<Session>;
 ```
 
-- [ ] **Step 1: Write the failing device-login tests**
+- [x] **Step 1: Write the failing device-login tests**
 
 `packages/mcp-server/test/device-login.test.ts`:
 
@@ -1929,12 +1929,12 @@ describe('the device flow', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/device-login.test.ts 2>&1 | tail -20`
 Expected: FAIL — cannot resolve `../src/device-login.js`.
 
-- [ ] **Step 3: Write `src/device-login.ts`**
+- [x] **Step 3: Write `src/device-login.ts`**
 
 ```ts
 import type { GisikClient } from './http-client.js';
@@ -1991,7 +1991,7 @@ export async function runDeviceLogin(deps: {
 }
 ```
 
-- [ ] **Step 4: Write the failing session tests**
+- [x] **Step 4: Write the failing session tests**
 
 `packages/mcp-server/test/session.test.ts`:
 
@@ -2094,7 +2094,7 @@ describe('the session', () => {
 });
 ```
 
-- [ ] **Step 5: Write `src/session.ts`**
+- [x] **Step 5: Write `src/session.ts`**
 
 ```ts
 import type { McpConfig } from './config.js';
@@ -2167,12 +2167,12 @@ export async function createSession(deps: {
 
 Extend `src/index.ts` with `export * from './device-login.js';` and `export * from './session.js';`.
 
-- [ ] **Step 6: Run the package suite**
+- [x] **Step 6: Run the package suite**
 
 Run: `pnpm --filter @gisik-nokma/mcp-server exec vitest run 2>&1 | tail -20`
 Expected: 18 passed. Confirm the count — a suite reporting 0 files is not a pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server/src packages/mcp-server/test

@@ -221,3 +221,39 @@ assignments rather than the file's maximum, which is exactly what §12's header 
 - **14.47** ✅ Posts with no token when there is none, which the device flow requires: the two
   unauthenticated doors are reached before any credential exists. —
   (`packages/mcp-server/test/http-client.test.ts`)
+
+## Task 7 — the device-flow login driver and the session (`packages/mcp-server`)
+
+*Every source of time is injected — `sleep`, `now`, the deadline — so the whole flow runs in
+microseconds under test and a reader can see there is no hidden clock.*
+
+- **14.50** ✅ Mints, prompts, polls until issued, and returns token + userId. **The poll interval comes
+  from the SERVER's answer**, not a constant in the client: the server is the side that knows its own
+  rate-limit budget, and a client carrying its own number would 429 itself the day that budget changes —
+  a login loop that rate-limits its own polling is indistinguishable from a server that never approves. —
+  (`packages/mcp-server/test/device-login.test.ts`)
+- **14.51** ✅ Gives up at the deadline rather than polling forever. — (`packages/mcp-server/test/device-login.test.ts`)
+- **14.52** ✅ Surfaces the prompt **before** the first poll — the ORDER is asserted, not merely that both
+  happened. A person cannot approve a code they have not been shown, and prompting after the first poll
+  would spend one interval of silence on every login. — (`packages/mcp-server/test/device-login.test.ts`)
+- **14.54** ✅ Uses a cached token without running the device flow. — (`packages/mcp-server/test/session.test.ts`)
+- **14.55** ✅ A 401 re-runs the device flow and retries the call ONCE — and **the user id moves with the
+  token**. A stale id would make every write's `actorId` disagree with the session and draw an
+  identity-spoof refusal from the permission gate: a confusing failure a long way from its cause. —
+  (`packages/mcp-server/test/session.test.ts`)
+- **14.56** ✅ **A second 401 is surfaced, not looped on**, asserted by counting calls. A server answering
+  401 to everything would otherwise spin forever and spend the device-flow rate-limit budget doing it. —
+  (`packages/mcp-server/test/session.test.ts`)
+  *Mutation: make the re-auth an unbounded loop and **exactly 14.56 fails**, by TIMING OUT at 4003ms —
+  the failure mode is the spin itself, which is the right way for this one to die.*
+- **14.57** ✅ **A 404 is NOT a re-auth trigger — it is the answer.** The product answers 404 for "does
+  not exist" and "not yours" alike, deliberately, so a caller cannot probe for which records exist.
+  Re-authenticating on it would turn a correct visibility refusal into a login prompt. —
+  (`packages/mcp-server/test/session.test.ts`)
+  *Mutation: re-auth on ANY `HttpError` rather than 401 only — **exactly 14.57 fails**.*
+
+> **`14.53` does not exist, and that is a correction rather than a gap.** The plan's docblock for
+> `device-login.test.ts` says "Cases 14.50–14.53" and then defines three. Corrected to 14.50–14.52 in the
+> file rather than carried forward: a docblock naming a case no test defines is exactly what
+> `check-case-citations.mjs` exists to catch, and this catalogue would otherwise have inherited a ✅ with
+> nothing behind it. The id is left unused; §13's rule is never to renumber around a gap.
