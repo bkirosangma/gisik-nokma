@@ -41,6 +41,32 @@ removing the `#`-comment check kills nothing because exact key equality already 
 form — measured and printed, not assumed. Weakening a case to kill an equivalent mutant is how a suite
 starts asserting the implementation instead of the property.
 
+# ▶ TUESDAY 2026-09-08 ~04:2x IST — **THE LEDGER IS 190/190, AND THE GATE CAN NOW SEE A ROW THAT LIES.**
+
+*Off `main` (`2df88e8`), independent of #325–#328.*
+
+**`main` itself was gated first, and is green** — nothing had run the forced gate on it after five
+merges landed tonight. **33/33 EXIT 0, `Cached: 0`**, Node **v22.22.2**, and all seven checks EXIT 0
+(`env`, `tasks`, `runbook`, `citations`, `help`, `db-tz` against the dev stack, `case-ids` at 1761).
+
+**What that turned up.** `mcp-server/12` read `in-flight  324  -` while the work had landed through
+**#329**: merging #323 deleted `exec/111`, which was #324's base, so GitHub auto-closed #324. The row
+survived pointing whoever restarts from this file at a CLOSED PR, for work that shipped hours earlier.
+Corrected to `done 329 267c104`, sha checked as an ancestor of `origin/main` rather than pasted. The
+ledger now reads **190/190, 100% VERIFIED COMPLETE**.
+
+**Nothing in the gate could see it, and now it can.** `done` rows are validated by sha reachability;
+a non-`done` row requires no evidence BY DESIGN — that is the whole point of the status split — so a
+wrong status carrying a stale PR number was invisible to every other check in the file. A row citing a
+PR that was closed without merging is now a HARD failure, with a four-case self-test in the same shape
+its three sibling scripts use. Case 13.262.
+
+**`git checkout -- <path>` destroyed an uncommitted fix for the THIRD time tonight**, on the very edit
+that added that self-test — with the memory saying "restore from a copy you made yourself, never from
+HEAD" already loaded. Caught by a read-back with a prediction attached; redone, committed FIRST, and
+the second control used `cp file file.good` and restored from that.
+
+
 # ▶ TUESDAY 2026-09-08 ~04:0x IST — **#324 WAS AUTO-CLOSED, NOT MERGED. THE SAME TRAP, A SECOND TIME.**
 
 > **READ THIS FIRST.** `origin/main` is `94f1f18` — **#323 (MCP Task 11) merged**. Merging it deleted
