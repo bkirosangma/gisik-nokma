@@ -20,6 +20,42 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~03:0x IST — **SECURITY HEADERS: THE PRODUCT SENT EXACTLY ONE, NOW IT SENDS FOUR.**
+
+*This branch (`exec/113-security-headers`) is off `main` and INDEPENDENT of the MCP stack — it can merge
+before or after #323/#324. It is deliberately not stacked on them: a third level on the mechanism that
+auto-closed four PRs unmerged earlier tonight is the worse risk, and the only overlap is narrative
+(`Features.md`, this file), which resolves keep-both.*
+
+Measured, not recalled: a sweep of `apps/server/src` and `apps/web/next.config.ts` for `helmet`,
+`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and
+`Permissions-Policy` returned **only `hsts.ts`**. The gap had been carried as open in this file for
+days. Owner ruling 2026-09-08: close the unambiguous part, defer CSP.
+
+| header | API | web |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | `nosniff` |
+| `X-Frame-Options` | `DENY` | `DENY` |
+| `Referrer-Policy` | `no-referrer` | `strict-origin-when-cross-origin` |
+| `Content-Security-Policy` | **deferred, absence asserted** | **deferred, absence asserted** |
+
+The referrer difference is deliberate: a browser never navigates FROM an API response, while a page
+whose own links stop carrying their origin breaks flows that legitimately read it.
+
+**`next.config.ts`'s `headers()` used to return `[]` outright over http.** Right for HSTS, wrong for
+anything else — gating the other three on the deployment protocol would leave local dev weaker than
+production, which is how a header that breaks something is found by users rather than by a developer.
+Case **13.248** went with it: it said "sends NOTHING" and asserted `toEqual([])`, which passes just as
+happily if `headers()` is deleted. It now names the header that must be absent.
+
+Cases 13.256–13.261; five mutations, five killed — classified by EXIT STATUS, after a harness earlier
+tonight grepped for `×` against a reporter that prints `1.` and read five kills as survivals.
+
+**`pnpm check-case-ids` is RED on this branch and that is expected**: `14.88`/`14.88b` collide under
+`main`'s reader, and the fix is in **#323**. Verified by running #323's reader against this tree —
+**EXIT 0, 1754 unique ids** — so the six new ids collide with nothing.
+
+
 # ▶ TUESDAY 2026-09-08 ~02:1x IST — **THE STACK IS CONSOLIDATED ON ONE BRANCH. TASKS 0–10 ARE ALL HERE.**
 
 > **READ THIS FIRST.** `origin/main` is `876a364` — #309 (pre-launch 6 + 7) merged at 19:44Z and

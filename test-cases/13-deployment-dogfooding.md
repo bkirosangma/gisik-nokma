@@ -1169,3 +1169,48 @@ is the next free id IN THAT BLOCK, not derived from the file's maximum.*
   every first run. Recording is now `UPDATE_TAP_BASELINE=1`, an explicit act. Proven by hiding the
   committed file and running: EXIT 1, one error per route naming the key and its observed count;
   restored by SHA-256 against `HEAD` and re-run green.*
+
+## Security headers beyond HSTS (owner-assigned, 2026-09-08)
+
+*Before this the whole product sent exactly ONE security header — `hsts.ts`'s `Strict-Transport-Security`.
+A sweep of `apps/server/src` and `apps/web/next.config.ts` for `helmet`, `Content-Security-Policy`,
+`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy` returned nothing
+else. The gap had been carried as open in the executor handoff for days. The owner ruled on 2026-09-08:
+close the unambiguous part, defer CSP.*
+
+- **13.256** ✅ The three ride on an ordinary answered request. — (`apps/server/test/http/security-headers.test.ts`)
+- **13.257** ✅ …and on a **404 and an unauthenticated 401** too. That is why the hook is a root
+  `onRequest` and not an `onSend`: a browser's first meeting with an unfamiliar host is often an error
+  reply, and a header that appeared only on 2xx would be absent exactly then. —
+  (`apps/server/test/http/security-headers.test.ts`)
+- **13.258** ✅ They do **not depend on the `options.security` block being configured** — the same three,
+  byte for byte, from an app built with it and one built without. `buildTestApp` passes no security
+  options and roughly sixty other call sites do the same, so a header registered inside that block is a
+  control that exists only in the configuration nobody exercises. —
+  (`apps/server/test/http/security-headers.test.ts`)
+  *Mutation: move the hook inside the block → 13.258 fails.*
+- **13.259** ✅ Each VALUE is pinned, not merely "three headers are present": `nosniff`, `DENY` (not
+  `SAMEORIGIN` — nothing this server returns is a document meant to be framed by anything, itself
+  included), `no-referrer`. And **CSP and Permissions-Policy are asserted ABSENT**, so adding either is a
+  deliberate act that reddens a test rather than a quiet drift. —
+  (`apps/server/test/http/security-headers.test.ts`)
+  *Mutations: weaken `DENY` to `SAMEORIGIN` → fails. Add a CSP to the set → fails.*
+- **13.260** ✅ The web app sends all three over **http AND https**, both inputs in one case — either
+  alone passes for a function that gates everything on the protocol, which is exactly the shape this
+  replaced. `referrer-policy` is `strict-origin-when-cross-origin` here and `no-referrer` on the API,
+  deliberately: this is a document origin and that one is never a page a browser navigates FROM. —
+  (`apps/web/test/next-config.test.ts`)
+  *Mutation: restore the `if (!https) return []` gate → 13.260 fails.*
+- **13.261** ✅ The web app sends **no `Content-Security-Policy` and no `Permissions-Policy`** — deferred
+  by the owner, and pinned so adding one is deliberate. A CSP for this app is a real design problem
+  (webpack rather than Turbopack, `output: 'standalone'`, a rewrite-based same-origin proxy) whose
+  failure mode is breaking in production only. — (`apps/web/test/next-config.test.ts`)
+  *Mutation: add a CSP to `headers()` → fails.*
+
+> ### 13.248 was a weaker claim wearing a stronger sentence
+>
+> It read *"sends NOTHING for an http `SERVER_ORIGIN`"* and asserted `toEqual([])`. That passes just as
+> happily if `headers()` is deleted outright, so what it actually measured was "the function returns an
+> empty array", not "HSTS is withheld over http". Landing three headers that legitimately ship over http
+> forced the distinction. It now names the header that must be absent and asserts the others are there,
+> which fails if the protocol gate is removed AND if the function stops being wired.
