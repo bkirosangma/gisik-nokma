@@ -43,6 +43,9 @@ async function within<T>(label: string, budgetMs: number, work: () => Promise<T>
   return result;
 }
 
+/**
+ * 13.169 — assertStackIsTheStack refuses the run unless /healthz answers ok with a non-empty sha AND GET :3001/v1/me/workspaces is answered by the API server (401, server's own {"error":"unauthenticated"} body) inside a 10s budget (HOP_BUDGET_MS), before any spec runs.
+ */
 export async function assertStackIsTheStack(): Promise<{ sha: string }> {
   // 1. The API server itself, by its own door.
   const health = await fetch(`${SERVER}/healthz`).catch((cause: unknown) => {

@@ -21,6 +21,11 @@ import { WEB as WEB_ORIGIN } from './helpers/stack.js';
  * client uses — carrying the session cookie this browser just earned.
  */
 
+/**
+ * 13.172 — signIn (invoked at the top of this test) drives the shipped sign-in UI by role/label (getByLabel('Email'), getByRole('button', {name:'Send magic link'})) with no test id added for the suite; the link is fetched from Mailpit and followed, landing the browser authenticated.
+ * 13.173 — this test navigates Convenience Corner -> Shop operations to a real board-column-* element and asserts ticket-card-* count is greater than zero, so an empty board (which would satisfy a bare no-error check) fails it.
+ * 13.177 — a RECORD rather than an assertion, kept beside the suite it describes: the e2e-stack suite is off the LOCAL gate structurally — reached by `test:e2e:stack`, a script name turbo defines no task for, and excluded by `apps/web/vitest.config.ts`'s `test/**` include — while being deliberately ON CI's `gate` fan-in. Measured as `turbo run test --dry=json` = 16 tasks, 10 `#test`, 0 e2e; no test asserts it at runtime.
+ */
 test('sign in through the real stack, reach the seeded board, and see the guarded door from both sides', async ({
   page,
 }) => {
@@ -52,6 +57,9 @@ test('sign in through the real stack, reach the seeded board, and see the guarde
     .toBeGreaterThan(0);
 });
 
+/**
+ * 13.174 — this test POSTs to /v1/events through the WEB container's proxy with the session cookie, real ids read off the page, a real ULID (not crypto.randomUUID(), which would 200 as malformed-envelope), the WEB_ORIGIN header Playwright's page.request omits by default, and actorId from /api/auth/get-session, asserting exactly 200 with one non-malformed result; the identical POST from a fresh unauthenticated context asserts 401.
+ */
 test('the guarded door: the cookie-carrying POST reaches the server and is answered by it', async ({
   page,
   browser,

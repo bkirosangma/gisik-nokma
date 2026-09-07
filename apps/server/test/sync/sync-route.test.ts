@@ -298,6 +298,8 @@ describe('POST /v1/sync — the sync ingress', () => {
   });
 
   /**
+   * 12.76 — closed by Task 7 and scoped rather than declared shut: on the one production path that files a contest (POST /v1/sync), the Refusal is passed straight into buildContestedClaim, making coherence structural at construction rather than merely un-refused by checkContestCoherence, proven here and by 12.102/12.103's two other refusal shapes; checkContestCoherence remains the only net for a contest built any other way, which this test does not close.
+   *
    * 12.7 — a refused offline claim's ledger row is type claim.contested and carries the exact refusing rule ('restrict-to') in its payload.
    */
   it('12.101 an engine refusal becomes a claim.contested ledger event, and the contest is COHERENT by construction', async () => {

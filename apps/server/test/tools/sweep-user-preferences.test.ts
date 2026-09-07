@@ -197,6 +197,9 @@ describe('sweepUserPreferences — retention after revocation', () => {
    * Driven mutation: removing the `resolveEffectiveRole` early return reddens
    * this test and nothing else in the file.
    */
+  /**
+   * 6.144 — THE EXCLUDING FIXTURE: a member re-granted after revocation keeps their preferences however old the revocation is, because eligibility for the sweep is decided through resolveEffectiveRole's current-membership read rather than the ledger's revocation timestamp alone; driven by removing the early return, which reddens only this test.
+   */
   it('a member re-granted inside the window keeps their preferences, however old the revocation', async () => {
     const ws = newUlid();
     const user = newUlid();
@@ -286,6 +289,9 @@ describe('sweepUserPreferences — retention after revocation', () => {
    * in the ledger has no window start, so there is no window to be past. The
    * row is kept AND named in the report — a row silently skipped with no trace
    * is a retention tool that cannot be audited.
+   */
+  /**
+   * 6.145 — a non-member with no `membership.revoked` anywhere in the ledger is retained (no window start, so nothing to be past) and reported distinctly in `report.noRevocationEvidence` rather than silently skipped; asserted on both the report list and the surviving preference row.
    */
   it('retains a non-member with no revocation evidence, and reports it distinctly', async () => {
     const ws = newUlid();

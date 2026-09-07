@@ -84,6 +84,9 @@ describe('WEB_ORIGIN is a trusted origin', () => {
    * what makes this reachable without first minting a session, and it is the
    * exact path the browser takes on its very first sign-in.
    */
+  /**
+   * 13.182 — POSTing to /sign-in/magic-link with the WEB_ORIGIN header a real browser sends is accepted (200); deleting trustedOrigins from createAuth reddens this case alone (4 pass / 1 fail, expected 403 to be 200), making it the one assertion in the suite that distinguishes the default from the fix.
+   */
   it('accepts the WEB_ORIGIN a browser actually sends', async () => {
     const app = buildServer(WEB_ORIGIN);
     const res = await app.inject({
@@ -97,6 +100,9 @@ describe('WEB_ORIGIN is a trusted origin', () => {
     await app.close();
   });
 
+  /**
+   * 13.183 — an origin in neither the default (baseUrl) nor WEB_ORIGIN (http://evil.test:9) is still refused 403 INVALID_ORIGIN after the trustedOrigins fix.
+   */
   it('still refuses an origin that is in neither the default nor WEB_ORIGIN', async () => {
     const app = buildServer(WEB_ORIGIN);
     const res = await app.inject({
@@ -116,6 +122,9 @@ describe('WEB_ORIGIN is a trusted origin', () => {
    * and only then appends `options.trustedOrigins`. If the fix had replaced the
    * default instead of extending it, this case would 403.
    */
+  /**
+   * 13.184 — the baseUrl origin the better-auth default already trusts is STILL accepted (200) after WEB_ORIGIN is added, proving the fix appends to trustedOrigins rather than substituting for the default (getTrustedOrigins pushes baseURL's origin, then options.trustedOrigins).
+   */
   it('keeps trusting the baseUrl origin the default provides', async () => {
     const app = buildServer(WEB_ORIGIN);
     const res = await app.inject({
@@ -132,6 +141,9 @@ describe('WEB_ORIGIN is a trusted origin', () => {
    * The same-origin deployment — one host serving both — must be unaffected.
    * Here `WEB_ORIGIN` and `baseUrl` are the same string, so the list simply
    * holds it twice.
+   */
+  /**
+   * 13.185 — a same-origin deployment (WEB_ORIGIN == baseUrl) still accepts BASE_URL (200) and does not become permissive: :3001/WEB_ORIGIN is refused 403 INVALID_ORIGIN by that deployment. Mutation: trusting every origin ('*') reddens this case AND 13.183, both being the suite's permissiveness bounds.
    */
   it('a same-origin deployment behaves exactly as before', async () => {
     const app = buildServer(BASE_URL);
@@ -184,6 +196,9 @@ describe('WEB_ORIGIN is a trusted origin', () => {
    * making both permissiveness bounds go green. `WEB_ORIGIN` is set by hand in
    * `deploy/do/app.yaml`, so nothing but this check stands between a typo and a
    * silently widened CSRF boundary.
+   */
+  /**
+   * 13.189 — proves a WEB_ORIGIN containing a wildcard is refused at assembly, before it ever reaches better-auth's wildcardMatch branch.
    */
   it('refuses a wildcard WEB_ORIGIN instead of trusting it', () => {
     expect(() => buildServer('https://*.artsourced.in')).toThrowError(/wildcard/);
