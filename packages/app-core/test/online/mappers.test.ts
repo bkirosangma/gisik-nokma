@@ -479,6 +479,9 @@ describe('3.37 mapIngestResults — index alignment and the arm, both checked', 
   });
 });
 
+/**
+ * 3.63 — ruling P24’s OTHER asymmetry, closed at the type: the server keeps `listColumns` and `grouping` as two records keyed independently, and this block asserts P24 in both directions.
+ */
 describe('3.38 preferences — ruling P24 both ways', () => {
   /**
    * RULING P24, the half that is ABSENT — and this test replaced one that
@@ -497,6 +500,9 @@ describe('3.38 preferences — ruling P24 both ways', () => {
    * only thing that distinguishes the two situations, since the VALUE a view
    * ends up rendering is the same `'epic'` either way. That is the whole finding
    * in one line: the old shape could not tell them apart.
+   */
+  /**
+   * 3.64 — a half nobody chose is never STORED: the ABSENT half is reported as not set rather than defaulted under the user’s name, so a half-set project round-trips as half-set.
    */
   it('reports the half that is ABSENT as not set, rather than defaulting it under the user’s name', () => {
     const prefs = mapPreferences({
