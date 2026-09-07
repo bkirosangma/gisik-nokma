@@ -73,7 +73,10 @@ type EventEnvelope = {
 type SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>;
 ```
 
-- **`ORIGINS = ['web', 'mobile', 'desktop', 'server']`** (`envelope.ts:26`) — **there is no `'mcp'`.** Every write in this plan submits `origin: 'web'`. See Open question 1; this is the largest place the plan takes a plain reading rather than a decision.
+- **`ORIGINS = ['web', 'mobile', 'desktop', 'server', 'mcp']`** — `envelope.ts:26`. **`'mcp'` is added by
+  Task 0** (owner ruling 1); it is NOT in the enum on `main` today, so Task 0 lands before any write.
+  Every write in this plan submits `origin: 'mcp'`, so the ledger can tell a claim a person typed from
+  one their assistant made on their behalf. `'server'` is refused at the client door.
 - **`origin: 'server'` is refused at the client door** (`apps/server/src/permissions/check-permission.ts:403`), and `actorId` must equal the session user (`:400`). The MCP server therefore **must know its own user id** — Task 3 makes the token exchange return it, because no read route on this surface carries it (there is no `GET /v1/me`).
 - **INGEST RESULT (exact, `packages/domain/src/ingest-result.ts:14`) — three statuses, no more:**
 
@@ -169,6 +172,42 @@ Three routes. Named here once so Tasks 3, 4, 6 and 7 agree without re-deriving.
 - **`expiresInSec = 600`, `pollIntervalSec = 12`.** Derived, not picked — see Task 3 Step 1.
 
 ---
+
+### Task 0: `'mcp'` becomes an envelope-origin of its own
+
+**Owner ruling 1.** An assistant's write must be distinguishable, in the ledger, from a claim the
+person typed themselves. In a product whose stated purpose is a board that cannot lie about its own
+history, a write that claims `'web'` when a machine made it is the ledger lying about who acted — the
+one thing the whole design exists to prevent.
+
+**Scope, MEASURED at `8190507` rather than estimated.** This plan originally called it *"more than
+this plan's scope"*; it is not. See the ruling table above for the full measurement.
+
+- [ ] **Step 1 — add the member.** `packages/domain/src/envelope.ts:26`:
+      `export const ORIGINS = ['web', 'mobile', 'desktop', 'server', 'mcp'] as const;`
+      `Origin` (`:27`) and `z.enum(ORIGINS)` (`:182`) both derive from it and need no edit.
+      **No migration:** the column is `origin text NOT NULL` with no `CHECK` and no Postgres enum
+      (`migrations/1787841717635_events-and-snapshots.sql:12`), verified across every migration.
+- [ ] **Step 2 — kill the second authority.** `packages/rule-engine/src/fixtures/harness.ts:53`
+      re-spells the list as `z.enum(['web', 'mobile', 'desktop', 'server'])`. **Import `ORIGINS` and
+      use `z.enum(ORIGINS)`** — do not add a fifth string. A second list of what the origins are is
+      precisely the drift `check-permission.test.ts:33-36` warns about in prose, and it is sitting one
+      package away from the file that warns about it. Fixing it by hand would leave the same trap set
+      for the sixth member.
+- [ ] **Step 3 — read what Step 1 switched on for free.** `check-permission.test.ts:38` derives
+      `CLIENT_ORIGINS` from `ORIGINS` and runs `it.each(CLIENT_ORIGINS)`, so `'mcp'` gains a
+      permission-gate case the moment Step 1 lands: *the gate must admit an `mcp`-origin client
+      submission.* Run that suite and confirm the new case passes. **If it fails, stop** — the gate
+      refusing `'mcp'` is a real finding about the ingest door, not a test to adjust.
+- [ ] **Step 4 — a case that says why the value exists.** Assert an `'mcp'` envelope round-trips the
+      ingest door and comes back out of the ledger as `'mcp'`. The point is not that the enum accepts
+      a fifth string; it is that a reader of the history can tell a person's claim from their
+      assistant's. A case asserting only `ORIGINS.includes('mcp')` would test the constant.
+
+**Requirements:** `pnpm turbo run build test typecheck` green; the new permission-gate case passes
+without editing it; no migration added.
+
+**This task comes BEFORE Task 9**, which sends the value.
 
 ### Task 1: The package scaffold, and the one gate that will not see it
 
@@ -2503,7 +2542,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
       type: 'ticket.created',
       version: 1,
       actorId: USER,
-      origin: 'web',
+      origin: 'mcp',
       entity: { kind: 'ticket' },
       payload: { typeId: 'task', projectId: '01J0PROJ00000000000000000A', parentId: null, title: 'Renew the trade licence' },
     });
@@ -2654,10 +2693,12 @@ function envelope(
     // whether the actor is the person submitting, and it refuses any envelope
     // where they differ.
     actorId: session.userId(),
-    // `'web'`, because ORIGINS has no 'mcp' and 'server' is refused at the
-    // client door. See the plan's Open question 1 — this is the plain reading,
-    // not a decision this package is entitled to make.
-    origin: 'web',
+      // `'mcp'` — owner ruling 1. This was `'web'` while ORIGINS had no
+      // fifth member; Task 0 adds one, and the whole reason it exists is
+      // that a ledger which cannot distinguish a person's claim from their
+      // assistant's is a ledger lying about who acted. `'server'` remains
+      // refused at the client door.
+    origin: 'mcp',
   });
 }
 
@@ -3085,6 +3126,101 @@ git commit -m "Features.md §14, the MCP test-case bucket, and a task-ledger gat
 
 ---
 
+## Owner rulings (2026-09-07) — all seven answered
+
+**Five confirmed the plan's written default and change nothing. Two are real changes**, and both are
+reflected in the tasks below rather than only recorded here.
+
+| # | Question | Ruling | Effect |
+|---|---|---|---|
+| 1 | envelope-origin for MCP | **`'mcp'`**, a distinct value — not `'web'` | **CHANGE.** New **Task 0**; Task 9 sends `'mcp'` |
+| 2 | approval page in `apps/web` | **yes** | Confirms default. Task 5 unchanged |
+| 3 | `list_projects` as a client-side filter | **keep it** | Confirms default. Task 8 unchanged |
+| 4 | token expiry | **no expiry** | Confirms default. Task 2 unchanged |
+| 5 | revoke surface | **"a simple UI for it"** | **CHANGE.** New **Task 12**; the plan had defaulted to SQL-only |
+| 6 | filename | **dated name** | Confirms default. Task 11 unchanged |
+| 7 | "nine write tools" | **four writes, five reads** | Confirms the plan's reading |
+
+### Ruling 1, verified against the tree — and the plan OVERSTATED the work
+
+This plan's own text called adding `'mcp'` *"a `packages/domain` envelope change with migration and
+test fallout across the ingest gate, the contest rules and the sync clients — genuinely more than this
+plan's scope."* **Measured at `8190507`, that is wrong in the expensive direction, and a scary estimate
+left standing is how a one-line change gets deferred for weeks:**
+
+- **`ORIGINS` is referenced in exactly ONE source file** — `packages/domain/src/envelope.ts:26`, with
+  `Origin` derived at `:27` and `z.enum(ORIGINS)` at `:182`. Adding a member is one line.
+- **No migration is needed.** The column is `origin text NOT NULL`
+  (`migrations/1787841717635_events-and-snapshots.sql:12`) — no `CHECK`, no Postgres enum. Nothing in
+  any migration constrains the value.
+- **No consumer switches on it exhaustively.** A sweep of every `.ts`/`.tsx` in `apps/` and `packages/`
+  found no `switch` on an origin and no `Record<Origin, …>`, so no code needs a new branch. Adding a
+  member to a union is not the same as changing one: every existing producer keeps compiling.
+
+**But the sweep found two sites the plan does not name, and one of them is a real defect:**
+
+1. **`packages/rule-engine/src/fixtures/harness.ts:53` re-spells the list**:
+   `z.enum(['web', 'mobile', 'desktop', 'server'])`. It is a **second authority for what an origin is**,
+   and it will not learn about `'mcp'`. This is exactly the drift
+   `check-permission.test.ts:33-36` warns about in prose — *"a second list of what the origins are
+   would drift from `ORIGINS` silently"* — sitting one package over from the file that says it. Task 0
+   fixes it by importing `ORIGINS`, not by adding a fifth string.
+2. **`apps/server/test/permissions/check-permission.test.ts:38`** derives
+   `CLIENT_ORIGINS = ORIGINS.filter((o) => o !== 'server')` and runs `it.each(CLIENT_ORIGINS)`. Its own
+   comment says *"a fifth origin member is covered the day it is added instead of the day somebody
+   remembers this file."* So adding `'mcp'` **creates a new permission-gate case automatically** — the
+   gate must admit an `mcp`-origin client submission, and if it does not, that test goes red without
+   anyone writing it. That is a feature, and it is why Task 0 comes before Task 9.
+
+---
+
+
+### Task 12: The revoke surface
+
+**Owner ruling 5, and the one that is NOT the plan's default.** The plan defaulted to no UI —
+revocation as a hand-written `DELETE` — and explicitly flagged the asymmetry as *"something a person
+should agree to knowingly"*: granted in two clicks, withdrawn only with database access. The owner
+ruled for **"a simple UI for it."**
+
+**Why this is a page of design and not a fresh planning pass.** The surface exists
+(`apps/web/app/w/[workspaceId]/settings/` already has three screens, so this is a fourth, not a new
+area); the data model is settled by Task 2 (`mcp_tokens`, hashed at rest, no expiry per ruling 4); and
+the load-bearing architectural question — whether `apps/web` is in scope at all — was ruling 2, answered
+yes, with Task 5's approval page already establishing the pattern.
+
+- [ ] **Step 1 — the list.** A settings screen listing this user's own MCP tokens. **It cannot show the
+      token**: Task 2 stores `sha256(token)` and the raw value exists only in the response that minted
+      it. So each row shows what is honestly available — a label, and when it was approved. A row that
+      implied it could show the credential would be a lie about the storage.
+- [ ] **Step 2 — the revoke.** `DELETE /v1/me/mcp-tokens/:id`, scoped to
+      `request.currentUserId` the way every `/v1/me/*` route is, so a caller cannot revoke somebody
+      else's. **Answer the same 404 for "not yours" and "does not exist"**, matching
+      `routes/notifications.ts` — otherwise this route becomes an oracle for which token ids exist.
+      Cookie-authenticated and mutating, so it joins `HTTP_ORIGIN_PROTECTED_ROUTES` (`http-origin.ts:151`)
+      with a planted-defect test, exactly as Task 3's approval POST does.
+- [ ] **Step 3 — say what revoking does.** Deleting the row ends access at the next request, because
+      `resolveMcpToken` finds nothing. The screen should say that plainly rather than implying a
+      session is being killed mid-flight.
+- [ ] **Step 4 — the catalogue.** §14 cases for the list, the revoke, the cross-user refusal and the
+      HTTP-Origin protection.
+
+> #### ⚠ ONE SUB-QUESTION FOR THE OWNER, not for the executor
+>
+> **Should the list show when each token was LAST USED?**
+>
+> It is the single most useful column for deciding whether to revoke — *"this one has not been touched
+> in three months"* — and it is **not in Task 2's schema today**. Adding it means a `last_used_at`
+> column and a write on every authenticated MCP request.
+>
+> It is flagged rather than decided because it is not merely a column: **it is a log of when a person's
+> assistant acted on their behalf**, kept per token. That is a privacy-shaped decision in a product
+> whose whole posture is that a record should not quietly know more than it says it does.
+>
+> **Written against:** no `last_used_at`, list without it — buildable exactly as Task 2 stands.
+> **If ruled otherwise:** one column, one `UPDATE` on the token-resolution path, one test, and a
+> sentence on the screen saying the product records it.
+
+
 ## Open questions
 
 > **Two unrelated things are called "origin" in this repo, and this plan touches both.** The
@@ -3094,10 +3230,12 @@ git commit -m "Features.md §14, the MCP test-case bucket, and a task-ledger gat
 > mean nothing to each other. *Someone who conflates them writes a header check and believes the
 > forgery window is closed.* Say **envelope-origin** or **HTTP-Origin** in every task, commit and review.
 
-These are **for the owner, not for the executor**. Each names the plain reading the plan is written against, so the plan is executable either way — but a different ruling changes real content, and the affected tasks are named.
+**ALL SEVEN ARE NOW RULED — see the table above.** Kept below because each records the *reasoning*, which the one-line answers do not, and a later reader deciding whether to revisit one needs the argument rather than the verdict. Each names the plain reading the plan is written against, so the plan is executable either way — but a different ruling changes real content, and the affected tasks are named.
 
 1. **Is there an envelope-origin value for MCP, or does an assistant's write claim `'web'`?**
-   `ORIGINS = ['web','mobile','desktop','server']` and there is no `'mcp'`. Every write in Task 9 sends `origin: 'web'`, which means the ledger cannot distinguish a claim a person typed from a claim their assistant made on their behalf. In a product whose stated purpose is a board that cannot lie about its own history, that is not a small thing. Adding `'mcp'` is a `packages/domain` envelope change with migration and test fallout across the ingest gate, the contest rules and the sync clients — genuinely more than this plan's scope, which is why the plan does not assume it. **Written against:** `'web'`. **If ruled otherwise:** Task 9 changes one literal; a new Task 0 adds `'mcp'` to `ORIGINS` and sweeps every consumer.
+   **RULED: `'mcp'`.** *The question as originally written, preserved because the reasoning is the part a later reader needs — and because my own edit briefly broke it: replacing the literal turned this sentence into "writes send `'mcp'`, which means the ledger cannot distinguish", attaching the consequence of one answer to the other. A find-and-replace through prose changes what sentences MEAN, not just what they say.*
+
+   `ORIGINS = ['web','mobile','desktop','server']` and there was no `'mcp'`. Every write in Task 9 would have sent `origin: 'web'`, which means the ledger cannot distinguish a claim a person typed from a claim their assistant made on their behalf. In a product whose stated purpose is a board that cannot lie about its own history, that is not a small thing. ~~Adding `'mcp'` is a `packages/domain` envelope change with migration and test fallout across the ingest gate, the contest rules and the sync clients — genuinely more than this plan's scope.~~ **This estimate was WRONG and is struck rather than deleted: measured at `8190507`, `ORIGINS` has one source reference, the column has no `CHECK` and no consumer switches on it. See the ruling table. A scary estimate left standing is how a one-line change gets deferred for weeks.** **Written against:** `'web'`. **If ruled otherwise:** Task 9 changes one literal; a new Task 0 adds `'mcp'` to `ORIGINS` and sweeps every consumer.
 
 2. **Does v1 get a web approval page (`apps/web`), or does the device flow terminate somewhere else?**
    The spec's architecture diagram lists changes to `apps/server` only and never mentions `apps/web`. But the flow it describes — "the user opens the URL in their already-authenticated browser session and approves" — has to land on a page, and it cannot be a page served by the API: an approval POST must carry `Origin: <WEB_ORIGIN>` to survive `httpOriginRefused`, and a page on the API origin sends its own origin instead. **Written against:** a minimal page in `apps/web` (Task 5). **If the owner would rather not touch `apps/web` in v1:** the alternative is exempting the approve route from the origin check, which this plan will not propose — it would remove the only CSRF defence from the one route that mints a credential.
