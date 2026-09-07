@@ -123,6 +123,9 @@ describe('ticketTransitionedPayloadSchema', () => {
   });
 });
 
+/**
+ * 4.38 — cited on the block: the version walk lives ONCE, in `@gisik-nokma/domain`. It follows mappings through every intermediate version rather than only the last, reports the id at the point the chain BROKE rather than the one it started from, and refuses a state the latest definition no longer has.
+ */
 describe('foldStateIdForward — the one version walk', () => {
   const v1 = workflowDefSchema.parse(validDef);
   const v2 = workflowDefinedPayloadSchema.parse({
@@ -202,6 +205,9 @@ describe('foldStateIdForward — the one version walk', () => {
   });
 });
 
+/**
+ * 4.40 — cited on the block: `workflow.defined` is bound to entity kind `workflow` AT THE DOOR, so an envelope naming this type against any other kind is refused `entity-kind-mismatch` — the general type↔kind binding every entity-kind-declaring registration gets, layered beneath the engine’s own kind checks rather than replacing them.
+ */
 describe('workflow.defined registration', () => {
   function rawWorkflowDefined(): Record<string, unknown> {
     const workflowId = newUlid();
