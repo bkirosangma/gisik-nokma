@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
+import { hstsHeaderFor } from './http/hsts.js';
 import { FORBIDDEN_ORIGIN_BODY, httpOriginRefused, normalizeOrigin } from './http/http-origin.js';
 import { makeFixedWindowLimiter, rateLimitKeyFor } from './http/rate-limit.js';
 import type { Auth } from './auth/auth.js';
@@ -357,6 +358,30 @@ export function buildApp(
     // the incident in everyone's scrollback.
     alertWithoutWaiting(alerter, `${request.method} ${redactInviteToken(request.url)}`, error);
     return reply.status(INTERNAL_ERROR_BODY.statusCode).send(INTERNAL_ERROR_BODY);
+  });
+
+  // ── HSTS, on every response that arrived over HTTPS ────────────────────────
+  //
+  // Registered UNCONDITIONALLY, outside the `options.security` block below, and
+  // that placement is the point: `buildTestApp` and roughly sixty test call
+  // sites do not pass `security`, so a header registered inside that block
+  // would be absent from every test that could otherwise witness it — a control
+  // that exists only in the configuration nobody exercises.
+  //
+  // It is a root `onRequest`, so it also covers the two ENCAPSULATED surfaces
+  // (`POST /v1/attachments`, `/api/auth/*`) and unmatched routes, on the same
+  // measured basis the section below records for its own hooks. Setting the
+  // header here rather than in `onSend` means it is present on error and 404
+  // replies too, which is where a browser is most likely to first meet this
+  // host.
+  //
+  // `hstsHeaderFor` returns `null` for anything but https, so this is silent in
+  // local dev by construction — see its docblock for why emitting it there
+  // would be a self-inflicted, uninstallable outage.
+  app.addHook('onRequest', async (request, reply) => {
+    const hsts = hstsHeaderFor(request.protocol);
+    if (hsts !== null) void reply.header('strict-transport-security', hsts);
+    return undefined;
   });
 
   // ── The deployment security surface (Plan 11 Task 2) ───────────────────────

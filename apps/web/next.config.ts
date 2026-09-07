@@ -77,6 +77,48 @@ const nextConfig: NextConfig = {
       { source: '/api/auth/:path*', destination: `${serverOrigin}/api/auth/:path*` },
     ];
   },
+
+  /**
+   * HSTS for the WEB host, which is a different host from the API's.
+   *
+   * `pm.artsourced.in` and `pm-api.artsourced.in` are two sibling names
+   * (`deploy/do/app.yaml`'s `domains:` block). HSTS is scoped per host, so the
+   * API server sending it — which it now does, `apps/server/src/http/hsts.ts` —
+   * says nothing whatsoever about this one. Both must send it or the browser
+   * still opens a cleartext connection to whichever host it was never told
+   * about.
+   *
+   * ## Gated on the CONFIGURED origin, not on `NODE_ENV`
+   *
+   * RFC 6797 §7.2 forbids sending this over plain HTTP, and Next's `headers()`
+   * runs at build time with no request to inspect — so the protocol has to come
+   * from configuration. `NODE_ENV === 'production'` was the obvious gate and is
+   * the wrong one: it means "this is a production BUILD", not "this is served
+   * over TLS", and the two come apart the first time somebody runs a production
+   * build behind plain HTTP to reproduce something. `SERVER_ORIGIN` is already
+   * https for the real deployment and http for local dev, so it is a signal
+   * this config already has, already documents, and `test/next-config.test.ts`
+   * can drive both ways.
+   *
+   * The honest limit, stated rather than left to be found: this infers the
+   * BROWSER's protocol from the API origin the same build was pointed at. They
+   * are the same in every configuration that exists (both https in
+   * `app.yaml`, both http in dev). A deployment that served this app over TLS
+   * while addressing its API over cleartext would get no header here — it would
+   * also be a deployment sending session traffic in the clear, so the missing
+   * header would not be its most urgent problem.
+   */
+  async headers() {
+    if (!serverOrigin.startsWith('https://')) return [];
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'strict-transport-security', value: 'max-age=31536000; includeSubDomains' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

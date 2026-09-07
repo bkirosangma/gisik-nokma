@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { buildApp, type AppDeps } from '../../src/app.js';
+import { type SecurityOptions, buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
@@ -94,6 +94,20 @@ export type BuildTestAppOverrides = {
    * `attachments-wired.test.ts` is the one that does.
    */
   store?: ObjectStore;
+  /**
+   * `AppDeps.security` — the deployment security surface.
+   *
+   * Widened 2026-09-07 for the HSTS wiring test, which cannot be written
+   * without it: the header is emitted only for an https request, and
+   * `request.protocol` reports https only when Fastify was CONSTRUCTED with
+   * `trustProxy` and the caller sends `x-forwarded-proto`. `trustProxy` is a
+   * constructor option, so no per-request header can substitute for it and no
+   * test could otherwise reach the branch that matters.
+   *
+   * Undefaulted, so every existing caller keeps `trustProxy: false` — which is
+   * the honest default and the one under which the HSTS hook must stay silent.
+   */
+  security?: SecurityOptions;
 };
 
 /**
@@ -156,7 +170,9 @@ export function buildTestApp(
       // the cheap honest default for the ~sixty test files that never upload.
       store: overrides.store ?? createObjectStoreFromEnv({}),
     },
-    overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
+    overrides.logStream === undefined
+      ? { security: overrides.security }
+      : { logLevel: 'info', logStream: overrides.logStream, security: overrides.security },
   );
   return { app, otp, ingest };
 }
