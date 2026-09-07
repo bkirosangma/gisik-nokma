@@ -167,11 +167,18 @@ a { color: var(--gn-accent); }
   font-size: 1rem;
 }
 
+/* 1rem for the same reason `.gn-notfound__aside` above is, and it is the same
+   0.95rem — 15.2px on a phone, under the 16px floor for body copy. Items 1–3
+   caught it on the 404 and missed it here, because that pass measured one page
+   and measured it at desktop width; item 7's viewport suite found it on both
+   legal pages at 390px, which is the whole argument for having the suite. This
+   line carries the pages' "Last updated · Operated by · Governed by" — the
+   party and jurisdiction facts a reader is most likely to have come for. */
 .gn-legal__meta {
   max-width: 68ch;
   margin: 0 0 2rem;
   color: var(--gn-text-muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .gn-legal__section {

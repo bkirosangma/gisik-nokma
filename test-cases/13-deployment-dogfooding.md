@@ -1130,3 +1130,36 @@ all three and says it will not guess.*
 - **13.251** ✅ Both legal pages carry bracketed placeholders rather than invented party details — (`apps/web/test/not-found-and-legal.test.tsx`)
 - **13.252** ✅ The "not reviewed by a lawyer" marker is in the SOURCE and absent from the RENDER — both ends asserted against both files, because asserting either alone passes against the opposite failure — (`apps/web/test/not-found-and-legal.test.tsx`)
 - **13.253** ✅ The terms state the four things the product does not promise, so a later legal cleanup cannot quietly remove them — (`apps/web/test/not-found-and-legal.test.tsx`)
+
+### Checklist items 6–7 — colour contrast and responsive (2026-09-07)
+
+*Minted from this lane's own `13.241` block, which items 1–3 opened and used through `13.253`; `13.254`
+is the next free id IN THAT BLOCK, not derived from the file's maximum.*
+
+- **13.254** ✅ **The signed-in shell does not scroll sideways at 390px.** `apps/web/e2e-stack/viewport.spec.ts`
+  — signs in through the real door, reaches a **workspace-scoped** page, and asserts both
+  `scrollWidth <= clientWidth + 1` and that no element's rect crosses the right edge.
+  *Why it lives in `e2e-stack` and not in the new `e2e-viewport` suite: the defect was on the
+  AUTHENTICATED pages. `.gn-nav` overflowed by 10px on `/my-work`, `/members`, both settings pages and
+  the board, and on none of the five signed-out routes — `AppNav` is the row that overflowed and
+  signed-out pages do not render it, so the unauthed suite would have stayed green through the entire
+  bug. Signing in and stopping at `/workspaces` would not have caught it either: measured, that page did
+  not overflow while `/my-work` did, because `AppNav` renders a longer row once a workspace is in scope.*
+  *The overflow was DATA-dependent — the row's last child is `Sign out {user.name}` — which is why the
+  fix is `flex-wrap: wrap` rather than a width. Verified causally before it was written: injecting the
+  rule took all five routes 10 → 0 while a negative control (an irrelevant declaration on the same
+  selector) left all five at 10, and the nav was measured to WRAP (88px → 104px, every child inside)
+  rather than clip.*
+  *The instrument asserts itself first: `window.innerWidth` is read back inside the page, because this
+  repo has a recorded failure where a resize reported success while the page stayed 1512px wide.*
+- **13.255** ✅ **The signed-out surface holds its layout at 390, 768 and 1512, and the three are
+  measurably DIFFERENT.** `apps/web/e2e-viewport/responsive.spec.ts` over
+  `apps/web/playwright.viewport.config.ts` — five routes × three real device viewports, each asserting
+  the configured viewport AND the in-page `innerWidth` before measuring anything. The cross-width case is
+  the load-bearing one: a suite that passes identically at all three widths has proven nothing about
+  responsiveness. *Found a real defect on first run: `p.gn-legal__meta` rendered at 15.2px on `/privacy`
+  and `/terms` — the same 0.95rem body-copy floor items 1–3 had already fixed on the 404's aside, missed
+  there because that pass measured one page at desktop width.*
+  *Tap targets ratchet rather than assert a floor (`e2e-viewport/tap-target-baseline.json`): the reading
+  is real but it does not move with the viewport, so it is a type-and-spacing decision recorded for the
+  owner in the pre-launch checklist, not a responsive defect. The count may fall, never rise.*

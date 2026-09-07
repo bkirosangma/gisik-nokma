@@ -165,9 +165,17 @@ Rendered at `localhost:3007` and measured rather than eyeballed:
 > not. Measured across both configs and every spec: zero occurrences of `devices`, `projects`,
 > `viewport`, or `setViewportSize`, against a positive control of 4 `defineConfig`/`use:` hits in the
 > same files. **Nothing in this repo had ever exercised a non-default Playwright viewport.** Playwright
-> itself was ready — `@playwright/test` installed, chromium and webkit binaries present — so the
-> conclusion "use Playwright" survived; the claim that the instrument already existed did not, and a
-> stale claim that an instrument exists is exactly how the next session skips building it.
+> itself was ready — `@playwright/test` 1.62.1 installed, with a working chromium — so the conclusion
+> "use Playwright" survived; the claim that the instrument already existed did not, and a stale claim
+> that an instrument exists is exactly how the next session skips building it.
+>
+> **A correction to that correction, since a directory listing is not a working browser.** An earlier
+> draft of this box said "chromium and webkit binaries present". The listing does show `webkit-2272`,
+> but Playwright 1.62.1 wants `webkit-2336`, and `webkit.launch()` fails with *"Executable doesn't
+> exist at …/webkit-2336/pw_run.sh"*. **Webkit does not run on this machine today.** All three viewport
+> projects are chromium — which is independently the right call, because a cross-width comparison across
+> two engines cannot attribute a difference to the width. Recorded because "the binary is present" and
+> "the browser launches" are different claims and only the second one matters.
 
 ## Items 6 and 7 — done, 2026-09-07
 
