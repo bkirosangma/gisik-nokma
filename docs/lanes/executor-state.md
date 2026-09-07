@@ -16,6 +16,57 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~05:30 IST — **THE BACKFILL IS COMPLETE to the limit the catalogue permits. 815 → 218 uncited.** Rule 9 recorded and extended. Nothing running. **`exec/65` holds THIRTY commits behind two open PRs — that is the only thing left blocking.**
+
+| § | start | now | what remains |
+|---|---|---|---|
+| §09 | 219 | **0** | — |
+| §10 | 66 | **0** | — |
+| §11 | — | **0** | — |
+| **§07** | 78 | **1** | 7.199 only |
+| **§03** | 45 | **5** | names no test |
+| **§06** | 63 | **12** | names no test |
+| **§13** | 153 | **26** | names no test |
+| §04 | 45 | 29 | names no test |
+| §05 | 67 | 17 | on #244 |
+| §12 | 78 | 78 | **31 citable — block NOT CLEARED** |
+
+**Repo-wide 1312 cited / 218 uncited.** Outside §12, **every remaining row genuinely names no covering test.**
+
+## BRANCHES — merge order still required
+
+| branch | state | contains |
+|---|---|---|
+| `exec/63` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64` | **PR #245 OPEN** | §06 63 → 37 |
+| **`exec/65`** | pushed, **NO PR**, stacked on `exec/64`, **30 commits** | §03 →5 · §06 →12 · §04 →29 · §07 →1 · §13 →26 · rule 9 |
+
+**#244 and #245 both edit adjacent lines of `check-case-citations-baseline.json`; the second to merge needs a
+CHERRY-PICK, not a rebase.** Then cherry-pick `exec/65`. **Verified:** `engine-context.test.ts` takes §05
+citations in #244 (lines 340/842/890/917) and §06 ones here (381/513/672/741) — 40+ lines apart, clean merge.
+
+## RULE 9 — recorded in the coordination doc as instructed, and EXTENDED twice since
+
+Seven shapes, each producing a **well-formed number about the wrong thing**, none erroring:
+marker-first ids (27) · range ids (50) · **multi-line rows (46)** · `:line`-suffixed paths (23) · header-named
+blocks (36) · **substring collision in the GROUPING step (6)** · **a stale line number** (caught by an assertion).
+
+> **A count is a claim about the SHAPE of a source.** An authority validates only ITS question — `check:citations`
+> agreed with my totals throughout because it counts ✅ ids and has no opinion on which rows NAME a file.
+> **What found every one of them was reading raw records, never more counting.**
+
+**And the habit that cost more than any single defect:** rows were deferred as "ambiguous" ELEVEN times and
+almost none were — five lived in a file their candidate list did not point at, three were further down a skimmed
+file, two were RECORDS (a decision about the convention, not an ambiguity). **"I have not decided" and "this is
+undecidable" are different claims.** Deferring stayed right; accumulating deferrals did not.
+
+## NEXT
+
+1. **Merge #244 → #245 → cherry-pick `exec/65`.** Everything is gated and verified.
+2. **§12** is the only citable pool left (31 rows) and its block is **not cleared**.
+3. The ~185 rows naming no test are a **reader pass**, not transcription.
+
+
 # 🟢 MONDAY 2026-09-07 ~04:50 IST — **SESSION CONSOLIDATED. Gate green (17th identical run). Nothing running. `exec/65` holds SIXTEEN commits behind two open PRs — that backlog is now the main risk.**
 
 ## STATE
