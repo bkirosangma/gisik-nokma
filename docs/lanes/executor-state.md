@@ -96,6 +96,46 @@ because the edits were minutes old and reproducible from the review's own text.
 
 ---
 
+# ⚠ MONDAY 2026-09-07 ~19:xx IST — **THE #274 SQUASH DROPPED TWO COMMITS, AND ONE OF THEM WAS A FIX. `main` carries a live false negative it believes is fixed.**
+
+`exec/80` was rebuilt onto `cf79d28` by cherry-pick. **The conflict was never about the anchor PRs.**
+
+| what | measured |
+|---|---|
+| `main`'s `colour-scan.ts` and `token-discipline.test.ts` | **byte-identical to `ada9879`** |
+| `exec/79`'s head | `83d61cc` — **two commits past that** |
+| dropped by the squash | `7b61463` (**the false-negative fix**) and `83d61cc` (handoff) |
+| consequence on `main` today | the **REGEX** comment stripper, and **zero** occurrences of the URL case |
+
+**So on `main` right now, a `//` inside a URL still swallows a real colour literal after it** —
+`findColourLiterals("const u = 'https://a.com'; const c = '#fff';")` returns `[]`. The gate is green and the
+hole is open. #274 was merged in the belief that fix was in it.
+
+> **This is the recorded squash-merge shape:** the merge captures the branch AS OF MERGE TIME, and every
+> signal on the branch side still reports success — the branch is green, the PR says merged, and nothing
+> anywhere says two commits stayed behind. **It surfaced only because a rebuild forced a diff of `main`
+> against the branch.** Worth auditing whether any earlier squash in this series lost a late push the same
+> way.
+
+**The rebuild is a CHERRY-PICK of six commits, not a rebase** — the two dropped `exec/79` ones plus
+`exec/80`'s four. All six applied with **zero conflicts**, because only what `main` lacked was replayed; a
+rebase would have re-applied commits `main` already holds in squashed form, which is exactly the "real
+conflict in `colour-scan.ts`" that was reported.
+
+## ⚠ A CONTAMINATED CONTROL, CAUGHT — worth more than the fix it nearly hid
+
+Re-verifying cache invalidation after the rebuild, touching `packages/ui/src/ui.css` produced
+**`cache hit`** — apparently a failure. It was not. The earlier round had appended the **identical**
+`/* probe */` string and run the same task, so that exact tree state was already cached: a legitimate hit
+on a hash seen before.
+
+> **A cache experiment repeated with an identical mutation measures the cache's MEMORY, not the
+> invalidation.** Re-run with a unique marker and both flip `cache hit` → `cache miss` as they should.
+> Had this been read as a real failure it would have sent a session chasing a bug that was not there; read
+> the other way — an identical-mutation HIT taken as proof of correctness — it would have certified nothing.
+
+---
+
 # 🔴→🟢 MONDAY 2026-09-07 ~18:xx IST — **MAIN WAS RED OVER A PR NUMBER. The colour scanner now judges POSITION, not shape.** `exec/79-colour-scanner-context` off `4f89591`.
 
 | what | value |
