@@ -16,52 +16,114 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# 🔴 MONDAY 2026-09-07 ~14:40 IST — **OPTION 4 IS BUILT AND PROVEN, BUT THE BRANCH IS RED. DO NOT MERGE `exec/77-decouple-create` AS IT STANDS.** One test fails; the fix itself is sound.
+# 🟢 MONDAY 2026-09-07 ~15:1x IST — **THE RED IS RESOLVED AND THE OPEN QUESTION IS ANSWERED. `exec/77-decouple-create` is GREEN.** PR open; the Board-tab change is a design call recorded for reversal.
 
 | what | value |
 |---|---|
-| `main` | `b8877f7` (#267 merged) |
-| branch | **`exec/77-decouple-create`** — **RED, pushed for review only** |
-| suites | `app-core` **green**, `apps/web` **138 passed / 1 FAILED** |
-| the failure | `page-refusals.test.tsx` → *"past the list cap, the refusal renders in the absence's own words"* |
+| `main` | `11779b1` → `a0d9963` (controller anchors only, `docs/lanes/controller-state.md`) |
+| branch | **`exec/77-decouple-create`**, rebased onto `a0d9963` |
+| gate | `GATE_EXIT=0` · **30/30 tasks** · **3703 \| 5 skipped (3708) / 296 files** · `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 → **1537 cited / 0 uncited / 1537** · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| node | **v22.22.2** — a gate result that does not name its Node is not evidence |
+| not in the gate | `check:db-tz` needs `DATABASE_URL` and exits 1 without it on ANY tree; env-dependent, never part of the composition these anchors report |
+| conflict risk | **none measured**: `main` added only `controller-state.md` since `b8877f7`; this branch touches `executor-state.md`. Different files. |
 
-## WHAT IS DONE AND PROVEN
+## THE RED WAS NEVER ABOUT THE REFUSAL — THE PAGE CRASHED BEFORE IT RENDERED
 
-**Option 4 is implemented and works.** `createRegion` no longer gates on the list read:
+12.382's stub said `getPreferences: async () => ({ columns, grouping })` — a **`ProjectViewPrefs`**, where
+the method returns a **`UserPreferences` document**. `useTicketList` does
+`preferences.document?.projects[projectId]`: `document` was non-null, `projects` was `undefined`, and the
+index threw. React unmounted the tree. **The body under all three of the previous session's failed
+matcher attempts was `<body><div /></body>`.**
 
-- `new-ticket-dialog.tsx` gains `parentCandidatesUnavailable?: string`. When set the parent
-  `<select>` is REPLACED by the reason, and the draft leaves with `parentId: null` — project root, the
-  one creation that never needed a parent. **An empty picker was rejected on purpose:** it asserts *this
-  project has no possible parent*, which is the exact silent claim case 3.142 exists to refuse.
-- `create-ticket-flow.tsx` forwards it.
-- `page.tsx`: **types still gate creation** (no type, no ticket); **the list no longer does.**
+So none of those three attempts was evidence about anything, and the conclusion they produced —
+*"`ShellRefusal` likely does not use `role="status"`"* — **is refuted by the first case in the same file**,
+which finds it exactly that way. Do not inherit it.
 
-**Proven by 3.142, which passes.** Its PRINCIPLE was unchanged — *"a refused ticket list is never
-rendered as 'this project has no parents'"* — and only its MECHANISM moved, from withholding the whole
-control to naming the unavailability. Its old text explicitly recorded the cost being removed here:
-creation blocked *"not even at project root, which needs no parent"*, accepted because *"Plan 7 owns the
-list route's serving gap"*. **That premise never applied to the CAP refusal**, which is a client-chosen
-bound no route change clears.
+**The stub was also unnecessary.** `stubServices` already defaults `getPreferences` to `EMPTY_PREFERENCES`,
+which has the right shape, and every stub in `project-create-gate.test.tsx` uses that constant. The
+override replaced a correct default with a hand-typed wrong one. Deleting it was the whole fix.
 
-## ⛔ WHAT IS NOT DONE — exactly
+## ⚠ THE FINDING THAT COSTS THE MOST NEXT TIME: **A SUITE PASS IS NOT THE GATE**
 
-`page-refusals.test.tsx`'s 12.382 asserted the OLD behaviour and had to change. **It is not green.** The
-refusal does not appear in that harness even after clicking the List tab and stubbing types and
-preferences. Three attempts: text matcher → element-role matcher → `waitFor` over `role="status"`.
+The previous session reported *"`app-core` green, `apps/web` 138 passed / 1 FAILED"* and pushed. The gate is
+`pnpm turbo run build test typecheck`. **Measured here by re-applying the exact bad stub and running
+typecheck: `EXIT=2`,** with
 
-**I do not yet know whether that is a harness problem or a real one**, and that is the honest state.
-**The candidate worth checking first:** with `createRegion` no longer rendering the list refusal, the
-ONLY renderers are the List/Calendar/Timeline tab arms — so if the List arm does not render under these
-stubs, a project past the cap on the BOARD tab now shows **no refusal anywhere**. That would be a real
-regression introduced by this change and is the first thing to test, not the last.
+```
+test/page-refusals.test.tsx(209,11): error TS2322: Type '() => Promise<{ columns: …; grouping: … }>'
+  is not assignable to type '(workspaceId: string) => Promise<UserPreferences>'.
+```
 
-**Do not merge until that question is answered.** A green suite reached by weakening 12.382 would bury it.
+**The line number and the wrong shape, in one message, pointing straight at the defect** — while three
+rounds went into matcher strategy against an empty DOM. `stubServices` types its overrides as
+`Partial<DataSourceQuery>`, which is TIGHT; the harness has no hole. **The gate was simply not run.**
+
+## THE CONTROLLER'S OPEN QUESTION, ANSWERED: YES, AND IT IS CORRECT
+
+> *"a project sitting on the Board tab past the cap may now show no refusal anywhere"*
+
+**Confirmed by reading the rendered DOM**, not by inference: on the default `'board'` tab, past the cap, the
+only `role="status"` nodes are the attention strip's and the board's. `New ticket` renders and works.
+
+**It is not a regression, and here is the argument so the owner can reverse it in a sentence if they
+disagree:**
+
+1. The lost renderer was `createRegion`, which sits inside the tablist and therefore refused on every tab.
+   Its words were **`"The tickets that could be a parent, so New ticket is not offered"`** — and `New ticket`
+   **is** now offered, at project root. **That sentence is false today.** A refusal cannot be left standing
+   to say something untrue, and any tab-independent replacement would have to describe the ticket list on a
+   tab that does not show one.
+2. Nothing false took its place. The board tab draws the **board** read — a different query — and neither a
+   spinner nor an empty table stands where the list would be. This file's own stated property is *"the
+   refusal's own words present, AND the thing that would otherwise stand in its place absent"*; on the board
+   tab **nothing stands in its place**, so the property has no teeth there.
+3. The user still meets the cap on all three tabs that show a list, and in the create dialog's parent field,
+   which names the unavailability (3.142).
+
+## WHAT 12.382 NOW ASSERTS, AND THE FOUR MUTATIONS THAT PROVE IT
+
+The case clicks the List tab, and says in the test why that click is load-bearing.
+
+| mutation | site | result |
+|---|---|---|
+| **M1** tab click removed | test | **killed** — `expected false to be true` |
+| **M2** List arm's `what` renamed off `"The ticket list"` | `page.tsx` | **killed** — the identity guard is live |
+| **M3′** error arm dropped, `rows={list.rows ?? []}` — *the exact defect this file exists to catch* | `page.tsx` | **killed** at the refusal-present assertion |
+| **M3′ + isolation** (refusal half disabled so a kill can only be `list-summary`) | both | **killed at `page-refusals.test.tsx:268`, naming `data-testid="list-summary"`; positive control on the restored page PASSES** |
+
+**A first M3 was discarded rather than counted.** It forced `rows={list.rows}` with `list.rows === null` and
+died on `Cannot read properties of null (reading 'length')` — **a kill at a shape gate, which measures no
+property.** It is the pattern already recorded on this machine; it was replaced, not reported.
+
+**Two assertions were passing for reasons unrelated to their names, and both were repaired:**
+
+- `queryByText('Loading…')` is absent on the **board** tab too under these stubs, so alone it never depended
+  on the tab click — the case would have passed with the click deleted. `list-summary`'s absence is the half
+  that actually pairs with the refusal.
+- `statuses.some(t => t.includes(ownWords))` matched **any** of the three status nodes. It now requires the
+  matching node to carry `"The ticket list cannot be shown yet."` as well, so cap prose leaking into another
+  read's message cannot satisfy it.
+
+## RECORDED, NOT FIXED — with a named owner
+
+**`packages/app-core/src/views/ticket-list.tsx:439`** — `preferences.document?.projects[projectId]` guards
+`document` but **not** `projects`. A document arriving without `projects` crashes the whole project page to a
+blank screen, with no error boundary above `<ProjectBoard>` (the `Suspense` fallback does not catch throws).
+
+**Not reachable through the shipped client**, and that was checked rather than assumed: `mapPreferences`
+(`online/mappers.ts:939`) builds `projects` as an object literal on every path, so the field always exists.
+It is reachable only from a stub that violates `UserPreferences` — which is precisely what happened here, and
+what typecheck catches. **Owner: whoever next touches `useTicketList`'s preferences read.** Deliberately not
+fixed in this branch: the brief's rule is that out-of-scope findings are recorded with an owner, not
+repaired, and folding a defensive `?? {}` in here would also weaken the type that caught the real bug.
 
 ## NEXT
 
-1. Answer the question above; fix the test or the page accordingly.
-2. **Then the owner's second half: real filtering, as its own PR.**
-3. Then 13.176 — measurement, then design, then implement.
+1. **The owner's second half: real filtering, as its own PR.** `ticket-list.tsx` hardcodes the filter as
+   `{}`; letting a user narrow under the bound needs the route's query language to express the narrowing.
+2. **13.176** — guest navigation to explicitly-shared tickets. Measurement, then design, then code.
+3. Still open and still the owner's: which of the four cliff remedies (raise the cap / paged view type /
+   filter affordance) follows. **Remedy 4 — this branch — is done.**
 
 ---
 
