@@ -13,7 +13,7 @@ import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
-import { visibleTicketsWhere } from '../read/visible-where.js';
+import { explicitAudienceWhere, visibleTicketsWhere } from '../read/visible-where.js';
 import { canSee } from '../visibility/can-see.js';
 
 /**
@@ -129,10 +129,13 @@ export async function readMyWork(
     params.toArray(),
   );
 
+  const sharedRows = await sharedWithMeRows(db, viewerId, workspaceId);
+
   const groups: MyWorkResponse['groups'] = { open: [], active: [], terminal: [] };
   for (const card of await assembleTicketCards(db, viewerId, rows)) {
     bucketFor(groups, card).push(card);
   }
+  const shared = await assembleTicketCards(db, viewerId, sharedRows);
 
   // NAMES ONLY, and only for projects this viewer may be told the name of
   // (rulings P32/P38). A card the viewer can see always carries its
@@ -148,7 +151,12 @@ export async function readMyWork(
     (await visibleProjects(db, eff, workspaceId)).map((project) => [project.projectId, project.name]),
   );
   const projectNames: Record<string, string> = {};
-  for (const bucket of [groups.open, groups.active, groups.terminal]) {
+  // `shared` is in this walk, not beside it: a shared card carries a projectId
+  // like any other and the withholding rule is the same one. The guest 13.176 is
+  // about is precisely the caller for whom this map comes back EMPTY — they are
+  // on no project, so `visibleProjects` returns none, so every shared card
+  // renders id-only. That is rulings P32/P38 applying, not a missing lookup.
+  for (const bucket of [groups.open, groups.active, groups.terminal, shared]) {
     for (const card of bucket) {
       const name = names.get(card.projectId);
       // Only the projects these cards are actually in. Emitting the viewer's
@@ -161,9 +169,89 @@ export async function readMyWork(
     workspaceId,
     groups,
     projectNames,
-    stateNames: await stateNamesFor(db, workspaceId, rows),
+    // TOTAL over every card this answer carries, `shared` included. The rows are
+    // deduplicated by ticket id first because a ticket that is both assigned to
+    // and shared with the viewer appears in both lists by design, and
+    // `stateNamesFor` would otherwise fold the same workflow twice to write the
+    // same key twice.
+    stateNames: await stateNamesFor(db, workspaceId, dedupeRows([...rows, ...sharedRows])),
     contested: await contestedFor(db, viewerId, workspaceId),
+    shared,
   };
+}
+
+/**
+ * The tickets in this workspace whose RESOLVED audience names this viewer —
+ * "shared with me", the read case 13.176 says the product had no route to.
+ *
+ * ## Two conjuncts, and the missing third is deliberate
+ *
+ * `t.workspace_id` is the tenancy clause, supplied HERE because
+ * `explicitAudienceWhere` has none — the same contract `visibleTicketsWhere`
+ * states and for the same reason. Without it an actor-supplied workspace id
+ * would reach every explicit share this user holds anywhere, which is the shape
+ * this series has caught before.
+ *
+ * **`visibleTicketsWhere` is NOT the third conjunct, and leaving it out is the
+ * honest choice rather than the lax one.** Past `requireMember` the viewer's
+ * role is non-null, and for every non-null role the explicit clause is already
+ * NARROWER than the decision table's answer: a guest's whole permitted set IS
+ * the explicit column; member and admin reach explicit as one disjunct of three;
+ * an owner reaches everything. So `visibleTicketsWhere AND explicitAudienceWhere`
+ * is equal to `explicitAudienceWhere` for every caller who gets this far — a
+ * conjunct no fixture could ever redden, which is a check that cannot fail
+ * wearing the costume of defence in depth. The security argument is the table,
+ * not a second copy of it, and it is stated here so the next reader can check it
+ * against `can-see.ts` rather than trusting this sentence.
+ *
+ * The one role the clause would have excluded — `null`, a non-member — never
+ * arrives: `requireMember` answers 404 at the door, and case 7.111 pins it.
+ *
+ * ## An owner is not exempt from being LISTED
+ *
+ * An owner sees every ticket in the workspace, but "shared with me" asks who was
+ * NAMED, so an explicit ticket that does not name them is absent from their
+ * `shared` even though they may read it. That is the question this key asks, and
+ * it is the difference an owner fixture is written to catch.
+ */
+async function sharedWithMeRows(
+  db: Queryable,
+  viewerId: string,
+  workspaceId: string,
+): Promise<ProjTicketRow[]> {
+  const params = new SqlParams();
+  const where = [
+    `t.workspace_id = ${params.add(workspaceId)}`,
+    explicitAudienceWhere(viewerId, params),
+  ];
+  const { rows } = await db.query<ProjTicketRow>(
+    `SELECT ${PROJ_TICKET_COLUMNS}
+       FROM proj_tickets t
+       JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY t.ticket_id`,
+    params.toArray(),
+  );
+  return rows;
+}
+
+/**
+ * One row per ticket id, first occurrence winning — for `stateNames`, whose keys
+ * are ticket ids and whose contract is one entry per card.
+ *
+ * **Stated honestly: the RESPONSE is identical without this.** A ticket that is
+ * both assigned to and shared with the viewer appears in both lists, and
+ * `stateNamesFor` would write the same key twice with the same value. What this
+ * saves is the fold — `foldedWorkflowDefs` being asked for a definition it has
+ * already been asked for — so no fixture can redden its removal, and no test
+ * here pretends to. It is a cost, not a contract.
+ */
+function dedupeRows(rows: readonly ProjTicketRow[]): ProjTicketRow[] {
+  const byId = new Map<string, ProjTicketRow>();
+  for (const row of rows) {
+    if (!byId.has(row.ticket_id)) byId.set(row.ticket_id, row);
+  }
+  return [...byId.values()];
 }
 
 /**

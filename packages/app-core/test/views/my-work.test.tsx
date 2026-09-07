@@ -24,6 +24,7 @@ const GST: WorkItem = {
 const VIEW: MyWorkView = {
   assigned: [GST],
   inTransit: [],
+  shared: [],
   contested: [
     {
       ticketId: 't9',
@@ -103,6 +104,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     const contested: MyWorkView = {
       assigned: [],
       inTransit: [],
+      shared: [],
       contested: [
         {
           ticketId: 't9',
@@ -185,6 +187,7 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
         projectNames: {},
         stateNames: {},
         contested: [],
+        shared: [],
       },
       new Map(),
     ).inTransit).toEqual([]);
@@ -215,9 +218,83 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     expect(within(assigned).queryByText('claim in transit')).not.toBeInTheDocument();
   });
 
+  it('3.160 the Shared with me section renders its rows, and says so when it has none', () => {
+    // The section exists whether or not it has rows: a section that vanished
+    // when empty is indistinguishable from one that failed to load, and for the
+    // guest this key exists for it is the ONLY section that can ever be
+    // non-empty.
+    const empty = { assigned: [], inTransit: [], contested: [], shared: [] };
+    const { unmount } = render(<MyWork view={empty} onOpenTicket={vi.fn()} />);
+    const region = screen.getByRole('region', { name: 'Shared with me' });
+    expect(within(region).getByText('Nothing has been shared with you.')).toBeInTheDocument();
+    unmount();
+
+    // With a row, the empty sentence is GONE and the errand is named. Both
+    // halves, because "the row renders" passes on a section that also still
+    // claims to be empty.
+    render(<MyWork view={{ ...empty, shared: [GST] }} onOpenTicket={vi.fn()} />);
+    const filled = screen.getByRole('region', { name: 'Shared with me' });
+    expect(within(filled).queryByText('Nothing has been shared with you.')).not.toBeInTheDocument();
+    expect(within(filled).getByText('File the GST return')).toBeInTheDocument();
+
+    // And it is a SECTION of its own, not more rows in "Assigned to me" — the
+    // ticket is shared, not assigned, and the assigned section still says so.
+    const assigned = screen.getByRole('region', { name: 'Assigned to me' });
+    expect(within(assigned).getByText('Nothing assigned to you.')).toBeInTheDocument();
+    expect(within(assigned).queryByText('File the GST return')).not.toBeInTheDocument();
+  });
+
+  it('3.161 a shared errand whose project NAME is withheld shows the project ID and is not offered as openable', async () => {
+    // The guest this key exists for is on no project, so `projectName` is null
+    // for every row they will ever see here. Two properties, both of which were
+    // wrong before this change and only one of which is new.
+    //
+    // The two rows carry DIFFERENT titles and ids on purpose: given the same
+    // title, the control's button would satisfy the negative's query and the
+    // "no button" assertion would be about the wrong row.
+    const withheld: WorkItem = {
+      ...GST,
+      ticketId: 't-withheld',
+      title: 'Collect the shop keys',
+      projectName: null,
+      projectId: 'prj_withheld',
+    };
+    const onOpenTicket = vi.fn();
+    render(
+      <MyWork
+        view={{ assigned: [], inTransit: [], contested: [], shared: [withheld, GST] }}
+        onOpenTicket={onOpenTicket}
+      />,
+    );
+    const region = screen.getByRole('region', { name: 'Shared with me' });
+
+    // 1. THE ID, NOT A BLANK. `WorkItem.projectName`'s own contract says a
+    //    withheld name leaves the viewer holding the id, "so the item renders
+    //    id-only rather than blank" — and the renderer printed nothing at all.
+    expect(within(region).getByText('prj_withheld')).toBeInTheDocument();
+
+    // 2. NOT OPENABLE. The sheet lives at /w/:ws/p/:projectId, so a viewer who
+    //    may not be told the project exists cannot load the page the button
+    //    would send them to. Offering it would be a control that reads as
+    //    working and is not. The title is still THERE — withholding the
+    //    affordance is not withholding the errand.
+    expect(
+      within(region).queryByRole('button', { name: 'Collect the shop keys' }),
+    ).not.toBeInTheDocument();
+    expect(within(region).getByText('Collect the shop keys')).toBeInTheDocument();
+
+    // The CONTROL, in the same render and the same section: the row that DOES
+    // carry a project name keeps its button and still opens. Without this the
+    // assertion above passes on a section that renders no buttons at all.
+    const openable = within(region).getByRole('button', { name: 'File the GST return' });
+    await userEvent.click(openable);
+    expect(onOpenTicket).toHaveBeenCalledWith('t1');
+    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+  });
+
   it('the assigned section has its own honest empty state', () => {
     render(
-      <MyWork view={{ assigned: [], inTransit: [], contested: [] }} onOpenTicket={vi.fn()} />,
+      <MyWork view={{ assigned: [], inTransit: [], contested: [], shared: [] }} onOpenTicket={vi.fn()} />,
     );
     expect(screen.getByText('Nothing assigned to you.')).toBeInTheDocument();
     expect(screen.getByText('No contested claims.')).toBeInTheDocument();
@@ -424,7 +501,7 @@ describe('3.60 useMyWork — a refusal is an error, never three empty sections',
     const source = createFakeDataSource({
       getMyWork: async (workspaceId) => {
         asked.push(workspaceId);
-        return { assigned: [GST], inTransit: [], contested: [] };
+        return { assigned: [GST], inTransit: [], contested: [], shared: [] };
       },
     });
     render(<Harness source={source} />);

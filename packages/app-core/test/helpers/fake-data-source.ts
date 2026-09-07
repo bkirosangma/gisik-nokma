@@ -49,7 +49,7 @@ export function createFakeDataSource(
     // Three of these take a `workspaceId` (ruling P25 clause 2) and none of the
     // defaults reads it: the fake answers the same empty view for every
     // workspace, which is what a default is for. Overrides that care take it.
-    getMyWork: async () => ({ assigned: [], inTransit: [], contested: [] }),
+    getMyWork: async () => ({ assigned: [], inTransit: [], contested: [], shared: [] }),
     getAttention: async () => [],
     getPreferences: async () => ({ version: 1, projects: {}, savedFilters: [] }),
     putPreferences: async () => {},

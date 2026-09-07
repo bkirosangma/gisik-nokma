@@ -858,6 +858,7 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     const other = '01J9GPRJ00000000000000000B';
     const body: MyWorkResponse = {
       workspaceId: 'w',
+      shared: [],
       groups: {
         // `stateCategory` is overridden per group because it is the key the
         // server BUCKETS by (`bucketFor` reads it off the card), so a card in
@@ -915,6 +916,7 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     const withheld = '01J9GPRJ00000000000000000C';
     const base: MyWorkResponse = {
       workspaceId: 'w',
+      shared: [],
       groups: {
         open: [serverCard({ ticketId: 'tkt-1' }), serverCard({ ticketId: 'tkt-2', projectId: withheld })],
         active: [],
@@ -951,9 +953,66 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
    * `serverTime` for a contested claim, and a mutation that copies
    * `contestedAt` into one must redden this.
    */
+  /**
+   * 3.159 — `shared` (case 13.176) goes through the SAME `mapWorkItem` as the
+   * three groups, and this case exists to keep it that way.
+   *
+   * A second mapper for shared cards is the obvious shortcut and the wrong one:
+   * `projectNames` and `stateNames` carry two DIFFERENT meanings for a miss —
+   * one is a rule applying, the other is a malformed body — and a copy is free
+   * to drift on either. The fixture puts a withheld project on a SHARED card
+   * specifically, because that is the normal case for the guest this key exists
+   * for, and asserts the group card beside it as the control.
+   */
+  it('3.159 mapMyWork reads `shared` through the same item mapper — a withheld project name degrades, a missing state name refuses', () => {
+    const withheld = '01J9GPRJ00000000000000000C';
+    const named = '01J9GPRJ000000000000000000';
+    const body: MyWorkResponse = {
+      workspaceId: 'w',
+      groups: { open: [serverCard({ ticketId: 'tkt-mine', projectId: named })], active: [], terminal: [] },
+      shared: [
+        serverCard({ ticketId: 'tkt-shared', projectId: withheld }),
+        serverCard({ ticketId: 'tkt-shared-named', projectId: named }),
+      ],
+      projectNames: { [named]: 'Registrations' },
+      stateNames: { 'tkt-mine': 'Doing', 'tkt-shared': 'Doing', 'tkt-shared-named': 'Doing' },
+      contested: [],
+    };
+
+    const view = mapMyWork(body, new Map());
+    expect(view.shared.map((item) => item.ticketId)).toEqual(['tkt-shared', 'tkt-shared-named']);
+
+    // The withheld one keeps its ID and loses only the NAME — `null`, never ''
+    // and never the id wearing a name's clothes.
+    expect(view.shared[0]?.projectName).toBeNull();
+    expect(view.shared[0]?.projectId).toBe(withheld);
+    // The named one in the SAME array proves the lookup runs at all, so the
+    // `null` above is the rule applying and not a map that was never read.
+    expect(view.shared[1]?.projectName).toBe('Registrations');
+    // And the group card is the cross-section control: one rule, both sections.
+    expect(view.assigned[0]?.projectName).toBe('Registrations');
+
+    // The OTHER map's miss is not a rule, and must refuse rather than degrade —
+    // `WorkItem.stateName` is required, and a fallback to the state id would put
+    // a slug where a name goes. Asserted on a SHARED card, which is the arm that
+    // did not exist before this key.
+    const missing: MyWorkResponse = {
+      ...body,
+      stateNames: { 'tkt-mine': 'Doing', 'tkt-shared-named': 'Doing' },
+    };
+    expect(() => mapMyWork(missing, new Map())).toThrow(/tkt-shared/);
+
+    // The key itself is required: a body that omits `shared` entirely is
+    // malformed and says so, rather than being read as "nothing is shared with
+    // you" — which is a sentence about the world, not about the body.
+    const { shared: _dropped, ...withoutShared } = body;
+    expect(() => mapMyWork(withoutShared, new Map())).toThrow(/myWork\.shared/);
+  });
+
   it('12.252 mapMyWork maps a contested claim with both recorded instants and no serverTime', () => {
     const body: MyWorkResponse = {
       workspaceId: 'w',
+      shared: [],
       groups: { open: [], active: [], terminal: [] },
       projectNames: {},
       stateNames: {},

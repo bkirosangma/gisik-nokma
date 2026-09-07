@@ -239,6 +239,22 @@ export type MyWorkView = {
   assigned: WorkItem[];
   inTransit: WorkItem[];
   contested: ContestedClaim[];
+  /**
+   * Handed to this viewer BY NAME — the ticket's resolved audience lists them
+   * (case 13.176). A fourth section rather than more rows in `assigned`, because
+   * *you are doing this* and *you were handed this* are different claims and a
+   * ticket can carry the second without the first.
+   *
+   * **A ticket in both is in both**, deliberately: de-duplicating would drop the
+   * only claim a non-assignee can ever have. `MyWork` labels the sections so the
+   * repeat reads as two facts about one errand rather than as a doubled row.
+   *
+   * Unlike `inTransit`, this is READ OFF THE WIRE (`MyWorkResponse.shared`) —
+   * who may see a ticket is a server fact, and the replica has no visibility
+   * table at all, which is why `getMyWork` refuses there outright rather than
+   * serving a narrowed version of this.
+   */
+  shared: WorkItem[];
 };
 
 export type AttentionKind = 'blocked' | 'stale' | 'due-soon' | 'contested';

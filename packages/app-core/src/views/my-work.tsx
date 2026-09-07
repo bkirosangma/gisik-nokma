@@ -92,6 +92,25 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
           ))
         )}
       </section>
+
+      {/*
+        Case 13.176. For a guest on no project this is the ONLY section that can
+        ever have rows — the other three are assignment- and claim-scoped, and an
+        errand handed to somebody is neither. The section renders unconditionally
+        rather than only when non-empty, so "nothing has been shared with you" is
+        a sentence the product says rather than a section that vanishes; a
+        disappearing section is indistinguishable from one that failed to load.
+      */}
+      <section role="region" aria-label="Shared with me" className="gn-my-work__section">
+        <h3 className="gn-my-work__heading">Shared with me</h3>
+        {view.shared.length === 0 ? (
+          <p className="gn-my-work__empty">Nothing has been shared with you.</p>
+        ) : (
+          view.shared.map((item) => (
+            <WorkItemCard key={item.ticketId} item={item} onOpenTicket={onOpenTicket} shared />
+          ))
+        )}
+      </section>
     </div>
   );
 }
@@ -157,21 +176,63 @@ function WorkItemCard({
   item,
   onOpenTicket,
   pending = false,
+  shared = false,
 }: {
   item: WorkItem;
   onOpenTicket: (ticketId: string) => void;
   pending?: boolean;
+  shared?: boolean;
 }) {
+  /**
+   * The ticket sheet lives at `/w/:ws/p/:projectId?ticket=…` — through the
+   * PROJECT page — so opening one needs a project this viewer may actually
+   * load, and `projectName === null` is exactly the register that says they may
+   * not be told the project even exists by name (rulings P32/P38). A guest
+   * holding a shared errand is that viewer for every row in this section.
+   *
+   * So the affordance is gated on the thing it NEEDS, not on the section it sits
+   * in: a member whose shared ticket is in a project they are on still gets the
+   * button. Offering it to the guest would push them to a page that answers 404
+   * while the card said "open" — a control that reads as working and is not,
+   * which is the shape `new-ticket-dialog`'s withheld parent picker was fixed
+   * for. Only `shared` rows are gated: the other sections' rows reach this state
+   * too (a guest ASSIGNED an invisible-project ticket, case 7.108) and that dead
+   * click is a real, PRE-EXISTING defect — recorded, not silently widened into
+   * here, because changing those sections is not this change's job.
+   */
+  const openable = !shared || item.projectName !== null;
   return (
     <Card className="gn-my-work__item">
-      <button
-        type="button"
-        className="gn-my-work__title"
-        onClick={() => onOpenTicket(item.ticketId)}
-      >
-        {item.title}
-      </button>
-      <span className="gn-my-work__project">{item.projectName}</span>
+      {openable ? (
+        <button
+          type="button"
+          className="gn-my-work__title"
+          onClick={() => onOpenTicket(item.ticketId)}
+        >
+          {item.title}
+        </button>
+      ) : (
+        <span className="gn-my-work__title gn-my-work__title--unopenable">{item.title}</span>
+      )}
+      {/*
+        `WorkItem.projectName`'s own contract: a withheld name leaves the viewer
+        holding the `projectId`, "so the item renders id-only rather than blank".
+        This line printed `{item.projectName}` — i.e. NOTHING — whenever the rule
+        applied, so the type promised one register and the renderer delivered
+        another. PRE-EXISTING and reachable before this change (case 7.108's
+        guest), but this section is where it becomes the NORMAL case rather than
+        an edge, so it is fixed here with one rule for every section.
+      */}
+      {item.projectName !== null ? (
+        <span className="gn-my-work__project">{item.projectName}</span>
+      ) : (
+        <span
+          className="gn-my-work__project gn-my-work__project--id"
+          title="You have not been told this project’s name."
+        >
+          {item.projectId}
+        </span>
+      )}
       <Chip tone={item.stateCategory} title={formatStateProvenance(item.stateName, item.stateProvenance)}>
         {item.stateName}
       </Chip>
