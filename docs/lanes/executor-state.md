@@ -38,6 +38,35 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 **218 (exec/65's tip) − 50 (#244's §05 citations, now underneath) = 168.** The two measurements reconcile.
 
+## 🔴 THE DISPATCH BRIEF'S "SERIAL SEQUENCE" HAS EXPIRED — the ledger says 177/177, 0 todo
+
+The executor dispatch brief states *"~109 of 177 tasks remain"* and lays out steps 4–16 beginning at
+**Plan 4 T4 → T5**. Measured now with `pnpm check:tasks` (EXIT 0):
+
+```
+plan  tasks  done  claimed  in-flight  todo
+  01..11  177   177        0          0     0
+  done (merge sha verified on origin/main) : 177
+  todo                                     : 0
+```
+
+**Every one of the twelve plans is complete and merge-verified.** The instrument is not taking anyone's word
+for it: `scripts/check-task-ledger.mjs` validates each `done` row with `git merge-base --is-ancestor <sha>
+origin/main` — deliberately `origin/main` and not `main`, deliberately not `git cat-file` ("worktrees share
+one object store"), and it documents its own 2026-09-02 correction about rebase- versus squash-merge. It is
+the same discipline this file demands of narrative shas, applied by a program.
+
+**So steps 4 through 16 of the dispatch brief are all done, and a restart that obeyed it would begin by
+re-implementing Plan 4 T4 — merged work — against a sequence that no longer describes the repo.** This is the
+brief's own diagnosis turned on itself: *"A brief that names a position is a brief that expires."* Its
+`START HERE` section deliberately names no task and has held up perfectly; `THE SERIAL SEQUENCE` names
+fifteen and has not. The brief also says its arithmetic is **advisory** — that sentence is now the only part
+of the section that is still true.
+
+**What this means for the role.** There is no plan work outstanding, which is why this session's work has
+been the citation/quality track rather than the sequence. The executor's remaining candidates are exactly
+the three in NEXT below, and two of the three need the controller.
+
 ## 🔴 GITHUB ACTIONS IS DEAD ON BILLING — AND IT BREAKS A PRECONDITION OF THE STANDING MERGE AUTHORIZATION
 
 **PR #247's four "failing" checks did not fail. They never started.** Every job carries the same annotation:
