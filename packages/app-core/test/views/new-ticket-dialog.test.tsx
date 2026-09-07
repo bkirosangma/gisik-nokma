@@ -23,6 +23,64 @@ import { NewTicketDialog } from '../../src/views/new-ticket-dialog.js';
  * Tested here rather than through the page because this is the component's own
  * invariant — it must hold for every caller, not only for the one that exists today.
  */
+/**
+ * 12.388 — A NARROWED PARENT PICKER SAYS SO, INSIDE THE MODAL.
+ *
+ * `parentCandidates` is built from `list.rows`, which became filter-dependent when the
+ * list gained a narrowing control. So ticking *Only tickets in progress* silently
+ * removes every done ticket from the parent picker — and a user who wants to file a
+ * sub-task under a finished ticket finds it absent with nothing saying why.
+ *
+ * **The claim is the same one this component already refuses, one notch quieter.** An
+ * EMPTY picker asserts *this project has no possible parent*; a NARROWED picker asserts
+ * *these are the tickets that could be a parent*. Both are claims about the world made
+ * from what the caller happened to see, and both are made inside a modal — where, as
+ * this file's sibling case puts it, a sentence rendered on the page behind cannot be
+ * read. The page's own `list-filter-note` is exactly such a sentence.
+ *
+ * Kept separate from `parentCandidatesUnavailable` because the facts differ: there the
+ * list could not be shown at all and creation falls back to project root; here it was
+ * shown, narrowly, and every offered option is real.
+ */
+describe('12.388 a narrowed parent picker names its narrowing', () => {
+  const TYPES = [{ id: 'task', name: 'Task' }];
+  const CANDIDATES = [{ id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign' }];
+
+  it('the reason is beside the picker, and the picker still works', () => {
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={TYPES}
+        parentCandidates={CANDIDATES}
+        parentCandidatesNarrowing="tickets in progress"
+        onCreate={vi.fn()}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('parent-narrowing')).toHaveTextContent(
+      'showing only tickets in progress — a ticket outside that is not offered here',
+    );
+    // The picker is still a picker: this is a DISCLOSURE, not the withholding that
+    // `parentCandidatesUnavailable` does. Without this the case would pass against a
+    // dialog that replaced the control, which is a different and wrong behaviour.
+    expect(within(screen.getByLabelText('Parent')).getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('CONTROL: unnarrowed, no such claim is made', () => {
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={TYPES}
+        parentCandidates={CANDIDATES}
+        onCreate={vi.fn()}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.queryByTestId('parent-narrowing')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Parent')).getAllByRole('option')).toHaveLength(2);
+  });
+});
+
 describe('3.157 the dialog never submits a parent it has stopped showing', () => {
   const TYPES = [
     { id: 'epic', name: 'Epic' },

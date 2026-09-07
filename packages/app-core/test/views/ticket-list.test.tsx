@@ -127,9 +127,14 @@ function ControlledList({
  * `matching` always", which would make every list hedge and none of them informative.
  */
 describe('12.384 the summary says when the rows are not the whole project', () => {
-  it('narrowed: the count reads `matching`, and the narrowing is named beside it', () => {
+  it('narrowed: the count reads `matching`, the `done` half is gone, and the narrowing is named', () => {
     render(<ControlledList narrowing="tickets in progress" />);
-    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 matching · 1 done');
+    // `· N done` is dropped, not recomputed. It is a claim about the PROJECT, and
+    // under the only shipped narrowing it is structurally always `0 done` — a
+    // number that can only say zero, in a shape that invites the project-wide
+    // reading the count no longer supports.
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 matching');
+    expect(screen.getByTestId('list-summary')).not.toHaveTextContent('done');
     expect(screen.getByTestId('list-narrowing')).toHaveTextContent(
       'narrowed to tickets in progress — not the whole project',
     );

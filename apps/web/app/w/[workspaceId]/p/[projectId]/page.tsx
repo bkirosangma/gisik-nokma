@@ -142,11 +142,14 @@ function ProjectBoard() {
    * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
    * The first version of this asked for `['open', 'active']` — *"hide done"*, which
    * is the narrowing a person would actually reach for. `toServerFilterSpec`
-   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: every axis on
-   * `FilterSpec` is a LIST client-side and `filterSpecSchema` takes exactly ONE
-   * value, so `stateCategory` can name `open` OR `active` OR `terminal` and never
-   * "not terminal". Found by 12.383 failing, not by reading the type — the client
-   * type is plural and looks as though it composes.
+   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: the SIX
+   * id-shaped axes are LISTS client-side — `assigneeIds`, `collaboratorIds`,
+   * `typeIds`, `stateIds`, `stateCategories`, `projectIds` — while
+   * `filterSpecSchema` takes exactly ONE value for each (`text`, `dueBefore`,
+   * `dueAfter` are scalars and `fields` is a record, so they are not part of this).
+   * So `stateCategory` can name `open` OR `active` OR `terminal` and never "not
+   * terminal". Found by 12.383 failing, not by reading the type — the plural axes
+   * look as though they compose.
    *
    * That guard is right and is the reason this is a label change rather than a bug:
    * an unexpressible filter REFUSES loudly instead of being silently dropped and
@@ -207,10 +210,20 @@ function ProjectBoard() {
     // predicates, because claiming a test for it would be the overclaim.
     const rows = list.rows ?? [];
     return {
-      epicTitle: (epicId) => rows.find((row) => row.ticketId === epicId)?.title ?? epicId,
+      // `?? epicId` was safe while `list.rows` was always the COMPLETE set: any
+      // epic a surviving child pointed at was necessarily in it. A narrowing
+      // breaks that — an epic that is `open` or `terminal` is filtered out while
+      // its `active` children survive and are rooted by `nestRows`, so the lookup
+      // misses and a 26-character ULID appears where a section title goes. Named
+      // rather than printed raw, and only when a narrowing can explain it: with no
+      // narrowing in force a missing epic means something else (visibility), and
+      // saying "outside the narrowing" there would be inventing a reason.
+      epicTitle: (epicId) =>
+        rows.find((row) => row.ticketId === epicId)?.title ??
+        (activeOnly ? 'An epic outside this narrowing' : epicId),
       typeName: (typeId) => typeId,
     };
-  }, [list.rows]);
+  }, [list.rows, activeOnly]);
 
   /**
    * The roster, for the two views that print a claim's AUTHOR.
@@ -418,6 +431,7 @@ function ProjectBoard() {
           currentUserId={currentUserId}
           typeOptions={typeOptions}
           parentCandidates={parentCandidates}
+          {...(activeOnly ? { parentCandidatesNarrowing: 'tickets in progress' } : {})}
           {...parentsUnavailable}
           onCreated={openTicket}
         />
@@ -450,7 +464,15 @@ function ProjectBoard() {
 
             {/*
               ABOVE the tab arms, and that placement is the whole point rather than
-              a layout choice. Every renderer of the list lives inside
+              a layout choice.
+
+              Which forces the note beside it to NAME THE SURFACES. The control
+              renders on every tab, but it narrows only the reads that take a
+              filter: `useBoard` takes none and cannot be narrowed, so an unscoped
+              "done are excluded" sits on the DEFAULT tab directly above a Done
+              column holding a done card — an unnarrowed set claiming to be
+              narrowed, which is the same class of lie as a narrowed one claiming
+              to be whole and is the reason this control exists. Every renderer of the list lives inside
               `list.error === null` — put the narrowing control there and it is
               reachable by everyone EXCEPT the person who needs it, because past the
               cap those arms render a refusal instead. That is the identical mistake
@@ -474,7 +496,8 @@ function ProjectBoard() {
               */}
               {activeOnly ? (
                 <span className="gn-list-filter__note" data-testid="list-filter-note">
-                  asking only for tickets in progress — not started and done are both excluded
+                  the list, calendar and timeline are asking only for tickets in progress —
+                  not started and done are both excluded. The board is not narrowed.
                 </span>
               ) : null}
             </div>

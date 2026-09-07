@@ -153,9 +153,18 @@ export function TicketList({
     <div className="gn-list">
       <div className="gn-list__controls">
         <span data-testid="list-summary" className="gn-list__summary">
+          {/*
+            The `done` half is dropped when narrowed rather than carried. It is a
+            fact about the PROJECT — "of your tickets, this many are finished" —
+            and over a narrowed set it is a fact about the narrowing instead,
+            which under the only shipped one (`stateCategories: ['active']`) is
+            structurally always `0 done`. A number that can only ever say zero is
+            not information; it is a familiar shape inviting a reader to draw the
+            project-wide conclusion the count no longer supports.
+          */}
           {narrowing === undefined
             ? `${counts.total} tickets · ${counts.terminal} done`
-            : `${counts.total} matching · ${counts.terminal} done`}
+            : `${counts.total} matching`}
         </span>
         {/*
           The narrowing is stated in the SUMMARY ROW and not only by the control
@@ -462,6 +471,31 @@ export type TicketListState = {
  * re-opens on a workspace switch, where `usePreferences` clears the document
  * before asking.
  */
+/**
+ * A key that is the same for two filters that mean the same thing.
+ *
+ * Sorting the TOP level only was the first version, and it delivered the property
+ * one level down from where `FilterSpec` needs it: `fields` is a
+ * `Record<string, string>` whose key order is insertion order, so two specs with
+ * the same field predicates in a different order produced different keys — the
+ * exact rekey-and-re-walk the sorting was added to prevent, for the only axis
+ * that nests. Recursion is the fix, and it is written here rather than inlined
+ * because the argument for it is longer than the code.
+ *
+ * Arrays keep their order deliberately. `['a','b']` and `['b','a']` are the same
+ * SET, but `toServerFilterSpec` rejects any array of more than one element, so
+ * two orders can never both be expressible and sorting them would hide nothing
+ * real while making the key claim more than it knows.
+ */
+function stableFilterKey(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(stableFilterKey).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableFilterKey(v)}`).join(',')}}`;
+}
+
 export function useTicketList(
   source: DataSource,
   workspaceId: string,
@@ -479,11 +513,7 @@ export function useTicketList(
   // object key order is insertion order, so two specs that mean the same thing
   // stringify differently and would rekey — clearing the list and re-walking every
   // page for a question already answered.
-  const filterKey = JSON.stringify(
-    Object.entries(filter)
-      .filter(([, value]) => value !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : 1)),
-  );
+  const filterKey = stableFilterKey(filter);
   const list = useLiveQuery(source, workspaceId, `${projectId}\u0000${filterKey}`, () =>
     source.query.getTickets(projectId, filter, 'flat'),
   );
