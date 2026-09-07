@@ -16,6 +16,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ⏸ MONDAY 2026-09-07 ~19:5x IST — **ANCHOR REFRESH. STILL NOTHING QUEUED. `main` IS `7f80048`, NOT `af369c0`.**
+
+**This entry supersedes the anchor table below it**, which is four merges behind and whose `branch` row
+names a branch that has never existed — here or on `origin`. Both defects are the class this file spent
+today documenting, landing in the one table whose whole job is to be the thing a restart trusts.
+
+| what | value |
+|---|---|
+| `origin/main` | **`7f80048`** — #288, #289, #290, #291 all merged since the table below was written |
+| branch | `exec/88-anchor-refresh-stale-pointers` (docs only), off `7f80048` |
+| working tree | CLEAN |
+| **queue** | **EMPTY** — unchanged. Nothing below this line is queued work. |
+| standing instruction | **HOLD.** Unchanged: the controller is taking "what next" to the OWNER. |
+| **unrecorded** | **PR #276 is OPEN** and appears in NEITHER state file — see below |
+
+**Reachability, measured at `7f80048` with `git branch -r --contains` (empty = orphaned), never
+`git cat-file`:** `7f80048`, `af369c0`, `6a491df`, `72a8e68`, `ac187e8`, `e33c429`, `e09666c`, `4d5dd39`,
+`c5e3e02`, `0d93bc1` — **all reachable from `origin/main`.** `cff68be` and `72d6d5a` are **NOT**; both
+resolve only from `exec/84-step10-ran-and-a-truncated-message`. The ten positives are the positive control
+for the two empties: the same command shape printed `origin/main` ten times in the same run, so the two
+absences are real and not a broken instrument.
+
+## Three corrections to the entries below, made by reference rather than in place, per this file's convention
+
+**1. `:84` presents an unreachable sha as a merge sha.** It reads *"PR #286 merged at `cff68be`."* #286
+merged as **`0d93bc1`** (squash). `cff68be` was the *branch-side head at the moment of capture* and is not
+on `main` and never will be. The sentence is *about* the squash-drop trap and is right about the trap; it
+just names the branch sha where a reader needs the merge sha. **A squash merge means the sha you watched
+is never the sha that landed** — that is the mechanism, and writing "merged at <branch sha>" restates the
+error the paragraph exists to warn about.
+
+**2. The branch row names `exec/85b-plan9-gap-owned`. No such branch exists** — locally or on `origin`.
+The real one is **`exec/85-plan9-gap-owned`** (no `b`). Positive control: `git branch -a --list '*85*'`
+returns exactly the two real refs, and the same command shape with `'*87*'` returns `exec/87-truncation-threshold`
+and its remote, so the glob works. **This row was never verifiable in the first place**: the file's own
+header promises anchors were checked with `git branch --contains`, and `--contains` on a *branch name* is
+not that check at all — the promise and the row are different operations, so the typo could survive every
+verification the header claims. **A verification claim that names the wrong command verifies nothing, and
+reads exactly like one that does.**
+
+**3. PR #291 landed clean — checked, not assumed.** `git diff origin/main exec/87-truncation-threshold --
+docs/lanes/executor-state.md` is empty, and the same command shape against `6a491df` prints 35 lines, so
+the empty is a real empty. The truncation-threshold content is on `main`: 16 case-insensitive hits,
+positive control `restart surface` = 5. **And the case trap fired again inside that very check** — a
+case-sensitive `grep -n 'truncation threshold'` on the merged file returned **nothing**, which is what a
+dropped commit looks like. `grep -in 'truncat'` returns 16. That is the second time in two days a grep
+flag has manufactured a false drop; the content was never at risk, the instrument was.
+
+## ⚠ FOR THE CONTROLLER — PR #276 is open, unrecorded, and may be the answer you are waiting for
+
+**[#276 "Design spec: gisik-nokma MCP server"](https://github.com/bkirosangma/gisik-nokma/pull/276),
+opened 2026-09-07 08:50Z, still OPEN, docs-only** (one added file,
+`docs/superpowers/specs/2026-09-07-mcp-server-design.md`, +148). It is the *only* open PR in the repo.
+It was opened from a **different session** (`session_01UeY1nbhVET7pi9zg76oyyv`) while the controller was
+taking "what next" to the owner, and its own body says *"Implementation follows via `writing-plans` once
+this is approved."*
+
+**Flagged, deliberately not acted on.** New scope — a `packages/mcp-server` with a device-authorization
+flow and a new token-auth path alongside the session-cookie check — is an owner decision, and the standing
+instruction is HOLD. But it is plausibly the "what next" the controller is waiting for, and **neither
+state file mentions it**, so the hold and the answer were sitting in the same repo not knowing about each
+other. Recorded with an owner — the controller — rather than picked up.
+
 # ⏸ MONDAY 2026-09-07 ~19:xx IST — **NOTHING IS QUEUED. THE EXECUTOR IS IDLE BY INSTRUCTION, NOT BLOCKED.**
 
 **Read this before acting on anything below it.** Every section further down describes work that is
@@ -28,6 +91,11 @@ MERGED. A resuming executor should not start from them.
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
+
+> **SUPERSEDED as an anchor table by the ~19:5x entry above.** `origin/main` is **`7f80048`**, four merges
+> on. The `branch` row's `exec/85b-plan9-gap-owned` is a name that **has never existed** — the real branch
+> is `exec/85-plan9-gap-owned`. The `queue` and `standing instruction` rows still hold unchanged; only the
+> two anchor rows drifted, which is the pattern: *the narrative outlives the anchors it was measured at.*
 
 ## AMENDED 17:3x IST — **STEP 10 AS THE BRIEF WORDS IT NEVER RAN IN FULL. A NARROWER PASS RAN UNDER THAT NAME; THE OTHER TWO-THIRDS WERE COVERED FOUR DAYS LATER UNDER A DIFFERENT ONE.**
 
