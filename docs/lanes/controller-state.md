@@ -1,5 +1,29 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 20:5x IST — ALL SEVEN MCP RULINGS LANDED IN THE PLAN. PR #306 merged (docs-only, plan document, no code gate needed). `main` is `2e77dc8`. MCP implementation itself still hasn't started — plan is ready, nothing built.
+
+**Ruling 1's cost was overstated, and the correction is measured, not asserted.** The plan originally
+called adding `'mcp'` to the envelope-origin enum "genuinely more than this plan's scope" (migration +
+fallout across the ingest gate, contest rules, sync clients). **Independently re-verified by this
+controller, not just trusted**: `ORIGINS` has exactly one source reference
+(`packages/domain/src/envelope.ts:26`), the `origin` column is plain `text NOT NULL` with no `CHECK` and
+no Postgres enum, and the zod schema derives from the array directly. **One line, no migration.** The
+sweep also found two real sites the original plan never named: a test fixture that re-spells the origin
+list as a second, silently-drifting authority (fixed by importing `ORIGINS`, not adding a fifth string),
+and a permission-gate test that derives its cases from `ORIGINS` — so `'mcp'` gets a real test case for
+free the moment it's added, with an explicit "stop if it fails, that's a finding not a test to adjust."
+
+**Ruling 5 (revoke UI) landed as Task 12**, confirmed genuinely a page-of-design addition rather than
+needing fresh planning, exactly as the executor assessed before doing the work. One sub-question stays
+explicitly open for the owner rather than decided: whether the revoke list should show **last-used** per
+token — flagged as a privacy-shaped decision (a log of when someone's assistant acted), not a technical
+one. Written against: no, buildable now without it.
+
+**A small self-correction worth naming as a lesson, not just noting:** the executor's own find-and-replace
+through the original Open-question-1 prose briefly changed what a sentence MEANT (attaching one ruling's
+consequence to the unruled hypothetical), not just what it said — caught and fixed before this controller
+saw it, with the mechanism named explicitly rather than just the fix.
+
 ## ✅ MONDAY 20:4x IST — IN-APP MANUAL/FAQ LANDED, ALL THREE SURFACES. PR #304 merged, own forced gate GREEN (fresh install, lockfile changed). `main` is `e6b19a7`. Owner has ruled all 7 MCP plan questions; plan update queued next.
 
 **One parse, two renderers, three apps.** `scripts/help-content.mjs` parses `docs/manual.md` +
