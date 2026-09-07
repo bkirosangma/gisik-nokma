@@ -117,10 +117,44 @@ what typecheck catches. **Owner: whoever next touches `useTicketList`'s preferen
 fixed in this branch: the brief's rule is that out-of-scope findings are recorded with an owner, not
 repaired, and folding a defensive `?? {}` in here would also weaken the type that caught the real bug.
 
+## ⚠ MEASURED FOR THE NEXT ITEM: **REMEDY 3 IS MUCH CHEAPER THAN THIS FILE HAS BEEN RECORDING**
+
+The premise carried across three anchors — *"letting a user narrow under the bound needs the route's query
+language to express the narrowing"* — **is wrong, and it has been wrong the whole time.** The pipeline
+exists end to end and is tested. Measured, not inferred:
+
+| link | evidence |
+|---|---|
+| client serialises the filter | `online-data-source.ts:68` `listQueryString` → `toServerFilterSpec` → `filter=<json>` |
+| ...on **every page** of the walk | `online-data-source.ts:223`, inside the `for` loop, not before it |
+| route validates it | `routes/list.ts:526` `filterSpecSchema.safeParse`, `400 invalid_filter` otherwise |
+| route compiles it to SQL | `routes/list.ts:14` `compileFilterSpec`, **parameterised** |
+| the narrowing is proven | `list.test.ts:1115` narrows by `assigneeId`; **7.18** (`list.test.ts:969`) plants a hostile filter and shows it executes harmlessly |
+| the axes already exist | `FilterSpec` (`view-types.ts:70`): text, assignee, collaborator, type, state, state-category, project, due-before/after, custom fields — all optional, all AND-combined |
+
+**And filtering genuinely relieves the cliff**, which is the part that decides whether remedy 3 is a real
+answer or a consolation. The cap is not a server bound: `getTickets` walks up to `LIST_PAGE_CAP` (10) pages
+of `LIST_PAGE_SIZE` (200) and throws only if a cursor is **still outstanding** afterwards
+(`online-data-source.ts:246`). A filter that narrows server-side shortens the walk, so the same project that
+refuses unfiltered answers filtered.
+
+**What is actually missing is client-side only, and it is small:**
+
+1. `packages/app-core/src/views/ticket-list.tsx:436` hardcodes the filter as `{}` — the single site.
+2. No control exists for choosing one.
+3. **The control must render OUTSIDE the refusing arm.** This is the load-bearing part and it is easy to get
+   wrong: a filter control drawn inside `list.error === null` is unreachable by the only user who needs it.
+   That is the identical mistake `createRegion` was making until this branch, and the fix has the same shape
+   — gate the affordance on what it actually needs, not on the read that happens to sit beside it.
+
+**`SavedFilter` (`view-types.ts:264`) and the preferences document already carry named filters**, so there
+may be a smaller first step than a general filter bar. Not designed here — the owner asked for measurement
+first, and this is the measurement.
+
 ## NEXT
 
-1. **The owner's second half: real filtering, as its own PR.** `ticket-list.tsx` hardcodes the filter as
-   `{}`; letting a user narrow under the bound needs the route's query language to express the narrowing.
+1. **The owner's second half: real filtering, as its own PR** — see the measurement directly above, which
+   says it is a client-side change against a pipeline that already works, not a route change.
 2. **13.176** — guest navigation to explicitly-shared tickets. Measurement, then design, then code.
 3. Still open and still the owner's: which of the four cliff remedies (raise the cap / paged view type /
    filter affordance) follows. **Remedy 4 — this branch — is done.**
