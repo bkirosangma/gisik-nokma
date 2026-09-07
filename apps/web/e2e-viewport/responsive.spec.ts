@@ -247,7 +247,7 @@ async function measureOverflow(page: Page): Promise<Overflow> {
   });
 }
 
-type TapTargets = {
+export type TapTargets = {
   /**
    * How many nodes the SELECTOR matched, before any visibility or exemption
    * filtering. This is the anti-broken-selector control, and it is separate
@@ -285,7 +285,7 @@ type TapTargets = {
  * carrying text of its own beyond the link. An `inline-block` control, or a
  * link that is its parent's entire content, is NOT exempt.
  */
-async function measureTapTargets(page: Page): Promise<TapTargets> {
+export async function measureTapTargets(page: Page): Promise<TapTargets> {
   return page.evaluate(() => {
     const SELECTOR = [
       'a[href]',
@@ -637,20 +637,28 @@ async function measureContrast(page: Page): Promise<Contrast> {
 
 const TAP_BASELINE_PATH = fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));
 
-function readTapBaseline(): Record<string, number> {
+/**
+ * Both helpers take the path, because there are now TWO baselines: this suite's
+ * unauthed one and `e2e-stack/tap-target-baseline.json` for the signed-in shell.
+ * They share this code rather than each carrying a copy, for the reason this
+ * repo has a catalogue of: a second definition of "what a tap target is" drifts
+ * from the first silently, and the two counts would stop being comparable
+ * without either file changing.
+ */
+export function readTapBaseline(path: string = TAP_BASELINE_PATH): Record<string, number> {
   try {
-    return JSON.parse(readFileSync(TAP_BASELINE_PATH, 'utf8')) as Record<string, number>;
+    return JSON.parse(readFileSync(path, 'utf8')) as Record<string, number>;
   } catch {
     return {};
   }
 }
 
-function recordTapBaseline(key: string, count: number): void {
-  const current = readTapBaseline();
+export function recordTapBaseline(key: string, count: number, path: string = TAP_BASELINE_PATH): void {
+  const current = readTapBaseline(path);
   if (current[key] !== undefined) return;
   current[key] = count;
   const ordered = Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(TAP_BASELINE_PATH, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
+  writeFileSync(path, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

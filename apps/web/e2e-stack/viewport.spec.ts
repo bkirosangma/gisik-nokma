@@ -1,5 +1,11 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
+import {
+  measureTapTargets,
+  readTapBaseline,
+  recordTapBaseline,
+} from '../e2e-viewport/responsive.spec.js';
 
 /**
  * ## THE ONE VIEWPORT CASE THAT CANNOT LIVE IN `e2e-viewport/`
@@ -104,4 +110,57 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
     `documentElement.scrollWidth ${layout.scrollWidth} > clientWidth ${layout.clientWidth} + 1 — ` +
       `the signed-in shell scrolls sideways on a phone`,
   ).toBeLessThanOrEqual(layout.clientWidth + 1);
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * TAP TARGETS ON THE SIGNED-IN SHELL — the numbers that had no guard at all.
+   *
+   * The pre-launch review measured 48 interactive elements under 24x24 on the
+   * board and recorded them as "reported, not fixed". Nothing pinned them: this
+   * file measured OVERFLOW only, and the unauthed suite cannot see these pages.
+   * So the one place the counts were written down was a prose note in a
+   * checklist, which no run can contradict.
+   *
+   * The measurement is IMPORTED, not restated. `measureTapTargets` and the
+   * baseline helpers live in `e2e-viewport/responsive.spec.ts`; a second copy
+   * here would be a second definition of "what a tap target is", free to drift
+   * from the first while both files keep reporting confident numbers.
+   * ────────────────────────────────────────────────────────────────────────*/
+  const taps = await measureTapTargets(page);
+  const smallest = taps.smallestExamined;
+  console.log(
+    `[stack-phone-390] /my-work — tap targets: selector matched ${taps.rawMatches}, ` +
+      `examined ${taps.examined.length}, inline-in-prose exempt ${taps.inlineExempt.length}, ` +
+      `invisible skipped ${taps.invisibleSkipped}, smallest examined = ` +
+      `${smallest === null ? 'n/a' : `${smallest.w}x${smallest.h} (${smallest.selector})`}, ` +
+      `offenders=${taps.offenders.length}`,
+  );
+  // The anti-broken-selector control, the same one the unauthed suite carries:
+  // `examined` may legitimately be small, but a zero `rawMatches` on a page with
+  // a nav, a search box and a board can only mean the selector stopped matching.
+  expect(taps.rawMatches, 'the tap-target selector matched NOTHING on the signed-in shell').toBeGreaterThan(5);
+
+  const TAP_BASELINE = fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));
+  const tapKey = 'stack-phone-390|/my-work';
+  const allowed = readTapBaseline(TAP_BASELINE)[tapKey];
+  if (allowed === undefined) {
+    // A MISSING BASELINE FAILS rather than seeding itself — the same guard, and
+    // for the same reason, as the unauthed suite: a first run that recorded
+    // whatever is broken today would print a tick over zero enforcement.
+    if (process.env['UPDATE_TAP_BASELINE'] === '1') {
+      recordTapBaseline(tapKey, taps.offenders.length, TAP_BASELINE);
+    } else {
+      expect(
+        allowed,
+        `no tap-target baseline for "${tapKey}" in e2e-stack/tap-target-baseline.json, and this suite ` +
+          `refuses to invent one. Observed ${taps.offenders.length} offenders. Re-run once with ` +
+          `UPDATE_TAP_BASELINE=1 and COMMIT the file.`,
+      ).toBeDefined();
+    }
+  } else {
+    expect(
+      taps.offenders.length,
+      `interactive targets under 44x44 on the signed-in shell rose above the recorded ` +
+        `${allowed}: ${JSON.stringify(taps.offenders.slice(0, 8))}`,
+    ).toBeLessThanOrEqual(allowed);
+  }
 });
