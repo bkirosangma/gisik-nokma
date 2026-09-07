@@ -103,6 +103,8 @@ because the edits were minutes old and reproducible from the review's own text.
 | `main` | `7d24716` (#270 merged as `c3404af`, #271 anchored) |
 | branch | **`exec/78-list-filter`** |
 | owner ruling used | remedy 4 landed; this is the **second half** the owner authorised. **13.176 = option B confirmed**, queued behind this PR. |
+| gate | `GATE_EXIT=0` · **30/30** · **3715 \| 5 skipped (3720) / 297 files** · Node **v22.22.2** · `check:env`/`check:tasks`/`check:runbook`/`check:citations` all 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| delta | **+9 cases, +0 files** vs `main`'s 3706/297 — 12.383, 12.384's pair, 12.385, 12.386, 12.387, 12.388's pair, 12.389 |
 
 ## WHAT IT DOES
 
@@ -150,6 +152,48 @@ naming a narrowing that was never applied. **12.386 was written for it and now k
 **An F5 was discarded rather than counted** — moving the control's JSX produced a transform error, so it
 killed at a shape gate and measured no property. Replaced with F5′, which gates the control on
 `list.rows !== null` and is valid code.
+
+## ⚠ REVIEW ROUND — ONE CRITICAL, TWO IMPORTANT, AND A ROOT CAUSE WORTH KEEPING
+
+**The root cause in one line, because it explains all three:** the narrowing is
+`list.rows`-scoped and the sentence announcing it is page-scoped. So every OTHER consumer of `list.rows`
+inherited the narrowing without the announcement, and every surface that is NOT `list.rows` inherited the
+announcement without the narrowing. **`list.rows` has four consumers on this page and I updated one.**
+
+| finding | what it did |
+|---|---|
+| **CRITICAL** `parentCandidates` is built from `list.rows` | narrowing silently removed every done ticket from the New-ticket parent picker. A user filing a sub-task under a finished ticket found it absent, **inside a modal**, with nothing saying why — and the page note that would explain it is exactly the sentence a modal hides. **It blocks an action, not just misinforms.** |
+| **IMPORTANT** the note claimed a surface it does not narrow | `useBoard` takes no filter, so an unscoped *"done are excluded"* sat on the **default** tab above a Done column holding a done card — an unnarrowed set claiming to be narrowed. |
+| **IMPORTANT** `epicTitle`'s `?? epicId` | safe only while `list.rows` was complete. A terminal epic filtered out from under its surviving active children put a **26-character ULID** where a section title goes. |
+
+Closed as **12.388**, **12.387**, **12.389**; all three mutation-witnessed, each killing at its own site,
+each with a control.
+
+## ⚠ A TYPE HOLE FOUND WHILE FIXING THE CRITICAL
+
+Passing the new prop through the JSX **spread** form — `{...(cond ? { prop: v } : {})}` — **typechecked
+while `CreateTicketFlow` had no such prop**, so it was silently dropped and the fix did nothing. An excess
+property inside a spread is not checked the way a named attribute is. Caught only because the test failed.
+
+> **Never introduce a new prop through the conditional-spread idiom.** It is the repo's house style for
+> `exactOptionalPropertyTypes`, and it silently swallows a name the target does not accept.
+
+## ⚠ `check:citations` CANNOT CATCH A MISSING CATALOGUE ENTRY
+
+12.386 had no `test-cases/` row and the gate was green. `scripts/check-case-citations.mjs` checks
+**catalogue → test**, never test → catalogue, so **a test citing an id nothing catalogues passes
+silently**. `check-case-ids.mjs` checks duplicates and **is not wired into the gate at all**.
+
+Four entries added (12.386–12.389). **Owner for the missing direction: whoever next touches the gate
+scripts** — this is a check that cannot fail in the direction a new case actually travels.
+
+## ⚠ `Features.md` CARRIED TWO FALSE SENTENCES, ONE OF THEM SINCE #270
+
+- *"no ticket can be created from this page — not even at project root"* — **false since remedy 4 landed**,
+  i.e. #270 changed the behaviour and left the entry. Mine to have caught, and I did not.
+- *"the project page passes neither a FilterSpec nor a lane"* — **falsified by this PR.**
+
+Both corrected in place rather than quietly rewritten, and the new control now has its own ✅ entry.
 
 ## NEXT
 
