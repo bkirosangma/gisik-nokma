@@ -20,6 +20,39 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~03:5x IST — **THE SIGNED-IN SHELL'S TAP TARGETS NOW HAVE A GUARD (9 → 7).**
+
+*Same branch as the signed-out work, `exec/116-tap-targets` / PR #328.*
+
+The pre-launch review's "48 elements under 24×24 on the board" lived **only in a prose note**:
+`e2e-stack/viewport.spec.ts` measured overflow and nothing else, and the unauthed suite cannot see those
+pages. It now carries the same sweep, threshold and ratchet. `/my-work` at 390px: **9 offenders, then 7**
+once `.gn-nav a, .gn-nav button` reached 44px.
+
+**A spec is not a library.** Importing the sweep from `responsive.spec.ts` made Playwright load that
+spec's `test()` registrations into the stack config — six `project "" has no entry in VIEWPORTS`
+failures, from an import that typechecked. It lives in `e2e-viewport/tap-targets.ts` now, and the move
+was verified not to shift a number: the unauthed suite re-ran 19 passed, byte-identical.
+
+**Two environment facts this cost real time to learn again:**
+
+1. **The compose `web` container serves a PRE-BUILT image.** Every CSS change needs
+   `docker compose up -d --build --wait web` — about six minutes — before the stack suite can see it. A
+   measurement taken before that rebuild is a number for code that is not in the image, and it looks
+   exactly like a fix that did not work.
+2. **The Docker VM filled again mid-rebuild** (`ENOSPC` during `pnpm install`). Reclaimed **15.1GB of
+   BUILD CACHE ONLY** — never images, never volumes, because the volumes hold the seeded world.
+
+**Left unshipped on purpose:** the remaining 7 are attention-row titles at `249x23`, which by this
+change's own rule should go to 24px. Verifying one more CSS rule costs another full rebuild on a disk
+that just filled, and shipping it unverified is the failure mode this whole session keeps catching. The
+reading is recorded so the next person starts from a number.
+
+**A gate run taken mid-rebuild came back 31/33** with 104 test FILES failed but only 16 test failures
+and 1048 skipped, at load average **67**. That is contention, not a defect — re-run at load 2.73:
+**33/33 EXIT 0, `Cached: 0`**, Node **v22.22.2**.
+
+
 # ▶ TUESDAY 2026-09-08 ~03:4x IST — **TAP TARGETS: 60 OFFENDERS TO 42, `/sign-in` TO ZERO (owner-assigned).**
 
 *Off `main`, independent of #323–#327. Overlap is narrative only.*

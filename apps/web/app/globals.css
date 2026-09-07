@@ -56,6 +56,22 @@ a { color: var(--gn-accent); }
 .gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
 .gn-nav__spacer { flex: 1; }
 
+/* Measured on the signed-in shell at 390px: `89x23` on the nav's links — nine
+   of `/my-work`'s nine tap-target offenders, and the reason the shared
+   `.gn-button` fix did not reach them (they are `<a>`, not buttons).
+
+   44px, not 24px, on the same rule the rest of this change follows: a nav link
+   is a standalone control, not a link inside a sentence. `.gn-nav` already
+   wraps (item 7's overflow fix), so a taller row grows downward rather than
+   running past the edge — which the overflow assertion in
+   `e2e-stack/viewport.spec.ts` re-checks in the same run as the tap targets. */
+.gn-nav a,
+.gn-nav button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
 .gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 .gn-sign-in__method label { display: flex; flex-direction: column; gap: 0.3rem; }

@@ -1202,6 +1202,32 @@ suite enforces **2.5.5**'s enhanced 44px, and a nineteen-entry table of contents
 tall on a 390px phone. Dense in-list links stay at 24; standalone controls use 44. The ratchet holds the
 count so it can fall again but never rise.
 
+### The signed-in shell had no tap-target guard at all
+
+The pre-launch review measured 48 interactive elements under 24×24 on the board and recorded them as
+"reported, not fixed". **Nothing pinned them.** `e2e-stack/viewport.spec.ts` measured OVERFLOW only, and
+the unauthed suite cannot see these pages — so the one place those counts existed was a prose note in a
+checklist, which no run can contradict. It now carries the same sweep, the same 44px threshold and the
+same ratchet, against `e2e-stack/tap-target-baseline.json`.
+
+| signed-in `/my-work` at 390px | offenders | smallest examined |
+|---|---|---|
+| with `.gn-button` fixed (first reading) | 9 | `89x23` — the nav's links |
+| after `.gn-nav a, .gn-nav button` → 44px | **7** | `249x23` — `button.gn-attention__title` |
+
+The sweep is IMPORTED from `e2e-viewport/tap-targets.ts`, a plain module. The first attempt imported it
+from `responsive.spec.ts` and **Playwright loaded that spec's `test()` registrations into the stack
+config** — six `project "" has no entry in VIEWPORTS` failures from an import that typechecked and read
+as harmless. A spec is not a library. The move was verified not to shift any number: the unauthed suite
+re-ran 19 passed with byte-identical readings.
+
+**The remaining 7 are dense in-list controls** — attention-row titles at `249x23`, the same shape as
+`/help`'s TOC links. By the rule this change follows they should go to 24px (2.5.8) rather than 44px.
+**Not shipped, deliberately:** the compose `web` container serves a pre-built image, so verifying one
+more CSS rule costs a full rebuild — and this session has already had one of those die on `ENOSPC`
+mid-run. An unverified CSS change is exactly what the two process notes below are about. The number is
+recorded so the next person starts from a reading rather than a guess.
+
 > ### Two process notes from this run
 >
 > **A `python3` `.replace()` with no assertion is a silent no-op.** The first attempt at the

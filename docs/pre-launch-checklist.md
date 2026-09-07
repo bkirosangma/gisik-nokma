@@ -315,8 +315,12 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   view tabs (`55x21`) and the sign-in inputs (`340x21`) now meet 44px, taking the signed-out ratchet
   from **60 offenders to 42** and `/sign-in` to **0** on all three viewports. `/help`'s table-of-contents
   links went 23px → 24px — WCAG 2.5.8's floor — and deliberately not to 44px, because nineteen entries
-  at 44px is 836px tall on a phone. The board's own counts still need the authenticated stack. Original
-  note kept below.
+  at 44px is 836px tall on a phone. The signed-in shell now has a ratchet too — it had **none**, since
+  `e2e-stack/viewport.spec.ts` measured overflow only. `/my-work` at 390px: **9 offenders, then 7**
+  after the nav links went to 44px. The remaining 7 are attention-row titles at `249x23` — dense
+  in-list controls that should go to 24px by the same rule as `/help`'s TOC, left unshipped because
+  verifying one more CSS rule against the pre-built container costs a full rebuild. Original note
+  kept below.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,
