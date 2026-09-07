@@ -89,6 +89,9 @@ describe('the scan finds the server’s real routes before it is trusted to say 
   });
 });
 
+/**
+ * 3.87 — every Next dev rewrite names a prefix `apps/server/src` actually registers, re-derived from the server source on every run. The POSITIVE CONTROLS above are load-bearing: without them a scan that found nothing would silently report every rewrite as valid.
+ */
 describe('every dev rewrite names a prefix the server actually serves', () => {
   it('both rules resolve to at least one registered route', async () => {
     const rules = await nextConfig.rewrites?.();

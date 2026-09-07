@@ -83,6 +83,9 @@ afterAll(async () => {
 });
 
 describe('phone sign-in with the production OTP sender', () => {
+  /**
+   * 13.148 — over the REAL mounted route (`app.inject` against `/api/auth/phone-number/send-otp`), the refusal is a 501 the client can render rather than a 500.
+   */
   it('refuses in a shape the client can render, not as a 500', async () => {
     const response = await sendOtp(refusing, '+919000000101');
 
@@ -112,6 +115,9 @@ describe('phone sign-in with the production OTP sender', () => {
     expect(response.body).not.toContain('code sent');
   });
 
+  /**
+   * 13.150 — the positive control that makes 13.148 mean something: the identical request against `LogOtpSender` succeeds. Without it, a 501 could come from the route being broken rather than from the sender refusing.
+   */
   it('POSITIVE CONTROL: the same request succeeds on the dev sender', async () => {
     // Without this, the 501 above would be consistent with a mount that is
     // simply broken for this route. The ONLY difference between the two servers
