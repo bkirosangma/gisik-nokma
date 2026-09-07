@@ -23,7 +23,22 @@ export const ENTITY_KINDS = [
 ] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
-export const ORIGINS = ['web', 'mobile', 'desktop', 'server'] as const;
+/**
+ * `'mcp'` is a member here, not a flavour of `'web'` (owner ruling 1, MCP plan
+ * Task 0). An assistant's write must be distinguishable IN THE LEDGER from a
+ * claim the person typed themselves: in a product whose stated purpose is a
+ * board that cannot lie about its own history, a write claiming `'web'` when a
+ * machine made it is the history lying about who acted.
+ *
+ * No migration. The column is `origin text NOT NULL` with no `CHECK` and no
+ * Postgres enum (`migrations/1787841717635_events-and-snapshots.sql:12`),
+ * verified across every migration — the plan's original estimate that this was
+ * "more than this plan's scope" was measured and found wrong.
+ *
+ * `Origin` below and `z.enum(ORIGINS)` in `eventEnvelopeSchema` both derive
+ * from this array, so adding a member here is the whole edit.
+ */
+export const ORIGINS = ['web', 'mobile', 'desktop', 'server', 'mcp'] as const;
 export type Origin = (typeof ORIGINS)[number];
 
 /**

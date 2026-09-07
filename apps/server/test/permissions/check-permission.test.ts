@@ -224,6 +224,19 @@ function forgedContest(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent 
   };
 }
 
+/**
+ * The origin as the LEDGER holds it, not as the request sent it. 3.163 needs the
+ * value that survived the round trip — a test reading back its own input would
+ * pass against a door that discarded the field entirely.
+ */
+async function ledgerOriginFor(eventId: string): Promise<string | undefined> {
+  const { rows } = await db.pool.query<{ origin: string }>(
+    'SELECT origin FROM events WHERE id = $1',
+    [eventId],
+  );
+  return rows[0]?.origin;
+}
+
 async function ledgerRowsFor(eventId: string): Promise<number> {
   const { rows } = await db.pool.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM events WHERE id = $1',
@@ -375,5 +388,52 @@ describe('envelope-origin gate — the internal door (ingestBatch) is NOT gated'
 
     expect(results[0]).toMatchObject({ status: 'committed', eventId: internal.id });
     expect(await ledgerRowsFor(internal.id)).toBe(1);
+  });
+});
+
+/**
+ * 3.163 — an `'mcp'`-origin claim round-trips the real client door and comes back
+ * out of the ledger AS `'mcp'`, alongside a `'web'` claim in the SAME batch that
+ * comes back as `'web'`.
+ *
+ * WHY THE PAIR, AND NOT A SINGLE VALUE. The owner ruling this case exists for is
+ * not "the enum accepts a fifth string" — a case asserting `ORIGINS.includes('mcp')`
+ * would test the constant and nothing else, and would pass against a door that
+ * dropped the field on the floor. The ruling is that **a reader of the history can
+ * tell a person's claim from their assistant's**. That is a statement about two
+ * rows being DIFFERENT, so it takes two rows to state it: one batch, one door, one
+ * transaction, two origins that must not converge.
+ *
+ * It also fails for the right reason under the obvious wrong implementations. A
+ * door that normalised every client submission to `'web'` reddens on the mcp row
+ * while the web row stays green; a door that discarded `origin` reddens on both;
+ * and a door that accepted the value but wrote it to the wrong row reddens on the
+ * inequality. `ledgerOriginFor` reads the column back rather than echoing the
+ * request, so none of those can pass.
+ */
+describe('envelope-origin `mcp` — an assistant\'s write is distinguishable in the ledger (MCP plan Task 0)', () => {
+  it('commits an mcp-origin claim and a web-origin claim in one batch, and the ledger keeps them apart', async () => {
+    const { app, user, headers } = await signedInApp();
+    const byTheAssistant = submittedWorkspaceCreated({ origin: 'mcp', actorId: user.userId });
+    const byThePerson = submittedWorkspaceCreated({ origin: 'web', actorId: user.userId });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers,
+      payload: { events: [byTheAssistant, byThePerson] },
+    });
+
+    const body = response.json() as { results: Array<{ status: string; eventId: string }> };
+    expect(body.results[0]).toMatchObject({ status: 'committed', eventId: byTheAssistant.id });
+    expect(body.results[1]).toMatchObject({ status: 'committed', eventId: byThePerson.id });
+
+    // Read back from the column, not from the request.
+    expect(await ledgerOriginFor(byTheAssistant.id)).toBe('mcp');
+    expect(await ledgerOriginFor(byThePerson.id)).toBe('web');
+    // The whole point, stated as the inequality it is.
+    expect(await ledgerOriginFor(byTheAssistant.id)).not.toBe(
+      await ledgerOriginFor(byThePerson.id),
+    );
   });
 });
