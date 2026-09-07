@@ -280,7 +280,7 @@ export async function registerAttachmentRoutes(
     limits: { fileSize: Number.MAX_SAFE_INTEGER, fieldSize: 256, parts: 8 },
   });
 
-  const requireSession = makeRequireSession(deps.auth);
+  const requireSession = makeRequireSession(deps.auth, deps.pool);
 
   app.post('/v1/attachments', { preHandler: requireSession }, async (request, reply) => {
     let data;

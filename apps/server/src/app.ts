@@ -680,7 +680,7 @@ export function buildApp(
   // preHandler that writes it — the rule `require-session.ts` states, made
   // structural: `registerEventRoutes` takes the preHandler as an argument, so
   // there is no version of this line that forgets it and still compiles.
-  const requireSession = makeRequireSession(deps.auth);
+  const requireSession = makeRequireSession(deps.auth, deps.pool);
   registerEventRoutes(app, deps.ingest, requireSession);
   // The contests read surface (Plan 10 Task 4). It takes the same preHandler by
   // parameter for the same reason the events door does: a route that reads

@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import type { Queryable } from '../../src/db/queryable.js';
 import { makeRequireSession } from '../../src/auth/require-session.js';
 import { registerAuthRoutes } from '../../src/auth/routes.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -18,6 +20,8 @@ const UNAUTHENTICATED = '{"error":"unauthenticated"}';
 
 let db: TestDatabase;
 let app: FastifyInstance;
+/** Every credential the PAT fallback was asked to resolve, in order. */
+let patLookups: string[] = [];
 let otp: LogOtpSender;
 
 /**
@@ -39,7 +43,18 @@ beforeAll(async () => {
   });
   app = Fastify();
   registerAuthRoutes(app, auth);
-  const requireSession = makeRequireSession(auth);
+  // A stub rather than `db.pool`, and the stub RECORDS, so the case below can
+  // assert the fallback was actually REACHED rather than inferring it from a
+  // 401 that the old code produced anyway. The narrowest thing satisfying
+  // `Queryable` for this purpose: a `query` that always misses.
+  patLookups = [];
+  const patStub = {
+    query: async (_text: string, values?: unknown[]) => {
+      patLookups.push(String((values ?? [])[0] ?? ''));
+      return { rows: [], rowCount: 0 };
+    },
+  } as unknown as Queryable;
+  const requireSession = makeRequireSession(auth, patStub);
   app.get('/protected', { preHandler: requireSession }, async (request) => ({
     userId: request.currentUserId,
   }));
@@ -166,5 +181,46 @@ describe('requireSession', () => {
     });
     expect(after.statusCode).toBe(401);
     expect(after.body).toBe(UNAUTHENTICATED);
+  });
+
+  /**
+   * 14.36 — a request better-auth REJECTS still reaches the MCP fallback, and
+   * still answers the same contentless 401 when the fallback misses.
+   *
+   * The 401 alone proves nothing here: it is exactly what this route answered
+   * before the fallback existed. What makes the case a discriminator is
+   * `patLookups` — the stub records every credential it was asked to resolve,
+   * so this asserts the fallback was REACHED and missed, rather than inferring
+   * it from an unchanged status code.
+   */
+  it('14.36 a rejected bearer reaches the MCP fallback and still 401s when it misses', async () => {
+    patLookups = [];
+    const response = await app.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { authorization: 'Bearer definitely-not-a-session' },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.body).toBe(UNAUTHENTICATED);
+    // Reached, with the raw credential and nothing else.
+    expect(patLookups).toHaveLength(1);
+    expect(patLookups[0]).toBe(
+      // sha256('definitely-not-a-session') — the store hashes before it looks up,
+      // so what reaches the query is never the credential itself.
+      createHash('sha256').update('definitely-not-a-session').digest('hex'),
+    );
+  });
+
+  /**
+   * 14.37 — a request carrying NO Authorization header does not reach the
+   * fallback at all. The guard is `startsWith('Bearer ')`, and without this
+   * case a fallback that ran on every unauthenticated request — one database
+   * write per anonymous probe — would look identical from the outside.
+   */
+  it('14.37 an unauthenticated request with no bearer never reaches the fallback', async () => {
+    patLookups = [];
+    const response = await app.inject({ method: 'GET', url: '/protected' });
+    expect(response.statusCode).toBe(401);
+    expect(patLookups).toEqual([]);
   });
 });
