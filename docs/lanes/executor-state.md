@@ -16,7 +16,41 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
+# ▶ MONDAY 2026-09-07 ~21:0x IST — **PRE-LAUNCH 6 AND 7 ARE DONE AND MEASURED. THE WHOLE CHECKLIST IS CLOSED. MCP IMPLEMENTATION IS THE ONLY THING LEFT.**
+
+| what | value |
+|---|---|
+| `origin/main` | **`2859df4`** — #306 (MCP rulings), #307 (handoff), #308 merged since the entry below |
+| branch | `exec/99-prelaunch-6-7-contrast-responsive`, off `2859df4` |
+| in flight | that branch — items 6 and 7, **not yet PR'd at the time of writing** |
+| **queue** | **MCP implementation** — the plan is landed and all 7 rulings are in it. Task 12's `last_used_at` sub-question is still an open OWNER decision. Nothing else is outstanding. |
+| substrate | the **full dev stack was up and seeded** for this work (`docker-compose.dev.yml`, Convenience Corner seed, 123 tickets). `pnpm test:e2e:stack` passed 3/3 against it. |
+
+**What was measured, so a restart does not redo it:** 60 page-loads — 12 routes × 3 viewports (390/768/
+1512) in light, 12 × 2 in dark — against the real authenticated stack. **Zero contrast failures** with
+real alpha compositing. **One responsive defect**, fixed. Both passes assert the instrument took effect
+(`innerWidth` read inside the page; dark verified by `body` background resolving to `coal`).
+
+**Three findings, all in the branch:**
+1. `.gn-nav` was a no-wrap flex row whose last child is `Sign out {user.name}` → 10px horizontal overflow
+   at 390px on every page rendering `AppNav`, none on pages that do not. **The overflow scales with the
+   user's name.** Fixed with `flex-wrap: wrap`; verified 10→0 on five routes with a negative control that
+   stayed at 10.
+2. `CONTRAST_PAIRS` declared 8 pairs while 18 more co-occur on screen. All 18 pass today; added so the
+   existing test enforces them. 21 → 57 tests; mutation reddens exactly one named assertion.
+3. **`apps/desktop` shipped with every design token undefined** — `ui.css` defines none of them and only
+   `apps/web` ever called `themeStylesheet()`. Confirmed in the built artifact (24 usages, 0 definitions).
+   Fixed via `installTheme()`, case 15.257.
+
+**Two things recorded for the OWNER and deliberately not fixed:** `apps/mobile/src/screens/help-screen.tsx:59`
+hardcodes `colorOf('light', …)` so the mobile help screen ignores dark mode (a theme-support decision, not
+a ratio failure); and board tap targets at 390px are mostly 23px tall, missing WCAG 2.5.8's 24px by one
+pixel, plus one 13×13 input. Neither is in items 6/7's wording.
+
+**Still open from earlier, unchanged:** `EXPO_PUBLIC_DEV_TOKEN` can be inlined into a release build, and
+there is no `helmet`/CSP/`X-Content-Type-Options`/`X-Frame-Options` anywhere.
+
+# ▶ MONDAY 2026-09-07 ~20:4x IST *(superseded by the entry above)* — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
 
 | what | value |
 |---|---|
@@ -40,8 +74,14 @@ DESKTOP measurement, and nothing has exercised any `max-width: 40rem` rule.
 
 Item 7's own wording is *"actually check in a real viewport, not just visually inspect the code"* — and a
 resize that reports success while changing nothing is exactly how that instruction gets satisfied on
-paper. **Use Playwright**, which this repo already has configured with real device viewports
-(`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`).
+paper. **Use Playwright.**
+
+**CORRECTED 2026-09-07 (item 7, done):** the rest of that sentence used to read *"which this repo already
+has configured with real device viewports (`apps/web/playwright.stack.config.ts`, `pnpm test:e2e`)"*, and
+it was false — the same false claim also sat in `docs/pre-launch-checklist.md`. Measured across both
+configs and every spec: **zero** occurrences of `devices`, `projects`, `viewport` or `setViewportSize`,
+against a positive control of 4 `defineConfig`/`use:` hits in the same files. Playwright and the browser
+binaries were installed; the viewport configuration had to be written, and now is.
 
 ## The three defects the in-app help work produced that no test would have caught
 
