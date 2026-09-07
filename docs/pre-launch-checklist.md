@@ -213,10 +213,18 @@ there are two thresholds, and the three viewports discriminate all three states:
 
 ### Item 6 — no live defect anywhere, and two real gaps that had nothing watching them
 
-**Zero contrast failures across all 60 page-loads**, computed from the live DOM with the used foreground
-colour composited over the **effective** background — every layer walked up the ancestor chain, alpha
-composited, rather than the element's own possibly-transparent `background-color`. The palette is
-genuinely well built. Two things were nonetheless wrong, and neither was a colour that fails today:
+**Zero TEXT contrast failures across all 60 page-loads**, computed from the live DOM with the used
+foreground colour composited over the **effective** background — every layer walked up the ancestor
+chain, alpha composited, rather than the element's own possibly-transparent `background-color`.
+
+> **That instrument measured text and only text, and the unqualified sentence it first replaced —
+> "zero contrast failures" — was the wrong claim.** Non-text contrast (WCAG 1.4.11: borders, focus
+> rings, anything that identifies a control) was outside what it walked. When a second pass did measure
+> it, **17 of 24 distinct bordered classes fall below 3:1 in BOTH themes.** See the owner box at the end
+> of this section. A scoped result reported without its scope is how a real gap gets signed off.
+
+The text palette is genuinely well built. Two things were nonetheless wrong there, and neither was a
+colour that fails today:
 
 **6a. `CONTRAST_PAIRS` declared 8 pairs; 18 more actually co-occur on screen.** That array's own docblock
 calls a colour with no guarantee *"the one thing this file exists to make impossible"* — and nothing
@@ -236,6 +244,55 @@ the 24 as the positive control. **Nothing caught it because both existing guards
 that every `var()` names a declared role, and that no colour literal is written outside `tokens.ts`.
 Neither says a stylesheet defining those variables is ever installed in a given app, which is a property
 of an entry point. Fixed by `installTheme(document)`, tested as case 15.257.
+
+> ### ⚠ Open for the owner — non-text contrast, product-wide. NOT fixed here, and deliberately so.
+>
+> **17 of 24 distinct bordered classes render below WCAG 1.4.11's 3:1, in both themes.** Measured on the
+> live authenticated stack across five routes, with a positive control in the same run: the primary
+> `button` reads **19.43** (light) / **18.26** (dark), so the instrument distinguishes red from green.
+>
+> Ranked by how defensible the finding is, not by ratio:
+>
+> | what | light | dark | standing |
+> |---|---|---|---|
+> | `.gn-button--ghost` | **2.49** | **2.30** | **Least contestable.** A control whose fill is 1.09 against the page, so the border is the *only* thing identifying it. Includes the nav's own Sign out button. |
+> | `td`, `th`, `ticket-type-list__row`, `gn-board__column` | 1.34–1.61 | 1.34–1.61 | Defensible: table and column structure is information, not decoration. |
+> | `.gn-card`, `.gn-chip` | 1.45 | 1.34–1.61 | **Concede if pressed** — decorative containers arguably do not invoke 1.4.11 at all. |
+>
+> **Why this is recorded rather than fixed, in three parts.** (1) The remedy is to darken the `line` and
+> `lineStrong` primitives, which changes every card, chip, table cell and column in the product, in both
+> themes — a design decision with product-wide blast radius, and the owner's to make. (2) These pairs
+> **cannot be added to `CONTRAST_PAIRS` first**: enforcement and remedy would have to be the same commit,
+> because declaring them reddens the gate immediately. (3) The `surfaceOverlay` pairs need a
+> compositing-aware `relativeLuminance` before they can be enforced *at all* — see the note below.
+>
+> **Named owner: whoever next takes a design pass over `packages/ui`.** Nothing is blocked by it; items 6
+> and 7 are complete without it.
+>
+> #### How this was nearly missed, which is the part worth keeping
+>
+> The contrast calculator used through item 6 was validated with a known-failing pair: `line #d9d6cf` on
+> `paper #f7f6f3` = **1.34**, chosen because it was obviously too low to be real. **It is real.** That is
+> the exact pair `.gn-card`, `.gn-chip`, `td`, `th` and `.gn-board__column` render every day, and the
+> same 1.34 appears twice in the table above. A number picked as a synthetic floor turned out to be a
+> shipped colour, and the first pass read right past it because the instrument that produced the
+> confident "zero failures" only ever walked text. **The control was sound; the scope it certified was
+> narrower than the sentence it was used to support.**
+>
+> #### The existing contrast function cannot be used for `surfaceOverlay`, and would print a false red
+>
+> `relativeLuminance()` in `tokens.test.ts:24` ignores alpha *by documented design*. `surfaceOverlay` is
+> the one alpha role (`scrimLight #1c1b1866`, `scrimDark #000000a6`). Slicing the alpha off `#1c1b1866`
+> yields `#1c1b18` — which is literally the `ink` primitive that `text` resolves to — so `text` on
+> `surfaceOverlay` computes **1.00** and would report a catastrophic failure. Composited correctly it is
+> **6.43** light / **16.43** dark: a comfortable pass. **Had item 6 simply declared that pair, the gate
+> would have gone red on a colour that is fine.** It runs the other way too: `border` on `surfaceOverlay`
+> reads 11.87 naively and **1.85** composited — a false *green*, which is the more dangerous direction.
+>
+> This is not a duplicate implementation to reconcile: the token-level function is correct for opaque
+> pairs and documents its own limit, while the live-DOM walker must composite to say anything at all.
+> Enforcing any overlay pair means teaching the token function a backdrop first, because a scrim's
+> contrast is a property of what is behind it.
 
 ### What was NOT measured, stated so it is a known absence
 
