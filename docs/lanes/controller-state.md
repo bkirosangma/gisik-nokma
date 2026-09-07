@@ -1,5 +1,73 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 17:5x IST — DISPATCH BRIEF'S STALE SERIAL SEQUENCE RETIRED (owner-approved). PRs #285/#286 merged. `main` is `0d93bc1`, docs-only since the last real gate (`4d5dd39`, still the operative figures). **One durable residual recorded here, not left to die with the retired pointer: Plan 9's notifications fake is witnessed producer-side only — the client consumer in `apps/web` has never been executed end-to-end. Owned, not fixed.**
+
+**What was wrong and what I did.** `dispatch-executor-serial.md` (untracked, outside this repo, at
+`/Users/kiro/my_projects/gisik-nokma-lanes/`) still said *"~109 of 177 tasks remain"* and listed a Phase
+1–4 sequence starting at Plan 4 T4 — all of it long since merged. A restarted executor reading it cold
+would have redone finished work. The executor flagged this as a ruling request rather than editing its
+own dispatch orders — correctly: my own operating rule requires handing back any explicitly-requested
+ruling rather than deciding it on Sonnet, and this is exactly that trigger, however well-evidenced. **Put
+to the owner directly; owner ruled: approve, edit it.** I retired the section myself (matching Phase 0's
+own existing convention — struck through, closed, kept readable rather than deleted) rather than the
+executor doing it, per the separation this topology is built on.
+
+**PR #285 — the initial audit.** All 21 Plan/Task-numbered items the brief names were checked against
+`task-ledger.tsv`: every `merge_sha` an ancestor of `origin/main`, every one touching real `apps/` or
+`packages/` source, 21/21, with a negative control (a docs-only commit) correctly failing the same test.
+`pnpm check:tasks`: 177/177.
+
+**PR #286 — a genuine self-correction, not a rubber stamp, worth recording as a method lesson on its
+own.** The brief's item 10 ("integration checkpoint — prove Plans 6a, 8 and 9's fakes") has **no
+`### Task N:` heading, so no ledger row** — `check:tasks`' 177/177 is structurally blind to it and always
+was. The executor first pushed a version claiming flatly "it ran," backed by three files under one claim
+— but had verified two of the three itself and taken the third from a subagent's summary. **Before that
+version could be merged**, a four-angle dynamic workflow it ran itself split 1-affirmative/3-dissenting;
+it read the affirmative first, believed it, and only checked the dissents when they turned out to be
+narrower and more specific rather than weaker. The discriminating fact was first-appearance commit, one
+`git log --diff-filter=A` away: `real-door-round-trip.test.ts` and `client-contract.test.ts` (`ac187e8`,
+PR #70, **09-02**) self-identify as "Step 10, Task B" and are the real checkpoint pass — 22 `app.inject`
+calls against real Postgres, 0 `vi.mock`, no seeding backdoor. `fixture-witnesses.test.ts` (`e33c429`, PR
+#187, **09-06**) calls itself "Lane F," contains **zero** occurrences of "step 10" (positive control: the
+same grep returns 1 on the real file), and is a *different, later, unrelated-by-name* pass. **Case 7.241
+— the Plan 8 fake-gateway drift catch — belongs to Lane F, not step 10**, and the first draft credited it
+wrongly.
+
+**The actual shape of the coverage, corrected:** step 10 ran 09-02, two days *before* Plan 9's
+notifications even landed (09-04) — it could not have proven Plans 8/9's fakes and never claimed to in its
+own code, which names its mocking readers as Plans 6, 9 and 10, not the brief's "6a, 8, 9." **The brief's
+own attribution was wrong from the moment it was written, not merely stale.** Plans 8 and 9 were witnessed
+four days later, by Lane F, under a name that never claimed to be step 10. **Retiring the SERIAL SEQUENCE
+section is still safe** — the coverage genuinely exists — **but for a more contingent reason than "it
+ran": two passes, two names, assembled after the fact, and no document had ever said so.** This entry is
+that document.
+
+**The residual, owned rather than fixed, recorded here so retiring the pointer does not retire the gap
+with it:** Lane F's own file states it plainly (`:380-403`) — Plan 9's notifications fake is witnessed
+**producer-side only**, because the real consumer adapter lives in `apps/web`, outside `apps/server`'s
+dependency graph. The wire contract is proven end to end; the client gateway has never been executed.
+**Owner: whoever next touches Plan 9's client-side notification consumer** — prove it against the real
+producer before trusting the fake, the same principle step 10 and Lane F both exist to enforce elsewhere.
+
+**Corrects an old line rather than editing it in place, per this file's own convention:** at line ~4552,
+*"The integration checkpoint no longer fires — replacement trigger is the Phase 2/3 boundary"* — the
+Phase 2/3 boundary being exactly the brief's item 10, now retired above — is superseded by everything in
+this entry. Not wrong when written; just never revisited once item 10's real story turned out different
+from its own description.
+
+**Own-verified before merging both PRs** (not inherited from either PR's own report): head shas re-fetched
+immediately before each merge, both diffs empty against `docs/lanes/executor-state.md` alone, both
+squash-merge integrity checks empty. `check:citations` 1556/0, `check:runbook` 14/14, `check:tasks`
+177/177 — all re-confirmed at `cff68be` per the executor's own re-run, consistent with the docs-only scope
+of both changes; no code moved since `4d5dd39`, so no new forced-gate run was needed.
+
+**A delivery lesson worth keeping, named by the executor mid-session and independently confirmed here:**
+`tmux send-keys` returning success is not proof of delivery. Two of the executor's messages to this
+controller were lost or truncated today — one read as complete and was answered confidently on a single
+final paragraph, the actual content having silently dropped. **Before treating any relayed executor
+message as ground truth for a consequential action, `tmux capture-pane` its own pane directly** — done
+twice this entry, both times confirming the relayed content against the source rather than trusting it.
+
 ## ✅ MONDAY 16:2x IST — PR #282 MERGED: `13.176` OPTION B ("SHARED WITH ME") IS 🟡. `main` is `4d5dd39`, own forced gate GREEN (not cited from the PR's report). `13.176` was "what's actually left" in the prior entry — it is now done to the limit the branch itself states, and nothing is queued behind it.
 
 **Verified independently before merging, not taken on the executor's word:**
