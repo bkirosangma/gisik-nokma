@@ -16,6 +16,53 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ▶ MONDAY 2026-09-07 ~21:5x IST — **MCP TASK 0 DONE. PRE-LAUNCH 6/7 IS PR #309, UNMERGED — AND CI CANNOT RUN ON ANY BRANCH.**
+
+*This branch (`exec/100-mcp-task0-origin`) is off `main`, so the pre-launch 6/7 narrative lives on
+`exec/99-...` and PR #309, not here. Both are in flight; they share no files.*
+
+| what | value |
+|---|---|
+| `origin/main` | `2859df4` — unchanged; nothing merged this session |
+| in flight | **PR #309** (pre-launch 6+7) · **`exec/100-mcp-task0-origin`** (MCP Task 0) |
+| **queue** | MCP plan **Tasks 1–13**. Task 0 done. Task 12's `last_used_at` is still an open OWNER decision, and it blocks Task 12 only. |
+| gate | Task 0 at `0c65a1a5`: **30/30 EXIT 0**, `Cached: 0` (forced, nothing replayed), Node **v22.22.2**; five repo checks exit 0 |
+
+> **⚠ CI IS RED FOR BILLING ON EVERY BRANCH, AND IT LOOKS LIKE A CODE FAILURE.** Run `34141928556`:
+> every job died in 3–4 s with *"The job was not started because recent account payments have failed or
+> your spending limit needs to be increased."* `scope` never ran, so `build`, `typecheck`,
+> `server-tests`, `other-tests`, `e2e`, `check-env`, `check-tasks` all report `skipping`. **No job has
+> executed any branch's code.** The coordination doc's standing auto-merge authorization requires an
+> independent CI run green, and **no branch can meet that condition until billing is fixed** — so every
+> merge now needs an explicit human decision, PR #309 included.
+
+## MCP Task 0 — `'mcp'` is an envelope-origin of its own (owner ruling 1)
+
+- The member is one line; `Origin` and `z.enum(ORIGINS)` derive from it, and the column is
+  `origin text NOT NULL` with no `CHECK` and no Postgres enum, so **no migration**. The plan's own
+  "more than this plan's scope" estimate was measured and found wrong.
+- `rule-engine`'s fixture harness re-spelled the list; it now imports `ORIGINS`. Swept after: the only
+  literal spelling left in source is the declaration itself.
+- **Step 3 is what deriving buys.** `CLIENT_ORIGINS` derives from `ORIGINS`, so `it.each` gained *"still
+  admits an ordinary mcp-origin client submission"* the moment the member landed — passing unedited.
+- **Case 3.163 is a PAIR on purpose, and the mutation proves it earns its place:** folding only `'mcp'`
+  into `'web'` at the insert kills **exactly one test out of 1,396** — this one. Nothing else in the
+  suite catches an assistant's write being disguised as a person's, which is the entire ruling.
+
+**What the plan did not name, and what it cost.** Two tests pin the zod refusal message verbatim
+(`envelope.test.ts:157`, `parse-event.test.ts:146`) and went red; eight docblocks stated the enum as four
+members and became false. All fixed. **The red gate came from running
+`turbo test --filter=./apps/server` and reading it as done — a filter to one package cannot see a sibling
+it does not build.**
+
+**RECORDED, NOT FIXED — the same defect one line above the one I was sent to fix.** `harness.ts:19` also
+re-spells `ENTITY_KINDS`, and it has **already drifted**: the domain declares seven kinds including
+`'invite'`, the harness lists six. Latent (no fixture uses an invite entity yet), and deriving it would
+change which envelopes the harness accepts, which is beyond this task. *Owner: whoever next touches the
+rule-engine fixtures.* **Also left alone deliberately:** the coordination doc and
+`test-cases/12-offline-sync-apps.md` still say four origins — a historical record and another lane's
+catalogue respectively.
+
 # ▶ MONDAY 2026-09-07 ~21:2x IST — **IN-APP HELP LANDED. PRE-LAUNCH 1–5 DONE. MCP RULINGS IN FLIGHT (#306). 6/7 ARE NEXT AND NEED PLAYWRIGHT.**
 
 | what | value |
