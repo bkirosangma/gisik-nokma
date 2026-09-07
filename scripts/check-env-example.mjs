@@ -51,7 +51,17 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // bundle from a page could ship undocumented. The walker already skips
 // node_modules, dist, .next and *.test.* files, so widening this costs one
 // config file and covers the whole app.
-const ROOTS = ['apps/server/src', 'apps/web', 'packages'];
+// 'apps/mobile' and 'apps/desktop' added 2026-09-07 (pre-launch checklist item
+// 4, "no secrets stored in the frontend"). The reason is the one already given
+// just above for widening to 'apps/web': a variable BAKED INTO A CLIENT BUNDLE
+// could ship undocumented. Expo inlines every `EXPO_PUBLIC_*` and Vite every
+// `VITE_*` exactly the way Next inlines `NEXT_PUBLIC_*` -- so the gate was
+// enforcing that rule on one of the three shipping clients. Measured before
+// fixing: apps/mobile read EXPO_PUBLIC_API_BASE, EXPO_PUBLIC_DEV_TOKEN and
+// EXPO_PUBLIC_DEV_WORKSPACE, and apps/desktop read VITE_API_BASE, and NONE of
+// the four appeared in .env.example while this gate reported ok. One of them is
+// named DEV_TOKEN and is inlined into whatever bundle is built with it set.
+const ROOTS = ['apps/server/src', 'apps/web', 'apps/mobile', 'apps/desktop', 'packages'];
 // Variables this codebase does not READ as its own configuration. The gate's
 // subject is the contract between an operator and the app: a name the code
 // reads out of its environment must be documented, or a deployment can be
@@ -116,6 +126,18 @@ for (const root of ROOTS) {
     }
     for (const m of source.matchAll(/process\.env\[\s*['"]([A-Z][A-Z0-9_]*)['"]\s*\]/g)) {
       record(m[1], shown, 'process.env access');
+    }
+
+    // D1b -- `import.meta.env.NAME`, Vite's accessor. Added 2026-09-07 with the
+    // apps/desktop root, and it is a SECOND blind spot rather than a detail of
+    // the first: widening ROOTS alone still missed VITE_API_BASE entirely,
+    // because apps/desktop never writes the string `process.env` at all. The
+    // gate's subject is "a name this code reads out of its environment", and
+    // which accessor a bundler happens to provide is not part of that subject.
+    // Measured: before this line the widened gate reported three undocumented
+    // vars; with it, four.
+    for (const m of source.matchAll(/import\.meta\.env\.([A-Z][A-Z0-9_]*)/g)) {
+      record(m[1], shown, 'import.meta.env access');
     }
 
     // D2 and D3 both scan `code`, so the gate that admits a file to them must

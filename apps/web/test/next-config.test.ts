@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import nextConfig from '../next.config.js';
 
 /**
@@ -130,5 +130,50 @@ describe('every dev rewrite names a prefix the server actually serves', () => {
     expect(rules.map((rule) => rule.source)).not.toContain('/v1/stream');
     // …and it is still a real route, reached directly at NEXT_PUBLIC_SERVER_URL.
     expect(SERVED.map((entry) => entry.path)).toContain('/v1/stream');
+  });
+});
+
+/**
+ * HSTS on the WEB host — pre-launch checklist item 5.
+ *
+ * `pm.artsourced.in` and `pm-api.artsourced.in` are two sibling names
+ * (`deploy/do/app.yaml`). HSTS is scoped per host, so the API server sending it
+ * says nothing about this one; both must, or a browser still opens a cleartext
+ * connection to whichever host it was never told about.
+ *
+ * `serverOrigin` is captured at MODULE LOAD, so each case re-imports the config
+ * under a different `SERVER_ORIGIN` rather than mutating a live object —
+ * `resetModules` is what makes the second import re-read the environment. A
+ * test that stubbed the env without resetting would measure the first import
+ * twice and pass whatever the gate did.
+ */
+describe('HSTS — emitted only when this build targets an https deployment', () => {
+  async function headersUnder(serverOrigin: string): Promise<Array<{ key: string; value: string }>> {
+    vi.resetModules();
+    vi.stubEnv('SERVER_ORIGIN', serverOrigin);
+    const fresh = (await import('../next.config.js')).default;
+    const groups = (await fresh.headers?.()) ?? [];
+    return groups.flatMap((group) => group.headers as Array<{ key: string; value: string }>);
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('13.247 sends it for an https SERVER_ORIGIN, a year long and without preload', async () => {
+    const headers = await headersUnder('https://pm-api.artsourced.in');
+    const hsts = headers.find((header) => header.key === 'strict-transport-security');
+    expect(hsts?.value).toBe('max-age=31536000; includeSubDomains');
+    // Same one-way-door reasoning as the server's own case: adding `preload`
+    // must be a deliberate act that reddens a test.
+    expect(hsts?.value).not.toContain('preload');
+  });
+
+  it('13.248 sends NOTHING for an http SERVER_ORIGIN — RFC 6797 forbids it, and local dev is http', async () => {
+    // The positive case above is this one's control: the same function, the
+    // same import path, one input changed. Without it an empty array here
+    // would equally well mean `headers()` is not wired at all.
+    expect(await headersUnder('http://localhost:3000')).toEqual([]);
   });
 });

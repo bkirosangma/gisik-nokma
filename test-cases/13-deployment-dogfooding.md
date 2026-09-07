@@ -1085,3 +1085,33 @@ more specific claim: whoever next does substantial work on that bucket's tests, 
 same-change-set rule — cite while touching, rather than as a separate sweep. `11-calendar-notifications.md`
 needs no owner: it is fully cited today (0 of 147 uncited) and stays that way structurally as long as new
 cases there are cited when written.
+
+
+## Pre-launch checklist — HTTPS enforcement (owner-assigned, 2026-09-07)
+
+*Checklist item 5 asked which layer's job "force HTTPS" is. Measured against `deploy/do/app.yaml`, it
+splits three ways: the HTTP→HTTPS **redirect** is App Platform's router (an in-app one would be
+unreachable code), the **`Secure` cookie flag** was already correct and is pinned elsewhere by
+`sign-in-flows.test.ts`, and **HSTS was genuinely missing** with no layer supplying it. These cases cover
+the part that was the app's job. Both hosts are covered because HSTS is scoped per host —
+`pm.artsourced.in` and `pm-api.artsourced.in` are siblings, and the API sending it says nothing about the
+web app. Full findings: `docs/pre-launch-checklist.md`.*
+
+- **13.242** ✅ `hstsHeaderFor` answers the header for `https` and nothing for http, undefined, `HTTPS` or `https:` — not a prefix match — (`apps/server/test/http/hsts.test.ts`)
+- **13.243** ✅ The value is a year with `includeSubDomains`, and `preload` is asserted ABSENT so adding it must redden a test — (`apps/server/test/http/hsts.test.ts`)
+- **13.244** ✅ Present on a real https request including on the 401 an unauthenticated caller gets — a first visit meets a refusal more often than a 200 — (`apps/server/test/http/hsts.test.ts`)
+- **13.245** ✅ Present on an unmatched route's 404, for the same reason — (`apps/server/test/http/hsts.test.ts`)
+- **13.246** ✅ Absent over plain http, AND absent when `x-forwarded-proto: https` is forged against an app with `trustProxy: false` — otherwise the control would be caller-controlled — (`apps/server/test/http/hsts.test.ts`)
+- **13.247** ✅ The web shell sends it when `SERVER_ORIGIN` is https, a year long and without `preload` — (`apps/web/test/next-config.test.ts`)
+- **13.248** ✅ The web shell sends nothing when `SERVER_ORIGIN` is http — RFC 6797 §7.2 forbids it and local dev is http — (`apps/web/test/next-config.test.ts`)
+
+## Pre-launch checklist — the frontend-secrets audit (owner-assigned, 2026-09-07)
+
+*Checklist item 4. No secret value ships in any client bundle — swept at the ARTIFACT level (50 files,
+1.4 MB of built `.next/static`), not from source, with positive controls printed beside every zero. Two
+`check:env` blind spots were found and closed: it scanned one of the three shipping clients, and its
+detector knew only `process.env` while `apps/desktop` reads `import.meta.env`. Fixing the first revealed
+the second. No new cases here — the property is enforced by `check:env` itself, which now fails on an
+undocumented client-inlined variable; `docs/pre-launch-checklist.md` records the audit and the one risk
+left open for the owner (`EXPO_PUBLIC_DEV_TOKEN` is a real bearer token inlined into any build made with
+it set, and nothing prevents a release build from carrying it).*
