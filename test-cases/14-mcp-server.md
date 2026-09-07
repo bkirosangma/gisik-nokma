@@ -346,3 +346,117 @@ cannot tell a person's claim from their assistant's is a ledger lying about who 
 > that question the other way — which is why Task 0 exists — and Task 0's closing line reads "This task
 > comes BEFORE Task 9, **which sends the value**." The plan's own test and implementation both already
 > said `'mcp'`; only the prose table was left behind.
+
+## Task 10 — the stdio entrypoint and the nine-tool registration (`packages/mcp-server`)
+
+*One wiring point: `register.ts` is the only file in the package that knows the MCP SDK's registration
+API, so everything else speaks `ToolDefinition` and every tool test runs with no transport at all.
+These cases run against a **real `McpServer` and a real `Client` over `InMemoryTransport`** — a
+recording double records whatever it is handed and would pass even if the SDK rejected all nine
+definitions, which is the one question Step 1 of this task exists to answer.*
+
+- **14.80** ✅ `allTools` yields **exactly the nine**, in a stable order, each named once and each
+  described. A tool dropped from either half disappears from the assistant's world silently — there is
+  no error, the capability simply stops existing. — (`packages/mcp-server/test/register.test.ts`)
+  *Mutation: drop one write tool → 14.80 and 14.81 both fail.*
+- **14.81** ✅ A **real `McpServer`** accepts all nine and a **real client** lists them, each with a
+  description and an object input schema. — (`packages/mcp-server/test/register.test.ts`)
+- **14.82** ✅ The **empty raw shape** (`list_workspaces`) and the **imported `.strict()` FilterSpec**
+  (`search_tickets`) both survive into real JSON Schema — `{type:'object',properties:{}}` rather than no
+  schema at all, and `additionalProperties: false` three levels deep. The second is the proof that the
+  SDK walked the SAME zod instance `@gisik-nokma/domain` built the schema with; two copies of zod in the
+  tree would misclassify it and it would be absent. — (`packages/mcp-server/test/register.test.ts`)
+- **14.83** ✅ The SDK **enforces** that schema **before the handler runs**: a call missing a required
+  argument is refused with the SDK's own `-32602` invalid-params answer and the handler is never
+  reached. — (`packages/mcp-server/test/register.test.ts`)
+  *This case was written asserting only `toContain('ticketId')` and, measured, **could not fail**:
+  every handler re-parses its own arguments, so registering all nine with `inputSchema: {}` still
+  refused the call and still named `ticketId` — from inside the handler, with the SDK validating
+  nothing. Anchored on `-32602`, which only the schema reaching the SDK can produce, the same mutation
+  kills it.*
+- **14.84** ✅ A handler's answer comes back as MCP **text content** carrying the body unchanged. —
+  (`packages/mcp-server/test/register.test.ts`)
+- **14.85** ✅ A rule-engine refusal returns `isError: true` with the rule and the reason **VERBATIM** —
+  asserted with full string equality, not `toContain`, because the failure being guarded is a reworded
+  or truncated refusal and a truncation that keeps the prefix passes `toContain`. —
+  (`packages/mcp-server/test/register.test.ts`)
+  *Mutations: reword the message → fails; truncate it to 24 characters → fails.*
+- **14.86** ✅ A throw that is **not an `Error`** still arrives as its own text rather than
+  `[object Object]`. — (`packages/mcp-server/test/register.test.ts`)
+- **14.87** ✅ **The handshake does not wait on a credential.** `initialize` and `tools/list` both
+  complete with zero logins; the FIRST TOOL CALL authenticates, exactly once, and the call used is a
+  WRITE — whose handler reads `session.userId()` synchronously while building the envelope, so this
+  only passes if `registerTools` awaited `ready()` before dispatching. —
+  (`packages/mcp-server/test/register.test.ts`)
+  *Mutations: authenticate eagerly in `lazySession` → fails; drop the `await session.ready()` in
+  `registerTools` → fails.*
+- **14.88** ✅ **Nothing on the tool path writes to STDOUT** — registration, all nine handlers, and the
+  login prompt `main.ts` installs, with `process.stdout.write` recorded. stdout IS the transport: one
+  stray line lands in the middle of the JSON-RPC stream and the client answers with a parse error
+  instead of a tool result. The prompt goes to stderr and names both the verification URI and the user
+  code. — (`packages/mcp-server/test/register.test.ts`)
+  *Mutation: point `stderrLoginPrompt` at stdout → fails. The prompt is called through the SAME
+  binding `main.ts` uses, so this covers the wiring rather than a re-creation of it.*
+- **14.88b** ✅ `createLoginPrompt` writes **one** chunk naming both halves of the instruction. —
+  (`packages/mcp-server/test/register.test.ts`)
+
+> ### The plan's `main.ts` would never have answered `initialize`
+>
+> Its ordering was `await createSession(...)` and then `server.connect(...)`. `createSession`
+> authenticates EAGERLY, and `readCachedToken` returns `null` on a fresh install — so that await runs
+> the device flow and blocks for up to its ten-minute deadline before the transport exists. The person
+> is never told, because the prompt goes to stderr, which for a stdio server is a log file nobody is
+> reading; the client sees a server that failed to start. That is the whole "how a person installs it"
+> story, broken by a line order.
+>
+> Measured, not argued. Against a stub gisik-nokma that mints a device code and never approves it —
+> the ordinary first run — the BUILT `dist/main.js` was driven by a real MCP client over a real child
+> process:
+>
+> | ordering | outcome | HTTP requests during the window |
+> |---|---|---|
+> | as shipped (connect first) | `initialize` answered in **107 ms**, 9 tools listed | **none** |
+> | the plan's (authenticate first) | **timed out at 8 s, `initialize` never answered** | `/v1/mcp/device/code`, `/v1/mcp/device/token` |
+>
+> `lazy-session.ts` is the fix: the transport connects immediately and the credential is fetched on the
+> first tool call. `registerTools` awaits `ready()` before dispatching, which is what keeps
+> `session.userId()` — synchronous, and the source of every write's `actorId` — safe inside a handler.
+
+> ### Step 6, driven end to end against the live compose stack
+>
+> Real magic-link sign-in; the BUILT `dist/main.js` launched as a child process by a real MCP client;
+> `initialize` answered with nine tools and **no credential**; the first tool call printing to stderr
+>
+>     gisik-nokma needs you to approve this assistant.
+>       1. Open http://localhost:3001/mcp/authorize
+>       2. Enter the code 57XK-2HCW
+>
+> `POST /v1/mcp/device/approve` → `200 {"approved":true}`, and the waiting `list_workspaces` completing
+> with Convenience Corner and its one project. Then, verbatim:
+>
+> | call | answer |
+> |---|---|
+> | `create_ticket` | `committed`, `seq 1`, ticket `01M1YPTE147N7MCHNHM3JRVG5G` |
+> | `add_comment` | `committed`, `seq 2` |
+> | `transition_ticket … to: "no-such-state"` | `refused by unknown-state: The workflow "Errand with waits" has no state "no-such-state".` |
+> | `get_ticket` on a ticket the owner cannot see | `gisik-nokma answered 404` |
+>
+> And the point of the whole plan, read back out of the ledger itself:
+>
+>     seq |      type      | origin |          actor_id
+>     -----+----------------+--------+----------------------------
+>        1 | ticket.created | mcp    | 01M1V02CWM3G3SADCCRC40JQ42
+>        2 | comment.added  | mcp    | 01M1V02CWM3G3SADCCRC40JQ42
+>
+> workspace-wide: `web 123 · server 6 · mcp 2`. `mcp_tokens.last_used` was written, as its column
+> comment claims.
+>
+> **The first attempt refused every write**, and that is worth keeping. The container then running
+> predated Task 0, so its `ORIGINS` had four members and each write came back
+> `malformed-envelope: … at origin: Invalid enum value. Expected 'web' | 'mobile' | 'desktop' |
+> 'server', received 'mcp'`. Nothing was wrong with this task; the stack was a version behind. It is the
+> sharpest available proof that Task 0 is load-bearing rather than bookkeeping — without it every write
+> tool is dead at the door — and the refusal reached the assistant word for word through server, HTTP
+> client, `submitOne` and `registerTools`, which is case 14.85's property demonstrated in production
+> rather than in a test. `docker compose -f docker-compose.dev.yml up -d --build --wait server` fixed
+> it, exactly as the plan's Step 6 says to run it.

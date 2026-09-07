@@ -2857,7 +2857,7 @@ git commit -m "The four MCP write tools: real domain events, and refusals surfac
 - Consumes: `readTools`, `writeTools`, `createSession`, `loadMcpConfig`, `createGisikClient`.
 - Produces: the `gisik-nokma-mcp` bin, and `registerTools(server, session)`.
 
-- [ ] **Step 1: Verify the SDK's registration API against the installed package**
+- [x] **Step 1: Verify the SDK's registration API against the installed package**
 
 Do not write against recall. Run:
 
@@ -2868,7 +2868,7 @@ ls node_modules/@modelcontextprotocol/sdk/dist/esm/server/
 
 Read the `McpServer` class's `registerTool`/`tool` signature in the installed `.d.ts` and confirm whether `inputSchema` takes a **zod raw shape** (an object of zod validators) or a JSON Schema. `@modelcontextprotocol/sdk@1.30.0` declares `zod: '^3.25 || ^4.0'` as a dependency and a peer, and ships `zod-to-json-schema`, which strongly suggests a raw shape — but **confirm it, and if it takes JSON Schema instead, convert with `zod-to-json-schema` in `register.ts` and nowhere else.** The `ToolDefinition.inputSchema` type from Task 8 is the seam that makes that a one-file change.
 
-- [ ] **Step 2: Write `src/tools/register.ts`**
+- [x] **Step 2: Write `src/tools/register.ts`**
 
 One wiring point. Every tool's handler result is returned as MCP content; every thrown error becomes an MCP tool error carrying the message verbatim.
 
@@ -2915,7 +2915,7 @@ export function registerTools(server: McpServer, session: Session): void {
 
 Adjust the exact `registerTool` call to whatever Step 1 established. `test/register.test.ts` asserts `allTools(fakeSession)` yields exactly the nine names, in a stable order — that is the test that catches a tool silently dropped.
 
-- [ ] **Step 3: Write `src/main.ts`**
+- [x] **Step 3: Write `src/main.ts`**
 
 ```ts
 #!/usr/bin/env node
@@ -2965,7 +2965,7 @@ main().catch((error: unknown) => {
 });
 ```
 
-- [ ] **Step 4: Write `packages/mcp-server/README.md`**
+- [x] **Step 4: Write `packages/mcp-server/README.md`**
 
 Answer the spec's packaging open question by taking the **repo-local script** option for v1, and say why in one paragraph: this is a private workspace package (`"private": true` like every other), publishing to npm is a decision nobody has taken, and an MCP client config can point at a built path today. Include a copy-pasteable client config:
 
@@ -2983,14 +2983,14 @@ Answer the spec's packaging open question by taking the **repo-local script** op
 
 State plainly what the assistant can then do (create, move, comment on and assign tickets **as you**) and that revoking access is `DELETE FROM mcp_tokens WHERE user_id = …` until a revoke surface exists (Open question 5).
 
-- [ ] **Step 5: Add it to the runbook**
+- [x] **Step 5: Add it to the runbook**
 
 `docs/runbook.md` gains a short "MCP server" section: build, configure, authorize, and revoke. `pnpm check:runbook` will now resolve any `pnpm --filter @gisik-nokma/mcp-server run <script>` the section names — Task 1 Step 7 added the package to that gate's directory list, which is why this can land at all.
 
 Run: `pnpm check:runbook 2>&1 | tail -10`
 Expected: ok.
 
-- [ ] **Step 6: Drive it end to end against the compose stack**
+- [x] **Step 6: Drive it end to end against the compose stack**
 
 Run: `docker compose -f docker-compose.dev.yml up -d --build --wait`
 Run: `pnpm turbo run build --filter @gisik-nokma/mcp-server 2>&1 | tail -5`
@@ -2998,7 +2998,7 @@ Then launch the built `dist/main.js` from a real MCP client, complete the device
 
 **Record the actual transcript in the ledger row** — tool name, arguments, and the server's answer. "It worked" is not evidence; a refusal reproduced verbatim is.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/mcp-server docs/runbook.md
@@ -3006,6 +3006,44 @@ git commit -m "The stdio entrypoint, the nine-tool registration, and how a perso
 ```
 
 ---
+
+
+> **Execution note (2026-09-08).** Step 1 answered from the installed
+> `@modelcontextprotocol/sdk@1.30.0` `.d.ts`, not recalled: `registerTool(name, config, cb)` types
+> `inputSchema` as `ZodRawShapeCompat | AnySchema` where `ZodRawShapeCompat = Record<string, AnySchema>`
+> — a zod RAW SHAPE, exactly what Task 8's `ToolDefinition` carries. No `zod-to-json-schema` conversion
+> was needed anywhere. Confirmed at runtime through a real client: `list_workspaces`'s empty shape
+> becomes `{type:'object',properties:{}}` and the imported `.strict()` FilterSpec becomes
+> `additionalProperties: false` three levels deep.
+>
+> **Step 3 departs from the snippet, and had to.** As written, `main.ts` awaited `createSession` before
+> `server.connect(...)`. `createSession` authenticates eagerly and `readCachedToken` returns `null` on a
+> fresh install, so that await runs the device flow and blocks up to its ten-minute deadline before the
+> transport exists — `initialize` is never answered and the MCP client reports a server that failed to
+> start, with the sign-in instruction sitting in a stderr log nobody is reading. Measured against a stub
+> that mints a code and never approves it: **as shipped, `initialize` answered in 107 ms with nine tools
+> and zero HTTP requests; with the plan's ordering, it had not answered after 8 seconds** and the server
+> was already polling. `src/lazy-session.ts` is the fix and `registerTools` awaits `ready()` before
+> dispatching, which is what keeps the synchronous `session.userId()` safe inside a write handler.
+>
+> **Step 6 ran end to end against the live compose stack.** Magic-link sign-in, `dist/main.js` launched
+> as a child process by a real MCP client, `initialize` + nine tools with no credential, the stderr
+> prompt carrying user code `57XK-2HCW`, `POST /v1/mcp/device/approve` → `200 {"approved":true}`, and
+> the waiting `list_workspaces` returning Convenience Corner. Then `create_ticket` committed at seq 1
+> (ticket `01M1YPTE147N7MCHNHM3JRVG5G`), `add_comment` at seq 2, `transition_ticket … to:
+> "no-such-state"` refused as `refused by unknown-state: The workflow "Errand with waits" has no state
+> "no-such-state".`, and `get_ticket` on an invisible ticket answering 404. The ledger reads
+> `origin = mcp` on both committed events — workspace-wide `web 123 · server 6 · mcp 2` — and
+> `mcp_tokens.last_used` was written.
+>
+> The FIRST attempt refused every write with `malformed-envelope: … at origin: Invalid enum value.
+> Expected 'web' | 'mobile' | 'desktop' | 'server', received 'mcp'`: the running container predated
+> Task 0. Not a defect in this task, and the sharpest available proof that Task 0 is load-bearing.
+> Rebuilding the server service, which is what Step 6 already tells you to run, fixed it.
+>
+> Cases 14.80–14.88 (plus 14.88b) are in `test-cases/14-mcp-server.md`; nine mutations were run and all
+> nine were killed by the case that names the property. One of them exposed 14.83 as a check that could
+> not fail; it was rewritten before the mutation was accepted as passing.
 
 ### Task 11: The catalogue, the baselines, and the gate that cannot see this plan
 

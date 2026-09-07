@@ -208,6 +208,44 @@ worth stating because the mistake is easy to repeat:
   `reference/` *is* present in the DEV container — via a host mount App Platform has no equivalent of.
   Checking inside a running dev container answers a different question than checking the image.
 
+## MCP server
+
+The assistant-facing door. It runs on the PERSON'S machine, not on ours — there is nothing to deploy —
+so everything here is either a build, a database statement, or an answer to "why can't they sign in".
+Full instructions for the person live in `packages/mcp-server/README.md`.
+
+**Build** (from a checkout):
+
+    pnpm --filter @gisik-nokma/mcp-server run build
+
+**Configure.** The client config points `node` at the built `dist/main.js` and sets `GISIK_SERVER_URL`
+to the **API** origin — `http://localhost:3000` in the dev stack, `https://pm-api.artsourced.in` in
+production. Not the web origin. `GISIK_MCP_TOKEN_PATH` overrides the `~/.gisik-nokma/mcp-token` cache.
+
+**Authorize.** Nothing happens at startup: the transport connects first and the device flow runs on the
+first tool call, so a person who has not signed in sees a tool that waits, not a server that failed.
+The instruction goes to the process's **stderr**, which most clients write to a log file. The code is
+typed at `WEB_ORIGIN + /mcp/authorize`, so if that page 404s the server's `WEB_ORIGIN` is wrong — the
+same setting behind *Sign-in refused with "Invalid origin"* below.
+
+**Revoke** — one statement, effective on the next call:
+
+    DELETE FROM mcp_tokens WHERE user_id = '<user id>';
+
+There is no revoke UI yet. `mcp_tokens.last_used` says whether the token is still being used; it is an
+observation and no code path reads it to authorise anything. `mcp_tokens` has no `expires_at` on
+purpose — see the header of `apps/server/migrations/1788600000000_mcp-device-auth.sql`.
+
+**Never list `mcp_tokens` or `mcp_device_codes` in a projection's `tables` array.** They are not
+projections and not rebuildable. `reset()` empties what that array names, and a rebuild that emptied
+`mcp_tokens` would sign every MCP client out with no way to put them back — the ledger does not hold
+these rows and cannot replay them.
+
+**"The assistant says it is not signed in."** Expected once, on a revoked or expired-by-deletion token:
+the server answers 401, the client clears its cache and starts a fresh device flow. Twice in a row is
+not — the client surfaces the second 401 rather than looping, so look at `require-session` and whether
+`mcp_tokens` has the row at all.
+
 ## Incident basics
 
 - **Is it up?** `curl https://pm-api.artsourced.in/healthz` — the deploy sha tells you what is running.
