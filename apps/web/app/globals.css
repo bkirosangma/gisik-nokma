@@ -31,8 +31,13 @@ a { color: var(--gn-accent); }
    The 10px was the seeded owner's name length; a longer name overflows further,
    which is why the fix is wrapping rather than a width guess. Every other flex
    row of this shape in the two stylesheets already sets it — this one was the
-   outlier, and `gn-nav__spacer`'s `flex: 1` collapses to zero on a wrapped line,
-   so the wrapped layout stays left-aligned rather than springing apart. */
+   outlier.
+
+   MEASURED BEFORE AND AFTER, because a fix that removed the overflow by CLIPPING
+   the button would read as success on a scrollWidth check too. Before: the nav
+   box was 88px tall and `Sign out` was the one child whose rect crossed the
+   viewport edge. After: 104px, every child fully inside, scrollWidth equal to
+   clientWidth. The button wraps onto another line; it is not hidden. */
 .gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
 .gn-nav__spacer { flex: 1; }
 
