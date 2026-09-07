@@ -1240,3 +1240,35 @@ recorded so the next person starts from a reading rather than a guess.
 > says falling numbers are re-recorded by deleting it. Two runs reported "0 removed" before that was
 > read rather than assumed.
 
+## The ledger guard for a PR that never merged (2026-09-08)
+
+*`mcp-server/12` read `in-flight  324  -` while the work had landed through **#329**. Merging #323
+deleted `exec/111`, which was #324's base, so GitHub auto-closed #324 as closed-not-merged — the same
+mechanic that had already closed #313/#315/#317/#319 that night. The row survived saying "in flight,
+see #324", pointing whoever restarts from this file at a closed PR for work that shipped hours earlier.*
+
+- **13.262** 🚫 The guard's own cases live in `scripts/check-task-ledger.mjs`'s **self-test** (four
+  inputs with known answers, run before the real sweep) rather than as vitest cases — the same shape
+  `check-runbook-commands.mjs`, `check-case-ids.mjs` and `check-case-citations.mjs` use, and for the
+  same reason: a gate must refuse to certify anything when its own instrument is broken, and a matcher
+  that silently matched nothing would report "no bad citations" on every run. The four: a row citing a
+  never-merged PR → 1; a row citing a **merged** PR with a non-`done` status → 0 (without this the
+  guard is "any non-done row fails", a different check wearing this one's name); a row with no PR at
+  all → 0; one offender among three sound rows → 1.
+  *Controlled: replacing the matcher's predicate with `false` makes `pnpm check:tasks` exit 1 naming
+  two of the four before the ledger is read. Controlled again against reality: pointing
+  `mcp-server/12` back at `#324` fails with `LEDGER ROWS CITING A PR THAT NEVER MERGED`, naming the
+  row, its `file:line`, its status and that PR's title.*
+
+> ### Why nothing already here could see it
+>
+> `done` rows are validated by sha reachability against `origin/main`. A **non-`done` row requires no
+> evidence BY DESIGN** — that is the entire point of the status split, and the reason `claimed` exists.
+> So a wrong status carrying a stale PR number is invisible to every other check in the file, and the
+> ledger is the restart surface: the one artefact a controller reads to find out what is still owed.
+>
+> It is a hard failure rather than a printed note, unlike the reverse-drift list beside it. An unciteed
+> merged PR is often a docs or ruling PR that legitimately closes no task, and this repo has many. A row
+> citing a PR that never merged is always one of exactly two real problems: the row is stale, or the
+> work is not on `main` at all.
+

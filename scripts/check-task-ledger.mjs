@@ -303,6 +303,9 @@ if (unreachable.length > 0) {
 // because this is the direction that catches implementation work landing on
 // main without ever reaching the board.
 let unciteedPrs = [];
+/** The merged-PR list, hoisted so the closed-citation guard below can tell a
+ *  `gh` outage from a genuine answer rather than silently reporting clean. */
+let mergedPrs = null;
 try {
   const merged = JSON.parse(
     execFileSync('gh', ['pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'number,title,mergeCommit'], {
@@ -310,12 +313,106 @@ try {
       encoding: 'utf8',
     })
   );
+  mergedPrs = merged;
   const cited = new Set(ledgerRows.map((r) => r.pr).filter(Boolean));
   unciteedPrs = merged
     .filter((pr) => !cited.has(String(pr.number)))
     .map((pr) => `#${pr.number}  ${(pr.mergeCommit?.oid ?? '').slice(0, 8)}  ${pr.title.slice(0, 66)}`);
 } catch {
   unciteedPrs = null; // gh unavailable or offline; reported as unknown, never as clean
+}
+
+/**
+ * The matcher, as a pure function of (rows, never-merged map), so the rule can
+ * be exercised on known inputs before it is trusted on the real ledger. Its
+ * siblings do the same for the same reason — `check-runbook-commands.mjs`,
+ * `check-case-ids.mjs` and `check-case-citations.mjs` all refuse to certify
+ * anything until their own instrument has fired on planted defects. A matcher
+ * that silently matched nothing would report "no bad citations" on every run,
+ * which is indistinguishable from success.
+ */
+function citationsOfNeverMergedPrs(rows, neverMerged) {
+  return rows
+    .filter((r) => r.pr && r.pr !== '-' && neverMerged.has(r.pr))
+    .map(
+      (r) =>
+        `${r.key}  ${r.at}  (status ${r.status}) cites #${r.pr}, which was CLOSED WITHOUT MERGING: ` +
+        `${(neverMerged.get(r.pr) ?? '').slice(0, 54)}`
+    );
+}
+
+{
+  // ── SELF-TEST: four inputs with known answers, run before the real sweep.
+  const never = new Map([['324', 'MCP Task 12: the revoke surface']]);
+  const row = (pr, status) => ({ pr, status, key: 'x/1', at: 'ledger:1' });
+  const cases = [
+    // The defect this guard was built for: a row still pointing at #324.
+    [[row('324', 'in-flight')], 1, 'a row citing a never-merged PR'],
+    // A MERGED pr must not fire whatever the status is — otherwise this is
+    // "any non-done row fails", a different check wearing this one's name.
+    [[row('329', 'in-flight')], 0, 'a row citing a merged PR, non-done status'],
+    // `-` is how every todo/in-flight row without a PR is written.
+    [[row('-', 'todo')], 0, 'a row with no PR at all'],
+    // And it must find the offender among rows that are fine.
+    [[row('329', 'done'), row('324', 'done'), row('-', 'todo')], 1, 'one offender among three rows'],
+  ];
+  const failures = [];
+  for (const [rows, expected, what] of cases) {
+    const got = citationsOfNeverMergedPrs(rows, never).length;
+    if (got !== expected) failures.push(`${what}: expected ${expected}, got ${got}`);
+  }
+  if (failures.length > 0) {
+    console.error('task ledger gate: SELF-TEST FAILED on the never-merged-PR matcher.');
+    for (const f of failures) console.error(`  ${f}`);
+    console.error('  A matcher that fires on nothing reports "no bad citations" on every run, which');
+    console.error('  is indistinguishable from success. Refusing to certify the ledger.');
+    process.exit(1);
+  }
+}
+
+// ------------------------------------------- rows citing a PR that never merged
+// A row whose `pr` names a CLOSED, UNMERGED pull request.
+//
+// This is not hypothetical and it is not cosmetic. On 2026-09-08 `mcp-server/12`
+// read `in-flight  324  -` while the work had landed through **#329**: merging
+// #323 deleted `exec/111`, which was #324's base, so GitHub auto-closed #324 as
+// closed-not-merged. The row survived saying "in flight, see #324" — pointing
+// whoever restarts from this file at a closed PR, for work that had shipped
+// hours earlier. The same branch-deletion mechanic had already closed
+// #313/#315/#317/#319 the same night.
+//
+// Nothing above could see it. `done` rows are validated by sha reachability,
+// but a NON-done row requires no evidence by design (that is the whole point of
+// the split), so a wrong status with a stale PR number is invisible to every
+// other check here — and the ledger is the restart surface.
+//
+// A HARD failure rather than a printed note, unlike the reverse-drift list
+// below: an unciteed merged PR is often a docs PR that legitimately closes no
+// task, but a row citing a PR that never merged is always one of two real
+// problems — the row is stale, or the work is not on main at all.
+let closedCitations = [];
+if (mergedPrs === null) {
+  closedCitations = null; // gh unavailable; reported as unknown, never as clean
+} else {
+  try {
+    const all = JSON.parse(
+      execFileSync('gh', ['pr', 'list', '--state', 'closed', '--limit', '300', '--json', 'number,mergedAt,title'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      })
+    );
+    // `--state closed` returns merged PRs too; `mergedAt === null` is the ones
+    // that were closed WITHOUT merging, which is the set this cares about.
+    const neverMerged = new Map(
+      all.filter((pr) => pr.mergedAt === null).map((pr) => [String(pr.number), pr.title])
+    );
+    closedCitations = citationsOfNeverMergedPrs(ledgerRows, neverMerged);
+  } catch {
+    closedCitations = null;
+  }
+}
+if (closedCitations !== null && closedCitations.length > 0) {
+  note('LEDGER ROWS CITING A PR THAT NEVER MERGED', closedCitations);
 }
 
 // -------------------------------------------------------------------- report
