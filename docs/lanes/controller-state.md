@@ -1,5 +1,48 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 19:5x IST — PRE-LAUNCH ITEMS 4/5 CLOSED, README + IN-REPO DOCS LANDED. PRs #299/#300 merged. `main` is `396828e`, own forced gate GREEN. Reorder approved (below). **Checklist item 4 found a real risk, recorded not fixed — for the owner.**
+
+**PR #299 — items 4 (secrets) and 5 (HTTPS), both genuinely audited against artifacts, not source-read.**
+Item 4 swept the BUILT web bundle (50 files, 1.4MB) for server-only identifiers and secret-shaped
+literals with a positive control proving the sweep can print — zero secrets ship. Caught and corrected
+its own false positive along the way (`BETTER_AUTH_SECRET`/`AUTH_SECRET` flagged as "LEAK" were
+better-auth's own lazy-getter property NAMES, resolving to `undefined` in a browser — a name-based scan
+cannot distinguish that from a real leak without reading context). Found `check:env`'s gate walked only
+`apps/server/src`, `apps/web`, `packages` — never `apps/mobile` or `apps/desktop` — and separately that
+widening the roots alone still missed `VITE_API_BASE` because the detector only knew `process.env`, not
+Vite's `import.meta.env`. Both closed. Item 5: HSTS was the one piece of "force HTTPS" that was actually
+missing (redirect and the `Secure` cookie flag are already handled elsewhere) — added on both hosts,
+correctly refuses to send over plain http per RFC 6797, `preload` deliberately withheld as a one-way door.
+
+**One real risk recorded, not fixed — flagging to the owner directly, not just leaving it in the doc:**
+`EXPO_PUBLIC_DEV_TOKEN` (`apps/mobile/src/app.tsx:14`) is a genuine bearer token that gets inlined into
+the mobile bundle in plain text if the env var is set at build time, with **no mechanism preventing a
+release build from carrying it.** Defaults empty, harmless today, but the remedy (a build-time refusal
+when this var is non-empty) is out of this checklist item's scope and needs an owner decision on priority.
+
+**Also worth the owner's attention, from the same PR:** other security headers (CSP, `X-Frame-Options`,
+`X-Content-Type-Options`, `helmet`) are named as **known absences**, out of item 5's scope as written —
+not fixed, not silently skipped. And **`deploy/do/app.yaml` states outright it is "NOT APPLIED TO ANY LIVE
+APP — a written spec only"** — every claim in this work about what the platform already handles is a
+claim about that spec, not an observed running system. Full detail: `docs/pre-launch-checklist.md`.
+
+**PR #300 — the README reconciled against a shipped product**, not overwritten wholesale: kept the
+still-true dev-setup instructions, replaced the "Status: building" / pre-brainstorm framing that had gone
+stale months ago. `docs/manual.md`, `docs/faq.md`, `docs/product-coverage-map.md` landed as the in-repo
+content source — **the in-app surface (web + mobile + desktop) is still upcoming, this is content only.**
+
+**Own forced gate at `396828e`**: `GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · node `v22.22.2` · no
+`Unsupported engine` · **3,748 passed | 5 skipped, 301 test files** (27+4+15+12+8+73+19+138+3+2 files;
+464+47+178+282+90+1139+134+1389+20+5 tests). Zero orphaned vitest workers. All 7 changed files across
+both PRs checksum-verified individually (existence-checked first, neither hash the empty-input constant).
+
+**Reorder approved.** Checklist 1–3 → in-app manual/FAQ surface → checklist 6/7 last, once, across
+everything — not the hedge (running contrast early). The executor's own reasoning holds: `packages/ui`
+owns the shared tokens, so a systemic contrast fix from a single late pass lands in one place regardless
+of when it's found, and running 6/7 before three new surfaces exist means auditing something that's about
+to grow by a third and auditing it twice. This is a sequencing call, not a scope or product one — approved
+directly, no owner ruling needed.
+
 ## ✅ MONDAY 19:0x IST — MCP SERVER PLAN LANDED (as a document, not executed). PRs #296/#297 merged. `main` is `a32c3bf`. The checksum rule from #295 already had a hole, found within hours by the executor and closed here.
 
 **PR #296 — `docs/superpowers/plans/2026-09-07-mcp-server.md`, 11 tasks.** Not self-certified: the
