@@ -134,12 +134,26 @@ function ProjectBoard() {
    * who meets it to ask a smaller question — `ticket-list.tsx` sent `{}` and
    * nothing could change it, so a project past the bound refused for ever.
    *
-   * **`active` is one axis and that is deliberate.** It is chosen for whether it
-   * RELIEVES the bound, not for whether it is useful: excluding terminal work
-   * removes monotonically more rows the older a project gets, which is exactly
-   * what makes a mature project large. A text search narrows nothing reliably —
-   * it can match anything — so it would not shorten the walk. More axes are a
-   * scope call, not a free addition.
+   * **One axis, chosen for whether it RELIEVES the bound** rather than for whether
+   * it is useful: a text search narrows nothing reliably — it can match anything —
+   * so it would not shorten the walk. More axes are a scope call, not a free
+   * addition.
+   *
+   * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
+   * The first version of this asked for `['open', 'active']` — *"hide done"*, which
+   * is the narrowing a person would actually reach for. `toServerFilterSpec`
+   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: every axis on
+   * `FilterSpec` is a LIST client-side and `filterSpecSchema` takes exactly ONE
+   * value, so `stateCategory` can name `open` OR `active` OR `terminal` and never
+   * "not terminal". Found by 12.383 failing, not by reading the type — the client
+   * type is plural and looks as though it composes.
+   *
+   * That guard is right and is the reason this is a label change rather than a bug:
+   * an unexpressible filter REFUSES loudly instead of being silently dropped and
+   * answering the wrong question. The consequence is only that this control says
+   * what it can actually do. **Recorded for whoever designs the fuller filter
+   * surface: "not done" needs either a plural `stateCategory` on the route or a
+   * negation term, and today it has neither.**
    *
    * Local state, not preferences: writing this through `usePreferences` is a
    * whole-document PUT gated on `canSetPrefs`, and the user who most needs the
@@ -147,7 +161,7 @@ function ProjectBoard() {
    */
   const [activeOnly, setActiveOnly] = useState(false);
   const listFilter = useMemo(
-    () => (activeOnly ? { stateCategories: ['open', 'active'] as StateCategory[] } : {}),
+    () => (activeOnly ? { stateCategories: ['active'] as StateCategory[] } : {}),
     [activeOnly],
   );
 
@@ -451,7 +465,7 @@ function ProjectBoard() {
                   checked={activeOnly}
                   onChange={(event) => setActiveOnly(event.target.checked)}
                 />
-                Hide done tickets
+                Only tickets in progress
               </label>
               {/*
                 Said here as well as in the list's own summary, because past the cap
@@ -460,7 +474,7 @@ function ProjectBoard() {
               */}
               {activeOnly ? (
                 <span className="gn-list-filter__note" data-testid="list-filter-note">
-                  asking only for tickets that are not done
+                  asking only for tickets in progress — not started and done are both excluded
                 </span>
               ) : null}
             </div>
@@ -580,7 +594,7 @@ function ProjectBoard() {
                 // The words, not a flag: the summary has to say WHICH narrowing,
                 // and `undefined` here is what makes the unnarrowed count still
                 // read as the project's own.
-                {...(activeOnly ? { narrowing: 'tickets that are not done' } : {})}
+                {...(activeOnly ? { narrowing: 'tickets in progress' } : {})}
                 rows={list.rows}
                 // `''` while the session resolves or when signed out, and here
                 // that is harmless and deliberate: this prop drives only the

@@ -274,6 +274,65 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     expect(screen.queryByTestId('list-summary')).not.toBeInTheDocument();
   });
 
+  /**
+   * 12.385 — THE WAY OUT OF THE CLIFF IS REACHABLE FROM INSIDE IT.
+   *
+   * 12.382 above proves the refusal renders. This proves the user who meets it can do
+   * something about it, which is the half that makes the refusal survivable rather
+   * than merely honest.
+   *
+   * **The placement is the property, not the markup.** Every renderer of the list —
+   * the List, Calendar and Timeline arms — lives inside `list.error === null`. A
+   * narrowing control put among them is reachable by everyone EXCEPT the person past
+   * the cap, because for that person those arms render a refusal instead. It is the
+   * same mistake `createRegion` made until #270 and it fails the same way: the
+   * affordance exists, is tested, and is unreachable in the one state it was built
+   * for.
+   *
+   * So this case asserts it from the state that matters — `getTickets` refusing with
+   * the real `LIST_TOO_LARGE_ABSENCE` — and pairs the control's presence with the
+   * refusal's, because a control on a page with no refusal would prove nothing about
+   * this state, and a refusal with no control is the cliff as it stood.
+   */
+  it('12.385 past the cap, the narrowing control is on the page beside the refusal', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices({
+          getTickets: () =>
+            Promise.reject(new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])),
+          getTicketTypes: async () => [
+            { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+          ],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // Present in the refusing state, and reached WITHOUT first going to a tab that
+    // renders a list — there is none to go to.
+    const narrow = await screen.findByRole('checkbox', { name: 'Only tickets in progress' });
+    expect(narrow).toBeInTheDocument();
+
+    // Paired with the thing that makes the state real. Without this the case would
+    // pass on a page whose list answered, where the control is not the point.
+    const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 40);
+    await user.click(await screen.findByRole('tab', { name: 'List' }));
+    await waitFor(() => {
+      const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
+      expect(statuses.some((text) => text.includes(ownWords))).toBe(true);
+    });
+
+    // And it is operable, not merely rendered: ticking it states the narrowing on the
+    // page itself. Past the cap there is no list, so the list's own summary cannot be
+    // the only place the question's state is visible.
+    await user.click(narrow);
+    expect(await screen.findByTestId('list-filter-note')).toHaveTextContent(
+      'asking only for tickets in progress',
+    );
+  });
+
   it('Project page: the board tab shows the board read’s own failure, not "Loading…"', async () => {
     render(
       <Providers

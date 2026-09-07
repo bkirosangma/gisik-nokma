@@ -80,12 +80,17 @@ function ControlledList({
   prefsEditable,
   onOpenTicket = vi.fn(),
   onChange,
+  // Undefaulted for the same reason `prefsEditable` is: `TicketList`'s own
+  // unnarrowed arm is the one every existing case exercises, and defaulting it
+  // here would leave that arm untested by all of them.
+  narrowing,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
   prefsEditable?: boolean;
   onOpenTicket?: (ticketId: string) => void;
   onChange?: (prefs: ProjectViewPrefs) => void;
+  narrowing?: string;
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -100,9 +105,42 @@ function ControlledList({
       }}
       labels={LABELS}
       onOpenTicket={onOpenTicket}
+      {...(narrowing === undefined ? {} : { narrowing })}
     />
   );
 }
+
+/**
+ * 12.384 — A NARROWED LIST MAY NOT WEAR THE PROJECT'S COUNT.
+ *
+ * `{total} tickets · {terminal} done` is a claim about the PROJECT. Over a filtered
+ * set it says the project holds `total` tickets, which is 12.258's defect — a partial
+ * list presented as whole — in a new costume. That case is precisely why `getTickets`
+ * refuses past the cap instead of serving the pages it already had, so handing the
+ * same falsehood back through a filter would return what the refusal was protecting.
+ *
+ * **Both halves are asserted because either alone passes against a page that is still
+ * lying.** A note saying "narrowed" beside the words "12 tickets" leaves the NUMBER
+ * claiming to be the project's, and the number is what a person reads first; changing
+ * the number without naming the narrowing leaves a reader unable to tell what "12
+ * matching" matched. And the unnarrowed control is what stops the fix from being "say
+ * `matching` always", which would make every list hedge and none of them informative.
+ */
+describe('12.384 the summary says when the rows are not the whole project', () => {
+  it('narrowed: the count reads `matching`, and the narrowing is named beside it', () => {
+    render(<ControlledList narrowing="tickets in progress" />);
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 matching · 1 done');
+    expect(screen.getByTestId('list-narrowing')).toHaveTextContent(
+      'narrowed to tickets in progress — not the whole project',
+    );
+  });
+
+  it('CONTROL: unnarrowed, the count still speaks for the project and no note appears', () => {
+    render(<ControlledList />);
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets · 1 done');
+    expect(screen.queryByTestId('list-narrowing')).not.toBeInTheDocument();
+  });
+});
 
 const ALL_GROUPINGS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
 
