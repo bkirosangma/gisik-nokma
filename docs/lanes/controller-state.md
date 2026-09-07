@@ -1,5 +1,35 @@
 # Cross-lane controller — live state
 
+## ▶ MONDAY 10:1x IST — OWNER SAID "CLOSE THE ENTIRE THING, FULLY 100%." `main` is `446c550`, gate green. Citations at 1516/14. SCOPE EXPANDED to the Saturday-carried items, including two real product decisions the owner made this morning.
+
+**Owner's decisions, this morning, put directly rather than assumed:**
+1. **The final citation rows: write new runtime tests where required, not a documented carve-out.** "Go with
+   what is safer and more stable." PR #253 merged (38→14) doing exactly that; a read-only 3-agent design pass
+   is running for the remaining 14 to design a concrete runtime test per row before writing any.
+2. **Scope now includes the Saturday-carried items**, not just the citation backfill: `13.181` (seed:dev
+   runtime coverage), `13.195`'s docker half + `13.196`, `TicketPullNotFound` (unhandled rejection after
+   `withTimeout` abandonment), the six `helpers/seed.ts` borderline rows A classified Saturday 17:35, and
+   `12.321` (refetch cancellation — needs its own measurement first). These are technical/investigation items,
+   dispatched the same way as tonight's work — no design decision needed, read/fix/test/PR.
+3. **`13.176` (a guest has no navigation to tickets explicitly shared with them): owner ruled — add a
+   dedicated "Shared with me" view.** Real feature work; the executor was told to sketch the concrete
+   query/route/component shape in the handoff before writing code.
+4. **`12.322`/`12.258` (the pagination-cap cliff — the filter is hard-coded `{}`, so a user cannot narrow a
+   large project under the cap and three of four tabs hit `ShellRefusal`): owner deferred to this controller's
+   recommendation — add real filtering, not just raise the cap.** Reasoning put to the owner and unchallenged:
+   raising the cap delays the same cliff as data grows; the cap was never the defect, the missing narrowing
+   capability was.
+
+**Both product items are explicitly instructed to stay small and to escalate rather than guess** if either
+hits an ambiguous data-model question or touches genuinely shared/critical code mid-implementation — this is
+new feature work riding on the same overnight serial pipeline that's spent all night on mechanical citation
+work, and that distinction matters for how closely the next restart should read its diffs.
+
+**PR #253 merged** (38→14, one non-docs delta: 13 test files + the baseline JSON, zero source). Gate:
+`GATE_EXIT=0` · 30/30 · 3666 passed | 5 skipped (3671), identical again. `check:citations`: **1516 cited / 14
+uncited**. `check:tasks`: 177/177 unchanged. CI still confirmed billing-blocked (checked fresh this morning,
+same annotation) — owner reaffirmed keep relying on the local-gate waiver.
+
 ## ⏹ MONDAY 09:4x IST — CITATION BACKFILL EFFECTIVELY DONE: 1492/38 (from 815 uncited Sunday morning). `main` is `e34844d`, gate green. The remaining 38 are NOT transcription backlog — they need a design decision, not more dispatching.
 
 **PR #251 merged: §12 78→1, dispatched to five read-only sonnet agents (78 rows across 32 files, zero errors).**
