@@ -2668,3 +2668,51 @@ mutation sweep through this door: unassigned.*
 - **12.387** ✅ **THE NARROWING NOTE MAY NOT CLAIM A SURFACE IT DOES NOT NARROW.** The control renders on every tab, which 12.385 requires — but it narrows only reads that TAKE a filter, and `useBoard` takes none. An unscoped *"done are excluded"* therefore sat on the **default** tab directly above a Done column holding a done card: an unnarrowed set claiming to be narrowed, the same class of lie as a narrowed one claiming to be whole, which is the reason this control exists at all. The note now names the surfaces and exempts the board. The done card's presence on the board is asserted in the same run — without it the exemption could be excusing a narrowing that had no visible effect there anyway — and the Board tab is asserted `aria-selected` so the case is about what a user sees FIRST. (Planted defect: restoring the unscoped wording kills it.) — `apps/web/test/page-refusals.test.tsx`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
 - **12.388** ✅ **A NARROWED PARENT PICKER SAYS SO, INSIDE THE MODAL.** `parentCandidates` is built from `list.rows`, which became filter-dependent, so narrowing silently removed every done ticket from the New-ticket parent picker — a user filing a sub-task under a finished ticket found it absent with nothing saying why, and could not complete the action. **The claim is the one this component already refuses, one notch quieter:** an EMPTY picker asserts *this project has no possible parent*, a NARROWED one asserts *these are the tickets that could be a parent*; both are claims about the world built from what the caller happened to see, and both are made inside a modal where the page's own `list-filter-note` cannot be read. Kept separate from `parentCandidatesUnavailable` because the facts differ — there the list could not be shown and creation falls back to project root; here it was shown, narrowly, and every offered option is real. A CONTROL asserts no such claim appears unnarrowed, and both halves assert the picker still has its options, so the case cannot be satisfied by a dialog that withholds the control instead of disclosing. **The note is rendered OUTSIDE the `<label>`**: inside, it becomes part of the control's accessible name — `getByLabelText('Parent')` stops resolving and a screen reader announces the whole disclosure as the field's label. Measured, red with *"Unable to find a label with the text of: Parent"* while the field rendered fine. (Planted defect: dropping the span kills the first case; moving it inside the label kills it with the accessible-name error.) — `packages/app-core/test/views/new-ticket-dialog.test.tsx`, `packages/app-core/src/views/new-ticket-dialog.tsx`
 - **12.389** ✅ **A NARROWING MUST NOT TURN A SECTION HEADING INTO A ULID.** `epicTitle` resolves an epic by searching `list.rows` with `?? epicId` as the fallback — safe while those rows were always the COMPLETE set, because any epic a surviving child pointed at was necessarily in them. A narrowing breaks the invariant: an `open` or `terminal` epic is filtered out while its `active` children survive and are correctly rooted by `nestRows`, so the lookup misses and a 26-character ULID appears where a section title belongs. Named instead, and **only when a narrowing can explain it** — with none in force a missing epic means visibility, and saying "outside this narrowing" there would be inventing a reason. The CONTROL runs first in the same render, asserting the real title is the heading unnarrowed, so the case cannot pass against a page that never renders a title at all; the child is asserted still on screen, so the heading is the only thing at issue. (Planted defect: restoring the bare `?? epicId` kills it.) — `apps/web/test/page-refusals.test.tsx`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
+
+## The build guard for `EXPO_PUBLIC_DEV_TOKEN` (owner-assigned, 2026-09-08)
+
+*Pre-launch checklist item 4 recorded this on 2026-09-07 as a risk with an owner rather than a defect
+to fix quietly: `apps/mobile/src/app.tsx:16` reads a variable whose `EXPO_PUBLIC_` prefix means it is
+**substituted into the bundle at build time**, so a build carrying a real token publishes a working
+bearer credential in plain text — and "what is missing is any mechanism preventing a release build from
+carrying it." This is that mechanism.*
+
+- **12.390** ✅ The dotenv reader handles the shapes people actually write — plain, double-quoted,
+  single-quoted, `export`-prefixed, last-assignment-wins — and refuses the two that only look like it:
+  a commented line and a LONGER name (`…_SUFFIX`). Both of those are the false-POSITIVE direction, which
+  is how a guard gets switched off. `X=` is present-but-empty, not absent — `.env.example` ships exactly
+  that line. — (`apps/mobile/scripts/check-dev-credentials.test.ts`)
+  *Mutation: match the key by prefix instead of equality → fails.*
+- **12.391** ✅ An offender is found **in the environment AND in any `.env*` file**, named separately so
+  the refusal can say where. Expo loads those files and substitutes what it finds, so a guard reading
+  only `process.env` is blind to the mechanism the variable is normally configured through — it would
+  report clean on the build most likely to be carrying a token. —
+  (`apps/mobile/scripts/check-dev-credentials.test.ts`)
+  *Mutations: stop reading `.env*` files → fails. Count an EMPTY assignment as an offender → fails.*
+- **12.392** ✅ **The default is REFUSE**: an unset token builds, a set one stops the build, and only an
+  explicit `GISIK_ALLOW_DEV_TOKEN=1` admits it — with the opt-in path saying out loud what it is letting
+  through. All three driven through the real CLI as a child process, so what is measured is the thing
+  `pnpm build` runs. — (`apps/mobile/scripts/check-dev-credentials.test.ts`)
+  *Mutation: make the opt-in unnecessary → fails.*
+- **12.393** ✅ The guard is **wired into `package.json`'s `build` script with `&&`**, so `turbo run
+  build` cannot skip it and a refusal stops the build. A gate nothing invokes is a gate that does not
+  exist. — (`apps/mobile/scripts/check-dev-credentials.test.ts`)
+  *Mutation: unwire it from `build` → fails.*
+
+> ### Why the refusal is the DEFAULT, and one mutation that survived on purpose
+>
+> The obvious shape is "fail when this is a release build". It is the wrong way round: there is no
+> reliable signal for "release" at build time — Expo sets nothing, and `NODE_ENV` means "production
+> BUILD" rather than "shipping to people" — and any control that needs a signal to be PRESENT before it
+> fires **fails open the moment that signal is absent**. So the dangerous state refuses by default and
+> the safe-looking one has to say so.
+>
+> `EXPO_PUBLIC_DEV_WORKSPACE` is deliberately not guarded: a workspace id names a thing and authorises
+> nothing, and refusing it would train people to set the opt-in as a matter of course — which is how an
+> opt-in stops meaning anything.
+>
+> One mutation survived and was **not** chased: removing the `line.startsWith('#')` check kills no case,
+> because exact key equality already rejects every commented form (`#EXPO_PUBLIC_DEV_TOKEN` and
+> `# EXPO_PUBLIC_DEV_TOKEN` are both keys that are not the name — measured, printed, not assumed). It is
+> an equivalent mutant, so the honest response is to record it rather than weaken a case until it dies.
+
