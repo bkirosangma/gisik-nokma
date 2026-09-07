@@ -1620,6 +1620,77 @@ describe('12.305-12.308 the per-ticket pull door (closure 5b(d), ruling P37.1)',
    * distinction is worth something — the case detects the hang, it does not
    * merely survive it, so it stays fast and says which side of the bound broke.*
    */
+  /**
+   * The sibling of 12.308, and the one that actually bites. 12.308's pull NEVER
+   * settles, so it never rejects and nothing is ever left unhandled. A pull that
+   * is abandoned and THEN fails is the real shape: `Promise.race` does not
+   * cancel the loser, so once the timeout wins there is nothing attached to the
+   * pull, and its later rejection is an UNHANDLED rejection — fatal under Node's
+   * default `--unhandled-rejections=throw`.
+   *
+   * The listener is attached to `process` rather than trusting the runner,
+   * because an unhandled rejection raised inside a fake-timer window can be
+   * reported against a LATER test or after the file finishes, where it reads as
+   * an unrelated flake rather than as this defect.
+   */
+  it('12.380 a pull abandoned by the timeout that later REJECTS is observed, not left unhandled', async () => {
+    const owed = newUlid();
+    let failPull: ((cause: unknown) => void) | null = null;
+    const { script, replica, engine } = await fixture({
+      // Pending past the timeout, and then rejects — a request the timeout gave
+      // up on that the network answers a moment later.
+      pullImpl: () =>
+        new Promise<TicketBootstrap>((_, reject) => {
+          failPull = reject;
+        }),
+    });
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+
+    try {
+      await engine.start(WS);
+      vi.useFakeTimers();
+      try {
+        script.handlers!.onItem({ kind: 'reach-granted', workspaceId: WS, tickets: [{ id: owed, headSeq: 1 }] });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(script.pullCalls).toEqual([{ workspaceId: WS, ticketId: owed }]);
+
+        // Past the bound: the drain gives up and the pull is abandoned in flight.
+        await vi.advanceTimersByTimeAsync(PULL_TIMEOUT_MS + 1);
+        await engine.settled();
+
+        // NOW the abandoned request answers, with nothing racing it any more.
+        failPull!(new TicketPullNotFound(owed));
+        await vi.advanceTimersByTimeAsync(0);
+      } finally {
+        vi.useRealTimers();
+      }
+      // Two real turns: an unhandled rejection is reported on a later tick, so
+      // asserting immediately would pass whether or not one was raised.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    // Observed is not swallowed: what the abandoned pull said is kept, and names
+    // the ticket it was about.
+    const abandoned = engine.lastAbandonedPull();
+    expect(abandoned?.ticketId).toBe(owed);
+    expect(abandoned?.message).toContain(owed);
+
+    // And the abandonment still behaves as 12.308 requires: the id stays owed,
+    // and none of this reads as a fold failure.
+    expect((await replica.listPendingPulls(WS)).map((t) => t.id)).toEqual([owed]);
+    expect(engine.lastApplyFailure()).toBeNull();
+  });
+
   it('12.308 a pull that never settles is abandoned after the timeout, and the id stays owed', async () => {
     const owed = newUlid();
     const anchor = newUlid();

@@ -137,6 +137,14 @@ export type SyncEngine = {
   /** The item this replica could not fold, or null. Non-null means the stream is STALLED. */
   lastApplyFailure(): ApplyFailure | null;
   /**
+   * What an abandoned per-ticket pull said when it finally answered, or null.
+   *
+   * A pull the timeout gave up on is not cancelled — it is still in flight, and
+   * it may still fail. That failure is observed rather than left to become an
+   * unhandled rejection, and reported here rather than discarded.
+   */
+  lastAbandonedPull(): { ticketId: string; message: string } | null;
+  /**
    * Resolves once every frame handed to the handlers so far has been applied
    * and any in-flight flush has finished.
    *
@@ -377,6 +385,19 @@ export function createSyncEngine(deps: {
   let flushing: Promise<void> | null = null;
   let lastStreamError: { code: string; message: string } | null = null;
   let applyFailure: ApplyFailure | null = null;
+  /**
+   * What an ABANDONED per-ticket pull said when it finally answered, or null.
+   *
+   * `withTimeout` races the pull against a timer, and when the timer wins the
+   * pull promise is left with nothing attached to it. A promise in that state
+   * that later REJECTS is an unhandled rejection, which is fatal under Node's
+   * default `--unhandled-rejections=throw` — a background pull losing a race
+   * could take the process down. So the abandoned pull is still observed, and
+   * what it said is kept here rather than discarded: "we stopped waiting" and
+   * "it later failed, and here is why" are different facts, and the second is
+   * the one that explains a ticket that keeps coming back owed.
+   */
+  let abandonedPull: { ticketId: string; message: string } | null = null;
   /** Single-flight latch for `reconcile`, modelled on `flushing` — see `reconcile`. */
   let reconciling: Promise<{ presented: number; purged: string[] }> | null = null;
   /** When the last automatic reconcile ran. See `RECONCILE_MIN_INTERVAL_MS`. */
@@ -488,7 +509,7 @@ export function createSyncEngine(deps: {
         // transport that never settles would otherwise stop this chain in
         // total silence, which is the one failure mode worse than the stall
         // this function exists to avoid.
-        const payload = await withTimeout(transport.bootstrapTicket(ws, ticketId));
+        const payload = await withTimeout(transport.bootstrapTicket(ws, ticketId), ticketId);
         await replica.loadTicketBootstrap(payload);
         await replica.clearPendingPull(ws, ticketId);
       } catch (err) {
@@ -510,13 +531,31 @@ export function createSyncEngine(deps: {
   }
 
   /** `Promise.race` with a timer, so an unsettling transport cannot stop the chain. */
-  async function withTimeout<T>(work: Promise<T>): Promise<T> {
+  async function withTimeout<T>(work: Promise<T>, ticketId: string): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
         work,
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
+            // ATTACHED HERE, inside the timer, and deliberately not at the call
+            // site. This is the only moment we know the pull was ABANDONED
+            // rather than answered: a pull that rejects on its own loses the
+            // race first, `finally` clears this timer, and this line never
+            // runs — so a genuine `TicketPullNotFound` is still handled by the
+            // caller and is never mis-recorded as an abandonment.
+            //
+            // Attaching it matters because `Promise.race` does not cancel the
+            // loser. Once the rejection below wins, nothing is left attached to
+            // `work`, and a promise that rejects with no handler is an
+            // UNHANDLED rejection — fatal under Node's default. Observing it is
+            // not swallowing it: the reason is kept for `lastAbandonedPull()`.
+            void work.catch((cause: unknown) => {
+              abandonedPull = {
+                ticketId,
+                message: cause instanceof Error ? cause.message : String(cause),
+              };
+            });
             reject(new Error(`sync: a per-ticket pull exceeded ${PULL_TIMEOUT_MS}ms and was abandoned`));
           }, PULL_TIMEOUT_MS);
         }),
@@ -923,6 +962,7 @@ export function createSyncEngine(deps: {
     status: () => currentStatus,
     lastError: () => lastStreamError,
     lastApplyFailure: () => applyFailure,
+    lastAbandonedPull: () => abandonedPull,
 
     async settled() {
       // The chain grows while it is awaited — an item's link can enqueue a
