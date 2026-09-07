@@ -841,26 +841,18 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   class of error as reading a stale image's health as the stack's health, and the third time this lane
   measured the wrong environment. In production both seeds run from a checkout (runbook, "Seeding
   production")
-- 13.181 ❌ `seed:dev` has no runtime coverage and CANNOT be run the plan's way: it reads
-  `docs/superpowers/plans`, which is **absent** from the image (measured, against `reference/` present as
-  the positive control), so `docker compose exec server node dist/seed/cli-seed-dev-workspace.js` cannot
-  work. Host-side only, `DATABASE_URL` → `localhost:54330`. Owner: Lane D. (Case 13.90 is `seed:cc`'s CLI
-  smoke and stays Lane D's to flip; Task 13 produces evidence for it but does not claim it)
-
-### `WEB_ORIGIN` is a trusted origin — the defect the E2E found (Task 13, ruling P42)
-
-`apps/server/test/auth/trusted-origins.test.ts`. **The product refused its own client**: a real browser at
-`http://localhost:3001` submitting the shipped sign-in form got
-`403 {"message":"Invalid origin","code":"INVALID_ORIGIN"}`, with "Invalid origin" rendered on the page.
-`trustedOrigins` was left at better-auth's default — the origin of `baseURL`, i.e. THIS SERVER's origin,
-which no browser ever sends. **`deploy/do/app.yaml` had the same condition waiting**
-(`WEB_ORIGIN=https://pm.artsourced.in` vs `BETTER_AUTH_URL=https://pm-api.artsourced.in`).
-
-**Why the existing suite was green through it:** `sign-in-flows.test.ts` asserts acceptance with
-`origin: BASE_URL` in both places it asserts acceptance at all — pinning what the default already
-guarantees and no client exercises — while pinning refusals against `evil.example`. A bound asserted on
-only one side of its line.
-
+- 13.181 ✅ `seed:dev` now has CLI coverage, and its host-only constraint is a documented FACT rather
+  than an open defect. `apps/server/test/seed/seed-dev-cli.test.ts` spawns the entry point: it refuses
+  without `DATABASE_URL`, prints usage without an owner, refuses an owner who never signed in, seeds
+  end to end through `--plans-dir`, and — the control that makes that mean anything — fails naming the
+  directory when it holds no plan documents, so a CLI ignoring the flag and reading the repo's own
+  `docs/` could not pass. (An earlier draft of that case used an unknown owner and claimed the refusal
+  proved the directory was read; it did not — `seedDevWorkspace` resolves the owner BEFORE
+  `readPlanSeries`, so it fired whatever `--plans-dir` pointed at. The control exposed it.)
+  It still cannot run inside the production image — `docs/` is in `.dockerignore`, so
+  `docker compose exec server node dist/seed/cli-seed-dev-workspace.js` cannot work — and the runbook
+  now states that for BOTH seeds, with the reason. Host-side only, `DATABASE_URL` → `localhost:54330`.
+  (Case 13.90 is `seed:cc`'s CLI smoke and stays Lane D's to flip)
 - 13.182 ✅ the WEB_ORIGIN a browser actually sends is ACCEPTED on `/sign-in/magic-link` (200). **Mutation:
   delete `trustedOrigins` from `createAuth` → this case reddens ALONE, 4 pass / 1 fail, `expected 403 to
   be 200` — the production defect reproduced, and the only assertion in the suite that distinguishes the
