@@ -164,7 +164,14 @@ never reaches it, so web, mobile and desktop pay nothing; only MCP calls do.*
 else: `/v1/mcp/device/approve` is inside `HTTP_ORIGIN_PROTECTED_ROUTES`, so a cookie-carrying POST must
 present `Origin: <WEB_ORIGIN>`, and only a page served from the web origin does.*
 
-- **14.40** 🧪 **End-to-end, driven against the real compose stack** — mint with `curl`, approve in a real
+*Numbered **14.100**, outside every decade the plan assigns, and that is deliberate. The plan gives each
+task a decade — Task 2 the 14.10s, Task 3 the 14.20s, Task 4 the 14.30s, Task 6 the 14.40s, and so on,
+with Task 11 owning each `x9`. **Task 5 has no decade**: the plan never numbers it, because it specifies
+this verification as a manual drive rather than a committed spec. An earlier draft of this section minted
+`14.40` for it, which is Task 6's FIRST case — caught before Task 6 was written, by reading the plan's
+assignments rather than the file's maximum, which is exactly what §12's header warns is the only safe way.*
+
+- **14.100** 🧪 **End-to-end, driven against the real compose stack** — mint with `curl`, approve in a real
   browser as a real signed-in person, exchange with `curl`, and use the issued token on a real product
   route. Manual rather than a committed spec, per the plan's Step 3, and the exact readings are recorded
   in the commit: `?code=` prefill matched the minted code, approval and refusal both rendered, exchange
