@@ -3481,6 +3481,36 @@ was mentioned. **Verifying the instance you happened to think of, then generalis
 other two stayed invisible.** Two commands size the surface, and they cost nothing next to discovering a
 conflict twelve picks into a sequence.
 
+### The six `helpers/seed.ts` borderline rows, SETTLED (2026-09-07, serial executor)
+
+Lane A classified seven borderline rows at 2026-09-06 17:35 (`eac1caa`) and the number went 23 → 29 → 21
+along the way, so each classification was **re-measured here rather than adopted**. All seven hold. What
+follows is the measurement, because a classification without one is the thing this series keeps paying for.
+
+| row | A's call | measured here | settled as |
+|---|---|---|---|
+| `apps/server/test/helpers/seed.ts` — `applyAll` | not a witness item; applies 4 of 12 | **CONFIRMED: exactly four** — `projProjects`, `memberships`, `projInvites`, `projVisibility` | **Recorded, not fixed.** A dedicated cleanup; ~20 files share the helper |
+| `apps/server/test/helpers/seed.ts` — `insertTicketHead` | addressable, but the producer is the REDUCER, not a route | CONFIRMED — it writes `transitions`/`fields` the real fold computes | **Recorded, not fixed.** Different witness shape, high blast radius |
+| `app-core/test/helpers/seed.ts` — `WF_ERRAND` | not addressable; real problem is the non-ULID `id` | **CONFIRMED, and stronger than stated** — see below | **SCOPE CALL, raised** |
+| `app-core/test/helpers/seed.ts` — `ticketStateSeed` | same, domain-owned | CONFIRMED; also carries `actorId: 'user_anselma'`, and the envelope types `actorId` as `ulidString` | **SCOPE CALL, same one** |
+| `fake-data-source.ts` — `ingest()` default | DISCHARGED by 7.226/7.234 | **CONFIRMED** — both exist in `fixture-witnesses.test.ts`: 7.226 over a real COMMITTED response, 7.234 over a real RULE REFUSAL | **Closed** |
+| `fake-data-source.ts` — `pushStreamItem` | needs a real hub and socket peer | CONFIRMED | **Not this lane's surface** |
+| `flows/guarded-child-event.test.ts` — three builders | addressable, promoted | CONFIRMED | **Belongs to A's witness cluster** |
+
+**The realism finding is real, and larger than "a non-ULID".** `workflowDefSchema.id` is only
+`z.string().min(1)`, so the DEF type admits `wf-errand` — but a `workflow.defined` event carries
+`entity: { kind: 'workflow', id }`, and the envelope tests `ULID_REGEX` on `entity.id` for every
+non-membership kind. Measured: `ULID_REGEX.test('wf-errand')` is **false**, as is
+`ULID_REGEX.test('user_anselma')`, while a real ULID passes. **So no `workflow.defined` naming
+`wf-errand` can exist, and these fixtures model a state production refuses at the door.**
+
+**Not fixed here, on purpose.** `wf-errand` appears **139 times across 23 files** — 133 in tests, and the
+4 in `src` are inside a docblock quoting a different string (`wf-errands`), so no production code depends
+on it. A 133-occurrence rename across ~20 test files, many of which assert on the literal, is not a
+smallest-correct-change and several of those assertions would have to be re-reasoned rather than
+substituted. **Owner: the controller/owner to schedule as its own item.** Raised as a scope call rather
+than taken, per the standing instruction to ask when a change reaches shared test infrastructure.
+
 ## Two findings about method, from Lane 2's T3 review (2026-08-28)
 
 Both are about *how* defects were caught rather than what they were, and both bind the controller harder
