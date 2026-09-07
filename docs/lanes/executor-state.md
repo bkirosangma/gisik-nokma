@@ -16,6 +16,54 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🚨 RESTART BRIEF — MONDAY 2026-09-07 ~05:35 IST. **DO THESE TWO THINGS FIRST, IN THIS ORDER.** Everything below is pushed; the worktree is clean; nothing is running.
+
+**`main` = `686ab85`. #244 IS MERGED (§05 landed). #245 IS STILL OPEN AND NOW NEEDS A REBUILD** — exactly the
+hazard flagged before it happened: #244 and #245 both edit **adjacent lines** of
+`scripts/fixtures/check-case-citations-baseline.json`, so the second one needs a **CHERRY-PICK, not a rebase**.
+
+## TASK 1 — rebuild and reopen #245 (§06 backfill)
+
+`exec/64-s06-backfill` is at **`2340dae`**, based on the pre-#244 `main`. Do NOT `git rebase` it.
+```
+git checkout -b exec/66-s06-rebuild origin/main        # 686ab85
+git cherry-pick fb68f97 30ecc0f 36a8326 b8e8765        # §06 batches 1-4 (skip its handoff commits)
+```
+Then: set the baseline entries the checker asks for (**run `pnpm check:citations` and take ITS numbers, never
+your own count**), gate, and open the PR. Close #245 or repoint it.
+
+## TASK 2 — open `exec/65`'s PR (§03 · §06 · §04 · §07 · §13)
+
+`exec/65-s03-backfill` is at **`f1adedd`**, stacked on `exec/64`. Once Task 1's branch exists, cherry-pick
+`exec/65`'s CONTENT commits onto it (or onto `main` after Task 1 merges):
+`e409201 d693ce0 480c470 6a9a644 24020a6 7aed3f1 386092b b240f58 5450ee6 b443626 bfd78ae 08a1411 e569adf 1d15812 2aeac50 813c28e`
+— the rest of its 30 commits are handoffs. **Verified safe:** `engine-context.test.ts` takes §05 citations (now
+on `main`, lines 340/842/890/917) and §06 ones (381/513/672/741) — 40+ lines apart, clean merge.
+
+## TASK 3 — §12, the only citable pool left
+
+**31 of §12's 78 uncited rows name a covering test.** Its block `12.380–12.399` is **ALLOCATED but NOT CLEARED**
+— controller's words, "one thing at a time". **Ask before starting.** Backfilling citations mints no ids, so the
+block may not actually gate it, but that is the controller's call and not the executor's.
+
+## RESULT OF THIS SESSION — **815 → 218 uncited**
+
+§09 **0** · §10 **0** · §11 **0** · §07 **1** · §03 **5** · §06 **12** · §13 **26** · §04 29 · §05 17 (merged) ·
+§12 78. **Outside §12, every remaining row genuinely names no covering test** — a reader pass, NOT transcription.
+**Do not let a dispatch "finish the backfill" from the counts alone; it would manufacture citations.**
+
+## THE RULES — all in the coordination doc, §"Verification-method rule 9" (extended twice) plus rules 5–8
+
+Nine total. The load-bearing ones: **a row in a file's candidate list is not evidence that file asserts it**
+(5 deferrals, 5 confirmed) · **a count is a claim about the SHAPE of a source** (7 shapes, each a well-formed
+number about the wrong thing) · **an authority validates only ITS question** · **run the control, READ it, then
+write the prose SEPARATELY** · **"I have not decided" ≠ "this is undecidable"** (11 deferrals, almost none
+genuinely ambiguous). **Use `/tmp/cite2.py`** — multi-line, range, marker-first and `:line` aware — and still
+cross-check the checker.
+
+**Weekly meter: genuinely reset (controller, 05:30). The "Weekly reset used" banner is STALE — ignore it.**
+
+
 # 🟢 MONDAY 2026-09-07 ~05:30 IST — **THE BACKFILL IS COMPLETE to the limit the catalogue permits. 815 → 218 uncited.** Rule 9 recorded and extended. Nothing running. **`exec/65` holds THIRTY commits behind two open PRs — that is the only thing left blocking.**
 
 | § | start | now | what remains |
