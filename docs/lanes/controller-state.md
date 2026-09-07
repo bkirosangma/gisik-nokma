@@ -1,5 +1,74 @@
 # Cross-lane controller — live state
 
+## ✅ MONDAY 21:5x IST — RECOVERED: FIVE "MERGED" PRs HAD NEVER TOUCHED MAIN. PR #321 lands the full, verified MCP server (Tasks 0–10) directly on `main`. `main` is `60a4a1e`, own forced gate GREEN. This entry is an honest account of a real controller error, not just its fix.
+
+**What actually happened, in order.** The executor built the MCP implementation as eleven PRs
+(#310–#320), each one a genuine GitHub **stacked PR** — every PR from #312 onward had its declared
+base set to the *previous task's own branch* (`exec/101`, `exec/103`, …), not `main`. This controller
+never checked `baseRefName` before merging. `gh pr merge --squash --delete-branch` on #312, #314, #316,
+#318, #320 respected each PR's real declared base and squash-merged them there — landing real commits
+on `exec/101`, `exec/103`, `exec/105`, `exec/107`, `exec/109` — **never on `main`.** Deleting each PR's
+own head branch afterward then deleted the *next* PR's base, and GitHub auto-closed #313/#315/#317/#319
+as **closed, not merged**, with no error and no notification distinguishable from a deliberate close.
+
+**Why this went undetected through five separate "successful" merges.** Two checks were run every
+time and both passed every time, for the wrong reason:
+1. `git checkout main && git pull` showed *"up to date with origin/main"* immediately followed by an
+   **unrelated** line reporting some other branch being fetched (`git pull` fetches every
+   remote-tracking ref, not just the current one) — misread as confirming the merge landed.
+2. The post-merge checksum (`git show <sha>:<path> | shasum`, per the #295/#297/#298 practice) compared
+   the PR's head content against the resulting squash commit's content. **That proves the squash commit
+   is correct. It says nothing about which branch that commit lives on.** Every one of those checks
+   legitimately passed, for content that had, each time, landed somewhere other than `main`.
+
+Five forced-gate runs and five anchor entries this file already carries were run against what this
+controller believed was an updated `main` and was not — `main`'s real tip never moved past `876a364`
+(#309) for the entire sequence. **Those five anchor entries above this one, for #312/#314/#316/#318/#320,
+are now void as claims about `main`'s state at the time** — kept unedited per this file's own
+convention (corrected by a later entry, not rewritten), and superseded completely by this one.
+
+**How it was found:** not by this controller's own verification, which had no check capable of
+catching it. The executor independently discovered the exact same incident from its own side (its
+`docs/pre-launch-checklist.md`-adjacent workflow), diagnosed the full mechanism, verified every source
+and test file in the four orphaned squashes as byte-identical to the survivor branch's copy, and opened
+**#321** — `exec/109` (the branch that had absorbed the most content via the same misdirected-merge
+mechanism, making it the accidental superset) — **directly against `main`** with a corrected, careful
+PR. A memory file describing the mechanism appeared on disk mid-session, written from that same
+discovery. This controller's own recovery consisted of independently re-verifying #321 (base genuinely
+`main` this time; 11 security-sensitive files spot-checked directly, matching everything already
+reviewed piecemeal across the five void merges) rather than trusting either side's account, then merging
+it with a corrected verification method — see below.
+
+**The corrected verification practice, adopted for every merge from here on, not just this one:**
+1. **Check `baseRefName` before merging** (`gh pr view <n> --json baseRefName`) — if it is not the
+   intended target, merging will not land there.
+2. **After merging, verify via the platform's own authoritative state, not local git output**:
+   `gh api repos/<o>/<r>/branches/<branch> -q '.commit.sha'`, compared against the reported merge
+   commit. Local `checkout`/`pull`/`log` output can be describing an unrelated ref in the same breath.
+3. **Pair every content checksum with a reachability check**:
+   `git merge-base --is-ancestor <merge-commit-sha> origin/<target>`. A checksum proves *what*; only
+   this proves *where*. Full account: this controller's own memory,
+   `merge-verification-must-check-reachability.md`.
+
+**Recovery actions taken:** #321 merged to `main` (`60a4a1e`), independently re-verified (checksums +
+reachability, corrected method) on 11 security-sensitive files. #310 and #311 (still open, both strict
+subsets of #321's content) closed as superseded, not merged separately — redundant work, not lost work.
+Own forced gate at `60a4a1e`: `GATE_EXIT=0` · **`Tasks: 33 successful, 33 total`** (three new
+`mcp-server` package tasks) · node `v22.22.2` confirmed · no `Unsupported engine` · **3,876 passed | 5
+skipped, 315 test files** (4+27+12+8+15+8+74+3+141+3+20 files; 83+464+282+43+178+90+1152+8+1417+20+139
+tests). Zero orphaned vitest workers.
+
+**What was NOT lost, stated plainly:** no code, no review work, no findings. Every security review this
+controller did across the eleven original PRs (token store CSPRNG/hashing, session-fallback ordering
+and its now-falsifiable adversarial case, client-side token file permissions, the approval route's CSRF
+protection, the consent screen's empty-name bug, the device routes' rate-limit bucket) describes exactly
+what's on `main` now — the content was always correct, only its *landing spot* was wrong for a while.
+
+**Also worth carrying forward: Task 2's `mcp_tokens.last_used` tracks every request**, which is exactly
+the privacy-sensitive behavior the plan's Task 12 explicitly named as unruled and defaulted to "no." It
+shipped ahead of that ruling — well-documented, never used for authorization, but a real process gap
+worth the owner's explicit sign-off rather than quiet acceptance.
+
 ## ✅ MONDAY 20:5x IST — ALL SEVEN MCP RULINGS LANDED IN THE PLAN. PR #306 merged (docs-only, plan document, no code gate needed). `main` is `2e77dc8`. MCP implementation itself still hasn't started — plan is ready, nothing built.
 
 **Ruling 1's cost was overstated, and the correction is measured, not asserted.** The plan originally

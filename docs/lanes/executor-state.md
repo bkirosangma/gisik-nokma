@@ -20,6 +20,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~04:0x IST — **#324 WAS AUTO-CLOSED, NOT MERGED. THE SAME TRAP, A SECOND TIME.**
+
+> **READ THIS FIRST.** `origin/main` is `94f1f18` — **#323 (MCP Task 11) merged**. Merging it deleted
+> `exec/111-mcp-task11-catalogue`, which was **#324's base**, so GitHub closed #324 as **closed, NOT
+> merged**. Task 12 — the revoke surface and the `last_used` column — is **not on `main`**, and its
+> branch `exec/112-mcp-task12-revoke` still holds all of it.
+>
+> This is the identical failure that took out #313/#315/#317/#319 earlier tonight, and the PR that was
+> closed carried an explicit warning not to delete the base branch. **The lesson is not "warn harder":
+> merge a stack TIP-FIRST as one PR into `main`, or merge without deleting branches.** A warning in a
+> description is not a mechanism.
+
+Recovered by merging `main` into `exec/112` and reopening against `main`. Three narrative conflicts, all
+additive (this branch adds, `main` adds nothing at that point) — `Features.md`, this file, and the
+ledger's Task 12 row, where `main` carries the pre-implementation `todo` and this branch the built one.
+
+Task 11's ledger row is corrected to `done 323 94f1f18` in the same change: it merged, and a row still
+reading `in-flight` is the restart surface lying about what shipped.
+
+
 # ▶ TUESDAY 2026-09-08 ~02:5x IST — **THE PLAN IS FINISHED AND THE OWNER RULED ON FIVE OPEN FINDINGS.**
 
 > **READ THIS FIRST.** `origin/main` is `f200cb0`. **#323** (Task 11) and **#324** (Task 12 + the
