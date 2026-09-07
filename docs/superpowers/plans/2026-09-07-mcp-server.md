@@ -3058,7 +3058,7 @@ git commit -m "The stdio entrypoint, the nine-tool registration, and how a perso
 - Consumes: every task above — this one records what they actually did, never what they were supposed to do.
 - Produces: §14 and its test-case bucket; a task-ledger gate that can see this plan.
 
-- [ ] **Step 1: Write `Features.md` §14**
+- [x] **Step 1: Write `Features.md` §14**
 
 Appended at the end of the file (§13 is the last heading; the file's headings are not in numeric order and that is fine). Follow the exact bullet shape: `- <marker> **Bold title** — prose. \`path\``, marker from the legend at `Features.md:3` (`✅` user-observable · `⚙️` internal subsystem · `?` inferred/unverified — and **never leave a `?` you introduced**; the file currently has zero).
 
@@ -3076,7 +3076,7 @@ Appended at the end of the file (§13 is the last heading; the file's headings a
 
 Edit each bullet to describe what actually landed. A bullet describing a task's *intention* is worse than no bullet.
 
-- [ ] **Step 2: Write `test-cases/14-mcp-server.md`**
+- [x] **Step 2: Write `test-cases/14-mcp-server.md`**
 
 Header exactly in the house shape (compare `test-cases/13-deployment-dogfooding.md:1-3`):
 
@@ -3090,7 +3090,7 @@ Numbering: this bucket opens at `14.1`. **Never renumber.** A deleted case leave
 
 Then one line per case, in the file's dominant id-first style (`- 14.1 ✅ **short title** — what it proves.`). Every id this plan's tests cite must appear, and its marker must match reality at commit time.
 
-- [ ] **Step 3: Add the citation baseline entry — the gate FAILS without it**
+- [x] **Step 3: Add the citation baseline entry — the gate FAILS without it**
 
 `scripts/check-case-citations.mjs` fails naming any `test-cases/NN-*.md` with no committed baseline entry, and fails on `actual < baseline` as well: an exact match is the whole property of a ratchet. Add to `scripts/fixtures/check-case-citations-baseline.json`:
 
@@ -3106,7 +3106,7 @@ Expected: ok, and the new file named in the report.
 Run: `node scripts/check-case-ids.mjs 2>&1 | tail -10`
 Expected: 0 duplicates, and the new bucket's ids counted. **Confirm the count went up** — a reader that silently stops matching this file's style would report clean.
 
-- [ ] **Step 4: Make the task-ledger gate able to see this plan**
+- [x] **Step 4: Make the task-ledger gate able to see this plan**
 
 `scripts/check-task-ledger.mjs:145` matches `/^2026-08-20-(\d\d)-.*\.md$/`. This plan's file does not match, so its eleven tasks get no ledger rows and no `done`-against-`origin/main` validation — the gate passes while tracking nothing, which is the exact failure the script's own header calls out ("a tracker whose denominator can quietly become 0 reports 0/0 = clean forever").
 
@@ -3135,7 +3135,7 @@ Then add eleven rows to `docs/lanes/task-ledger.tsv`, keyed `mcp-server/1` … `
 
 **A slug key is safe here, and that was checked rather than assumed.** The ledger parser is `const [plan, task, status, pr, sha, ...rest] = line.split('\t')` with `key = \`${plan}/${task}\`` (`check-task-ledger.mjs:193-197`) — plain tab-split strings, no fixed width and no `\d\d` pattern anywhere on the ledger side. `perPlan`, `CONTROL_PLANS` and `PLAN_WITHOUT_TASKS` are all keyed by the same strings, so `'mcp-server'` sits beside `'11'` without disturbing either. If a future reader adds a width assumption, Step 5's second control is what catches it.
 
-- [ ] **Step 5: Prove BOTH halves of the gate change, with two different planted defects**
+- [x] **Step 5: Prove BOTH halves of the gate change, with two different planted defects**
 
 One control proves the plan is *discovered*; the other proves its rows are *matched*. A pass on the first alone would leave the eleven rows unvalidated, which is the same 0/0 shape one level down.
 
@@ -3153,7 +3153,7 @@ Expected: **FAILS** under `PLAN TASKS WITH NO LEDGER ROW`, naming `mcp-server/7`
 
 Restore the row. Re-run: clean.
 
-- [ ] **Step 6: Run the whole gate**
+- [x] **Step 6: Run the whole gate**
 
 Run: `pnpm turbo run build test typecheck --force > /tmp/mcp-gate.log 2>&1; tail -40 /tmp/mcp-gate.log`
 Expected: every package green. **Redirect, then read** — never pipe into `head`.
@@ -3163,12 +3163,59 @@ Expected: all four ok.
 
 Then, per the repo's gate-environment rule, **name the Node version in the ledger row**: `node --version`. A gate result that does not name its Node is not evidence.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Features.md test-cases/14-mcp-server.md scripts/fixtures/check-case-citations-baseline.json scripts/check-task-ledger.mjs docs/lanes/task-ledger.tsv
 git commit -m "Features.md §14, the MCP test-case bucket, and a task-ledger gate that can see a plan not named after the retired series"
 ```
+
+
+> **Execution note (2026-09-08).** Steps 2 and 3 were already done — `test-cases/14-mcp-server.md`
+> and its `"14-mcp-server.md": 0` baseline entry were opened by Task 1 and extended by every task
+> since, which is the workspace convention (`test-cases/` moves in the SAME change set as the code).
+> Three things the plan did not know:
+>
+> **The plan asks for eleven ledger rows; there are THIRTEEN tasks.** Owner ruling 1 added Task 0 and
+> ruling 5 added Task 12 after this task's text was written. Measured with the discovery change in
+> place, the gate names all thirteen by id.
+>
+> **`scripts/check-case-ids.mjs` was already exiting 1 on `main`.** `ID_LINE` captured `(\d+\.\d+)`,
+> truncating `14.27b` to `14.27` and `14.88b` to `14.88` — two pairs of distinct, separately-cited
+> cases reported as duplicate ids. The limitation was documented in prose at
+> `test-cases/13-deployment-dogfooding.md:274` without being fixed. The id now takes an optional
+> letter, the same shape `check-task-ledger.mjs` already reads for task ids, and the fixture gained a
+> `13.91b` line so the SELF-TEST fails before the real sweep if the suffix is ever dropped again
+> (union 4 against sum 5, naming `13.91b`). Before: union 1746 < sum 1748, EXIT 1. After: 1748 ==
+> 1748, EXIT 0, highest id 15.17.
+>
+> **`Features.md` had no §14 at all.** Ten MCP bullets were sitting at the end of §13 while
+> `test-cases/14-mcp-server.md` claimed to mirror a §14 that did not exist. Also repaired while there:
+> §13's viewport bullet had been orphaned after two blank lines by the keep-both resolution where
+> #309 met this stack, and the §3 provenance bullet listed `'mcp'` twice — once as the addition and
+> once inside the list it was added to.
+>
+> **Step 5's controls, both halves, with the readings.** *A — discovery.* Run in `main`'s world
+> (`main`'s script AND `main`'s ledger, both inside the repo so `REPO_ROOT` resolves — the first
+> attempt ran the copy from a scratch directory and died on ENOENT before reaching the check, which
+> is a control that measured nothing):
+>
+> | run | plan file | result |
+> |---|---|---|
+> | `main`'s script | present | **EXIT 0 — "177 tasks across 12 plan files"**, `mcp-server` never named |
+> | `main`'s script | renamed away | **EXIT 0 — identical output.** The gate cannot tell the plan exists |
+> | this branch's script | renamed away | **EXIT 1 — "plan mcp-server: 0 tasks"** |
+> | this branch's script | restored | **EXIT 0 — 190 tasks across 13 plan files, 190 rows** |
+>
+> *B — row matching.* Deleting the `mcp-server/7` row fails under `PLAN TASKS WITH NO LEDGER ROW`
+> naming `mcp-server/7` by id. Retargeting that row's plan field to `mcp-server-typo` fails under
+> **both** `LEDGER ROWS NAMING A TASK NO PLAN CONTAINS` (`mcp-server-typo/7`) and `PLAN TASKS WITH NO
+> LEDGER ROW` (`mcp-server/7`) in one run — both directions traverse the new key space. Restored:
+> clean.
+>
+> Evidence in the eleven `done` rows cites `60a4a1e` (#321), not the current tip and not the branch
+> commits: #321 was a squash, so `26e06c3`, `89eed49` and the four orphaned squashes are **not**
+> ancestors of `origin/main` — checked, not assumed.
 
 ---
 
