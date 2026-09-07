@@ -16,6 +16,78 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ⏸ MONDAY 2026-09-07 ~19:xx IST — **NOTHING IS QUEUED. THE EXECUTOR IS IDLE BY INSTRUCTION, NOT BLOCKED.**
+
+**Read this before acting on anything below it.** Every section further down describes work that is
+MERGED. A resuming executor should not start from them.
+
+| what | value |
+|---|---|
+| `origin/main` | **`fce81ac`** |
+| branch | `exec/82-idle-handoff` (this handoff only), off `fce81ac` |
+| working tree | CLEAN |
+| **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
+| standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
+
+## PR #282 IS MERGED AND ITS SQUASH DROPPED NOTHING — verified, with a control that fired
+
+The standing practice applied to my own work, because `#274`'s squash silently dropped a real fix and
+every signal on the branch side still reported success.
+
+```
+git diff origin/main exec/81-shared-with-me -- <the 14 files that mattered>   → EMPTY
+```
+
+**An empty diff is also what a malformed path list returns**, so it is not evidence on its own. The
+controls, through the SAME command shape:
+
+- **Positive control:** the same `git diff` over `docs/lanes/controller-state.md` prints
+  `1 file changed, 14 deletions(-)` — so the command shape can print.
+- **Path control:** all five load-bearing paths resolve on `origin/main` (`git cat-file -e`).
+- **Content control:** `explicitAudienceWhere` ×3 in `read/visible-where.ts`, `myWork.data?.shared.find`
+  ×1 in the web page's resolver, `shared: TicketCard[]` ×1 in `read-models.ts` — all read off
+  `origin/main` itself, not off the branch.
+
+Controller independently re-verified the gate at `4d5dd39` and reports it matches these figures exactly.
+Anchored in `controller-state.md` via PR #283, also merged.
+
+## WHAT LANDED (13.176 option B), in one paragraph so nobody re-derives it
+
+`MyWorkResponse.shared` — the tickets whose RESOLVED audience names the viewer, via
+`explicitAudienceWhere` EXPORTED from `read/visible-where.ts` rather than restated. The gap was a READ,
+not a link: a guest already reaches `/v1/me/work` (the workspaces page links it from every workspace
+card, OUTSIDE the projects list, and 13.175 asserts that link visible to a guest), and `groups` is
+*assigned to me*, so an errand handed to a non-assignee was in none of them. Cases **7.260–7.265**,
+**3.159–3.162**; **13.176 → 🟡** with its two absences enumerated (no browser spec; `getTicket` still
+refuses for every viewer). Nothing minted in §12 or §13 — both are block-allocated — and the controller
+confirmed the §3/§7 mints before merging.
+
+## THE FOUR SENTENCES THIS TASK EARNED — carry them, they generalise
+
+- **A control that can only return the expected value is not a control.** My mutation extractor was
+  wrong twice — first printing vitest's full test LISTING instead of its failures, then missing turbo's
+  line prefix — and the second time the control's `0` looked like success, because 0 is exactly what a
+  broken extractor returns. Verify an instrument POSITIVELY (watch it find something) before trusting
+  any zero it prints.
+- **The SCOPE of a mutation run is part of its result.** Two counts were understated by measuring one
+  file; one of them was understated because the second red test was added by the same change set,
+  AFTER the measurement. A delta is a fact about a commit.
+- **A check can be unfalsifiable while its own name says otherwise.** 7.262 said "an owner gets only
+  what NAMES them" and no fixture could redden the audience half, because every explicit audience in
+  that workspace happened to list the owner.
+- **A comment that reads as measured and is not is worse than no comment.** I gated an affordance on a
+  claim (`a guest gets 404 from the project page`) that `routes/board.ts` contradicts in writing, and
+  the false sentence had already been copied into a catalogue entry before review caught it.
+
+## IF YOU ARE A RESUMING EXECUTOR
+
+**Do not pick work from the sections below — they are all merged.** Do not start Phase 1–4 of the
+dispatch brief's serial sequence on your own initiative either: the controller is asking the owner what
+comes next, and starting a Plan task now would be inventing scope against an explicit hold. Ask the
+controller for the queue; if it is still empty, stay idle and say so.
+
+---
+
 # ✅ MONDAY 2026-09-07 ~18:xx IST — **REVIEW FOUND AN IMPORTANT DEFECT THIS BRANCH INTRODUCED, AND TWO OF MY OWN CLAIMS WERE FALSE. ALL FIXED, RE-MEASURED, RE-GATED.** This supersedes the "ready" reading of the section below; its figures are older than this one's.
 
 | what | value |
