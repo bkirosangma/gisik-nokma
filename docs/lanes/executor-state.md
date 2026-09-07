@@ -22,9 +22,17 @@ brief recovers only what is written here. Refreshed at every task boundary.
 |---|---|
 | `origin/main` | **`2859df4`** — #306 (MCP rulings), #307 (handoff), #308 merged since the entry below |
 | branch | `exec/99-prelaunch-6-7-contrast-responsive`, off `2859df4` |
-| in flight | that branch — items 6 and 7, **not yet PR'd at the time of writing** |
+| in flight | that branch — items 6 and 7 |
 | **queue** | **MCP implementation** — the plan is landed and all 7 rulings are in it. Task 12's `last_used_at` sub-question is still an open OWNER decision. Nothing else is outstanding. |
 | substrate | the **full dev stack was up and seeded** for this work (`docker-compose.dev.yml`, Convenience Corner seed, 123 tickets). `pnpm test:e2e:stack` passed 3/3 against it. |
+| gate | `turbo build test typecheck` **30/30 EXIT 0** at `b69ace0`, Node **v22.22.2**; all five repo checks exit 0. The two grep hits for "failed" in that log are test NAMES containing the word, both ✓ — checked, not assumed. |
+
+> **⚠ THE BRIEF ITSELF CARRIES A DEAD CITATION.** The dispatch brief's "TWO KNOWN GAPS" §2 cites
+> `apps/web/test/contests.test.tsx:97` as the TZ-took-effect precedent. **That file does not exist.**
+> The real precedent is `apps/web/test/ist-today.test.ts` (which does assert `TZ` took effect). Found
+> because a subagent was asked to model an assertion on it and reported it missing; verified here with a
+> positive control listing what `apps/web/test/` actually holds. The RULE that section states is sound —
+> only its pointer is dead.
 
 **What was measured, so a restart does not redo it:** 60 page-loads — 12 routes × 3 viewports (390/768/
 1512) in light, 12 × 2 in dark — against the real authenticated stack. **Zero contrast failures** with
@@ -42,10 +50,42 @@ real alpha compositing. **One responsive defect**, fixed. Both passes assert the
    `apps/web` ever called `themeStylesheet()`. Confirmed in the built artifact (24 usages, 0 definitions).
    Fixed via `installTheme()`, case 15.17.
 
-**Two things recorded for the OWNER and deliberately not fixed:** `apps/mobile/src/screens/help-screen.tsx:59`
+4. **`p.gn-legal__meta` rendered at 15.2px** on `/privacy` and `/terms` — the *same* 0.95rem body-copy
+   floor items 1–3 already fixed on the 404's aside, missed there because that pass measured one page at
+   desktop width. Found by the new viewport suite on its first run. Now `1rem`.
+
+**The instruments, both committed.** `apps/web/e2e-viewport/` (five signed-out routes × three viewports,
+own `next dev` on port 3021 with `reuseExistingServer: false`) and `apps/web/e2e-stack/viewport.spec.ts`
+(case 13.254, the signed-in shell). **The second exists because the first would have stayed green through
+the entire bug** — the overflow was on authenticated pages only, and even `/workspaces` did not reproduce
+it because `AppNav` grows a longer row once a workspace is in scope. Ids minted from THIS lane's own
+`13.241` block (items 1–3 used it through `13.253`), never from the file maximum.
+
+> **⚠ THE BIG ONE, and it reverses a sentence I wrote earlier in this same entry.** "Zero contrast
+> failures" was TRUE and SCOPED: the instrument walked **text only**. Non-text contrast — WCAG 1.4.11,
+> the borders and rings that identify a control — was never in it. Measured properly: **17 of 24 distinct
+> bordered classes fall below 3:1 in both themes**, `.gn-button--ghost` worst-defensible at 2.49/2.30
+> with a fill of 1.09 against the page, so the border is the only thing marking it as a control. The
+> number I had used as a *known-failing control* (`line` on `paper` = 1.34) turned out to be a pair the
+> product ships on `.gn-card`, `.gn-chip`, `td`, `th`. **RECORDED, NOT FIXED** — the remedy moves
+> `line`/`lineStrong` across every surface in both themes (owner's design call), the pairs cannot be
+> declared first because that reddens the gate in the same commit that would fix them, and the
+> `surfaceOverlay` pairs cannot be enforced at all until `relativeLuminance` composites (it ignores alpha
+> by design: `text` on `surfaceOverlay` computes 1.00 against a true 6.43 — a false red — while `border`
+> on it reads 11.87 against a true 1.85, the false green). Full table in the checklist.
+
+**Recorded for the OWNER, deliberately not fixed:** the border finding above · `apps/mobile/src/screens/help-screen.tsx:59`
 hardcodes `colorOf('light', …)` so the mobile help screen ignores dark mode (a theme-support decision, not
-a ratio failure); and board tap targets at 390px are mostly 23px tall, missing WCAG 2.5.8's 24px by one
-pixel, plus one 13×13 input. Neither is in items 6/7's wording.
+a ratio failure) · tap targets, which **ratchet** in the suite rather than assert a floor
+(`e2e-viewport/tap-target-baseline.json`, count may fall never rise) because the reading is identical at
+390, 768 and 1512 and so is not a responsive finding at all.
+
+**Two environment facts worth inheriting.** `webkit` does NOT run here — only `webkit-2272` is installed
+and Playwright 1.62.1 wants `webkit-2336`, so all three viewport projects are chromium (independently
+correct: a cross-width comparison across two engines cannot attribute a difference to the width). And the
+compose web container serves a **pre-built image**, so a source edit is invisible to it until rebuilt —
+which is why 13.254 correctly reports RED against the stale container and needs the image rebuilt to go
+green. That is the test failing on the bug it was written for, not a defect in the test.
 
 **Still open from earlier, unchanged:** `EXPO_PUBLIC_DEV_TOKEN` can be inlined into a release build, and
 there is no `helmet`/CSP/`X-Content-Type-Options`/`X-Frame-Options` anywhere.

@@ -663,9 +663,6 @@ for (const route of UNAUTHED_ROUTES) {
       route.label === '404' ? 404 : 200,
     );
 
-    // ADVERSARIAL-REVIEW MUTATION — TEMPORARY, WILL BE REVERTED.
-    await page.setViewportSize({ width: 1512, height: 844 });
-
     // ── GATE. Hard, and first. Nothing below is evidence until this passes.
     const reading = await assertViewportTookEffect(page, testInfo);
 
