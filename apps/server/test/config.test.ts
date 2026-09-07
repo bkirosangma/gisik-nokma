@@ -84,6 +84,9 @@ describe('loadConfig', () => {
     expect(config.logLevel).toBe('debug');
   });
 
+  /**
+   * 3.22 — boot refuses a missing `DATABASE_URL` with the variable NAMED. The non-numeric `PORT` half of the row is a test further down this block.
+   */
   it('planted defect: a missing DATABASE_URL is refused with the variable named', () => {
     // Only DATABASE_URL removed, not an empty environment: `toThrowError(string)`
     // matches on substring, so `loadConfig({})` — which now names three missing

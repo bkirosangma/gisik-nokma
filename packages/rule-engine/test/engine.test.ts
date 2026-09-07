@@ -247,6 +247,9 @@ function transitioned(to: string, entityId = 't1', payloadExtra: Record<string, 
  * dispatcher does not handle passes through, and consults nothing on the way.
  */
 describe('evaluateEvent — the dispatcher', () => {
+  /**
+   * 3.6 — the pass-through engine passes an unhandled event type through untouched. That it CONSULTS NOTHING — a pass-through must not fake judgement it does not have — is the test below.
+   */
   it('passes an unhandled event type through untouched', async () => {
     const { ctx } = spyContext();
     await expect(evaluateEvent(envelope(), ctx)).resolves.toEqual({ refused: false });

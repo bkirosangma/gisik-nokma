@@ -17,6 +17,9 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * 3.19 — cited on the block: `proj_entity_heads` tracks the newest event per entity, a STALE replayed apply cannot regress a head, and a rebuild derives the same heads from the raw ledger.
+ */
 describe('proj_entity_heads', () => {
   it('readEntityHead is null for an entity with no committed events', async () => {
     await expect(readEntityHead(db.pool, 'workspace', newUlid())).resolves.toBeNull();

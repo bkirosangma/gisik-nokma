@@ -55,6 +55,9 @@ describe('projection registry', () => {
   });
 });
 
+/**
+ * 3.18 — cited on the block: `rebuildProjection` resets ONCE then applies the whole ledger in canonical order rather than arrival order, and an unknown projection name is refused.
+ */
 describe('rebuildProjection', () => {
   it('planted defect: refuses an unknown projection name', async () => {
     const registry = createProjectionRegistry();

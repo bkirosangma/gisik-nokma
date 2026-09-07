@@ -33,6 +33,9 @@ function rejectionIssues<Input, Output>(
   return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
 }
 
+/**
+ * 3.1 — cited on the block: a well-formed submitted event passes envelope validation, and a non-ULID id, an unknown entity kind, a missing actor, an unreal datetime and microsecond precision are each refused by their own test here.
+ */
 describe('submittedEventSchema', () => {
   it('accepts a well-formed submitted event', () => {
     expect(submittedEventSchema.safeParse(validSubmitted()).success).toBe(true);

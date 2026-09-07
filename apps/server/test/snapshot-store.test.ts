@@ -12,6 +12,9 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * 3.10 — cited on the block: snapshots return the highest-seq state per entity, and absent means null rather than an empty state.
+ */
 describe('snapshot store', () => {
   it('returns null when no snapshot exists', async () => {
     await expect(readLatestSnapshot(db.pool, 'workspace', '01J60000000000000000000WKA')).resolves.toBeNull();
