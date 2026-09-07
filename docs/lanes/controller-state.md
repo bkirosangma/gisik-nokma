@@ -1,5 +1,40 @@
 # Cross-lane controller — live state
 
+## ⏸ MONDAY 14:4x IST — CONTROLLER `gisik-nokma-0c` RESTARTING (context full). `main` is `cf79d28`, gate GREEN there — but read the next section before trusting that: `main` currently ships a KNOWN, LIVE gap in the color-discipline check, being fixed right now on `exec/80-gate-cache-blindspot`.
+
+**⚠ THE #274 SQUASH-MERGE DROPPED TWO COMMITS — the actual bug it was supposed to fix is NOT on `main`
+right now, despite every gate reading green.** Measured by the executor, not assumed: `main`'s
+`colour-scan.ts` / `token-discipline.test.ts` are byte-identical to `ada9879` (an earlier commit on that
+branch), while the branch's real final head was `83d61cc`, two commits later. **`7b61463`, the string-awareness
+fix itself (the URL-in-a-string false negative), never landed.** Concretely, on `main` today,
+`findColourLiterals` still returns `[]` for a string containing a URL followed by a real color literal on the
+same line — the exact hole #274 was supposed to close. **The gate is green because nothing currently in the
+test suite exercises that specific shape; this is a live blind spot, not a red flag anyone is ignoring.**
+
+**Why this happened, distinct from every earlier squash-timing incident tonight:** this controller DID
+fetch the head sha immediately before merging (`gh pr view 274 --json headRefOid`, same command block as the
+merge) — the discipline adopted after #247/#253/#255 was followed correctly. The executor had pushed
+`7b61463`/`83d61cc` in a window this controller's fetch-then-merge sequence did not catch. **The standing
+re-fetch-immediately-before-merging rule is necessary but was not sufficient here** — worth the next
+controller's attention: is there a tighter check possible (e.g. re-fetching AGAIN right after merge and
+diffing the squash commit against the fetched head, rather than trusting the merge succeeded)?
+
+**In flight right now, not blocked on the controller:** the executor is rebuilding `exec/80-gate-cache-
+blindspot` onto `cf79d28`, cherry-picking **six** commits (the two dropped from `exec/79` plus `exec/80`'s own
+four), explicitly re-verifying the URL false-negative is actually closed on the rebuilt branch (not assumed
+from the earlier report), re-gating with `--force`, and will force-push + update **PR #278**. **The next
+controller's first action once resumed: check PR #278's state, verify the URL-false-negative fix is
+genuinely present in the diff (not just claimed), verify, and merge.**
+
+**Everything else stands as documented below:** the four-package cache-scoping sweep (§ below), the `--force`
+vs. declared-`inputs` ruling, `13.176` (option B, "Shared with me" view) queued behind #278, and **PR #276 (the
+MCP server design spec) is open and AWAITING THE OWNER'S REVIEW** — do not merge it without that, per the
+brainstorming skill's user-review gate; it is not part of the executor's queue at all, it is this controller's
+own design work.
+
+**No orphaned processes at handoff** — checked directly (`ps` for gate.sh/turbo/vitest by ppid and name):
+zero. Gate lock file (`/tmp/gisik-gate.lock`) empty. Clean stop.
+
 ## ⚠ MONDAY 14:2x IST — A SYSTEMIC GATE-INTEGRITY BUG FOUND, EXPLAINS THE `4f89591` RED. `token-discipline.test.ts` (the check #274 just fixed) declares no turbo `inputs`, so its cache scope is `packages/ui/**` — but the check reads `apps/web/**` etc. FROM DISK at runtime. Fix in progress; `main` is currently `e4a77df`, still green (this is about a check's RELIABILITY, not a new break).
 
 **What this means, precisely:** turbo can replay a stale cache HIT for `packages/ui#test` — reporting the
