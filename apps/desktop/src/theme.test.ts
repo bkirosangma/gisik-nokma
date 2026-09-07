@@ -3,7 +3,7 @@ import { TOKEN_ROLES, cssVariableName, themeStylesheet } from '@gisik-nokma/ui/t
 import { installTheme } from './theme.js';
 
 /**
- * 15.257 — the desktop window must DEFINE the design tokens it uses, not merely
+ * 15.17 — the desktop window must DEFINE the design tokens it uses, not merely
  * reference them. `ui.css` declares none of them (321 `var(--gn-…)` usages, zero
  * definitions); until `installTheme` existed only `apps/web` ever emitted
  * `themeStylesheet()`, so the desktop app rendered with every `--gn-*` resolving
@@ -39,7 +39,7 @@ function fakeDocument(): { doc: Document; appended: FakeStyle[] } {
   return { doc, appended };
 }
 
-describe('the desktop shell installs the design tokens (15.257)', () => {
+describe('the desktop shell installs the design tokens (15.17)', () => {
   it('appends one stylesheet to the head', () => {
     const { doc, appended } = fakeDocument();
     installTheme(doc);

@@ -40,7 +40,7 @@ real alpha compositing. **One responsive defect**, fixed. Both passes assert the
    existing test enforces them. 21 → 57 tests; mutation reddens exactly one named assertion.
 3. **`apps/desktop` shipped with every design token undefined** — `ui.css` defines none of them and only
    `apps/web` ever called `themeStylesheet()`. Confirmed in the built artifact (24 usages, 0 definitions).
-   Fixed via `installTheme()`, case 15.257.
+   Fixed via `installTheme()`, case 15.17.
 
 **Two things recorded for the OWNER and deliberately not fixed:** `apps/mobile/src/screens/help-screen.tsx:59`
 hardcodes `colorOf('light', …)` so the mobile help screen ignores dark mode (a theme-support decision, not

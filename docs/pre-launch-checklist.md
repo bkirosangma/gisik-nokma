@@ -243,7 +243,7 @@ defines none of them (321 `var(--gn-…)` usages, zero declarations, no `:root`)
 the 24 as the positive control. **Nothing caught it because both existing guards are claims about text** —
 that every `var()` names a declared role, and that no colour literal is written outside `tokens.ts`.
 Neither says a stylesheet defining those variables is ever installed in a given app, which is a property
-of an entry point. Fixed by `installTheme(document)`, tested as case 15.257.
+of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
 
 > ### ⚠ Open for the owner — non-text contrast, product-wide. NOT fixed here, and deliberately so.
 >
