@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
@@ -168,7 +168,19 @@ function parentOptionLabels(): string[] {
 }
 
 describe('3.142 a refused ticket list is never rendered as "this project has no parents"', () => {
-  it('withholds the New-ticket control and names the read — while the board shows the tickets the picker used to deny', async () => {
+  /**
+   * **The PRINCIPLE is unchanged; the MECHANISM moved, and that is the whole edit.**
+   * A refused list must never render as "this project has no parents". It used to
+   * satisfy that by withholding the New-ticket control entirely — which also blocked
+   * creation at PROJECT ROOT, the one creation that never needed a parent. The page's
+   * own docblock named that cost and accepted it on the premise that the refusal was
+   * temporary and route-owned.
+   *
+   * That premise expired for the refusal a real customer meets: `LIST_TOO_LARGE_ABSENCE`
+   * is a bound this client chose, and no route change clears it (12.382). So the control
+   * is offered, and the parent picker — not the form — carries the refusal.
+   */
+  it('offers New ticket and names the missing parent list, rather than withholding the whole control', async () => {
     render(
       <Providers
         services={stubServices({
@@ -188,17 +200,39 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     // `?? []` a contradiction and not merely an empty state.
     expect(await screen.findByText('Rewire the shop sign')).toBeInTheDocument();
 
-    // The refusal names the parent read AND says what it cost.
+    // The control IS offered now — creation at project root never needed the list.
+    const open = await screen.findByRole('button', { name: 'New ticket' });
+    fireEvent.click(open);
+
+    // And the half that keeps 3.142's claim true: there is no parent `<select>` at
+    // all, so nothing can assert "this project has no parents". The reason stands
+    // in its place. Measured before the original fix, when the picker DID render:
+    // `PARENT OPTIONS: ['None (project root)']` — a lie with one option.
+    //
+    // **This assertion used to be one that could not fail**, and it is worth naming
+    // because it looked like the strictest spelling available:
+    //
+    //     screen.queryByLabelText('Parent')?.querySelector('select') ?? null
+    //
+    // `queryByLabelText('Parent')` returns the `<select>` ITSELF (the label wraps the
+    // control), so `.querySelector('select')` looks INSIDE it and finds nothing when
+    // the picker is present — and the optional chain yields null when it is absent.
+    // `null` in both states, for opposite reasons. Restoring the empty picker left it
+    // green, and so did rendering the picker AND the reason together, which is the
+    // one arrangement this case exists to forbid.
+    //
+    // Counted instead, over the dialog, because the number differs between the two
+    // states where the old expression did not: Title has no select, Type has one, and
+    // Parent adds a second only when the picker renders.
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryAllByRole('combobox')).toHaveLength(1);
+    expect(within(dialog).queryByRole('option', { name: 'None (project root)' })).toBeNull();
     expect(
-      await screen.findByText(
-        /The tickets that could be a parent, so New ticket is not offered cannot be shown yet\./,
-      ),
+      screen.getByText(/the list of tickets that could be a parent cannot be shown/),
     ).toBeInTheDocument();
 
-    // The half that makes those a test: the control that would have lied is not
-    // on the page at all, so no dialog can be opened to be told there are no
-    // parents. Measured before the fix: `PARENT OPTIONS: ['None (project root)']`.
-    expect(screen.queryByRole('button', { name: 'New ticket' })).not.toBeInTheDocument();
+    // The type picker is untouched: types still gate creation, parents do not.
+    expect(typeOptionLabels()).toContain('Epic');
   });
 
   it('offers the real rows once the list ANSWERS, so the gate is not "never offer it"', async () => {
@@ -218,7 +252,49 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     );
     await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
     expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
-    expect(screen.queryByText(/could be a parent, so New ticket is not offered/)).not.toBeInTheDocument();
+    // The paired absence is the REASON, not the old refusal. `"…could be a parent, so
+    // New ticket is not offered"` was deleted with `createRegion`'s list arm and is
+    // produced by no source file now, so asserting it absent asserted nothing — it
+    // could not have been present. This string can be.
+    expect(
+      screen.queryByText(/the list of tickets that could be a parent cannot be shown/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('3.158 a preferences failure does not claim the parent list cannot be shown', () => {
+  /**
+   * `parentCandidates` is built from `list.rows`; `list.error` is
+   * `list.error ?? preferences.error` (`ticket-list.ts`). Keyed on the error, the
+   * dialog told a user the tickets that could be a parent *"cannot be shown"* — and
+   * offered a **preferences** 500 as the reason — while the rows sat there intact and
+   * the very same page could have shown them. Two false statements at once, and the
+   * state the stale-parent submit fired from.
+   *
+   * Keyed on `list.rows === null` it says only what it can see.
+   */
+  it('the rows are intact, so the picker is offered and the preferences error is not misused', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD,
+          getTickets: async () => LIST,
+          getTicketTypes: async () => WORKSPACE_TYPES,
+          getPreferences: () =>
+            Promise.reject(new HttpError(500, '/v1/me/preferences?workspaceId=w1')),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
+
+    // The true thing present...
+    expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
+    // ...and the false one absent. Paired, as every case in this file is.
+    expect(
+      screen.queryByText(/the list of tickets that could be a parent cannot be shown/),
+    ).not.toBeInTheDocument();
   });
 });
 

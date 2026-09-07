@@ -16,6 +16,255 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🔴→🟢 MONDAY 2026-09-07 ~16:0x IST — **REVIEW FOUND A CRITICAL THIS BRANCH INTRODUCED. FIXED, WITNESSED, RE-GATED.** The section below is still accurate about the red; this supersedes its "ready to merge" reading.
+
+| what | value |
+|---|---|
+| the defect | **the dialog submitted a parent it had just told the user would not apply** |
+| introduced by | **this branch** — at `a0d9963` a list error unmounted the create flow, so the state was unreachable |
+| why it shipped green | **`parentCandidatesUnavailable` appeared in ZERO tests**, and 3.142's guard could not fail |
+| fixed at | `new-ticket-dialog.tsx` (the draft) **and** `page.tsx` (the condition) — two different mistakes |
+| witnessed by | **3.157** (component, with a control) and **3.158** (page) |
+| `main` | `a0d9963` |
+| branch | **`exec/77-decouple-create`** — PR **#270**, green, awaiting the controller |
+| gate sha | **`17d605c`** — the sha the figures below were measured at, verified REACHABLE with `git branch --contains`, not `cat-file`. **Branch HEAD is at or ahead of it and every commit after it is docs-only** — a handoff cannot name the commit that writes it, so the gate sha is quoted instead of a HEAD that is stale the moment it is typed. Confirm with `git diff --name-only 17d605c..HEAD`. |
+| gate | `GATE_EXIT=0` · **30/30** · **3706 \| 5 skipped (3711) / 297 files** · Node **v22.22.2** · `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| the delta | **+3 cases, +1 file** against the section below's `3703 / 296` — exactly 3.157's pair plus 3.158. **That older row is a fact about an older sha; do not read it as current.** |
+
+## THE CRITICAL, AND WHY READING THE SCREEN WOULD HAVE MISSED IT
+
+`NewTicketDialog` holds `parentId` in `useState` and Create emitted it unconditionally. **Withholding the
+picker stops it RENDERING; it does not clear the state behind it.** So: the list answers → the user picks a
+parent → a later read fails → the picker is replaced by *"This ticket will be created at project root"* →
+Create submits the earlier id.
+
+**The sentence on screen was correct. The payload contradicted it.** Any case asserting the rendered text
+would have passed against the defect, which is why 3.157 asserts the emitted **draft**.
+
+**Reachability never needed the row cap.** `useTicketList` returns `error: list.error ?? preferences.error`
+(`ticket-list.ts:459`), so an ordinary `getPreferences` 500 — or a `setPrefs` PUT the user triggered
+themselves — set `list.error` with `list.rows` intact. The page keyed the withheld picker on that error, so
+it told the user the parent list *"cannot be shown"* **and offered a preferences failure as the reason**, on
+a page that could have listed them. Two false sentences, and the state the stale submit fired from.
+
+## ⚠ 3.142's GUARD COULD NOT FAIL — the sixteenth disguise, in a check written to be strict
+
+```js
+screen.queryByLabelText('Parent')?.querySelector('select') ?? null   // null in BOTH states
+```
+
+`queryByLabelText('Parent')` returns the `<select>` **itself** (the label wraps the control), so
+`querySelector('select')` looks *inside* it and finds nothing when the picker is present — and the optional
+chain yields `null` when it is absent. **Null for opposite reasons.** The reviewer killed it two ways and
+**1255 tests stayed green**: restoring the empty picker, and rendering the picker AND the reason together —
+the one arrangement the case exists to forbid. Counted over the dialog now; both mutations fail loudly
+(`expected […] to have a length of 1 but got 2`).
+
+## THE FOUR WITNESSES, ALL KILLING AT THEIR OWN SITE
+
+| mutation | result |
+|---|---|
+| **N1** dialog emits the stale `parentId` again | **3.157 fails, its CONTROL passes** — so the case is not satisfied by a dialog that drops every parent |
+| **N2** page keyed on `list.error !== null` again | **3.158 fails** (`Unable to find a label with the text of: Parent`) |
+| **N3** the `parentCandidatesUnavailable` spread removed — the empty picker returns | **3.142 fails**, `length of 1 but got 2` |
+| **N4** picker AND reason rendered together (the arrangement 1255 tests survived) | **3.142 fails**, same assertion |
+
+## ⚠ I REPEATED MEMORY #16 WITH THE MEMORY ALREADY WRITTEN
+
+`git checkout --` during the mutation round **destroyed both source fixes**, because I had committed the
+TEST and left the two source edits uncommitted. The rule I was carrying says *commit first, then mutate*;
+I applied it to one file and not the two it most protected.
+
+**It was caught only because a baseline re-run failed** — `git status` was clean, both mutations reported
+"restored: []", and every signal said the round was healthy. **A restore that reports success tells you the
+tree matches HEAD, which is exactly what a destroyed fix also looks like.** The recovery was cheap only
+because the edits were minutes old and reproducible from the review's own text.
+
+> **The generalisation: `git checkout -- <path>` is a claim about HEAD, never about your work.** Before
+> running one, the question is not "is the tree dirty" but "is everything I want to keep IN HEAD".
+
+## THE FOUR MINORS, ALL REAL, ALL FIXED
+
+1. `new-ticket-dialog.tsx:17`'s docblock stated a contract the code did not keep — now enforced at the
+   submit site and the docblock says where.
+2. 12.382's `getTicketTypes` override is **inert** (deleting it leaves 10/10 green, measured) and its
+   comment claimed it protected an assertion that does not exist. Kept, honestly described.
+3. A negative assertion in 3.142's control named a string **no source file produces any more**, so it
+   asserted nothing. Replaced with one that can be present.
+4. My own comment said **three** `role="status"` nodes stand on the page; it is **two** — the board arm
+   unmounts on tab change. The count was inferred from the stubs rather than read off the page.
+
+---
+
+# 🟢 MONDAY 2026-09-07 ~15:1x IST — **THE RED IS RESOLVED AND THE OPEN QUESTION IS ANSWERED. `exec/77-decouple-create` is GREEN.** PR open; the Board-tab change is a design call recorded for reversal.
+
+| what | value |
+|---|---|
+| `main` | `11779b1` → `a0d9963` (controller anchors only, `docs/lanes/controller-state.md`) |
+| branch | **`exec/77-decouple-create`**, rebased onto `a0d9963` |
+| gate | `GATE_EXIT=0` · **30/30 tasks** · **3703 \| 5 skipped (3708) / 296 files** · `check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 → **1537 cited / 0 uncited / 1537** · **zero orphans** (positive control: the sweep sees 9 node processes) |
+| node | **v22.22.2** — a gate result that does not name its Node is not evidence |
+| not in the gate | `check:db-tz` needs `DATABASE_URL` and exits 1 without it on ANY tree; env-dependent, never part of the composition these anchors report |
+| conflict risk | **none measured**: `main` added only `controller-state.md` since `b8877f7`; this branch touches `executor-state.md`. Different files. |
+
+## THE RED WAS NEVER ABOUT THE REFUSAL — THE PAGE CRASHED BEFORE IT RENDERED
+
+12.382's stub said `getPreferences: async () => ({ columns, grouping })` — a **`ProjectViewPrefs`**, where
+the method returns a **`UserPreferences` document**. `useTicketList` does
+`preferences.document?.projects[projectId]`: `document` was non-null, `projects` was `undefined`, and the
+index threw. React unmounted the tree. **The body under all three of the previous session's failed
+matcher attempts was `<body><div /></body>`.**
+
+So none of those three attempts was evidence about anything, and the conclusion they produced —
+*"`ShellRefusal` likely does not use `role="status"`"* — **is refuted by the first case in the same file**,
+which finds it exactly that way. Do not inherit it.
+
+**The stub was also unnecessary.** `stubServices` already defaults `getPreferences` to `EMPTY_PREFERENCES`,
+which has the right shape, and every stub in `project-create-gate.test.tsx` uses that constant. The
+override replaced a correct default with a hand-typed wrong one. Deleting it was the whole fix.
+
+## ⚠ THE FINDING THAT COSTS THE MOST NEXT TIME: **A SUITE PASS IS NOT THE GATE**
+
+The previous session reported *"`app-core` green, `apps/web` 138 passed / 1 FAILED"* and pushed. The gate is
+`pnpm turbo run build test typecheck`. **Measured here by re-applying the exact bad stub and running
+typecheck: `EXIT=2`,** with
+
+```
+test/page-refusals.test.tsx(209,11): error TS2322: Type '() => Promise<{ columns: …; grouping: … }>'
+  is not assignable to type '(workspaceId: string) => Promise<UserPreferences>'.
+```
+
+**The line number and the wrong shape, in one message, pointing straight at the defect** — while three
+rounds went into matcher strategy against an empty DOM. `stubServices` types its overrides as
+`Partial<DataSourceQuery>`, which is TIGHT; the harness has no hole. **The gate was simply not run.**
+
+## THE CONTROLLER'S OPEN QUESTION, ANSWERED: YES, AND IT IS CORRECT
+
+> *"a project sitting on the Board tab past the cap may now show no refusal anywhere"*
+
+**Confirmed by reading the rendered DOM**, not by inference: on the default `'board'` tab, past the cap, the
+only `role="status"` nodes are the attention strip's and the board's. `New ticket` renders and works.
+
+**It is not a regression, and here is the argument so the owner can reverse it in a sentence if they
+disagree:**
+
+1. The lost renderer was `createRegion`, which sits inside the tablist and therefore refused on every tab.
+   Its words were **`"The tickets that could be a parent, so New ticket is not offered"`** — and `New ticket`
+   **is** now offered, at project root. **That sentence is false today.** A refusal cannot be left standing
+   to say something untrue, and any tab-independent replacement would have to describe the ticket list on a
+   tab that does not show one.
+2. Nothing false took its place. The board tab draws the **board** read — a different query — and neither a
+   spinner nor an empty table stands where the list would be. This file's own stated property is *"the
+   refusal's own words present, AND the thing that would otherwise stand in its place absent"*; on the board
+   tab **nothing stands in its place**, so the property has no teeth there.
+3. The user still meets the cap on all three tabs that show a list, and in the create dialog's parent field,
+   which names the unavailability (3.142).
+
+## WHAT 12.382 NOW ASSERTS, AND THE FOUR MUTATIONS THAT PROVE IT
+
+The case clicks the List tab, and says in the test why that click is load-bearing.
+
+| mutation | site | result |
+|---|---|---|
+| **M1** tab click removed | test | **killed** — `expected false to be true` |
+| **M2** List arm's `what` renamed off `"The ticket list"` | `page.tsx` | **killed** — the identity guard is live |
+| **M3′** error arm dropped, `rows={list.rows ?? []}` — *the exact defect this file exists to catch* | `page.tsx` | **killed** at the refusal-present assertion |
+| **M3′ + isolation** (refusal half disabled so a kill can only be `list-summary`) | both | **killed at `page-refusals.test.tsx:268`, naming `data-testid="list-summary"`; positive control on the restored page PASSES** |
+
+**A first M3 was discarded rather than counted.** It forced `rows={list.rows}` with `list.rows === null` and
+died on `Cannot read properties of null (reading 'length')` — **a kill at a shape gate, which measures no
+property.** It is the pattern already recorded on this machine; it was replaced, not reported.
+
+**Two assertions were passing for reasons unrelated to their names, and both were repaired:**
+
+- `queryByText('Loading…')` is absent on the **board** tab too under these stubs, so alone it never depended
+  on the tab click — the case would have passed with the click deleted. `list-summary`'s absence is the half
+  that actually pairs with the refusal.
+- `statuses.some(t => t.includes(ownWords))` matched **any** of the three status nodes. It now requires the
+  matching node to carry `"The ticket list cannot be shown yet."` as well, so cap prose leaking into another
+  read's message cannot satisfy it.
+
+## RECORDED, NOT FIXED — with a named owner
+
+**`packages/app-core/src/views/ticket-list.tsx:439`** — `preferences.document?.projects[projectId]` guards
+`document` but **not** `projects`. A document arriving without `projects` crashes the whole project page to a
+blank screen, with no error boundary above `<ProjectBoard>` (the `Suspense` fallback does not catch throws).
+
+**Not reachable through the shipped client**, and that was checked rather than assumed: `mapPreferences`
+(`online/mappers.ts:939`) builds `projects` as an object literal on every path, so the field always exists.
+It is reachable only from a stub that violates `UserPreferences` — which is precisely what happened here, and
+what typecheck catches. **Owner: whoever next touches `useTicketList`'s preferences read.** Deliberately not
+fixed in this branch: the brief's rule is that out-of-scope findings are recorded with an owner, not
+repaired, and folding a defensive `?? {}` in here would also weaken the type that caught the real bug.
+
+## ⚠ MEASURED FOR THE NEXT ITEM: **REMEDY 3 IS MUCH CHEAPER THAN THIS FILE HAS BEEN RECORDING**
+
+The premise carried across three anchors — *"letting a user narrow under the bound needs the route's query
+language to express the narrowing"* — **is wrong, and it has been wrong the whole time.** The pipeline
+exists end to end and is tested. Measured, not inferred:
+
+| link | evidence |
+|---|---|
+| client serialises the filter | `online-data-source.ts:68` `listQueryString` → `toServerFilterSpec` → `filter=<json>` |
+| ...on **every page** of the walk | `online-data-source.ts:223`, inside the `for` loop, not before it |
+| route validates it | `routes/list.ts:526` `filterSpecSchema.safeParse`, `400 invalid_filter` otherwise |
+| route compiles it to SQL | `routes/list.ts:14` `compileFilterSpec`, **parameterised** |
+| the narrowing is proven | `list.test.ts:1115` narrows by `assigneeId`; **7.18** (`list.test.ts:969`) plants a hostile filter and shows it executes harmlessly |
+| the axes already exist | `FilterSpec` (`view-types.ts:70`): text, assignee, collaborator, type, state, state-category, project, due-before/after, custom fields — all optional, all AND-combined |
+
+**And filtering genuinely relieves the cliff**, which is the part that decides whether remedy 3 is a real
+answer or a consolation. The cap is not a server bound: `getTickets` walks up to `LIST_PAGE_CAP` (10) pages
+of `LIST_PAGE_SIZE` (200) and throws only if a cursor is **still outstanding** afterwards
+(`online-data-source.ts:246`). A filter that narrows server-side shortens the walk, so the same project that
+refuses unfiltered answers filtered.
+
+**What is actually missing is client-side only, and it is small:**
+
+1. `packages/app-core/src/views/ticket-list.tsx:436` hardcodes the filter as `{}` — the single site.
+2. No control exists for choosing one.
+3. **The control must render OUTSIDE the refusing arm.** This is the load-bearing part and it is easy to get
+   wrong: a filter control drawn inside `list.error === null` is unreachable by the only user who needs it.
+   That is the identical mistake `createRegion` was making until this branch, and the fix has the same shape
+   — gate the affordance on what it actually needs, not on the read that happens to sit beside it.
+
+**`SavedFilter` (`view-types.ts:264`) and the preferences document already carry named filters**, so there
+may be a smaller first step than a general filter bar. Not designed here — the owner asked for measurement
+first, and this is the measurement.
+
+## MEASURED FOR 13.176: IT LANDS ON A RULING THE OWNER ALREADY HOLDS
+
+13.176 says *"a guest has NO NAVIGATION to the four errands explicitly shared with them"*. The measurement
+says why, and the why matters more than the symptom: **there is no read that could serve it, and the one
+that would is already held with the owner over this exact question.**
+
+- **No `DataSource` method lists "tickets shared with me."** All thirteen enumerated at
+  `packages/app-core/src/data-source.ts:132-143`; the closest is `getMyWork(workspaceId)`.
+- **`getMyWork` cannot serve it.** `apps/server/src/routes/my-work.ts:120` filters
+  `t.assignee_id = <viewer>`, and `MyWorkView` is `{assigned, inTransit, contested}`
+  (`view-types.ts:238`). A ticket shared with a guest who is not its **assignee** appears in none of the
+  three. The route's own docblock (`:56`) names *"a ticket explicitly shared with somebody else"* as a case
+  it is measured against — it is deliberately not this read's job.
+- **`getMyWorkspaces` — the natural entry point for a guest with no project — REFUSES**, and
+  `online-data-source.ts:92-95` says it is **HELD with the owner** because *"serving them means deciding
+  what a project-scoped guest sees of a workspace's other projects, and there is no shipped project-list
+  read at all."*
+
+**That last line IS 13.176.** So this is not a fresh UX question to design and build; it is the client-side
+face of a ruling already sitting with the owner, and designing a guest navigation before that ruling lands
+would be picking the answer to the held question by implementing one. **Recommend it be raised as part of
+the `getMyWorkspaces`/`getMyWork` hold rather than opened as its own design item.** Recorded, not decided.
+
+## NEXT
+
+1. **The owner's second half: real filtering, as its own PR** — see the measurement directly above, which
+   says it is a client-side change against a pipeline that already works, not a route change.
+2. **13.176** — guest navigation to explicitly-shared tickets. **Measured below; it is NOT an independent
+   design decision.**
+3. Still open and still the owner's: which of the four cliff remedies (raise the cap / paged view type /
+   filter affordance) follows. **Remedy 4 — this branch — is done.**
+
+---
+
 # 🟡 MONDAY 2026-09-07 ~13:45 IST — **12.258's carried half CLOSED, and the pagination cliff is WORSE than 12.322 records. The design decision is OPEN and is the owner's.** PR on `exec/76-pagination-cliff`, gate green.
 
 | what | value |
