@@ -16,6 +16,58 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟡 MONDAY 2026-09-07 ~13:45 IST — **12.258's carried half CLOSED, and the pagination cliff is WORSE than 12.322 records. The design decision is OPEN and is the owner's.** PR on `exec/76-pagination-cliff`, gate green.
+
+| what | value |
+|---|---|
+| `main` | `b75f744` (#265 merged) |
+| branch | **`exec/76-pagination-cliff`** off `b75f744` |
+| gate | `GATE_EXIT=0` · 30/30 · **3703 \| 5 (3708) / 296** · **1537 ids, 1537 cited, 0 uncited** · zero orphans (positive control: the sweep sees 4 node processes) |
+
+## WHAT THE MEASUREMENT FOUND — 12.322 UNDERSTATES THE COST
+
+12.322 says a project past the cap *"loses three of four tabs"*. **ONE `useTicketList` read
+(`page.tsx:129`) feeds FOUR consumers:** `createRegion` (`:310`), Calendar (`:421`), Timeline (`:464`),
+List (`:489`).
+
+> **So `New ticket` is not offered either, on any tab. A user whose project grew past 2000 tickets cannot
+> create a ticket in it.** Board survives on a separate read.
+
+**And what they read is developer prose.** `ShellRefusal` renders the authority's own words without
+paraphrase, so the message is `ServingGapError`'s: *"facts the shipped route does not serve —
+TicketListView.rows (… which is the defect this loop exists to prevent; owner: raise LIST_ROW_CAP once a
+real project-size distribution is known …)"*. A customer meets the words *"the defect this loop exists to
+prevent"*.
+
+**Closed here: 12.258's carried half** — *"a refusal nobody renders is a blank screen with a good
+conscience"* — as **12.382**, driving the real page with the real `LIST_TOO_LARGE_ABSENCE`.
+
+## ⛔ THE DESIGN DECISION IS OPEN, AND I HAVE NOT TAKEN IT
+
+Owner said measure/design first and stop rather than guess at UX. **Measured; not designed.** The
+options, with what each costs — **for the owner, not for me to pick**:
+
+1. **Raise `LIST_ROW_CAP`.** Cheapest, moves the cliff, does not remove it. The absence itself calls the
+   bound *"a disclosed assumption, never a measurement"*.
+2. **Give the list surface a paged view type.** What the absence's `owner` field actually asks for.
+   Largest change; `TicketListView` is currently defined as the COMPLETE row set, and 12.258 exists
+   precisely because a truncated list presented as whole is the defect.
+3. **A filter affordance** — 12.322's own suggestion. `ticket-list.tsx` hardcodes the filter as `{}`;
+   letting a user narrow under the bound needs the route's query language to express the narrowing.
+4. **Decouple `createRegion` from the list read** — narrow, and it restores ticket creation past the cap
+   regardless of which of 1–3 is chosen. **This is the one I would do first if asked**, because a user
+   who cannot create a ticket is worse off than one who cannot see a list, and it is independent.
+
+**Throwing remains right** — 12.258 and 12.322 both say so, and I agree; the truncated list is the worse
+defect. What is missing is the graceful path.
+
+## NEXT
+
+- **13.176** (guest navigation to explicitly-shared tickets) — not started. Also a design decision.
+- The two above are the last carried items; everything else in the queue is closed.
+
+---
+
 # 🟢 MONDAY 2026-09-07 ~13:00 IST — **CARRIED QUEUE: 5 of 5 DONE. 12.321 was a correctness bug, not amplification.** PR on `exec/75-live-query-refetch`, gate green. Nothing running.
 
 | what | value |

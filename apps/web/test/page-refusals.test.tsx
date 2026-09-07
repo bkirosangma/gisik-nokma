@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HttpError, ServingGapError } from '@gisik-nokma/app-core/online';
+import { HttpError, LIST_TOO_LARGE_ABSENCE, ServingGapError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
 import { EXPIRED_SESSION_COPY, isExpiredSession } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -174,6 +174,50 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       await screen.findByText(/What needs your attention cannot be shown yet\./),
     ).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Needs attention' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 12.382 — case 12.258 asserted the CAP REFUSAL and recorded, with an owner, that
+   * *"what the WEB SHELL renders when `getTickets` throws past the cap is not exercised
+   * anywhere … a refusal nobody renders is a blank screen with a good conscience."*
+   * This renders it, with the REAL `LIST_TOO_LARGE_ABSENCE` rather than a hand-made
+   * error, so the case pins the string a user actually meets and reddens if that prose
+   * changes.
+   *
+   * **And it measures more than 12.322 records.** That row says a project past the cap
+   * *"loses three of four tabs"*. One `useTicketList` read feeds all four consumers on
+   * this page — the create region, Calendar, Timeline and List — so **`New ticket` is
+   * not offered either.** A user whose project grew past the bound cannot create a
+   * ticket in it, on any tab. That is asserted here rather than narrated, because it is
+   * the part a design decision most needs to know.
+   */
+  it('Project page: past the list cap, three tabs AND New ticket all refuse', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getTickets: () =>
+            Promise.reject(new ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // The create affordance is gone, and says so — the half 12.322 does not record.
+    expect(
+      await screen.findByText(/The tickets that could be a parent, so New ticket is not offered/),
+    ).toBeInTheDocument();
+
+    // The refusal carries the absence's OWN words, not a paraphrase. Taken FROM the
+    // absence rather than from a re-imported constant: `LIST_ROW_CAP` is not exported
+    // through this entrypoint, and importing it anyway yielded `undefined`, which made
+    // the matcher `/undefined/` and failed for a reason unrelated to the page.
+    const ownWords = LIST_TOO_LARGE_ABSENCE.because.slice(0, 60);
+    expect(screen.getByText(new RegExp(ownWords.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument();
+
+    // Paired, as every case in this file is: the refusal present AND what would
+    // otherwise stand in its place absent.
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
   it('Project page: the board tab shows the board read’s own failure, not "Loading…"', async () => {
