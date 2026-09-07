@@ -1818,7 +1818,11 @@ git commit -m "proj_memberships turns membership history into effective roles: o
 > the ledger: the seven-event order by `workspace_seq`, the four type ids each naming the workflow
 > defined one event earlier, the founding workflow equal to `SIMPLE_KANBAN_TEMPLATE`, and the founder's
 > `owner` row in `proj_memberships`. *Owner of the missing end-to-end assertion: whoever runs the
-> step-10 integration checkpoint after Plan 3 Chain B lands.*
+> step-10 integration checkpoint after Plan 3 Chain B lands.* **— AMENDED 2026-09-07: there is no
+> step-10 checkpoint to run.** It ran once, narrowly, on 2026-09-02 (`ac187e8`, PR #70) over Plan 5's
+> and Plan 6a's seams only, and the dispatch brief's phase list that named it has been retired. This
+> residual therefore has **no owner by process**. Re-assign it explicitly or close it; do not wait on
+> a trigger that cannot fire.
 
 **Planted-defect discipline for this task and Task 9:** Plan 2's fixture format (`{name, workflowDef, priorEvents, candidateEvent, expected}` in `packages/rule-engine/fixtures/`) is for *rule-engine* rules — refusals a workflow declares. Permission refusals are PRE-engine and never involve a workflowDef, so they do NOT go into that fixture directory. Their planted defects are ordinary Vitest tests in `apps/server` that construct the defective scenario (the wrong actor, the insufficient role) and assert the exact Refusal object. Same discipline, different harness — do not hunt for a fixtures folder.
 

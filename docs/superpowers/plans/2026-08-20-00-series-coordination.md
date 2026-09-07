@@ -987,6 +987,22 @@ when the ruling was about *who*, not *what*.
 
 ### Two concerns the topology does NOT solve, recorded so they are not assumed away
 
+> **⚠ AMENDED 2026-09-07 — BOTH CONCERNS BELOW ARE STALE, AND THIS SECTION IS NOT COVERED BY THE
+> SEQUENCE RETIREMENT ABOVE.** `### ~~The serial sequence~~ — RETIRED` is a *sibling* `###` heading,
+> so its "do not start work from this section" banner stops before this one. A reader arriving here
+> cold gets two present-tense claims with nothing marking them. Corrected, not deleted:
+>
+> 1. **The wave-boundary checkpoint's "replacement trigger: the Phase 2/3 boundary" already fired,
+>    and points into the retired phase list.** All 177 tasks are done (`pnpm check:tasks`), so Plan 5
+>    landed and Plans 6–10 built on it long ago. What actually happened is messier than either the
+>    trigger or its own description: **step 10 ran 2026-09-02 (`ac187e8`, PR #70) but covered only
+>    Plan 5's `applyCommitted` fake and Plan 6a's client contract** — it could not have covered Plans
+>    8 and 9, whose fakes landed later — and **Plans 8 and 9 were witnessed 2026-09-06 by Lane F
+>    (`e33c429`, PR #187)** under a different name. The live residual is **Plan 9's notifications
+>    consumer**, witnessed producer-side only; it is owned in `docs/lanes/controller-state.md`, not
+>    here, and is being closed as assigned work rather than by any "trigger".
+> 2. **The `TZ` figure is wrong by an order of magnitude** — see the correction inline below.
+
 **The wave-boundary integration checkpoint no longer fires, and it guarded the signature defect.** The
 schedule provided "at each wave boundary, one live-integration pass proves the seams against the real
 server before the next wave builds on them." Plans 6a, 8 and 9 all build against sanctioned fakes, and *a
@@ -995,10 +1011,20 @@ mocked contract is the thing that excuses the server from existing* is this seri
 after Plan 5 lands and before Plan 6, 7, 8, 9 or 10 build on it. It is the only point in the serial order
 where the same seams are exposed.
 
-**The environment is a fixture, and no test on `main` varies it.** Measured across all 48 test files on
-`main`: **zero vary `TZ`; seven are day- or clock-sensitive; all seven omit it.** The exposed set includes
+**The environment is a fixture, and no test on `main` varies it.** ~~Measured across all 48 test files on
+`main`: **zero vary `TZ`; seven are day- or clock-sensitive; all seven omit it.**~~
+**AMENDED 2026-09-07, measured at `7f80048`: 17 of 298 test files vary `TZ` by assignment** (27 mention
+it at all, so ten mention without setting it); the denominator came from `git ls-files` over
+`*.test.ts`/`*.test.tsx`, a different method from the gate's own "298 test files", and the two agree. A
+negative control (`NOT_A_REAL_VAR_XYZ`) returned 0, so the 17 is a real count and not a matching bug.
+**The RULE below stands unchanged and is the part that matters** — the aggregate went stale, the
+principle did not. The dispatch brief carried this same correction on 2026-09-06 and *this* document,
+which its own `## READ FIRST` calls "the interface authority" and sends a restarting executor to FIRST,
+did not get it — the identical structural miss PR #289 fixed for the serial sequence, one section over. The exposed set includes
 `packages/domain/test/ist-day.test.ts` — the dedicated test for the IST day-boundary module, which
-therefore cannot distinguish *the code computes IST correctly* from *the machine is already in IST*. Also
+therefore cannot distinguish *the code computes IST correctly* from *the machine is already in IST*.
+**Still true at `7f80048`: that file contains zero occurrences of `TZ`.** The aggregate above went
+stale; this example did not, and correcting the count must not quietly retire the instance it names. Also
 `clock-skew.test.ts` and `event-store.test.ts`.
 
 Found by Lane 4's T9, which mutated the shared IST renderer to the device's `toLocaleDateString` and
@@ -1044,6 +1070,27 @@ dominates: nearly every one of those 17.6 agents was opus.
 **Fable is not dispatched.** Not for refuters, not for the mocked-contract lens, not for floor-list
 reviewers — the three the earlier narrowing preserved. The deviation-ledger path is no longer a deviation;
 opus at the stated effort is the ceiling.
+
+> **STILL OPERATIVE 2026-09-07 — but read this before you conclude otherwise, because the obvious
+> reading of the record reverses it.** `docs/lanes/controller-state.md` records a LATER owner ruling,
+> verbatim: *"fable unblock is lifted. but fable should only be used for what is actually necessary. do
+> not need to use a butcher's knife to kill a chicken"*, dated **2026-09-06**, which supersedes the
+> 2026-08-31 "fable out entirely" ruling with a proportionality rule. Taken alone that revives fable
+> for three named uses and makes this section dead.
+>
+> **It does not, and the discriminating fact is the heading the quote sits under, not the quote's own
+> date.** That ruling lives inside the entry headed *"⚡ RESUMED 2026-09-06 **00:30** IST — FIVE
+> PARALLEL LANES, OWNER-DIRECTED"*, and every use it authorises is named against that topology (Lane
+> A's closure-2 reviewer, the HELD pair, a *lane's* final whole-branch reviewer). The same file carries
+> a later entry the same day — *"⛔ OWNER INSTRUCTION 2026-09-06 **18:41** IST — AFTER MONDAY'S WEEKLY
+> RESET, BACK TO SERIAL EXECUTION, TOKEN ECONOMY FIRST"* — which ends the five lanes. **18:41 > 00:30,
+> and the topology the unblock was scoped to no longer exists**, so the unblock has nothing left to
+> apply to and this section governs.
+>
+> Written down because an executor checked exactly this on 2026-09-07 and was one step from escalating
+> it as a live conflict: **a dated quote is not a dated ruling — the entry it lives inside carries its
+> scope, and in an append-at-top file the entry above is the later one.** Anyone re-opening this should
+> re-read both entries rather than the two quotes.
 
 **Sonnet is the default and opus is the exception**, which inverts the previous table's posture. A
 dispatch goes to opus only if its work class is named in an opus row above. **If you are unsure, it is

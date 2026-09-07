@@ -16,6 +16,119 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# ⏸ MONDAY 2026-09-07 ~19:5x IST — **ANCHOR REFRESH. STILL NOTHING QUEUED. `main` IS `7f80048`, NOT `af369c0`.**
+
+**This entry supersedes the anchor table below it**, which is four merges behind and whose `branch` row
+names a branch that has never existed — here or on `origin`. Both defects are the class this file spent
+today documenting, landing in the one table whose whole job is to be the thing a restart trusts.
+
+| what | value |
+|---|---|
+| `origin/main` | **`7f80048`** — #288, #289, #290, #291 all merged since the table below was written |
+| branch | `exec/88-anchor-refresh-stale-pointers` (docs only), off `7f80048` |
+| working tree | CLEAN |
+| **queue** | **EMPTY** — unchanged. Nothing below this line is queued work. |
+| standing instruction | **HOLD.** Unchanged: the controller is taking "what next" to the OWNER. |
+| **unrecorded** | **PR #276 is OPEN** and appears in NEITHER state file — see below |
+
+**Reachability, measured at `7f80048` with `git branch -r --contains` (empty = orphaned), never
+`git cat-file`:** `7f80048`, `af369c0`, `6a491df`, `72a8e68`, `ac187e8`, `e33c429`, `e09666c`, `4d5dd39`,
+`c5e3e02`, `0d93bc1` — **all reachable from `origin/main`.** `cff68be` and `72d6d5a` are **NOT**; both
+resolve only from `exec/84-step10-ran-and-a-truncated-message`. The ten positives are the positive control
+for the two empties: the same command shape printed `origin/main` ten times in the same run, so the two
+absences are real and not a broken instrument.
+
+## Three corrections to the entries below, made by reference rather than in place, per this file's convention
+
+**1. `:84` presents an unreachable sha as a merge sha.** It reads *"PR #286 merged at `cff68be`."* #286
+merged as **`0d93bc1`** (squash). `cff68be` was the *branch-side head at the moment of capture* and is not
+on `main` and never will be. The sentence is *about* the squash-drop trap and is right about the trap; it
+just names the branch sha where a reader needs the merge sha. **A squash merge means the sha you watched
+is never the sha that landed** — that is the mechanism, and writing "merged at <branch sha>" restates the
+error the paragraph exists to warn about.
+
+**2. The branch row names `exec/85b-plan9-gap-owned`. No such branch exists** — locally or on `origin`.
+The real one is **`exec/85-plan9-gap-owned`** (no `b`). Positive control: `git branch -a --list '*85*'`
+returns exactly the two real refs, and the same command shape with `'*87*'` returns `exec/87-truncation-threshold`
+and its remote, so the glob works. **This row was never verifiable in the first place**: the file's own
+header promises anchors were checked with `git branch --contains`, and `--contains` on a *branch name* is
+not that check at all — the promise and the row are different operations, so the typo could survive every
+verification the header claims. **A verification claim that names the wrong command verifies nothing, and
+reads exactly like one that does.**
+
+**3. PR #291 landed clean — checked, not assumed.** `git diff origin/main exec/87-truncation-threshold --
+docs/lanes/executor-state.md` is empty, and the same command shape against `6a491df` prints 35 lines, so
+the empty is a real empty. The truncation-threshold content is on `main`: 16 case-insensitive hits,
+positive control `restart surface` = 5. **And the case trap fired again inside that very check** — a
+case-sensitive `grep -n 'truncation threshold'` on the merged file returned **nothing**, which is what a
+dropped commit looks like. `grep -in 'truncat'` returns 16. That is the second time in two days a grep
+flag has manufactured a false drop; the content was never at risk, the instrument was.
+
+## THE STALE-POINTER SWEEP — 10 survivors of 13, and I broke four of my own fixes inside the commit that made them
+
+A 6-agent sweep (4 readers × distinct staleness angles, then 2 adversarial refuters, sonnet throughout)
+over the TRACKED lane and plan docs. 13 findings, **3 refuted, 10 survived**; each reader printed a
+positive control. Refutation earned its place: two "stale" hits were deliberate historical narrative
+under this file's own correct-by-reference convention, and one cited an F5 item that a later line in the
+same file had already marked folded.
+
+**The one that mattered — `TZ`, and it is the same structural miss PR #289 fixed one section over.** The
+coordination doc still claimed, present tense and unflagged, *"no test on `main` varies it… all 48 test
+files… zero vary `TZ`"*. Measured at `7f80048`: **17 of 298 test files vary `TZ` by assignment** (27
+mention it; 298 from `git ls-files`, a different method from the gate's own 298, and they agree; negative
+control returned 0). The dispatch brief carried this exact correction on **2026-09-06**; the coordination
+doc — which the brief's `## READ FIRST` calls *"the interface authority"* and sends a restarting executor
+to **first** — never got it. **Correcting the brief and not the authority it points at is the defect PR
+#289 already fixed for the serial sequence.** It recurred one section over, in the same document, because
+the fix was applied to an instance rather than to the class. The RULE was always fine; only the count died.
+
+**And the named example inside the false aggregate was still TRUE** — `packages/domain/test/ist-day.test.ts`
+still contains zero `TZ`. Correcting a stale total must not quietly retire the live instance it cites.
+
+### The finding I generated myself, which is the most useful one here
+
+I corrected four drifted line citations — and **my own edits, higher in the same file, invalidated all
+four before the commit was even written.** `1036→1062`, `6791→6838`, `2843→2890`, `2608→2655`. The
+offset was **uniform**, which is exactly what proves it: a uniform shift means content was inserted
+above, not that anything at the target changed.
+
+**So a line number into an append-at-top document cannot be "fixed" — it can only be re-broken more
+recently,** and a freshly-corrected number is the most convincing wrong answer available, because it
+carries the authority of having just been checked. All four now lead with the quoted text and label the
+number a dated snapshot. Every one of these citations already quoted its target verbatim, which is the
+only reason any of them was recoverable at all. **Quote the target; treat the number as a hint.**
+
+### Two instrument failures during the sweep, both silent
+
+1. **`rtk` rewrote `grep -n` output into match COUNTS** — `-> "2 matches in 1 files"` where line numbers
+   belonged. Well-formed, plausible, and useless for a line-number audit; it would have had me "verify"
+   citations against a number that was never printed. Re-run through `python3`, proxy-free, the real
+   numbers appeared. **A proxied search is one of this repo's recorded silent-wrong-answer modes and it
+   fired on the one task that is entirely about line numbers.**
+2. **The fable near-escalation.** `controller-state.md` records a **2026-09-06** owner ruling lifting the
+   fable block — later than the brief's 2026-08-31 "fable is out", and I was one step from reporting a
+   live conflict in my own operating instructions. It is not one: that ruling sits under *"⚡ RESUMED
+   2026-09-06 **00:30** — FIVE PARALLEL LANES"*, and a later entry the same day — *"⛔ OWNER INSTRUCTION
+   2026-09-06 **18:41** — BACK TO SERIAL EXECUTION, TOKEN ECONOMY FIRST"* — ends that topology. **A dated
+   quote is not a dated ruling: the entry it lives inside carries its scope, and in an append-at-top file
+   the entry ABOVE is the later one.** The discriminating fact was the heading, not the line. Recorded in
+   the coordination doc beside the fable table so the next reader meets it there.
+
+## ⚠ FOR THE CONTROLLER — PR #276 is open, unrecorded, and may be the answer you are waiting for
+
+**[#276 "Design spec: gisik-nokma MCP server"](https://github.com/bkirosangma/gisik-nokma/pull/276),
+opened 2026-09-07 08:50Z, still OPEN, docs-only** (one added file,
+`docs/superpowers/specs/2026-09-07-mcp-server-design.md`, +148). It is the *only* open PR in the repo.
+It was opened from a **different session** (`session_01UeY1nbhVET7pi9zg76oyyv`) while the controller was
+taking "what next" to the owner, and its own body says *"Implementation follows via `writing-plans` once
+this is approved."*
+
+**Flagged, deliberately not acted on.** New scope — a `packages/mcp-server` with a device-authorization
+flow and a new token-auth path alongside the session-cookie check — is an owner decision, and the standing
+instruction is HOLD. But it is plausibly the "what next" the controller is waiting for, and **neither
+state file mentions it**, so the hold and the answer were sitting in the same repo not knowing about each
+other. Recorded with an owner — the controller — rather than picked up.
+
 # ⏸ MONDAY 2026-09-07 ~19:xx IST — **NOTHING IS QUEUED. THE EXECUTOR IS IDLE BY INSTRUCTION, NOT BLOCKED.**
 
 **Read this before acting on anything below it.** Every section further down describes work that is
@@ -28,6 +141,11 @@ MERGED. A resuming executor should not start from them.
 | working tree | CLEAN |
 | **queue** | **EMPTY.** Controller confirmed 2026-09-07: both 12.322/12.258 remedies (createRegion decouple, real filtering) merged earlier, and 13.176 was the last named item in "what's actually left". |
 | standing instruction | **HOLD. Do not invent new scope.** The controller is taking "what next" to the OWNER; the queue is empty because the work is done, not because anything is wrong. |
+
+> **SUPERSEDED as an anchor table by the ~19:5x entry above.** `origin/main` is **`7f80048`**, four merges
+> on. The `branch` row's `exec/85b-plan9-gap-owned` is a name that **has never existed** — the real branch
+> is `exec/85-plan9-gap-owned`. The `queue` and `standing instruction` rows still hold unchanged; only the
+> two anchor rows drifted, which is the pattern: *the narrative outlives the anchors it was measured at.*
 
 ## AMENDED 17:3x IST — **STEP 10 AS THE BRIEF WORDS IT NEVER RAN IN FULL. A NARROWER PASS RAN UNDER THAT NAME; THE OTHER TWO-THIRDS WERE COVERED FOUR DAYS LATER UNDER A DIFFERENT ONE.**
 
@@ -5790,9 +5908,12 @@ plainly in T14's commit which of the two it is.
   an array and runs no schema check, so it is the seam through which the `toStateId` payload drift
   and the non-ULID seed `actorId`s pass silently (coordination doc §"The validating fake", 2802–2825).
   It is the sibling of the seam Plan 8 T4 hardened (`createFakeGateway`), and T4 does not touch it.
-  **The doc's own assignment — "Owner: Lane 4" at line 2825 — names an owner that no longer exists.**
-  (The review that raised this cited 2826; that line is blank. Measured: 2825, and it is the only
-  `Owner: Lane 4` in the file — the other `Owner: Lane` is Lane 2 / Plan 4 at 2590.)
+  **The doc's own assignment — "Owner: Lane 4" — names an owner that no longer exists.**
+  (The review that raised this cited 2826; that line is blank. Measured 2825 when written; **at
+  2026-09-07 it is 2890, and the other `Owner: Lane` — Lane 2 / Plan 4 — moved 2590 → 2655.** Both
+  drifted by the SAME offset at every measurement, which is itself the evidence: a uniform shift means
+  content was inserted above them, not that either row changed. **Search `Owner: Lane 4`; the number is
+  a snapshot and this one has now been re-measured twice in one day.**)
   Lane 4's own file opens *"execution state at fold-back to serial … written 2026-08-31 when Wave 1
   folded back into serial execution"*, and the last mention of the lane anywhere in the coordination
   doc is line 4001 of 6169 — a back-reference to a dependency version it shipped, inside a 2026-08-31
@@ -6547,8 +6668,9 @@ thing to die under 22.4 GB of orphaned workers. It was a symptom of the crash, n
   `calendar/calendar-view.tsx`; `packages/domain/src/ticket-types.test.ts` → `domain/test/`.
 - `test-cases/README.md` — its §11 passage asserted the bucket did not exist. Task 15 falsifies it.
 - `docs/superpowers/plans/2026-08-20-00-series-coordination.md` — **same problem, one level up.** At
-  its line ~6572 the doc uses "`Features.md` carries no §11 heading" as its EVIDENCE that Task 15 has
-  not run. Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
+  its line **6838** as of 2026-09-07 (written as "~6572", +266 of cumulative drift — the largest measured
+  in this sweep, and it moved again *within this very commit*) the doc uses "`Features.md` carries no §11
+  heading" as its EVIDENCE that Task 15 has not run. **Search that quoted sentence, not the number.** Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
   only its reading changed.
 
 **A claim I wrote and then had to retract, recorded because the retraction is the lesson.** I first

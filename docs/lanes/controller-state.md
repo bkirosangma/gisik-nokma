@@ -99,7 +99,7 @@ dependency graph. The wire contract is proven end to end; the client gateway has
 **Owner: whoever next touches Plan 9's client-side notification consumer** — prove it against the real
 producer before trusting the fake, the same principle step 10 and Lane F both exist to enforce elsewhere.
 
-**Corrects an old line rather than editing it in place, per this file's own convention:** at line ~4552,
+**Corrects an old line rather than editing it in place, per this file's own convention:** at line **4603** (written as "~4552"; this file grows at the top, so the target drifted +51 below the citation),
 *"The integration checkpoint no longer fires — replacement trigger is the Phase 2/3 boundary"* — the
 Phase 2/3 boundary being exactly the brief's item 10, now retired above — is superseded by everything in
 this entry. Not wrong when written; just never revisited once item 10's real story turned out different
@@ -4286,7 +4286,7 @@ at **9.35**.
 ### The sonnet reviewer default is CONDITIONAL, and the condition is checkable
 
 The cost ruling's table reads *"Per-task reviewers **where the plan text is complete** | sonnet | medium"*
-(line 1016; the older `| opus | high` row at 613 is superseded — do not cite it). **That precondition is
+(**search the quoted row, do not trust a line number**: it was cited as 1016, was 1036 an hour ago and is **1062** as of 2026-09-07 — it moved twice in one day. The older `| opus | high` row, cited as 613, is at **616** and is superseded — do not cite it. Both rows are quoted verbatim above, and that quote is the only part of this pointer that does not decay.). **That precondition is
 measurable, so measure it** rather than defaulting: grep the task's own line range for the
 security-relevant terms it is supposed to cover, with a control term from the same range.
 
