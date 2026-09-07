@@ -43,17 +43,73 @@ describe('the 404, which says WHICH KIND of not-found it cannot rule out', () =>
 });
 
 describe('the legal pages', () => {
-  it('13.251 carry bracketed placeholders rather than invented party details', () => {
-    const { container: privacy } = render(<PrivacyPolicy />);
-    const privacyText = privacy.textContent ?? '';
-    for (const placeholder of ['[ENTITY NAME]', '[JURISDICTION]', '[CONTACT EMAIL]']) {
-      expect(privacyText).toContain(placeholder);
-    }
+  /**
+   * 13.251 — every slot that must be a placeholder still IS one, asserted by
+   * COUNT and not by presence.
+   *
+   * The first version of this case used `toContain` per placeholder, and a
+   * mutation walked straight through it: replacing `[JURISDICTION]` with an
+   * invented "Karnataka, India" in the Disputes clause left three other
+   * `[JURISDICTION]`s standing, so `toContain` was still satisfied and the suite
+   * stayed green. **`toContain` asks whether a placeholder survives ANYWHERE;
+   * the property that matters is that NONE of them was filled in.** On a legal
+   * page those are very different questions — a real-looking jurisdiction in the
+   * clause that decides which court hears a dispute is exactly the sentence
+   * somebody would rely on.
+   *
+   * Counts are the cheap way to ask the real question. They are deliberately
+   * brittle: filling a placeholder in reddens this test, and that is correct,
+   * because the moment these stop being placeholders is the moment a lawyer must
+   * already have reviewed the page. Updating the number is how that gets
+   * recorded rather than slipped in.
+   */
+  it('13.251 carry bracketed placeholders in EVERY slot, counted, not merely present somewhere', () => {
+    const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
-    const { container: terms } = render(<Terms />);
-    const termsText = terms.textContent ?? '';
-    for (const placeholder of ['[ENTITY NAME]', '[JURISDICTION]']) {
-      expect(termsText).toContain(placeholder);
+    // Every placeholder in each page, with the count MEASURED from the rendered
+    // output rather than guessed. (The first draft of these numbers was guessed
+    // and one was wrong, which this suite caught immediately — an expectation is
+    // not a reading.)
+    const expected: Array<[string, Record<string, number>]> = [
+      [
+        'privacy',
+        {
+          '[ENTITY NAME]': 3,
+          '[JURISDICTION]': 1,
+          '[CONTACT EMAIL]': 2,
+          '[REGISTERED ADDRESS]': 1,
+          '[DATE]': 1,
+          '[RESPONSE PERIOD]': 1,
+          '[SUPERVISORY AUTHORITY]': 1,
+        },
+      ],
+      [
+        'terms',
+        {
+          '[ENTITY NAME]': 3,
+          '[JURISDICTION]': 2,
+          '[CONTACT EMAIL]': 1,
+          '[DATE]': 1,
+          '[MINIMUM AGE]': 1,
+          '[LIABILITY CAP]': 1,
+          '[COURTS/VENUE]': 1,
+        },
+      ],
+    ];
+
+    const rendered: Record<string, string> = {
+      privacy: render(<PrivacyPolicy />).container.textContent ?? '',
+      terms: render(<Terms />).container.textContent ?? '',
+    };
+
+    for (const [page, placeholders] of expected) {
+      const text = rendered[page] ?? '';
+      for (const [placeholder, n] of Object.entries(placeholders)) {
+        expect(count(text, placeholder), `${page}: ${placeholder}`).toBe(n);
+      }
+      // A control on the method: a bracket-shaped string that is NOT one of ours
+      // must count zero, or these numbers are measuring the wrong thing.
+      expect(count(text, '[NOT A REAL PLACEHOLDER]'), `${page}: control`).toBe(0);
     }
   });
 
