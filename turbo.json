@@ -71,6 +71,7 @@
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/turbo.json",
         "$TURBO_ROOT$/packages/ui/src/**",
         "$TURBO_ROOT$/packages/app-core/src/**",
         "$TURBO_ROOT$/packages/editor/src/**",
@@ -78,6 +79,45 @@
         "$TURBO_ROOT$/apps/web/app/**",
         "$TURBO_ROOT$/apps/desktop/src/**",
         "$TURBO_ROOT$/apps/mobile/src/**"
+      ]
+    },
+    // `reporting-scope-guard.test.ts` walks SEVEN trees (its own `SCANNED_ROOTS`),
+    // and three CSS-binding suites read `packages/ui/src/ui.css` — the stylesheet
+    // whose class names they assert against rendered markup. A rule deleted from
+    // `ui.css` would leave every one of them replaying a green log.
+    "@gisik-nokma/app-core#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/app-core/src/**",
+        "$TURBO_ROOT$/packages/domain/src/**",
+        "$TURBO_ROOT$/packages/rule-engine/src/**",
+        "$TURBO_ROOT$/packages/ui/src/**",
+        "$TURBO_ROOT$/apps/server/src/**",
+        "$TURBO_ROOT$/apps/web/src/**",
+        "$TURBO_ROOT$/apps/web/app/**"
+      ]
+    },
+    // `next-config.test.ts` reads `apps/server/src` to check the shell's config
+    // against the server it talks to.
+    "@gisik-nokma/web#test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/server/src/**"]
+    },
+    // The tooling, ci and docs suites assert things that live at the REPO ROOT and
+    // nowhere near this package: the gate scripts and their fixtures, the runbook,
+    // the compose file, and CI's own workflow. Case 13.208 parses `ci.yml` and
+    // asserts its job graph — cached against `apps/server/**` alone, a CI edit that
+    // broke the graph would report green.
+    "@gisik-nokma/server#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/**",
+        "$TURBO_ROOT$/docs/**",
+        "$TURBO_ROOT$/.github/workflows/**",
+        "$TURBO_ROOT$/docker-compose.dev.yml",
+        "$TURBO_ROOT$/test-cases/**"
       ]
     },
     "typecheck": {
