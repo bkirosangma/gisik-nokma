@@ -197,6 +197,9 @@ describe('ingestBatch', () => {
     });
   });
 
+  /**
+   * 4.41 — an entity already bound to one workspace cannot be re-filed under another: ingest refuses `entity-workspace-mismatch` BEFORE the engine evaluates anything.
+   */
   it('planted defect: an entity already bound to one workspace cannot be re-filed under another', async () => {
     // The other half of coordination doc §11. `workspaceId` is a per-event
     // claim that nothing validated: a second event on this entity naming a

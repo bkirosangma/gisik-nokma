@@ -41,6 +41,9 @@ async function listedIds(userId: string, workspaceId: string): Promise<string[]>
 }
 
 describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
+  /**
+   * 6.40 — an owner on NO project and NO explicit list still receives every ticket, from the bypass alone — and the SQL and `canSee` agree ticket by ticket rather than only in aggregate.
+   */
   it('every viewer class gets exactly its slice, and canSee agrees ticket by ticket', async () => {
     const ws = newUlid();
     const prj1 = newUlid();

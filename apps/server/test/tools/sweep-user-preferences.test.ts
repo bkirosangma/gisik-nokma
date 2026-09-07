@@ -157,6 +157,9 @@ describe('sweepUserPreferences — retention after revocation', () => {
    * instants is what makes the window itself the thing under test rather than
    * whichever side of it a second fixture happened to land on.
    */
+  /**
+   * 6.143 — a revoked member’s `user_preferences` row is RETAINED for a documented window and then collected — retention and deletion asserted as one behaviour rather than only the deletion.
+   */
   it('retains inside the window and deletes once the window is reached', async () => {
     const ws = newUlid();
     const user = newUlid();

@@ -32,6 +32,9 @@ import { describe, expect, it } from 'vitest';
  * five-line assertion look thorough.
  */
 describe('the gate names the Node it ran under', () => {
+  /**
+   * 6.128 — the gate names the Node it ran under FROM INSIDE the run, because the instrument everyone otherwise relies on is inert in this repo: a version read from outside the worker is not evidence about the worker.
+   */
   it('the worker Node satisfies the root package.json engines range', () => {
     const manifest = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../../package.json', import.meta.url)), 'utf8'),

@@ -3,6 +3,9 @@ import { newUlid } from '../src/ids.js';
 import { SIMPLE_KANBAN_TEMPLATE, simpleKanbanWorkflowDef } from '../src/simple-kanban.js';
 import { validateWorkflowDef } from '../src/validate-workflow.js';
 
+/**
+ * 6.47 — cited on the block: the canonical simple-Kanban definition clones into a def that validates clean at version 1, and is DEEP-cloned, so editing a clone never reaches the template.
+ */
 describe('the canonical simple-Kanban definition', () => {
   it('clones into a def that validates clean at version 1', () => {
     const id = newUlid();

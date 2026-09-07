@@ -79,6 +79,9 @@ async function signedIn() {
  * 3.16 — cited on the block: `POST /v1/events` answers 200 with index-aligned per-event results, and every malformed shape the row lists is a 400 rather than a half-heard batch — missing, empty and oversized arrays, `events` as an object, string, number or null, and an unknown top-level key.
  */
 describe('POST /v1/events', () => {
+  /**
+   * 6.48 — `POST /v1/events` answers `401 {error:'unauthenticated'}` with no session and NEVER reaches ingest — the refusal is at the door, not inside it.
+   */
   it('answers 401 unauthenticated with no session, and never reaches ingest', async () => {
     // The door's identity guard, pinned on its own. Everything below this test
     // authenticates, so without this case the whole file would prove only that
