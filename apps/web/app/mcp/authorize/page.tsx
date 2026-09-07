@@ -41,6 +41,29 @@ import { useSessionStatus } from '../../../src/providers.js';
  * own assistant is a normal thing to do. Dressing it as an alarm trains people
  * to click through alarms, which is the opposite of informed consent.
  */
+/**
+ * Who the consent sentence names, and why it is not just `session.user.name`.
+ *
+ * FOUND BY DRIVING THE REAL FLOW, not by any test: the approval confirmation
+ * rendered "It now acts as , with exactly your permissions" — naming nobody, in
+ * the one sentence whose entire job is naming somebody.
+ *
+ * `useSessionStatus` builds the name as `user.name ?? user.id`, and `??` only
+ * catches null and undefined. A magic-link account has name `''` — an EMPTY
+ * STRING, confirmed in the database — so the fallback never fires and the empty
+ * string wins. That is a latent defect in the shared hook, recorded for its
+ * owner rather than changed here, because every other surface reading a name
+ * would move with it.
+ *
+ * "you" rather than the user id: an id is not an answer to "who is this
+ * assistant going to act as", and a consent screen that answers with
+ * `01M1V02CWM3G3SADCCRC40JQ42` has technically named the person and actually
+ * told them nothing.
+ */
+function actingAs(name: string): string {
+  return name.trim() === '' ? 'you' : name;
+}
+
 function AuthorizeScreen(): React.JSX.Element {
   const params = useSearchParams();
   // The discriminated union, not `useCurrentUser()`: that hook answers `null`
@@ -106,7 +129,7 @@ function AuthorizeScreen(): React.JSX.Element {
           <div data-testid="mcp-authorize-approved" role="status">
             <p className="gn-mcp-authorize__granted">Approved. The assistant is connected.</p>
             <p className="gn-mcp-authorize__what">
-              It now acts <strong>as {session.user.name}</strong>, with exactly your permissions — it can see
+              It now acts <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions — it can see
               and change whatever you can, and every claim it records will carry your name.
             </p>
             <p className="gn-mcp-authorize__revoke">
@@ -123,7 +146,7 @@ function AuthorizeScreen(): React.JSX.Element {
             {/* The consent, stated BEFORE the button rather than beside it. */}
             <p className="gn-mcp-authorize__consent">
               <span className="gn-mcp-authorize__consent-label">What you are approving</span>
-              An assistant that acts <strong>as {session.user.name}</strong>, with exactly your permissions.
+              An assistant that acts <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions.
               It can see and change whatever you can, and every claim it records will carry your
               name. It lasts until you revoke it.
             </p>
