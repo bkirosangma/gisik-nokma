@@ -132,15 +132,15 @@ function FoundingForm() {
   return (
     <form className="gn-founding" onSubmit={submit}>
       <h2 className="gn-founding__heading">New workspace</h2>
-      <label className="gn-founding__label" htmlFor="gn-founding-name">
-        Name
+      <label className="gn-field" htmlFor="gn-founding-name">
+        <span className="gn-field__label">Name</span>
+        <input
+          id="gn-founding-name"
+          className="gn-field__input"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </label>
-      <input
-        id="gn-founding-name"
-        className="gn-founding__name"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-      />
       <Button variant="primary" type="submit" disabled={sending}>
         Create workspace
       </Button>

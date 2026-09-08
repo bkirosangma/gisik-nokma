@@ -59,7 +59,30 @@ button { font: inherit; }
 }
 .gn-page-title { margin: 1.2rem 0 0.4rem; }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
+/* HIG surface, Task 4a. `.gn-card` already renders borderless at 8px radius
+   (`packages/ui/src/components/card.tsx`); the plan wants 12px on these two
+   routes specifically, so it is scoped here rather than touched globally. */
+.gn-workspace-list .gn-card { border-radius: 12px; }
 .gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+/* The founding form has no `.gn-card` ancestor of its own — it sits beside the
+   list, not inside a card — so it carries its own surface, per R1(c): fill and
+   spacing separate it, never a border. */
+.gn-founding {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+  padding: 1rem;
+  background: var(--gn-surface-raised);
+  border-radius: 12px;
+}
+.gn-founding__heading { margin: 0; }
+
+/* `.gn-invite` already carries `.gn-card`'s borderless surface-raised fill
+   (`Card className="gn-invite"`); only the radius is scoped here. */
+.gn-invite { border-radius: 12px; }
+.gn-invite__dead { color: var(--gn-text-muted); }
 
 /* 2.75rem = 44px, the floor this product already uses for standalone controls
    (the 404's recovery links, the MCP code input). Measured at 390px before
