@@ -2,12 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { passkey, seen } = vi.hoisted(() => ({
+const { passkey, seen, probe: probeFn } = vi.hoisted(() => ({
   // Records the DOM state AT THE MOMENT better-auth's client would run
   // @simplewebauthn's `document.querySelectorAll("input[autocomplete$='webauthn']")`.
   seen: [] as number[],
+  probe: () => document.querySelectorAll("input[autocomplete$='webauthn']").length,
   passkey: vi.fn(async (_o: { autoFill: boolean }) => {
-    seen.push(document.querySelectorAll("input[autocomplete$='webauthn']").length);
+    seen.push(probeFn());
     return { data: {}, error: null };
   }),
 }));
@@ -49,9 +50,8 @@ describe('REFUTATION ATTEMPT', () => {
     await waitFor(() => expect(passkey).toHaveBeenCalled());
     const before = passkey.mock.calls.length;
     await user.click(screen.getByRole('tab', { name: /email/i }));
-    await waitFor(() => expect(document.querySelectorAll("input[autocomplete$='webauthn']").length).toBe(1));
-    console.log('CALLS-BEFORE-TAB:', before, 'CALLS-AFTER-TAB:', passkey.mock.calls.length,
-      'ELIGIBLE-AFTER-TAB:', document.querySelectorAll("input[autocomplete$='webauthn']").length);
+    // POSITIVE CONTROL, through the SAME function the mock uses:
+    await waitFor(() => expect(probeFn()).toBe(1));
     expect(passkey.mock.calls.length).toBeGreaterThan(before);
   });
 });

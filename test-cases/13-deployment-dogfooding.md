@@ -1972,8 +1972,22 @@ what works, then style what remains**.*
   With the server answering all-true, both buttons resolve by their exact shipped accessible names,
   have empty text content (icon-only), and each reaches the provider it names — a mark wired to the
   wrong provider would satisfy every other assertion. Passkey is asserted as
-  `signIn.passkey({ autoFill: true })`, **the argument and not merely the call**, because a bare
-  `passkey()` would satisfy "was called" while being the dead modal-triggering thing it replaces.
+  `signIn.passkey({ autoFill: true })` **called at a moment when the field it attaches to is IN THE
+  DOM** — a clause that exists because the feature shipped inert for one commit without it.
+  *Conditional mediation attaches to an eligible input present at the instant of the call. The effect
+  ran on mount with `[]` deps and the default tab is **Phone**, so the email input — the only field
+  carrying `autocomplete="username webauthn"` — was not rendered; the request had nothing to attach to,
+  and switching tabs did not re-issue it. **A mock can see that a call happened and with what argument;
+  it cannot see that the call was pointless**, so every test passed and the replacement for the dead
+  button was itself dead.* The case now asserts `passkey` is NOT called while Phone is showing, that no
+  `input[autocomplete~="webauthn"]` exists then, that it IS called after switching to Email with that
+  field present in the same DOM, and that a tab round-trip issues no second request (a concurrent
+  `credentials.get()` throws `InvalidStateError`, and better-auth's client exposes no `signal` to
+  cancel the first). Mutation-witnessed: restoring the fire-on-mount form reddens this case alone.
+  **Named absence:** a user who never opens the Email tab is never offered a passkey — the cost of
+  attaching to the email field, nil today because no user can hold a passkey until Task 12 ships
+  registration, and written at the site for whoever builds it. It replaces a bare `passkey()`, which
+  would have satisfied "was called" while being the dead modal-triggering control it exists to remove.
   Mutation-witnessed: the provider check dropped reddens the discrimination case and the all-disabled
   case; the `google:true, apple:false` ordering correctly stays green because that mutation leaves
   Apple's branch intact, which is why two orderings run. — (`apps/web/test/sign-in.test.tsx`)
