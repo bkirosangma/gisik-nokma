@@ -20,9 +20,30 @@ D 13.41–13.100** (Tasks 7, 8) · **Lane E 13.101–13.200** (the rest of Plan 
 NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201–13.240**, allocated
 2026-09-06 once `13.1–13.40` was confirmed exhausted — minted at **13.201–13.209** so far (13.201–13.203
 the scheduler-generalisation errand, 13.204–13.209 Lane F Pass 1's citation check; **13.210–13.240 remain
-free in this block**). **The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
-its assigned block and does not derive the next free id from this file — recount the MAXIMUM in use
-against `origin/main` at every rebase as the control, but never mint from it.
+free in this block**). ~~**The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.**~~ **STALE — CORRECTED
+2026-09-08. `13.241`–`13.265` are CONSUMED** (`13.241` has 4 hits, `13.265` has 2). A lane obeying that
+line would have been handed an occupied block. **Block `13.266`–`13.275` is allocated to the serial
+executor (controller, 2026-09-08); the next free BLOCK is `13.276`, controller-allocated ON REQUEST
+ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
+
+> **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
+> `11-calendar-notifications.md`'s pointer corrected on 2026-09-08, one file over. It is written once
+> and read by every later lane, and nothing re-derives it, so it is wrong from the first allocation
+> after it and stays wrong. **Recount before trusting it. Both readings below are ways that recount
+> goes wrong, and both were made for real on 2026-09-08:**
+>
+> * **Do not extract ids with a bare `13\.[0-9]+`** — it matches **`13.3333px`**, the user-agent font
+>   size that cases 13.266–13.267 are about, and reports a maximum of `13.3333`. The id pattern
+>   collides with a pixel value living in the same file.
+> * **Do not sort ids as FLOATS.** `13.99 > 13.265` numerically, so a float sort reports a maximum of
+>   `13.99` and a block allocated from it would hand out ids **already in use**. A case id is a
+>   `(section, ordinal)` INTEGER PAIR, not a decimal number. Compare on the ordinal.
+>
+> One root error under both: *treating a case id as a number.* The first reads a quantity as an id, the
+> second reads an id as a quantity. They were caught only because two parties recounted independently
+> and **disagreed** — `13.99` against `13.265` — and the disagreement was checked rather than resolved
+> in favour of whoever read first.
 
 **Numbering is BLOCK-allocated across parallel lanes, controller-assigned 2026-09-06, because more than
 one lane opened this section before Plan 11 Task 16's own catalogue pass (normally the sole opener, held
@@ -1349,6 +1370,65 @@ maximum of `13.3333` — the id pattern collides with the pixel value this very 
   and for a comparable reason: the instrument is unavailable, not absent. Flip to ✅ on a green run
   after the rebuild window; do not flip it on the strength of the signed-out result.*
 
+
+## The magic link lands on the app, not the API (owner-dispatched P1, 2026-09-08)
+
+*The owner signed in by hand on 2026-09-08 and the link dead-ended on a JSON 404.
+`apps/web/app/sign-in/page.tsx` handed better-auth a RELATIVE `callbackURL`, which the browser resolves
+at the moment the token is verified — and at that moment it is on the API origin, because that is where
+the emailed link points. Measured on the dev stack: `:3001/workspaces` → **200**, `:3000/workspaces` →
+**404**. Not a dev-stack artefact: `deploy/do/app.yaml` puts production on two sibling subdomains
+(`pm.artsourced.in`, `pm-api.artsourced.in`), the same split, so every magic-link sign-in in production
+ended on raw JSON at the API host — the first thing a new user would ever have seen.*
+
+*The dispatch named the magic link. **`signIn.social` had the identical shape** and is fixed in the same
+change; two call sites, one bug.*
+
+- **13.268** ✅ **An ABSOLUTE `callbackURL` on `WEB_ORIGIN` is accepted (200).** The value the shipped
+  page now sends. Requirement 1 said verify rather than assume: the behaviour was first read out of
+  better-auth's `origin-check.mjs` (`isTrustedOrigin(url, { allowRelativePaths: true })`) and then
+  measured, because reading is not measuring. — (`apps/server/test/auth/trusted-origins.test.ts`)
+  *Mutation: drop `trustedOrigins` from `createAuth` → the absolute callback is refused and the
+  client-side fix would trade a 404 for a 403 rather than working.*
+- **13.269** ✅ **An absolute `callbackURL` on an UNTRUSTED origin is refused `403
+  INVALID_CALLBACK_URL`.** — (`apps/server/test/auth/trusted-origins.test.ts`)
+  *The refusal side of 13.268, and not optional: **"the absolute URL is accepted" is equally true of a
+  server that validates nothing at all.** A bound asserted on one side of its line is the failure this
+  very file already records for `sign-in-flows.test.ts`.*
+- **13.270** 🟡 **Following the magic link LANDS THE BROWSER ON THE WEB APP** — origin asserted, not
+  merely "the path no longer says /sign-in". — (`apps/web/e2e-stack/helpers/sign-in.ts`)
+  *🟡 because it has not been RUN: it needs the compose stack rebuilt to carry the fixed page, and the
+  rebuild window opened only as this was written. **Flip to ✅ on a green stack run, not before.***
+  *THE ASSERTION IT REPLACES IS A CHECK THAT COULD NOT FAIL, and it is why this defect reached the
+  owner's hands: `waitForURL((url) => !url.pathname.includes('/sign-in'))` **is satisfied by a JSON
+  404.** It asserted the user LEFT the sign-in page and never that they ARRIVED anywhere.*
+  *WHY NOTHING DOWNSTREAM NOTICED, which is the part worth carrying: on localhost the web and API
+  ports **share cookies**, so the session was genuinely set and every later test navigated explicitly
+  and passed. **The property that made the suite green is the same property that concealed the
+  defect** — which is exactly why the new assertion is on ORIGIN and not on "some page loaded".*
+  *⚠ A LOCALHOST GREEN DOES NOT PROVE THIS, stated in those words per the dispatch's requirement 3.
+  The dev stack is two PORTS on one host; production is two SUBDOMAINS. The test proves the browser
+  ends on `WEB` rather than `SERVER`, which is the defect's actual signature and does discriminate.
+  It does NOT exercise cross-subdomain cookie behaviour, and nothing in this repo can today.*
+- **13.271** ✅ **The page sends an ABSOLUTE `callbackURL`, for BOTH the magic link and Google.**
+  Pinned as the literal resolved URL rather than rebuilt from `window.location.origin`, which would
+  restate the implementation and pass for a relative value too. — (`apps/web/test/sign-in.test.tsx`)
+  *Mutation RUN: revert both call sites to `callbackURL: next` → **EXIT 1, 6 failed**, the magic-link
+  and Google cases naming the relative value. Restored from a commit made before the mutation.*
+- **13.272** ✅ **`?next=` is constrained to a same-site PATH, so it cannot steer the authenticated
+  callback off-site.** Four hostile shapes: protocol-relative `//evil.example`, absolute
+  `https://evil.example`, backslash-authority `/\evil.example`, and schemeless junk. —
+  (`apps/web/test/sign-in.test.tsx`)
+  *This guard is load-bearing BECAUSE of 13.271. A bare `next` was already reaching `router.push`,
+  where `//evil.example` navigates off-site; making the callback absolute would additionally have fed
+  `new URL()` an attacker's absolute URL, turning a client-side redirect into an authenticated one.
+  better-auth refuses to send a token there (13.269 proves it) — but a hole this file opens should not
+  be closed by a library's check.*
+  *⚠ AN ASSERTION THAT COULD NOT FAIL WAS FOUND INSIDE THIS CASE BY MUTATION, AND FIXED. The first
+  version asserted only the callback's ORIGIN. Removing the guard killed three of the four rows —
+  `not-a-path` stayed green, because `new URL('not-a-path', origin)` resolves SAME-ORIGIN. One row that
+  could not fail, hiding inside a set that could, and invisible while the suite was green. The
+  assertion now pins the whole resolved URL, and the re-run of the same mutation kills **4 of 4**.*
 
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)
 

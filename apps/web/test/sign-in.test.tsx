@@ -126,11 +126,19 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     await user.click(screen.getByRole('button', { name: 'Send magic link' }));
 
     const sent = magicLink.mock.calls.at(-1)?.[0] as { callbackURL: string };
+    /* The whole URL, not just its origin — and that distinction was found by
+       MUTATION rather than by inspection. Removing the guard and asserting only
+       the ORIGIN left `not-a-path` green, because `new URL('not-a-path', origin)`
+       resolves same-origin: three of the four shapes killed the mutant and the
+       fourth could not, an assertion that cannot fail hiding inside a set that
+       can. Pinning the resolved URL makes every row falsifiable — without the
+       guard this one becomes `…/not-a-path`. */
     expect(
-      new URL(sent.callbackURL).origin,
+      sent.callbackURL,
       `?next=${hostile} steered the authenticated callback to ${sent.callbackURL}. ` +
-        'better-auth would refuse to send a token there, but the guarantee belongs here.',
-    ).toBe('http://localhost:3000');
+        'better-auth would refuse to send a token off-origin, but the guarantee belongs here — ' +
+        'and an on-origin path is not refused by anything at all.',
+    ).toBe('http://localhost:3000/workspaces');
   });
 
   it('magic-link flow sends the email', async () => {
