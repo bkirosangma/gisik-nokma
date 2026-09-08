@@ -151,9 +151,12 @@ services:
       # simply by the passage of time.
       - key: APPLE_CLIENT_SECRET
         type: SECRET
-      # The native app's bundle id, used as the id-token audience for the
-      # native flow only. Not a secret; harmless if unset, which is what it is
-      # until the mobile app ships Sign in with Apple.
+      # The native app's bundle id. Not a secret, and NOT harmless when set on
+      # its own: better-auth has ONE id-token audience per provider, so a bundle
+      # id alone REPLACES the Services ID and breaks every web sign-in.
+      # `social-providers.ts` passes an explicit audience list containing both
+      # whenever this is set. Leave it unset until the mobile app ships Sign in
+      # with Apple.
       - key: APPLE_APP_BUNDLE_IDENTIFIER
         type: SECRET
       # Confirmed by the owner 2026-08-20, corrected 2026-09-02: the apex

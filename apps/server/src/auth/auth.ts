@@ -311,10 +311,13 @@ export function createAuth(deps: AuthDeps) {
      * rendered `Continue with Google` on a dev stack where it could not work.
      * The owner found that by clicking it.
      *
-     * `deps.socialProviders` is the object `app.ts` also reads back to answer
-     * `GET /v1/auth/methods`, so the page cannot offer a method the server will
-     * refuse. See `social-providers.ts` for why it is passed in rather than
-     * computed here.
+     * Whatever lands here — passed in, or the environment default — is what
+     * `GET /v1/auth/methods` reports, because that route reads
+     * `auth.options.socialProviders` off the CONSTRUCTED instance rather than
+     * off any caller's copy. An earlier version of this comment said `app.ts`
+     * "also reads back" a providers object; it does not have one. The
+     * distinction matters: a config handed to two places can be handed
+     * differently to each, and a config read off the instance cannot.
      */
     socialProviders: deps.socialProviders ?? socialProvidersFromEnv(readSocialProviderEnv()),
     plugins: [

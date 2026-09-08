@@ -1972,22 +1972,27 @@ what works, then style what remains**.*
   With the server answering all-true, both buttons resolve by their exact shipped accessible names,
   have empty text content (icon-only), and each reaches the provider it names — a mark wired to the
   wrong provider would satisfy every other assertion. Passkey is asserted as
-  `signIn.passkey({ autoFill: true })` **called at a moment when the field it attaches to is IN THE
-  DOM** — a clause that exists because the feature shipped inert for one commit without it.
-  *Conditional mediation attaches to an eligible input present at the instant of the call. The effect
-  ran on mount with `[]` deps and the default tab is **Phone**, so the email input — the only field
-  carrying `autocomplete="username webauthn"` — was not rendered; the request had nothing to attach to,
-  and switching tabs did not re-issue it. **A mock can see that a call happened and with what argument;
-  it cannot see that the call was pointless**, so every test passed and the replacement for the dead
-  button was itself dead.* The case now asserts `passkey` is NOT called while Phone is showing, that no
-  `input[autocomplete~="webauthn"]` exists then, that it IS called after switching to Email with that
-  field present in the same DOM, and that a tab round-trip issues no second request (a concurrent
-  `credentials.get()` throws `InvalidStateError`, and better-auth's client exposes no `signal` to
-  cancel the first). Mutation-witnessed: restoring the fire-on-mount form reddens this case alone.
-  **Named absence:** a user who never opens the Email tab is never offered a passkey — the cost of
-  attaching to the email field, nil today because no user can hold a passkey until Task 12 ships
-  registration, and written at the site for whoever builds it. It replaces a bare `passkey()`, which
-  would have satisfied "was called" while being the dead modal-triggering control it exists to remove.
+  **no passkey request at all, plus the field kept ready** — and the deferral is the finding.
+  *The dispatch specified `signIn.passkey({ autoFill: true })` as the replacement for the dead button.
+  Two defects were found in it, in order. First it fired on MOUNT with `[]` deps while the default tab
+  is Phone, so the only field carrying `autocomplete="username webauthn"` was not rendered and the
+  request had nothing to attach to — the replacement for the dead button was itself dead, and every
+  test passed because a mock can see that a call happened and with what argument but not that the call
+  was pointless. Then, with that fixed, review DEMONSTRATED the real objection:
+  `signInPasskey` issues `GET /passkey/generate-authenticate-options` as its first statement, charged
+  against the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX` = 10/60s in production); ten such probes
+  through the assembled app made the eleventh real `POST /sign-in/magic-link` answer **429**, with a
+  zero-probe control answering 500 and not 429, and `http/rate-limit.ts` records as measured that a web
+  container proxies every browser into ONE client key. **A request that spends a shared sign-in budget
+  on a flow with zero possible successes is this round's own defect one layer down.*** So the case now
+  asserts there is no passkey button, that the email field DOES carry the token (asserting only "no
+  button" would let the request return silently; asserting only "no request" would let the token be
+  dropped and Task 12 start from a worse place), and — after a microtask flush, because asserting
+  immediately would pass against a page that fires one tick later — that `passkey` was never called.
+  Turning mediation on is Task 12's, in the change set that makes a passkey obtainable.
+  *(Refuted limb, recorded so nobody builds against it: the challenge rows are NOT unbounded.
+  `findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
+  phone-OTP verification calls it. No cleanup job is owed.)*
   Mutation-witnessed: the provider check dropped reddens the discrimination case and the all-disabled
   case; the `google:true, apple:false` ordering correctly stays green because that mutation leaves
   Apple's branch intact, which is why two orderings run. — (`apps/web/test/sign-in.test.tsx`)

@@ -137,23 +137,6 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   });
 
   /**
-   * 13.326 — THE LOAD-BEARING CASE, and it is asserted in BOTH directions
-   * because each alone passes on a broken page.
-   *
-   * A page that renders no social button ever satisfies the first half. A page
-   * that renders both unconditionally satisfies the second. Only the pair says
-   * *the button appears when and only when the server will accept it*.
-   *
-   * The negative half uses `waitFor` around a NEGATIVE, which is a shape worth
-   * justifying: the fetch resolves on a microtask, so asserting absence
-   * synchronously would pass before the answer had arrived — green for the wrong
-   * reason, and green even against a page that renders the button a tick later.
-   * Waiting for the POSITIVE control (the tabs, which render immediately) is not
-   * enough either, because it does not order against the fetch. So the negative
-   * is asserted after the page has been given the answer and re-rendered, which
-   * `findByRole` on a control that DOES appear in the enabled case establishes.
-   */
-  /**
    * 13.326 — THE DISCRIMINATION CASE, and it replaces a negative that could not
    * fail. **Found by mutation, not by reading.**
    *
@@ -270,44 +253,51 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    * is the difference between conditional UI and the dead modal-triggering call
    * this replaces.
    */
-  it('13.326 asks for a passkey only once the field it attaches to is on screen', async () => {
+  /**
+   * 13.326 — the passkey BUTTON is gone and NO passkey request is made, and the
+   * second half is the one that took a demonstration to earn.
+   *
+   * The dispatch's replacement for the dead button was
+   * `signIn.passkey({ autoFill: true })`. `signInPasskey` issues
+   * `GET /passkey/generate-authenticate-options` as its FIRST statement, which
+   * lands under `/api/auth/*` and is charged against the shared `auth:` bucket
+   * — `RATE_LIMIT_AUTH_MAX` is 10 per 60s in production. Review drove ten such
+   * probes through the assembled app and the eleventh real
+   * `POST /sign-in/magic-link` answered 429, against a zero-probe control that
+   * answered 500 and not 429. And `http/rate-limit.ts` records as measured that
+   * a web container proxies every browser into ONE client key, so that budget is
+   * shared across users.
+   *
+   * A request that spends a shared sign-in budget on a flow with zero possible
+   * successes — nobody can register a passkey — is the same defect this task
+   * removes, one layer down. So it is deferred to Task 12, which builds
+   * registration in the same change set.
+   *
+   * **The field keeps `autocomplete="username webauthn"`**, asserted here,
+   * because that half costs nothing and must already be in place when Task 12
+   * switches mediation on. Asserting only "no button" would let the request come
+   * back silently; asserting only "no request" would let the token be dropped
+   * and Task 12 start from a worse place.
+   */
+  it('13.326 makes no passkey request, and keeps the field ready for Task 12', async () => {
     const user = userEvent.setup();
     render(<SignInPage />);
 
-    /* THE ASSERTION THE FIRST VERSION OF THIS CASE DID NOT MAKE, and its absence
-     * is why the feature shipped inert for one commit.
-     *
-     * Conditional mediation attaches to an ELIGIBLE INPUT PRESENT IN THE DOM AT
-     * THE MOMENT OF THE CALL. The old case asserted only that
-     * `passkey({autoFill:true})` was called — which was true, on mount, while
-     * the default Phone tab was showing and the only field carrying
-     * `autocomplete="username webauthn"` did not exist. The call had nothing to
-     * attach to. **A mock can see that a call happened and with what argument;
-     * it cannot see that the call was pointless**, so the test passed and the
-     * replacement for the dead button was itself dead.
-     *
-     * So: NOT called while Phone is showing. */
-    expect(screen.getByRole('tab', { name: 'Phone' })).toHaveAttribute('aria-selected', 'true');
-    expect(document.querySelector('input[autocomplete~="webauthn"]')).toBeNull();
-    expect(passkey).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
 
     await user.click(screen.getByRole('tab', { name: 'Email link' }));
-
-    // Called once the field exists — and the field is asserted to exist in the
-    // same DOM, which is the property, not the call.
-    await waitFor(() => {
-      expect(passkey).toHaveBeenCalledWith({ autoFill: true });
-    });
+    // The field IS present and carries the token — so the absence below is a
+    // fact about the request, never about a missing field.
     expect(document.querySelector('input[autocomplete~="webauthn"]')).not.toBeNull();
 
-    // At most once per page load: a second concurrent credentials.get() throws
-    // InvalidStateError in a browser, and better-auth's client exposes no signal
-    // to cancel the first.
-    await user.click(screen.getByRole('tab', { name: 'Phone' }));
-    await user.click(screen.getByRole('tab', { name: 'Email link' }));
-    expect(passkey).toHaveBeenCalledTimes(1);
-
-    // And never a button, in any tab.
+    // Give any mount- or tab-triggered effect a chance to fire before concluding
+    // it did not. Asserting immediately would pass against a page that issues
+    // the request one tick later — the exact shape that made the first version
+    // of this case vacuous.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(passkey).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
   });
 

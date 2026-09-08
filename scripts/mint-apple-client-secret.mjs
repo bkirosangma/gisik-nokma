@@ -76,9 +76,15 @@ export function mintAppleClientSecret({ teamId, keyId, clientId, privateKeyPem, 
 /**
  * Proves the instrument against its own output before anything is shipped: the
  * signature verifies under the matching public key AND is 64 bytes, which is
- * what distinguishes a JOSE signature from a DER one. Asserting only that it
- * verifies would pass for DER, because `verify` accepts whichever encoding it is
- * told to expect — so the length is the assertion that catches defect (1).
+ * what distinguishes a JOSE signature from a DER one.
+ *
+ * *An earlier version of this paragraph claimed the LENGTH was the assertion
+ * that catches defect (1) and the verification would have passed for DER. That
+ * is false of this file: the `verify` call below also passes
+ * `dsaEncoding: 'ieee-p1363'`, so a DER signature fails BOTH assertions — the
+ * measured mutation prints both failures. The length assertion is still worth
+ * keeping, because it names the defect ("that is DER, not JOSE r||s") while a
+ * verification failure alone would send a reader hunting for a wrong key.*
  */
 function selfTest() {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });

@@ -18,9 +18,14 @@ import { enabledSocialProviders, type EnabledSocialProviders } from '../auth/soc
  * A build flag is a SECOND declaration of the same fact, baked into a bundle at
  * image-build time and read by a browser that may be talking to a server
  * deployed later with different secrets. **This answer comes from the very
- * object the running auth instance was constructed with** — `app.ts` passes
- * `deps.socialProviders` to `createAuth` and to this route, and
- * `enabledSocialProviders` reads that object rather than the environment. There
+ * object the running auth instance was constructed with** — `buildApp` receives
+ * an already-constructed `deps.auth` and hands THAT to this route, which reads
+ * `auth.options.socialProviders` back off it. `app.ts` never sees a providers
+ * object of its own, and an earlier version of this sentence said it did, which
+ * described a weaker design than the one here: a config passed to two places can
+ * be passed differently to each, while a config read off the instance cannot.
+ * `enabledSocialProviders` then reads that object rather than the environment.
+ * There
  * is no arrangement of variables under which the page can offer a provider this
  * server would refuse, which is a stronger property than "both read the same
  * env" and is what `test/routes/auth-methods.test.ts` pins.

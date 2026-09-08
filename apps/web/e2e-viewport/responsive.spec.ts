@@ -1057,11 +1057,11 @@ for (const route of UNAUTHED_ROUTES) {
       await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
       await page.unroute('**/v1/auth/methods');
 
-      /* The passkey affordance that REPLACED the dead button, asserted as a
-       * fact about the DOM rather than about a call: conditional mediation
-       * attaches to this token, and without it `signIn.passkey({autoFill:true})`
-       * is inert. A user with a passkey is offered it here; a user without one
-       * sees nothing, which is the whole point. */
+      /* The token the email field keeps for Task 12, asserted as a fact about
+       * the DOM. The conditional-mediation REQUEST is deferred (it spends the
+       * shared `auth:` budget on a flow no user can complete — see
+       * `app/sign-in/page.tsx`), but this half costs nothing and must already be
+       * in place when Task 12 switches mediation on alongside registration. */
       await list.getByRole('tab', { name: 'Email link' }).click();
       await expect(page.locator('input[type="email"]')).toHaveAttribute(
         'autocomplete',

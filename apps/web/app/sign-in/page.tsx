@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
@@ -166,85 +166,60 @@ function SignInForm() {
   const fail = (message: string | undefined) => setError(message ?? 'Sign-in failed. Try again.');
 
   /**
-   * PASSKEY: CONDITIONAL UI, NOT A DEAD BUTTON.
+   * PASSKEY: THE DEAD BUTTON IS GONE. THE REQUEST THAT WOULD HAVE REPLACED IT
+   * IS DEFERRED TO TASK 12, WITH REGISTRATION — and the deferral is the finding.
    *
-   * There was a `Sign in with a passkey` button here, and it could not work for
-   * ANY user, ANYWHERE — not a configuration gap like Google's, a missing
-   * feature. **There is no passkey registration flow anywhere in app code**: the
-   * only `addPasskey` occurrences in the tree are inside better-auth's own
-   * bundled client. `rpID` is correct (`auth.ts`, `new URL(baseUrl).hostname`),
-   * WebAuthn is wired, and nobody can ever hold a passkey to sign in with.
+   * ## What was here, and why it is not
    *
-   * `autoFill: true` is WebAuthn conditional mediation: the browser offers a
-   * registered passkey through the email field's own autofill — Touch ID on a
-   * Mac, the platform authenticator elsewhere — and shows NOTHING when the user
-   * has none. So a user with a passkey gets it where they are already typing,
-   * and a user without one sees no control that leads nowhere. It needs the
-   * `autocomplete="username webauthn"` on the input below; without that token the
-   * browser has nothing to attach the offer to and the call is inert.
+   * There was a `Sign in with a passkey` button, and it could not work for ANY
+   * user ANYWHERE: **there is no passkey registration flow anywhere in app
+   * code**, so nobody can hold a passkey to sign in with. `rpID` is correct
+   * (`auth.ts`, `new URL(baseUrl).hostname`) and WebAuthn is wired; the
+   * credential simply cannot exist. The button is removed, which is the honest
+   * half and the half the owner asked for.
    *
-   * `autoFill` was confirmed present on the INSTALLED
-   * `@better-auth/passkey@1.7.2` client (`dist/client.d.mts:29`), not assumed
-   * from documentation.
+   * The dispatch's replacement was `signIn.passkey({ autoFill: true })` —
+   * WebAuthn conditional mediation — issued on this page. **Review demonstrated
+   * that it cannot ship yet, with production's own numbers.**
    *
-   * Registration remains absent and is OUT of this round by the controller's
-   * ruling — scoped as Task 12 of the per-screen plan, after the owner's second
-   * look. It is recorded in `docs/pre-launch-checklist.md` with that owner, so
-   * the gap is written down rather than implied by the absence of a button.
+   * ## The measurement, because this reverses an instruction and must earn it
    *
-   * ## IT FIRES WHEN THE EMAIL FIELD EXISTS, NOT ON MOUNT — and the first
-   * ## version got this wrong in a way that made the whole thing inert
+   * `signInPasskey` in `@better-auth/passkey@1.7.2` issues
+   * `GET /passkey/generate-authenticate-options` as its FIRST statement, before
+   * any capability check. That path is under `/api/auth/*`, which `app.ts`
+   * charges against the shared `auth:` bucket — `RATE_LIMIT_AUTH_MAX` is **10**
+   * per 60s in `deploy/do/app.yaml`. A reviewer drove ten such probes through
+   * the assembled app and the eleventh real `POST /sign-in/magic-link` answered
+   * **429**, with a control run at zero probes answering 500 (offline DB) and
+   * not 429 — so the refusal was attributable to the probes and nothing else.
    *
-   * Conditional mediation attaches to an ELIGIBLE INPUT THAT IS IN THE DOM AT
-   * THE MOMENT OF THE CALL. The first version ran on mount with `[]` deps, and
-   * the default method is `'phone'` — so the email input, the only field
-   * carrying `autocomplete="username webauthn"`, **was not rendered yet**. The
-   * request had nothing to attach to, and switching to the Email tab did not
-   * re-issue it because the deps array was empty. **The replacement for the dead
-   * button was itself dead**, and every test still passed: the call WAS made and
-   * `{ autoFill: true }` WAS its argument, which is all a mock can see.
+   * And the budget is very likely SHARED. `http/rate-limit.ts` records as
+   * measured that the dev stack raised `AUTH_MAX` to 60 "because its web
+   * container proxies every browser into a single client key". Production has
+   * the same topology. So the cost is not one user's own budget; it is
+   * everyone's.
    *
-   * So it keys on `method`. The request goes out when the email field is on
-   * screen and can actually be offered through.
+   * **A request that spends a shared sign-in budget on a flow with zero possible
+   * successes is the same defect this whole task removes, one layer down.** The
+   * page would have stopped showing a control that cannot work and started
+   * making a request that cannot work — and this one can refuse somebody else's
+   * magic link.
    *
-   * `asked` is a ref, not state, and it exists because a second concurrent
-   * `navigator.credentials.get()` throws `InvalidStateError` in browsers —
-   * toggling the tabs would otherwise stack requests. It is deliberately never
-   * reset: better-auth's client exposes no `signal` on `passkey()`
-   * (`dist/client.d.mts` lists `autoFill`, `extensions`, `returnWebAuthnResponse`
-   * and `fetchOptions` — checked), so a request once issued cannot be cancelled
-   * when the user leaves the tab, and asking again would be the stacking this
-   * guard prevents. One offer per page load is the honest ceiling.
+   * *(One limb of that finding was refuted and is recorded so nobody builds
+   * against it: the challenge rows are NOT unbounded. `findVerificationValue`
+   * sweeps expired rows globally on every call and `disableCleanup` is unset,
+   * and phone-OTP verification calls it — so they are reclaimed opportunistically
+   * rather than never. No cleanup job is owed.)*
    *
-   * **NAMED ABSENCE, not a partial:** a user who never opens the Email tab is
-   * never offered a passkey. That is the cost of attaching to the email field,
-   * and it is small today for a reason that will expire — no user can hold a
-   * passkey at all until Task 12 ships registration. When it does, whoever
-   * builds it should revisit whether the phone field should carry the token too.
+   * ## What ships instead, and what is owed
    *
-   * Failures are swallowed on purpose. This runs unprompted, and every reason it
-   * can fail — no passkey enrolled, no platform authenticator, the user
-   * dismissing the sheet, a browser without conditional mediation — is a
-   * NON-EVENT for somebody who came here to type an address. Surfacing any of
-   * them would put a refusal on screen that the person did not ask for and
-   * cannot act on. A passkey that DOES resolve navigates.
+   * The email input keeps `autocomplete="username webauthn"`. It costs nothing,
+   * it is correct, and it is the half that must already be in place when
+   * conditional mediation is switched on. **Task 12 owns turning it on, in the
+   * same change set that builds registration** — which is the right pairing:
+   * until a user can register a passkey, an offer to use one has no population
+   * it can serve.
    */
-  const asked = useRef(false);
-
-  useEffect(() => {
-    if (method !== 'email' || asked.current) return;
-    asked.current = true;
-    void authClient.signIn
-      .passkey({ autoFill: true })
-      .then((result) => {
-        if (result?.error === undefined || result.error === null) router.push(next);
-      })
-      .catch(() => {
-        // See above: an unprompted probe has no failure worth showing.
-      });
-    // `next` and `router` are stable for the life of this page.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method]);
 
   return (
     <main className="gn-shell gn-shell--centred">

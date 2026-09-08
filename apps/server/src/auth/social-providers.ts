@@ -59,11 +59,28 @@ export type SocialProviderConfig = {
   clientId: string;
   clientSecret: string;
   /**
-   * Apple only. better-auth's `AppleOptions` carries `appBundleIdentifier` for
-   * the NATIVE app's audience check; the web flow's audience is the Services ID
-   * in `clientId`. Absent for Google, whose options have no such member.
+   * Apple only. Absent for Google, whose options have no such member.
+   *
+   * **AND IT DOES NOT MEAN WHAT AN EARLIER VERSION OF THIS COMMENT SAID.** That
+   * version read "the web flow's audience is the Services ID in `clientId`",
+   * which implies setting a bundle id is harmless for web. It is not.
+   * better-auth builds ONE id-token audience for the provider, not one per
+   * flow: `options.audience ?? options.appBundleIdentifier ?? options.clientId`
+   * (`@better-auth/core@1.7.2`, `apple.ts`, the `idToken` block). So a bundle id
+   * present with no explicit `audience` REPLACES the Services ID, and every WEB
+   * sign-in — whose id-token carries the Services ID as `aud` — fails
+   * validation. The day the owner set that variable for the native app, Apple
+   * sign-in on the web would have broken, and the documentation said it was
+   * safe. Found in review.
    */
   appBundleIdentifier?: string;
+  /**
+   * Set ALONGSIDE `appBundleIdentifier` and never alone: the explicit list of
+   * audiences better-auth accepts, which is the only way both flows validate.
+   * `AppleOptions.audience` is `string | string[] | undefined` in the installed
+   * package and takes precedence over both fallbacks above.
+   */
+  audience?: string[];
 };
 
 /** Trims, because a variable set to a lone space is not configuration. */
@@ -77,7 +94,7 @@ function readable(env: NodeJS.ProcessEnv, key: string): string {
  *
  * `socialProvidersFromEnv` takes its environment as an argument so it can be
  * driven from a fixture, and reads it as `env[key]` with `key` a variable. That
- * is invisible to `scripts/check-env-example.mjs`, whose detectors anchor on the
+ * is invisible to `scripts/check-env-example.mjs`, whose detectors anchor on
  * the literal environment access with the key spelled inline — so routing every read
  * through a helper silently removed `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
  * from the gate's view (they were direct accesses in `auth.ts` before) and never
@@ -160,7 +177,13 @@ export function socialProvidersFromEnv(
     providers.apple = {
       clientId: appleId,
       clientSecret: appleSecret,
-      ...(bundleId === '' ? {} : { appBundleIdentifier: bundleId }),
+      // A bundle id is carried WITH an explicit audience list, never on its own.
+      // Alone it REPLACES the Services ID as better-auth's id-token audience and
+      // breaks every WEB sign-in; the pair makes better-auth accept both, which
+      // is what "the native app also uses this provider" actually requires.
+      ...(bundleId === ''
+        ? {}
+        : { appBundleIdentifier: bundleId, audience: [appleId, bundleId] }),
     };
   }
 

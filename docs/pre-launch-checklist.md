@@ -312,11 +312,21 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   always was (`auth.ts`, `rpID: new URL(baseUrl).hostname`; the passkey plugin is mounted), which is
   exactly what made the gap invisible — every piece was present except the one that lets a credential
   come into existence.
-  **What 2b did:** removed the dead button and replaced it with WebAuthn conditional mediation
-  (`signIn.passkey({ autoFill: true })` against an `autocomplete="username webauthn"` field), which
-  offers a passkey to somebody who has one and shows nothing to somebody who does not. **That makes
-  the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of this product
-  can hold a passkey, and the method is effectively unavailable however well it is wired.
+  **What 2b did:** removed the dead button, and kept `autocomplete="username webauthn"` on the email
+  field. **The conditional-mediation REQUEST the dispatch specified is deferred to Task 12, on a
+  measurement** — `signInPasskey` issues `GET /passkey/generate-authenticate-options` as its first
+  statement, which is charged against the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX` = 10/60s in
+  `deploy/do/app.yaml`). Review drove ten probes through the assembled app and the eleventh real
+  `POST /sign-in/magic-link` answered **429**, against a zero-probe control that answered 500 and not
+  429; and `apps/server/src/http/rate-limit.ts` records as measured that a web container proxies every
+  browser into ONE client key, so that budget is shared across users. **A request that spends a shared
+  sign-in budget on a flow with zero possible successes is the same defect this round removes, one
+  layer down.** Turning mediation on belongs in the change set that makes a passkey obtainable.
+  *(Refuted limb, recorded so nobody builds against it: the challenge rows are NOT unbounded —
+  `findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
+  phone-OTP verification calls it. No cleanup job is owed.)*
+  **That makes the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of
+  this product can hold a passkey, and the method is unavailable however well it is wired.
   *Recorded here rather than left to the absence of a button, because an unrecorded deferral is defect
   class 4 from Plan 1 — and because the button's removal is exactly the change that would otherwise
   make the gap harder to notice, not easier.*

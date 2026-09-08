@@ -163,13 +163,34 @@ async function stubApi(page: Page): Promise<void> {
   );
 }
 
-test('sign-in offers all four passwordless methods', async ({ page }) => {
+/**
+ * RENAMED AND AMENDED, and the old name is the finding.
+ *
+ * It was `sign-in offers all four passwordless methods`, and it asserted the two
+ * that could not work: `Continue with Google` rendered while `GOOGLE_CLIENT_ID`
+ * was unset, and `Sign in with a passkey` could not work for any user anywhere
+ * because no registration flow exists. **A test whose NAME asserts a property is
+ * a test that defends it**, and this one was defending the defect.
+ *
+ * This file is Playwright and is NOT in the turbo gate, so it stayed green
+ * through the whole change and only turned red when someone ran it directly —
+ * which is exactly how a suite outside the gate fails: silently, until it does
+ * not. Recorded rather than just fixed.
+ *
+ * `stubApi` does not stub `/v1/auth/methods`, so the page's availability request
+ * goes unanswered here and no social button renders — which is the honest
+ * expectation for a run with no server behind it. The BOTH-DIRECTIONS property
+ * lives in `apps/web/test/sign-in.test.tsx` (13.326), where the answer can be
+ * driven, and in `e2e-viewport/responsive.spec.ts` (13.292).
+ */
+test('sign-in offers the methods that can work, and no control that cannot', async ({ page }) => {
   await stubApi(page);
   await page.goto('/sign-in');
   await expect(page.getByRole('tab', { name: 'Phone' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Email link' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
 });
 
 /**

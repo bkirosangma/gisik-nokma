@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import { createAuth } from '../../src/auth/auth.js';
@@ -6,6 +6,7 @@ import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import {
   enabledSocialProviders,
+  readSocialProviderEnv,
   socialProvidersFromEnv,
 } from '../../src/auth/social-providers.js';
 import { createPool } from '../../src/db.js';
@@ -104,12 +105,22 @@ describe('13.324 the page is told which social methods this server will actually
   });
 
   /**
-   * The route reads `auth.options.socialProviders` off the CONSTRUCTED instance
-   * rather than off a copy the caller kept. This asserts that better-auth
-   * actually preserves the object — if a future version normalised absent keys
-   * into present-and-disabled ones, every boolean above would silently become
-   * `true` and the page would go back to offering a dead button. Read from the
-   * instance, not from the argument, on purpose.
+   * 13.324 — THE INSTANCE IS THE SOURCE, and this case is deliberately weak in a
+   * way worth stating rather than dressing up.
+   *
+   * At `better-auth@1.7.2` `auth.options` is the caller's own object BY
+   * REFERENCE, so `auth.options.socialProviders` IS the literal passed three
+   * lines up. As an assertion about better-auth's behaviour that is close to a
+   * tautology, and a reviewer called it one. **It is kept because a tautology
+   * today is a tripwire tomorrow**: if a future version clones or normalises
+   * `options` — turning absent keys into present-and-disabled ones — every
+   * boolean here flips to `true`, the page goes back to offering a dead button,
+   * and this is the only case in the suite that would say so. That upgrade-time
+   * failure is exactly what the route's design exists to prevent.
+   *
+   * What it is NOT is evidence that the route consults the instance rather than
+   * its argument. The cases above establish that, by going through the real
+   * route on a real app.
    */
   it('13.324 better-auth preserves the absence of an unconfigured provider in `options`', () => {
     const auth = createAuth({
@@ -166,6 +177,15 @@ describe('13.325 "empty disables" is a property of this repo, not a vendor coinc
       expected: { google: false, apple: false },
     },
     {
+      // The row a reviewer found missing. Without it the `appleId !== ''` half of
+      // Apple's pair check was asserted by NOTHING — Google had both mixed rows
+      // and Apple had one, so a mutation deleting Apple's id check survived the
+      // whole cross-product.
+      label: 'apple secret only',
+      env: { APPLE_CLIENT_SECRET: 'a-jwt' },
+      expected: { google: false, apple: false },
+    },
+    {
       label: 'apple id only',
       env: { APPLE_CLIENT_ID: 'a-id' },
       expected: { google: false, apple: false },
@@ -211,6 +231,53 @@ describe('13.325 "empty disables" is a property of this repo, not a vendor coinc
    * asserted with `Object.keys`, because `toEqual` treats a key holding
    * `undefined` as absent and would pass against exactly the shape this avoids.
    */
+  /**
+   * 13.325 — `readSocialProviderEnv()` IS THE ONLY PATH A REAL DEPLOYMENT TAKES,
+   * and until a reviewer said so it was exercised by nothing.
+   *
+   * Every case above supplies its own env literal or its own providers object,
+   * so the five actual `process.env` reads — the ones an operator's variables
+   * flow through, and the ones that exist in that shape so `check:env` can SEE
+   * them — were covered by no test at all. A typo in one key name would have
+   * disabled a provider in production with the whole suite green.
+   *
+   * `vi.stubEnv` drives the real function. The key set is asserted with
+   * `Object.keys` because that is the contract `check:env` depends on: a key
+   * missing here is a variable the gate stops watching, silently.
+   */
+  it('13.325 readSocialProviderEnv reads the five real keys, and nothing else', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', 'g-id');
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', 'g-secret');
+    vi.stubEnv('APPLE_CLIENT_ID', 'a-id');
+    vi.stubEnv('APPLE_CLIENT_SECRET', 'a-jwt');
+    vi.stubEnv('APPLE_APP_BUNDLE_IDENTIFIER', 'in.example.app');
+    try {
+      const env = readSocialProviderEnv();
+      expect(Object.keys(env).sort()).toEqual([
+        'APPLE_APP_BUNDLE_IDENTIFIER',
+        'APPLE_CLIENT_ID',
+        'APPLE_CLIENT_SECRET',
+        'GOOGLE_CLIENT_ID',
+        'GOOGLE_CLIENT_SECRET',
+      ]);
+      // And the values are the ones the environment actually holds — a reader
+      // that returned the right KEY SET with wrong values would pass the line
+      // above while disabling every provider.
+      expect(env['GOOGLE_CLIENT_ID']).toBe('g-id');
+      expect(env['APPLE_CLIENT_SECRET']).toBe('a-jwt');
+
+      // End to end through the real reader: both providers enabled, and the
+      // bundle id carried WITH an explicit audience list containing BOTH the
+      // Services ID and the bundle id. Alone, a bundle id REPLACES the Services
+      // ID as better-auth's id-token audience and breaks every web sign-in.
+      const providers = socialProvidersFromEnv(env);
+      expect(enabledSocialProviders(providers)).toEqual({ google: true, apple: true });
+      expect(providers.apple?.audience).toEqual(['a-id', 'in.example.app']);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('13.325 the optional Apple bundle id is omitted, not set to an empty value', () => {
     const without = socialProvidersFromEnv({
       APPLE_CLIENT_ID: 'a-id',
