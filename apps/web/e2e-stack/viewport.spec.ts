@@ -204,17 +204,34 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * those two would have ratcheted 0 and 0, reported green, and been perfectly
    * blind to every rule this change actually fixes.
    *
-   * Because the five sub-floor declarations are not on those pages. Measured,
-   * they live on the settings and membership surfaces:
+   * Because the five sub-floor declarations are not on those pages.
    *
-   *     .ticket-type-list__badge      /settings/ticket-types
-   *     .gn-transition-edge__label    /settings/workflows
-   *     .gn-avatar--small             /members
+   * ONE OF THE FIVE IS WITNESSED HERE, AND FOUR ARE NOT. Stated plainly because
+   * "five rules fixed" beside "this suite is green" reads as five rules proven,
+   * and only one of them is:
    *
-   * (`.escape-chip__hint` and `.upload-chips__chip` are editor chrome, reached
-   * only inside a ticket's description editor; they are fixed and enumerated in
-   * the commit, but no route here renders them and this file does not claim
-   * they are covered.)
+   *     .ticket-type-list__badge    /settings/ticket-types   WITNESSED, 4 -> 0
+   *     .gn-transition-edge__label  workflow EDITOR canvas   not rendered by
+   *                                 (not the /settings/workflows list)  any route here
+   *     .gn-avatar--small           board + ticket list, but ONLY when a card
+   *                                 has an assignee -- and no seeded card does,
+   *                                 so it rendered on none of these five routes
+   *     .escape-chip__hint          editor chrome, reached only inside a
+   *     .upload-chips__chip         ticket's description editor
+   *
+   * `.gn-avatar--small` is the one worth knowing about: it IS a `<span>` with
+   * direct text, so this sweep would have caught it at 10.4px had it rendered.
+   * It did not appear in the before-reading, which is how the gap was found —
+   * the absence of an expected offender, not a green tick.
+   * Owner for the four: whoever next seeds an assigned card or sweeps the
+   * workflow editor and the description editor.
+   *
+   * `/members` is kept although it currently examines ZERO elements (its roster
+   * rows are `li`/`p`, which belong to the body sweep's population, not this
+   * one). Its baseline of 0 is still a live guard — small label text appearing
+   * there later would be examined and would redden — but it proves nothing
+   * today, and it does NOT cover `.gn-avatar--small`, which was why it was
+   * added.
    *
    * The general lesson, which is the one this repo keeps paying for: a ratchet
    * on the pages a finding NAMED is not a ratchet on the pages the defect is

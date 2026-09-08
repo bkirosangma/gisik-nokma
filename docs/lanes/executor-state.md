@@ -47,6 +47,31 @@ green, and been blind to every rule this change fixes. Adding `/members`, `/sett
 `/settings/workflows` found it: **four `span.ticket-type-list__badge` at 11.2px, 4 → 0.**
 *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON.*
 
+**ONE OF THE FIVE FIXES IS WITNESSED. FOUR ARE NOT, AND THAT WAS FOUND BY AN ABSENCE.**
+`.ticket-type-list__badge` is the only one on a swept route (4 → 0). `.gn-avatar--small` renders on the
+board and ticket list **only when a card has an assignee** and no seeded card does; it is a `<span>`
+with direct text, so the sweep WOULD have reported it at 10.4px had it rendered — **its absence from
+the before-reading is the evidence, not a green tick.** `.gn-transition-edge__label` is on the workflow
+EDITOR canvas, not the `/settings/workflows` list; the two editor chips are inside a ticket's
+description editor. Recorded as owned rather than fixed-and-claimed: **whoever next seeds an assigned
+card, or sweeps the workflow editor and the description editor.** Guarding against the reading that
+"five rules fixed" beside "suite green" means five rules proven.
+
+**`/members` earns a mention because it examines ZERO elements.** Added to catch `.gn-avatar--small`;
+it does not — the avatar is not used there at all (`board.tsx`, `ticket-list.tsx`), and the roster rows
+are `li`/`p`, which belong to the BODY sweep's population, not the label one. Kept, because a 0
+baseline there still reddens if label text appears later, but it proves nothing today and the route
+list says so.
+
+**The image was confirmed to carry the fix before the 0 was believed.** `docker exec` grep of the
+built stylesheet: `font-size:.75rem` on all three `ui.css` rules. A 0 from an unchanged image and a 0
+from a fixed one print identically, and the previous pass's recorded trap is a measurement taken
+against an image that predates the change. The rebuild itself died once on **ENOSPC** mid-`pnpm
+install` and needed `docker builder prune` (**6.48GB, build cache only** — never images, never volumes;
+the volumes hold the seeded world). Note the shape of that failure report: the background task
+announced **"exited with code 0"**, because that was the shell's status, while the log said
+`failed to solve ... exit code: 1`.
+
 **A ONE-CHARACTER CLASS HOLE IN MY OWN ENUMERATION.** The first sweep for sub-floor declarations used
 `0\.(6[0-9]|7[0-4])[0-9]*rem` — whose alternation requires TWO digits after the point, so it cannot
 match `0.7rem`. It reported three offenders, missed two, and printed them in the shape of a complete

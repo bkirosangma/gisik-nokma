@@ -1215,6 +1215,18 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
   (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/type-scale-baseline.json`)
   *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON. Zero
   offenders on two routes is evidence about two routes.*
+  *ONE OF THE FIVE FIXED RULES IS WITNESSED BY THIS CASE, NOT FIVE.* Only `.ticket-type-list__badge`
+  renders on a swept route. `.gn-transition-edge__label` lives on the workflow EDITOR canvas rather
+  than the `/settings/workflows` list; `.escape-chip__hint` and `.upload-chips__chip` are editor chrome
+  inside a ticket's description; and `.gn-avatar--small` renders on the board and ticket list **only
+  when a card has an assignee**, which no seeded card does. That last one is how the gap was found —
+  the avatar is a `<span>` with direct text, so this sweep WOULD have reported it at 10.4px had it
+  rendered, and its absence from the before-reading is the evidence. The other four are fixed and
+  unwitnessed; owner is whoever next seeds an assigned card or sweeps the two editor surfaces.*
+  *`/members` examines ZERO elements today — its roster rows are `li`/`p`, which belong to the body
+  sweep's population rather than this one. Its 0 baseline is still a live guard (new label text there
+  would be examined and would redden) but it proves nothing now, and it does NOT cover
+  `.gn-avatar--small`, which is why it was added. Recorded rather than quietly dropped.*
   *Two route guesses cost a run each and are recorded in the spec so the third person does not pay
   again: `/my-work` carries no project link (it links to ticket surfaces), and `/w/<id>` is not a page
   at all — there is no `app/w/[workspaceId]/page.tsx`, so it renders the 404, a document with a nav and
@@ -1239,6 +1251,15 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
 > emptiness is a reading rather than a broken scan: at a 12.5px threshold the same scan reports 22
 > declarations in `ui.css`, which reconciles exactly — 20 at 12px plus the two `0.78rem` (12.48px)
 > rules.
+>
+> The after-reading reconciles the same way rather than just reporting a smaller number:
+> `/settings/ticket-types` went from `{11.2px: 4, 12px: 10, 14.4px: 5}` to `{12px: 14, 14.4px: 5}` —
+> the four badges moved onto the 12px rung, 10 + 4 = 14, and nothing else changed.
+>
+> The image was confirmed to CARRY the fix before the 0 was believed: `docker exec` grep of the built
+> stylesheet reports `font-size:.75rem` on all three `ui.css` rules. A 0 from an unchanged image and a
+> 0 from a fixed one print identically, and the recorded trap on the previous pass was a measurement
+> taken against an image that predated the change.
 
 
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)

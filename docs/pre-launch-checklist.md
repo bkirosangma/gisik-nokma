@@ -325,7 +325,10 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   ABOVE the floor and were left alone. Five declarations sat below it, each a one-off stray:
   `.escape-chip__hint` 10.0px (and `opacity: 0.7` on top), `.gn-avatar--small` 10.4px,
   `.upload-chips__chip` 11.0px, `.gn-transition-edge__label` and `.ticket-type-list__badge` 11.2px.
-  All five now at `0.75rem`, proven **4 → 0** on `/settings/ticket-types`.
+  All five now at `0.75rem`. **One is witnessed, four are not** — only `.ticket-type-list__badge` renders on a swept route (**4 → 0** on `/settings/ticket-types`). The
+  others are on the workflow editor canvas, inside a ticket description editor, or on a card with an
+  assignee, and no seeded card has one. Owner for the four: whoever next seeds an assigned card or
+  sweeps those two editor surfaces.
   **The route list is the part worth inheriting.** `/my-work` and the board — the pages this very
   paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
   0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a
