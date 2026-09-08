@@ -20,9 +20,59 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> # ▣ ROUND 2c — PHONE GATING. PR OPEN, AWAITING MERGE. 2026-09-08 ~21:4x IST.
+>
+> **Branch `exec/137-2c-phone-gating`, off `main` `1115e24`. Hold was lifted for THIS ROUND ONLY;
+> nothing after 2c starts until the owner has looked again.**
+>
+> ## WHAT SHIPPED
+>
+> `GET /v1/auth/methods` gains `phone`, derived from the sender the running auth instance holds
+> (`createAuth` carries it on its return; the route reads `auth.otpSender`). `/sign-in` renders the
+> Phone tab only when that is true, with `method` DERIVED rather than stored so "no tab" and "phone
+> form showing" cannot both be true. With phone unavailable there is no segmented control at all.
+> The manual and FAQ passages describing the dead tab are rewritten and the in-app help regenerated.
+>
+> ## THE FINDING THAT WIDENED THE ROUND — read this before touching the viewport suite
+>
+> **The viewport suite is not hermetic.** `next.config.ts` rewrites `/v1/*` to the API origin, so the
+> dev server that suite starts on its own port PROXIES to the developer's compose stack. Its own
+> comment said otherwise and had been relied on; that sentence is now struck in place.
+>
+> It surfaced because the owner turned Google on that evening: `/sign-in` rendered `Continue with
+> Google` inside the suite and it went into the accessible-names baseline. **The `/sign-in` baseline
+> read `ariaLabel: 1` before the round (the segmented control) and measured `ariaLabel: 1` after it
+> (the Google button) — the same number for a different reason, which is exactly what hid it.**
+> Recorded that way, 13.285 fails with "LOST ariaLabel" on any machine with the stack down, and in CI.
+> Measured both ways: API reachable → 1, request aborted → 0. Now pinned by a `page.route` before the
+> first navigation.
+>
+> **`/sign-in`'s ratchet is now VACUOUS and this is accepted, not overlooked** (controller, 2026-09-08,
+> on two conditions, both met: said at 13.285's catalogue line and in `accessible-names.ts`; the false
+> sentence struck not deleted with `next.config.ts` named). All four ratcheted counts are 0 — the
+> tablist and its tabs were the page's only accessible names. 13.286 still guards the sweep.
+>
+> ## WHAT A LATER READER SHOULD NOT HAVE TO REDISCOVER
+>
+> * **Two Playwright files are outside the turbo gate and will lie silently.** `e2e/smoke.spec.ts`
+>   stayed green through the PREVIOUS round while asserting an already-deleted passkey button, and
+>   would have done it again here; `e2e-stack/helpers/sign-in.ts` clicked a tab that no longer exists.
+>   Both fixed here. **When you change the sign-in surface, grep these two by hand.**
+> * **`unroute` before `reload({ waitUntil: 'networkidle' })` HANGS** in that suite: the request goes
+>   unanswered and networkidle never arrives. Cost one 40-minute stall.
+> * A mutation aimed at `theme-toggle.tsx` to witness 13.285 measured NOTHING — that component is in
+>   `app-nav.tsx`, which `/sign-in` does not render. The witness that works is the back button's
+>   `aria-label`, on `/privacy`.
+
 > # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~20:3x IST. **READ THIS BLOCK BEFORE ANY OTHER IN THIS FILE.**
 >
-> **`main` is `5b4f8fc`. There are ZERO open PRs. The queue is EMPTY and a HOLD is in force.**
+> **PR #369 is merged. `main` is `5b4f8fc` plus this document's own merge. There were ZERO open PRs
+> when this was written, and the queue was EMPTY under a hold.**
+>
+> *The sha is phrased that way deliberately. The first version of this line read ``main`` is `5b4f8fc`
+> and was **wrong the instant it landed**: a line naming `main`'s commit inside a file that gets merged
+> INTO `main` cannot name the commit that contains it. It was two docs-only commits stale on arrival
+> (#370's anchor, and this block's own merge as `1115e24`). Name the PR, which does not move.*
 >
 > PR **#369** (`exec/135-signin-auth-methods` — 2b item 2, the rebuilt sign-in auth methods) is
 > **MERGED** as `5b4f8fc`. Verified rather than adopted from the controller's word:
@@ -62,9 +112,20 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## STILL OWED, UNASSIGNED — recorded so it is not lost, NOT to be started under the hold
 >
-> * **The widened staleness sweep**, items 1–2 of the #287 block's own "NOT VERIFIED" list: `.json`,
->   `.yml`, `.sh`, `Dockerfile`s and `README`s were never swept, and the pattern set was never
->   exhaustive. Merging #339 did not close either.
+> * ~~**The widened staleness sweep**~~ — **RUN 2026-09-08 and EMPTY; item 1 of the #287 block's
+>   "NOT VERIFIED" list is closed.** 1183 files across every extension that list names (`.json`,
+>   `.yml`, `.sh`, `Dockerfile`s, `README`s, and more), 11 patterns broadened past the original set.
+>   Coverage confirmed by name rather than assumed: `.github/workflows/ci.yml` is the only CI file and
+>   was in the list, along with all 7 READMEs and both Dockerfiles. **25 raw hits, all 25 inside
+>   `graphify-out/`, which is untracked and gitignored (`.gitignore:31`) — hits outside it: ZERO.**
+>   Positive control through the identical pipeline: 62, of which 25 survive the same filter.
+>   **Anchor, stated correctly because the first report of it was not:** the sweep was measured at
+>   `e2add78`, not at `1115e24` as first claimed — a worktree left on a merged branch is a stale tree
+>   that `git status` calls clean. The result still holds for `1115e24`, and that was CHECKED rather
+>   than assumed: the only two files differing between those trees are `docs/lanes/controller-state.md`
+>   and the per-screen plan, both `.md` and neither a README, so neither is inside the swept extension
+>   set — 0 in-scope hits, with a filter control matching 3 of 4 on a list where one entry must not
+>   match. **Item 2 of that list — "the pattern set is mine, not exhaustive" — is REDUCED, not closed.**
 > * **The four unwitnessed type-scale fixes** named further down. *I did not re-check whether they have
 >   since been witnessed — stated as unverified rather than repeated as owed.*
 >

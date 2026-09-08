@@ -178,7 +178,9 @@ async function stubApi(page: Page): Promise<void> {
  * not. Recorded rather than just fixed.
  *
  * `stubApi` does not stub `/v1/auth/methods`, so the page's availability request
- * goes unanswered here and no social button renders — which is the honest
+ * goes unanswered here and no social button renders — and, since round 2c, no
+ * phone tab either: an unanswered request leaves availability `null`, which the
+ * page reads as "cannot work" for every gated method. That is the honest
  * expectation for a run with no server behind it. The BOTH-DIRECTIONS property
  * lives in `apps/web/test/sign-in.test.tsx` (13.326), where the answer can be
  * driven, and in `e2e-viewport/responsive.spec.ts` (13.292).
@@ -186,8 +188,18 @@ async function stubApi(page: Page): Promise<void> {
 test('sign-in offers the methods that can work, and no control that cannot', async ({ page }) => {
   await stubApi(page);
   await page.goto('/sign-in');
-  await expect(page.getByRole('tab', { name: 'Phone' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Email link' })).toBeVisible();
+  /* Email, not the tabs — and this file is WHY that matters. `smoke.spec.ts` is
+   * Playwright and is NOT in the turbo gate, so when the previous round removed
+   * the passkey button this file went on asserting it and stayed green through
+   * the entire change, turning red only when someone ran it by hand. The same
+   * trap was set here for the Phone tab: `stubApi` does not stub
+   * `/v1/auth/methods`, the request goes unanswered, availability stays `null`,
+   * and a `null` answer now means NO phone tab — so these two lines would have
+   * failed, silently, until a human ran the file. Updated in the same change
+   * set as the behaviour, deliberately, because the gate will not do it. */
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page.getByRole('tablist', { name: 'Sign-in method' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Phone' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);

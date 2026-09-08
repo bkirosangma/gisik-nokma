@@ -10,6 +10,25 @@ import type { Page } from '@playwright/test';
  * equal count is not this gate's business — that is the copy rule, reviewed by
  * a person. A restyle that DROPS one is, and a count that fell is the whole
  * signal. Same one-way shape as the tap-target and type-scale baselines.
+ *
+ * ## `/sign-in`'s floor is 0, and that is a known hole rather than a clean bill
+ *
+ * Round 2c (2026-09-08) gated the Phone tab on whether an SMS channel exists.
+ * The segmented control it removed carried that page's ONLY `aria-label`, its
+ * `tablist` and `tab` roles, and both `aria-selected`s — so every ratcheted
+ * count for `/sign-in` is now `0`. **A floor of zero cannot fall: 13.285
+ * protects nothing on that route** until a labelled control returns, which
+ * means Task 12's passkey UI or a deployment with a provider configured.
+ * `rawMatches` is 54 and 13.286 still asserts the sweep saw something, so a
+ * sweep gone blind is still caught; it is only the LOSS check that is inert.
+ *
+ * The values here are only meaningful because the suite pins
+ * `GET /v1/auth/methods` before its first navigation. Without that, they record
+ * whatever the developer's compose stack happens to be configured with —
+ * `next.config.ts` rewrites `/v1/*` to the API origin, so this suite's dev
+ * server proxies to it. That is not hypothetical: this baseline briefly held a
+ * `Continue with Google` button's `aria-label` on 2026-09-08, which would have
+ * failed 13.285 on any machine without that stack running.
  */
 export type AccessibleNameCounts = {
   ariaLabel: number;

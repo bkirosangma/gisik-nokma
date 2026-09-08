@@ -84,24 +84,24 @@
     "rawMatches": 96
   },
   "phone-390|/sign-in": {
-    "ariaLabel": 1,
-    "role": 3,
-    "ariaSelected": 2,
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
     "ariaDescribedby": 0,
-    "rawMatches": 56
+    "rawMatches": 54
   },
   "tablet-768|/sign-in": {
-    "ariaLabel": 1,
-    "role": 3,
-    "ariaSelected": 2,
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
     "ariaDescribedby": 0,
-    "rawMatches": 56
+    "rawMatches": 54
   },
   "desktop-1512|/sign-in": {
-    "ariaLabel": 1,
-    "role": 3,
-    "ariaSelected": 2,
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
     "ariaDescribedby": 0,
-    "rawMatches": 56
+    "rawMatches": 54
   }
 }

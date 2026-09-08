@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -79,12 +79,17 @@ import SignInPage from '../app/sign-in/page.js';
  * is unset — and a default that matched production would make every case below
  * pass for a reason unrelated to what it names.
  */
-function serverOffers(answer: { google: boolean; apple: boolean }): void {
+function serverOffers(answer: { google: boolean; apple: boolean; phone?: boolean }): void {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes('/v1/auth/methods')) {
-        return new Response(JSON.stringify(answer), {
+        // `phone` defaults to FALSE for the same reason the social pair does:
+        // that is the dev stack's real state (`selectOtpSender()` returns a
+        // `NullOtpSender`), and a default matching a hypothetical SMS-enabled
+        // deployment would make every case below pass for a reason unrelated to
+        // what it names. A case that wants the Phone tab asks for it.
+        return new Response(JSON.stringify({ phone: false, ...answer }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -119,21 +124,44 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    *     to sign in with. Not a configuration gap; a missing feature.
    *
    * So the property is no longer *four methods are offered* but **exactly the
-   * methods that can work are offered**. Phone and email need no provider and
-   * are unconditional; the social pair is gated on the server's own answer; and
-   * passkey moves from a button to conditional mediation, which shows itself
-   * only to a user who actually has one.
+   * methods that can work are offered**. Email link needs no channel and is the
+   * one unconditional method; the social pair is gated on the server's own
+   * answer; passkey has no entry point until Task 12 restores it with
+   * registration.
+   *
+   * **AMENDED AGAIN (round 2c), and the sentence this replaces is the finding.**
+   * It read *"Phone and email need no provider and are unconditional"*. Phone
+   * was never unconditional — it only looked that way because the page offered
+   * it unconditionally. `selectOtpSender()` returns a `NullOtpSender` that
+   * refuses every code with 501, so the Phone tab was the same dead control the
+   * Google button and the passkey button were, and this case's own NAME
+   * asserted the defect. Phone is now gated on `GET /v1/auth/methods`, and both
+   * directions are asserted below, because the false half alone would pass
+   * against a page that had simply deleted phone sign-in.
    *
    * The password absence is unchanged and still asserted: `auth.ts:84` sets
    * `emailAndPassword: { enabled: false }` with "the spec forbids passwords", so
    * the prototype's Password tab is not merely absent but forbidden.
    */
-  it('3.84 offers phone OTP and magic link unconditionally, and nothing password-shaped', () => {
+  it('3.84 offers magic link always, phone only where SMS can deliver, and nothing password-shaped', async () => {
     render(<SignInPage />);
-    expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Email link' })).toBeInTheDocument();
+    // The dev stack's real state: no SMS channel. Email is the method, and there
+    // is no segmented control at all — a control with one option asks the user
+    // to make a decision that has already been made.
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Phone' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Phone number')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /password/i })).not.toBeInTheDocument();
+
+    cleanup();
+    serverOffers({ google: false, apple: false, phone: true });
+    render(<SignInPage />);
+    // And where a code CAN arrive the tab is back and phone is the default, so
+    // this case cannot be satisfied by deleting phone sign-in altogether.
+    expect(await screen.findByRole('tab', { name: 'Phone' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Email link' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone number')).toBeInTheDocument();
   });
 
   /**
@@ -199,7 +227,8 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     const { container } = render(<SignInPage />);
 
     // The page rendered, so a zero count is a fact about buttons, not a blank DOM.
-    expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
+    // The Email form still renders; the point of this case is that NO social row does.
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
     // The request was actually made and its body consumed before anything below
     // is read. Without this the assertions run on the first tick and pass
     // against a page that has not yet been told anything.
@@ -285,7 +314,8 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
 
     expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
 
-    await user.click(screen.getByRole('tab', { name: 'Email link' }));
+    // No tab to click: with no SMS channel there is no control, and Email link
+    // is the method the page opens on.
     // The field IS present and carries the token — so the absence below is a
     // fact about the request, never about a missing field.
     expect(document.querySelector('input[autocomplete~="webauthn"]')).not.toBeNull();
@@ -302,9 +332,12 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   });
 
   it('phone flow: request the code, then verify it', async () => {
+    // This flow only exists on a deployment with an SMS channel, so the case
+    // says so rather than inheriting a default that no longer offers it.
+    serverOffers({ google: false, apple: false, phone: true });
     const user = userEvent.setup();
     render(<SignInPage />);
-    await user.type(screen.getByLabelText('Phone number'), '+919812345678');
+    await user.type(await screen.findByLabelText('Phone number'), '+919812345678');
     await user.click(screen.getByRole('button', { name: 'Send code' }));
     expect(sendOtp).toHaveBeenCalledWith({ phoneNumber: '+919812345678' });
     await user.type(await screen.findByLabelText('One-time code'), '123456');
@@ -344,7 +377,8 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     query.current = new URLSearchParams(`next=${hostile}`);
     const user = userEvent.setup();
     render(<SignInPage />);
-    await user.click(screen.getByRole('tab', { name: 'Email link' }));
+    // No tab to click: with no SMS channel there is no control, and Email link
+    // is the method the page opens on.
     await user.type(screen.getByLabelText('Email'), 'anselma@example.com');
     await user.click(screen.getByRole('button', { name: 'Send magic link' }));
 
@@ -367,7 +401,8 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   it('magic-link flow sends the email', async () => {
     const user = userEvent.setup();
     render(<SignInPage />);
-    await user.click(screen.getByRole('tab', { name: 'Email link' }));
+    // No tab to click: with no SMS channel there is no control, and Email link
+    // is the method the page opens on.
     await user.type(screen.getByLabelText('Email'), 'anselma@example.com');
     await user.click(screen.getByRole('button', { name: 'Send magic link' }));
     /* ABSOLUTE, against the origin this page is served from — jsdom's default

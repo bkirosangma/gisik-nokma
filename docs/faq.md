@@ -23,11 +23,11 @@ Nowhere. This product has no passwords at all and never asks you to make one up.
 something for you when they set it up, it was a one-time code or a sign-in link, not a password you
 would re-use.
 
-**The sign-in screen opens on "Phone". Should I use it?**
-No. Type your number, press Send code, and no code will arrive — the product answers with a message
-saying sign-in is by email. Use the **Email link** tab, or Google, or a passkey. This is the single
-most confusing thing on any screen in the product, because the option that fails is the one the screen
-puts in front of you first.
+**Why is there no "Phone" option on the sign-in screen?**
+Because this deployment has no way to send you a code. Sending an SMS to an Indian number needs a
+DLT-registered sender and template, which is a registration rather than a setting, and until that
+exists the screen does not offer a tab that cannot work. Sign in with the **Email link**. Where SMS
+delivery is configured, the Phone tab appears on its own.
 
 **What's a passkey?**
 The fingerprint or face unlock your phone or laptop already does. If you have set that up, it is the

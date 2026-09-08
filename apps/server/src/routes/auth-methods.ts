@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Auth } from '../auth/auth.js';
 import { enabledSocialProviders, type EnabledSocialProviders } from '../auth/social-providers.js';
+import { phoneSignInAvailable } from '../auth/otp-sender.js';
 
 /**
  * `GET /v1/auth/methods` — which social sign-in methods this server will
@@ -65,14 +66,31 @@ import { enabledSocialProviders, type EnabledSocialProviders } from '../auth/soc
  * changes nothing, so it is outside the set by construction rather than by
  * omission — stated here so a later reader does not "fix" a gap that is not one.
  */
+/**
+ * The response body: one boolean per social provider, plus `phone`.
+ *
+ * `phone` sits beside them rather than in a nested object because it answers
+ * the same question the page asks once — "which methods will this server
+ * accept?" — and a client that already reads `google` reads it with no new
+ * shape.
+ */
+export type AuthMethods = EnabledSocialProviders & { phone: boolean };
+
 export function registerAuthMethodRoutes(app: FastifyInstance, auth: Auth): void {
   // Computed ONCE, at registration, from the object the auth instance holds.
   // Provider configuration cannot change without a restart — it is read from the
   // environment at assembly — so re-deriving per request would suggest a
   // liveness this server does not have.
-  const enabled: EnabledSocialProviders = enabledSocialProviders(
-    auth.options.socialProviders ?? {},
-  );
+  const enabled: AuthMethods = {
+    ...enabledSocialProviders(auth.options.socialProviders ?? {}),
+    // Read off the SAME instance, for the same reason as the providers above:
+    // `auth.otpSender` is the object `sendOTP` awaits (`auth/auth.ts:326`), so
+    // there is no arrangement under which this says yes and the send refuses.
+    // Computed here, not in the handler, which is what keeps the route's
+    // "no database, no crypto, no per-request computation" claim true and so
+    // keeps it honestly outside every rate-limit bucket.
+    phone: phoneSignInAvailable(auth.otpSender),
+  };
 
   app.get('/v1/auth/methods', async (_request, reply) => {
     return reply.send(enabled);

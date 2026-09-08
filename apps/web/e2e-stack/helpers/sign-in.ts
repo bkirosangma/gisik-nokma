@@ -18,8 +18,19 @@ export const ACCOUNTANT_EMAIL = 'accountant@e2e.gisik-nokma.local';
  */
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/sign-in');
-  // The page opens on the phone tab; the email form is behind "Email link".
-  await page.getByRole('tab', { name: 'Email link' }).click();
+  /* NO TAB CLICK, and its absence is load-bearing rather than a tidy-up.
+   *
+   * This used to read `getByRole('tab', { name: 'Email link' }).click()` with
+   * the comment "the page opens on the phone tab". It no longer does: the stack
+   * server selects a `NullOtpSender`, `GET /v1/auth/methods` reports
+   * `phone: false`, and the page renders the email form with no segmented
+   * control at all — so there is no tab here to click, and clicking for one
+   * would fail the whole suite at its first step.
+   *
+   * `getByLabel('Email')` is what carries the weight now. It is not a weaker
+   * assertion for having lost the click: a page that failed to render, or that
+   * rendered the phone form instead, fails here loudly rather than silently
+   * signing nobody in. */
   await page.getByLabel('Email').fill(email);
 
   // Purge LAST, immediately before the send, so exactly one link is in flight.

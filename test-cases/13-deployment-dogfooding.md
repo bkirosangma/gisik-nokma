@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. The next free BLOCK after that is `13.327`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. `13.327`–`13.333` is ALLOCATED to Task 12 (passkey registration), of which `13.333` is the rate-limit property. `13.334`–`13.336` is ALLOCATED to round 2c, the phone gating (controller, 2026-09-08). The next free BLOCK after that is `13.337`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1864,6 +1864,15 @@ the gate would have stayed 33/33.*
   naming the route and printing **"LOST ariaSelected: baseline 2, now 1"**. Committed first, then
   mutated, then restored — `git checkout --` restores from HEAD and has destroyed uncommitted work here
   twice.*
+  **FLOOR 0 ON `/sign-in` SINCE ROUND 2c (2026-09-08), and it is recorded here rather than left to be
+  discovered.** Gating the Phone tab removed the segmented control, which carried this page's only
+  `aria-label`, its `tablist`/`tab` roles and both `aria-selected`s — so all four ratcheted counts are
+  `0`, and **a floor of zero cannot fall: 13.285 protects nothing on `/sign-in`** until a labelled
+  control returns (Task 12's passkey UI, or a deployment with a provider configured). 13.286 still
+  guards the sweep on that route — `rawMatches` is 54, so a sweep that saw nothing is still caught. The
+  ratchet MECHANISM is witnessed on `/privacy`, whose floor is non-zero: deleting the back button's
+  `aria-label` reddens 6 of 19 with **"LOST ariaLabel: baseline 1"** naming `/privacy` and `/terms` at
+  all three viewports.
 - **13.286** ✅ The sweep's selector control, asserted HARD and BEFORE the ratchet: `*` over a rendered
   document must examine more than zero elements. *A sweep that stopped matching reports zero losses and
   is byte-for-byte indistinguishable from a page that lost nothing — the failure this file catalogues
@@ -2017,6 +2026,38 @@ what works, then style what remains**.*
 *Four items came back from the owner's live look at `/sign-in` on `ebb21aa`. Items 1 and 3 are here;
 item 2 (render only the auth methods that can actually work, then style them) is its own change set
 because the finding underneath it is a product gap, not a styling one.*
+
+- **13.334** ✅ With the server reporting `phone: false` — the dev stack's real state — `/sign-in`
+  offers **neither the Phone tab nor the OTP form nor a segmented control at all**, at all three
+  viewports, and Email link is the method the page opens on. The Email field is asserted FIRST and is
+  what makes the four zero counts mean anything: it is a positive, awaited signal that the answer
+  arrived and the page re-rendered against it, and without it **a blank document satisfies every
+  `toHaveCount(0)` in the case** — the same vacuous shape 13.292's own social half was rewritten to
+  escape, which is why it is not repeated here. The answer is supplied by `page.route`, because this
+  suite's `next dev` has no API behind it and an unanswered fetch leaves the page's availability state
+  `null`, which renders nothing whatever the gate does. Mutation: dropping `phoneAvailable ?` in
+  `sign-in/page.tsx` so the control renders unconditionally → RED at all three viewports.
+  — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.335** ✅ And with `phone: true` driven through `page.route`, the Phone tab is back, Email link
+  beside it, and **phone is the default** — the half that stops 13.334 from being satisfied by simply
+  deleting phone sign-in. The phone FORM is asserted, not merely the tab: a selected tab sitting over
+  the email form is the state the page would reach if `method` were stored and corrected by an effect
+  rather than derived, and that state is unrecoverable by clicking because the tab that would switch
+  back is the one that is missing. Mutation: forcing `method` to `'email'` → RED here, and 13.334
+  stays green, so the two cases fail for different reasons.
+  — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.336** ✅ `GET /v1/auth/methods` reports `phone` from the sender the running auth instance holds
+  — `NullOtpSender` ⇒ `false`, a sender that can deliver ⇒ `true` — and **both directions are pinned**,
+  because the false half alone would pass forever against a route that hard-coded false. The third
+  case builds two apps in ONE process, so `process.env` is byte-identical for both, and they disagree:
+  no answer derived from an environment variable can produce two different booleans there, which is
+  what makes "from the selection, not from env" a measurement rather than a claim. That case is also
+  the one that fails if the route is "simplified" into calling `selectOtpSender()` itself, which
+  re-decides instead of reporting and so stops reporting on the instance that actually sends.
+  Mutations: hard-code `phone: true` → RED on exactly two cases, both 13.336's, naming their own site;
+  hard-code `phone: false` → RED including 13.336's true half; substitute `selectOtpSender()` for
+  `auth.otpSender` → RED on the true half and the disagreement case, with the false half correctly
+  still green. — (`apps/server/test/routes/auth-methods.test.ts`)
 
 - **13.321** ✅ The sign-in sheet is centred in the viewport — **both halves, measured from the live
   box rather than the computed style.** (a) the `<main>` is at least the viewport height, and (b) the

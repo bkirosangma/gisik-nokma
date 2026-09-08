@@ -60,6 +60,31 @@ export const PHONE_SIGN_IN_UNAVAILABLE_MESSAGE =
  *
  * It holds no state, so there is nothing here to grow and nothing to dump.
  */
+/**
+ * WHETHER PHONE SIGN-IN CAN WORK ON THIS DEPLOYMENT — the one rule, in the file
+ * that defines what "cannot deliver" means.
+ *
+ * `GET /v1/auth/methods` reports this so `/sign-in` renders the Phone tab only
+ * where a code can actually arrive. It is derived from the sender the running
+ * auth instance holds, never from an env flag: a `SMS_*` variable would be a
+ * SECOND declaration of the same fact, and the arrangement where it says yes
+ * and `selectOtpSender()` still returns a `NullOtpSender` is exactly the
+ * offered-but-refused door this exists to close.
+ *
+ * `instanceof` rather than a `canDeliver` flag on the interface, deliberately:
+ * the refusal is a property of THIS class — it throws on every send — not
+ * something an implementer declares about itself and could declare wrongly.
+ * When `selectOtpSender()` gains a real branch that can return a
+ * half-configured sender, that is the change that earns a self-reported
+ * capability; today there are two implementers and one of them is a refusal.
+ *
+ * `LogOtpSender` reads as available, and that is correct: it delivers to a log,
+ * which is what the test and dev paths sign in through.
+ */
+export function phoneSignInAvailable(sender: OtpSender): boolean {
+  return !(sender instanceof NullOtpSender);
+}
+
 export class NullOtpSender implements OtpSender {
   async send(_phoneE164: string, _code: string): Promise<void> {
     throw new APIError('NOT_IMPLEMENTED', {

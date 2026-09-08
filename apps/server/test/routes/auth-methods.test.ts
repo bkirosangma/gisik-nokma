@@ -3,7 +3,7 @@ import { buildApp } from '../../src/app.js';
 import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
-import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import { LogOtpSender, NullOtpSender, type OtpSender } from '../../src/auth/otp-sender.js';
 import {
   enabledSocialProviders,
   readSocialProviderEnv,
@@ -38,10 +38,13 @@ function fakeIngest(): IngestService {
   };
 }
 
-function appWithProviders(socialProviders: Parameters<typeof createAuth>[0]['socialProviders']) {
+function appWithProviders(
+  socialProviders: Parameters<typeof createAuth>[0]['socialProviders'],
+  otpSender: OtpSender = new LogOtpSender(() => {}),
+) {
   const auth = createAuth({
     pool: offlinePool,
-    otpSender: new LogOtpSender(() => {}),
+    otpSender,
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
@@ -79,7 +82,7 @@ describe('13.324 the page is told which social methods this server will actually
     expect(response.statusCode).toBe(200);
     // `toEqual`, not a partial match: the point is that this route says NOTHING
     // ELSE. A body that grew a client id would still satisfy `toMatchObject`.
-    expect(response.json()).toEqual({ google: false, apple: false });
+    expect(response.json()).toEqual({ google: false, apple: false, phone: true });
   });
 
   it('13.324 answers true for exactly the providers the auth instance was built with', async () => {
@@ -87,7 +90,7 @@ describe('13.324 the page is told which social methods this server will actually
       method: 'GET',
       url: '/v1/auth/methods',
     });
-    expect(both.json()).toEqual({ google: true, apple: true });
+    expect(both.json()).toEqual({ google: true, apple: true, phone: true });
 
     // Each alone, because `{google:true, apple:true}` and `{google:false,
     // apple:false}` are both satisfied by a route that returns one boolean twice.
@@ -95,13 +98,13 @@ describe('13.324 the page is told which social methods this server will actually
       method: 'GET',
       url: '/v1/auth/methods',
     });
-    expect(googleOnly.json()).toEqual({ google: true, apple: false });
+    expect(googleOnly.json()).toEqual({ google: true, apple: false, phone: true });
 
     const appleOnly = await appWithProviders({ apple: APPLE }).inject({
       method: 'GET',
       url: '/v1/auth/methods',
     });
-    expect(appleOnly.json()).toEqual({ google: false, apple: true });
+    expect(appleOnly.json()).toEqual({ google: false, apple: true, phone: true });
   });
 
   /**
@@ -135,6 +138,73 @@ describe('13.324 the page is told which social methods this server will actually
     const options = auth.options.socialProviders ?? {};
     expect(Object.keys(options).sort()).toEqual(['google']);
     expect(enabledSocialProviders(options)).toEqual({ google: true, apple: false });
+  });
+});
+
+describe('13.336 the page is told whether phone sign-in can work, from the running instance', () => {
+  /**
+   * 13.336 — THE LOAD-BEARING HALF. `selectOtpSender()` returns a
+   * `NullOtpSender`, which throws `PHONE_SIGN_IN_UNAVAILABLE` on every send, so
+   * the honest answer to "will you accept a phone sign-in" is no — and the page
+   * renders no Phone tab on the strength of it.
+   *
+   * Mutation witnessed: hard-coding `phone: true` in `registerAuthMethodRoutes`
+   * reddens this case and this case alone, naming `/v1/auth/methods`.
+   */
+  it('13.336 answers phone:false when the selected sender is a NullOtpSender', async () => {
+    const response = await appWithProviders({}, new NullOtpSender()).inject({
+      method: 'GET',
+      url: '/v1/auth/methods',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ google: false, apple: false, phone: false });
+  });
+
+  /**
+   * 13.336 — AND THE OTHER DIRECTION, which is what makes the case above mean
+   * anything. A route that answered `phone: false` unconditionally would pass
+   * the first case forever; only a sender that CAN deliver, answering true,
+   * shows the value is read rather than written.
+   *
+   * Mutation witnessed: hard-coding `phone: false` reddens this case alone.
+   */
+  it('13.336 answers phone:true when the selected sender can deliver', async () => {
+    const response = await appWithProviders({}, new LogOtpSender(() => {})).inject({
+      method: 'GET',
+      url: '/v1/auth/methods',
+    });
+    expect(response.json()).toEqual({ google: false, apple: false, phone: true });
+  });
+
+  /**
+   * 13.336 — IT COMES FROM THE SELECTION, NOT FROM THE ENVIRONMENT, and this is
+   * the case that proves it rather than asserting it.
+   *
+   * Both apps are built inside ONE process, so `process.env` is byte-identical
+   * for both. They disagree. An answer derived from any environment variable —
+   * an `SMS_ENABLED` flag, a `NODE_ENV` branch — could not produce two different
+   * booleans here, because there is nothing different for it to read. The only
+   * thing that differs is the sender object each auth instance holds, which is
+   * the property `phoneSignInAvailable` exists to expose.
+   *
+   * This is also the case that fails if someone "simplifies" the route by
+   * calling `selectOtpSender()` itself instead of reading `auth.otpSender`:
+   * that version answers false for BOTH apps, because it re-decides rather than
+   * reporting, and the instance it reports on stops being the instance that
+   * sends.
+   */
+  it('13.336 two instances in one process, one env, disagree', async () => {
+    const refusing = await appWithProviders({}, new NullOtpSender()).inject({
+      method: 'GET',
+      url: '/v1/auth/methods',
+    });
+    const delivering = await appWithProviders({}, new LogOtpSender(() => {})).inject({
+      method: 'GET',
+      url: '/v1/auth/methods',
+    });
+
+    expect(refusing.json().phone).toBe(false);
+    expect(delivering.json().phone).toBe(true);
   });
 });
 
@@ -221,7 +291,12 @@ describe('13.325 "empty disables" is a property of this repo, not a vendor coinc
         method: 'GET',
         url: '/v1/auth/methods',
       });
-      expect(response.json()).toEqual(expected);
+      // `phone` is invariant across this table BY CONSTRUCTION and stays in the
+      // `toEqual`: every row varies social ENV, none varies the sender, and the
+      // helper's default is a `LogOtpSender`, which can deliver. Spreading it in
+      // rather than dropping to `toMatchObject` keeps the "says NOTHING ELSE"
+      // property these rows exist for. 13.336 is where the sender varies.
+      expect(response.json()).toEqual({ ...expected, phone: true });
     });
   }
 

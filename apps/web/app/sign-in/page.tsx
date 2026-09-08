@@ -102,17 +102,17 @@ function samePathOnly(raw: string | null): string {
  * be guessing on behalf of. Phone and email are unaffected either way; they need
  * no provider and are never gated by this.
  */
-type SocialAvailability = { google: boolean; apple: boolean };
+type AuthMethods = { google: boolean; apple: boolean; phone: boolean };
 
-function useSocialAvailability(): SocialAvailability | null {
-  const [available, setAvailable] = useState<SocialAvailability | null>(null);
+function useAuthMethods(): AuthMethods | null {
+  const [available, setAvailable] = useState<AuthMethods | null>(null);
 
   useEffect(() => {
     // `/v1/*` is rewritten to the API by `next.config.ts`, so this is
     // same-origin and needs no base URL — the same path `authClient` relies on.
     const controller = new AbortController();
     void fetch('/v1/auth/methods', { signal: controller.signal })
-      .then(async (response) => (response.ok ? ((await response.json()) as SocialAvailability) : null))
+      .then(async (response) => (response.ok ? ((await response.json()) as AuthMethods) : null))
       .then((answer) => {
         if (answer !== null) setAvailable(answer);
       })
@@ -154,8 +154,30 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = samePathOnly(searchParams.get('next'));
-  const social = useSocialAvailability();
-  const [method, setMethod] = useState<Method>('phone');
+  const social = useAuthMethods();
+
+  /**
+   * PHONE IS OFFERED ONLY WHERE A CODE CAN ARRIVE, and `method` is DERIVED
+   * rather than stored, which is what makes the bad state unreachable instead
+   * of merely unlikely.
+   *
+   * The stored-state version — `useState<Method>('phone')` corrected by an
+   * effect when availability lands — has a window in which `method` is
+   * `'phone'` and the Phone tab is not rendered. What the user sees there is a
+   * card with no form in it at all: the tab that would switch back does not
+   * exist, so it is not even recoverable. Deriving it means "no phone tab" and
+   * "phone form showing" cannot both be true, for any ordering of the fetch,
+   * any re-render, and any future edit that adds another `setMethod` call.
+   *
+   * `null` (in flight, or the fetch failed) reads as UNAVAILABLE, which is the
+   * same conservative default the hook above already documents for the social
+   * buttons: a method that appears a moment late is a smaller fault than one
+   * that is offered and refused. Email link needs no channel and always works,
+   * so the page is never empty while it waits.
+   */
+  const phoneAvailable = social?.phone === true;
+  const [chosen, setChosen] = useState<Method | null>(null);
+  const method: Method = phoneAvailable ? (chosen ?? 'phone') : 'email';
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -234,15 +256,27 @@ function SignInForm() {
         <p className="gn-page-header__tagline">The keeper of memory</p>
       </header>
       <Card className="gn-sign-in">
-        <SegmentedControl
-          aria-label="Sign-in method"
-          value={method}
-          onChange={setMethod}
-          options={[
-            { value: 'phone', label: 'Phone' },
-            { value: 'email', label: 'Email link' },
-          ]}
-        />
+        {/*
+          No control at all when phone is unavailable, rather than a control
+          with one option. A segmented control offering a single choice is a
+          control that cannot control anything — it asks the user to make a
+          decision that has already been made — and it is the same defect this
+          round exists to remove, one layer up from the tab itself. Dropping it
+          also takes the `tab` roles out of the accessibility tree, which is why
+          the `/sign-in` accessible-names baseline falls in this change; that is
+          a dead control leaving, not a ratchet going slack.
+        */}
+        {phoneAvailable ? (
+          <SegmentedControl
+            aria-label="Sign-in method"
+            value={method}
+            onChange={setChosen}
+            options={[
+              { value: 'phone', label: 'Phone' },
+              { value: 'email', label: 'Email link' },
+            ]}
+          />
+        ) : null}
 
         {method === 'phone' ? (
           <div className="gn-sign-in__method">
