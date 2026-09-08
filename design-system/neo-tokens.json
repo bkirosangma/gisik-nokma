@@ -1,0 +1,4735 @@
+{
+  "$comment": [
+    "Task 13, Part B. Every value below was extracted programmatically from",
+    "design-system/interactive/{desktop,mobile}.dc.html's <style> block by",
+    "design-system/tools/neo_tokens_probe.py \u2014 none hand-authored (MASTER.md).",
+    "Source of truth for the CODE remains packages/ui/src/tokens.ts; this file",
+    "is Task 13's measurement, feeding Task 14's transcription, not a decision."
+  ],
+  "device": {
+    "desktop": {
+      "hig": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EFE7DF",
+              "raw": "#EFE7DF",
+              "selector": ":root"
+            },
+            "raised": {
+              "value": "#FBF7F3",
+              "raw": "#FBF7F3",
+              "selector": ":root"
+            },
+            "sunken": {
+              "value": "#E4D8CC",
+              "raw": "#E4D8CC",
+              "selector": ":root"
+            },
+            "overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "raw": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "0 1px 3px rgba(39,58,99,0.16)",
+              "selector": ":root",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EFE7DF",
+              "selector": ":root"
+            },
+            "--raised": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--sunken": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--cardR": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "0 1px 3px rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--chipBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "4px 10px",
+              "selector": ":root"
+            },
+            "--ctlBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--navShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--segBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--segOnBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--segOnShadow": {
+              "value": "0 3px 8px rgba(39,58,99,0.16),0 3px 1px rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--sideOnBg": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--sideOnColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#141A2E",
+              "raw": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "raised": {
+              "value": "#20294A",
+              "raw": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "sunken": {
+              "value": "#2A3560",
+              "raw": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "raw": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "0 1px 3px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--raised": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sunken": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardR": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "0 1px 3px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--chipBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "4px 10px",
+              "selector": ":root"
+            },
+            "--ctlBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--navShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--segBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnShadow": {
+              "value": "0 3px 8px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      },
+      "minimal": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EFE7DF",
+              "raw": "#EFE7DF",
+              "selector": ":root"
+            },
+            "raised": {
+              "value": "#FBF7F3",
+              "raw": "#FBF7F3",
+              "selector": ":root"
+            },
+            "sunken": {
+              "value": "#E4D8CC",
+              "raw": "#E4D8CC",
+              "selector": ":root"
+            },
+            "overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "raw": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EFE7DF",
+              "selector": ":root"
+            },
+            "--raised": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--sunken": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--cardR": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "4px 0",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--navShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--segBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--segOnBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--segOnShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--sideOnBg": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--sideOnColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#141A2E",
+              "raw": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "raised": {
+              "value": "#20294A",
+              "raw": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "sunken": {
+              "value": "#2A3560",
+              "raw": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "raw": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--raised": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sunken": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardR": {
+              "value": "16px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "4px 0",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--navShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--segBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      },
+      "neo": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "raised": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "sunken": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "overlay": {
+              "value": "rgba(176,152,132,0.45)",
+              "raw": "rgba(176,152,132,0.45)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "20px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "control": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "7px 7px 16px rgba(176,152,132,0.55),-7px -7px 16px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": false,
+                  "color": "rgba(176,152,132,0.55)"
+                },
+                {
+                  "inset": false,
+                  "color": "rgba(255,255,255,0.95)"
+                }
+              ]
+            },
+            "sunken": {
+              "value": "inset 4px 4px 9px rgba(176,152,132,0.6),inset -4px -4px 9px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": true,
+                  "color": "rgba(176,152,132,0.6)"
+                },
+                {
+                  "inset": true,
+                  "color": "rgba(255,255,255,0.95)"
+                }
+              ]
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--raised": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--sunken": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--overlay": {
+              "value": "rgba(176,152,132,0.45)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill2": {
+              "value": "rgba(39,58,99,0.15)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardR": {
+              "value": "20px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardShadow": {
+              "value": "7px 7px 16px rgba(176,152,132,0.55),-7px -7px 16px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipShadow": {
+              "value": "inset 2px 2px 4px rgba(176,152,132,0.55),inset -2px -2px 4px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipPad": {
+              "value": "5px 12px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlShadow": {
+              "value": "5px 5px 11px rgba(176,152,132,0.55),-5px -5px 11px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlR": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldShadow": {
+              "value": "inset 4px 4px 9px rgba(176,152,132,0.6),inset -4px -4px 9px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--trayBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--trayShadow": {
+              "value": "inset 4px 4px 9px rgba(176,152,132,0.45),inset -4px -4px 9px rgba(255,255,255,0.9)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--navBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--navShadow": {
+              "value": "0 6px 14px rgba(176,152,132,0.4)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segOnBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segOnShadow": {
+              "value": "inset 3px 3px 6px rgba(176,152,132,0.55),inset -3px -3px 6px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--sideOnBg": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--sideOnColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "raised": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "sunken": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "overlay": {
+              "value": "rgba(0,0,0,0.6)",
+              "raw": "rgba(0,0,0,0.6)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "20px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "control": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "7px 7px 16px rgba(6,10,22,0.62),-7px -7px 16px rgba(242,233,225,0.07)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": false,
+                  "color": "rgba(6,10,22,0.62)"
+                },
+                {
+                  "inset": false,
+                  "color": "rgba(242,233,225,0.07)"
+                }
+              ]
+            },
+            "sunken": {
+              "value": "inset 4px 4px 9px rgba(0,0,0,0.6),inset -4px -4px 9px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": true,
+                  "color": "rgba(0,0,0,0.6)"
+                },
+                {
+                  "inset": true,
+                  "color": "rgba(255,255,255,0.05)"
+                }
+              ]
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--raised": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--sunken": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--overlay": {
+              "value": "rgba(0,0,0,0.6)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill2": {
+              "value": "rgba(216,204,193,0.21)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--cardR": {
+              "value": "20px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardShadow": {
+              "value": "7px 7px 16px rgba(6,10,22,0.62),-7px -7px 16px rgba(242,233,225,0.07)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipShadow": {
+              "value": "inset 2px 2px 4px rgba(0,0,0,0.55),inset -2px -2px 4px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipPad": {
+              "value": "5px 12px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--ctlShadow": {
+              "value": "5px 5px 11px rgba(0,0,0,0.55),-5px -5px 11px rgba(255,255,255,0.06)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--ctlR": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--fieldShadow": {
+              "value": "inset 4px 4px 9px rgba(0,0,0,0.6),inset -4px -4px 9px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--trayBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--trayShadow": {
+              "value": "inset 4px 4px 9px rgba(0,0,0,0.5),inset -4px -4px 9px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--navBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--navShadow": {
+              "value": "0 6px 14px rgba(0,0,0,0.5)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segOnBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segOnShadow": {
+              "value": "inset 3px 3px 6px rgba(0,0,0,0.55),inset -3px -3px 6px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      }
+    },
+    "mobile": {
+      "hig": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EFE7DF",
+              "raw": "#EFE7DF",
+              "selector": ":root"
+            },
+            "raised": {
+              "value": "#FBF7F3",
+              "raw": "#FBF7F3",
+              "selector": ":root"
+            },
+            "sunken": {
+              "value": "#E4D8CC",
+              "raw": "#E4D8CC",
+              "selector": ":root"
+            },
+            "overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "raw": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "0 1px 3px rgba(39,58,99,0.16)",
+              "selector": ":root",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EFE7DF",
+              "selector": ":root"
+            },
+            "--raised": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--sunken": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--cardR": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "0 1px 3px rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--chipBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "3px 9px",
+              "selector": ":root"
+            },
+            "--ctlBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--barShadow": {
+              "value": "0 -1px 12px rgba(39,58,99,0.10)",
+              "selector": ":root"
+            },
+            "--segBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--segOnBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--segOnShadow": {
+              "value": "0 3px 8px rgba(39,58,99,0.16),0 3px 1px rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--bezel": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#141A2E",
+              "raw": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "raised": {
+              "value": "#20294A",
+              "raw": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "sunken": {
+              "value": "#2A3560",
+              "raw": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "raw": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "0 1px 3px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--raised": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sunken": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardR": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "0 1px 3px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--chipBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "3px 9px",
+              "selector": ":root"
+            },
+            "--ctlBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--barShadow": {
+              "value": "0 -1px 12px rgba(6,10,22,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnShadow": {
+              "value": "0 3px 8px rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--bezel": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      },
+      "minimal": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EFE7DF",
+              "raw": "#EFE7DF",
+              "selector": ":root"
+            },
+            "raised": {
+              "value": "#FBF7F3",
+              "raw": "#FBF7F3",
+              "selector": ":root"
+            },
+            "sunken": {
+              "value": "#E4D8CC",
+              "raw": "#E4D8CC",
+              "selector": ":root"
+            },
+            "overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "raw": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EFE7DF",
+              "selector": ":root"
+            },
+            "--raised": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--sunken": {
+              "value": "#E4D8CC",
+              "selector": ":root"
+            },
+            "--overlay": {
+              "value": "rgba(39,58,99,0.34)",
+              "selector": ":root"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--fill4": {
+              "value": "rgba(39,58,99,0.06)",
+              "selector": ":root"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--cardR": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "3px 0",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--barShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--segBg": {
+              "value": "rgba(39,58,99,0.11)",
+              "selector": ":root"
+            },
+            "--segOnBg": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--segOnShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--bezel": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#141A2E",
+              "raw": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "raised": {
+              "value": "#20294A",
+              "raw": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "sunken": {
+              "value": "#2A3560",
+              "raw": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "raw": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "control": {
+              "value": "8px",
+              "selector": ":root"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]",
+              "layers": []
+            },
+            "sunken": {
+              "value": "none",
+              "selector": ":root",
+              "layers": []
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--raised": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sunken": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--overlay": {
+              "value": "rgba(10,14,26,0.62)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill4": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardR": {
+              "value": "12px",
+              "selector": ":root"
+            },
+            "--cardShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--chipShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--chipPad": {
+              "value": "3px 0",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--ctlShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--ctlR": {
+              "value": "8px",
+              "selector": ":root"
+            },
+            "--fieldBg": {
+              "value": "rgba(216,204,193,0.10)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fieldShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--trayBg": {
+              "value": "transparent",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--trayShadow": {
+              "value": "none",
+              "selector": ":root"
+            },
+            "--barBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--barShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--segBg": {
+              "value": "rgba(216,204,193,0.16)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnBg": {
+              "value": "#2A3560",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--segOnShadow": {
+              "value": "none",
+              "selector": "body[data-style=\"minimal\"]"
+            },
+            "--bezel": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": ":root"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      },
+      "neo": {
+        "light": {
+          "core": {
+            "surface": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "raised": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "sunken": {
+              "value": "#EDE4DB",
+              "raw": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "overlay": {
+              "value": "rgba(176,152,132,0.45)",
+              "raw": "rgba(176,152,132,0.45)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "18px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "control": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "6px 6px 13px rgba(176,152,132,0.55),-6px -6px 13px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": false,
+                  "color": "rgba(176,152,132,0.55)"
+                },
+                {
+                  "inset": false,
+                  "color": "rgba(255,255,255,0.95)"
+                }
+              ]
+            },
+            "sunken": {
+              "value": "inset 4px 4px 8px rgba(176,152,132,0.6),inset -4px -4px 8px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": true,
+                  "color": "rgba(176,152,132,0.6)"
+                },
+                {
+                  "inset": true,
+                  "color": "rgba(255,255,255,0.95)"
+                }
+              ]
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--raised": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--sunken": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--overlay": {
+              "value": "rgba(176,152,132,0.45)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill1": {
+              "value": "rgba(39,58,99,0.20)",
+              "selector": ":root"
+            },
+            "--fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--label": {
+              "value": "#202B49",
+              "selector": ":root"
+            },
+            "--label2": {
+              "value": "rgba(32,43,73,0.78)",
+              "selector": ":root"
+            },
+            "--label3": {
+              "value": "rgba(32,43,73,0.52)",
+              "selector": ":root"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--danger": {
+              "value": "#B93327",
+              "selector": ":root"
+            },
+            "--warning": {
+              "value": "#A2540B",
+              "selector": ":root"
+            },
+            "--success": {
+              "value": "#2C7355",
+              "selector": ":root"
+            },
+            "--gray": {
+              "value": "#6C6E7A",
+              "selector": ":root"
+            },
+            "--purple": {
+              "value": "#4C4A8F",
+              "selector": ":root"
+            },
+            "--pink": {
+              "value": "#B03A62",
+              "selector": ":root"
+            },
+            "--onColor": {
+              "value": "#FBF7F3",
+              "selector": ":root"
+            },
+            "--shadow": {
+              "value": "rgba(39,58,99,0.16)",
+              "selector": ":root"
+            },
+            "--tintDanger": {
+              "value": "rgba(185,51,39,0.13)",
+              "selector": ":root"
+            },
+            "--tintWarning": {
+              "value": "rgba(240,124,52,0.20)",
+              "selector": ":root"
+            },
+            "--tintPink": {
+              "value": "rgba(176,58,98,0.12)",
+              "selector": ":root"
+            },
+            "--tintPurple": {
+              "value": "rgba(76,74,143,0.13)",
+              "selector": ":root"
+            },
+            "--tintSuccess": {
+              "value": "rgba(44,115,85,0.13)",
+              "selector": ":root"
+            },
+            "--tintAccent": {
+              "value": "rgba(58,109,176,0.14)",
+              "selector": ":root"
+            },
+            "--cardBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardR": {
+              "value": "18px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardShadow": {
+              "value": "6px 6px 13px rgba(176,152,132,0.55),-6px -6px 13px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipShadow": {
+              "value": "inset 2px 2px 4px rgba(176,152,132,0.55),inset -2px -2px 4px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--chipPad": {
+              "value": "4px 10px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlShadow": {
+              "value": "5px 5px 10px rgba(176,152,132,0.55),-5px -5px 10px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlR": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldShadow": {
+              "value": "inset 4px 4px 8px rgba(176,152,132,0.6),inset -4px -4px 8px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--trayBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--trayShadow": {
+              "value": "inset 4px 4px 8px rgba(176,152,132,0.45),inset -4px -4px 8px rgba(255,255,255,0.9)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--barBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--barShadow": {
+              "value": "0 -6px 14px rgba(176,152,132,0.4)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segOnBg": {
+              "value": "#EDE4DB",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--segOnShadow": {
+              "value": "inset 3px 3px 6px rgba(176,152,132,0.55),inset -3px -3px 6px rgba(255,255,255,0.95)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--bezel": {
+              "value": "rgba(176,152,132,0.35)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            }
+          }
+        },
+        "dark": {
+          "core": {
+            "surface": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "raised": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "sunken": {
+              "value": "#1B2340",
+              "raw": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "overlay": {
+              "value": "rgba(0,0,0,0.6)",
+              "raw": "rgba(0,0,0,0.6)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            }
+          },
+          "fillLadder": {
+            "fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "fill2": {
+              "value": null,
+              "selector": "NOT DECLARED for this device"
+            },
+            "fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "radii": {
+            "card": {
+              "value": "18px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "control": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            }
+          },
+          "shadow": {
+            "raised": {
+              "value": "6px 6px 13px rgba(0,0,0,0.55),-6px -6px 13px rgba(255,255,255,0.06)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": false,
+                  "color": "rgba(0,0,0,0.55)"
+                },
+                {
+                  "inset": false,
+                  "color": "rgba(255,255,255,0.06)"
+                }
+              ]
+            },
+            "sunken": {
+              "value": "inset 4px 4px 8px rgba(0,0,0,0.6),inset -4px -4px 8px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]",
+              "layers": [
+                {
+                  "inset": true,
+                  "color": "rgba(0,0,0,0.6)"
+                },
+                {
+                  "inset": true,
+                  "color": "rgba(255,255,255,0.05)"
+                }
+              ]
+            },
+            "overlay": {
+              "value": null,
+              "selector": null,
+              "note": "NOT DEFINED in the exported CSS \u2014 --overlay is a background scrim colour only, no dedicated box-shadow variable exists for it in either file"
+            }
+          },
+          "allResolvedVars": {
+            "--surface": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--raised": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--sunken": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--overlay": {
+              "value": "rgba(0,0,0,0.6)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--fill1": {
+              "value": "rgba(216,204,193,0.26)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--fill3": {
+              "value": "rgba(176,152,132,0.16)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fill4": {
+              "value": "rgba(176,152,132,0.10)",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--label": {
+              "value": "#F2E9E1",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label2": {
+              "value": "rgba(242,233,225,0.80)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--label3": {
+              "value": "rgba(242,233,225,0.55)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--accentPick": {
+              "value": "#3A6DB0",
+              "selector": ":root"
+            },
+            "--accent": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--danger": {
+              "value": "#F79086",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--warning": {
+              "value": "#F7A961",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--success": {
+              "value": "#7BD3AA",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--gray": {
+              "value": "#9AA0B4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--purple": {
+              "value": "#B7B4F4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--pink": {
+              "value": "#F49AB7",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--onColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--shadow": {
+              "value": "rgba(6,10,22,0.66)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintDanger": {
+              "value": "rgba(247,144,134,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintWarning": {
+              "value": "rgba(247,169,97,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPink": {
+              "value": "rgba(244,154,183,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintPurple": {
+              "value": "rgba(183,180,244,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintSuccess": {
+              "value": "rgba(123,211,170,0.13)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--tintAccent": {
+              "value": "rgba(127,169,228,0.14)",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--cardBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--cardR": {
+              "value": "18px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--cardShadow": {
+              "value": "6px 6px 13px rgba(0,0,0,0.55),-6px -6px 13px rgba(255,255,255,0.06)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipShadow": {
+              "value": "inset 2px 2px 4px rgba(0,0,0,0.55),inset -2px -2px 4px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--chipPad": {
+              "value": "4px 10px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--ctlBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--ctlShadow": {
+              "value": "5px 5px 10px rgba(0,0,0,0.55),-5px -5px 10px rgba(255,255,255,0.06)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--ctlR": {
+              "value": "14px",
+              "selector": "body[data-style=\"neo\"]"
+            },
+            "--fieldBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--fieldShadow": {
+              "value": "inset 4px 4px 8px rgba(0,0,0,0.6),inset -4px -4px 8px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--trayBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--trayShadow": {
+              "value": "inset 4px 4px 8px rgba(0,0,0,0.5),inset -4px -4px 8px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--barBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--barShadow": {
+              "value": "0 -6px 14px rgba(0,0,0,0.5)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segOnBg": {
+              "value": "#1B2340",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--segOnShadow": {
+              "value": "inset 3px 3px 6px rgba(0,0,0,0.55),inset -3px -3px 6px rgba(255,255,255,0.05)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--bezel": {
+              "value": "rgba(255,255,255,0.10)",
+              "selector": "body[data-theme=\"dark\"][data-style=\"neo\"]"
+            },
+            "--brand": {
+              "value": "#EE7733",
+              "selector": ":root"
+            },
+            "--navBg": {
+              "value": "#20294A",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnBg": {
+              "value": "#7FA9E4",
+              "selector": "body[data-theme=\"dark\"]"
+            },
+            "--sideOnColor": {
+              "value": "#141A2E",
+              "selector": "body[data-theme=\"dark\"]"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ruleA_sunkenInputShadowEdge": {
+    "desktop": {
+      "hig": {
+        "light": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.1
+        },
+        "dark": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.24
+        }
+      },
+      "minimal": {
+        "light": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.1
+        },
+        "dark": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.24
+        }
+      },
+      "neo": {
+        "light": {
+          "applicable": true,
+          "backdrop": "#EDE4DB",
+          "layers": [
+            {
+              "color": "rgba(176,152,132,0.6)",
+              "inset": true,
+              "ratioVsFieldBg": 1.56
+            },
+            {
+              "color": "rgba(255,255,255,0.95)",
+              "inset": true,
+              "ratioVsFieldBg": 1.24
+            }
+          ],
+          "worstRatio": 1.24,
+          "passes3to1": false
+        },
+        "dark": {
+          "applicable": true,
+          "backdrop": "#1B2340",
+          "layers": [
+            {
+              "color": "rgba(0,0,0,0.6)",
+              "inset": true,
+              "ratioVsFieldBg": 1.25
+            },
+            {
+              "color": "rgba(255,255,255,0.05)",
+              "inset": true,
+              "ratioVsFieldBg": 1.16
+            }
+          ],
+          "worstRatio": 1.16,
+          "passes3to1": false
+        }
+      }
+    },
+    "mobile": {
+      "hig": {
+        "light": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.15
+        },
+        "dark": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.24
+        }
+      },
+      "minimal": {
+        "light": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.15
+        },
+        "dark": {
+          "applicable": false,
+          "note": "fieldShadow: none \u2014 boundary is by FILL (fieldBg vs surface), not shadow",
+          "fieldBgOnSurfaceRatio": 1.24
+        }
+      },
+      "neo": {
+        "light": {
+          "applicable": true,
+          "backdrop": "#EDE4DB",
+          "layers": [
+            {
+              "color": "rgba(176,152,132,0.6)",
+              "inset": true,
+              "ratioVsFieldBg": 1.56
+            },
+            {
+              "color": "rgba(255,255,255,0.95)",
+              "inset": true,
+              "ratioVsFieldBg": 1.24
+            }
+          ],
+          "worstRatio": 1.24,
+          "passes3to1": false
+        },
+        "dark": {
+          "applicable": true,
+          "backdrop": "#1B2340",
+          "layers": [
+            {
+              "color": "rgba(0,0,0,0.6)",
+              "inset": true,
+              "ratioVsFieldBg": 1.25
+            },
+            {
+              "color": "rgba(255,255,255,0.05)",
+              "inset": true,
+              "ratioVsFieldBg": 1.16
+            }
+          ],
+          "worstRatio": 1.16,
+          "passes3to1": false
+        }
+      }
+    }
+  },
+  "ruleB_controlFillBoundary": {
+    "desktop": {
+      "hig": {
+        "light": {
+          "ctlBg": "rgba(39,58,99,0.11)",
+          "ctlBgVsSurface": 1.2,
+          "ctlPasses3to1": false,
+          "chipBg": "rgba(39,58,99,0.11)",
+          "chipBgVsSurface": 1.2,
+          "chipPasses3to1": false,
+          "chipNote": null
+        },
+        "dark": {
+          "ctlBg": "rgba(216,204,193,0.16)",
+          "ctlBgVsSurface": 1.45,
+          "ctlPasses3to1": false,
+          "chipBg": "rgba(216,204,193,0.16)",
+          "chipBgVsSurface": 1.45,
+          "chipPasses3to1": false,
+          "chipNote": null
+        }
+      },
+      "minimal": {
+        "light": {
+          "ctlBg": "transparent",
+          "ctlBgVsSurface": null,
+          "ctlPasses3to1": false,
+          "chipBg": "transparent",
+          "chipBgVsSurface": null,
+          "chipPasses3to1": null,
+          "chipNote": "transparent in minimal \u2014 no fill boundary at all"
+        },
+        "dark": {
+          "ctlBg": "transparent",
+          "ctlBgVsSurface": null,
+          "ctlPasses3to1": false,
+          "chipBg": "transparent",
+          "chipBgVsSurface": null,
+          "chipPasses3to1": null,
+          "chipNote": "transparent in minimal \u2014 no fill boundary at all"
+        }
+      },
+      "neo": {
+        "light": {
+          "ctlBg": "#EDE4DB",
+          "ctlBgVsSurface": 1.0,
+          "ctlPasses3to1": false,
+          "chipBg": "#EDE4DB",
+          "chipBgVsSurface": 1.0,
+          "chipPasses3to1": false,
+          "chipNote": null
+        },
+        "dark": {
+          "ctlBg": "#1B2340",
+          "ctlBgVsSurface": 1.0,
+          "ctlPasses3to1": false,
+          "chipBg": "#1B2340",
+          "chipBgVsSurface": 1.0,
+          "chipPasses3to1": false,
+          "chipNote": null
+        }
+      }
+    },
+    "mobile": {
+      "hig": {
+        "light": {
+          "ctlBg": "rgba(39,58,99,0.11)",
+          "ctlBgVsSurface": 1.2,
+          "ctlPasses3to1": false,
+          "chipBg": "rgba(39,58,99,0.11)",
+          "chipBgVsSurface": 1.2,
+          "chipPasses3to1": false,
+          "chipNote": null
+        },
+        "dark": {
+          "ctlBg": "rgba(216,204,193,0.16)",
+          "ctlBgVsSurface": 1.45,
+          "ctlPasses3to1": false,
+          "chipBg": "rgba(216,204,193,0.16)",
+          "chipBgVsSurface": 1.45,
+          "chipPasses3to1": false,
+          "chipNote": null
+        }
+      },
+      "minimal": {
+        "light": {
+          "ctlBg": "transparent",
+          "ctlBgVsSurface": null,
+          "ctlPasses3to1": false,
+          "chipBg": "transparent",
+          "chipBgVsSurface": null,
+          "chipPasses3to1": null,
+          "chipNote": "transparent in minimal \u2014 no fill boundary at all"
+        },
+        "dark": {
+          "ctlBg": "transparent",
+          "ctlBgVsSurface": null,
+          "ctlPasses3to1": false,
+          "chipBg": "transparent",
+          "chipBgVsSurface": null,
+          "chipPasses3to1": null,
+          "chipNote": "transparent in minimal \u2014 no fill boundary at all"
+        }
+      },
+      "neo": {
+        "light": {
+          "ctlBg": "#EDE4DB",
+          "ctlBgVsSurface": 1.0,
+          "ctlPasses3to1": false,
+          "chipBg": "#EDE4DB",
+          "chipBgVsSurface": 1.0,
+          "chipPasses3to1": false,
+          "chipNote": null
+        },
+        "dark": {
+          "ctlBg": "#1B2340",
+          "ctlBgVsSurface": 1.0,
+          "ctlPasses3to1": false,
+          "chipBg": "#1B2340",
+          "chipBgVsSurface": 1.0,
+          "chipPasses3to1": false,
+          "chipNote": null
+        }
+      }
+    }
+  },
+  "ruleC_darkFillSeparation": {
+    "desktop": {
+      "hig": {
+        "surfaceVsRaised": 1.21,
+        "raisedVsSunken": 1.2,
+        "surfaceVsSunken": 1.46,
+        "surface": "#141A2E",
+        "raised": "#20294A",
+        "sunken": "#2A3560",
+        "allIdentical": false
+      },
+      "minimal": {
+        "surfaceVsRaised": 1.21,
+        "raisedVsSunken": 1.2,
+        "surfaceVsSunken": 1.46,
+        "surface": "#141A2E",
+        "raised": "#20294A",
+        "sunken": "#2A3560",
+        "allIdentical": false
+      },
+      "neo": {
+        "surfaceVsRaised": 1.0,
+        "raisedVsSunken": 1.0,
+        "surfaceVsSunken": 1.0,
+        "surface": "#1B2340",
+        "raised": "#1B2340",
+        "sunken": "#1B2340",
+        "allIdentical": true
+      }
+    },
+    "mobile": {
+      "hig": {
+        "surfaceVsRaised": 1.21,
+        "raisedVsSunken": 1.2,
+        "surfaceVsSunken": 1.46,
+        "surface": "#141A2E",
+        "raised": "#20294A",
+        "sunken": "#2A3560",
+        "allIdentical": false
+      },
+      "minimal": {
+        "surfaceVsRaised": 1.21,
+        "raisedVsSunken": 1.2,
+        "surfaceVsSunken": 1.46,
+        "surface": "#141A2E",
+        "raised": "#20294A",
+        "sunken": "#2A3560",
+        "allIdentical": false
+      },
+      "neo": {
+        "surfaceVsRaised": 1.0,
+        "raisedVsSunken": 1.0,
+        "surfaceVsSunken": 1.0,
+        "surface": "#1B2340",
+        "raised": "#1B2340",
+        "sunken": "#1B2340",
+        "allIdentical": true
+      }
+    }
+  },
+  "textSurfacePairs": {
+    "desktop": {
+      "hig": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.42,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 13.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.97,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.65,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.99,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.3,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 14.4,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 9.56,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.13,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 5.18,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 5.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      },
+      "minimal": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.42,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 13.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.97,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.65,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.99,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.3,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 14.4,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 9.56,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.13,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 5.18,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 5.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      },
+      "neo": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.02,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.02,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.96,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.19,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.19,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 8.71,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.71,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 4.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 6.39,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 6.39,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      }
+    },
+    "mobile": {
+      "hig": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.42,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 13.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.97,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.65,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.99,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.3,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 14.4,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 9.56,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.13,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 5.18,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 5.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      },
+      "minimal": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.42,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 13.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.97,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.11,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.65,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.99,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.3,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 14.4,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 9.86,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 9.56,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.13,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 5.18,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 5.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      },
+      "neo": {
+        "light": [
+          {
+            "pair": "label on surface",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 11.12,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 6.02,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 6.02,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 2.96,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 4.19,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 4.19,
+            "minimum": 4.5,
+            "pass": false
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 4.93,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ],
+        "dark": [
+          {
+            "pair": "label on surface",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on raised",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label on sunken",
+            "ratio": 12.87,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on surface",
+            "ratio": 8.71,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label2 on raised",
+            "ratio": 8.71,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "label3 on surface",
+            "ratio": 4.89,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on surface",
+            "ratio": 6.39,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "accent on raised",
+            "ratio": 6.39,
+            "minimum": 4.5,
+            "pass": true
+          },
+          {
+            "pair": "onColor on accent",
+            "ratio": 7.15,
+            "minimum": 4.5,
+            "pass": true
+          }
+        ]
+      }
+    }
+  },
+  "paletteDelta": {
+    "desktop": {
+      "hig": {
+        "light": {
+          "surface": {
+            "exported": "#EFE7DF",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -3,
+              "dG": -11,
+              "dB": -24
+            }
+          },
+          "raised": {
+            "exported": "#FBF7F3",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -4,
+              "dG": -8,
+              "dB": -12
+            }
+          },
+          "sunken": {
+            "exported": "#E4D8CC",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": -1,
+              "dG": -13,
+              "dB": -30
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#141A2E",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 20,
+              "dG": 26,
+              "dB": 46
+            }
+          },
+          "raised": {
+            "exported": "#20294A",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": 4,
+              "dG": 13,
+              "dB": 44
+            }
+          },
+          "sunken": {
+            "exported": "#2A3560",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -2,
+              "dG": 9,
+              "dB": 50
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      },
+      "minimal": {
+        "light": {
+          "surface": {
+            "exported": "#EFE7DF",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -3,
+              "dG": -11,
+              "dB": -24
+            }
+          },
+          "raised": {
+            "exported": "#FBF7F3",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -4,
+              "dG": -8,
+              "dB": -12
+            }
+          },
+          "sunken": {
+            "exported": "#E4D8CC",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": -1,
+              "dG": -13,
+              "dB": -30
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#141A2E",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 20,
+              "dG": 26,
+              "dB": 46
+            }
+          },
+          "raised": {
+            "exported": "#20294A",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": 4,
+              "dG": 13,
+              "dB": 44
+            }
+          },
+          "sunken": {
+            "exported": "#2A3560",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -2,
+              "dG": 9,
+              "dB": 50
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      },
+      "neo": {
+        "light": {
+          "surface": {
+            "exported": "#EDE4DB",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -5,
+              "dG": -14,
+              "dB": -28
+            }
+          },
+          "raised": {
+            "exported": "#EDE4DB",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -18,
+              "dG": -27,
+              "dB": -36
+            }
+          },
+          "sunken": {
+            "exported": "#EDE4DB",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": 8,
+              "dG": -1,
+              "dB": -15
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#1B2340",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 27,
+              "dG": 35,
+              "dB": 64
+            }
+          },
+          "raised": {
+            "exported": "#1B2340",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": -1,
+              "dG": 7,
+              "dB": 34
+            }
+          },
+          "sunken": {
+            "exported": "#1B2340",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -17,
+              "dG": -9,
+              "dB": 18
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      }
+    },
+    "mobile": {
+      "hig": {
+        "light": {
+          "surface": {
+            "exported": "#EFE7DF",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -3,
+              "dG": -11,
+              "dB": -24
+            }
+          },
+          "raised": {
+            "exported": "#FBF7F3",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -4,
+              "dG": -8,
+              "dB": -12
+            }
+          },
+          "sunken": {
+            "exported": "#E4D8CC",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": -1,
+              "dG": -13,
+              "dB": -30
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#141A2E",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 20,
+              "dG": 26,
+              "dB": 46
+            }
+          },
+          "raised": {
+            "exported": "#20294A",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": 4,
+              "dG": 13,
+              "dB": 44
+            }
+          },
+          "sunken": {
+            "exported": "#2A3560",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -2,
+              "dG": 9,
+              "dB": 50
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      },
+      "minimal": {
+        "light": {
+          "surface": {
+            "exported": "#EFE7DF",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -3,
+              "dG": -11,
+              "dB": -24
+            }
+          },
+          "raised": {
+            "exported": "#FBF7F3",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -4,
+              "dG": -8,
+              "dB": -12
+            }
+          },
+          "sunken": {
+            "exported": "#E4D8CC",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": -1,
+              "dG": -13,
+              "dB": -30
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#141A2E",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 20,
+              "dG": 26,
+              "dB": 46
+            }
+          },
+          "raised": {
+            "exported": "#20294A",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": 4,
+              "dG": 13,
+              "dB": 44
+            }
+          },
+          "sunken": {
+            "exported": "#2A3560",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -2,
+              "dG": 9,
+              "dB": 50
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      },
+      "neo": {
+        "light": {
+          "surface": {
+            "exported": "#EDE4DB",
+            "shipped": "#f2f2f7",
+            "delta": {
+              "dR": -5,
+              "dG": -14,
+              "dB": -28
+            }
+          },
+          "raised": {
+            "exported": "#EDE4DB",
+            "shipped": "#ffffff",
+            "delta": {
+              "dR": -18,
+              "dG": -27,
+              "dB": -36
+            }
+          },
+          "sunken": {
+            "exported": "#EDE4DB",
+            "shipped": "#e5e5ea",
+            "delta": {
+              "dR": 8,
+              "dG": -1,
+              "dB": -15
+            }
+          },
+          "accent": {
+            "exported": "#3A6DB0",
+            "shipped": "#0040dd",
+            "delta": {
+              "dR": 58,
+              "dG": 45,
+              "dB": -45
+            }
+          }
+        },
+        "dark": {
+          "surface": {
+            "exported": "#1B2340",
+            "shipped": "#000000",
+            "delta": {
+              "dR": 27,
+              "dG": 35,
+              "dB": 64
+            }
+          },
+          "raised": {
+            "exported": "#1B2340",
+            "shipped": "#1c1c1e",
+            "delta": {
+              "dR": -1,
+              "dG": 7,
+              "dB": 34
+            }
+          },
+          "sunken": {
+            "exported": "#1B2340",
+            "shipped": "#2c2c2e",
+            "delta": {
+              "dR": -17,
+              "dG": -9,
+              "dB": 18
+            }
+          },
+          "accent": {
+            "exported": "#7FA9E4",
+            "shipped": "#409cff",
+            "delta": {
+              "dR": 63,
+              "dG": 13,
+              "dB": -27
+            }
+          }
+        }
+      }
+    }
+  }
+}
