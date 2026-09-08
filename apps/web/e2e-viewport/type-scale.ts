@@ -59,8 +59,25 @@ const BODY_SELECTOR = 'p, li, dd, dt, td, figcaption, label';
  * because this product uses them today but because they are the tags a due
  * date, a computed count and a glossary term arrive as, and this sweep should
  * not have to be edited to keep covering the page.
+ *
+ * `a`, `button`, `summary` and `th` ARE IN THE LIST BECAUSE A MUTATION CAUGHT
+ * THEIR ABSENCE, and the way it caught it is the reason to trust the list now.
+ * The first attempt to prove this ratchet could redden planted `font-size:
+ * 0.7rem` on `.gn-help__toc-link` and ran the suite. It went red — through the
+ * TAP-TARGET ratchet, because the links lost height — while this sweep reported
+ * `under-12px=0` on the same page in the same run. `a` was in neither
+ * population: not here, and not in `measureBodyText`'s `p, li, dd, dt, td,
+ * figcaption, label`. **Every link and every button in the product had no
+ * font-size floor of any kind**, and the mutation designed to test this check
+ * could not be seen by it.
+ *
+ * That is this repo's recorded failure shape — a control that does not traverse
+ * the same path as the measurement — and it was one green tick away from being
+ * shipped as proof. Headings stay out, matching the body sweep's own reasoning:
+ * they are the responsive signature's business and are larger by construction.
  */
-const LABEL_SELECTOR = 'span, small, div, strong, em, b, i, time, output, abbr, dfn';
+const LABEL_SELECTOR =
+  'span, small, div, strong, em, b, i, time, output, abbr, dfn, a, button, summary, th';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
