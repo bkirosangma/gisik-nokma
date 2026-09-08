@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * `vi.hoisted`, not five bare `const`s. `vi.mock` is hoisted above every
@@ -70,17 +70,148 @@ vi.mock('next/navigation', () => ({
 
 import SignInPage from '../app/sign-in/page.js';
 
+/**
+ * THE SERVER'S ANSWER ABOUT WHICH SOCIAL METHODS EXIST, stubbed per test.
+ *
+ * The page asks `GET /v1/auth/methods` on mount and renders a social button only
+ * for a provider the server says it will accept. `{ google: false, apple: false }`
+ * is the DEFAULT here because it is the dev stack's real state — `GOOGLE_CLIENT_ID`
+ * is unset — and a default that matched production would make every case below
+ * pass for a reason unrelated to what it names.
+ */
+function serverOffers(answer: { google: boolean; apple: boolean }): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/v1/auth/methods')) {
+        return new Response(JSON.stringify(answer), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch in sign-in test: ${String(input)}`);
+    }),
+  );
+}
+
+beforeEach(() => {
+  serverOffers({ google: false, apple: false });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  passkey.mockClear();
+});
+
 describe('sign-in — all four passwordless methods (spec §6)', () => {
   /**
-   * 3.84 — sign-in offers all four passwordless methods (phone OTP, magic link, Google, passkey) and nothing password-shaped. The absence is asserted, not merely unmentioned.
+   * 3.84, AMENDED — and the amendment is the finding, not a relaxation.
+   *
+   * This case used to assert that all four methods render as controls. Two of
+   * those four COULD NOT WORK, and asserting their presence is what kept them on
+   * screen:
+   *
+   *   * `Continue with Google` rendered unconditionally while
+   *     `GOOGLE_CLIENT_ID` was unset on the dev stack. The owner found it by
+   *     pressing it.
+   *   * `Sign in with a passkey` could not work for ANY user ANYWHERE — there is
+   *     no passkey registration flow in app code, so nobody can hold a passkey
+   *     to sign in with. Not a configuration gap; a missing feature.
+   *
+   * So the property is no longer *four methods are offered* but **exactly the
+   * methods that can work are offered**. Phone and email need no provider and
+   * are unconditional; the social pair is gated on the server's own answer; and
+   * passkey moves from a button to conditional mediation, which shows itself
+   * only to a user who actually has one.
+   *
+   * The password absence is unchanged and still asserted: `auth.ts:84` sets
+   * `emailAndPassword: { enabled: false }` with "the spec forbids passwords", so
+   * the prototype's Password tab is not merely absent but forbidden.
    */
-  it('offers phone OTP, magic link, Google and passkey — and nothing password-shaped', () => {
+  it('3.84 offers phone OTP and magic link unconditionally, and nothing password-shaped', () => {
     render(<SignInPage />);
     expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Email link' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign in with a passkey' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /password/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.326 — THE LOAD-BEARING CASE, and it is asserted in BOTH directions
+   * because each alone passes on a broken page.
+   *
+   * A page that renders no social button ever satisfies the first half. A page
+   * that renders both unconditionally satisfies the second. Only the pair says
+   * *the button appears when and only when the server will accept it*.
+   *
+   * The negative half uses `waitFor` around a NEGATIVE, which is a shape worth
+   * justifying: the fetch resolves on a microtask, so asserting absence
+   * synchronously would pass before the answer had arrived — green for the wrong
+   * reason, and green even against a page that renders the button a tick later.
+   * Waiting for the POSITIVE control (the tabs, which render immediately) is not
+   * enough either, because it does not order against the fetch. So the negative
+   * is asserted after the page has been given the answer and re-rendered, which
+   * `findByRole` on a control that DOES appear in the enabled case establishes.
+   */
+  it('13.326 renders no social button for a provider the server will not accept', async () => {
+    serverOffers({ google: false, apple: false });
+    render(<SignInPage />);
+
+    // Positive control first: the page rendered at all, so a zero count below is
+    // a fact about the buttons and not about an empty DOM.
+    expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Continue with Google' })).toBeNull();
+    });
+    expect(screen.queryByRole('button', { name: 'Continue with Apple' })).toBeNull();
+    // The old dead control, gone rather than hidden.
+    expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull();
+  });
+
+  it('13.326 renders each social button, by its shipped accessible name, when the server accepts it', async () => {
+    serverOffers({ google: true, apple: true });
+    render(<SignInPage />);
+
+    // The EXACT shipped wording, carried by `aria-label` now that the visible
+    // text is a logo mark. This is the locator 13.292 uses, so the copy rule is
+    // satisfied where a screen reader and a test both look.
+    const google = await screen.findByRole('button', { name: 'Continue with Google' });
+    const apple = await screen.findByRole('button', { name: 'Continue with Apple' });
+
+    // Icon-only: the accessible name comes from the label, not from text.
+    expect(google.textContent).toBe('');
+    expect(apple.textContent).toBe('');
+
+    // And the button reaches the provider it names — a mark wired to the wrong
+    // provider would satisfy every assertion above.
+    await userEvent.click(google);
+    expect(social).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'google' }),
+    );
+    await userEvent.click(apple);
+    expect(social).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'apple' }),
+    );
+  });
+
+  /**
+   * 13.326 — passkey is offered through WebAuthn conditional mediation, not a
+   * button. `autoFill: true` is the whole point: it asks the browser to surface a
+   * REGISTERED passkey through the email field's autofill and to show nothing at
+   * all when the user has none.
+   *
+   * Asserting the call is made is not enough on its own — `signIn.passkey()`
+   * with no argument would also be "called" — so the ARGUMENT is asserted. That
+   * is the difference between conditional UI and the dead modal-triggering call
+   * this replaces.
+   */
+  it('13.326 asks for a passkey through conditional mediation, with no button', async () => {
+    render(<SignInPage />);
+    await waitFor(() => {
+      expect(passkey).toHaveBeenCalledWith({ autoFill: true });
+    });
+    expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
   });
 
   it('phone flow: request the code, then verify it', async () => {
@@ -169,15 +300,27 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     ).toBe(false);
   });
 
-  it('Google and passkey call their sign-in methods', async () => {
+  /**
+   * The social callback, which is the half of 13.271 that reaches a PROVIDER
+   * rather than an inbox — and it now needs the server to say Google is
+   * available before the button it clicks exists at all.
+   *
+   * The passkey half moved OUT of this case. It used to click
+   * `Sign in with a passkey` and assert `passkey` was called with no argument,
+   * which is exactly the call that shipped a dead control: it opens a modal
+   * asking for a credential no user in this product can hold. 13.326 asserts the
+   * replacement — `{ autoFill: true }`, conditional mediation — and asserts the
+   * argument rather than the call, because a bare `passkey()` would satisfy
+   * "was called" while being the thing that was wrong.
+   */
+  it('13.271 the Google button carries the absolute web-origin callback', async () => {
+    serverOffers({ google: true, apple: false });
     const user = userEvent.setup();
     render(<SignInPage />);
-    await user.click(screen.getByRole('button', { name: 'Continue with Google' }));
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
     expect(social).toHaveBeenCalledWith({
       provider: 'google',
       callbackURL: 'http://localhost:3000/workspaces',
     });
-    await user.click(screen.getByRole('button', { name: 'Sign in with a passkey' }));
-    expect(passkey).toHaveBeenCalled();
   });
 });

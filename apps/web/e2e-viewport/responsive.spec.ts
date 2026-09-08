@@ -999,13 +999,50 @@ for (const route of UNAUTHED_ROUTES) {
     }
 
     if (route.path === '/sign-in') {
-      // 13.292 — every shipped method survives the restyle. The prototype drew
-      // two and the product ships four; the audit's D column is binding.
+      /* 13.292 — AMENDED, and the amendment is a finding rather than a
+       * relaxation.
+       *
+       * This case asserted that all four shipped methods render as controls,
+       * and TWO OF THE FOUR COULD NOT WORK. `Continue with Google` rendered
+       * unconditionally while `GOOGLE_CLIENT_ID` was unset (the owner found it
+       * by pressing it); `Sign in with a passkey` could not work for any user
+       * anywhere, because no passkey REGISTRATION flow exists in app code.
+       * **Asserting their presence is what kept them on screen** — the case was
+       * doing its job and its job was wrong.
+       *
+       * The property is now *exactly the methods that can work are offered*.
+       * Phone and email need no provider and stay unconditional. The social pair
+       * is gated on `GET /v1/auth/methods`, and this suite's dev server has no
+       * credentials, so the honest expectation here is ZERO social buttons — the
+       * dev stack's real state, asserted rather than worked around.
+       *
+       * The both-directions half of this property lives in
+       * `apps/web/test/sign-in.test.tsx` (13.326), where the server's answer can
+       * be driven to `true`. A viewport suite cannot set the server's env, so
+       * asserting only the empty direction HERE would be a check that cannot
+       * distinguish "gated correctly" from "the row was deleted" — which is why
+       * the positive control below asserts the row's own container is absent for
+       * the same reason the buttons are, and why 13.326 exists at all.
+       */
       const list = page.getByRole('tablist', { name: 'Sign-in method' });
       await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
       await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
+      await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
+
+      /* The passkey affordance that REPLACED the dead button, asserted as a
+       * fact about the DOM rather than about a call: conditional mediation
+       * attaches to this token, and without it `signIn.passkey({autoFill:true})`
+       * is inert. A user with a passkey is offered it here; a user without one
+       * sees nothing, which is the whole point. */
+      await list.getByRole('tab', { name: 'Email link' }).click();
+      await expect(page.locator('input[type="email"]')).toHaveAttribute(
+        'autocomplete',
+        'username webauthn',
+      );
+      await list.getByRole('tab', { name: 'Phone' }).click();
       // Phone is the DEFAULT, and this case's own name says so — added because
       // review found the claim unasserted. Flipping `useState<Method>('phone')`
       // to `'email'` left this suite fully green; the only thing that reddened
