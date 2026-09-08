@@ -252,4 +252,9 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.196.**
+**New cases continue from 11.197.**  
+*(11.196 is IN USE, at the entry directly above. This pointer means the NEXT FREE id — that is the
+convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188). #293 set it
+equal to the highest id instead of one past it, and #304 then minted exactly the id the pointer named;
+no duplicate resulted only because #304 advanced the pointer to its own new maximum, carrying the
+fault forward. Restored to max+1 here. Nothing validates this line, so it is checked by reading.)*

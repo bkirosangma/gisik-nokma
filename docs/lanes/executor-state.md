@@ -236,6 +236,133 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
 > while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
 >
+# ▶ TUESDAY 2026-09-08 ~11:3x IST — **THE WIDENED SWEEP: THE PRIOR PASS HAD THREE ENUMERATION HOLES, NOT ONE, AND THE #287 CLOSURE ITSELF BROKE A NEXT-FREE POINTER.**
+
+*Branch `exec/121-widened-staleness-sweep`, off `main` (`5191cf4`). Closes items 1-2 of the previous
+entry's five-unverified list. Touches one `.ts` file (a docblock citation), so NOT docs-only.*
+
+**FIRST, THE DROP CHECK ON THE PREVIOUS BRANCH — it passed.** `git diff origin/main
+exec/120-287-staleness` with NO path filter printed **zero insertions** (60 deletions, i.e. `main` merely
+ahead by #340). Positive control: the same diff against `HEAD~1` printed the handoff's 51 lines, proving
+the check can see a drop. #339 captured everything.
+
+## THE PRIOR SWEEP'S HOLE WAS BIGGER THAN IT KNEW, AND IT NAMED ONLY THE SMALLEST PART
+
+It recorded "`.md`/`.ts`/`.tsx` only; `.json`, `.yml`, `.sh`, Dockerfiles, READMEs not swept." True, and
+incomplete. Measured by `git ls-files` (never `find` — `rtk find` returns ZERO for compound predicates):
+
+| hole | size | how it was missed |
+|---|---|---|
+| unswept **classes** (`.json` `.yml` `.sh` Dockerfile README `.mjs` `.sql` `.css` `.toml` `.js` `.env`) | **180** | the one the prior pass named |
+| unswept **roots** — `.md`/`.ts`/`.tsx` OUTSIDE `docs,test-cases,apps,packages` | **12** non-frozen | **its own extension classes had holes**: `CLAUDE.md`, `Features.md`, `README.md`, `deploy/do/README.md`, 6 `.superpowers/sdd/*.md`, 2 `scripts/fixtures/*.md` |
+| **residue** — in no category at all | **15** | `.rs` `.tsv` `.lock` `.png` `.html` `.d.mts`; includes **`docs/lanes/task-ledger.tsv`**, a source of truth |
+
+Arithmetic reconciles exactly: 827 prior-swept + 192 unswept-surface + 15 residue + 10 frozen `reference/`
+= **1040 tracked**. The prior pass's own "829 files" was 827; a two-file overcount, harmless, recorded
+because *delta counts are readings, not facts*.
+
+**Per-class positive controls were run through the SAME `xargs grep` pipeline as the real patterns, and
+one FAILED**: `.sh` with control `tmux` returned 0/4, because the shell scripts that mention tmux live in
+`~/.claude/scripts`, not the repo. Repaired to `#!/` (4/4). **Had it not been printed, four files would
+have contributed a meaningless zero to a "nothing found" conclusion.**
+
+## FOUR CORRECTIONS, EACH MEASURED
+
+1. **`docs/lanes/task-ledger.tsv:171` (Plan 9 T14) cited a path #293 DELETED.** `apps/web/src/notifications-gateway.ts`
+   exists in no tracked file; git recorded it as an `R098` rename to `packages/app-core/src/online/notifications.ts`.
+   Annotated inline (the ledger's own `| CONTROLLER:` house style) rather than rewritten — **the row records
+   T14's merge-time artefacts, which is what a ledger row is for.**
+   **The measurement, with its own control:** all **166** distinct artefact paths cited across the ledger were
+   tested for existence; **3 were dead, and only this one is a real drift** — `scripts/generate-editor-html.mjs`
+   and `test-cases/08-web-client.md` are artefacts of MY OWN extraction regex (the first is
+   `apps/mobile/scripts/...` under a brace-expansion; the second the row itself calls *"deliberately NOT
+   created… Deviation recorded, not hidden"*). **My regex's recall is unmeasured, so 1-of-166 is a FLOOR on
+   drift, not a count.** `pnpm check:tasks` never validates path existence — it passed at every step.
+2. **`test-cases/11-calendar-notifications.md:255` pointed at an id already in use.** "New cases continue
+   from 11.196" sat two lines under the live `11.196` entry. **Corrected to 11.197 — and the file's own
+   history proves which reading is right rather than assuming it:**
+
+   | commit | pointer | max entry | |
+   |---|---|---|---|
+   | `e09666c` (file's founding, Plan 9 T15) | 11.189 | 11.188 | **next-free = max+1** ← the convention |
+   | `9c0af02` (**#293 — the #287 closure itself**) | 11.195 | 11.195 | **broke it** |
+   | `e6b19a7` (#304) | 11.196 | 11.196 | minted exactly the id the pointer named |
+
+   **The collision has already fired once, silently.** #304 took 11.196 *because the pointer said so*, and
+   escaped a duplicate only by advancing the pointer to its own new maximum — carrying the fault forward.
+   The next author who obeys it mints a duplicate. **Nothing validates this line**: `check-case-ids.mjs`
+   does not read it (grep for `continue from` in that script returns nothing).
+   **05 and 13 were checked and are NOT defects** — 05's "continued from 5.54" is explicitly historical and
+   points at its single authoritative next-free; 13 is block-allocated and says a lane must not derive an
+   id from the file. **A first, style-blind check called all three collisions**: `05` uses plain bullets
+   (`- 5.1`), not `- **5.1**`, so the bold-only matcher returned a false ZERO on the one file where the
+   pointer really was taken. Style-aware matching plus reading the sentences separated the three.
+3. **`test-cases/README.md` §11 statistics, stale in TWO paragraphs.** "147 ids are live … 11.130–11.188 …
+   continue from 11.189" → **154 … 11.190–11.196 … continue from 11.197**. Correct at `e09666c`; overtaken
+   by #293 (11.190–11.195) and #304 (11.196). **The recount reconciles exactly (147 + 7 = 154) and an
+   earlier reading of 156 was WRONG** — the range-form bullets `- **11.9–11.17, …**` and `- **11.123–11.129**`
+   were counted as live entries. That is the *same* range-form extraction bug this README documents
+   someone else hitting. **It nearly produced a false finding that the README was wrong about 11.9 and
+   11.123 — it is not; those ranges are correctly recorded as permanently unused.**
+4. **`test-cases/07-api-realtime-search.md:467` — case 7.243, still ❌, was the one genuine MISS.** It sat
+   inside the prior sweep's own roots and classes; only its *phrasing* escaped. It named
+   `apps/web/test/notifications-gateway.test.ts` (absent from all 1040 tracked files) and asserted
+   *"`apps/server` has no dependency on `apps/web` … so the web gateway cannot be driven from a server
+   test"* — **the exact premise #293 refuted** — while `Features.md:843` had already recorded it *"BUILT
+   2026-09-07 and the premise was wrong"*. **A half-correction that reads as a whole one, for the second
+   session running.** Flipped to ✅ with the premise stated and Lane F's ownership discharged.
+   **The ✅ was EARNED, not asserted:** the citation ratchet's baseline for that file is **0 uncited ✅**, so
+   a bare flip would have failed `check:citations`. Case id `7.243` added to
+   `notifications-consumer-roundtrip.test.ts`'s docblock — the test that actually witnesses it. Ratchet
+   re-run: **"ok (ratchet holds exactly on every file)"**.
+
+## WHAT THE FAN-OUT FOUND, AND WHAT IT COST
+Six agents (the brief's hard cap), four independent angles + judge + completeness critic. **Only the
+identifier angle produced a real finding** (7.243). The phrasing angle ran **58** patterns over 192 files
+and found nothing stale; the behavioural angle proved the closure holds *in fact* — `apps/server/vitest.config.ts`
+has `include: ['test/**/*.test.ts']` and **no `exclude` key at all**, CI shards the whole suite with no
+filter, and `packages/app-core` exports `./online`. **I verified that independently rather than taking the
+zero**: `vitest list --filesOnly` shows the roundtrip file at line 60 of 143 collected, with controls in
+both directions, and it runs **6 passed** at this sha.
+
+## THREE MEASUREMENT TRAPS THAT FIRED IN THIS SESSION, ALL SILENT
+- **`vitest list` piped through the rtk proxy printed `PASS (33) FAIL (0)`** — the proxy's summary, not the
+  list. Subject AND control both read 0. `--filesOnly` survived. *The control is what exposed it.*
+- **`git show "$c:path"` in zsh:** `$c:t` is a **history modifier** (basename), so the path silently became
+  `est-cases/…` and every read returned empty across three commits. `${c}:path` fixes it. A whole history
+  comparison read "UNREADABLE" before that — and an earlier version of the same loop printed
+  **`POINTER == MAX` for empty-vs-empty**, a check that could not fail.
+- **`git show <sha>:<path>` redirected to a file yields 0 bytes here while the identical command piped to
+  `grep` works.** Not diagnosed; recorded as an observation, not a mechanism.
+
+## NOT MINE, RECORDED WITH OWNERS
+- **Root `CLAUDE.md:5` still reads "Status: pre-brainstorm. No product decisions exist… do not scaffold
+  apps, pick stacks, or write product code."** All 177 tasks are done. Surfaced by the unswept-roots
+  angle; **not corrected — it is the project's own governing document and rewriting its status is the
+  owner's call, not an executor's.**
+- `check-case-ids.mjs` validates no next-free pointer, and `check-task-ledger.mjs` validates no artefact
+  path. Both are real "checks that cannot fail" for the properties corrected above. Owner: whoever next
+  touches those scripts.
+- **`Features.md` needed NO change** — 815, 843 and 1798 already state the closure correctly. Confirmed by
+  reading, not assumed.
+
+## ANCHORS — verify, do not adopt
+Branch `exec/121-widened-staleness-sweep` off `main` `5191cf4`. Gate at the pre-`.ts`-edit tree: **33/33
+EXIT 0, `Cached: 0` (forced)**, Node **v22.22.2**, server 143 files / 1431 passed + 5 skipped, **zero
+orphaned vitest workers**. `check:env` `check:tasks` `check:runbook` `check:citations` `check:help` and
+`check-case-ids.mjs` all EXIT 0. **`check:db-tz` EXITs 2 for want of `DATABASE_URL` — identical on a
+pristine `origin/main`, measured, not assumed.** *(`pnpm check:ids` does not exist; that name was mine.)*
+
+## WHAT IS NOT VERIFIED
+1. **The phrasing angle's residual blind spot is structural** — 58 patterns cross-filtered on five
+   keywords. A stale claim using none of them is not ruled out, and cannot be without reading all 192
+   files verbatim, which nobody did.
+2. **The ledger artefact-path check has unmeasured recall** (see correction 1). Other dead paths may exist
+   that my regex never extracted.
+3. **Whether flipping 7.243 to ✅ is the right FORM** rather than annotating it in place. `Features.md`
+   already calls it built and the ratchet is satisfied, so this is defensible — but it is a status marker
+   on another lane's case, and a reviewer may prefer an annotation. **The claim I am least sure of.**
+
 # ▶ TUESDAY 2026-09-08 ~11:xx IST — **#287 STALENESS SETTLED: THREE DOCUMENTS CORRECTED, FOUR ALREADY RIGHT, ONE FALSE POSITIVE.**
 
 *Branch `exec/120-287-staleness`, off `main` (`8b0d15e`). Docs-only, controller-assigned.*
