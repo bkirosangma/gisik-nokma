@@ -1494,8 +1494,26 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
 test('13.299 — /workspaces with an EMPTY roster renders the empty state and the founding form', async ({
   page,
 }, testInfo) => {
+  // THE BODY IS `{ workspaces: [] }`, NOT `[]`, and the difference is the whole
+  // case. `mapWorkspaceRefs` calls `asRecord(raw, 'workspaces')` FIRST
+  // (`packages/app-core/src/online/mappers.ts:1035`), so a bare array throws a
+  // MappingError before it can ever mean "no workspaces" — and the page renders
+  // `ShellRefusal` for that, not the empty state.
+  //
+  // Written as `[]` first and MEASURED: 3 viewports RED, "element(s) not found"
+  // for the empty-state sentence, because what actually rendered was the refusal
+  // panel. This case was authored PREDICTED-not-witnessed and the prediction was
+  // wrong — which is the argument for running one of these before believing it.
+  // Note WHICH WAY it failed: the stub drove the ERROR branch while claiming to
+  // test the EMPTY branch, and only the positive control's specificity caught
+  // it. A looser assertion — "the founding form is present", say — would have
+  // passed on the refusal screen and printed a green tick over the wrong page.
   await page.route('**/v1/me/workspaces', (apiRoute) =>
-    apiRoute.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    apiRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ workspaces: [] }),
+    }),
   );
 
   const response = await page.goto('/workspaces', { waitUntil: 'networkidle' });
