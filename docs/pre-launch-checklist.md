@@ -327,8 +327,15 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   `.upload-chips__chip` 11.0px, `.gn-transition-edge__label` and `.ticket-type-list__badge` 11.2px.
   All five now at `0.75rem`. **One is witnessed, four are not** — only `.ticket-type-list__badge` renders on a swept route (**4 → 0** on `/settings/ticket-types`). The
   others are on the workflow editor canvas, inside a ticket description editor, or on a card with an
-  assignee, and no seeded card has one. Owner for the four: whoever next seeds an assigned card or
-  sweeps those two editor surfaces.
+  assignee, and no seeded card has one (zero `assign` mentions across `apps/server/src/seed`). The
+  workflow editor route was ADDED to witness `.gn-transition-edge__label` and then removed: it
+  measured `{labelsInDom: 0, flowNodes: 0, flowEdges: 0}` — the canvas renders nothing at 390px —
+  and a route sweeping five nav links is a green row meaning nothing. Owner for the four: whoever
+  next seeds an assigned card or sweeps the two editor surfaces.
+  **The checklist's own named element is now guarded.** Widening the population to `a`/`button`
+  took the board from 36 examined to 104 and surfaced `button.gn-board-card__provenance` at 12.48px
+  x26 — the "12.5px x25" in the paragraph below, invisible to every sweep until now because it is a
+  `<button>`. Above the floor, so the judgment below stands; it is simply measured now.
   **The route list is the part worth inheriting.** `/my-work` and the board — the pages this very
   paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
   0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a

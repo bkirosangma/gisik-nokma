@@ -1233,14 +1233,32 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
   (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/type-scale-baseline.json`)
   *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON. Zero
   offenders on two routes is evidence about two routes.*
-  *ONE OF THE FIVE FIXED RULES IS WITNESSED BY THIS CASE, NOT FIVE.* Only `.ticket-type-list__badge`
-  renders on a swept route. `.gn-transition-edge__label` lives on the workflow EDITOR canvas rather
-  than the `/settings/workflows` list; `.escape-chip__hint` and `.upload-chips__chip` are editor chrome
-  inside a ticket's description; and `.gn-avatar--small` renders on the board and ticket list **only
-  when a card has an assignee**, which no seeded card does. That last one is how the gap was found —
-  the avatar is a `<span>` with direct text, so this sweep WOULD have reported it at 10.4px had it
-  rendered, and its absence from the before-reading is the evidence. The other four are fixed and
-  unwitnessed; owner is whoever next seeds an assigned card or sweeps the two editor surfaces.*
+  *WIDENING THE POPULATION FOUND THE CHECKLIST'S OWN NAMED ELEMENT.* Once `a`/`button` joined the
+  sweep, the board went from 36 examined to 104 and reported
+  `smallest = 12.48px on button.gn-board-card__provenance`, x26 — the very thing the checklist
+  recorded as "`gn-board-card__provenance` at 12.5px x25" and which had been invisible to every sweep
+  because it is a `<button>`. It sits ABOVE the 12px floor, so it is not an offender and the
+  checklist's judgment stands; it is now measured on every run instead of once by hand.
+  *Also newly visible: `13.3333px` on buttons such as `button.workflow-list__new` — the user-agent
+  default where a control does not set `font: inherit`. Above the floor, so recorded rather than
+  changed.*
+  *ONE OF THE FIVE FIXED RULES IS WITNESSED, AND THE OTHER FOUR WERE CHASED UNTIL THEY WERE MEASURED
+  RATHER THAN ASSUMED.* `.ticket-type-list__badge` is witnessed (4 → 0) and now also carries a
+  **`MUST_EXAMINE` coverage assertion**: the route must examine an element with that class, so a 0 for
+  a rule that stopped rendering reddens instead of passing. A ratchet at 0 for an absent rule looks
+  exactly like a ratchet at 0 for a healthy one, and that was the gap.
+  *`.gn-transition-edge__label` — TRIED AND MEASURED UNWITNESSABLE. Its route
+  (`/settings/workflows/<id>`) was added, reached by clicking (the list navigates by `router.push`;
+  there is no `<a href>`), and reported `{labelsInDom: 0, rulesInDom: 0, flowNodes: 0, flowEdges: 0}`
+  with the page a shell of five nav elements. The canvas renders nothing at all at 390px in the seeded
+  world. The route was REMOVED rather than kept as a green row meaning nothing — and it was the
+  `MUST_EXAMINE` assertion that said so, in one line naming the selector.*
+  *`.gn-avatar--small` — UNWITNESSABLE, for a reason read out of the seed rather than guessed: it
+  renders only when a card has an assignee, and the Convenience Corner seed **assigns nothing** (zero
+  `assign` mentions across `apps/server/src/seed`). It is a `<span>` with direct text, so this sweep
+  would report it at 10.4px the moment one exists.*
+  *`.escape-chip__hint` and `.upload-chips__chip` are editor chrome inside a ticket's description
+  editor; no route here reaches them. All four are fixed and unproven, owner recorded.*
   *`/members` examines ZERO elements today — its roster rows are `li`/`p`, which belong to the body
   sweep's population rather than this one. Its 0 baseline is still a live guard (new label text there
   would be examined and would redden) but it proves nothing now, and it does NOT cover

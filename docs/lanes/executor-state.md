@@ -76,6 +76,31 @@ added; `/help` 317 → 341 examined, still 0 offenders; re-run of the same plant
 made BEFORE the edit, never from `HEAD`, and re-run green.
 **Read a red for WHICH check produced it. "It failed" is not "it failed for the reason I claim."**
 
+**THE FOUR UNWITNESSED FIXES WERE CHASED UNTIL "UNWITNESSABLE" WAS A MEASUREMENT.** Holding with them
+merely recorded would have been the easy read of "the queue is empty".
+
+- **`.gn-transition-edge__label`** — its route (`/settings/workflows/<id>`) WAS added, reached by
+  clicking because the list navigates with `router.push` and carries no `<a href>`. It measured
+  `{labelsInDom: 0, rulesInDom: 0, flowNodes: 0, flowEdges: 0}`, the page a shell of five nav
+  elements: **the xyflow canvas renders nothing at all at 390px** in the seeded world. Route REMOVED —
+  a green row over five nav links, reached by the most fragile navigation in the file, is worse than
+  no row. **A new `MUST_EXAMINE` assertion is what said so in one line naming the selector.**
+- **`.gn-avatar--small`** — renders only on a card with an assignee, and the Convenience Corner seed
+  **assigns nothing** (zero `assign` mentions across `apps/server/src/seed`). Read out of the seed,
+  not guessed.
+- The two editor chips are inside a ticket's description editor; no swept route reaches them.
+
+**`MUST_EXAMINE` is the durable half.** A ratchet at 0 for a rule that stopped rendering reads exactly
+like a ratchet at 0 for a healthy one; the map asserts the route examines the class it exists to
+witness. Wired to `ticket-type-list__badge`, the one it can actually assert.
+
+**WIDENING TO `a`/`button` FOUND THE CHECKLIST'S OWN NAMED ELEMENT.** The board went 36 → 104 examined
+and reported `smallest = 12.48px on button.gn-board-card__provenance`, x26 — the "12.5px x25" the
+pre-launch note recorded by hand, invisible to every sweep because it is a `<button>`. Above the
+floor, so the judgment stands; it is measured on every run now instead of once. Also newly visible:
+`13.3333px` on buttons that do not set `font: inherit` — the UA default, above the floor, recorded not
+changed.
+
 **ONE OF THE FIVE FIXES IS WITNESSED. FOUR ARE NOT, AND THAT WAS FOUND BY AN ABSENCE.**
 `.ticket-type-list__badge` is the only one on a swept route (4 → 0). `.gn-avatar--small` renders on the
 board and ticket list **only when a card has an assignee** and no seeded card does; it is a `<span>`

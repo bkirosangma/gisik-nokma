@@ -226,6 +226,22 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * Owner for the four: whoever next seeds an assigned card or sweeps the
    * workflow editor and the description editor.
    *
+   * THE WORKFLOW EDITOR WAS TRIED AND REMOVED, which is worth more than the
+   * route would have been. `/settings/workflows/<id>` is where
+   * `.gn-transition-edge__label` lives, so it looked like the way to witness
+   * that repair. Reached by clicking (the list navigates with `router.push`;
+   * there is no `<a href>` to read an id from), it measured:
+   *
+   *     {labelsInDom: 0, rulesInDom: 0, flowNodes: 0, flowEdges: 0}
+   *     label text: selector matched 7, examined 5, smallest 16px
+   *
+   * The canvas renders NOTHING at 390px in the seeded world — not empty labels,
+   * no graph at all — and the page is a shell of five nav elements. A route
+   * that sweeps five nav links and reports 0 offenders is a green row meaning
+   * nothing, reached by the most fragile navigation in the file. Removed.
+   * The MUST_EXAMINE assertion is what said so, in one line naming the
+   * selector, which is why that is a measured fact rather than a guess.
+   *
    * `/members` is kept although it currently examines ZERO elements (its roster
    * rows are `li`/`p`, which belong to the body sweep's population, not this
    * one). Its baseline of 0 is still a live guard — small label text appearing
@@ -237,7 +253,29 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * on the pages a finding NAMED is not a ratchet on the pages the defect is
    * ON. Zero offenders on two routes is evidence about two routes.
    */
-  const routes = [
+  /**
+   * SELECTORS THAT MUST BE EXAMINED, per route.
+   *
+   * This exists because of a gap this suite's own first version had. Five CSS
+   * rules were raised onto the floor; the ratchet witnessed exactly ONE of
+   * them, and the other four were "fixed" against no measurement at all. A
+   * ratchet at 0 for a rule that never renders is indistinguishable from a
+   * ratchet at 0 for a rule that is fine.
+   *
+   * So the routes that are supposed to render a repaired rule now ASSERT that
+   * they do. If a refactor stops rendering one, this reddens naming the
+   * selector, rather than the ratchet quietly continuing to report 0 for
+   * something it can no longer see.
+   *
+   * `gn-transition-edge__rule` and not `__label`: the label `div` has no direct
+   * text (its children carry it) and this sweep counts only direct-text
+   * carriers, so the child is where the inherited size is actually measured.
+   */
+  const MUST_EXAMINE: Record<string, string[]> = {
+    'stack-phone-390|/settings/ticket-types': ['ticket-type-list__badge'],
+  };
+
+  const routes: { path: string; key: string; reach?: () => Promise<void> }[] = [
     { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
     { path: projectHref ?? '', key: 'stack-phone-390|/p/:projectId' },
     { path: `/w/${workspaceId}/members`, key: 'stack-phone-390|/members' },
@@ -249,7 +287,8 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
   ];
 
   for (const route of routes) {
-    await page.goto(route.path, { waitUntil: 'networkidle' });
+    if (route.reach !== undefined) await route.reach();
+    else await page.goto(route.path, { waitUntil: 'networkidle' });
 
     // ── The instrument proves itself before it is believed, per route: a
     // client-side navigation can reset nothing, but `goto` is a full load and
@@ -296,6 +335,18 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       );
     }
     /* eslint-enable no-console */
+
+    // Every rule this route is supposed to render, actually rendered. See
+    // MUST_EXAMINE: a ratchet at 0 for a rule that never renders looks exactly
+    // like a ratchet at 0 for a rule that is fine.
+    for (const cls of MUST_EXAMINE[route.key] ?? []) {
+      expect(
+        typeScale.examined.map((e) => e.selector).filter((sel) => sel.includes(cls)),
+        `${route.key} examined no element matching ".${cls}". This route exists in the sweep to ` +
+          `witness that rule, so a 0 here would be a 0 about nothing. Either the page stopped ` +
+          `rendering it or the sweep stopped seeing it; both make the ratchet decorative.`,
+      ).not.toEqual([]);
+    }
 
     // The selector control, hard and before the ratchet: a sweep that matched
     // nothing reports zero offenders and reads as the best possible result.
