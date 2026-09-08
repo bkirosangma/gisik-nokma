@@ -20,7 +20,41 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~03:4x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~03:0x ONE, IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~04:4x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~03:4x ONE, IS HISTORY.**
+>
+> **The implementer subagent (below, ~03:4x block) RETURNED and its work is INDEPENDENTLY VERIFIED —
+> not merely trusted.** Commit `f2d5dbf9` on `exec/144-task14-style-axis`. I personally: read every line
+> of `git diff dc507b43 HEAD` across all 9 changed files; ran `pnpm turbo run build test typecheck --force`
+> (0 cached, 33/33 green — a FULL-TURBO all-cached run is NOT verification on this machine, per this
+> file's own standing lesson, so I forced it); rebuilt the dev stack myself
+> (`docker compose -f docker-compose.dev.yml up -d --build --wait web`) and ran BOTH live Playwright
+> suites myself (`pnpm test:e2e:stack` 6/6, `pnpm test:e2e:viewport` 28/28+2 skipped) — the numbers
+> printed match the committed `non-text-contrast-roster.json`/`accessible-names-baseline.json` exactly
+> (e.g. `input`/`select` 3.62 on backdrop `rgb(237,228,219)`); and ran all six repo checks
+> (`check:env/tasks/db-tz/runbook/citations/help`) green (`db-tz` needs `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`,
+> NOT port 54329 — that's the STANDALONE postgres this brief names, 54330 is the dev-COMPOSE stack's,
+> confirm which one is actually up with `docker compose ps` before guessing).
+>
+> **One real finding, not a defect: case 13.343.** The ruling expected the non-text-contrast roster to
+> grow by one sanctioned waiver entry (the neo field's sunken shadow edge, 1.24/1.16). It does NOT grow —
+> `sweepBorders` has no box-shadow compositing (border-properties only) AND `.gn-field__input` never
+> renders on any of the 5 swept routes anyway. Verified myself, not taken on the implementer's word.
+> Recorded in the catalogue with an explicit "owner/controller: decide" line — not fixed, not hidden.
+> **Worth a line in the PR body; not escalation-worthy** (the ruling's SUBSTANCE — the owner accepted the
+> sub-3:1 edge — is unaffected; only this specific instrument can't see it).
+>
+> **Dispatched a reviewer subagent** (read-only, sonnet) to independently check the diff — CSS
+> correctness, test-mutation validity, scope discipline, the disclosed judgment calls' honesty. Implementer
+> #1 of 2 used against the 6-subagent cap for this task.
+>
+> ## STILL OUTSTANDING
+> * Reviewer's report.
+> * Fix round only if it finds Important-or-worse.
+> * Open ONE PR (frozen head = `91c19c3b`, re-verify `origin/main` hasn't moved immediately before push),
+>   push, report to the controller.
+> * Task 15 next, blocked on this PR merging — read `origin/main` after merge, not a local copy.
+>
+> ---
 >
 > **PR #385/#386 (Task 13 + the palette ruling) are MERGED — `91c19c3b` is on `origin/main`, verified via
 > `gh pr view 385/386 --json state,mergeCommit` and `git rev-parse origin/main`.** Task 14 is IN PROGRESS on
