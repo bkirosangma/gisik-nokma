@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--warning:#B25000;--onColor:#FFFFFF;
+      --r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none}
+    .sheet{width:390px;height:844px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    /* 44px, 17px text — under 16px iOS zooms the viewport on focus. */
+    .search{display:flex;align-items:center;gap:9px;min-height:44px;padding:0 13px;
+      border-radius:10px;background:var(--raised);color:var(--label3);font-size:17px}
+    .seg{display:flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:36px;
+      border-radius:7px;font-size:15px;font-weight:500}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    /* Grouped nav list — HIG's disclosure rows, separated by fill not rules.
+       `flex:none` for the reason MobileTicket's carries it: in a column flex
+       scroller an `overflow:hidden` box shrinks and cuts its own rows. */
+    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden;flex:none}
+    .grow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+      min-height:48px;padding:0 14px;font-size:17px;color:var(--label)}
+    .grow:nth-child(even){background:var(--fill4)}
+    .tabs{display:flex;background:var(--raised);padding:6px 0 10px;
+      box-shadow:0 -1px 12px rgba(0,0,0,0.06)}
+    .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:48px;
+      justify-content:center;color:var(--label3);font-size:11px;line-height:14px}
+    .tab--on{color:var(--accent)}
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <div style="padding:14px 16px 12px;display:flex;flex-direction:column;gap:12px">
+    <h1 class="lt">Help</h1>
+    <span class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+      Search the manual
+    </span>
+    <div class="seg" role="tablist">
+      <span class="seg__item seg__item--on">Manual</span>
+      <span class="seg__item">FAQ</span>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 20px;display:flex;
+              flex-direction:column;gap:18px">
+
+    <div class="col" style="gap:9px">
+      <p class="fn muted" style="text-transform:uppercase;letter-spacing:0.6px">Start here</p>
+      <nav class="group">
+        <a href="#" class="grow">Getting started
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Workspaces and roles
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Tickets
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Boards and views
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+      </nav>
+    </div>
+
+    <div class="col" style="gap:9px">
+      <p class="fn muted" style="text-transform:uppercase;letter-spacing:0.6px">When things get complicated</p>
+      <nav class="group">
+        <a href="#" class="grow">Working offline
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Dates and claims
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Workflows
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a href="#" class="grow">Visibility and restricted fields
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+      </nav>
+    </div>
+
+    <div style="background:var(--sunken);border-radius:var(--r-m);padding:14px">
+      <p class="hl">A claim in transit is the same claim</p>
+      <p class="sh muted" style="margin-top:6px">In-transit work is drawn with a dashed outline, never a
+        different colour. Recolouring it would say it means something else.</p>
+      <a href="#" class="sh" style="display:inline-flex;align-items:center;min-height:24px;margin-top:8px">
+        Read &ldquo;Working offline&rdquo;</a>
+    </div>
+
+  </div>
+
+  <nav class="tabs">
+    <span class="tab">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="5" height="15" rx="1.5"/>
+        <rect x="9.75" y="4.5" width="5" height="10" rx="1.5"/><rect x="16" y="4.5" width="5" height="13" rx="1.5"/></svg>
+      Board</span>
+    <span class="tab">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9 16l10-9"/></svg>
+      My work</span>
+    <span class="tab">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16v11H8l-4 3.5Z"/></svg>
+      Inbox</span>
+    <span class="tab tab--on">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/>
+        <path d="M12 16.5h.01"/><path d="M12 13v-.5a2.5 2.5 0 1 0-2.5-2.5"/></svg>
+      Help</span>
+  </nav>
+
+</div>
+</x-dc>
+</body>
+</html>

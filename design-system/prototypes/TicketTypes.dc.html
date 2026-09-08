@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --purple:#8944AB;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .pill{display:inline-flex;align-items:center;background:var(--fill3);border-radius:var(--r-pill);
+      padding:2px 10px;font-size:12px;line-height:16px;font-weight:500;color:var(--label2)}
+    /* Sidebar: settings sections as a HIG grouped list — fill, not rules. */
+    .side{width:248px;flex:none;background:var(--raised);border-radius:var(--r-l);padding:8px;
+      display:flex;flex-direction:column;gap:2px;align-self:flex-start}
+    .side a{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;
+      color:var(--label);font-size:15px;font-weight:500}
+    .side a.on{background:var(--accent);color:var(--onColor);font-weight:600}
+    /* Rows: bordered rows become a grouped list on one raised card. */
+    .list{background:var(--raised);border-radius:var(--r-l);overflow:hidden}
+    .item{display:flex;align-items:center;gap:14px;padding:14px 18px}
+    .item:nth-child(even){background:var(--fill4)}
+    .ic{width:34px;height:34px;border-radius:9px;background:var(--fill3);display:flex;
+      align-items:center;justify-content:center;flex:none;color:var(--label2)}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#" class="on">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+
+    <div class="col" style="gap:4px;margin-top:26px">
+      <h1 class="lt">Settings</h1>
+      <p class="bd muted">Meghalaya Rollout</p>
+    </div>
+
+    <div style="display:flex;gap:24px;margin-top:22px;flex:1;min-height:0">
+
+      <nav class="side">
+        <a href="#" class="on">Ticket types</a>
+        <a href="#">Workflows</a>
+        <a href="#">Fields</a>
+        <a href="#">Visibility</a>
+        <a href="#">MCP tokens</a>
+        <a href="#">Danger zone</a>
+      </nav>
+
+      <div class="col" style="flex:1;min-width:0;gap:16px">
+
+        <div class="row" style="justify-content:space-between">
+          <div class="col" style="gap:2px">
+            <h2 class="t3">Ticket types</h2>
+            <p class="sh muted">Six types. Rank orders them in every picker.</p>
+          </div>
+          <button class="btn btn--primary">New type</button>
+        </div>
+
+        <div class="list">
+
+          <div class="item">
+            <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/>
+              <path d="M12 8v5"/><path d="M12 16h.01"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Defect</span>
+              <span class="c1 muted">4 fields &middot; Delivery v4</span></span>
+            <span class="pill">Built-in</span><span class="c1 muted">Rank 1</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+          <div class="item">
+            <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/>
+              <path d="M4 12h16"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Feature</span>
+              <span class="c1 muted">5 fields &middot; Delivery v4</span></span>
+            <span class="pill">Built-in</span><span class="c1 muted">Rank 2</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+          <div class="item">
+            <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Task</span>
+              <span class="c1 muted">3 fields &middot; Delivery v4</span></span>
+            <span class="pill">Built-in</span><span class="c1 muted">Rank 3</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+          <div class="item">
+            <span class="ic" style="color:var(--purple)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3v4"/><path d="M16 3v4"/>
+              <path d="M4 10h16"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Field visit</span>
+              <span class="c1 muted">7 fields &middot; Field ops v2 &middot; 1 restricted field</span></span>
+            <span class="c1 muted">Rank 4</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+          <div class="item">
+            <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/>
+              <path d="M4 12h16"/><path d="M4 18h10"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Change request</span>
+              <span class="c1 muted">6 fields &middot; Delivery v4</span></span>
+            <span class="c1 muted">Rank 5</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+          <div class="item">
+            <span class="ic" style="color:var(--warning)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 4.5 3.5 19h17Z"/><path d="M12 10v4"/><path d="M12 16.5h.01"/></svg></span>
+            <span class="col" style="flex:1;min-width:0;gap:2px">
+              <span style="font-weight:600">Incident</span>
+              <span class="c1 muted">8 fields &middot; Incident v1 &middot; unpublished draft</span></span>
+            <span class="pill" style="background:rgba(178,80,0,0.14);color:var(--warning)">Draft</span>
+            <span class="c1 muted">Rank 6</span>
+            <button class="btn" style="min-height:36px;padding:0 14px">Edit</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

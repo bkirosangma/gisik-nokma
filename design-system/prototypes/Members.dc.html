@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --purple:#8944AB;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:var(--accent);
+      color:var(--onColor);font-size:12px;line-height:18px;font-weight:600;text-align:center;margin-left:7px}
+    .avatar{width:36px;height:36px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;flex:none}
+    .avatar--sm{width:24px;height:24px;font-size:12px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .pill{display:inline-flex;align-items:center;background:var(--fill3);border-radius:var(--r-pill);
+      padding:3px 11px;font-size:13px;line-height:18px;font-weight:500}
+    /* Table: header rule and cell rules removed; the header sits on a sunken fill. */
+    .table{background:var(--raised);border-radius:var(--r-l);overflow:hidden;width:100%;
+      border-collapse:collapse}
+    .table th{text-align:left;font-size:13px;line-height:18px;font-weight:600;color:var(--label2);
+      background:var(--sunken);padding:11px 18px;white-space:nowrap}
+    .table td{padding:13px 18px;vertical-align:middle;font-size:17px}
+    .table tbody tr:nth-child(even){background:var(--fill4)}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox<span class="badge">7</span></a>
+    <a href="#" class="on">Members</a><a href="#">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar avatar--sm" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:20px">
+
+    <div class="row" style="justify-content:space-between;margin-top:26px">
+      <div class="col" style="gap:4px">
+        <h1 class="lt">Members</h1>
+        <p class="bd muted">Twelve people in Meghalaya Rollout.</p>
+      </div>
+      <button class="btn btn--primary">Invite people</button>
+    </div>
+
+    <table class="table">
+      <thead><tr>
+        <th style="width:38%">Person</th><th>Role</th><th>Joined</th><th>Assigned</th><th>Last seen</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="row" style="gap:12px;flex-wrap:nowrap"><span class="avatar">AK</span>
+            <span class="col"><span style="font-weight:600">Anjali Kharkongor</span>
+            <span class="fn muted">anjali@example.com</span></span></span></td>
+          <td><span class="pill" style="background:rgba(0,64,221,0.12);color:var(--accent)">Admin</span></td>
+          <td class="sh muted">12 Mar 2026</td><td class="sh">11 tickets</td><td class="sh muted">Now</td>
+        </tr>
+        <tr>
+          <td><span class="row" style="gap:12px;flex-wrap:nowrap"><span class="avatar">RS</span>
+            <span class="col"><span style="font-weight:600">Rahul Sangma</span>
+            <span class="fn muted">rahul@example.com</span></span></span></td>
+          <td><span class="pill">Member</span></td>
+          <td class="sh muted">4 Apr 2026</td><td class="sh">8 tickets</td><td class="sh muted">14 min ago</td>
+        </tr>
+        <tr>
+          <td><span class="row" style="gap:12px;flex-wrap:nowrap"><span class="avatar">MS</span>
+            <span class="col"><span style="font-weight:600">Meena Sohliya</span>
+            <span class="fn muted">meena@example.com</span></span></span></td>
+          <td><span class="pill" style="background:rgba(0,64,221,0.12);color:var(--accent)">Admin</span></td>
+          <td class="sh muted">12 Mar 2026</td><td class="sh">6 tickets</td><td class="sh muted">2 hours ago</td>
+        </tr>
+        <tr>
+          <td><span class="row" style="gap:12px;flex-wrap:nowrap"><span class="avatar">PD</span>
+            <span class="col"><span style="font-weight:600">Priya Das</span>
+            <span class="fn muted">priya@example.com</span></span></span></td>
+          <td><span class="pill" style="background:rgba(137,68,171,0.12);color:var(--purple)">Guest</span></td>
+          <td class="sh muted">Yesterday</td><td class="sh">1 ticket</td><td class="sh muted">Yesterday</td>
+        </tr>
+        <tr>
+          <td><span class="row" style="gap:12px;flex-wrap:nowrap"><span class="avatar">TM</span>
+            <span class="col"><span style="font-weight:600">Tengsak Marak</span>
+            <span class="fn muted">tengsak@example.com</span></span></span></td>
+          <td><span class="pill">Member</span></td>
+          <td class="sh muted">20 May 2026</td><td class="sh">4 tickets</td><td class="sh muted">3 days ago</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="col" style="gap:12px">
+      <p class="hl">Pending invitations &middot; 2</p>
+      <div style="background:var(--raised);border-radius:var(--r-l);overflow:hidden">
+        <div class="row" style="padding:14px 18px;justify-content:space-between;flex-wrap:nowrap">
+          <div class="col" style="gap:2px"><p class="bd">bikash@example.com</p>
+            <p class="fn muted">Invited by Meena &middot; expires in 4 days</p></div>
+          <div class="row"><span class="pill">Member</span><button class="btn">Resend</button>
+            <button class="btn" style="color:var(--danger);background:rgba(215,0,21,0.10)">Revoke</button></div>
+        </div>
+        <div class="row" style="padding:14px 18px;justify-content:space-between;flex-wrap:nowrap;background:var(--fill4)">
+          <div class="col" style="gap:2px"><p class="bd">sarah@example.com</p>
+            <p class="fn muted" style="color:var(--warning)">Invited by Anjali &middot; expires tomorrow</p></div>
+          <div class="row"><span class="pill">Guest</span><button class="btn">Resend</button>
+            <button class="btn" style="color:var(--danger);background:rgba(215,0,21,0.10)">Revoke</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

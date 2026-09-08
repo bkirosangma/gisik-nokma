@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --surface:#F2F2F7; --raised:#FFFFFF; --sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20); --fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12); --fill4:rgba(116,116,128,0.08);
+      --label:#000000; --label2:rgba(60,60,67,0.80); --label3:rgba(60,60,67,0.55);
+      --accent:#0040DD; --danger:#D70015; --warning:#B25000; --success:#1E7A34;
+      --gray:#6C6C70; --purple:#8944AB; --pink:#D30F45; --onColor:#FFFFFF;
+      --r-s:8px; --r-m:12px; --r-l:16px; --r-pill:999px;
+    }
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:2080px;box-sizing:border-box;padding:56px 64px;background:var(--surface)}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .card{background:var(--raised);border-radius:var(--r-m);padding:20px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+      padding:0 18px;border-radius:var(--r-s);border:none;background:var(--fill3);
+      color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .btn--danger{background:var(--danger);color:var(--onColor)}
+    .btn--plain{background:transparent;padding:0 6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:var(--fill3);
+      border-radius:var(--r-pill);padding:5px 12px;font-size:13px;line-height:18px}
+    .dot{width:9px;height:9px;border-radius:999px;flex:none}
+    .sw{display:flex;flex-direction:column;gap:8px}
+    .sw__chip{height:64px;border-radius:var(--r-m)}
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+    <div class="col" style="gap:8px">
+      <p class="fn muted" style="letter-spacing:0.6px;text-transform:uppercase">Gisik Nokma &middot; Design system</p>
+      <h1 class="lt">Apple HIG foundations</h1>
+      <p class="bd muted" style="max-width:70ch">Apple&rsquo;s increased-contrast system colors, the iOS type ramp, and separation
+        by fill rather than by rule. Every value below is measured against the 27 pairs declared in
+        <code style="background:var(--fill4);border-radius:6px;padding:1px 6px">packages/ui/src/tokens.ts</code>.</p>
+    </div>
+    <div class="card" style="min-width:280px">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Rulings applied</p>
+      <p class="sh" style="margin-top:10px"><strong>R1</strong> &middot; borders dropped, separation by fill</p>
+      <p class="sh" style="margin-top:6px"><strong>R2</strong> &middot; iOS metrics, Body 17pt</p>
+    </div>
+  </div>
+
+  <!-- ── Palette ─────────────────────────────────────────────────────────── -->
+  <h2 class="t2" style="margin-top:48px">Color</h2>
+  <p class="sh muted" style="margin-top:6px">Apple&rsquo;s increased-contrast variants. The stock palette failed 15 of 27 declared
+    pairs; these fail none.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;margin-top:20px">
+    <div class="sw"><div class="sw__chip" style="background:#0040DD"></div>
+      <p class="fn"><strong>accent</strong></p><p class="c1 muted">#0040DD &middot; 7.56:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#D70015"></div>
+      <p class="fn"><strong>danger</strong></p><p class="c1 muted">#D70015 &middot; 5.38:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#B25000"></div>
+      <p class="fn"><strong>warning</strong></p><p class="c1 muted">#B25000 &middot; 5.20:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#1E7A34"></div>
+      <p class="fn"><strong>success</strong></p><p class="c1 muted">#1E7A34 &middot; 4.66:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#8944AB"></div>
+      <p class="fn"><strong>restricted</strong></p><p class="c1 muted">#8944AB &middot; 6.04:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#D30F45"></div>
+      <p class="fn"><strong>contested</strong></p><p class="c1 muted">#D30F45 &middot; 5.35:1</p></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;margin-top:20px">
+    <div class="sw"><div class="sw__chip" style="background:#F2F2F7"></div>
+      <p class="fn"><strong>surface</strong></p><p class="c1 muted">#F2F2F7</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#FFFFFF"></div>
+      <p class="fn"><strong>surfaceRaised</strong></p><p class="c1 muted">#FFFFFF</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#E5E5EA"></div>
+      <p class="fn"><strong>surfaceSunken</strong></p><p class="c1 muted">#E5E5EA</p></div>
+    <div class="sw"><div class="sw__chip" style="background:#6C6C70"></div>
+      <p class="fn"><strong>categoryOpen</strong></p><p class="c1 muted">#6C6C70 &middot; 5.23:1</p></div>
+    <div class="sw"><div class="sw__chip" style="background:rgba(120,120,128,0.20)"></div>
+      <p class="fn"><strong>fill / primary</strong></p><p class="c1 muted">rgba(120,120,128,.20)</p></div>
+    <div class="sw"><div class="sw__chip" style="background:rgba(118,118,128,0.12)"></div>
+      <p class="fn"><strong>fill / tertiary</strong></p><p class="c1 muted">rgba(118,118,128,.12)</p></div>
+  </div>
+
+  <!-- ── The R1 decision, shown ───────────────────────────────────────────── -->
+  <h2 class="t2" style="margin-top:48px">Separation</h2>
+  <p class="sh muted" style="margin-top:6px">No HIG separator clears WCAG&rsquo;s 3:1 on any light background &mdash;
+    <code style="background:var(--fill4);border-radius:6px;padding:1px 6px">opaqueSeparator</code> measures 1.53&ndash;1.71.
+    So nothing here is separated by a line.</p>
+
+  <div class="row" style="gap:24px;margin-top:20px;align-items:stretch">
+    <div style="flex:1;background:var(--sunken);border-radius:var(--r-l);padding:16px">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Column &middot; sunken</p>
+      <div class="card" style="margin-top:12px">
+        <p class="hl">Card &middot; raised</p>
+        <div class="row" style="margin-top:10px">
+          <span class="chip"><span class="dot" style="background:#0040DD"></span>In progress</span>
+          <span class="chip"><span class="dot" style="background:#6C6C70"></span>Open</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <p class="hl">Three fills, three depths</p>
+        <p class="fn muted" style="margin-top:6px">Sunken &rarr; raised &rarr; chip fill. No rule anywhere.</p>
+      </div>
+    </div>
+    <div style="flex:1" class="card">
+      <p class="hl">What a border used to do</p>
+      <p class="sh muted" style="margin-top:8px">Seventeen of twenty-four bordered classes measured under 3:1.
+        The fix is not a darker hairline &mdash; it is removing the pixel that was carrying the meaning and
+        letting the fill carry it instead.</p>
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--fill4);border-radius:var(--r-s);padding:12px">
+          <p class="c1 muted">quaternary</p></div>
+        <div style="background:var(--fill3);border-radius:var(--r-s);padding:12px">
+          <p class="c1 muted">tertiary</p></div>
+        <div style="background:var(--fill2);border-radius:var(--r-s);padding:12px">
+          <p class="c1 muted">secondary</p></div>
+        <div style="background:var(--fill1);border-radius:var(--r-s);padding:12px">
+          <p class="c1 muted">primary</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Type ─────────────────────────────────────────────────────────────── -->
+  <h2 class="t2" style="margin-top:48px">Type &middot; iOS ramp</h2>
+  <p class="sh muted" style="margin-top:6px">SF Pro Text / Display. Body at 17px clears the product&rsquo;s committed
+    16px floor; Caption&nbsp;2 is clamped to 12px rather than HIG&rsquo;s 11 so the label ratchet holds.</p>
+
+  <div class="card" style="margin-top:20px">
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:14px 24px;align-items:baseline">
+      <p class="fn muted">Large Title &middot; 34/41</p><p style="font-size:34px;line-height:41px;font-weight:700;margin:0;letter-spacing:-0.4px">Sprint 14 board</p>
+      <p class="fn muted">Title 2 &middot; 22/28</p><p style="font-size:22px;line-height:28px;font-weight:600;margin:0">Ticket types</p>
+      <p class="fn muted">Title 3 &middot; 20/25</p><p style="font-size:20px;line-height:25px;font-weight:600;margin:0">Workflow builder</p>
+      <p class="fn muted">Headline &middot; 17/22</p><p style="font-size:17px;line-height:22px;font-weight:600;margin:0">Rate limiter shares one bucket</p>
+      <p class="fn muted">Body &middot; 17/22</p><p style="font-size:17px;line-height:22px;margin:0">The claim reached the server and was recorded against the ticket.</p>
+      <p class="fn muted">Callout &middot; 16/21</p><p style="font-size:16px;line-height:21px;margin:0">Assigned to you, due Thursday.</p>
+      <p class="fn muted">Subheadline &middot; 15/20</p><p style="font-size:15px;line-height:20px;margin:0">Moved from In review by Anjali</p>
+      <p class="fn muted">Footnote &middot; 13/18</p><p style="font-size:13px;line-height:18px;margin:0">Recorded 12:04, device clock ahead by 3s</p>
+      <p class="fn muted">Caption 1 &middot; 12/16</p><p style="font-size:12px;line-height:16px;margin:0">GN-1183 &middot; from MCP</p>
+    </div>
+  </div>
+
+  <!-- ── Controls ─────────────────────────────────────────────────────────── -->
+  <h2 class="t2" style="margin-top:48px">Controls</h2>
+  <p class="sh muted" style="margin-top:6px">44&times;44 minimum &mdash; already this product&rsquo;s floor, and HIG&rsquo;s.
+    Radii collapse from twelve ad-hoc values to four.</p>
+
+  <div class="row" style="gap:24px;margin-top:20px;align-items:stretch">
+    <div class="card" style="flex:1">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Buttons</p>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn--primary">Create ticket</button>
+        <button class="btn">Cancel</button>
+        <button class="btn btn--danger">Discard claim</button>
+        <button class="btn btn--plain">Leave them</button>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" style="opacity:0.4;cursor:not-allowed">Publish</button>
+        <p class="fn muted">Disabled &middot; 40% opacity</p>
+      </div>
+    </div>
+    <div class="card" style="flex:1">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Status chips</p>
+      <div class="row" style="margin-top:14px">
+        <span class="chip"><span class="dot" style="background:#6C6C70"></span>Open</span>
+        <span class="chip"><span class="dot" style="background:#0040DD"></span>Active</span>
+        <span class="chip"><span class="dot" style="background:#1E7A34"></span>Terminal</span>
+        <span class="chip"><span class="dot" style="background:#D70015"></span>Blocked</span>
+        <span class="chip"><span class="dot" style="background:#B25000"></span>Pending</span>
+        <span class="chip"><span class="dot" style="background:#8944AB"></span>Restricted</span>
+        <span class="chip"><span class="dot" style="background:#D30F45"></span>Contested</span>
+      </div>
+      <p class="c1 muted" style="margin-top:14px">Every dot clears 3:1 on both surface and raised.</p>
+    </div>
+  </div>
+
+  <div class="row" style="gap:24px;margin-top:24px;align-items:stretch">
+    <div class="card" style="flex:1">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Radii</p>
+      <div class="row" style="margin-top:14px;gap:16px">
+        <div class="col" style="gap:8px;align-items:center">
+          <div style="width:72px;height:56px;background:var(--fill2);border-radius:8px"></div><p class="c1 muted">8 &middot; control</p></div>
+        <div class="col" style="gap:8px;align-items:center">
+          <div style="width:72px;height:56px;background:var(--fill2);border-radius:12px"></div><p class="c1 muted">12 &middot; card</p></div>
+        <div class="col" style="gap:8px;align-items:center">
+          <div style="width:72px;height:56px;background:var(--fill2);border-radius:16px"></div><p class="c1 muted">16 &middot; sheet</p></div>
+        <div class="col" style="gap:8px;align-items:center">
+          <div style="width:72px;height:56px;background:var(--fill2);border-radius:999px"></div><p class="c1 muted">pill &middot; chip</p></div>
+      </div>
+    </div>
+    <div class="card" style="flex:1">
+      <p class="c1 muted" style="text-transform:uppercase;letter-spacing:0.6px">Fields</p>
+      <div class="col" style="gap:10px;margin-top:14px">
+        <label class="col" style="gap:6px">
+          <span class="fn muted">Email</span>
+          <span style="display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:8px;background:var(--fill4);color:var(--label3)">you@example.com</span>
+        </label>
+        <label class="col" style="gap:6px">
+          <span class="fn muted">Focused</span>
+          <span style="display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:8px;background:var(--raised);outline:3px solid var(--accent);outline-offset:-1px">GN-1183</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

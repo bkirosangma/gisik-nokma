@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --purple:#8944AB;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .seg{display:inline-flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;
+      border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    /* Grid: the 1px rules are gone. Day cells sit on raised; the grid gap IS the line. */
+    .cal{background:var(--sunken);border-radius:var(--r-l);padding:1px;display:grid;
+      grid-template-columns:repeat(7,1fr);gap:1px;overflow:hidden;flex:1;min-height:0}
+    .dow{background:var(--sunken);padding:9px 10px;font-size:12px;line-height:16px;font-weight:600;
+      color:var(--label2);text-transform:uppercase;letter-spacing:0.5px}
+    .day{background:var(--raised);padding:7px 8px;display:flex;flex-direction:column;gap:4px;min-height:0}
+    .day--outside{background:var(--fill4)}
+    .day--outside .day__n{color:var(--label3)}
+    .day__n{font-size:13px;line-height:18px;font-weight:600;margin:0}
+    .day--today .day__n{background:var(--accent);color:var(--onColor);border-radius:999px;
+      width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+    .ev{border-radius:6px;padding:2px 7px;font-size:12px;line-height:16px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ev--bar{background:var(--accent);color:var(--onColor)}
+    .ev--pending{outline:2px dashed var(--warning);outline-offset:-1px}
+    .ev--custom{color:var(--purple);background:rgba(137,68,171,0.12)}
+    .ev--unplaceable{background:var(--fill3);color:var(--label2);font-style:italic}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#" class="on">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:14px">
+
+    <div class="row" style="justify-content:space-between;margin-top:24px">
+      <div class="col" style="gap:4px">
+        <p class="fn muted">Meghalaya Rollout &middot; Delivery</p>
+        <h1 class="lt">Sprint 14</h1>
+      </div>
+      <div class="seg">
+        <span class="seg__item">Board</span><span class="seg__item">List</span>
+        <span class="seg__item seg__item--on">Calendar</span><span class="seg__item">Timeline</span>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between">
+      <div class="row" style="gap:8px">
+        <button class="btn" style="min-height:36px;padding:0 12px" aria-label="Previous month">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+        <p class="t3" style="min-width:190px;text-align:center">September 2026</p>
+        <button class="btn" style="min-height:36px;padding:0 12px" aria-label="Next month">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+      <!-- Legend: the bordered strip becomes a raised card. -->
+      <div class="row" style="gap:16px;background:var(--raised);border-radius:var(--r-s);padding:7px 14px">
+        <span class="row" style="gap:6px"><span style="width:14px;height:9px;border-radius:3px;background:var(--accent)"></span>
+          <span class="c1">Due date</span></span>
+        <span class="row" style="gap:6px"><span style="width:14px;height:9px;border-radius:3px;
+          outline:2px dashed var(--warning);outline-offset:-1px"></span><span class="c1">In transit</span></span>
+        <span class="row" style="gap:6px"><span style="width:14px;height:9px;border-radius:3px;background:var(--purple)"></span>
+          <span class="c1" style="color:var(--purple)">Workspace date field</span></span>
+      </div>
+    </div>
+
+    <div class="cal">
+      <div class="dow">Mon</div><div class="dow">Tue</div><div class="dow">Wed</div><div class="dow">Thu</div>
+      <div class="dow">Fri</div><div class="dow">Sat</div><div class="dow">Sun</div>
+
+      <div class="day day--outside"><p class="day__n">31</p></div>
+      <div class="day"><p class="day__n">1</p></div>
+      <div class="day"><p class="day__n">2</p><span class="ev ev--bar">GN-1149 Help TOC</span></div>
+      <div class="day"><p class="day__n">3</p></div>
+      <div class="day"><p class="day__n">4</p><span class="ev ev--custom">&#9679; Rollout &mdash; Tura</span></div>
+      <div class="day"><p class="day__n">5</p></div>
+      <div class="day"><p class="day__n">6</p></div>
+
+      <div class="day"><p class="day__n">7</p></div>
+      <div class="day day--today"><p class="day__n">8</p>
+        <span class="ev ev--bar">GN-1188 Sign-in lockout</span>
+        <span class="ev ev--bar ev--pending">GN-1190 Rate limiter</span></div>
+      <div class="day"><p class="day__n">9</p><span class="ev ev--bar">GN-1171 Edge labels</span></div>
+      <div class="day"><p class="day__n">10</p><span class="ev ev--bar">GN-1164 Drive token</span>
+        <span class="ev ev--bar">GN-1176 Invite token</span></div>
+      <div class="day"><p class="day__n">11</p><span class="ev ev--custom">&#9679; Rollout &mdash; Baghmara</span></div>
+      <div class="day"><p class="day__n">12</p></div>
+      <div class="day"><p class="day__n">13</p></div>
+
+      <div class="day"><p class="day__n">14</p><span class="ev ev--custom ev--pending">&#9679; Rollout &mdash; Williamnagar</span></div>
+      <div class="day"><p class="day__n">15</p></div>
+      <div class="day"><p class="day__n">16</p><span class="ev ev--bar">GN-1158 Restricted field</span></div>
+      <div class="day"><p class="day__n">17</p></div>
+      <div class="day"><p class="day__n">18</p><span class="ev ev--bar">GN-1179 Garo locale</span></div>
+      <div class="day"><p class="day__n">19</p></div>
+      <div class="day"><p class="day__n">20</p></div>
+
+      <div class="day"><p class="day__n">21</p></div>
+      <div class="day"><p class="day__n">22</p></div>
+      <div class="day"><p class="day__n">23</p><span class="ev ev--bar">Sprint 14 close</span></div>
+      <div class="day"><p class="day__n">24</p></div>
+      <div class="day"><p class="day__n">25</p></div>
+      <div class="day"><p class="day__n">26</p></div>
+      <div class="day"><p class="day__n">27</p></div>
+
+      <div class="day"><p class="day__n">28</p>
+        <!-- A claimed day that is not any day on this row — spans the week, points at nothing. -->
+        <span class="ev ev--unplaceable">2026-09-31 &mdash; not a day</span></div>
+      <div class="day"><p class="day__n">29</p></div>
+      <div class="day"><p class="day__n">30</p></div>
+      <div class="day day--outside"><p class="day__n">1</p></div>
+      <div class="day day--outside"><p class="day__n">2</p></div>
+      <div class="day day--outside"><p class="day__n">3</p></div>
+      <div class="day day--outside"><p class="day__n">4</p></div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

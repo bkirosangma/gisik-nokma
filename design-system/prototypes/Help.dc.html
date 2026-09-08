@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    /* Search field: 44px tall, 17px text — iOS will not zoom on focus. */
+    .search{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;
+      border-radius:10px;background:var(--raised);color:var(--label3);font-size:17px}
+    .seg{display:inline-flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 18px;
+      border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    /* TOC links: 24px in-list floor, not 44 — the product's own dense-list rule. */
+    .toc{display:flex;flex-wrap:wrap;gap:7px 20px}
+    .toc a{display:inline-flex;align-items:center;min-height:24px;font-size:17px;color:var(--accent)}
+    .quote{background:var(--sunken);border-radius:var(--r-m);padding:14px 16px;margin:0 0 16px}
+    .code{background:var(--fill3);border-radius:6px;padding:1px 6px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15.6px}
+    .doc{max-width:72ch}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#">Settings</a><a href="#" class="on">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="flex:1;min-height:0;overflow:hidden;display:flex;justify-content:center;padding:0 32px">
+    <div class="doc col" style="width:100%;gap:20px;padding-top:28px">
+
+      <div class="col" style="gap:14px">
+        <h1 class="lt">Help</h1>
+        <label class="col" style="gap:8px">
+          <span class="hl">Search the manual and FAQ</span>
+          <span class="search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            contested claim
+          </span>
+        </label>
+      </div>
+
+      <!-- Results: bordered box becomes a sunken card. -->
+      <div style="background:var(--sunken);border-radius:var(--r-l);padding:16px 18px">
+        <p class="hl">3 results</p>
+        <div class="col" style="gap:14px;margin-top:12px">
+          <div class="col" style="gap:2px">
+            <a href="#" style="font-weight:600">What happens when two devices disagree</a>
+            <p class="fn muted">Manual &rsaquo; Working offline</p>
+            <p class="sh muted">&hellip;neither claim is discarded. The ticket shows both and asks you to choose&hellip;</p>
+          </div>
+          <div class="col" style="gap:2px">
+            <a href="#" style="font-weight:600">Why a contested claim is not an error</a>
+            <p class="fn muted">FAQ</p>
+            <p class="sh muted">&hellip;a contest is the system telling the truth about what it recorded&hellip;</p>
+          </div>
+          <div class="col" style="gap:2px">
+            <a href="#" style="font-weight:600">Resolving a contest</a>
+            <p class="fn muted">Manual &rsaquo; Tickets</p>
+            <p class="sh muted">&hellip;keep yours, keep theirs, or discard &mdash; every outcome is recorded as an event&hellip;</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="seg" style="align-self:flex-start">
+        <span class="seg__item seg__item--on">Manual</span>
+        <span class="seg__item">FAQ</span>
+      </div>
+
+      <nav class="toc">
+        <a href="#">Getting started</a><a href="#">Workspaces</a><a href="#">Tickets</a>
+        <a href="#">Boards and views</a><a href="#">Workflows</a><a href="#">Ticket types</a>
+        <a href="#">Working offline</a><a href="#">Dates and claims</a><a href="#">Visibility</a>
+        <a href="#">MCP</a><a href="#">Keyboard</a>
+      </nav>
+
+      <div style="overflow:hidden">
+        <h2 class="t2">Working offline</h2>
+        <p class="bd" style="margin-top:12px">Gisik Nokma keeps working when the network does not. Every change you
+          make is recorded as a <em>claim</em> &mdash; a statement about what you did and when &mdash; and queued
+          until the server acknowledges it.</p>
+
+        <h3 class="t3" style="margin-top:20px">A claim in transit is the same claim</h3>
+        <p class="bd" style="margin-top:8px">In-transit work is drawn with a dashed outline, never a different
+          colour. Recolouring it would say it means something else. It does not: it means the same thing, not
+          yet acknowledged.</p>
+
+        <div class="quote" style="margin-top:16px">
+          <p class="bd">Nothing is discarded silently. If two devices recorded different values for one field,
+            the ticket shows you both and waits.</p>
+        </div>
+
+        <p class="bd">The sync strip at the bottom of every screen names the current state:
+          <span class="code">Live</span>, <span class="code">Offline</span>, or the server&rsquo;s own
+          reason if it declined a claim.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --surface:#F2F2F7; --raised:#FFFFFF; --sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20); --fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12); --fill4:rgba(116,116,128,0.08);
+      --label:#000000; --label2:rgba(60,60,67,0.80); --label3:rgba(60,60,67,0.55);
+      --accent:#0040DD; --danger:#D70015; --warning:#B25000; --success:#1E7A34;
+      --gray:#6C6C70; --onColor:#FFFFFF;
+      --r-s:8px; --r-m:12px; --r-l:16px; --r-pill:999px;
+    }
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;align-items:center;justify-content:center}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .col{display:flex;flex-direction:column}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+      padding:0 18px;border-radius:var(--r-s);border:none;background:var(--fill3);
+      color:var(--accent);font:inherit;font-weight:600;cursor:pointer;width:100%}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .field{display:flex;align-items:center;min-height:44px;padding:0 14px;
+      border-radius:var(--r-s);background:var(--fill4);color:var(--label3);font-size:17px}
+    /* Segmented control — HIG's own method picker, replacing the two bordered tabs. */
+    .seg{display:flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{flex:1;display:inline-flex;align-items:center;justify-content:center;
+      min-height:40px;border-radius:7px;font-size:15px;font-weight:500;color:var(--label);
+      cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="col" style="width:416px;gap:22px">
+
+    <div class="col" style="gap:8px;align-items:center;text-align:center">
+      <div style="width:56px;height:56px;border-radius:14px;background:var(--accent);
+                  display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/>
+          <path d="M8 13h8"/><path d="M8 16.5h5"/>
+        </svg>
+      </div>
+      <h1 class="lt">Gisik Nokma</h1>
+      <p class="bd muted">The keeper of memory</p>
+    </div>
+
+    <div style="background:var(--raised);border-radius:var(--r-l);padding:24px">
+      <div class="seg" role="tablist">
+        <span class="seg__item seg__item--on" role="tab" aria-selected="true">Magic link</span>
+        <span class="seg__item" role="tab" aria-selected="false">Password</span>
+      </div>
+
+      <div class="col" style="gap:16px;margin-top:20px">
+        <label class="col" style="gap:7px">
+          <span class="fn muted">Email</span>
+          <span class="field">you@example.com</span>
+        </label>
+        <button class="btn btn--primary">Send magic link</button>
+      </div>
+
+      <p class="fn muted" style="margin-top:16px;text-align:center">
+        We&rsquo;ll email you a link that signs you in. It expires in 15 minutes.
+      </p>
+    </div>
+
+    <p class="fn muted" style="text-align:center">
+      By continuing you agree to the <a href="#">Terms</a> and <a href="#">Privacy notice</a>.
+    </p>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .btn--sm{min-height:36px;padding:0 14px;font-size:15px}
+    .side{width:248px;flex:none;background:var(--raised);border-radius:var(--r-l);padding:8px;
+      display:flex;flex-direction:column;gap:2px;align-self:flex-start}
+    .side a{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;
+      color:var(--label);font-size:15px;font-weight:500}
+    .side a.on{background:var(--accent);color:var(--onColor);font-weight:600}
+    .list{background:var(--raised);border-radius:var(--r-l);overflow:hidden}
+    .item{display:flex;align-items:center;gap:14px;padding:15px 18px}
+    .item:nth-child(even){background:var(--fill4)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .pill{display:inline-flex;align-items:center;background:var(--fill3);border-radius:var(--r-pill);
+      padding:2px 10px;font-size:12px;line-height:16px;font-weight:500;color:var(--label2)}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#" class="on">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+    <div class="col" style="gap:4px;margin-top:26px">
+      <h1 class="lt">Settings</h1><p class="bd muted">Meghalaya Rollout</p>
+    </div>
+
+    <div style="display:flex;gap:24px;margin-top:22px;flex:1;min-height:0">
+      <nav class="side">
+        <a href="#">Ticket types</a><a href="#">Workflows</a><a href="#">Fields</a>
+        <a href="#">Visibility</a><a href="#" class="on">MCP tokens</a><a href="#">Danger zone</a>
+      </nav>
+
+      <div class="col" style="flex:1;min-width:0;gap:18px">
+        <div class="row" style="justify-content:space-between">
+          <div class="col" style="gap:2px">
+            <h2 class="t3">MCP tokens</h2>
+            <p class="sh muted">Tokens let an assistant read and write tickets as you. They carry your permissions,
+              not more.</p>
+          </div>
+          <button class="btn btn--primary">New token</button>
+        </div>
+
+        <!-- One-time reveal: success-tinted fill, no border. -->
+        <div style="background:rgba(30,122,52,0.10);border-radius:var(--r-l);padding:18px">
+          <p class="hl">Copy this now &mdash; it won&rsquo;t be shown again</p>
+          <div class="row" style="gap:10px;margin-top:12px;flex-wrap:nowrap">
+            <span class="mono" style="flex:1;min-width:0;background:var(--raised);border-radius:10px;
+                  padding:12px 14px;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              gnmcp_live_9f2c41aa7b3e4d18b0c65e7d2a94f130</span>
+            <button class="btn">Copy</button>
+          </div>
+          <p class="c1 muted" style="margin-top:10px">Stored as a hash. If you lose it, revoke and issue another.</p>
+        </div>
+
+        <div class="list">
+          <div class="item">
+            <div class="col" style="flex:1;min-width:0;gap:3px">
+              <span style="font-weight:600">Claude Desktop &mdash; Anjali</span>
+              <span class="c1 muted mono">gnmcp_live_9f2c&hellip;f130 &middot; created today</span></div>
+            <span class="pill" style="background:rgba(30,122,52,0.14);color:var(--success)">Active</span>
+            <span class="c1 muted">Used 4 min ago</span>
+            <button class="btn btn--sm" style="color:var(--danger);background:rgba(215,0,21,0.10)">Revoke</button>
+          </div>
+          <div class="item">
+            <div class="col" style="flex:1;min-width:0;gap:3px">
+              <span style="font-weight:600">CI &mdash; ticket sync</span>
+              <span class="c1 muted mono">gnmcp_live_31b8&hellip;0ac2 &middot; created 4 Aug</span></div>
+            <span class="pill" style="background:rgba(30,122,52,0.14);color:var(--success)">Active</span>
+            <span class="c1 muted">Used 2 hours ago</span>
+            <button class="btn btn--sm" style="color:var(--danger);background:rgba(215,0,21,0.10)">Revoke</button>
+          </div>
+          <div class="item">
+            <div class="col" style="flex:1;min-width:0;gap:3px">
+              <span style="font-weight:600;color:var(--label2)">Old laptop</span>
+              <span class="c1 muted mono">gnmcp_live_77de&hellip;9b41 &middot; revoked 2 Sep</span></div>
+            <span class="pill">Revoked</span>
+            <span class="c1 muted">&mdash;</span>
+            <span style="width:88px"></span>
+          </div>
+        </div>
+
+        <div style="background:var(--sunken);border-radius:var(--r-l);padding:18px">
+          <p class="hl">Connect an assistant</p>
+          <p class="sh muted" style="margin-top:6px">Point your MCP client at this endpoint and paste the token
+            when it asks.</p>
+          <p class="mono" style="margin-top:10px;background:var(--raised);border-radius:10px;padding:12px 14px;
+             font-size:15px">https://gisik-nokma.app/mcp</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

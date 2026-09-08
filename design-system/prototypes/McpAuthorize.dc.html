@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --purple:#8944AB;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;align-items:center;justify-content:center;padding:0 32px}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer;flex:1}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .scope{display:flex;gap:12px;align-items:flex-start;padding:13px 0}
+    .scope:nth-child(even){background:var(--fill4);border-radius:var(--r-s);
+      padding-left:14px;padding-right:14px;margin:0 -14px}
+    .ic{flex:none;margin-top:1px}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="col" style="width:520px;gap:20px">
+
+    <div class="col" style="gap:14px;align-items:center;text-align:center">
+      <div class="row" style="gap:14px;flex-wrap:nowrap;justify-content:center">
+        <span style="width:52px;height:52px;border-radius:13px;background:var(--accent);display:flex;
+                     align-items:center;justify-content:center">
+          <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/></svg>
+        </span>
+        <span class="muted" style="font-size:20px">&harr;</span>
+        <span style="width:52px;height:52px;border-radius:13px;background:var(--fill1);display:flex;
+                     align-items:center;justify-content:center;font-weight:600;font-size:19px">CD</span>
+      </div>
+      <div class="col" style="gap:6px">
+        <h1 class="t2">Let Claude Desktop use Gisik Nokma?</h1>
+        <p class="sh muted">It will act as <strong style="font-weight:600">Anjali Kharkongor</strong>
+          in <strong style="font-weight:600">Meghalaya Rollout</strong>.</p>
+      </div>
+    </div>
+
+    <div style="background:var(--raised);border-radius:var(--r-l);padding:20px">
+      <p class="fn muted" style="text-transform:uppercase;letter-spacing:0.6px">It will be able to</p>
+      <div style="margin-top:8px">
+        <div class="scope">
+          <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E7A34"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></svg>
+          <div class="col" style="gap:2px"><p class="bd">Read tickets, boards and comments</p>
+            <p class="c1 muted">Only in workspaces you belong to</p></div>
+        </div>
+        <div class="scope">
+          <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E7A34"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></svg>
+          <div class="col" style="gap:2px"><p class="bd">Create tickets and move them between states</p>
+            <p class="c1 muted">Every change is recorded as coming from MCP</p></div>
+        </div>
+        <div class="scope">
+          <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          <div class="col" style="gap:2px"><p class="bd muted">Read restricted fields</p>
+            <p class="c1 muted">Never &mdash; restricted fields are excluded from MCP entirely</p></div>
+        </div>
+        <div class="scope">
+          <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          <div class="col" style="gap:2px"><p class="bd muted">Invite people or change roles</p>
+            <p class="c1 muted">Never &mdash; membership stays a human action</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--sunken);border-radius:var(--r-l);padding:18px">
+      <p class="hl">Confirm the code shown in Claude Desktop</p>
+      <div class="row" style="gap:10px;margin-top:12px;flex-wrap:nowrap">
+        <!-- 44px tall, 17px text: iOS will not zoom the viewport on focus. -->
+        <span style="flex:1;display:flex;align-items:center;min-height:44px;padding:0 14px;
+              border-radius:10px;background:var(--raised);font-size:17px;letter-spacing:3px;
+              font-family:ui-monospace,SFMono-Regular,Menlo,monospace">HKQ&ndash;7T2</span>
+      </div>
+      <p class="c1 muted" style="margin-top:10px">If the codes don&rsquo;t match, deny this request &mdash;
+        something else asked for access.</p>
+    </div>
+
+    <div class="row" style="gap:12px;flex-wrap:nowrap">
+      <button class="btn">Deny</button>
+      <button class="btn btn--primary">Allow access</button>
+    </div>
+
+    <p class="c1 muted" style="text-align:center">You can revoke this any time from
+      <a href="#">Settings &rsaquo; MCP tokens</a>.</p>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

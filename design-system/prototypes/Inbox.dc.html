@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --gray:#6C6C70;--purple:#8944AB;--pink:#D30F45;--onColor:#FFFFFF;
+      --r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:var(--accent);
+      color:var(--onColor);font-size:12px;line-height:18px;font-weight:600;text-align:center;margin-left:7px}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .seg{display:inline-flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;
+      border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    /* Rows: the 1px bottom rule is gone. Alternating quaternary fill separates. */
+    .list{background:var(--raised);border-radius:var(--r-l);overflow:hidden}
+    .item{display:flex;align-items:baseline;gap:12px;padding:14px 18px}
+    .item:nth-child(even){background:var(--fill4)}
+    .item__text{flex:1;min-width:0}
+    .item__head{display:block;font-size:17px;line-height:22px}
+    .item__body{display:block;color:var(--label2);font-size:15px;line-height:20px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+    .unread .item__head{font-weight:600}
+    .glyph{color:var(--label2);flex:none;margin-top:2px}
+    .unread .glyph{color:var(--accent)}
+    .udot{align-self:center;width:9px;height:9px;border-radius:999px;background:var(--accent);flex:none}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a>
+    <a href="#">My work</a>
+    <a href="#" class="on">Inbox<span class="badge">7</span></a>
+    <a href="#">Members</a>
+    <a href="#">Settings</a>
+    <a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;
+              display:flex;flex-direction:column;gap:18px">
+
+    <div class="row" style="justify-content:space-between;margin-top:26px">
+      <div class="col" style="gap:4px">
+        <h1 class="lt">Inbox</h1>
+        <p class="bd muted">Seven unread of 42.</p>
+      </div>
+      <div class="row">
+        <div class="seg">
+          <span class="seg__item seg__item--on">All</span>
+          <span class="seg__item">Unread</span>
+          <span class="seg__item">Mentions</span>
+        </div>
+        <button class="btn">Mark all read</button>
+      </div>
+    </div>
+
+    <div class="list">
+
+      <div class="item unread">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 6.5h16v11H8l-4 3.5Z"/></svg>
+        <span class="item__text">
+          <span class="item__head">Anjali mentioned you on GN-1188</span>
+          <span class="item__body">&ldquo;The shared bucket is the availability defect, not the proxy header &mdash; can you confirm?&rdquo;</span>
+        </span>
+        <span class="fn muted">12:04</span><span class="udot"></span>
+      </div>
+
+      <div class="item unread">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3.5v13"/><path d="m7.5 12 4.5 4.5 4.5-4.5"/><path d="M4.5 20h15"/></svg>
+        <span class="item__text">
+          <span class="item__head">GN-1164 was assigned to you</span>
+          <span class="item__body">Drive attachments need an owner-scoped token &middot; moved to Blocked</span>
+        </span>
+        <span class="fn muted">11:47</span><span class="udot"></span>
+      </div>
+
+      <div class="item unread">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 4.5 3.5 19h17Z"/><path d="M12 10v4"/><path d="M12 16.5h.01"/></svg>
+        <span class="item__text">
+          <span class="item__head">A claim on GN-1190 is contested</span>
+          <span class="item__body">Two devices recorded a different state for the same field while you were offline</span>
+        </span>
+        <span class="fn muted">11:12</span><span class="udot"></span>
+      </div>
+
+      <div class="item">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12.5 10 17l9-10"/></svg>
+        <span class="item__text">
+          <span class="item__head">Rahul closed GN-1182</span>
+          <span class="item__body">Controls render in the product&rsquo;s font &middot; moved to Done</span>
+        </span>
+        <span class="fn muted">10:31</span>
+      </div>
+
+      <div class="item">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/></svg>
+        <span class="item__text">
+          <span class="item__head">Workflow &ldquo;Delivery v4&rdquo; was published</span>
+          <span class="item__body">Meena published 3 state changes &middot; 28 tickets remapped</span>
+        </span>
+        <span class="fn muted">09:58</span>
+      </div>
+
+      <div class="item">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+        <span class="item__text">
+          <span class="item__head">Priya accepted your invitation</span>
+          <span class="item__body">Joined Meghalaya Rollout as a member</span>
+        </span>
+        <span class="fn muted">Yesterday</span>
+      </div>
+
+    </div>
+
+    <button class="btn" style="align-self:center;background:transparent">Load 20 more</button>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

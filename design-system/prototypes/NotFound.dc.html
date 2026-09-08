@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--fill1:rgba(120,120,128,0.20);
+      --fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;align-items:center;justify-content:center;padding:0 32px}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .col{display:flex;flex-direction:column}
+    /* Standalone controls take the 44px floor, not the 24px in-list one. */
+    .link{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 16px;
+      border-radius:10px;background:var(--raised);color:var(--label);font-size:17px;font-weight:500}
+    .glyph{color:var(--label3);flex:none}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="col" style="width:520px;gap:26px;align-items:center;text-align:center">
+
+    <div style="width:72px;height:72px;border-radius:18px;background:var(--fill3);
+                display:flex;align-items:center;justify-content:center">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.55)"
+           stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/>
+        <path d="m9.5 11.5 5 5"/><path d="m14.5 11.5-5 5"/>
+      </svg>
+    </div>
+
+    <div class="col" style="gap:10px">
+      <h1 class="lt">This page isn&rsquo;t here</h1>
+      <p class="bd muted">The link may be out of date, or the ticket may have moved to a workspace
+        you don&rsquo;t belong to. Nothing was deleted.</p>
+    </div>
+
+    <div class="col" style="gap:10px;width:100%;text-align:left">
+      <a href="#" class="link">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 11 8-7 8 7"/>
+          <path d="M6.5 9.5V20h11V9.5"/></svg>
+        Go to your workspaces</a>
+      <a href="#" class="link">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/>
+          <path d="m16 16 4 4"/></svg>
+        Search the manual</a>
+      <a href="#" class="link">
+        <svg class="glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16v11H8l-4 3.5Z"/></svg>
+        Open your inbox</a>
+    </div>
+
+    <p class="fn muted">If someone sent you this link, they may still have access &mdash; ask them to
+      re-share it from the ticket.</p>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
