@@ -231,6 +231,74 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
 > 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
+# ▶ TUESDAY 2026-09-08 ~14:5x IST — **ONE LIMITER ON `/api/auth/*`, AND IT IS OURS. THE FIRST VERSION OF THE GUARD PASSED 59/59 AGAINST ITS OWN DEFECT.**
+
+*Branch `exec/125-single-ratelimit-authority`, off `main` `5df5d28`. Controller ruling
+`gisik-nokma-lanes/CTL-RULING-2026-09-08-better-auth-ratelimit.md`, delegated by the owner. All six
+requirements met. `RATE_LIMIT_AUTH_MAX` untouched.*
+
+## WHAT LANDED
+
+`rateLimit: { enabled: false }` in `apps/server/src/auth/auth.ts`. Our limiter — per client address
+under `TRUST_PROXY`, rightmost `X-Forwarded-For` — becomes the single authority on `/api/auth/*`.
+
+## ⚠ THE GUARD I WROTE FIRST COULD NOT FAIL, AND THE MUTATION IS THE ONLY REASON I KNOW
+
+The first version of 13.273 passed **59/59 under its own mutation.** Two independent reasons, and both
+generalise:
+
+1. **The mutation was wrong.** I "mutated" by deleting `rateLimit: { enabled: false }`. But
+   `enabled: options.rateLimit?.enabled ?? isProduction`
+   (`dist/context/create-context.mjs:171`) and **vitest sets `NODE_ENV=test`** — so deleting the line
+   leaves the limiter OFF and the mutation changes nothing. **The mutation must be `enabled: true`.**
+   *That same NODE_ENV-dependent default is why no server test ever exercised better-auth's limiter and
+   why this shipped unseen* — the objection `auth.ts` already records against `skipOriginCheck`, now
+   with a second instance.
+2. **The harness cannot reproduce the defect, and the reason is structural.** `app.inject` clients are
+   distinguishable ONLY by `X-Forwarded-For` — and an `X-Forwarded-For` is also enough for better-auth's
+   `getIP()` to RESOLVE, at which point better-auth separates clients too and the shared bucket
+   disappears. **The property that makes two clients distinguishable in the harness is the same property
+   whose absence causes the bug.** Measured, not assumed: with the limiter re-enabled a second client's
+   first request came back `500` (its own budget), not `429`.
+
+**So the case was rewritten around what it CAN witness:** better-auth's limiter no longer *answers*.
+At `authMax: 6`, the **sixth** request — past better-auth's own `max: 5` on the magic-link path — must
+not carry its body; the **seventh** must be ours. Mutation now **EXIT 1**, quoting better-auth's body
+back in the failure. *The shared-bucket claim rests on the dev-stack measurement, and the case says so.*
+
+**I also deleted a test I had written.** The console-capture "warning is absent" case passed under the
+mutation too, for the same `getIP`-resolves reason — an assertion that could not fail. It was replaced
+by 13.274, a manual stack witness, rather than kept as a green tick meaning nothing.
+
+## REQUIREMENTS — all six, and how each was met
+
+| # | requirement | evidence |
+|---|---|---|
+| 1 | which limiter, by BODY not status | 13.273 asserts `{"error":"rate_limited","retryAfterSeconds":60}` and the ABSENCE of `Too many requests…` |
+| 2 | case 13.273, two clients | minted; second address not refused (see the caveat above about what that does and does not show) |
+| 3 | mutation must redden | `enabled: true` → **EXIT 1**, naming better-auth's own body. Restored, green 58/58 |
+| 4 | startup warning GONE, with a positive control | **0 hits** after rebuild, against **39 log lines / 16 `incoming request` / 8 magic-link** as controls. Baseline before: **2 hits**. Plus BEHAVIOUR: **8/8 sends `200`** where the 6th was previously better-auth's `429` |
+| 5 | `Features.md` + `test-cases/` same change set | done; 13.273 ✅, 13.274 🧪 |
+| 6 | do not touch `RATE_LIMIT_AUTH_MAX` | untouched, verified |
+
+## ⚠ A THIRD SILENT-EMPTY, AND THE CONTROL IS THE ONLY REASON IT WAS NOT FILED AS SUCCESS
+
+Requirement 4's first attempt reported **0 warning hits — and 0 for `incoming request`, a line I knew
+was present.** The `docker logs | grep` pipeline produced zero bytes through the proxy. Re-measured via
+`subprocess.run(['docker','logs',…])`: 8158 lines, 3986 requests, **2** warning hits. **Third time that
+mode has fired today.** Without the positive control it would have been written up as *"the warning is
+already gone"* — a false success, before the fix even existed.
+
+## OPEN / OWNED
+
+* **The sign-in-specific bucket** in OUR limiter, to restore the per-path tightening better-auth was
+  giving `/sign-in/magic-link` (`max || 5` per `window || 60`, overriding the generic 10s/3). The ruling
+  names this as a follow-up and explicitly says not to build it here. **Owner: whoever next touches the
+  auth rate limiter.**
+* **Dev stack only.** The shared-bucket measurement and the warning witness are both on the dev stack;
+  neither has been checked against the real deployment.
+* **Block `13.266`–`13.275`:** `13.266`–`13.274` now used, **`13.275` free.**
+
 >
 # ▶ TUESDAY 2026-09-08 ~14:2x IST — **ONE CLIENT CAN LOCK EVERY USER OUT OF SIGN-IN. MEASURED, WITH THE CONTROL THAT MAKES IT A FINDING — AND IT REFUTES MY OWN EARLIER EXPLANATION.**
 
