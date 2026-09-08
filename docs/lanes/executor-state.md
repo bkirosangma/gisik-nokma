@@ -20,6 +20,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ▸ ONE UNREPRODUCIBLE `git log` READING — RECORDED AS AN OBSERVATION, NOT A MECHANISM
+>
+> Counting #328's commits, `git log origin/main..origin/exec/116-tap-targets --oneline | wc -l`
+> returned **8**, and a `grep` of the same output found **zero** merge commits. The branch tip is
+> itself a merge commit, so that answer could not be right. `git rev-list --count` on the identical
+> range returned **14**, and `--no-merges` returned **8** — i.e. the log output matched the
+> `--no-merges` view of a command that was not given `--no-merges`.
+>
+> **It did not reproduce.** Eight consecutive runs of the same command in the same shell afterwards
+> all returned 14 lines with 6 merge commits, and `rev-list --count` was stable at 14 throughout.
+>
+> **I am deliberately NOT writing down a mechanism.** The obvious story — "the proxy strips merge
+> commits" — is exactly the shape of the overcorrection this same session had to fix two entries
+> above, where a note searched one path, found nothing, and declared a real file fictional. One
+> unreproducible reading does not support a claim about a tool that every session depends on, and a
+> confident wrong warning is more damaging than a hedged true one.
+>
+> **What is safe to carry forward, because it does not depend on the cause:**
+> * **Use `git rev-list --count <range>` for a commit count, not `git log … | wc -l`.** The invariant
+>   was stable across every reading; the formatted one was not.
+> * **A commit count that omits merges when the tip IS a merge is self-contradicting** — that
+>   internal inconsistency is what caught it, not a comparison against a known-good number.
+> * Add it to the standing list of things whose null or low answers must be cross-checked, beside the
+>   proxied `grep -n` line numbers and the `$?`-after-a-proxied-command readings recorded above.
+>
 > ### ▸ NEW OWNER QUESTION: 26 CONTROLS RENDER AT THE BROWSER'S FONT, NOT THE PRODUCT'S
 >
 > Found by turning the sweep's own floor up to 16px for one enumerating run (then restored; the
