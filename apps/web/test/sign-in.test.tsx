@@ -270,11 +270,44 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    * is the difference between conditional UI and the dead modal-triggering call
    * this replaces.
    */
-  it('13.326 asks for a passkey through conditional mediation, with no button', async () => {
+  it('13.326 asks for a passkey only once the field it attaches to is on screen', async () => {
+    const user = userEvent.setup();
     render(<SignInPage />);
+
+    /* THE ASSERTION THE FIRST VERSION OF THIS CASE DID NOT MAKE, and its absence
+     * is why the feature shipped inert for one commit.
+     *
+     * Conditional mediation attaches to an ELIGIBLE INPUT PRESENT IN THE DOM AT
+     * THE MOMENT OF THE CALL. The old case asserted only that
+     * `passkey({autoFill:true})` was called — which was true, on mount, while
+     * the default Phone tab was showing and the only field carrying
+     * `autocomplete="username webauthn"` did not exist. The call had nothing to
+     * attach to. **A mock can see that a call happened and with what argument;
+     * it cannot see that the call was pointless**, so the test passed and the
+     * replacement for the dead button was itself dead.
+     *
+     * So: NOT called while Phone is showing. */
+    expect(screen.getByRole('tab', { name: 'Phone' })).toHaveAttribute('aria-selected', 'true');
+    expect(document.querySelector('input[autocomplete~="webauthn"]')).toBeNull();
+    expect(passkey).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('tab', { name: 'Email link' }));
+
+    // Called once the field exists — and the field is asserted to exist in the
+    // same DOM, which is the property, not the call.
     await waitFor(() => {
       expect(passkey).toHaveBeenCalledWith({ autoFill: true });
     });
+    expect(document.querySelector('input[autocomplete~="webauthn"]')).not.toBeNull();
+
+    // At most once per page load: a second concurrent credentials.get() throws
+    // InvalidStateError in a browser, and better-auth's client exposes no signal
+    // to cancel the first.
+    await user.click(screen.getByRole('tab', { name: 'Phone' }));
+    await user.click(screen.getByRole('tab', { name: 'Email link' }));
+    expect(passkey).toHaveBeenCalledTimes(1);
+
+    // And never a button, in any tab.
     expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
   });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
@@ -192,14 +192,48 @@ function SignInForm() {
    * look. It is recorded in `docs/pre-launch-checklist.md` with that owner, so
    * the gap is written down rather than implied by the absence of a button.
    *
-   * Failures are swallowed on purpose. This runs unprompted on every page load,
-   * and every reason it can fail — no passkey enrolled, no platform
-   * authenticator, the user dismissing the sheet, a browser without conditional
-   * mediation — is a NON-EVENT for somebody who came here to type a phone
-   * number. Surfacing any of them would put a refusal on screen that the person
-   * did not ask for and cannot act on. A passkey that DOES resolve navigates.
+   * ## IT FIRES WHEN THE EMAIL FIELD EXISTS, NOT ON MOUNT — and the first
+   * ## version got this wrong in a way that made the whole thing inert
+   *
+   * Conditional mediation attaches to an ELIGIBLE INPUT THAT IS IN THE DOM AT
+   * THE MOMENT OF THE CALL. The first version ran on mount with `[]` deps, and
+   * the default method is `'phone'` — so the email input, the only field
+   * carrying `autocomplete="username webauthn"`, **was not rendered yet**. The
+   * request had nothing to attach to, and switching to the Email tab did not
+   * re-issue it because the deps array was empty. **The replacement for the dead
+   * button was itself dead**, and every test still passed: the call WAS made and
+   * `{ autoFill: true }` WAS its argument, which is all a mock can see.
+   *
+   * So it keys on `method`. The request goes out when the email field is on
+   * screen and can actually be offered through.
+   *
+   * `asked` is a ref, not state, and it exists because a second concurrent
+   * `navigator.credentials.get()` throws `InvalidStateError` in browsers —
+   * toggling the tabs would otherwise stack requests. It is deliberately never
+   * reset: better-auth's client exposes no `signal` on `passkey()`
+   * (`dist/client.d.mts` lists `autoFill`, `extensions`, `returnWebAuthnResponse`
+   * and `fetchOptions` — checked), so a request once issued cannot be cancelled
+   * when the user leaves the tab, and asking again would be the stacking this
+   * guard prevents. One offer per page load is the honest ceiling.
+   *
+   * **NAMED ABSENCE, not a partial:** a user who never opens the Email tab is
+   * never offered a passkey. That is the cost of attaching to the email field,
+   * and it is small today for a reason that will expire — no user can hold a
+   * passkey at all until Task 12 ships registration. When it does, whoever
+   * builds it should revisit whether the phone field should carry the token too.
+   *
+   * Failures are swallowed on purpose. This runs unprompted, and every reason it
+   * can fail — no passkey enrolled, no platform authenticator, the user
+   * dismissing the sheet, a browser without conditional mediation — is a
+   * NON-EVENT for somebody who came here to type an address. Surfacing any of
+   * them would put a refusal on screen that the person did not ask for and
+   * cannot act on. A passkey that DOES resolve navigates.
    */
+  const asked = useRef(false);
+
   useEffect(() => {
+    if (method !== 'email' || asked.current) return;
+    asked.current = true;
     void authClient.signIn
       .passkey({ autoFill: true })
       .then((result) => {
@@ -208,10 +242,9 @@ function SignInForm() {
       .catch(() => {
         // See above: an unprompted probe has no failure worth showing.
       });
-    // `next` and `router` are stable for the life of this page; re-running the
-    // conditional-mediation request would stack browser autofill sessions.
+    // `next` and `router` are stable for the life of this page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [method]);
 
   return (
     <main className="gn-shell gn-shell--centred">
