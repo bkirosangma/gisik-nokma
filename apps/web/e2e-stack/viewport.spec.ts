@@ -271,7 +271,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
   ).not.toBeNull();
 
   /**
-   * FIVE ROUTES, AND THE LAST THREE ARE THE ONES THAT EARN THEIR KEEP.
+   * SIX ROUTES, AND THREE OF THEM ARE THE ONES THAT EARN THEIR KEEP.
    *
    * `/my-work` and the board were the obvious choices — the checklist's own
    * reading is about the board — and measured first they BOTH came back with
@@ -359,6 +359,27 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       key: 'stack-phone-390|/settings/ticket-types',
     },
     { path: `/w/${workspaceId}/settings/workflows`, key: 'stack-phone-390|/settings/workflows' },
+    /* `/workspaces` — ADDED 2026-09-08 with Task 4, and it should have been here
+       from the start. Task 4's dispatch asserted "13.287's signed-in ratchet
+       watches /workspaces"; it did not. The baseline file held five keys and
+       none of them was this route, so the screen Task 4 restyles had NO
+       accessible-name floor under it at all — the (a) task's stated guard was
+       missing exactly the half that guards it.
+
+       Recorded because of HOW it survived: the claim was written from the
+       plan's promise rather than from `accessible-names-baseline.json`, and a
+       ratchet nobody has read the keys of is indistinguishable from one that
+       covers everything. The route is unscoped — it is the workspace CHOOSER,
+       so it takes no `workspaceId`.
+
+       Its sibling `/invite/<token>` is still uncovered and is a KNOWN RESIDUAL
+       GAP, not an oversight: this suite has no standing invite token to visit,
+       and a token-less visit renders the dead-link branch, which would baseline
+       the wrong screen. Owner: whoever gives the stack seed a standing invite
+       token — Task 4's successor at the invite surface, or Task 10 if it lands
+       first. Also written in `docs/pre-launch-checklist.md`, because a gap that
+       lives only in a code comment is a gap nobody reviews. */
+    { path: '/workspaces', key: 'stack-phone-390|/workspaces' },
   ];
 
   for (const route of routes) {

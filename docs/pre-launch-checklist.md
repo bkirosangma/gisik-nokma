@@ -304,6 +304,29 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
 
 ### What was NOT measured, stated so it is a known absence
 
+- **NEW, 2026-09-08 — `/invite/<token>` HAS NO ACCESSIBLE-NAME FLOOR UNDER IT. Owner: whoever gives
+  the stack seed a standing invite token** — Task 4's successor at the invite surface, or Task 10 if
+  it lands first. Task 4 restyled `/workspaces` and `/invite/[token]` together and could only put a
+  ratchet under the first of them. The reason is structural, not laziness: the signed-in sweep visits
+  fixed paths, and a token-less visit to `/invite/<token>` renders the **dead-link branch** — so
+  adding the route to the loop would record a baseline for the wrong screen and then defend it
+  forever, which is worse than no baseline, because a ratchet at 0 over a screen nobody reaches
+  reports green and reads as coverage. Closing it needs a seeded, non-expiring invite token in the
+  stack fixture; then the route joins `routes` in `apps/web/e2e-stack/viewport.spec.ts` beside
+  `/workspaces`.
+  **What DOES guard the invite surface today, so the gap is not overstated:** **eight** `it` blocks across four `describe`s in `apps/web/test/invite-page.test.tsx`, carrying
+  **six** case ids (3.118–3.123) — counted, after an earlier draft of this very sentence said
+  "twelve", a number nothing had printed covering the live link, the dead link, the
+  session-loading and signed-out branches and both acceptance-refusal shapes, plus case **13.300**,
+  which drives the real page in a real browser behind a stubbed summary. What is absent is
+  specifically the **one-way accessible-name floor** — the instrument that catches a future restyle
+  silently dropping an `aria-label` or a `role`, which no assertion above is shaped to notice.
+  *How this was found is the part worth keeping:* Task 4's dispatch asserted that the signed-in
+  ratchet already watched these routes. It did not — the baseline file held five keys and neither of
+  Task 4's two routes was among them. The claim was written from the plan's promise rather than from
+  `accessible-names-baseline.json`, and **a ratchet whose keys nobody has read is indistinguishable
+  from one that covers everything.**
+
 - **NEW, 2026-09-08 — PASSKEY REGISTRATION DOES NOT EXIST. Owner: Task 12 of the HIG per-screen plan,
   scheduled after the owner's second look at sign-in.** `/sign-in` shipped a `Sign in with a passkey`
   button that **could not work for any user anywhere**. Not a configuration gap like Google's — a

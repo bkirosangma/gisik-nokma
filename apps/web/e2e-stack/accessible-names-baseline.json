@@ -33,5 +33,12 @@
     "ariaSelected": 0,
     "ariaDescribedby": 0,
     "rawMatches": 57
+  },
+  "stack-phone-390|/workspaces": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 61
   }
 }

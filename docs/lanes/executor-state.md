@@ -20,7 +20,84 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ ROUND 2c — PHONE GATING. PR OPEN, AWAITING MERGE. 2026-09-08 ~21:4x IST.
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+>
+> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and its PR is OPEN:
+> #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.**
+>
+> Local HEAD, `origin/exec/138-task4-workspaces` and the PR's `headRefOid` all read `c2c6313` —
+> checked with `gh pr view 374 --json headRefOid`, not assumed from the push succeeding.
+>
+> Verified rather than adopted from the controller's relaunch note:
+> `gh pr view 372 --json state,mergeCommit` → `MERGED`, `469602f`; `gh pr list --state open` → none.
+>
+> **The branch is off `29bc5da`, NOT off `469602f`.** `origin/main` moved while I was orienting — the
+> controller's own Task 4 dispatch commit landed on it. A handoff that named `469602f` as the base
+> would send a restarted executor to rebase against a commit one behind, which is the
+> false-conflict shape this file has been burned by; so the base is named as what `git merge-base`
+> actually answers, and the check is `git merge-base --is-ancestor 29bc5da origin/main`.
+>
+> ## WHAT IS DONE ON THE BRANCH (one commit so far: `a687bc5`)
+>
+> * `/workspaces` added to the signed-in accessible-name sweep, `apps/web/e2e-stack/viewport.spec.ts`.
+> * `/invite/<token>` recorded as a residual gap with a named owner, in `docs/pre-launch-checklist.md`.
+> * The plan's Task 4b line amended — 13.298 struck and re-pointed, "Features §6" struck.
+>
+> ## TWO RULINGS, BOTH ANSWERED — `gisik-nokma-lanes/CTL-RULING-2026-09-08-task4-two.md`
+>
+> 1. **13.298 is RE-POINTED**, not returned: *a 401 on `/workspaces` leaves the REAL browser settled
+>    on `/sign-in`*. Mutation is deleting the `router.push` line. Cite `page-refusals.test.tsx:180`
+>    at the case as the jsdom half it complements.
+>    **Why the plan's version was retired, measured not argued:** deleting the `expired ?` arm gives
+>    `EXIT=1`, **19 pass / 1 fail**, and the failure is that PRE-EXISTING case. "13.298 RED, alone"
+>    was unsatisfiable before the plan was written; and in a browser the notice is transient before
+>    the push, so mutated and unmutated both settle on `/sign-in` and nothing can separate them.
+> 2. **`/workspaces` joins the stack sweep; `/invite/<token>` does not** — it has no standing token,
+>    and a token-less visit baselines the DEAD-LINK branch, which is worse than no baseline.
+>
+> ## WHAT IS DONE — this list was written BEFORE the work and review caught it stale
+>
+> *Review finding 5, and it is worth keeping rather than silently overwriting: this block listed six
+> outstanding items and four of them had been completed by later commits ON THIS SAME BRANCH. It
+> fails in the conservative direction — a relaunched executor redoes finished work — which is the
+> direction nobody audits, and it is this file's own recorded failure mode.*
+>
+> * 13.298 written and **witnessed**: mutation `router.push` deleted → RED ×3, on that case alone.
+> * 13.299 and 13.300 written and green. 13.299's stub was WRONG on the first run (`[]` instead of
+>   `{ workspaces: [] }`) and drove the refusal branch while claiming to test the empty one; fixed
+>   at `302781e`. Mutations for both witnessed, each reddening only its own case.
+> * `/workspaces` accessible-names AND type-scale baselines recorded, then the suite re-run with
+>   NEITHER seeding variable set — so the 6/6 is enforcement, not re-recording. Ratchet probed by
+>   raising the floor 1→2: *"13.287: /workspaces LOST ariaLabel"*, naming the route.
+> * `Features.md` bullets at :60 and :61 extended in place; catalogue rows 13.298–13.300 written.
+> * Dev images rebuilt from the frozen head, stack suite 6/6, `docker builder prune -f`.
+>   **Docker VM: 83% before → 88% after the builds → 80% after the prune** (11.2G free; 4.52GB
+>   reclaimed). Ends better than it started. `docker system df` does NOT show this figure —
+>   `nsenter -t 1 -m` onto `/var/lib` does.
+> * Forced gate at the final head: **33/33, 0 cached, 3978 tests / 5 skipped / 321 files.**
+> * Review run (one opus reviewer): **no Critical, one Important, four Minor, three Nits** — all
+>   answered in the fix round. The Important was real: 13.298's docblock stated a mutation outcome
+>   that cannot happen (the positive control reddens, not the pathname assertion) and stated it
+>   unhedged, so it read as measured. Corrected in both the spec and the catalogue.
+>
+> ## STILL OUTSTANDING
+>
+> * **The controller's merge of #374, and the owner's look at `http://localhost:3001/workspaces`.**
+>   Per the Task 4 dispatch, *nothing after Task 4 starts until they have*. Task 12 is next in the
+>   queue and is HELD behind that look — do not start it from this file alone.
+> * If you are a relaunched executor reading this: the queue is EMPTY pending those two events.
+>   Hold. Do not re-derive work from the brief's retired sequence.
+> * NOT this task's, recorded with owners: `PLANS_WITH_TASKS` omits `hig-per-screen`;
+>   `check-case-citations` cannot see a case that has no catalogue row; the `13.321` next-free
+>   pointer already collides with a live case (controller owns that one).
+>
+> ## TWO FLAGS SENT TO THE OWNER VIA THE CONTROLLER — do not act on either
+>
+> * `invite/[token]/page.tsx:110` says "any of the four sign-in methods works". 2c made the phone tab
+>   conditional, so that count is now conditionally wrong. Shipped copy ⇒ the owner's call.
+> * The Workspaces prototype subtitle ("Three workspaces you belong to.") — C row, flagged not adopted.
+
+> # ▣ ROUND 2c — PHONE GATING. ~~PR OPEN, AWAITING MERGE~~ **MERGED as `469602f` (PR #372).** 2026-09-08 ~21:4x IST.
 >
 > **Branch `exec/137-2c-phone-gating`, off `main` `1115e24`. Hold was lifted for THIS ROUND ONLY;
 > nothing after 2c starts until the owner has looked again.**
