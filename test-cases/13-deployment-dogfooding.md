@@ -1269,6 +1269,10 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
   prose that would have swept cleanly while measuring nothing. The project links are on `/workspaces`,
   the same page the workspace id came from.*
   *Mutation: revert `.ticket-type-list__badge` to `0.7rem` → 13.265 fails naming four offenders.*
+  *Mutation RUN on the coverage assertion itself: point `MUST_EXAMINE` at a class nothing renders →
+  `EXIT 1`, "examined no element matching `.ticket-type-list__badge-THAT-DOES-NOT-RENDER`". Restored
+  from a copy taken before the edit and re-run green. The assertion had already fired once for real,
+  on the workflow-editor route, which is how that route was found to be an empty shell.*
 
 > ### The enumeration that found the offenders was wrong the first time, in the shape this repo collects
 >
