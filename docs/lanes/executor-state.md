@@ -20,6 +20,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ⚠ AND THE OTHER RECORDED GAP HAD A CORRECTION IN IT THAT WAS ITSELF WRONG
+>
+> Having found gap #1 stale, I measured gap #2 (the `TZ` one) the same way. **Its rule stands and its
+> numbers have only improved** — 17 of 272 test files varied `TZ` when the brief was amended; at
+> `f8ea0d3` it is **27 of 320**, counted by enumeration with the precedent file as a positive control.
+>
+> **But its exemplar had been "corrected" into fiction.** `playwright.viewport.config.ts:35` read:
+> *"The brief cited `apps/web/test/contests.test.tsx:97` for this; no such file exists. The ist-today
+> lines are the real precedent."*
+>
+> The PATH is wrong — nothing named `contests` exists under `apps/web`. **The file is real**, in
+> another package: `packages/app-core/test/contests.test.tsx:101`, case 12.194, *"renders the IST day
+> under a non-IST TZ, and the TZ actually took effect"* — doing exactly what the brief claimed, and it
+> is the STRONGER of the two precedents: it probes first (same instant, different hour under `UTC`
+> than `America/Los_Angeles`) so a green cannot come from `TZ` being ignored, then renders under three
+> zones including `Pacific/Kiritimati`.
+>
+> **A wrong path is not a missing file.** The earlier note searched the cited path, found nothing, and
+> concluded the citation was invented. **The overcorrection is the more damaging of the two errors**:
+> a stale citation misdirects, while "no such file exists" in a docblock teaches every later reader
+> that a real and better precedent is fiction. Corrected in place at that docblock, not edited away.
+>
+> **Both audits came from the same move — check the claim before repeating it — and both recorded
+> gaps turned out to contain something false.** That is two for two on this session's restart surface.
+>
 > ### ⚠ THE ONE "OPEN" ITEM I WAS ABOUT TO TAKE IS ALREADY CLOSED — #287 IS STALE
 >
 > `controller-state.md` records, and the dispatch brief repeats under **TWO KNOWN GAPS #1**, that

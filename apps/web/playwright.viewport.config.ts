@@ -32,8 +32,27 @@ import { VIEWPORT_BASE_URL, VIEWPORT_PORT, VIEWPORTS } from './e2e-viewport/view
  *      sibling block at `test/ist-today.test.ts:126-131` asserts
  *      `process.env['TZ']` IS what the case needs before trusting a date — it
  *      checks the environment took, rather than assuming it. (The brief cited
- *      `apps/web/test/contests.test.tsx:97` for this; no such file exists. The
- *      ist-today lines are the real precedent.)
+ *      `apps/web/test/contests.test.tsx:97` for this. **That correction was
+ *      itself wrong, and is corrected here rather than edited away.** The PATH
+ *      is wrong — nothing named `contests` exists under `apps/web` — but the
+ *      file is real in another package:
+ *      `packages/app-core/test/contests.test.tsx:101` is case 12.194,
+ *      *"renders the IST day under a non-IST TZ, and the TZ actually took
+ *      effect"*. It does precisely what the brief claimed, and it is the
+ *      STRONGER precedent of the two: it probes first, asserting that the same
+ *      instant reads a different hour under `UTC` than under
+ *      `America/Los_Angeles`, so a green cannot come from `TZ` being ignored by
+ *      the worker — then renders under three zones including
+ *      `Pacific/Kiritimati`.
+ *
+ *      The earlier note searched the cited path, found nothing, and concluded
+ *      the citation was invented. **A wrong path is not a missing file**, and
+ *      the overcorrection was the more damaging of the two errors: a stale
+ *      citation merely misdirects, while "no such file exists" sitting in a
+ *      docblock teaches every later reader that a real and better precedent is
+ *      fiction. Both files are precedents; `ist-today` is the closer sibling
+ *      for asserting an env knob took, 12.194 the closer one for asserting a
+ *      RENDERED day under a hostile zone.)
  *
  *   2. **Did the width CHANGE anything?** Requirement 1 can be satisfied by a
  *      page that reports 390 and lays out exactly as it does at 1512 — a
