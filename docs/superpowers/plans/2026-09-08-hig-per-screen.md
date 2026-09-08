@@ -1175,17 +1175,17 @@ so the cascade does the styling), `apps/web/app/globals.css` (`.gn-shell__refusa
 `apps/web/app/sign-in/page.tsx` and `apps/web/app/workspaces/page.tsx` only where markup must change (say why per
 hunk), baselines only upward, `Features.md` (the sign-in bullet is in §3 — locate by `page.tsx` path), `test-cases/13`.
 
-**Cases 13.344–13.350:**
-- **13.344** `/sign-in` still renders every method the server offers and no control the server refuses (13.292's
+**Cases 13.348–13.354:**
+- **13.348** `/sign-in` still renders every method the server offers and no control the server refuses (13.292's
   property) — unchanged by the restyle.
-- **13.345** `/workspaces`' three-state machine (13.298–13.300: loading / refusal / empty, and the 401 settle on
+- **13.349** `/workspaces`' three-state machine (13.298–13.300: loading / refusal / empty, and the 401 settle on
   `/sign-in`) is unchanged — the restyle deletes no state.
-- **13.346** accessible-name floors on `/sign-in`, `/workspaces` and `/invite/<token>`'s reachable states do not fall.
-- **13.347** tap-target and type-scale ratchets do not fall on either route (both suites, no seeding variable).
-- **13.348** the Back control on `/privacy` and `/terms` survives.
-- **13.349** `apps/web/app/invite/[token]/page.tsx` markup is byte-identical unless a hunk is named in the PR body
+- **13.350** accessible-name floors on `/sign-in`, `/workspaces` and `/invite/<token>`'s reachable states do not fall.
+- **13.351** tap-target and type-scale ratchets do not fall on either route (both suites, no seeding variable).
+- **13.352** the Back control on `/privacy` and `/terms` survives.
+- **13.353** `apps/web/app/invite/[token]/page.tsx` markup is byte-identical unless a hunk is named in the PR body
   (the Task 4a precedent: the invite surface is CSS over existing markup).
-- **13.350** the stack suite signs in through the restyled page and reaches `/workspaces` (6/6 as at #374).
+- **13.354** the stack suite signs in through the restyled page and reaches `/workspaces` (6/6 as at #374).
 
 - [ ] Restyle; gate + six checks; both suites; rebuild the dev images from the frozen head, run the stack suite
   against them, `docker image prune -f` (dangling only, never `-a`); hand the controller `http://localhost:3001/sign-in`
