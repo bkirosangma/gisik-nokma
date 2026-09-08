@@ -1,5 +1,68 @@
 # Cross-lane controller — live state
 
+## ▶ TUESDAY ~19:0x IST — TASKS 1 AND 2 MERGED; THE OWNER LOOKED AT THE LOGIN SCREEN AND FOUND SOMETHING THE AUDIT HAD NOT: **two of the four visible sign-in options cannot work.** `main` is `ebb21aa`, gate GREEN, executor RESTARTED at ctx 82% and now on Task 2b (the feedback round). **Three proxy false-greens of mine today are recorded below; read them before trusting any `EXIT=` line in this file's history.**
+
+### THE OWNER'S LOOK, and what it exposed
+
+Four items of feedback on the rebuilt sign-in (`ebb21aa`). Two are styling (vertical centring; a Back
+control on the legal pages, which have only cross-links). Two are not:
+
+- **"Google AND Apple, as logo marks."** Measured before dispatching: **`GOOGLE_CLIENT_ID` is unset in
+  the running dev server** and the button renders unconditionally — a dead end. **Apple has zero
+  footprint.** So the real item is *render only the methods the server will accept, then style what
+  remains* — the audit's principle inverted: a control that can never succeed and is shown anyway is
+  the same defect as one deleted by accident. Apple ships env-gated and inert until the owner
+  provisions credentials (guideline 4.8 is the owner's correct reason).
+- **"Should passkey allow my Mac fingerprint?"** Yes — a platform passkey IS Touch ID, and `rpID`
+  (`auth.ts:296`) is wired correctly. **But the product has no registration flow anywhere** — the only
+  `addPasskey` hits are inside better-auth's bundled client. The button is a dead end for every user.
+  Task 2b replaces it with WebAuthn conditional UI (`autoFill`), which shows nothing when no passkey
+  exists; registration is a new feature put to the owner, not assumed.
+
+**Neither dead button was in the reconciliation audit** — it classified what the prototype drew against
+what the code renders, and both buttons render. "Renders" and "works" are different populations, and
+only a person clicking found the gap. Case block `13.321`–`13.326` allocated to 2b.
+
+### THREE PROXY FALSE-GREENS, all mine, all today
+
+1. `pnpm check:tasks` → `EXIT=0` while the raw exit was 1 (main red after my #357).
+2. `pnpm check:env` → `EXIT=0` at `e5a2054` while the raw exit was 1 — **main was red on `check:env` for
+   two merges** (Task 0's `UPDATE_ACCESSIBLE_BASELINE` undocumented) and I certified both.
+3. The `-- $F` path-filtered drop-check control → 0 bytes, twice.
+
+**Same mechanism each time: `$?` after a bare proxied command measures the hook.** Standing practice
+now: every exit code that decides anything is read via `rtk proxy <cmd>` or the log's own last line.
+That is how #2 surfaced at all. **Any `EXIT=0` in this file's entries before ~17:00 today that was
+not accompanied by a `Tasks:` line or a raw re-run should be treated as unverified.**
+
+### WHAT LANDED
+
+- **#360 — Task 1**, the four shared pieces. The executor found **three guards that could not catch
+  what they claimed**: two tests I wrote in the plan pinned to the `border:` shorthand (a real `2px
+  solid` passed them green); an app-core test slicing a CSS block to end-of-file, which would have
+  fired on every later CSS-appending task; and **my plan's claim that the ghost button's 2.49:1 border
+  "was its only affordance" — true at noon, false after #354**, so the new rule is inert duplication,
+  kept with an honest comment. It also caught its own mis-numbering (#359 for #360) before I did.
+- **#362 — Task 2**, sign-in. **Four plan bugs found by running it, all mine:** a straight apostrophe
+  where the markup emits `&rsquo;`, so my assertion could never match; hint text at 0.8rem under the
+  product's own 16px body floor; the Features.md pointer wrong for the **third task running**; a test
+  named "Phone (default)" that asserted nothing about the default. All fixed and mutation-witnessed.
+  All four methods kept, no Password tab, both copy additions adopted. Verified by me: partitioned drop
+  check (own 8 files 0 bytes, control 40,505; the one outside file attributed to my #363), forced gate
+  33/33 `Cached: 0`, six checks raw-green **including `check:env` back to 0**, **stack suite 6/6 through
+  the rebuilt page**, bundle markers control-first (`gn-segmented` reads 0 in the page chunk and 3
+  bundle-wide — a bundling-location artefact, measured not assumed).
+- **#361, #363 (mine)** — ledger rows 0/1 flipped to `done`; the plan's ten `Features.md §N` pointers
+  replaced by one rule, **locate the bullet by `page.tsx` path, never by section number or title** —
+  sign-in's bullet is in §3 not §6, and the file's sections are not even in numeric order (§10, §11
+  follow §12; no §8). #361 then collided with the executor's own ledger edit on #362 — my doing; it
+  resolved it, correctly indifferent to whose it was.
+
+### RESTART
+
+Executor killed and relaunched at ctx 82% (owner's read; my capture lagged at 70%), tree clean, nothing
+unpushed, input box empty. Fresh at 8%, self-oriented from the handoff, Task 2b queued.
+
 ## ▶ TUESDAY ~17:1x IST — THE PER-SCREEN PLAN IS ON `main` AND TASK 0 (THE ACCESSIBLE-NAME GATE) IS MERGED. Execution is now **ONE TASK AT A TIME, owner reviews sign-in live before anything spreads.** `main` is `e5a2054`, gate GREEN, executor on Task 1 at ctx 58%. **Two of my own errors are recorded here first, because a restart would otherwise re-inherit both.**
 
 ### MY #357 MERGE PUT `main` RED, AND MY CHECK OF THAT CLAIM WAS A FALSE GREEN
