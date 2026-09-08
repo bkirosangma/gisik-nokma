@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -153,20 +153,84 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    * is asserted after the page has been given the answer and re-rendered, which
    * `findByRole` on a control that DOES appear in the enabled case establishes.
    */
-  it('13.326 renders no social button for a provider the server will not accept', async () => {
+  /**
+   * 13.326 — THE DISCRIMINATION CASE, and it replaces a negative that could not
+   * fail. **Found by mutation, not by reading.**
+   *
+   * The first version of this case answered `{google:false, apple:false}` and
+   * wrapped the absence in `waitFor`. That does not wait for anything: `waitFor`
+   * retries until its callback PASSES, and a callback asserting a button is
+   * absent passes on the very first tick — before the fetch has resolved and
+   * before the page has re-rendered with any answer at all. A mutation that
+   * dropped the per-provider check entirely and rendered the row on any answer
+   * left it GREEN. It was asserting the absence of a state update, not the
+   * presence of a gate. **The comment there claimed `waitFor` handled this. The
+   * comment was wrong, and it made the gap read as covered.**
+   *
+   * The answer here is asymmetric on purpose: `apple: true, google: false`.
+   * Apple's button appearing is a POSITIVE, awaited signal that the answer
+   * arrived AND was applied — `findByRole` genuinely waits, because it is
+   * waiting for something to exist — and Google's absence is then read from the
+   * same settled DOM. There is no tick at which this passes vacuously, and a
+   * page that ignores the per-provider flags renders both and fails.
+   *
+   * The two orderings are both asserted (`apple` on / `google` off, then the
+   * reverse) because a page that rendered whichever provider it checked FIRST
+   * would satisfy one of them.
+   */
+  it.each([
+    { on: 'apple', off: 'google', answer: { google: false, apple: true } },
+    { on: 'google', off: 'apple', answer: { google: true, apple: false } },
+  ])(
+    '13.326 renders $on and not $off when that is what the server says',
+    async ({ on, off, answer }) => {
+      serverOffers(answer);
+      render(<SignInPage />);
+
+      const onName = on === 'apple' ? 'Continue with Apple' : 'Continue with Google';
+      const offName = off === 'apple' ? 'Continue with Apple' : 'Continue with Google';
+
+      // Awaited POSITIVE. Until this resolves, the answer has not been applied,
+      // so nothing below can be read as a fact about the gate.
+      await screen.findByRole('button', { name: onName });
+      // Same settled DOM, and the whole property: the gate DISCRIMINATES.
+      expect(screen.queryByRole('button', { name: offName })).toBeNull();
+      // The old dead control is gone rather than hidden, in every answer.
+      expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull();
+    },
+  );
+
+  /**
+   * 13.326 — and the all-disabled answer, which is the dev stack's real state.
+   *
+   * This one CANNOT anchor on a positive rendering, because a correct page
+   * renders nothing new for it. So it anchors on the fetch having been made and
+   * its body having been consumed, then flushes the microtask queue the page's
+   * `.then` chain runs on, and only then reads the DOM. That is weaker than the
+   * discrimination case above by construction, and it is kept for what it adds:
+   * that the marks ROW itself disappears rather than rendering empty, which the
+   * asymmetric answers cannot show because one button is always present.
+   */
+  it('13.326 renders no social row at all when the server accepts neither', async () => {
     serverOffers({ google: false, apple: false });
-    render(<SignInPage />);
+    const { container } = render(<SignInPage />);
 
-    // Positive control first: the page rendered at all, so a zero count below is
-    // a fact about the buttons and not about an empty DOM.
+    // The page rendered, so a zero count is a fact about buttons, not a blank DOM.
     expect(screen.getByRole('tab', { name: 'Phone' })).toBeInTheDocument();
-
+    // The request was actually made and its body consumed before anything below
+    // is read. Without this the assertions run on the first tick and pass
+    // against a page that has not yet been told anything.
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Continue with Google' })).toBeNull();
+      expect(globalThis.fetch).toHaveBeenCalledWith('/v1/auth/methods', expect.anything());
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Continue with Google' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Continue with Apple' })).toBeNull();
-    // The old dead control, gone rather than hidden.
     expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull();
+    expect(container.querySelector('.gn-sign-in__marks')).toBeNull();
   });
 
   it('13.326 renders each social button, by its shipped accessible name, when the server accepts it', async () => {
