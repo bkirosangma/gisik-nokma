@@ -423,7 +423,19 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   refutes that**: clients are not separated even with no proxy in the path, so removing the proxy would
   fix nothing. The narrower story was wrong, and it was wrong in the direction of looking solved.
 
-  **The remedy is an owner decision about an auth-path security control**, not an executor's: configure
+  **✅ FIXED 2026-09-08 — controller ruling, delegated by the owner: `rateLimit: { enabled: false }` in
+  `auth.ts`.** better-auth's limiter is disabled outright and OUR limiter, which keys per client address
+  under `TRUST_PROXY`, is the single authority on `/api/auth/*`. Witnessed on this stack: **8/8
+  magic-link sends now return `200`** where the sixth was previously better-auth's `429`, and the
+  IP-fallback warning is **gone (0 hits, against 39 log lines and 16 requests as the positive control)**.
+  Cases **13.273** (automated, mutation-witnessed) and **13.274** (the manual stack witness).
+  **`RATE_LIMIT_AUTH_MAX` was NOT touched** — it was never the binding constraint.
+
+  **The named loss, recorded rather than discovered later:** better-auth's per-path tightening on the
+  magic-link route goes away; ours is a flat budget across the whole mount. A sign-in-specific bucket in
+  our limiter would restore parity and is an **owned follow-up, deliberately not built** in that change.
+
+  ~~**The remedy is an owner decision about an auth-path security control**, not an executor's: configure
   better-auth's own `rateLimit` (`enabled`/`window`/`max`, or `customRules` per path). **Mint case
   `13.273` when that is ruled on** — no case id is minted here because there is no guard yet, and a
   green case over an unfixed finding is exactly the shape this catalogue keeps recording.

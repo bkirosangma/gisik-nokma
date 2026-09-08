@@ -460,6 +460,101 @@ describe('rate limiting', () => {
     expect(Number(third.headers['retry-after'])).toBeGreaterThan(0);
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * OUR LIMITER IS THE ONLY LIMITER THAT ANSWERS ON `/api/auth/*` — controller
+   * ruling 2026-09-08, delegated by the owner.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * better-auth ships its own limiter, and on the real stack it could not tell
+   * clients apart: `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`
+   * (`dist/api/rate-limiter/index.mjs:245`) with `getIP()` falsy is one shared
+   * bucket per path, for everybody. Measured there: a client on `127.0.0.1`
+   * that had spent NOTHING was refused because a client on `192.168.65.1` had
+   * spent. `auth.ts` now sets `rateLimit: { enabled: false }`.
+   *
+   * ⚠ WHAT THIS UNIT TEST CANNOT PROVE, SAID FIRST SO NOBODY READS IT AS MORE
+   * THAN IT IS. It cannot reproduce the shared bucket, and the reason is exact:
+   * `app.inject` clients are only distinguishable by `X-Forwarded-For`, and an
+   * `X-Forwarded-For` is also enough for better-auth's `getIP()` to RESOLVE —
+   * at which point better-auth separates clients too and the defect disappears
+   * from the harness. **The property that makes two clients distinguishable
+   * here is the same property whose absence causes the bug.** Measured, not
+   * assumed: with the limiter re-enabled, a second client's first request came
+   * back `500` (its own budget) rather than `429`.
+   *
+   * So the shared-bucket claim rests on the DEV-STACK measurement, recorded in
+   * `docs/pre-launch-checklist.md`. What this case proves is the thing the
+   * ruling actually changes and that a unit test CAN witness: **better-auth's
+   * limiter no longer answers at all.**
+   *
+   * WHY `authMax: 6` AND SEVEN REQUESTS. better-auth's magic-link rule is
+   * `max: 5` per 60s (`plugins/magic-link/index.mjs:197-203`), which overrides
+   * the generic `/sign-in*` 10s/3 rule (`:302-308`). Six lets a client spend
+   * PAST better-auth's five, so the sixth request is precisely where
+   * better-auth would refuse and ours would not — the one request that can tell
+   * the two apart. The seventh is where ours refuses.
+   *
+   * MUTATION, RUN NOT REASONED: `rateLimit: { enabled: true }` in `auth.ts` and
+   * the sixth request comes back `429 {"message":"Too many requests. Please try
+   * again later."}` instead of passing — red, naming better-auth's own body.
+   *
+   * ⚠ THE MUTATION IS `enabled: true`, NOT "delete the line", and the first
+   * version of this case got that wrong. better-auth's default is
+   * `enabled: options.rateLimit?.enabled ?? isProduction`
+   * (`dist/context/create-context.mjs:171`), and vitest sets `NODE_ENV=test`,
+   * so deleting our line leaves the limiter OFF and the mutation changes
+   * nothing. That NODE_ENV-dependent default is also why no server test ever
+   * exercised this and why it shipped unseen.
+   */
+  /**
+   * 13.273 — better-auth's limiter does not answer on /api/auth/*: the sixth request, which is past better-auth's own max of 5 for the magic-link path, is NOT refused by it, and the refusal that does arrive at the seventh is OURS, identified by response BODY rather than status. Mutation: `rateLimit: { enabled: true }` in auth.ts turns the sixth into better-auth's 429.
+   */
+  it('better-auth does not answer on /api/auth/*, and the refusal that does is ours', async () => {
+    const { app } = build({ ...limits({ authMax: 6 }), trustProxy: true });
+    const send = (ip: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/auth/sign-in/magic-link',
+        headers: { 'x-forwarded-for': ip },
+        payload: { email: 'rate-limit-authority@example.test' },
+      });
+
+    const spent = [];
+    for (let i = 0; i < 7; i += 1) spent.push(await send('203.0.113.1'));
+    const past = spent[5]; // the 6th — past better-auth's max of 5
+    const refused = spent[6]; // the 7th — past OUR authMax of 6
+    const other = await send('203.0.113.2');
+    await app.close();
+
+    const BETTER_AUTH_429 = 'Too many requests. Please try again later.';
+
+    expect(
+      past?.body.includes(BETTER_AUTH_429),
+      "the SIXTH request was refused by better-auth's own limiter. It is supposed to be disabled " +
+        '(`rateLimit: { enabled: false }` in auth.ts) so that one limiter, ours, is the single ' +
+        'authority on /api/auth/*. Two limiters with different keying on one path is the defect ' +
+        `class this ruling closes. Body was: ${past?.body.slice(0, 120)}`,
+    ).toBe(false);
+
+    expect(
+      refused?.statusCode,
+      'our limiter did not refuse the seventh request, so nothing below distinguishes a working ' +
+        'limiter from an absent one',
+    ).toBe(429);
+    expect(
+      refused?.json(),
+      'the 429 did not come from OUR limiter. A bare status cannot tell the two apart — which is ' +
+        'exactly what made the shared-bucket defect invisible for so long.',
+    ).toEqual({ error: 'rate_limited', retryAfterSeconds: 60 });
+
+    expect(
+      other.statusCode,
+      'a second client, which had spent nothing, was refused. Under OUR limiter each address ' +
+        'carries its own budget.',
+    ).not.toBe(429);
+  });
+
   it('limits POST /v1/events on its own budget', async () => {
     const { app } = build(limits({ eventsMax: 1 }));
     await app.inject({ method: 'POST', url: '/v1/events', payload: { events: [{}] } });

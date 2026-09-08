@@ -1379,6 +1379,51 @@ maximum of `13.3333` — the id pattern collides with the pixel value this very 
   class rule, which is the ruling's "and no further" as a measurement rather than a promise.*
 
 
+## One limiter on `/api/auth/*`, and it is ours (controller ruling, 2026-09-08)
+
+*better-auth's own limiter could not tell clients apart — `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`
+(`dist/api/rate-limiter/index.mjs:245`) with `getIP()` falsy is **one shared bucket per path, for
+everybody**. `auth.ts` now sets `rateLimit: { enabled: false }`; our limiter, which keys per client
+address under `TRUST_PROXY`, becomes the single authority. `RATE_LIMIT_AUTH_MAX` is untouched — it was
+never the binding constraint, and now it is the control everyone already believed it was.*
+
+- **13.273** ✅ **better-auth's limiter does not answer on `/api/auth/*`, and the refusal that does
+  arrive is OURS — identified by BODY, not by status.** Seven requests at `authMax: 6`: the **sixth**,
+  which is past better-auth's own `max: 5` for the magic-link path, must not carry
+  `Too many requests. Please try again later.`; the **seventh** must be `429` with
+  `{"error":"rate_limited","retryAfterSeconds":60}`; and a second address must not be refused at all. —
+  (`apps/server/test/http/security-middleware.test.ts`, `apps/server/src/auth/auth.ts`)
+  *A bare 429 cannot tell the two limiters apart, which is exactly what kept this invisible. The body is
+  the discriminator that found the bug, inverted into the guard.*
+  *Mutation RUN: `rateLimit: { enabled: true }` → **EXIT 1**, the sixth request refused with
+  better-auth's own body quoted back in the failure message. Restored, re-run green, 58 passed.*
+  *⚠ **THE MUTATION IS `enabled: true`, NOT DELETING THE LINE**, and the first version of this case got
+  that wrong and passed 59/59 against its own defect. better-auth's default is
+  `enabled: options.rateLimit?.enabled ?? isProduction` (`dist/context/create-context.mjs:171`) and
+  vitest sets `NODE_ENV=test`, so deleting the line leaves the limiter OFF and the mutation mutates
+  nothing. **That NODE_ENV-dependent default is also why no server test ever exercised this, and why it
+  shipped unseen** — the same objection `auth.ts` already records against `skipOriginCheck`.*
+  *⚠ **WHAT THIS CASE CANNOT PROVE, and the reason is worth more than the case.** It does NOT reproduce
+  the shared bucket. `app.inject` clients are only distinguishable by `X-Forwarded-For`, and an
+  `X-Forwarded-For` is also enough for better-auth's `getIP()` to RESOLVE — at which point better-auth
+  separates clients too and the defect vanishes from the harness. **The property that makes two clients
+  distinguishable here is the same property whose absence causes the bug.** Measured, not assumed: with
+  the limiter re-enabled, a second client's first request came back `500`, its own budget, not `429`.
+  The shared-bucket claim rests on the dev-stack measurement in `docs/pre-launch-checklist.md`.*
+- **13.274** 🧪 **The "could not determine a client IP" warning is GONE from the running server, and the
+  fix is witnessed by BEHAVIOUR as well as by absence.** Rebuild the server container, then send eight
+  magic-link requests. — (`apps/server/src/auth/auth.ts`, manual against the dev stack)
+  *Measured 2026-09-08. **Before:** the warning appeared **2 times** in the running server's log (once
+  per process start — it is gated by `ipWarningLogged`), and the sixth send was better-auth's `429`.
+  **After:** **8/8 sends returned `200`** and the warning appears **0** times.*
+  *POSITIVE CONTROLS on the null, because an absence proves nothing on its own: the same run reports 39
+  log lines, 16 `incoming request` lines and 8 `sign-in/magic-link` lines. **A first attempt at this
+  check reported 0 warning hits AND 0 for a line known to be present** — the proxied-pipe silent-empty
+  mode — and without the control it would have been filed as "already gone".*
+  *🧪 rather than ✅ because it needs a container rebuild and a real process start; `onRequestRateLimit`
+  returns at its first line under `enabled: false`, so the warning cannot fire, and 13.273 is the
+  automated half of the same claim.*
+
 ## The magic link lands on the app, not the API (owner-dispatched P1, 2026-09-08)
 
 *The owner signed in by hand on 2026-09-08 and the link dead-ended on a JSON 404.
