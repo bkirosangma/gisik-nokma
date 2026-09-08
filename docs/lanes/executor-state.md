@@ -20,7 +20,24 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~04:4x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~03:4x ONE, IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~04:5x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~04:4x ONE, IS HISTORY.**
+>
+> **Task 14 is COMPLETE. Its PR is OPEN: #387, head `19668054`, base `main`, MERGEABLE.
+> AWAITING THE CONTROLLER'S MERGE.** Verify with `gh pr view 387 --json state,mergeable,headRefOid`
+> rather than trusting this line. Frozen head `91c19c3b` (origin/main at the time this branch was cut),
+> re-verified unchanged immediately before push.
+>
+> **Reviewer's one finding (Minor) already fixed in a follow-up commit before the PR opened**: a
+> `Features.md` prose line overclaimed `.gn-sheet` got a radius change — it has none (`.gn-dialog` does;
+> `.gn-sheet` docks flush to the screen edge). No other findings. Everything else in this PR — the two
+> accessibility regressions found/fixed, the one genuine measured conflict (neo-dark raised/accent,
+> resolved in favour of the harder gate), and case 13.343's finding (the non-text-contrast roster does
+> NOT grow by the expected waiver — two independently-verified reasons, not a defect) — is in the PR body.
+>
+> **STILL OUTSTANDING: only the controller's merge.** Task 15 (restyle sign-in/workspaces/invite in neo,
+> cases 13.348–13.356) is next per the amendment's sequence — blocked on this PR merging, reads
+> `origin/main` after merge, never a local copy of this branch (the reachability discipline every prior
+> task in this series has needed). Task 12 (passkey) stays behind Task 15.
 >
 > **The implementer subagent (below, ~03:4x block) RETURNED and its work is INDEPENDENTLY VERIFIED —
 > not merely trusted.** Commit `f2d5dbf9` on `exec/144-task14-style-axis`. I personally: read every line
