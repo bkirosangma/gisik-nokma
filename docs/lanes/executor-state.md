@@ -20,7 +20,61 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ ROUND 2c — PHONE GATING. PR OPEN, AWAITING MERGE. 2026-09-08 ~21:4x IST.
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+>
+> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is IN FLIGHT on branch
+> `exec/138-task4-workspaces`. No PR yet.**
+>
+> Verified rather than adopted from the controller's relaunch note:
+> `gh pr view 372 --json state,mergeCommit` → `MERGED`, `469602f`; `gh pr list --state open` → none.
+>
+> **The branch is off `29bc5da`, NOT off `469602f`.** `origin/main` moved while I was orienting — the
+> controller's own Task 4 dispatch commit landed on it. A handoff that named `469602f` as the base
+> would send a restarted executor to rebase against a commit one behind, which is the
+> false-conflict shape this file has been burned by; so the base is named as what `git merge-base`
+> actually answers, and the check is `git merge-base --is-ancestor 29bc5da origin/main`.
+>
+> ## WHAT IS DONE ON THE BRANCH (one commit so far: `a687bc5`)
+>
+> * `/workspaces` added to the signed-in accessible-name sweep, `apps/web/e2e-stack/viewport.spec.ts`.
+> * `/invite/<token>` recorded as a residual gap with a named owner, in `docs/pre-launch-checklist.md`.
+> * The plan's Task 4b line amended — 13.298 struck and re-pointed, "Features §6" struck.
+>
+> ## TWO RULINGS, BOTH ANSWERED — `gisik-nokma-lanes/CTL-RULING-2026-09-08-task4-two.md`
+>
+> 1. **13.298 is RE-POINTED**, not returned: *a 401 on `/workspaces` leaves the REAL browser settled
+>    on `/sign-in`*. Mutation is deleting the `router.push` line. Cite `page-refusals.test.tsx:180`
+>    at the case as the jsdom half it complements.
+>    **Why the plan's version was retired, measured not argued:** deleting the `expired ?` arm gives
+>    `EXIT=1`, **19 pass / 1 fail**, and the failure is that PRE-EXISTING case. "13.298 RED, alone"
+>    was unsatisfiable before the plan was written; and in a browser the notice is transient before
+>    the push, so mutated and unmutated both settle on `/sign-in` and nothing can separate them.
+> 2. **`/workspaces` joins the stack sweep; `/invite/<token>` does not** — it has no standing token,
+>    and a token-less visit baselines the DEAD-LINK branch, which is worse than no baseline.
+>
+> ## WHAT IS STILL OUTSTANDING — the queue for whoever holds this next
+>
+> * 13.298's test itself (in `e2e-viewport/responsive.spec.ts`) + its `router.push` mutation witness.
+> * Record `/workspaces`'s accessible-names baseline via `UPDATE_ACCESSIBLE_BASELINE=1`, and seed its
+>   type-scale key — **the type-scale path FAILS on a missing key rather than seeding it**, which is
+>   the opposite of the accessible-names path in the same file. That asymmetry costs a run if unknown.
+> * `Features.md` — extend the bullets at **:60 (Invite links)** and **:61 (Founding a workspace)**,
+>   located BY PATH per Global Constraints. The plan's own "Features §6" pointer is wrong and struck.
+> * `test-cases/13-deployment-dogfooding.md` — catalogue 13.298–13.300. The next-free pointer does
+>   NOT move: `13.295`–`13.319` is already reserved to Tasks 3–11, and Task 4 is not the last to merge.
+> * Rebuild both dev images from the frozen head, stack suite 6/6, `docker builder prune -f`.
+>   **Docker VM measured BEFORE: 83% — 45.9G used of 58.4G, 9.4G free** (`/dev/vda1`, via
+>   `nsenter -t 1 -m`; `docker system df` alone does NOT show the VM disk and is the wrong instrument
+>   for this number). Images hold 36.62GB reclaimable. An earlier rebuild filled this once.
+> * Forced gate at the final head, review, PR.
+>
+> ## TWO FLAGS SENT TO THE OWNER VIA THE CONTROLLER — do not act on either
+>
+> * `invite/[token]/page.tsx:110` says "any of the four sign-in methods works". 2c made the phone tab
+>   conditional, so that count is now conditionally wrong. Shipped copy ⇒ the owner's call.
+> * The Workspaces prototype subtitle ("Three workspaces you belong to.") — C row, flagged not adopted.
+
+> # ▣ ROUND 2c — PHONE GATING. ~~PR OPEN, AWAITING MERGE~~ **MERGED as `469602f` (PR #372).** 2026-09-08 ~21:4x IST.
 >
 > **Branch `exec/137-2c-phone-gating`, off `main` `1115e24`. Hold was lifted for THIS ROUND ONLY;
 > nothing after 2c starts until the owner has looked again.**
