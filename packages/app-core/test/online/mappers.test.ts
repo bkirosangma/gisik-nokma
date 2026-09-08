@@ -1499,3 +1499,33 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
   }
 });
 
+/**
+ * 13.357 — `mapWorkspaceRefs` reads `role`, the additions table's one
+ * owner-approved invented row: `GET /v1/me/workspaces` has carried it since
+ * the route first answered (`apps/server/src/routes/workspaces.ts`), and only
+ * the client-side read was missing.
+ */
+describe('13.357 mapWorkspaceRefs reads role, the server field the client used to ignore', () => {
+  function body(role: string): { workspaces: unknown[] } {
+    return {
+      workspaces: [{ workspaceId: 'ws1', name: 'Convenience Corner', role, projects: [] }],
+    };
+  }
+
+  it('maps role onto WorkspaceRef', () => {
+    expect(mapWorkspaceRefs(body('admin'))[0]).toEqual({
+      id: 'ws1',
+      name: 'Convenience Corner',
+      role: 'admin',
+      projects: [],
+    });
+  });
+
+  it('refuses a body with no role rather than defaulting one', () => {
+    const { workspaces } = body('owner');
+    const [entry] = workspaces as Record<string, unknown>[];
+    delete entry!['role'];
+    expect(() => mapWorkspaceRefs({ workspaces })).toThrow(MappingError);
+  });
+});
+
