@@ -3,6 +3,17 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { sweepBorders } from './helpers/non-text-contrast.js';
+import {
+  RATCHETED,
+  readAccessibleBaseline,
+  recordAccessibleBaseline,
+  sweepAccessibleNames,
+} from '../e2e-viewport/accessible-names.js';
+
+/** The signed-in twin's own baseline — a different population from the signed-out one. */
+const STACK_ACCESSIBLE_BASELINE_PATH = fileURLToPath(
+  new URL('./accessible-names-baseline.json', import.meta.url),
+);
 // The plain MODULE, never the spec: Playwright loads an imported spec's
 // `test()` registrations too, and importing `responsive.spec.ts` here made this
 // config try to run all six unauthed cases — six `project "" has no entry in
@@ -429,6 +440,38 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
           `Overlapping: ${JSON.stringify(typeScale.bodyOwned)}`,
       )
       .toEqual([]);
+
+    /* ── 13.287 — ACCESSIBLE NAMES AND ROLES, signed-in twin of 13.285. ──
+     * The signed-out ratchet cannot see any of this: `AppNav`, the view tabs,
+     * the board and every settings screen only exist behind a session. Same
+     * one-way contract, its own baseline file.
+     * ──────────────────────────────────────────────────────────────────*/
+    const names = await sweepAccessibleNames(page);
+    expect(
+      names.rawMatches,
+      `13.287: the accessible-name sweep examined NOTHING on ${route.path}.`,
+    ).toBeGreaterThan(0);
+
+    const accessibleKey = route.key;
+    const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
+    if (accessibleBaseline === undefined) {
+      if (process.env['UPDATE_ACCESSIBLE_BASELINE'] === '1') {
+        recordAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH, accessibleKey, names);
+      }
+      test
+        .info()
+        .annotations.push({ type: 'baseline', description: `${accessibleKey}: recorded, not asserted` });
+    } else {
+      for (const attr of RATCHETED) {
+        expect(
+          names[attr],
+          `13.287: ${route.path} LOST ${attr}: baseline ${accessibleBaseline[attr]}, now ` +
+            `${names[attr]}. Something that identified an element to assistive tech is gone. ` +
+            `If this is intended, delete the key from e2e-stack/accessible-names-baseline.json ` +
+            `in a commit that says which element and why.`,
+        ).toBeGreaterThanOrEqual(accessibleBaseline[attr]);
+      }
+    }
 
     /* Case 13.267 — every control renders in the PRODUCT's font, not the
        browser's. The signed-in half of the guard for the owner-ruled
