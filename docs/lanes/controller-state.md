@@ -32,8 +32,24 @@ the 2026-09-02 "Sonnet for the loop" ruling for the controller only; the executo
    succeeds without a magic link; skip registration → RED. **Case block `13.327`–`13.332`** allocated.
 3. **The controller restarts** (this entry).
 
+### ⚠ ADDED ~19:4x — I BROKE MY OWN ONE-HOUR-OLD RULE, AND THE FIX IS STRUCTURAL, NOT ANOTHER RULE
+
+**`main` was red on `check:tasks` from `9fe51e7` (#365, the handoff PR above) through #366 — two merges,
+both certified by me.** #365 added `### Task 12:` to the plan without its ledger row: **199 tasks, 198
+rows.** That is the identical mistake to #357, made about sixty minutes after the entry below recorded
+*"a plan file is never docs-only."* The rule was known and not applied, so writing a sharper rule is
+not the fix. **The fix is that the six raw checks are a fixed step of EVERY merge in the loop — run
+after `git merge --ff-only origin/main`, before the next dispatch, with no judgment about whether this
+PR "needs" them.** The judgment is precisely what fails. Row 12 added; `check:tasks` raw 0, 199/199.
+Also confirmed a third time: the `-- $F` variable form of the drop-check control prints 0 in this shell;
+**literal paths work** (57,947 bytes on #366). Do not use the variable form.
+
 ### FOR THE FRESH CONTROLLER — first actions, in order
 
+0. **The merge step, fixed, every time:** verify (literal paths, partitioned) → `git merge --ff-only
+   origin/main` → **six checks via `rtk proxy` (`check:env check:tasks check:runbook check:citations
+   check:help` + `node scripts/check-case-ids.mjs`), all raw exit 0** → forced gate if any source moved
+   → ledger row flipped → dispatch. Not a checklist to consult; the sequence itself.
 1. Arm the open-PR `Monitor` (the brief's "Reaching the executor" section; emit on change only).
 2. **Every exit code you act on: `rtk proxy <cmd>` or the log's last line, never `$?` after a bare
    proxied command.** Three false greens today; the entry below records them.

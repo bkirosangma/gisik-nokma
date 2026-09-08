@@ -225,3 +225,4 @@ hig-per-screen	3b	todo			Members — states. HELD: the owner reviews sign-in fir
 hig-per-screen	9	todo			The List view — the prototype that does not exist. Found by the reconciliation audit: the project route registers four view tabs and only three have artboards.
 hig-per-screen	10	todo			Help, Legal, NotFound, McpAuthorize, McpTokens.
 hig-per-screen	11	todo			Mobile — record the deferral durably, with an owner. CSS tokens do not transfer to React Native; an unrecorded deferral is defect class 4 from Plan 1.
+hig-per-screen	12	todo			Passkey registration — /account with a Passkeys section on @better-auth/passkey 1.7.2 (addPasskey/listUserPasskeys/deletePasskey); case 13.330 is the CDP virtual-authenticator end-to-end witness. Owner-scoped 2026-09-08 after the live look found sign-in-with-passkey was a dead end for every user. After Task 2b and the owner second look. Block 13.327-13.332.
