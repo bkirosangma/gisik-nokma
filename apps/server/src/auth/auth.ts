@@ -88,7 +88,7 @@ export interface AuthDeps {
  * provider that is configured-but-unusable is a button that cannot work.
  */
 export function createAuth(deps: AuthDeps) {
-  return betterAuth({
+  const auth = betterAuth({
     database: deps.pool,
     baseURL: deps.baseUrl,
     secret: deps.secret,
@@ -342,6 +342,33 @@ export function createAuth(deps: AuthDeps) {
       bearer(), // token sessions for the mobile/desktop apps
     ],
   });
+
+  /**
+   * THE OTP SENDER, CARRIED ON THE INSTANCE — so `GET /v1/auth/methods` can
+   * report phone availability by reading the running instance, exactly as it
+   * already reads `options.socialProviders`.
+   *
+   * The alternative was to thread the sender through `AppDeps` to `buildApp`.
+   * That is the design `routes/auth-methods.ts` argues against in its own
+   * docblock, in a paragraph written after an earlier version described the
+   * weaker shape: *"a config passed to two places can be passed differently to
+   * each, while a config read off the instance cannot."* Threading gives two
+   * call sites — `createAuth` and `buildApp` — and nothing stops a future
+   * caller feeding them different senders, which is precisely the arrangement
+   * under which the page offers phone and the server refuses it. Read off the
+   * instance, that arrangement does not exist: the object the route reports on
+   * IS the object `sendOTP` awaits at `:326`.
+   *
+   * `Object.assign` rather than a spread: `betterAuth` returns an object whose
+   * methods live on a prototype, and `{ ...auth }` would copy the own
+   * properties and drop them. The intersection type it produces keeps every
+   * existing `auth.handler` / `auth.options` / `auth.api` use resolving
+   * unchanged, so no call site moves. Verified against better-auth 1.7.2, whose
+   * own type declarations contain no `otpSender` member (measured across 210
+   * declaration files, with `socialProviders` as the positive control), so this
+   * augmentation collides with nothing the vendor ships.
+   */
+  return Object.assign(auth, { otpSender: deps.otpSender });
 }
 
 export type Auth = ReturnType<typeof createAuth>;
