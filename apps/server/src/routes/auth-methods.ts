@@ -36,6 +36,23 @@ import { enabledSocialProviders, type EnabledSocialProviders } from '../auth/soc
  * config object could. `enabledSocialProviders` returns booleans for exactly
  * this reason: it takes the config and gives back nothing that came out of it.
  *
+ * ## In no rate-limit bucket, stated as a decision rather than left silent
+ *
+ * `app.ts` classifies buckets by enumerated `routeUrl`, so this route is in none
+ * — and an unauthenticated route in no bucket is exactly the shape that was
+ * called out here before (`POST /v1/attachments` was "the one route in no bucket
+ * at all"). The difference is what the handler does: `enabled` is computed ONCE
+ * at registration, so a request touches no database, no crypto, no filesystem
+ * and allocates nothing beyond the serialised response. It is strictly cheaper
+ * than the 404 an unmatched path already answers, so a bucket would bound
+ * something that is not a cost. Every other `/v1` read is bounded by needing a
+ * session; this one cannot be, because its whole purpose is to answer a page
+ * where nobody has one.
+ *
+ * **If this route ever grows a database read or a per-request computation, it
+ * needs a bucket** — that is the condition, named, rather than a judgement that
+ * ages badly.
+ *
  * ## Not in `HTTP_ORIGIN_PROTECTED_ROUTES`
  *
  * That gate covers the four mutating methods on cookie-authenticated product
