@@ -1,5 +1,98 @@
 # Cross-lane controller — live state
 
+## ⏹ TUESDAY ~15:0x IST — **AUTONOMOUS EXECUTION STOPS HERE, BY OWNER INSTRUCTION.** `main` is `2607191`, gate GREEN, zero open PRs except **#351 deliberately held**. The owner is moving to manual feature testing. This is a deliberate stopping point, not an interruption.
+
+### ⛑ THE ONE THING A FUTURE LANE MUST READ: case block `13.276`–`13.280` IS ALLOCATED. Do not renumber it.
+
+**This entry exists because the ruling was in a PR comment and the FILE said something weaker.**
+`test-cases/13-deployment-dogfooding.md` records that block as *"used provisionally, controller may
+re-assign"* — so a lane landing there could not tell whether the re-assignment ever happened, and a PR
+comment is not a place anyone looks. **The owner allocated `13.276`–`13.280` retroactively and
+explicitly. It stands. The next free block is `13.281`, controller-allocated on request.**
+
+**The executor caught this gap in my ruling, not me** — the same class as the stale `13.241` pointer and
+the stale `#287` gap: *a correction that lives only where nobody will read it has not been made.*
+
+### WHAT LANDED SINCE THE LAST ANCHOR
+
+- **#350 — the sign-in-specific bucket.** Owner-directed (they instructed the executor
+  directly; my own earlier ruling had recorded it as owned-but-unbuilt, and the owner overrode that,
+  which is theirs to do). **Ruled on both open questions:** the ids above, and **the beyond-parity
+  tightening STANDS.** It can only ever tighten — both buckets are charged so the smaller binds, and a
+  path the matcher misses degrades to exactly today's behaviour, so no input makes it looser than
+  `main`. **Cost recorded, not hidden:** where one client key covers many people (NAT'd office, CGNAT)
+  that key gets **2 complete sign-in cycles per minute** at the shipped `RATE_LIMIT_AUTH_MAX=10`; under
+  `TRUST_PROXY` in production the key is the real client address, so it is per-person there.
+  `signInMaxFor` is one expression to adjust if a real deployment shows it biting.
+- **The more valuable half of #350 was not the bucket.** The executor had claimed "parity" in **four
+  places including a TEST NAME**, where it read as measured. Two reviewers found it was actually
+  **2.5×–5× tighter** than what it replaced, because better-auth keyed per *(ip, PATH)* and this keys on
+  the client across eight prefixes. It kept the tightening and removed every false claim.
+
+### THE SQUASH-DROP WINDOW FIRED FOR REAL, AND THE DISCIPLINE HELD
+
+The executor pushed **`ef25c47` while I was mid-merge on `4a38e84`** — the exact window where the pusher
+cannot see the merge coming — **and told me rather than hoping.** The merge captured `ef25c47` (GitHub
+uses the branch head at merge time). Verified the way it asked: `git diff origin/main ef25c47`, **no path
+filter, EMPTY, EXIT 0, clean stderr**, positive control **77,958 bytes**. Nothing lost.
+
+**My first check on it looked alarming and was wrong** — I diffed against the older `4a38e84` while
+`main` already held `ef25c47`, so the branch read as BEHIND. **The #342 false-positive shape in
+miniature**, and the cure is the one already recorded: *partition and attribute, never interpret a byte
+count.*
+
+### THE STACK WAS STALE FOR MANUAL TESTING — CAUGHT BEFORE THE OWNER HIT IT
+
+**The running web container predated the magic-link fix by 43 minutes** (#345 merged `13:12:58 IST`;
+web image built `12:30 IST`). The owner would have clicked a magic link, hit the same JSON 404 we spent
+the morning diagnosing, and reasonably concluded the fix did not work. **Both containers rebuilt from
+`2607191`** (`BUILD_EXIT=0`, images now `09:19Z`), stack up, all five services running.
+
+**Two instrument failures of mine inside that one verification, both instructive:**
+1. **An in-container `grep` returned empty and looked like "the fix is absent."** The positive control
+   returned empty too — **the grep was broken, not the code missing.** The empty result proved nothing.
+   Timestamps settled it instead, because they do not depend on a working grep.
+2. **I then "tested" the fix by POSTing directly to `/api/auth/sign-in/magic-link`** and read
+   `callbackURL=/` as proof the fix was NOT live. **It bypassed the fixed code path entirely** — the fix
+   is in the web page's `signIn.magicLink({ callbackURL: webOriginCallback(next) })`, and calling the API
+   directly means nobody supplies a callback, so better-auth defaults to `/`. **A control that does not
+   traverse the path it certifies certifies nothing** — this project's single most-repeated lesson, and I
+   committed it while verifying a fix for it.
+
+**Settled properly:** with a control that passes first (`Check your inbox`, 1 hit per bundle), the
+sign-in chunk carries **`location.origin` beside `callbackURL`** in both server and client bundles.
+`font:inherit` present too. `webOriginCallback` reads 0 and that is expected — a local name is minified
+away, so its absence is not evidence.
+
+### GATE at `2607191`
+
+`GATE_EXIT=0` · `Tasks: 33 successful, 33 total` · node **`v22.22.2`** · **`Cached: 0 cached, 33 total`**
+· zero `Unsupported engine` · server **1,457 passed | 5 skipped**.
+
+### HELD, NOT MERGED: #351
+
+24 prototype screens, `design-system/tokens.json`, and an Apple HIG adoption brief. **+4,258/-0 across 32
+files, ZERO shipped source**, so it cannot affect anything the owner tests. **Held deliberately for the
+owner's review** — *"every screen on Apple HIG"* is a product design direction, and design direction has
+been treated as the owner's all session; merging it silently would contradict that. It carries a finding
+that bears on the open contrast decision: **Apple's stock system colors fail 15 of the 27 pairs declared
+in `tokens.ts`; their increased-contrast palette fails none.**
+
+### STILL OPEN — all owner-owned
+
+1. Non-text contrast, product-wide (17 of 24 bordered classes below 3:1). **#351 bears on this.**
+2. `surfaceOverlay` unenforceable until `relativeLuminance` composites alpha — false red on one pair,
+   **false green** on another.
+3. Seven tap-target offenders on `/my-work` at 390px.
+4. Privacy + terms are unreviewed boilerplate.
+5. `retry-after` is a lower bound (told 1s, refused 59 more); `13.280` pins it so a fix has something to
+   flip.
+6. **Every measurement in this project is DEV-STACK ONLY.** `deploy/do/app.yaml` states outright it is a
+   written spec applied to no live app. Production has never been exercised.
+
+**Executor is HOLDING, tree clean, no orphaned workers, queue empty. Its last unused id is `13.281`
+onward, unallocated.**
+
 ## ⚠ TUESDAY ~13:5x IST — A LIVE, UNAUTHENTICATED DoS ON SIGN-IN WAS FOUND AND CLOSED. `main` is `6e0183f`, gate GREEN. **Four PRs (#345 #346 #347 merged, #344 closed-as-superseded), an owner-delegated ruling, a stack outage, and THREE bad checks of my own — two of which I nearly acted on.**
 
 **Read this first if you are restarting:** the headline is not the merges. It is that **better-auth's own
