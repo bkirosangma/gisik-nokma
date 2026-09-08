@@ -234,6 +234,87 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
+# ▶ TUESDAY 2026-09-08 ~13:2x IST — **ITEM B MEASURED. ITEM C'S ESCAPE HATCH FIRES: `RATE_LIMIT_AUTH_MAX` IS NOT THE BINDING CONSTRAINT AND MUST NOT BE RAISED.**
+
+*Branch `exec/123-signin-redirect`. **No code change — that is the deliverable.** The owner ruled
+"raise it" against a theory; the theory is dead, so the ruling does not survive it and the owner gets
+the facts instead.*
+
+## THE ANSWER, IN ONE LINE
+
+**The 429s are produced by better-auth's OWN built-in rate limiter, not by ours.** `RATE_LIMIT_AUTH_MAX`
+could be raised to any number and the stack suite would fail identically.
+
+## HOW THAT IS KNOWN — the response bodies are different, and they are decisive
+
+| limiter | 429 body | source |
+|---|---|---|
+| **ours** | `{"error":"rate_limited","retryAfterSeconds":N}` | `apps/server/src/app.ts:545` |
+| **better-auth's** | `{"message":"Too many requests. Please try again later."}` | `better-auth/dist/api/rate-limiter/index.mjs:65` |
+
+**The observed 429 is better-auth's, byte for byte.** Probed directly against the running stack:
+`POST /api/auth/sign-in/magic-link` answered `429 {"message":"Too many requests. Please try again
+later."}`. `apps/server/src/auth/auth.ts` contains **no `rateLimit` key at all** (grepped: 0 matches),
+so better-auth's limiter runs at ITS defaults — and its own module carries `max: 3` rules with 10s and
+60s windows. Nothing in `.env` reaches it.
+
+## THE MEASUREMENT ITEM B ASKED FOR — one run, attributable, with controls
+
+| reading | value |
+|---|---|
+| non-`OPTIONS` `/api/auth/*` in ONE full 5-test run | **20** |
+| **peak in any FIXED 60s window** | **16** |
+| peak in any SLIDING 60s window (conservative bound) | **20** |
+| `RATE_LIMIT_AUTH_MAX` in the running container (verified from its env, not the compose file) | **60** |
+| 429s in that run | **2** |
+| requests charged to the 429'd address in the preceding 60s | **9–12, never near 60** |
+
+**16 of 60, and 20 in the worst case. Comfortably under.** That is the escape hatch's own condition,
+met.
+
+**Attribution** is by a MARKED TIME BOUNDARY (an epoch-ms mark taken immediately before the run), not by
+a `docker logs --since` window — the previous attempt's three-minute window spanned two earlier runs,
+which is exactly why its bucketing was never established.
+
+**Instrument controls, all run before the measurement was believed:**
+* plant exactly 3 auth requests → counter reports **3**;
+* plant exactly 1 more → **4**, a rise of exactly one (the dispatch's requirement 3);
+* plant a NON-auth request → count **unchanged at 4** (negative control).
+
+## ⚠ TWO CORRECTIONS TO THINGS THIS PROJECT BELIEVED
+
+1. **The bucket is NOT keyed per email — and it is not one bucket either.** The controller's correction
+   (address, not email) was right and is confirmed. But two distinct addresses appear:
+   **`172.30.0.6` (the web container) and `192.168.65.1` (the browser via the Docker gateway)** — 69 and
+   51 requests respectively over the container's life. **Every single 429 came from `172.30.0.6`.** The
+   browser's own traffic never tripped anything.
+2. **I reported "0 × 429" for this run and that was WRONG.** It came from a `docker logs … | python3`
+   pipeline that silently produced **zero bytes** through the proxy — the same silent-empty mode this
+   repo already records for `git show` redirected to a file. The identical script run via
+   `subprocess.run(['docker','logs',…])` found the 2 × 429 immediately. **A zero from a proxied pipe is
+   not a reading.** Both scripts now print a parsed-line count as a positive control; the broken one
+   printed `parsed: 0` and I read past it once before catching it.
+
+## WHAT I DID NOT ESTABLISH — do not let the next reader inherit these as settled
+
+* **Why the WEB CONTAINER posts magic-link at all.** 69 auth requests from `172.30.0.6` is more than
+  `global-setup` alone should make, and I did not trace which code path issues them. It matters,
+  because that address is the one being limited.
+* **better-auth's exact default rule set.** I read `max: 3` and windows of 10 and 60 out of its bundle
+  and did NOT reconcile that against the observed 9–12. The conclusion does not depend on it — the body
+  identifies the limiter regardless — but the *number* is uncharacterised.
+* **Whether configuring better-auth's `rateLimit` is the right remedy.** It is the obvious next step and
+  it is a **security-control design decision on the auth path**, which is an owner call, not mine. Two
+  shapes exist (`rateLimit.enabled/window/max`, and `customRules` per path).
+
+## RECOMMENDATION — for the owner, not a change I have made
+
+**Do not raise `RATE_LIMIT_AUTH_MAX`.** It is not the constraint, and raising a ceiling that was never
+hit is a change that cannot be shown to work. If the goal is a stack suite that survives being run
+whole, the candidates are: configure better-auth's own `rateLimit` for the e2e profile; or reuse one
+session across tests instead of signing in five times. **Both are owner decisions about an auth-path
+security control.**
+
 > while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
 # ▶ TUESDAY 2026-09-08 ~12:5x IST — **P1: THE MAGIC LINK LANDED ON THE API'S 404, AND THE GUARD WAS SATISFIED BY IT. PLUS AN INCIDENT I CAUSED AND CLOSED.**
 
