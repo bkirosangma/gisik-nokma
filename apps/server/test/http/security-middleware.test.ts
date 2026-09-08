@@ -462,52 +462,55 @@ describe('rate limiting', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
-   * OUR LIMITER IS THE ONLY LIMITER ON `/api/auth/*` — controller ruling
-   * 2026-09-08, and the regression test is the CONTROL that found the bug.
+   * OUR LIMITER IS THE ONLY LIMITER THAT ANSWERS ON `/api/auth/*` — controller
+   * ruling 2026-09-08, delegated by the owner.
    * ═══════════════════════════════════════════════════════════════════════════
    *
-   * better-auth ships its own limiter and it CANNOT TELL CLIENTS APART here:
-   * `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`
-   * (`dist/api/rate-limiter/index.mjs:245`) with `getIP()` falsy means one
-   * shared bucket per path, for everybody. Measured on the dev stack: a client
-   * on `127.0.0.1` that had spent NOTHING was refused because a client on
-   * `192.168.65.1` had spent. `auth.ts` now sets `rateLimit: { enabled: false }`.
+   * better-auth ships its own limiter, and on the real stack it could not tell
+   * clients apart: `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`
+   * (`dist/api/rate-limiter/index.mjs:245`) with `getIP()` falsy is one shared
+   * bucket per path, for everybody. Measured there: a client on `127.0.0.1`
+   * that had spent NOTHING was refused because a client on `192.168.65.1` had
+   * spent. `auth.ts` now sets `rateLimit: { enabled: false }`.
    *
-   * TWO ASSERTIONS, ONE CASE, because either alone is satisfiable by the defect:
+   * ⚠ WHAT THIS UNIT TEST CANNOT PROVE, SAID FIRST SO NOBODY READS IT AS MORE
+   * THAN IT IS. It cannot reproduce the shared bucket, and the reason is exact:
+   * `app.inject` clients are only distinguishable by `X-Forwarded-For`, and an
+   * `X-Forwarded-For` is also enough for better-auth's `getIP()` to RESOLVE —
+   * at which point better-auth separates clients too and the defect disappears
+   * from the harness. **The property that makes two clients distinguishable
+   * here is the same property whose absence causes the bug.** Measured, not
+   * assumed: with the limiter re-enabled, a second client's first request came
+   * back `500` (its own budget) rather than `429`.
    *
-   *   1. **B is not refused.** A client that has spent nothing must not inherit
-   *      another client's exhaustion. This is the shared-bucket property itself.
-   *   2. **When A IS refused, the body is OURS.** A bare 429 cannot tell the two
-   *      limiters apart — that is exactly what made this hard to see. Ours is
-   *      `{"error":"rate_limited","retryAfterSeconds":N}` (`app.ts:545`);
-   *      better-auth's is `{"message":"Too many requests. Please try again
-   *      later."}`. The discriminator that found the bug, inverted into a guard.
+   * So the shared-bucket claim rests on the DEV-STACK measurement, recorded in
+   * `docs/pre-launch-checklist.md`. What this case proves is the thing the
+   * ruling actually changes and that a unit test CAN witness: **better-auth's
+   * limiter no longer answers at all.**
    *
-   * WHY `authMax: 6` AND SEVEN REQUESTS, rather than a smaller, tidier number:
-   * the mutation has to be able to kill this. better-auth's magic-link rule is
-   * `max: 5` per 60s (`plugins/magic-link/index.mjs:197-203`), so A must be
-   * allowed to make MORE than five requests that actually reach better-auth
-   * before ours refuses it. With `authMax: 2` our limiter would refuse A at its
-   * third, better-auth would never see a sixth request, its shared bucket would
-   * never fill, and **B would pass under the mutation too — a mutation that
-   * mutates nothing.** Six lets A spend past better-auth's five; the seventh
-   * proves ours still holds the line.
+   * WHY `authMax: 6` AND SEVEN REQUESTS. better-auth's magic-link rule is
+   * `max: 5` per 60s (`plugins/magic-link/index.mjs:197-203`), which overrides
+   * the generic `/sign-in*` 10s/3 rule (`:302-308`). Six lets a client spend
+   * PAST better-auth's five, so the sixth request is precisely where
+   * better-auth would refuse and ours would not — the one request that can tell
+   * the two apart. The seventh is where ours refuses.
    *
-   * MUTATION, RUN NOT REASONED: set `rateLimit: { enabled: true }` in
-   * `auth.ts` and this case goes RED on both halves — B's first request is
-   * refused, and A's seventh carries better-auth's body instead of ours.
+   * MUTATION, RUN NOT REASONED: `rateLimit: { enabled: true }` in `auth.ts` and
+   * the sixth request comes back `429 {"message":"Too many requests. Please try
+   * again later."}` instead of passing — red, naming better-auth's own body.
    *
-   * ⚠ THE MUTATION IS `enabled: true`, NOT "delete the line". better-auth's
-   * default is `enabled: options.rateLimit?.enabled ?? isProduction`
+   * ⚠ THE MUTATION IS `enabled: true`, NOT "delete the line", and the first
+   * version of this case got that wrong. better-auth's default is
+   * `enabled: options.rateLimit?.enabled ?? isProduction`
    * (`dist/context/create-context.mjs:171`), and vitest sets `NODE_ENV=test`,
-   * so deleting our line leaves the limiter OFF and the "mutation" changes
+   * so deleting our line leaves the limiter OFF and the mutation changes
    * nothing. That NODE_ENV-dependent default is also why no server test ever
    * exercised this and why it shipped unseen.
    */
   /**
-   * 13.273 — two clients on different addresses do NOT share an auth budget, and the refusal that does fire is OURS, identified by response BODY rather than by status. Mutation: `rateLimit: { enabled: true }` in auth.ts reddens both halves.
+   * 13.273 — better-auth's limiter does not answer on /api/auth/*: the sixth request, which is past better-auth's own max of 5 for the magic-link path, is NOT refused by it, and the refusal that does arrive at the seventh is OURS, identified by response BODY rather than status. Mutation: `rateLimit: { enabled: true }` in auth.ts turns the sixth into better-auth's 429.
    */
-  it('two clients do not share an auth budget, and the refusal is ours', async () => {
+  it('better-auth does not answer on /api/auth/*, and the refusal that does is ours', async () => {
     const { app } = build({ ...limits({ authMax: 6 }), trustProxy: true });
     const send = (ip: string) =>
       app.inject({
@@ -517,84 +520,39 @@ describe('rate limiting', () => {
         payload: { email: 'rate-limit-authority@example.test' },
       });
 
-    // A spends its whole budget. Six is deliberately past better-auth's five.
-    const clientA = [];
-    for (let i = 0; i < 7; i += 1) clientA.push(await send('203.0.113.1'));
-    const refused = clientA[6];
-
-    // B has spent nothing at all.
-    const clientB = await send('203.0.113.2');
+    const spent = [];
+    for (let i = 0; i < 7; i += 1) spent.push(await send('203.0.113.1'));
+    const past = spent[5]; // the 6th — past better-auth's max of 5
+    const refused = spent[6]; // the 7th — past OUR authMax of 6
+    const other = await send('203.0.113.2');
     await app.close();
+
+    const BETTER_AUTH_429 = 'Too many requests. Please try again later.';
+
+    expect(
+      past?.body.includes(BETTER_AUTH_429),
+      "the SIXTH request was refused by better-auth's own limiter. It is supposed to be disabled " +
+        '(`rateLimit: { enabled: false }` in auth.ts) so that one limiter, ours, is the single ' +
+        'authority on /api/auth/*. Two limiters with different keying on one path is the defect ' +
+        `class this ruling closes. Body was: ${past?.body.slice(0, 120)}`,
+    ).toBe(false);
 
     expect(
       refused?.statusCode,
-      'client A was not refused after spending authMax, so the rest of this case proves nothing',
+      'our limiter did not refuse the seventh request, so nothing below distinguishes a working ' +
+        'limiter from an absent one',
     ).toBe(429);
     expect(
       refused?.json(),
-      'the 429 did not come from OUR limiter. better-auth answers ' +
-        '{"message":"Too many requests. Please try again later."} — a bare status cannot tell them ' +
-        'apart, which is what made the shared-bucket defect invisible.',
+      'the 429 did not come from OUR limiter. A bare status cannot tell the two apart — which is ' +
+        'exactly what made the shared-bucket defect invisible for so long.',
     ).toEqual({ error: 'rate_limited', retryAfterSeconds: 60 });
+
     expect(
-      clientB.statusCode,
-      'a client that had spent NOTHING was refused because a DIFFERENT client had spent. That is ' +
-        'the shared-bucket defect: better-auth keys on NO_TRUSTED_IP_KEY when it cannot resolve an ' +
-        'IP, so one person retrying sign-in locks out everybody.',
+      other.statusCode,
+      'a second client, which had spent nothing, was refused. Under OUR limiter each address ' +
+        'carries its own budget.',
     ).not.toBe(429);
-  });
-
-  /**
-   * 13.274 — better-auth's "could not determine a client IP" warning is ABSENT, because with `enabled: false` `onRequestRateLimit` returns at its first line before `resolveRateLimitConfig` ever runs. Positive control: the mutation makes the same assertion capture the warning.
-   */
-  it('better-auth logs no shared-bucket warning, because its limiter never runs', async () => {
-    const seen: string[] = [];
-    const record =
-      (original: (...args: unknown[]) => void) =>
-      (...args: unknown[]) => {
-        seen.push(args.map((a) => String(a)).join(' '));
-        original(...args);
-      };
-    const spies = (['log', 'warn', 'error'] as const).map((level) => {
-      const original = console[level].bind(console) as (...args: unknown[]) => void;
-      console[level] = record(original) as typeof console.log;
-      return () => {
-        console[level] = original as typeof console.log;
-      };
-    });
-
-    try {
-      const { app } = build({ ...limits({ authMax: 100 }), trustProxy: true });
-      for (let i = 0; i < 8; i += 1) {
-        await app.inject({
-          method: 'POST',
-          url: '/api/auth/sign-in/magic-link',
-          headers: { 'x-forwarded-for': '203.0.113.9' },
-          payload: { email: 'rate-limit-warning@example.test' },
-        });
-      }
-      await app.close();
-    } finally {
-      for (const restore of spies) restore();
-    }
-
-    /* The absence is only worth reading because the capture demonstrably works:
-       these eight requests are the same traffic that produced the warning twice
-       in the dev stack's log. `ipWarningLogged` gates it to ONCE PER PROCESS, so
-       the positive control is the mutation run recorded in the case text, not a
-       second assertion here — a second one in the same process could not fire
-       even with the defect present. */
-    expect(
-      seen.filter((line) => line.includes('falling back to a single shared per-path bucket')),
-      'better-auth logged its shared-bucket warning, which means its limiter RAN. With ' +
-        '`rateLimit: { enabled: false }` `onRequestRateLimit` returns at its first line, before ' +
-        '`resolveRateLimitConfig` can reach the warning at all.',
-    ).toEqual([]);
-    expect(
-      seen.length,
-      'the console capture recorded nothing at all, so the empty result above is a broken ' +
-        'instrument rather than a reading',
-    ).toBeGreaterThan(0);
   });
 
   it('limits POST /v1/events on its own budget', async () => {
