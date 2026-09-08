@@ -22,8 +22,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
 >
-> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is IN FLIGHT on branch
-> `exec/138-task4-workspaces`. No PR yet.**
+> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and its PR is OPEN:
+> #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.**
+>
+> Local HEAD, `origin/exec/138-task4-workspaces` and the PR's `headRefOid` all read `c2c6313` —
+> checked with `gh pr view 374 --json headRefOid`, not assumed from the push succeeding.
 >
 > Verified rather than adopted from the controller's relaunch note:
 > `gh pr view 372 --json state,mergeCommit` → `MERGED`, `469602f`; `gh pr list --state open` → none.
@@ -79,7 +82,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## STILL OUTSTANDING
 >
-> * The PR itself, and the controller's merge.
+> * **The controller's merge of #374, and the owner's look at `http://localhost:3001/workspaces`.**
+>   Per the Task 4 dispatch, *nothing after Task 4 starts until they have*. Task 12 is next in the
+>   queue and is HELD behind that look — do not start it from this file alone.
+> * If you are a relaunched executor reading this: the queue is EMPTY pending those two events.
+>   Hold. Do not re-derive work from the brief's retired sequence.
 > * NOT this task's, recorded with owners: `PLANS_WITH_TASKS` omits `hig-per-screen`;
 >   `check-case-citations` cannot see a case that has no catalogue row; the `13.321` next-free
 >   pointer already collides with a live case (controller owns that one).
