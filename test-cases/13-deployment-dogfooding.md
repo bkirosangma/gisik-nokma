@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.282` minted by the HIG palette adoption, `13.283`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1780,3 +1780,48 @@ compute against one specific background — which is exactly why they are cases 
 > **no gate would object — a *darker* border fails nothing** — leaving the product visibly wrong on
 > `main` between two PRs while it is being tested by hand. The measurement the sweep starts from, taken
 > here: `border` on `surface` is **1.34** light and **1.49** dark against 3:1.
+
+
+## The border sweep (2026-09-08) — R1(c) applied, and the number that closed
+
+- **13.283** ✅ Non-text contrast (WCAG 1.4.11) across the rendered signed-in surface: **zero classes
+  below 3:1**, product-wide, on five routes.
+  *This case changed shape mid-change and the reason is the useful part. It was written to RECORD, not
+  assert, because the defect was live at **13 of 20**. It carried
+  `expect(examinedTotal).toBeGreaterThan(20)` to guard the real hazard that **a sweep matching nothing
+  reports zero offenders — the best possible result and the least trustworthy one.** The sweep then
+  removed 54 borders, the population fell to **19**, and the guard went RED. It was working; its
+  threshold had become an assumption about a population this very change was designed to shrink.*
+  *It was **not** lowered to 19 — that is moving a bar to meet a result. It was replaced by a control
+  that runs through the SAME path as the measurement: **the same sweep, on the same rendered page,
+  re-run at 25:1, must report offenders.** A sweep that answers "zero below 3" AND "zero below 25" is
+  not measuring anything, and that control stays honest at any future population.*
+  *The instrument composites alpha, which `relativeLuminance` cannot — the checklist records that mode
+  reading 11.87 where the truth is 1.85, a false GREEN. Every fill R1(c) introduces is `rgba()`.*
+- **13.284** ✅ A non-primary control is identifiable without a boundary — the affordance is fill plus an
+  accent-coloured semibold label, and the case measures which of the two actually carries it.
+  *Measured, because the ruling explicitly declined to assert it: **the FILL is 1.09–1.15 against every
+  surface and carries nothing.** The **LABEL** measures **5.31–6.81**, well past the 4.5 it owes as text.*
+  *The reading, stated as a reading: WCAG 1.4.11 asks for 3:1 on "visual information required to
+  identify" a component; where the label does the identifying and clears 3:1 several times over, the
+  fill is reinforcement rather than the identifying signal. **Its weakest point, named rather than
+  omitted: this product colours links with the same accent, so accent-plus-semibold is not UNIQUELY a
+  button.** What is left to separate them is fill, radius and a 44px target — each individually
+  sub-3:1. A reader who thinks that insufficient should reopen R1, which is the owner's call.*
+
+> **THREE FIELDS ARE DELIBERATELY NOT SWEPT, and this is requirement 4's "say so" half.**
+> `.gn-sign-in__method label input`, `.gn-mcp-authorize__input` and `.gn-notfound__link` keep their
+> borders. **13.284's argument does not transfer to them:** an EMPTY text field has no accent label
+> inside it, so removing its boundary leaves a 1.09–1.15 fill as the only thing marking it, which I
+> believe genuinely fails 1.4.11. The ruling says to come back rather than quietly ADD a boundary; the
+> same logic forbids quietly REMOVING one. Looked at directly on `/sign-in`, the bordered phone field
+> reads correctly and is easy to locate — which is the evidence for leaving it. **Owner's call.**
+
+> **SEEN BY LOOKING, NOT BY COUNTING — and it is NOT this change's doing.** On `/sign-in` the
+> `Phone | Email link` segmented control renders as two browser-default boxes, visibly inconsistent
+> beside the swept `Continue with Google` and `Sign in with a passkey`. Verified rather than assumed:
+> `.gn-view-tabs button` sets `min-height` and `padding-inline` **and nothing else** — globals.css says
+> so in its own comment — and `git diff` over this change touches none of it. It is the same
+> already-recorded finding as the 26 controls rendering at the browser's font. **The sweep did not
+> break it; the sweep made it visible**, because the controls beside it stopped looking browser-default
+> too. Per-screen work, so it belongs to the reconciliation audit, recorded here rather than fixed.
