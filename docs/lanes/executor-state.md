@@ -20,6 +20,60 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~20:3x IST. **READ THIS BLOCK BEFORE ANY OTHER IN THIS FILE.**
+>
+> **`main` is `5b4f8fc`. There are ZERO open PRs. The queue is EMPTY and a HOLD is in force.**
+>
+> PR **#369** (`exec/135-signin-auth-methods` — 2b item 2, the rebuilt sign-in auth methods) is
+> **MERGED** as `5b4f8fc`. Verified rather than adopted from the controller's word:
+>
+> | check | result |
+> |---|---|
+> | `gh pr view 369` | `MERGED`, base `main`, mergeCommit `5b4f8fc`, mergedAt `2026-09-08T14:42:07Z` (20:12 IST) |
+> | `git rev-parse origin/main` | `5b4f8fc` |
+> | `git diff --exit-code origin/main 28f942c` — **no path filter, all files** | **EXIT 0, 0 bytes stdout, 0 bytes stderr** |
+> | positive control **through the same pipeline**: `git diff --exit-code origin/main origin/main~1` | **EXIT 1, 160,976 bytes** — the instrument can report a difference, so the null above is a reading and not a silence |
+> | tree equality | `tree(origin/main)` == `tree(28f942c)` == `15881b8` |
+> | worktree | clean (`--porcelain=v1 --untracked-files=all` empty, EXIT 0); zero unpushed commits |
+>
+> **The squash-drops-late-pushes trap did NOT fire on #369.** Identical tree SHAs is a stronger
+> statement than the empty diff and shares none of its failure modes — it does not depend on `diff`
+> running, on a path filter, or on the exit status of a pipe.
+>
+> **THE HOLD — controller-issued, 2026-09-08 ~20:2x IST.** Nothing after 2b starts until the owner has
+> looked at the rebuilt sign-in. The hold covers **3a as well as 3b**, and **Task 12 is not to be
+> started.** If you are a restarted executor and the queue looks empty: it is. Hold.
+>
+> ## EVERY POSITION CLAIM BELOW THIS BLOCK IS SUPERSEDED
+>
+> The two blocks immediately following told a restarting executor that #334 and #328 were open and
+> that `exec/120-287-staleness` still needed its PR opened. All five of these are merged. Each merge
+> commit was confirmed an ancestor of `origin/main` with `merge-base --is-ancestor` — never
+> `cat-file` — and the same test was run against `0524251` (the `exec/120` branch tip, deliberately
+> not on `main`), which correctly failed it, so the test discriminates:
+>
+> | cited below as open / paused | actual state |
+> |---|---|
+> | #328 `exec/116-tap-targets` | **MERGED** `f03d6bb` |
+> | #334 `exec/117-type-scale` | **MERGED** `188abb6` |
+> | #339 `exec/120-287-staleness` | **MERGED** `cd050c8` — the "⏸ PAUSED / NO PR OPENED" block below is simply wrong now: the PR was opened and it landed |
+> | #366 `exec/134-signin-feedback-1-3` | **MERGED** `e53be92` |
+> | #369 `exec/135-signin-auth-methods` | **MERGED** `5b4f8fc` |
+>
+> ## STILL OWED, UNASSIGNED — recorded so it is not lost, NOT to be started under the hold
+>
+> * **The widened staleness sweep**, items 1–2 of the #287 block's own "NOT VERIFIED" list: `.json`,
+>   `.yml`, `.sh`, `Dockerfile`s and `README`s were never swept, and the pattern set was never
+>   exhaustive. Merging #339 did not close either.
+> * **The four unwitnessed type-scale fixes** named further down. *I did not re-check whether they have
+>   since been witnessed — stated as unverified rather than repeated as owed.*
+>
+> *Why this block exists: the top two hundred lines of this file instructed a restarting executor to
+> open a PR that had already merged, off a branch whose work was already on `main`. That is the same
+> class as the #287 staleness this file documents — a restart surface that lies in the conservative
+> direction, which is exactly why nobody checks it. A block that names a position expires; this one is
+> dated, and every check in it is reproducible from the shas it names.*
+
 > ### ⚠ THE SQUASH-DROPS-LATE-PUSHES TRAP FIRED, ON THIS BRANCH, TODAY — and this entry is the proof
 >
 > The finding below was committed as `5ef45d6` and pushed to `exec/117-type-scale`. **#334 was
@@ -156,7 +210,9 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > **Correcting `controller-state.md` is the controller's to make, not mine** — flagged, not edited.
 >
-> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, HEAD
+> **POSITION AS OF THIS ENTRY — SUPERSEDED 2026-09-08 ~20:3x: #334 MERGED as `188abb6`, #328
+> MERGED as `f03d6bb`. See the CURRENT POSITION block at the top of this file.** The reading below
+> was true when written. `exec/117-type-scale` was **PR #334, open and MERGEABLE**, HEAD
 > `d9624b3`. Gate re-run AT THAT SHA: **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**,
 > load 2.66, zero orphaned vitest workers. All five catalogue checks EXIT 0. Viewport suite 19 passed
 > / 2 skipped; stack sweep green on five routes; both type-scale baselines committed at 0.
@@ -185,7 +241,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > from `controller-state.md` without checking it, which is how a stale item survives: each reader
 > copies it forward because the previous reader looked careful.**
 
-> # ⏸ RESTART HANDOFF — #287 STALENESS TASK, PAUSED MID-FLIGHT FOR A BRIEF REFRESH
+> # ✅ ~~⏸ RESTART HANDOFF — #287 STALENESS TASK, PAUSED MID-FLIGHT~~ — RESOLVED 2026-09-08
+>
+> **PR #339 was opened from `exec/120-287-staleness` and MERGED as `cd050c8` (confirmed an
+> ancestor of `origin/main`). This block's "No PR exists" and its "NEXT CONCRETE STEP: open the
+> PR" are DEAD — do not act on them.** What survives: items 1 and 2 of its NOT-VERIFIED list —
+> the widened sweep — are still genuinely owed and unassigned.
 >
 > **Branch `exec/120-287-staleness`, off `main` `8b0d15e`. Committed and pushed. NO PR OPENED — the
 > controller instructed not to open one before the restart.** Read this block, then the entry below it
@@ -220,7 +281,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > 4. **The DISPATCH BRIEF still carries the stale claim** under *TWO KNOWN GAPS #1*. It is not in the
 >    repo, so no commit can fix it — it needs editing wherever the brief is authored, or the next
 >    executor will read the stale version and repeat it. **I repeated it twice myself before checking.**
-> 5. **No PR exists.** The branch is pushed; nothing has been proposed for merge.
+> 5. ~~**No PR exists.** The branch is pushed; nothing has been proposed for merge.~~ **FALSE as of
+>    2026-09-08: PR #339 exists and is MERGED as `cd050c8`.**
 >
 > ## NEXT CONCRETE STEP, in order
 >
