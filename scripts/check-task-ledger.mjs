@@ -123,9 +123,9 @@ const fail = [];
 const note = (section, rows) => fail.push({ section, rows });
 
 // ---------------------------------------------------------------- denominator
-// One entry per `### Task N:` heading, keyed `<plan>/<task>`. Task ids carry an
-// optional letter (4a, 12c) -- ten of the 177 do -- so the id is kept as text
-// and never coerced to a number.
+// One entry per TASK ID, keyed `<plan>/<task>` -- not one per heading line, because
+// a heading may declare two (`### Task 4a / 4b:`). Task ids carry an optional
+// letter (4a, 12c) so the id is kept as text and never coerced to a number.
 //
 // DO NOT ADD FENCED-CODE-BLOCK STRIPPING HERE. It is the obvious next thought --
 // these plans are mostly code, so a quoted `### Task N:` inside an example would
@@ -144,6 +144,86 @@ const note = (section, rows) => fail.push({ section, rows });
 // one; if that ever changes, fix the unbalanced fences in the plans first.
 const tasks = new Map();
 const perPlan = new Map();
+
+/**
+ * The heading reader, as a pure function of one line, for the same reason
+ * `citationsOfNeverMergedPrs` below is one: a matcher that cannot be exercised
+ * on known inputs reports success indistinguishably from firing on nothing.
+ * Inline in the readdirSync loop it was unreachable by any fixture, and it
+ * drifted exactly as that argument predicts —
+ *
+ * MEASURED 2026-09-08. The reader was `/^### Task (\d+[a-z]?):\s*(.*)$/` and
+ * `docs/superpowers/plans/2026-09-08-hig-per-screen.md` writes five of its
+ * headings as `### Task 4a / 4b: Workspaces + Invite` (also 5a/5b, 6a/6b,
+ * 7a/7b, 8a/8b): after `4a` comes ` / 4b:`, not `:`. Ten real tasks were
+ * invisible. The gate printed `199 tasks ... 199 ledger rows` and exited 0,
+ * because a task nothing counts also demands no ledger row — the denominator
+ * and the numerator went missing together, which is the one shape of this
+ * failure that no row-vs-task cross-check can see.
+ *
+ * Returns `{ ids, title }` with ids in heading order, or null. Ids stay TEXT
+ * (`4a`, `12`) and are never coerced to numbers.
+ */
+function taskIdsFromHeading(line) {
+  const heading = line.match(/^### Task (\d+[a-z]?(?:\s*\/\s*\d+[a-z]?)*):\s*(.*)$/);
+  if (!heading) return null;
+  return { ids: heading[1].split('/').map((part) => part.trim()), title: heading[2] };
+}
+
+{
+  // ── SELF-TEST: run before the sweep, and positioned ABOVE it deliberately.
+  // The positive control at PLANS_WITH_TASKS fires on a drifted reader only
+  // when a whole plan empties out; this one fires on the drift itself, and it
+  // must fire first or the wrong denominator is already built by the time the
+  // control speaks.
+  //
+  // The NEGATIVES were written first and each was confirmed to KILL a
+  // deliberately-too-greedy control, so none of them is certified by nothing:
+  //   * `/^#+ Tasks? ([^:]+):\s*(.*)$/`   — depth- and plural-loose. Wrongly
+  //     matches the first three negatives; cannot reach the fourth, which
+  //     carries no colon at all.
+  //   * `/^#+ Tasks? (\S+)\s*:?\s*(.*)$/` — also colon-loose. Wrongly matches
+  //     all four.
+  // Both controls accept every positive below, so the positives alone would
+  // have certified either one. That is the whole point of the negatives.
+  const ok = (line, ids, title) => [line, { ids, title }];
+  const no = (line) => [line, null];
+  const cases = [
+    // The defect this reader was rewritten for: one heading, TWO tasks.
+    ok('### Task 4a / 4b: Workspaces + Invite', ['4a', '4b'], 'Workspaces + Invite'),
+    ok('### Task 8a / 8b: Settings — TicketTypes', ['8a', '8b'], 'Settings — TicketTypes'),
+    // ...and the three forms already in the plans, which must not regress.
+    ok('### Task 3a: Members — surface', ['3a'], 'Members — surface'),
+    ok('### Task 0: The accessible-name gate', ['0'], 'The accessible-name gate'),
+    ok('### Task 12: Passkey registration', ['12'], 'Passkey registration'),
+    // NEGATIVES. The first is verbatim from the hig-per-screen plan (line 803)
+    // and the last verbatim from the coordination doc (line 3982) — plan `00`,
+    // which PLAN_WITHOUT_TASKS asserts yields EXACTLY zero, so a reader that
+    // loosened the depth would break that control rather than this one.
+    no('## Tasks 3–8: the per-screen pairs'),
+    no('### Tasks 3–8: the per-screen pairs'),
+    no('#### Task 9: x'),
+    no("## Task 8's re-review, run because its first one was contaminated"),
+    no('Task 4a / 4b: Workspaces + Invite'),
+  ];
+  const failures = [];
+  for (const [line, expected] of cases) {
+    const got = taskIdsFromHeading(line);
+    const show = (v) => (v === null ? 'null' : `[${v.ids.join(',')}] "${v.title}"`);
+    if (JSON.stringify(got) !== JSON.stringify(expected)) {
+      failures.push(`${JSON.stringify(line)}: expected ${show(expected)}, got ${show(got)}`);
+    }
+  }
+  if (failures.length > 0) {
+    console.error('task ledger gate: SELF-TEST FAILED on the task-heading reader.');
+    for (const f of failures) console.error(`  ${f}`);
+    console.error('  This reader IS the denominator. When it stops matching a heading form,');
+    console.error('  the task and its owed ledger row vanish together and the gate reports');
+    console.error('  a clean N/N -- which is what it did for ten tasks until 2026-09-08.');
+    console.error('  Refusing to certify the ledger.');
+    process.exit(1);
+  }
+}
 
 for (const name of readdirSync(PLANS_DIR).sort()) {
   // The retired 11-plan series, keyed by its series number...
@@ -165,14 +245,19 @@ for (const name of readdirSync(PLANS_DIR).sort()) {
   if (plan === undefined) continue;
   perPlan.set(plan, perPlan.get(plan) ?? 0);
   for (const line of readFileSync(join(PLANS_DIR, name), 'utf8').split('\n')) {
-    const heading = line.match(/^### Task (\d+[a-z]?):\s*(.*)$/);
+    const heading = taskIdsFromHeading(line);
     if (!heading) continue;
-    const key = `${plan}/${heading[1]}`;
-    if (tasks.has(key)) {
-      note('DUPLICATE TASK HEADINGS in the plans themselves', [`${key}  ${heading[2]}`]);
+    // One heading may declare more than one task (`### Task 4a / 4b:`), so the
+    // count advances per ID, never per line. Counting lines here is how the old
+    // reader would have under-counted even after it started matching the form.
+    for (const id of heading.ids) {
+      const key = `${plan}/${id}`;
+      if (tasks.has(key)) {
+        note('DUPLICATE TASK HEADINGS in the plans themselves', [`${key}  ${heading.title}`]);
+      }
+      tasks.set(key, { plan, task: id, title: heading.title, file: name });
+      perPlan.set(plan, perPlan.get(plan) + 1);
     }
-    tasks.set(key, { plan, task: heading[1], title: heading[2], file: name });
-    perPlan.set(plan, perPlan.get(plan) + 1);
   }
 }
 
