@@ -112,7 +112,13 @@ const LABEL_SELECTOR =
  */
 export const LABEL_FLOOR_PX = 12;
 
-export type TextSample = { selector: string; fontSizePx: number; text: string };
+export type TextSample = {
+  selector: string;
+  fontSizePx: number;
+  text: string;
+  /** Computed `font-family`. Carried so `uaFont` below can be a real check. */
+  fontFamily: string;
+};
 
 export type TypeScale = {
   /**
@@ -135,6 +141,42 @@ export type TypeScale = {
    * grown into each other and their counts have stopped being separable.
    */
   bodyOwned: TextSample[];
+  /**
+   * Examined elements whose computed `font-family` is NOT the one `body`
+   * resolves to — i.e. text painted in the BROWSER's font rather than the
+   * product's, because no rule ever set one.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * WHY THIS IS A SEPARATE READING AND NOT A SECOND FLOOR
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * The finding this answers could not be seen by `offenders`, and the reason
+   * is worth stating because it is the exact shape this repo keeps cataloguing.
+   * Twenty-six controls rendered at 13.3333px — Chrome's UA default for
+   * `<button>` — on the signed-in surface at 390px. The floor is 12px. **They
+   * were ABOVE it.** So the ratchet was green, the baseline read 0, and the
+   * defect was found only by a human temporarily raising the floor to 16 for
+   * one enumerating run. Nothing in the suite could have failed.
+   *
+   * Fixing that with a number — "assert the 13.3333px bucket is absent" — is
+   * one line and has a FALSE-GREEN mode: if the UA constant ever changes, or a
+   * different control leaks a different default, removing the fix produces some
+   * OTHER bucket and the assertion goes on passing. It would be a check keyed
+   * to the symptom of one browser version.
+   *
+   * `font-family` names the actual defect instead: *no rule set a font here.*
+   * It has no magic number, it cannot drift with a UA constant, and it is
+   * mutation-witnessed — deleting `button { font: inherit }` from
+   * `apps/web/app/globals.css` turns this list non-empty and names the
+   * selectors.
+   *
+   * Safe as an equality because this product has exactly one font stack: the
+   * only `font-family` declarations in `globals.css`, `ui.css` and
+   * `editor.css` are `body`'s own and two `inherit`s. A deliberate second
+   * typeface would need this comparison widened to a set — and it would fail
+   * loudly here first, which is the right way to find out.
+   */
+  uaFont: TextSample[];
   /** Invisible, empty, or code-owned: counted so a silent-empty run is visible. */
   skipped: number;
   /** The worst reading found, reported whether or not it offends. */
@@ -165,10 +207,18 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
         return `${el.tagName.toLowerCase()}${cls}`;
       };
 
-      const examined: { selector: string; fontSizePx: number; text: string }[] = [];
-      const offenders: { selector: string; fontSizePx: number; text: string }[] = [];
-      const bodyOwned: { selector: string; fontSizePx: number; text: string }[] = [];
+      type Sample = { selector: string; fontSizePx: number; text: string; fontFamily: string };
+      const examined: Sample[] = [];
+      const offenders: Sample[] = [];
+      const bodyOwned: Sample[] = [];
+      const uaFont: Sample[] = [];
       let skipped = 0;
+
+      /* The product's own resolved stack, read from the live document rather
+         than hardcoded here — a literal copy of `body`'s declaration would go
+         stale the day someone edits the stylesheet, and would then compare the
+         page against a font nothing uses. */
+      const bodyFamily = getComputedStyle(document.body).fontFamily;
 
       const matched = Array.from(document.querySelectorAll(labelSelector));
       for (const el of matched) {
@@ -197,6 +247,7 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
           selector: describe(el),
           fontSizePx: Number.parseFloat(cs.fontSize),
           text: directText.slice(0, 40),
+          fontFamily: cs.fontFamily,
         };
         if (el.matches(bodySelector)) {
           bodyOwned.push(entry);
@@ -204,6 +255,7 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
         }
         examined.push(entry);
         if (entry.fontSizePx < floor) offenders.push(entry);
+        if (entry.fontFamily !== bodyFamily) uaFont.push(entry);
       }
 
       const smallest =
@@ -211,7 +263,15 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
           ? null
           : examined.reduce((a, b) => (a.fontSizePx <= b.fontSizePx ? a : b));
 
-      return { rawMatches: matched.length, examined, offenders, bodyOwned, skipped, smallest };
+      return {
+        rawMatches: matched.length,
+        examined,
+        offenders,
+        bodyOwned,
+        uaFont,
+        skipped,
+        smallest,
+      };
     },
     { labelSelector: LABEL_SELECTOR, bodySelector: BODY_SELECTOR, floor: LABEL_FLOOR_PX },
   );

@@ -428,6 +428,27 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       )
       .toEqual([]);
 
+    /* Case 13.267 — every control renders in the PRODUCT's font, not the
+       browser's. The signed-in half of the guard for the owner-ruled
+       2026-09-08 `font: inherit` fix, and it exists because the
+       ratchet beside it could not have caught the thing it fixed: the 26
+       controls sat at 13.3333px, ABOVE the 12px floor, so `offenders` was 0
+       and the baseline stayed 0 through the whole defect. A fix whose only
+       evidence is a number that did not move is not guarded at all.
+
+       Deleting `button { font: inherit }` from `apps/web/app/globals.css`
+       turns this red on four of the five routes, naming the selectors. */
+    expect
+      .soft(
+        typeScale.uaFont,
+        `text on ${route.path} is painted in the BROWSER's font, not the product's — a control ` +
+          `where no rule sets \`font\`, which is what \`button { font: inherit }\` in ` +
+          `apps/web/app/globals.css exists to prevent. These render at the UA default and no ` +
+          `font-SIZE floor can see them, because the UA default sits above the floor. ` +
+          `Offending: ${JSON.stringify(typeScale.uaFont)}`,
+      )
+      .toEqual([]);
+
     const baseline = readTypeScaleBaseline(STACK_TYPE_SCALE_BASELINE);
     const allowed = baseline[route.key];
     if (allowed === undefined) {

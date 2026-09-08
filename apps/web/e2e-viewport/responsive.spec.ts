@@ -894,6 +894,29 @@ for (const route of UNAUTHED_ROUTES) {
       )
       .toEqual([]);
 
+    /* Case 13.266 — every control renders in the PRODUCT's font, not the
+       browser's. The signed-out half of the guard for the owner-ruled
+       2026-09-08 `font: inherit` fix. See the sibling
+       assertion in `e2e-stack/viewport.spec.ts` for why this is a font-FAMILY
+       reading and not a second floor: the defect it guards sat ABOVE the 12px
+       floor, so no size ratchet could ever have reddened on it.
+
+       This surface is where the ruling's own count came from being a floor
+       rather than a total: `/sign-in`'s two method tabs are unclassed
+       `<button role="tab">` inside `.gn-view-tabs`, which sets `min-height`
+       and `padding-inline` and no font. The signed-in enumeration found 26 and
+       could not see these two. */
+    expect
+      .soft(
+        typeScale.uaFont,
+        `text on ${route.path} at ${name} is painted in the BROWSER's font, not the product's — ` +
+          `a control where no rule sets \`font\`. \`button { font: inherit }\` in ` +
+          `apps/web/app/globals.css exists to prevent exactly this, and no font-SIZE floor can ` +
+          `see it because the UA default sits above the floor. ` +
+          `Offending: ${JSON.stringify(typeScale.uaFont)}`,
+      )
+      .toEqual([]);
+
     const typeKey = `${name}|${route.path}`;
     const typeBaseline = readTypeScaleBaseline();
     const typeAllowed = typeBaseline[typeKey];

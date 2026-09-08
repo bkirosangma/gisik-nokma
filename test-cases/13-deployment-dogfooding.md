@@ -20,9 +20,30 @@ D 13.41–13.100** (Tasks 7, 8) · **Lane E 13.101–13.200** (the rest of Plan 
 NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201–13.240**, allocated
 2026-09-06 once `13.1–13.40` was confirmed exhausted — minted at **13.201–13.209** so far (13.201–13.203
 the scheduler-generalisation errand, 13.204–13.209 Lane F Pass 1's citation check; **13.210–13.240 remain
-free in this block**). **The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.** A lane takes
-its assigned block and does not derive the next free id from this file — recount the MAXIMUM in use
-against `origin/main` at every rebase as the control, but never mint from it.
+free in this block**). ~~**The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.**~~ **STALE — CORRECTED
+2026-09-08. `13.241`–`13.265` are CONSUMED** (`13.241` has 4 hits, `13.265` has 2). A lane obeying that
+line would have been handed an occupied block. **Block `13.266`–`13.275` is allocated to the serial
+executor (controller, 2026-09-08); the next free BLOCK is `13.276`, controller-allocated ON REQUEST
+ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
+
+> **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
+> `11-calendar-notifications.md`'s pointer corrected on 2026-09-08, one file over. It is written once
+> and read by every later lane, and nothing re-derives it, so it is wrong from the first allocation
+> after it and stays wrong. **Recount before trusting it. Both readings below are ways that recount
+> goes wrong, and both were made for real on 2026-09-08:**
+>
+> * **Do not extract ids with a bare `13\.[0-9]+`** — it matches **`13.3333px`**, the user-agent font
+>   size that cases 13.266–13.267 are about, and reports a maximum of `13.3333`. The id pattern
+>   collides with a pixel value living in the same file.
+> * **Do not sort ids as FLOATS.** `13.99 > 13.265` numerically, so a float sort reports a maximum of
+>   `13.99` and a block allocated from it would hand out ids **already in use**. A case id is a
+>   `(section, ordinal)` INTEGER PAIR, not a decimal number. Compare on the ordinal.
+>
+> One root error under both: *treating a case id as a number.* The first reads a quantity as an id, the
+> second reads an id as a quantity. They were caught only because two parties recounted independently
+> and **disagreed** — `13.99` against `13.265` — and the disagreement was checked rather than resolved
+> in favour of whoever read first.
 
 **Numbering is BLOCK-allocated across parallel lanes, controller-assigned 2026-09-06, because more than
 one lane opened this section before Plan 11 Task 16's own catalogue pass (normally the sole opener, held
@@ -1301,6 +1322,132 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
 > 0 from a fixed one print identically, and the recorded trap on the previous pass was a measurement
 > taken against an image that predated the change.
 
+## Controls render in the product's font, not the browser's (owner-assigned, 2026-09-08)
+
+*The owner ruled on 2026-09-08 to apply `font: inherit` against `docs/pre-launch-checklist.md`'s
+`NEW, 2026-09-08` bullet: 22 unclassed `button` + 2 `.ticket-type-list__new` + 2 `.workflow-list__new`,
+all at exactly 13.3333px on the signed-in surface at 390px. The ruling was widened to the signed-out
+surface on a measurement taken before the rule was written (see 13.266).*
+
+*IDS ARE PROVISIONAL. §13's header requires block allocation by the controller ON REQUEST and says
+never to mint from the maximum. The controller was asked and was mid-incident on a production
+sign-in-redirect bug; 13.266–13.267 are the recounted next-free (maximum in use against `origin/main`
+is 13.265, and both are free repo-wide) and are to be renumbered if the controller assigns otherwise.
+**Recount trap for whoever does this next: `grep -oE '13\.[0-9]+'` matches `13.3333px` and reports a
+maximum of `13.3333` — the id pattern collides with the pixel value this very section is about.***
+
+- **13.266** ✅ **No control on the signed-out surface is painted in the browser's font.**
+  `apps/web/e2e-viewport/responsive.spec.ts` asserts `measureTypeScale`'s `uaFont` is empty on all five
+  routes at all three widths — every examined element's computed `font-family` equals the one `body`
+  resolves to. Before → after on `/sign-in`: `{13.3333px: 2, 16px: 3}` → `{16px: 5}`, the two
+  `<button role="tab">` in `.gn-view-tabs` (which sets `min-height` and `padding-inline` and no font). —
+  (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-viewport/type-scale.ts`,
+  `apps/web/app/globals.css`)
+  *Mutation RUN, not reasoned: delete `button { font: inherit }` from `globals.css` → **EXIT 1, 6
+  failed** — `/sign-in` AND `/help` at all three widths, each naming its own selectors. Restored with
+  `git checkout --` from a commit made BEFORE the mutation (never from an uncommitted tree) and re-run
+  green: 19 passed, EXIT 0.*
+  *THE MUTATION FOUND A SITE NO SIZE INSTRUMENT COULD HAVE: `button.gn-help__tab` was rendering at
+  **16px in Arial**. `ui.css:1321` sets `font-size: 1rem` and no `font-family`, so its SIZE was already
+  correct and the defect was invisible to the 12px floor, to the size histogram, and to the raised-floor
+  enumeration that found the original 26. **This is the case for reading font-FAMILY rather than
+  asserting the `13.3333px` bucket is absent** — the bucket form would have passed here, and would pass
+  again the day a UA constant changes.*
+  *`font: inherit` is the SHORTHAND and carries `font-weight` and `line-height` too, so the row was
+  read for those and not just for size: `.gn-help__tab[aria-pressed='true']`'s deliberate
+  `font-weight: 600` SURVIVES (0,2,0 beats 0,0,1), measured 600/400 before and after. Boxes: help tabs
+  unchanged at 366x44; sign-in tabs 67x44 → 74x44 and 85x44 → 96x44 — wider, never shorter, because
+  `min-height: 2.75rem` holds the height. Tap-target offender counts are byte-identical before and
+  after on every signed-out route (10/16/16 on `/help`, 0 elsewhere), so no ratchet moved.*
+- **13.267** ✅ **The same guard on the signed-in surface, over the five stack routes.**
+  `apps/web/e2e-stack/viewport.spec.ts` asserts `uaFont` is empty on all five. **RUN after the rebuild
+  window opened: 1 passed, EXIT 0, zero font-family offenders and ZERO `13.3333px` readings anywhere on
+  the signed-in surface** — the 26 controls this ruling is about. —
+  (`apps/web/e2e-stack/viewport.spec.ts`)
+  *The container was confirmed to CARRY the fix before the zero was believed, because a 0 from an
+  unchanged image and a 0 from a fixed one print identically: the served stylesheet contains
+  `button{font:inherit}`, fetched over HTTP from the running container.*
+  *POSITIVE CONTROL ON THE NULL: all five routes printed a histogram, so the zero is a reading rather
+  than a sweep that never ran. That control earned itself twice in this task — an earlier attempt
+  addressed the test by LINE NUMBER (`viewport.spec.ts:220`), the line had moved, and playwright ran
+  **nothing** in 20ms while the greps for `13.3333` and for offenders both returned a clean-looking 0.
+  A second attempt died in `globalSetup` and printed the same reassuring zeros. **Neither zero meant
+  anything, and neither was distinguishable from success without the control.** Address a test by
+  TITLE, not by a line number that any edit above it invalidates.*
+  *SCOPE, MEASURED ON THIS SURFACE TOO: the board still reads `{12.48px: 26, 12.8px: 24, 13.6px: 6,
+  16px: 48}` — `.gn-board-card__provenance` unmoved at 12.48px x26. The element selector loses to every
+  class rule, which is the ruling's "and no further" as a measurement rather than a promise.*
+
+
+## The magic link lands on the app, not the API (owner-dispatched P1, 2026-09-08)
+
+*The owner signed in by hand on 2026-09-08 and the link dead-ended on a JSON 404.
+`apps/web/app/sign-in/page.tsx` handed better-auth a RELATIVE `callbackURL`, which the browser resolves
+at the moment the token is verified — and at that moment it is on the API origin, because that is where
+the emailed link points. Measured on the dev stack: `:3001/workspaces` → **200**, `:3000/workspaces` →
+**404**. Not a dev-stack artefact: `deploy/do/app.yaml` puts production on two sibling subdomains
+(`pm.artsourced.in`, `pm-api.artsourced.in`), the same split, so every magic-link sign-in in production
+ended on raw JSON at the API host — the first thing a new user would ever have seen.*
+
+*The dispatch named the magic link. **`signIn.social` had the identical shape** and is fixed in the same
+change; two call sites, one bug.*
+
+- **13.268** ✅ **An ABSOLUTE `callbackURL` on `WEB_ORIGIN` is accepted (200).** The value the shipped
+  page now sends. Requirement 1 said verify rather than assume: the behaviour was first read out of
+  better-auth's `origin-check.mjs` (`isTrustedOrigin(url, { allowRelativePaths: true })`) and then
+  measured, because reading is not measuring. — (`apps/server/test/auth/trusted-origins.test.ts`)
+  *Mutation: drop `trustedOrigins` from `createAuth` → the absolute callback is refused and the
+  client-side fix would trade a 404 for a 403 rather than working.*
+- **13.269** ✅ **An absolute `callbackURL` on an UNTRUSTED origin is refused `403
+  INVALID_CALLBACK_URL`.** — (`apps/server/test/auth/trusted-origins.test.ts`)
+  *The refusal side of 13.268, and not optional: **"the absolute URL is accepted" is equally true of a
+  server that validates nothing at all.** A bound asserted on one side of its line is the failure this
+  very file already records for `sign-in-flows.test.ts`.*
+- **13.270** ✅ **Following the magic link LANDS THE BROWSER ON THE WEB APP** — origin asserted, not
+  merely "the path no longer says /sign-in". — (`apps/web/e2e-stack/helpers/sign-in.ts`)
+  *RUN after the rebuild: every stack test that signs in goes through this assertion, and the three
+  that reached it passed (`smoke.spec.ts` x2, `viewport.spec.ts:66`). The container was confirmed to
+  carry the fix first — the served sign-in chunk contains `location.origin`, fetched over HTTP.*
+  *MUTATION RUN, and it needed no rebuild, which is the trick worth keeping: **the emitted link carries
+  `callbackURL` in its own query**, so rewriting it to the pre-fix relative value in the helper puts the
+  server in exactly the state it was in before the fix, from the test process. Result: **EXIT 1**, and
+  the assertion named the site — `after following the magic link the browser is on
+  http://localhost:3000/workspaces, not the web app at http://localhost:3001`, `Received:
+  "http://localhost:3000"`. Restored and re-run green.*
+  ***THE OLD ASSERTION WOULD HAVE PASSED THAT EXACT RUN.*** The mutated landing path is `/workspaces`,
+  which contains no `/sign-in`. So this is not merely "the new check fails when the code is broken" —
+  it is the direct demonstration that the check it replaced could not distinguish the defect from
+  success. Requirement 4 of the dispatch, satisfied against the property that mattered.*
+  *THE ASSERTION IT REPLACES IS A CHECK THAT COULD NOT FAIL, and it is why this defect reached the
+  owner's hands: `waitForURL((url) => !url.pathname.includes('/sign-in'))` **is satisfied by a JSON
+  404.** It asserted the user LEFT the sign-in page and never that they ARRIVED anywhere.*
+  *WHY NOTHING DOWNSTREAM NOTICED, which is the part worth carrying: on localhost the web and API
+  ports **share cookies**, so the session was genuinely set and every later test navigated explicitly
+  and passed. **The property that made the suite green is the same property that concealed the
+  defect** — which is exactly why the new assertion is on ORIGIN and not on "some page loaded".*
+  *⚠ A LOCALHOST GREEN DOES NOT PROVE THIS, stated in those words per the dispatch's requirement 3.
+  The dev stack is two PORTS on one host; production is two SUBDOMAINS. The test proves the browser
+  ends on `WEB` rather than `SERVER`, which is the defect's actual signature and does discriminate.
+  It does NOT exercise cross-subdomain cookie behaviour, and nothing in this repo can today.*
+- **13.271** ✅ **The page sends an ABSOLUTE `callbackURL`, for BOTH the magic link and Google.**
+  Pinned as the literal resolved URL rather than rebuilt from `window.location.origin`, which would
+  restate the implementation and pass for a relative value too. — (`apps/web/test/sign-in.test.tsx`)
+  *Mutation RUN: revert both call sites to `callbackURL: next` → **EXIT 1, 6 failed**, the magic-link
+  and Google cases naming the relative value. Restored from a commit made before the mutation.*
+- **13.272** ✅ **`?next=` is constrained to a same-site PATH, so it cannot steer the authenticated
+  callback off-site.** Four hostile shapes: protocol-relative `//evil.example`, absolute
+  `https://evil.example`, backslash-authority `/\evil.example`, and schemeless junk. —
+  (`apps/web/test/sign-in.test.tsx`)
+  *This guard is load-bearing BECAUSE of 13.271. A bare `next` was already reaching `router.push`,
+  where `//evil.example` navigates off-site; making the callback absolute would additionally have fed
+  `new URL()` an attacker's absolute URL, turning a client-side redirect into an authenticated one.
+  better-auth refuses to send a token there (13.269 proves it) — but a hole this file opens should not
+  be closed by a library's check.*
+  *⚠ AN ASSERTION THAT COULD NOT FAIL WAS FOUND INSIDE THIS CASE BY MUTATION, AND FIXED. The first
+  version asserted only the callback's ORIGIN. Removing the guard killed three of the four rows —
+  `not-a-path` stayed green, because `new URL('not-a-path', origin)` resolves SAME-ORIGIN. One row that
+  could not fail, hiding inside a set that could, and invisible while the suite was green. The
+  assertion now pins the whole resolved URL, and the re-run of the same mutation kills **4 of 4**.*
 
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)
 

@@ -233,9 +233,403 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
 >
 > **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
+# ▶ TUESDAY 2026-09-08 ~13:5x IST — **THREE THINGS I HAD NOT CHECKED, CHECKED. ONE IS A PRODUCTION LEAD BIGGER THAN THE TASK THAT FOUND IT.**
+
+*Branch `exec/123-signin-redirect`. Closes the mutation-witness gap on 13.270 and answers the "why does
+the web container post magic-link" question the previous entry left open.*
+
+## 1. THE P1 CONVERTS A BAD LANDING INTO A HARD OUTAGE IF THE ORIGINS DISAGREE — CHECKED, AND THEY DO NOT
+
+The old RELATIVE `callbackURL` **could not be refused**: `isTrustedOrigin(url, { allowRelativePaths:
+true })` waves relative paths through. The new absolute one **is validated**, and case 13.269 proves the
+server answers **403 `INVALID_CALLBACK_URL`** on an untrusted origin. So if `WEB_ORIGIN` and the
+browser's real origin ever differ by scheme, host, port, `www` or a trailing slash, the fix turns
+*lands on the wrong page* into ***cannot sign in at all***. I had verified the match only where the two
+are trivially equal.
+
+**Checked against `deploy/do/app.yaml`: `WEB_ORIGIN` is `https://pm.artsourced.in` (line 118-119) and
+the web app is served on `pm.artsourced.in` (`domains:` 268-269, ingress `exact: pm.artsourced.in`).
+Byte-for-byte, no trailing slash, no `www`.** Production is safe. Case 13.188 exists because a trailing
+slash alone was once enough to break this, so it was worth one grep.
+
+## 2. ⚠ WHY THE WEB CONTAINER MAKES AUTH REQUESTS — IT IS A PROXY, AND THIS IS A PRODUCTION LEAD
+
+The previous entry listed "why does `172.30.0.6` post magic-link" as not established. **It is
+`apps/web/next.config.ts:94`:**
+
+```
+{ source: '/api/auth/:path*', destination: `${serverOrigin}/api/auth/:path*` }
+```
+
+**Every browser's auth traffic is proxied through the Next server.** That is why all 69 auth requests
+carried the web container's address and why **every single 429 came from it** while the browser's own
+address never tripped anything.
+
+**Now the part that is not about the test suite.** Three facts, each verified:
+* the running server has **`NODE_ENV=production`**, and better-auth's limiter is demonstrably active
+  there (it produced the 429s);
+* `deploy/do/app.yaml` sets **`TRUST_PROXY=true`** with the comment *"without it every client in the
+  world shares one bucket"* — so **OUR** limiter is proxy-aware in production;
+* **better-auth's own limiter has no `trustedProxyHeaders` configuration at all** (grepped `auth.ts`
+  and `app.ts`: 0 matches).
+
+**So the precaution that was taken for our limiter was not taken for better-auth's, and better-auth's is
+the one actually firing.** If it keys on the socket address, every user's magic-link sends in production
+share one small bucket behind the proxy — a first-run sign-in defect, not a test-suite annoyance.
+
+**STATED AS A LEAD, NOT A FINDING, and here is the exact step I did NOT take:** I did not verify
+better-auth's own IP-derivation default, nor whether the Next rewrite and DO's ingress preserve an
+`X-Forwarded-For` that it would honour. **Do not repeat this as established.** It is one experiment away
+— two clients from different addresses, through the proxy, and see whether they share a budget.
+
+## 3. 13.270 WAS ✅ WITHOUT A MUTATION WITNESS — NOW WITNESSED
+
+The dispatch's requirement 4 said the new assertion must go red and name the site. I had marked 13.270
+green on three passing sign-ins, **which is the same evidence shape as the assertion it replaced** — and
+that one passed for weeks while the defect shipped.
+
+**Witnessed without a rebuild, which is the trick worth keeping: the emitted link carries `callbackURL`
+in its OWN query**, so rewriting it to the pre-fix relative value inside the helper reproduces the
+server's pre-fix state from the test process. **EXIT 1**, naming the site: *"the browser is on
+`http://localhost:3000/workspaces`, not the web app at `http://localhost:3001`"*. Restored, re-run
+green.
+
+**The load-bearing detail: the OLD assertion would have PASSED that same run** — the landing path is
+`/workspaces`, which contains no `/sign-in`. So this is not just "the check fails when the code is
+broken"; it is the direct demonstration that the check it replaced could not tell the defect from
+success.
+
+## ANCHORS
+
+Gate at `cb8e259`: **33/33 EXIT 0, `Cached: 0` (forced)**; all six project checks EXIT 0
+(`check-case-ids` via `node scripts/check-case-ids.mjs`). `exec/122-font-inherit` is **still frozen at
+`85b0eb8`** — verified by `git ls-remote`, not assumed — and PR #344 is OPEN/MERGEABLE against it.
+
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
+# ▶ TUESDAY 2026-09-08 ~13:2x IST — **ITEM B MEASURED. ITEM C'S ESCAPE HATCH FIRES: `RATE_LIMIT_AUTH_MAX` IS NOT THE BINDING CONSTRAINT AND MUST NOT BE RAISED.**
+
+*Branch `exec/123-signin-redirect`. **No code change — that is the deliverable.** The owner ruled
+"raise it" against a theory; the theory is dead, so the ruling does not survive it and the owner gets
+the facts instead.*
+
+## THE ANSWER, IN ONE LINE
+
+**The 429s are produced by better-auth's OWN built-in rate limiter, not by ours.** `RATE_LIMIT_AUTH_MAX`
+could be raised to any number and the stack suite would fail identically.
+
+## HOW THAT IS KNOWN — the response bodies are different, and they are decisive
+
+| limiter | 429 body | source |
+|---|---|---|
+| **ours** | `{"error":"rate_limited","retryAfterSeconds":N}` | `apps/server/src/app.ts:545` |
+| **better-auth's** | `{"message":"Too many requests. Please try again later."}` | `better-auth/dist/api/rate-limiter/index.mjs:65` |
+
+**The observed 429 is better-auth's, byte for byte.** Probed directly against the running stack:
+`POST /api/auth/sign-in/magic-link` answered `429 {"message":"Too many requests. Please try again
+later."}`. `apps/server/src/auth/auth.ts` contains **no `rateLimit` key at all** (grepped: 0 matches),
+so better-auth's limiter runs at ITS defaults — and its own module carries `max: 3` rules with 10s and
+60s windows. Nothing in `.env` reaches it.
+
+## THE MEASUREMENT ITEM B ASKED FOR — one run, attributable, with controls
+
+| reading | value |
+|---|---|
+| non-`OPTIONS` `/api/auth/*` in ONE full 5-test run | **20** |
+| **peak in any FIXED 60s window** | **16** |
+| peak in any SLIDING 60s window (conservative bound) | **20** |
+| `RATE_LIMIT_AUTH_MAX` in the running container (verified from its env, not the compose file) | **60** |
+| 429s in that run | **2** |
+| requests charged to the 429'd address in the preceding 60s | **9–12, never near 60** |
+
+**16 of 60, and 20 in the worst case. Comfortably under.** That is the escape hatch's own condition,
+met.
+
+**Attribution** is by a MARKED TIME BOUNDARY (an epoch-ms mark taken immediately before the run), not by
+a `docker logs --since` window — the previous attempt's three-minute window spanned two earlier runs,
+which is exactly why its bucketing was never established.
+
+**Instrument controls, all run before the measurement was believed:**
+* plant exactly 3 auth requests → counter reports **3**;
+* plant exactly 1 more → **4**, a rise of exactly one (the dispatch's requirement 3);
+* plant a NON-auth request → count **unchanged at 4** (negative control).
+
+## ⚠ TWO CORRECTIONS TO THINGS THIS PROJECT BELIEVED
+
+1. **The bucket is NOT keyed per email — and it is not one bucket either.** The controller's correction
+   (address, not email) was right and is confirmed. But two distinct addresses appear:
+   **`172.30.0.6` (the web container) and `192.168.65.1` (the browser via the Docker gateway)** — 69 and
+   51 requests respectively over the container's life. **Every single 429 came from `172.30.0.6`.** The
+   browser's own traffic never tripped anything.
+2. **I reported "0 × 429" for this run and that was WRONG.** It came from a `docker logs … | python3`
+   pipeline that silently produced **zero bytes** through the proxy — the same silent-empty mode this
+   repo already records for `git show` redirected to a file. The identical script run via
+   `subprocess.run(['docker','logs',…])` found the 2 × 429 immediately. **A zero from a proxied pipe is
+   not a reading.** Both scripts now print a parsed-line count as a positive control; the broken one
+   printed `parsed: 0` and I read past it once before catching it.
+
+## WHAT I DID NOT ESTABLISH — do not let the next reader inherit these as settled
+
+* **Why the WEB CONTAINER posts magic-link at all.** 69 auth requests from `172.30.0.6` is more than
+  `global-setup` alone should make, and I did not trace which code path issues them. It matters,
+  because that address is the one being limited.
+* **better-auth's exact default rule set.** I read `max: 3` and windows of 10 and 60 out of its bundle
+  and did NOT reconcile that against the observed 9–12. The conclusion does not depend on it — the body
+  identifies the limiter regardless — but the *number* is uncharacterised.
+* **Whether configuring better-auth's `rateLimit` is the right remedy.** It is the obvious next step and
+  it is a **security-control design decision on the auth path**, which is an owner call, not mine. Two
+  shapes exist (`rateLimit.enabled/window/max`, and `customRules` per path).
+
+## RECOMMENDATION — for the owner, not a change I have made
+
+**Do not raise `RATE_LIMIT_AUTH_MAX`.** It is not the constraint, and raising a ceiling that was never
+hit is a change that cannot be shown to work. If the goal is a stack suite that survives being run
+whole, the candidates are: configure better-auth's own `rateLimit` for the e2e profile; or reuse one
+session across tests instead of signing in five times. **Both are owner decisions about an auth-path
+security control.**
+
 > while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
+# ▶ TUESDAY 2026-09-08 ~12:5x IST — **P1: THE MAGIC LINK LANDED ON THE API'S 404, AND THE GUARD WAS SATISFIED BY IT. PLUS AN INCIDENT I CAUSED AND CLOSED.**
+
+*Branch `exec/122-font-inherit` (now carries item A **and** the P1), off `main` `3be4f01`. Owner-dispatched
+P1 from `gisik-nokma-lanes/CTL-DISPATCH-2026-09-08-signin-redirect.md`. Items B and C still NOT started.*
+
+## POSITION
+
+| | |
+|---|---|
+| **PR #344** | OPEN, base `main`. **The controller froze it at `85b0eb8` to review; I have NOT pushed to it since.** The P1 commits sit on the same branch locally and go up as a SEPARATE push once the controller says so — see the conflict note below. |
+| **gate** | **33/33 EXIT 0, `Cached: 0` (forced)**, Node v22.22.2, zero orphaned vitest workers |
+| **checks** | all six EXIT 0 (`check-case-ids` is `node scripts/check-case-ids.mjs`, NOT a pnpm script) |
+| **queue** | P1 done and witnessed. **Items B + C next.** |
+
+## ⚠ A SEQUENCING PROBLEM THE CONTROLLER AND I CREATED BETWEEN US — read before merging #344
+
+The controller froze #344 at `85b0eb8` for review, and separately told me one rebuild should witness
+BOTH the P1 guard and item A's amber case 13.267. Those two instructions pull opposite ways: **13.267
+lives in #344, and its flip to ✅ is therefore in the P1 commits, not in the frozen PR.** So #344, as
+frozen, still says 13.267 is 🟡 and unrun. That is not stale — it was true when written — but a reader
+merging #344 alone would inherit an amber case that is in fact green and witnessed. Both PRs are on one
+branch; merging #344 first and then the P1 resolves it in order. **Flagged rather than fixed, because
+fixing it means pushing to the PR I was told not to push to.**
+
+## THE P1 — mechanism, and the part that matters more than the fix
+
+`sign-in/page.tsx` handed better-auth a RELATIVE `callbackURL`. The browser resolves it when the token
+is verified, and at that moment it is on the **API origin**, because that is where the emailed link
+points. Measured: `:3001/workspaces` → **200**, `:3000/workspaces` → **404**. **Not a dev artefact** —
+`deploy/do/app.yaml` ships production as two sibling subdomains, the same split, so this was every new
+user's first screen.
+
+**The dispatch named the magic link. `signIn.social` had the identical shape** and is fixed in the same
+change. Two call sites, one bug; the report named one.
+
+**The e2e guard could not have failed.** Its only assertion was
+`waitForURL((url) => !url.pathname.includes('/sign-in'))` — **a JSON 404 satisfies that.** It asserted
+the user LEFT, never that they ARRIVED. Nothing downstream noticed because on localhost the two ports
+**share cookies**, so the session really was set and every later test navigated explicitly and passed.
+**The property that kept the suite green is the property that hid the defect.** It now asserts the
+landing ORIGIN.
+
+**A second hole opened by the first fix, and closed in the same change.** `?next=` is
+attacker-controllable and was already reaching `router.push`, where `//evil.example` navigates off-site.
+Making the callback absolute would have fed `new URL()` an attacker's absolute URL — a client-side
+redirect promoted to an authenticated one. `?next=` is now constrained to a same-site path.
+
+## WITNESSES — all run, none reasoned
+
+* **13.268 / 13.269** (server): an absolute callback on `WEB_ORIGIN` is **accepted 200**; on an
+  untrusted origin **refused 403 `INVALID_CALLBACK_URL`**. Requirement 1 said verify rather than assume;
+  the behaviour was read out of better-auth's `origin-check.mjs` and then measured, because reading is
+  not measuring. **Both sides**, since "the absolute URL is accepted" is equally true of a server that
+  validates nothing.
+* **13.271 / 13.272** (client): mutation RUN. Revert both call sites to relative → **EXIT 1, 6 failed**.
+  Remove the `?next=` guard → **4 failed**, each naming the URL it was steered to.
+* **13.270** (e2e): green after the rebuild — three signing-in tests reached it.
+* **13.267** (item A, signed-in): **1 passed, EXIT 0, zero `13.3333px` anywhere signed-in.**
+
+## ⚠ AN ASSERTION THAT COULD NOT FAIL, FOUND INSIDE MY OWN NEW TEST BY MUTATION
+
+13.272's first version asserted only the callback's **origin**. Removing the guard killed three of four
+rows — `not-a-path` stayed green, because `new URL('not-a-path', origin)` resolves **same-origin**. One
+row that could not fail, hiding inside a set that could, invisible while everything was green. The
+assertion now pins the whole resolved URL and the same mutation kills **4 of 4**. *The mutation is what
+found it; inspection had already passed over it twice.*
+
+## ⚠ THREE ZEROS THAT MEANT NOTHING, IN ONE TASK
+
+All three looked exactly like success:
+1. **`playwright … viewport.spec.ts:220`** — the line had MOVED (my own edit above it), playwright ran
+   **nothing** in 20ms, and the greps for `13.3333` and for offenders both printed a clean 0.
+   **Address a test by TITLE; a line number is invalidated by any edit above it.**
+2. **The next attempt died in `globalSetup`** and printed the same reassuring zeros.
+3. **A BLOCKED tool call runs NOTHING, including the parts before the offending pipe.** A `python3` edit
+   chained ahead of a `| head` test run never happened, and I went on to run tests against the
+   unmodified file and read the result as real. *Do not assume partial execution of a blocked command.*
+
+The fix for all three is the same and it is cheap: **every null prints a positive control from the same
+run.** The five per-route histograms are what turned the final zero into a reading.
+
+## ⚠ INCIDENT — I TOOK THE DEV STACK DOWN, AND CLOSED IT
+
+The web rebuild filled the **Docker VM** disk (host had 77Gi free; the VM did not). Postgres went into a
+crash-restart loop — `PANIC: could not write to file "pg_logical/replorigin_checkpoint.tmp": No space
+left on device`, first at 07:05:28Z — and the server exited 1 behind it.
+
+**Closed with the safe reclaim only, per the standing rule *BUILD CACHE ONLY — never images, never
+volumes, because the volumes hold the seeded world*:** `docker builder prune -f` freed **3.933GB**;
+postgres healthy in ~6s, server `healthz` 200 in ~6s. **Seeded world verified intact after the
+unclean shutdown, not assumed: 131 events, 2 users.**
+
+**Left for whoever needs it: images are 47.93GB with 44.19GB (92%) reclaimable.** I did NOT prune them —
+that is beyond a safe unilateral action and days of rebuilds are involved, not just mine. **This will
+recur on the next rebuild or two.** Owner/controller call.
+
+## ⚠ THE STACK SUITE STILL 429s WHEN RUN WHOLE — this is items B/C, unchanged
+
+Whole-suite run: **3 passed, 2 failed, and BOTH failures were `sign-in.ts:31` timeouts on "Check your
+inbox"** — the magic-link send got rate-limited. **Confirmed, not inferred: exactly 2 × `"statusCode":429`
+in the server log for that window, matching the 2 failures.** Neither red was an assertion of mine.
+Individually and spaced, they pass. **A whole-suite red here is not evidence about a code change.**
+
+## ITEMS B + C — still not started, and now UNBLOCKED
+
+The owner is off the stack and the rebuild window is open, so B's measurement can run. Carry forward
+from the previous entry, unchanged and still unsettled:
+* **Does the server log each request with method+path?** Settle BEFORE building the harness.
+* **B's positive control must plant one extra `/api/auth/*` request and show the count rise by exactly 1.**
+* **`makeFixedWindowLimiter` is a FIXED window** — up to `2 × max` across a boundary, so a value chosen
+  against one run's peak is not automatically safe for two back-to-back runs.
+* **C's escape hatch:** if one run's peak is comfortably under 60, **STOP, do not raise it, hand the
+  facts back.** The ruling was given against a theory and does not outlive it.
+* **New datum for B:** the two 429s above were produced by a 5-test suite in one window, which is
+  consistent with the shared-bucket theory but is NOT the measurement — it was not attributable to a
+  single clean run.
+
 >
+# ▶ TUESDAY 2026-09-08 ~12:1x IST — **ITEM A (`font: inherit`): THE COUNT WAS 26, IT IS 30, AND TWO OF THEM WERE INVISIBLE TO EVERY SIZE INSTRUMENT IN THE REPO.**
+
+*Branch `exec/122-font-inherit`, off `main` (`3be4f01`). Owner ruling
+`gisik-nokma-lanes/CTL-RULING-2026-09-08-owner-three.md` item A. PR 1 of 2; B+C are NOT started.*
+
+## POSITION
+
+| | |
+|---|---|
+| **branch** | `exec/122-font-inherit`, 2 commits (`6f1ab13` code, `d2f3a6e` docs), ahead 2 / behind 0 of `origin/main` `3be4f01` |
+| **gate** | **33/33 EXIT 0, `Cached: 0` (forced)**, Node v22.22.2, server 143 files / 1431 passed + 5 skipped, **zero orphaned vitest workers** |
+| **checks** | `check:citations` `check:tasks` `check:runbook` `check:help` `check:env` all EXIT 0; `node scripts/check-case-ids.mjs` EXIT 0 (1779 ids). **`check:citations` was RED first** — a ✅ case must be cited by a test; fixed by putting the ids in the assertions. |
+| **queue** | item A awaiting merge. **Items B+C NOT STARTED and currently BLOCKED — see below.** |
+
+## WHAT CHANGED
+
+One line: `button { font: inherit; }` in `apps/web/app/globals.css`, an ELEMENT selector. Plus the
+guard, plus docs. **Why an element selector and not a list of 26:** the 26 are RENDERED INSTANCES on
+five routes, not 26 code sites — a handful of JSX sites render N rows each — so "change exactly those
+26" is not expressible in source. At 0,0,1 it also enforces the ruling's "and no further": every class
+rule still wins, measured (`.gn-board-card__provenance` stays 12.48px x26, every other bucket unmoved).
+
+## THE FINDING — carry this one, it generalises
+
+**`button.gn-help__tab` was rendering at 16px in ARIAL.** `ui.css:1321` sets `font-size: 1rem` and no
+`font-family`. **Its SIZE was already correct**, so the 12px floor, the size histogram, and the
+raised-floor-to-16px enumeration that produced the original 26 were ALL structurally incapable of
+seeing it — you cannot surface a 16px reading by raising a floor to 16px.
+
+It was found by the MUTATION, not by the fix: deleting the rule reddened the new guard on `/help` as
+well as `/sign-in`. **This is the entire argument for reading font-FAMILY instead of asserting the
+`13.3333px` bucket is absent.** The bucket form is one line, looks equivalent, passes straight over
+`/help`, and would pass again the day a UA constant changes. *A check keyed to the symptom of one
+browser version is not a check on the property.*
+
+## COUNT: 26 → 30, AND 30 IS A FLOOR
+
+| surface | site | before | why the original enumeration missed it |
+|---|---|---|---|
+| signed-in ×5 routes | 22 `button` + 2 `.ticket-type-list__new` + 2 `.workflow-list__new` | 13.3333px | — (the owner's 26) |
+| `/sign-in` ×3 widths | 2 `<button role="tab">` in `.gn-view-tabs` | 13.3333px | the raised-floor run was **signed-in only** |
+| `/help` ×3 widths | 2 `button.gn-help__tab` | **16px Arial** | **no size instrument could see it** |
+
+**Ten of nineteen routes are swept by NEITHER suite** (`/`, `/inbox`, `/invite/[token]`,
+`/mcp/authorize`, `/mcp/tokens`, `/workspaces`, ticket-type new/[typeId], workflow new/[workflowId]).
+Unstyled controls there are corrected by the same rule and are **not measurable by either instrument**.
+Enumerating the absence rather than calling it partial: 26 + 2 + 2 measured, an unmeasured tail.
+
+**The owner ratified 28 on the /sign-in measurement, BEFORE /help was known.** The extra 2 are the same
+defect class and arrived from the mutation afterwards. Flagged to the controller; not re-ratified.
+
+## WHAT WAS MEASURED, AND THE INSTRUMENT THAT LIED FIRST
+
+* **Signed-out, before → after:** `/sign-in` `{13.3333px:2, 16px:3}` → `{16px:5}` at 390 AND 768 AND
+  1512. `/help` 341 examined, all 16px, two of them Arial before and none after. Zero `13.3333` in the
+  whole log after. **19 passed, EXIT 0.**
+* **Mutation RUN:** delete the rule → **EXIT 1, 6 failed**, naming its own selectors on both routes.
+  Restored with `git checkout --` **from a commit made before the mutation** (memory #16 — the same
+  trap destroyed 16 citations once and recurred with the memory loaded), re-run green.
+* **Tap targets: byte-identical before and after** on every signed-out route (10/16/16 on `/help`, 0
+  elsewhere). No ratchet moved. Heights held by `min-height: 2.75rem`; boxes grew WIDER only
+  (67x44→74x44, 85x44→96x44), help tabs unchanged 366x44.
+* **`font: inherit` is the SHORTHAND** — weight and line-height ride along, and a size histogram cannot
+  show either. Read explicitly: `.gn-help__tab[aria-pressed='true']`'s deliberate `font-weight: 600`
+  SURVIVES (0,2,0 beats 0,0,1), measured 600/400 before and after.
+* **⚠ MY OWN BEFORE-INSTRUMENT WAS WRONG FIRST AND I CAUGHT IT BY READING IT.** The screenshot "before"
+  is reconstructed by injecting the UA font rather than editing the stylesheet. The first version used
+  `!important`, which beat the CLASS rules too and reported all five sign-in buttons at 13.3333px —
+  over-reporting the defect. Without `!important` it reproduces the independently-measured histogram
+  exactly (2 at 13.3333px, 3 at 16px). **A reconstruction that disagrees with the real measurement is
+  the instrument failing, not the finding growing.**
+
+## ⚠ WHAT IS NOT VERIFIED — do not report these as done
+
+1. **THE 26 CONTROLS THE RULING IS ACTUALLY ABOUT ARE FIXED BUT UNWITNESSED.** The signed-in guard
+   (13.267) is **written and unrun**, marked 🟡 for exactly that reason. It measures the compose web
+   container, which must be rebuilt to carry the new stylesheet, and **the controller instructed that
+   the dev containers not be rebuilt or restarted — the OWNER is using them by hand right now.**
+   Flip 13.267 to ✅ only on a green run after the rebuild window. **Do not flip it on the strength of
+   the signed-out result**; different surface, different routes.
+2. **Case ids 13.266–13.267 are PROVISIONAL.** §13 requires controller block allocation ON REQUEST and
+   says never to mint from the maximum. I asked; the controller was mid-incident on a production
+   sign-in-redirect bug. These are the recounted next-free (max in use 13.265, both free repo-wide).
+   **Recount trap: `grep -oE '13\.[0-9]+'` matches `13.3333px` and reports a maximum of `13.3333` —
+   the id pattern collides with the pixel value this task is about.**
+3. **The unswept tail is unquantified.** I know WHICH routes are unswept; I have not counted the
+   controls on them. "30 is a floor" is honest; "30 + N" would not be.
+4. **The visual pass covered the signed-out surface only** — `/sign-in` and `/help` at 390px, read for
+   wrap/clip/collision and for weight, and routed through `ui-ux-pro-max` (its `Readable Font Size`
+   rule is High severity, minimum 16px on mobile: the change moves these controls from VIOLATING it to
+   satisfying it, and `Font Size Scale` — no arbitrary sizes — is the second). The signed-in 26 have
+   not been looked at, same blocker as (1).
+
+## ⛔ ITEMS B + C ARE BLOCKED, BY INSTRUCTION, NOT BY DIFFICULTY
+
+The controller: the **owner is signing in through the dev stack by hand**, and those sign-ins hit
+`/api/auth/*` from the same host, so they land in the **same `auth:<clientKey>` bucket** B has to
+count. Measuring now reproduces the exact defect that made the previous count unusable (a window that
+spanned other traffic). **Do not start B until the controller says the machine is clear.**
+
+Two things to settle BEFORE building B's harness, so the expensive order is not discovered late:
+* **Does the server log each request with method+path?** If not, the counter needs another source
+  (instrument the limiter, or the access log) and finding that out after building the harness is the
+  costly sequence.
+* **B's positive control must plant one extra `/api/auth/*` request and show the count rise by exactly
+  1.** An instrument that has only ever printed the expected number has certified nothing.
+* **`makeFixedWindowLimiter` is a FIXED window** (its own docblock): a caller can spend `max` at the end
+  of one window and `max` again at the start of the next, so up to `2 × max` across a boundary. A value
+  chosen against one run's peak is not automatically safe for two back-to-back runs.
+* **C's escape hatch is load-bearing and the controller restated it:** if one run's peak is comfortably
+  under 60, the ceiling was never binding — **STOP, do not raise it, hand the facts back.**
+
+## ANCHORS — verify, do not adopt
+
+`exec/122-font-inherit` off `main` `3be4f01`; commits `6f1ab13` (code) and `d2f3a6e` (docs). Verify
+with `git branch --contains` — empty output means orphaned; `git cat-file` passes on reflog-only
+commits and will hand you pre-rebase content while looking like it worked.
+
+**After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.** Not
+boilerplate: that trap fired on `exec/117` on 2026-09-08, reachability passed while 23 lines were
+missing, and per-file checksums missed it because they skipped the narrative files. Note the refined
+form too — a branch merely BEHIND main is byte-for-byte indistinguishable from main having LOST work,
+so a non-empty result is a partition to attribute, never a verdict to report.
+
 # ▶ TUESDAY 2026-09-08 ~11:3x IST — **THE WIDENED SWEEP: THE PRIOR PASS HAD THREE ENUMERATION HOLES, NOT ONE, AND THE #287 CLOSURE ITSELF BROKE A NEXT-FREE POINTER.**
 
 *Branch `exec/121-widened-staleness-sweep`, off `main` (`5191cf4`). Closes items 1-2 of the previous
