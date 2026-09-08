@@ -1,5 +1,9 @@
 # Cross-lane controller — live state
 
+## ▶ WEDNESDAY ~02:0x IST — **OWNER: "yes. yes. yes. and do the restart yourself."** Neo for the whole product (incl. restyling sign-in and workspaces) · the second audit runs NOW · the owner exports the interactive prototype files. **Second audit DISPATCHED** (`CTL-DISPATCH-2026-09-09-second-audit-neo.md`, read-only, docs-only, opus/high; Part A from the session's feature list, Part B when `design-system/` gains the two `.dc.html` files). Task 12 and the neo restyle remain HELD until the fresh controller writes the plan amendment from Part B's numbers. **This controller respawns its own window (`tmux respawn-window -k -t gisik:0`, executed by the tmux server) at ~78% context.** `main` is `d4fca18` + this anchor; zero open PRs.
+
+**Fresh controller, in order:** read the entry below this one (the design-session read and the assessment), then #378's; re-arm the two Monitors; re-measure the six checks at the sha you report; wait for the audit PR (merge it in the fixed order — docs-only, no gate owed); check `git log -- design-system/` for the owner's export (Part B's precondition); then write the plan amendment ("neo tokens + shared pieces + restyle of the two done screens", before Task 12) and dispatch it. Older owner items still open are listed in the entry below. Executor: `gisik-nokma-exec-85`, ctx ~22%, restart it at the audit PR's merge as usual.
+
 ## ⏹ WEDNESDAY ~01:5x IST — **OWNER DIRECTION: "I want to make the platform in the neomorphism style."** The controller's context is at ~77% and it anchors here for its own restart. `main` is `03180df` + this anchor; zero open PRs; executor holding (Task 12 NOT started; the fabricated-release incident is closed, #378). **The Task 4 owner look was never given — the owner moved to the design direction instead.**
 
 ### What the owner pointed at, read tonight (browser; DesignSync cannot reach it)
