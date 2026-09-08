@@ -905,9 +905,19 @@ shipped sign-in via passkey with **no way to register one** — the only `addPas
 
 **Spec:** `@better-auth/passkey` 1.7.2 client, methods confirmed in the installed package:
 `addPasskey`, `listUserPasskeys`, `deletePasskey`, `updatePasskey`; server plugin already wired with
-`rpID = new URL(baseUrl).hostname` and `rpName: 'Gisik Nokma'` (`auth.ts:295-297`). Task 2b already
-moved sign-in to conditional UI (`autoFill`), which shows a passkey only when one exists — so this task
-is what makes that option ever appear.
+`rpID = new URL(baseUrl).hostname` and `rpName: 'Gisik Nokma'` (`auth.ts:295-297`). **CORRECTED 2026-09-08 ~20:2x (controller), after #369:** Task 2b did NOT ship conditional UI. Its review
+demonstrated that `signIn.passkey({ autoFill: true })` issues `GET /passkey/generate-authenticate-options` as its
+first statement, charged to the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX`, 10/60s in production) — ten anonymous
+page views then a real `POST /sign-in/magic-link` answered 429 (control at zero probes: 500, not 429) — so the request
+was removed. **Passkey sign-in has NO entry point on `/sign-in` today: no button, no autofill offer**; the
+`autocomplete="username webauthn"` token is present and inert. **This task restores the sign-in entry point
+TOGETHER with registration**, under one constraint: **an anonymous `/sign-in` page load must charge the shared auth
+bucket zero times.** Two doors, the implementer measures before choosing: (a) fire the conditional-mediation request
+only on user intent (focus/interaction on the email field), never on mount; (b) take the passkey options endpoint
+out of the shared `auth:` bucket into its own — a security-control change that goes to the owner first. Least
+certain, carried from #369's review and NOT settled: whether DigitalOcean's ingress collapses every browser into
+one client key the way the compose web container measurably does (`rate-limit.ts` records the collapse). It does not
+change the constraint — it is the difference between one user self-429ing and every user sharing the budget.
 
 **Files:**
 - Create: `apps/web/app/account/page.tsx` — a signed-in account page whose first (and for now only)
@@ -918,9 +928,15 @@ is what makes that option ever appear.
   like its siblings under `packages/app-core/src/`.
 - Modify: `apps/web/src/app-nav.tsx` (one link), `Features.md` (locate by path per Global Constraints —
   there is no account bullet yet; add beside the sign-in bullet), `test-cases/13-deployment-dogfooding.md`.
+- Modify: `docs/manual.md` (`:17`, `:74`) and `docs/faq.md` (`:28`, `:32`) — both still tell a user to "Sign in
+  with a passkey", which #369 made false on the shipped screen (the in-app Help renders exactly that line today).
+  Make them true again in the same change set as the entry point, regenerate `packages/app-core/src/help/
+  content.generated.ts` via `scripts/help-content.mjs`, `check:help` raw-green. Shipped copy: the owner's copy rule
+  applies — restore the original wording rather than inventing new prose.
 
 **Case ids:** `13.327`–`13.332` (a new block, allocated 2026-09-08; the plan's original block ends at
-`13.320` and Task 2b holds `13.321`–`13.326`). Move the header pointer to `13.333`.
+`13.320` and Task 2b holds `13.321`–`13.326`). **`13.333` is allocated to this task too** (the rate-limit property
+below; controller, 2026-09-08 ~20:2x). Move the header pointer to `13.334`.
 
 **Behaviour, each pinned by a case:**
 - **13.327** — the Passkeys section lists the signed-in user's passkeys via `listUserPasskeys`, and an
@@ -943,6 +959,12 @@ is what makes that option ever appear.
   delete control carries `aria-label="Delete passkey {name}"`.
 - **13.332** — signed-out `/account` renders `ExpiredSessionNotice` / the sign-in redirect, never a
   blank page — the same treatment as every other signed-in route.
+- **13.333** — **an anonymous `/sign-in` page load charges the shared auth bucket ZERO times.** Measured
+  through the assembled app (the shape #369's review used): N anonymous loads of `/sign-in`, then one real
+  `POST /sign-in/magic-link` from the same client key — it must NOT answer 429, and the server log must show no
+  `generate-authenticate-options` request until the user acts. Mutation: fire the request on mount → RED. This is
+  the property whose absence made 2b's first conditional-UI attempt a Critical; it is written here so the entry
+  point cannot come back without it.
 
 **Not in scope:** rename/edit of a passkey (`updatePasskey` exists; leave it unwired and say so in the
 catalogue), and any cross-device / QR flow.

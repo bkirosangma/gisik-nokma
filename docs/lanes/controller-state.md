@@ -1,5 +1,96 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY ~20:2x IST — **2b ITEM 2 MERGED (#369 → `5b4f8fc`), FORCED GATE GREEN, EXECUTOR RESTARTED AT THE FIXED POINT, STACK VERIFIED BY CONTENT. `main` is `5b4f8fc` + this anchor. HOLD: the owner looks at `http://localhost:3001/sign-in` before anything after 2b starts.** Zero open PRs.
+
+### The merge, in the fixed order — every number re-measured at the sha it names
+
+- **#369 head FROZEN at `28f942c` by the executor's own line** (local == remote, tree clean, forced gate there
+  33/33 `Cached: 0` node 22) — I had committed not to merge before that line (the #346 shape), which closed
+  the squash-drop window from my side. Re-fetched the head immediately before merging: still `28f942c`.
+  `baseRefName` `main`, MERGEABLE. **Merged (CI waived, owner 15:20)**; `MERGE_EXIT=0`; API: state MERGED,
+  merge `5b4f8fc`, `main` `5b4f8fc`; reachability EXIT 0; **trees of `28f942c` and `5b4f8fc` IDENTICAL.**
+- **Drop check, partitioned, literal paths** (23 files from `gh pr diff --name-only`, never memory): **0 bytes,
+  exit 0, empty stderr; positive control through the SAME path-filtered pipeline (`62dbaff`→`28f942c`)
+  160,956 bytes.** Unfiltered `git diff --name-only origin/main 28f942c`: **0 files** — the branch had merged
+  `62dbaff` and `main` had not moved, so nothing needed attributing.
+- **Six checks at `5b4f8fc`, raw exit 0 each:** `check:env` · `check:tasks` (193/199, 6 todo, 0 in-flight)
+  · `check:runbook` (19/16 — the minting script's runbook lines) · `check:citations` · `check:help` ·
+  `check-case-ids` (**1,812 ids**). Zero `Unsupported engine`.
+- **Forced gate at `5b4f8fc`** through `docs/lanes/gate-lock/locked-test.sh` + my `gate-full.sh` (install →
+  rebuild → `--force --concurrency=1`), lock pid 14926 acquired at once, pools drained: `INSTALL_EXIT=0` ·
+  `REBUILD_EXIT=0` · **`EXIT=0` · `Tasks: 33 successful, 33 total` · `Cached: 0 cached, 33 total` · 1m52s ·
+  node `v22.22.2` · `Unsupported engine` 0 · `CHECK_ENV_EXIT=0` · no orphaned workers.** Totals summed from
+  each package's own lines: **3,975 passed | 5 skipped (3,980) / 321 files** (domain 464/27 · ui 98/4 ·
+  rule-engine 282/12 · mcp-server 43/8 · editor 178/15 · sync-client 90/8 · app-core 1152/74 · server
+  1472|5/144 · web 161/21 · mobile 27/5 · desktop 8/3) — **= the executor's per-suite figures exactly.**
+- **Executor RESTARTED at the fixed point** (PR merged, tree clean, 0 unpushed, idle at "done 8:10 PM", its
+  final report read from the pane BEFORE the window died): `tmux kill-window` + `new-window` running a launcher
+  that passes the brief **plus a one-file override** (`gisik-nokma-lanes/override-hold-after-369.md`: #369 is
+  MERGED as `5b4f8fc`, queue EMPTY, HOLD, Task 12 not to be started) as one double-quoted argument — because
+  `main`'s handoff POSITION still reads "its PR is the next action", one step stale. Fresh session up, ctx 9%.
+
+### The stack the owner will look at — NOT rebuilt by me; verified by content, and here is why
+
+The executor rebuilt both dev images at 20:04–20:05 IST from `a0d2efb` (its fix-round head); `a0d2efb`→`28f942c`
+is **docs-only** (Features.md 1 line, executor-state, checklist), and `28f942c`'s tree == `5b4f8fc`'s, so the
+running images carry `main`'s source. **Verified control-first, not assumed:** web build (`/app/apps/web/.next`)
+— control `Check your inbox` 2 files, `auth/methods` 1, `google-mark.svg` 2, `username webauthn` 2,
+`Continue with Google` 5; live `GET :3000/v1/auth/methods` → 200 `{"google":false,"apple":false}` (a route that
+exists ONLY in #369, so the server side is this PR's code); `/google-mark.svg` → 200. A grep of the server
+image failed its own control (`/v1/me/work` → 0) and is **not cited**. All five services up; the seeded world
+intact after the executor's disk-full episode (**131 events, 2 users, 26 tickets** = the recorded baseline).
+**I did not rebuild because the Docker VM is at 83% (9.4 GB free) and the executor's rebuild filled it once
+today** — Postgres crash-looped, `server` exited 1, recovered by a build-cache-only prune. 36 GB of the 39.8 GB of
+images are the owner's other projects: `-a` territory, not ours. Owner should know before the next rebuild.
+
+### Two instrument failures of mine this merge, both caught
+
+1. **A claim I sent the executor was FALSE, and it caught it.** I told it Features.md "differs from `main` only by
+   the two restored `globals.css` lines" — I had read a `2 2` numstat as content and truncated the diff lines at
+   260 characters; the item-2 extension of the sign-in bullet (and six new paths) sat past the cut. **A count
+   read as content, plus a truncated read.** Retracted with the mechanism named; the other claim (3.84's catalogue
+   line unchanged — the amendment had landed only in a test docblock) was right and it fixed it (`f5901e6`).
+2. **Two dead greps that looked like findings:** `psql -U gisik` with no `-d` reported *"database gisik does not
+   exist"* (the DB is `gisik_nokma`; the container's own healthcheck trips the same benign FATAL), and busybox
+   `grep --include` inside the web container returned 0 for the CONTROL too. Neither was cited; both are here
+   so the next reader does not rediscover them.
+   Also: my pane-idle watch fired twice on a scrolled TUI (the spinner scrolls off; "Jump to bottom" is the
+   tell) and once on my own queued text containing "frozen" — fixed to match only the executor's `⏺` lines and
+   to treat a scrolled view or a queued message as running.
+
+### What #369 found, kept because each generalises (its body has the full account)
+
+- **The review's Critical reversed item 2(d), and I accepted it on the measurement:** the conditional-mediation
+  request fires on every anonymous page view and is charged to the shared `auth:` bucket — ten views, then a
+  real magic-link POST got 429 (zero-probe control: 500). *A request that spends a shared sign-in budget on a
+  flow with zero possible successes is the same defect the dead button was, one layer down.* **Passkey sign-in
+  now has NO entry point** — said in Features.md and the checklist in those words. **Task 12's plan text
+  corrected in this PR** (it claimed 2b shipped conditional UI): the entry point returns WITH registration under
+  the constraint *an anonymous `/sign-in` load charges the bucket zero times*, case **13.333** allocated for it,
+  header pointer → `13.334`, and the least-certain limb carried: whether DO's ingress collapses the client key
+  as the compose web container does (unsettled; the constraint holds either way).
+- **`APPLE_APP_BUNDLE_IDENTIFIER` set alone would have broken every Apple WEB sign-in** — better-auth has one
+  id-token audience per provider (`audience ?? appBundleIdentifier ?? clientId`); now ships
+  `audience: [servicesId, bundleId]`, mutation-witnessed. Owner: leave that variable unset until the native app
+  ships Sign in with Apple.
+- **#366's squash dropped `a730768`** (third recurrence today) — restored in #369, proven with the no-path-filter
+  diff against a control that did land. My predecessor's drop check ran against the head it had fetched; the push
+  came after. The frozen-head protocol above is the answer, and it held on this merge.
+- **A review agent's probe file was swept into `4247c30` by `git add -A`** — I measured it in the numstat and told
+  the executor; confirmed absent from `git diff --name-only origin/main HEAD` at the frozen head.
+- **The in-app Help still says "Sign in with a passkey"** (`docs/manual.md:74`, `:17`; `docs/faq.md:28`, `:32`; the
+  rendered `help.html` carries the line) — true yesterday, false on the shipped screen now. **Owner: Task 12**
+  (in its Files list now), and it is shipped copy, so the owner's copy rule applies if anyone wants it sooner.
+
+### Next — HOLD, then the fixed order
+
+1. **The owner looks** at `http://localhost:3001/sign-in` (dev stack, all five services up). What is there:
+   Phone / Email link segmented control, centred; **no** Google (until `GOOGLE_CLIENT_ID`/`_SECRET` are set in the
+   dev stack's env — `CTL-NOTE-2026-09-08-credentials.md`), **no** Apple (env-gated; cannot be tested on
+   localhost), **no** passkey (no entry point until Task 12). Back control on `/privacy` and `/terms`.
+2. Their feedback → a 2c round if any, else **Task 12** (opus; the amended text), then 3a onward, one at a time.
+3. Executor is fresh and holding; restart it again at the next merge. Google credentials remain the owner's.
+
 ## ▶ TUESDAY ~19:3x IST — FRESH CONTROLLER (Fable 5.1, owner-set) LIVE AT `371c437`. Six checks re-measured raw-green there; Actions still billing-blocked (annotation read, waiver stands); executor mid-Task-2b item 2 on `exec/135-signin-auth-methods` (unpushed, ctx ~32%); **the 13.292 collision its handoff flagged is RULED and it has acted on the ruling.** Zero open PRs.
 
 ### Re-measured at `371c437`, not carried
