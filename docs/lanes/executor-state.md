@@ -230,6 +230,62 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~15:1x IST — **THE STACK SUITE PASSES WHOLE. THE B/C LOOP IS CLOSED, AND `RATE_LIMIT_AUTH_MAX` WAS NEVER TOUCHED.**
+
+*Branch `exec/126-stack-suite-green`, off `main` `111d812` (after #347 merged). Docs-only. This entry
+exists because THIS FILE SAYS THE OPPOSITE in two earlier places, and a restart surface that carries a
+stale "known flaky" is how a fixed thing gets worked around forever.*
+
+## THE MEASUREMENT
+
+Full `pnpm test:e2e:stack` at merged `main`, against the rebuilt stack:
+
+| | before (this morning, repeatedly) | now |
+|---|---|---|
+| result | **3 passed / 2 failed** | **5 passed, EXIT 0** |
+| duration | 37.6s | **12.4s** |
+| 429 responses in the run | 2 | **0** |
+
+**Positive controls on that zero**, because "no 429s" is exactly the shape a broken log read produces:
+the same run reports **859 log lines** parsed and **413 completed requests** seen. The counting is via
+`subprocess.run(['docker','logs',…])`, never a shell pipe — the proxied-pipe silent-empty mode has
+fired three times today and produced a clean-looking 0 every time.
+
+**Both failures were always the same thing:** `sign-in.ts` timing out on "Check your inbox" because the
+magic-link POST was refused. They were better-auth's 429s, at 5 shared sends per 60s across every
+client. With its limiter disabled and ours (60/60s per address in dev) the only authority, seven
+sign-ins in a run is nowhere near the ceiling.
+
+## WHAT THIS CORRECTS IN THIS FILE
+
+Two earlier entries state the suite is unreliable when run whole and tell the reader to run routes
+individually, spaced:
+
+* *"THE STACK SUITE NOW TRIPS THE AUTH RATE LIMIT WHEN RUN WHOLE — pre-existing, and both this PR and
+  #328 add pressure"*
+* *"⚠ THE STACK SUITE STILL 429s WHEN RUN WHOLE — this is items B/C, unchanged"*
+
+**Both were true when written and are now false.** Per this file's correct-by-later-entry convention
+they are not rewritten — but note the failure mode that convention has: a reader landing on the older
+paragraph sees a live warning and has no reason to doubt it. That is the same shape as
+`controller-state.md:694` and the `#287` staleness sweep. **If you are about to space out stack runs to
+dodge 429s: don't. Run it whole.**
+
+## THE SHAPE OF THE WHOLE B/C EPISODE, worth one paragraph
+
+The owner ruled "raise `RATE_LIMIT_AUTH_MAX`" against the theory that five browser sign-ins exhaust a
+60-request budget. **The ceiling was never the constraint** — one run peaks at 16 of 60 — so the escape
+hatch fired and the number was never raised. The real cause was a *different limiter*, sharing one
+bucket across every client because it could not resolve an IP. **The ruling that would have "fixed" the
+symptom would have changed a security control that was not involved, and the suite would have gone on
+failing.** The escape hatch is the only reason that did not happen.
+
+## STATE
+
+`main` `111d812`. Content-verified after the squash: `rateLimit: { enabled: false }` present, cases
+13.273/13.274 present, **`.env.example` still `RATE_LIMIT_AUTH_MAX=10`** — untouched, as ruled.
+Block `13.266`–`13.275`: `13.275` is the only id left.
+
 > 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
 # ▶ TUESDAY 2026-09-08 ~14:5x IST — **ONE LIMITER ON `/api/auth/*`, AND IT IS OURS. THE FIRST VERSION OF THE GUARD PASSED 59/59 AGAINST ITS OWN DEFECT.**
 
