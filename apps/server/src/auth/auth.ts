@@ -6,6 +6,12 @@ import type { Pool } from 'pg';
 import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
 import { normalizeOrigin } from '../http/http-origin.js';
+import {
+  readSocialProviderEnv,
+  socialProvidersFromEnv,
+  type SocialProviderConfig,
+  type SocialProviderName,
+} from './social-providers.js';
 
 /**
  * The web origin, as better-auth may safely be told it. Normalised the same way
@@ -35,6 +41,24 @@ export interface AuthDeps {
    * trust it, and the failure is a 403 on every sign-in rather than a warning.
    */
   webOrigin: string;
+  /**
+   * The social providers that are FULLY configured — a key only for a provider
+   * with BOTH an id and a secret (`socialProvidersFromEnv`).
+   *
+   * OPTIONAL, and that is a deliberate departure from `webOrigin` beside it,
+   * which Plan 11 made required across fifteen call sites. The argument there
+   * was that a default would let a misconfiguration pass silently. It does not
+   * apply here, because the drift this field exists to prevent is closed
+   * somewhere else entirely: `GET /v1/auth/methods` reads
+   * `auth.options.socialProviders` back off the CONSTRUCTED INSTANCE, not off
+   * any caller's copy. Whatever ends up here — passed in, or the env default —
+   * is what the page is told, unconditionally. Requiring it would have bought
+   * ten test-file edits and no property.
+   *
+   * A test that wants a provider ON passes one; everything else gets the
+   * environment, which is what every caller was doing inline before.
+   */
+  socialProviders?: Partial<Record<SocialProviderName, SocialProviderConfig>>;
 }
 
 /**
@@ -53,10 +77,15 @@ export interface AuthDeps {
  * reads the code it needs from a log implementation and production swaps the
  * transport without touching this wiring.
  *
- * Google credentials are read from the environment here rather than threaded
- * through `AuthDeps` because they are provider registration, not a collaborator
- * this function's behaviour depends on — and an absent pair leaves the provider
- * configured-but-unusable rather than failing server start.
+ * Social providers are now THREADED THROUGH `AuthDeps`, and the paragraph that
+ * used to sit here argued the opposite — that they were "provider registration,
+ * not a collaborator this function's behaviour depends on", read straight from
+ * `process.env`. That reasoning had a consequence it did not mention: nothing
+ * outside this function could then tell which providers were live, so the
+ * sign-in page guessed, and it guessed wrong on the dev stack. The sentence it
+ * ended on — *"an absent pair leaves the provider configured-but-unusable"* —
+ * described the defect accurately and treated it as acceptable. It is not: a
+ * provider that is configured-but-unusable is a button that cannot work.
  */
 export function createAuth(deps: AuthDeps) {
   return betterAuth({
@@ -271,12 +300,26 @@ export function createAuth(deps: AuthDeps) {
         generateId: () => newUlid(),
       },
     },
-    socialProviders: {
-      google: {
-        clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
-        clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
-      },
-    },
+    /**
+     * ONE key per FULLY configured provider, and nothing for the others.
+     *
+     * This used to be a literal with `google` always present and `?? ''` for
+     * both values. `.env.example` has said `empty disables` beside
+     * `GOOGLE_CLIENT_ID` since Plan 4 and it was true only because better-auth
+     * treats `''` as absent internally — the key was still in the config, so
+     * nothing OUR code could read said the provider was off, and `/sign-in`
+     * rendered `Continue with Google` on a dev stack where it could not work.
+     * The owner found that by clicking it.
+     *
+     * Whatever lands here — passed in, or the environment default — is what
+     * `GET /v1/auth/methods` reports, because that route reads
+     * `auth.options.socialProviders` off the CONSTRUCTED instance rather than
+     * off any caller's copy. An earlier version of this comment said `app.ts`
+     * "also reads back" a providers object; it does not have one. The
+     * distinction matters: a config handed to two places can be handed
+     * differently to each, and a config read off the instance cannot.
+     */
+    socialProviders: deps.socialProviders ?? socialProvidersFromEnv(readSocialProviderEnv()),
     plugins: [
       phoneNumber({
         sendOTP: async ({ phoneNumber: phone, code }) => {

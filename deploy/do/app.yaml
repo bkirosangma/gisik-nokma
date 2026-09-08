@@ -123,6 +123,42 @@ services:
         type: SECRET
       - key: SMTP_URL
         type: SECRET
+      # Social sign-in. Every one of these is declared with NO value: the owner
+      # sets them in the DigitalOcean control panel, never in this file, and a
+      # SECRET-typed key with no value here is how the app spec asks for one
+      # without carrying it. Both providers ship INERT — `social-providers.ts`
+      # omits a provider unless BOTH halves of its pair are non-empty, and
+      # `GET /v1/auth/methods` answers from that same object, so an unset pair
+      # renders no button rather than a button that fails at the server.
+      #
+      # Google's redirect URI must be registered as
+      # `https://pm-api.artsourced.in/api/auth/callback/google` — the API host,
+      # which is this component, not the web one.
+      - key: GOOGLE_CLIENT_ID
+        type: SECRET
+      - key: GOOGLE_CLIENT_SECRET
+        type: SECRET
+      # Apple's client_id is the SERVICES ID, and its return URL is
+      # `https://pm-api.artsourced.in/api/auth/callback/apple`. Sign in with
+      # Apple needs HTTPS and a verified domain, so it cannot be exercised on
+      # localhost — this deployment is where it is first testable.
+      - key: APPLE_CLIENT_ID
+        type: SECRET
+      # NOT a password: a client-secret JWT minted by
+      # `scripts/mint-apple-client-secret.mjs` that EXPIRES (Apple caps it at
+      # six months). Rotation is an operational task with a runbook entry, and
+      # it is the one credential here that will fail on a working deployment
+      # simply by the passage of time.
+      - key: APPLE_CLIENT_SECRET
+        type: SECRET
+      # The native app's bundle id. Not a secret, and NOT harmless when set on
+      # its own: better-auth has ONE id-token audience per provider, so a bundle
+      # id alone REPLACES the Services ID and breaks every web sign-in.
+      # `social-providers.ts` passes an explicit audience list containing both
+      # whenever this is set. Leave it unset until the mobile app ships Sign in
+      # with Apple.
+      - key: APPLE_APP_BUNDLE_IDENTIFIER
+        type: SECRET
       # Confirmed by the owner 2026-08-20, corrected 2026-09-02: the apex
       # address, not a subdomain one.
       - key: MAGIC_LINK_FROM

@@ -47,9 +47,16 @@ ENV SERVER_ORIGIN=$SERVER_ORIGIN \
     NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=$NEXT_PUBLIC_GOOGLE_PICKER_API_KEY \
     NEXT_PUBLIC_GOOGLE_APP_ID=$NEXT_PUBLIC_GOOGLE_APP_ID
 RUN pnpm turbo run build --filter=@gisik-nokma/web...
-# apps/web ships no public/ directory today (verified at T5a); create an
-# empty one so the COPY below is stable even if that stays true, and starts
-# picking up real assets automatically the day one is added.
+# `apps/web/public` NOW EXISTS and carries a real asset — `google-mark.svg`,
+# the vendor mark on the sign-in button. This comment used to read "apps/web
+# ships no public/ directory today (verified at T5a)", and that stopped being
+# true the moment the mark landed. **The `mkdir -p` is what made the change
+# invisible**: it was written so the COPY stays valid whether or not the
+# directory exists, so adding one produced no build error and no diff here, and
+# the comment kept asserting an absence next to the line handling the presence.
+# Kept, because it is still doing that job for anyone who removes the last
+# asset. Verified rather than assumed: the rebuilt container answers
+# `GET /google-mark.svg` with 200 image/svg+xml, 2070 bytes.
 RUN mkdir -p apps/web/public
 
 FROM node:22-alpine AS runtime

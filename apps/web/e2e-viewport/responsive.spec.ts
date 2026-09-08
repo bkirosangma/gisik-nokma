@@ -999,13 +999,75 @@ for (const route of UNAUTHED_ROUTES) {
     }
 
     if (route.path === '/sign-in') {
-      // 13.292 — every shipped method survives the restyle. The prototype drew
-      // two and the product ships four; the audit's D column is binding.
+      /* 13.292 — AMENDED, and the amendment is a finding rather than a
+       * relaxation.
+       *
+       * This case asserted that all four shipped methods render as controls,
+       * and TWO OF THE FOUR COULD NOT WORK. `Continue with Google` rendered
+       * unconditionally while `GOOGLE_CLIENT_ID` was unset (the owner found it
+       * by pressing it); `Sign in with a passkey` could not work for any user
+       * anywhere, because no passkey REGISTRATION flow exists in app code.
+       * **Asserting their presence is what kept them on screen** — the case was
+       * doing its job and its job was wrong.
+       *
+       * The property is now *exactly the methods that can work are offered*.
+       * Phone and email need no provider and stay unconditional. The social pair
+       * is gated on `GET /v1/auth/methods`, and this suite's dev server has no
+       * credentials, so the honest expectation here is ZERO social buttons — the
+       * dev stack's real state, asserted rather than worked around.
+       *
+       * The both-directions half of this property lives in
+       * `apps/web/test/sign-in.test.tsx` (13.326), where the server's answer can
+       * be driven to `true`. A viewport suite cannot set the server's env, so
+       * asserting only the empty direction HERE would be a check that cannot
+       * distinguish "gated correctly" from "the row was deleted" — which is why
+       * the positive control below asserts the row's own container is absent for
+       * the same reason the buttons are, and why 13.326 exists at all.
+       */
       const list = page.getByRole('tablist', { name: 'Sign-in method' });
       await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
       await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
+
+      /* BOTH HALVES DRIVE THE ANSWER, and the negative one has to — MEASURED,
+       * not suspected.
+       *
+       * This half used to rely on the suite's own server, and it was a check
+       * that COULD NOT FAIL. This suite runs `next dev` with no API behind it,
+       * so `/v1/auth/methods` never resolves, the page's availability state
+       * stays `null`, and NOTHING renders whatever the gate does. A mutation
+       * that dropped the provider check and rendered the row on any answer left
+       * all three viewports GREEN — run, seen, and the reason this block exists.
+       *
+       * With the empty answer supplied, the page HAS an answer, the gate is the
+       * only thing between it and the DOM, and that same mutation reddens. */
+      await page.route('**/v1/auth/methods', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: false, apple: false }),
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      // The page came back, so a zero count below is a fact about the buttons
+      // and not about a blank document.
+      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
+      await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
+      await page.unroute('**/v1/auth/methods');
+
+      /* The token the email field keeps for Task 12, asserted as a fact about
+       * the DOM. The conditional-mediation REQUEST is deferred (it spends the
+       * shared `auth:` budget on a flow no user can complete — see
+       * `app/sign-in/page.tsx`), but this half costs nothing and must already be
+       * in place when Task 12 switches mediation on alongside registration. */
+      await list.getByRole('tab', { name: 'Email link' }).click();
+      await expect(page.locator('input[type="email"]')).toHaveAttribute(
+        'autocomplete',
+        'username webauthn',
+      );
+      await list.getByRole('tab', { name: 'Phone' }).click();
       // Phone is the DEFAULT, and this case's own name says so — added because
       // review found the claim unasserted. Flipping `useState<Method>('phone')`
       // to `'email'` left this suite fully green; the only thing that reddened
@@ -1085,6 +1147,38 @@ for (const route of UNAUTHED_ROUTES) {
       await expect(
         page.getByText("We’ll email you a link that signs you in. It expires in 15 minutes."),
       ).toHaveCount(0);
+
+      /* 13.292, the POSITIVE direction — the server's answer DRIVEN rather than
+       * its environment set, per the controller's ruling of 2026-09-08.
+       *
+       * Everything above ran against this suite's own dev server, which has no
+       * credentials, so it proves only that nothing renders when nothing is
+       * configured. That half alone cannot tell *gated correctly* from *the row
+       * was deleted*. `page.route` fulfils `/v1/auth/methods` with
+       * `google: true`, and the reload is what makes the page ask again — the
+       * availability request fires once, on mount.
+       *
+       * `toHaveCount(1)` rather than `toBeVisible`: two controls sharing an
+       * accessible name would satisfy visibility and would be a real defect.
+       */
+      await page.route('**/v1/auth/methods', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: true, apple: false }),
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      const googleMark = page.getByRole('button', { name: 'Continue with Google' });
+      await expect(googleMark).toHaveCount(1);
+      await expect(googleMark).toBeVisible();
+      // Icon-only: the accessible name comes from `aria-label`, not from text.
+      // A button that had kept its words would satisfy the locator above.
+      await expect(googleMark).toHaveText('');
+      // Apple stays off because the SAME answer said so, which is what makes
+      // this a test of the gate rather than of the fetch.
+      await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
+      await page.unroute('**/v1/auth/methods');
     }
 
     /* ── 5. COMPUTED CONTRAST FROM THE LIVE DOM. ──────────────────────────*/

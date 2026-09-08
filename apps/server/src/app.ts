@@ -9,6 +9,7 @@ import { isSignInPath, makeFixedWindowLimiter, rateLimitKeyFor } from './http/ra
 import type { Auth } from './auth/auth.js';
 import { NoopErrorAlerter, alertWithoutWaiting, type ErrorAlerter } from './alerts/error-alerter.js';
 import { registerAuthRoutes } from './auth/routes.js';
+import { registerAuthMethodRoutes } from './routes/auth-methods.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { createNotificationFanout } from './notifications/fanout.js';
@@ -1027,6 +1028,9 @@ export function buildApp(
     auth: deps.auth,
   });
   registerAuthRoutes(app, deps.auth);
+// Which social methods this instance will accept, read back off the auth
+// instance itself so the sign-in page cannot offer one the server refuses.
+registerAuthMethodRoutes(app, deps.auth);
 
   return app;
 }

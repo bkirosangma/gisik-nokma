@@ -164,6 +164,22 @@ button { font: inherit; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
+
+/* ── The vendor marks. Icon-only controls, and the size is not decorative. ──
+
+   `min-width` AS WELL AS `min-height`. `.gn-button` in `packages/ui/src/ui.css`
+   sets `min-height: 2.75rem` and NO `min-width` — which is enough for a control
+   whose label is a word and not enough for one whose label is an 18px glyph.
+   That exact asymmetry already cost a round on `a.gn-nav__inbox`, measured at
+   39x44: tall enough, six pixels too narrow, because a tap target is a box and
+   fixing one dimension while re-reading only the count leaves the other one
+   exactly as it was. An icon button is the case where the width is the one that
+   fails, so it is stated here rather than inherited.
+
+   The marks sit in a ROW, centred, because there are at most two of them and a
+   column of two icons reads as a list of one-character items. */
+.gn-sign-in__marks { display: flex; justify-content: center; gap: 0.75rem; }
+.gn-sign-in__mark { min-width: 2.75rem; min-height: 2.75rem; padding: 0.4rem; }
 /* 1rem, not the plan's 0.8rem (12.8px) — under the 16px floor for body copy
    on a phone, the same defect `.gn-notfound__aside` (globals.css:239) and
    `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */

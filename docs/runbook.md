@@ -73,6 +73,32 @@ scheduler reads only UTC accessors).
   broken — and the next instruction revokes the working pair on the strength of it. Revoke the old pair
   only after a run that used the new keys **in the deployment**.
 
+### `APPLE_CLIENT_SECRET` — the one credential that expires on its own
+
+Sign in with Apple's `client_secret` is not a string Apple issues; it is a JWT this repo signs, and
+Apple caps its lifetime at **six months**. Nothing warns you: the day it expires, Apple sign-in starts
+answering an error at the token endpoint that says nothing about lifetime, and every other credential
+in this product keeps working. **Put the expiry date in a calendar when you mint it.**
+
+Mint a fresh one from the four key-material variables (`APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+`APPLE_CLIENT_ID` — the Services ID, not the App ID — and `APPLE_PRIVATE_KEY`, the `.p8` contents):
+
+      node scripts/mint-apple-client-secret.mjs
+
+It prints the JWT on stdout and everything else on stderr, so it pipes into a secret store cleanly. It
+**self-tests before every mint**, because two ways of getting this wrong are accepted by every local
+check and refused only by Apple: an ECDSA signature in DER rather than the JOSE `r||s` pair (Node's
+default, and a valid signature that is not a valid JWS), and a lifetime past Apple's ceiling. The
+self-test asserts the signature is 64 bytes AND that a 365-day request is refused — verifying the
+signature alone would pass for DER.
+
+Rotation is safe and needs no announcement: a client secret is presented per token exchange, so a new
+one takes effect on the next sign-in and no session is invalidated. Set the new value, redeploy, then
+sign in with Apple once against the DEPLOYMENT before discarding the old value — the same rule as the
+object-store keys, and for the same reason. **The `.p8` key itself is NOT rotated by this**; Apple
+lets you download it exactly once, and if it is lost you create a new key in the developer portal and
+mint against that.
+
 ## Backups
 
 Nightly `pg_dump` (21:00 UTC = 02:30 IST) and weekly Sunday ledger export (22:00 UTC), both to the

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
@@ -80,10 +80,81 @@ function samePathOnly(raw: string | null): string {
   return raw;
 }
 
+/**
+ * WHICH SOCIAL METHODS THIS SERVER WILL ACTUALLY ACCEPT.
+ *
+ * This page used to render `Continue with Google` unconditionally. On the dev
+ * stack `GOOGLE_CLIENT_ID` is unset, so that button failed at the server for
+ * every user who pressed it — the owner found it by clicking it. A control that
+ * can never succeed and is shown anyway is the audit's own principle inverted.
+ *
+ * The answer comes from the server rather than a `NEXT_PUBLIC_*` build flag,
+ * because a build flag is baked into a bundle at image-build time and read by a
+ * browser that may be talking to a server deployed later with different secrets.
+ * `GET /v1/auth/methods` reads `auth.options.socialProviders` off the running
+ * instance (`apps/server/src/routes/auth-methods.ts`), so it cannot drift.
+ *
+ * `null` while the answer is in flight, and `null` renders NOTHING. That is the
+ * conservative default and it is the right one here: a brief absence is a button
+ * that appears a moment late, while a brief presence is a button that works for
+ * nobody and is the defect being fixed. Same reasoning if the fetch fails — a
+ * server that cannot tell us which methods it accepts is not a server we should
+ * be guessing on behalf of. Phone and email are unaffected either way; they need
+ * no provider and are never gated by this.
+ */
+type SocialAvailability = { google: boolean; apple: boolean };
+
+function useSocialAvailability(): SocialAvailability | null {
+  const [available, setAvailable] = useState<SocialAvailability | null>(null);
+
+  useEffect(() => {
+    // `/v1/*` is rewritten to the API by `next.config.ts`, so this is
+    // same-origin and needs no base URL — the same path `authClient` relies on.
+    const controller = new AbortController();
+    void fetch('/v1/auth/methods', { signal: controller.signal })
+      .then(async (response) => (response.ok ? ((await response.json()) as SocialAvailability) : null))
+      .then((answer) => {
+        if (answer !== null) setAvailable(answer);
+      })
+      .catch(() => {
+        // Deliberately silent, and deliberately NOT `setError`. A refusal here
+        // is not something the person signing in can act on, and the two methods
+        // that need no provider still work. It stays `null`, so nothing renders.
+      });
+    return () => controller.abort();
+  }, []);
+
+  return available;
+}
+
+/**
+ * Apple's logo mark, INLINE and monochrome.
+ *
+ * The opposite exit from Google's, and for a measured reason. The colour-literal
+ * gate (`packages/ui/test/token-discipline.test.ts`) scans `apps/web/app` and
+ * reports a hit for `fill="#4285F4"` inside TSX — a JSX attribute is a string
+ * literal to that scanner — but reports NOTHING for `fill="currentColor"`. Both
+ * were run against `findColourLiterals` before either mark was written.
+ *
+ * So Google's four-colour mark is a file under `public/` (outside the scan
+ * roots) and Apple's lives here, where `currentColor` also does the job the
+ * file could not: Apple's HIG asks for a black mark on light surfaces and a
+ * white one on dark, and this product ships both themes. A fixed-colour asset
+ * would be wrong in one of them.
+ */
+function AppleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.8-3.33.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.3-3.51zM14.88 5.6c.6-.74 1.01-1.76.9-2.78-.87.04-1.93.58-2.56 1.31-.56.65-1.06 1.69-.92 2.69.97.07 1.97-.49 2.58-1.22z" />
+    </svg>
+  );
+}
+
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = samePathOnly(searchParams.get('next'));
+  const social = useSocialAvailability();
   const [method, setMethod] = useState<Method>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -93,6 +164,62 @@ function SignInForm() {
   const [error, setError] = useState<string | null>(null);
 
   const fail = (message: string | undefined) => setError(message ?? 'Sign-in failed. Try again.');
+
+  /**
+   * PASSKEY: THE DEAD BUTTON IS GONE. THE REQUEST THAT WOULD HAVE REPLACED IT
+   * IS DEFERRED TO TASK 12, WITH REGISTRATION — and the deferral is the finding.
+   *
+   * ## What was here, and why it is not
+   *
+   * There was a `Sign in with a passkey` button, and it could not work for ANY
+   * user ANYWHERE: **there is no passkey registration flow anywhere in app
+   * code**, so nobody can hold a passkey to sign in with. `rpID` is correct
+   * (`auth.ts`, `new URL(baseUrl).hostname`) and WebAuthn is wired; the
+   * credential simply cannot exist. The button is removed, which is the honest
+   * half and the half the owner asked for.
+   *
+   * The dispatch's replacement was `signIn.passkey({ autoFill: true })` —
+   * WebAuthn conditional mediation — issued on this page. **Review demonstrated
+   * that it cannot ship yet, with production's own numbers.**
+   *
+   * ## The measurement, because this reverses an instruction and must earn it
+   *
+   * `signInPasskey` in `@better-auth/passkey@1.7.2` issues
+   * `GET /passkey/generate-authenticate-options` as its FIRST statement, before
+   * any capability check. That path is under `/api/auth/*`, which `app.ts`
+   * charges against the shared `auth:` bucket — `RATE_LIMIT_AUTH_MAX` is **10**
+   * per 60s in `deploy/do/app.yaml`. A reviewer drove ten such probes through
+   * the assembled app and the eleventh real `POST /sign-in/magic-link` answered
+   * **429**, with a control run at zero probes answering 500 (offline DB) and
+   * not 429 — so the refusal was attributable to the probes and nothing else.
+   *
+   * And the budget is very likely SHARED. `http/rate-limit.ts` records as
+   * measured that the dev stack raised `AUTH_MAX` to 60 "because its web
+   * container proxies every browser into a single client key". Production has
+   * the same topology. So the cost is not one user's own budget; it is
+   * everyone's.
+   *
+   * **A request that spends a shared sign-in budget on a flow with zero possible
+   * successes is the same defect this whole task removes, one layer down.** The
+   * page would have stopped showing a control that cannot work and started
+   * making a request that cannot work — and this one can refuse somebody else's
+   * magic link.
+   *
+   * *(One limb of that finding was refuted and is recorded so nobody builds
+   * against it: the challenge rows are NOT unbounded. `findVerificationValue`
+   * sweeps expired rows globally on every call and `disableCleanup` is unset,
+   * and phone-OTP verification calls it — so they are reclaimed opportunistically
+   * rather than never. No cleanup job is owed.)*
+   *
+   * ## What ships instead, and what is owed
+   *
+   * The email input keeps `autocomplete="username webauthn"`. It costs nothing,
+   * it is correct, and it is the half that must already be in place when
+   * conditional mediation is switched on. **Task 12 owns turning it on, in the
+   * same change set that builds registration** — which is the right pairing:
+   * until a user can register a passkey, an offer to use one has no population
+   * it can serve.
+   */
 
   return (
     <main className="gn-shell gn-shell--centred">
@@ -173,6 +300,10 @@ function SignInForm() {
               <input
                 className="gn-field__input"
                 type="email"
+                /* The `webauthn` token is what the conditional-mediation request
+                   above attaches to. Without it the browser has no field to
+                   offer a passkey through and `autoFill: true` does nothing. */
+                autoComplete="username webauthn"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -201,29 +332,56 @@ function SignInForm() {
           </div>
         )}
 
-        <div className="gn-sign-in__alternatives">
-          <Button
-            onClick={() =>
-              void authClient.signIn
-                .social({ provider: 'google', callbackURL: webOriginCallback(next) })
-                .then(({ error: socialError }) =>
-                  socialError ? fail(socialError.message) : undefined,
-                )
-            }
-          >
-            Continue with Google
-          </Button>
-          <Button
-            onClick={() =>
-              void authClient.signIn.passkey().then((result) => {
-                if (result?.error) fail(result.error.message);
-                else router.push(next);
-              })
-            }
-          >
-            Sign in with a passkey
-          </Button>
-        </div>
+        {/* Rendered only for providers this server will actually accept, and
+            only once it has said so. `social === null` is both "still asking"
+            and "could not ask", and both render nothing — see
+            `useSocialAvailability`. The whole row disappears when neither is
+            available, rather than leaving an empty separator above nothing. */}
+        {social !== null && (social.google || social.apple) ? (
+          <div className="gn-sign-in__alternatives">
+            <p className="gn-sign-in__hint">Or continue with</p>
+            <div className="gn-sign-in__marks">
+              {social.google ? (
+                <Button
+                  className="gn-sign-in__mark"
+                  /* THE VISIBLE TEXT GOES AND THE ACCESSIBLE NAME STAYS, and it
+                     stays as the EXACT shipped wording. The owner asked for logo
+                     marks; the copy rule's "keep the shipped wording" is
+                     satisfied where it matters, because `aria-label` is what a
+                     screen reader announces and what `getByRole('button', {
+                     name: 'Continue with Google' })` resolves — so 13.292's
+                     locator still finds this control after the restyle. */
+                  aria-label="Continue with Google"
+                  onClick={() =>
+                    void authClient.signIn
+                      .social({ provider: 'google', callbackURL: webOriginCallback(next) })
+                      .then(({ error: socialError }) =>
+                        socialError ? fail(socialError.message) : undefined,
+                      )
+                  }
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/google-mark.svg" alt="" width={18} height={18} />
+                </Button>
+              ) : null}
+              {social.apple ? (
+                <Button
+                  className="gn-sign-in__mark"
+                  aria-label="Continue with Apple"
+                  onClick={() =>
+                    void authClient.signIn
+                      .social({ provider: 'apple', callbackURL: webOriginCallback(next) })
+                      .then(({ error: socialError }) =>
+                        socialError ? fail(socialError.message) : undefined,
+                      )
+                  }
+                >
+                  <AppleMark />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {error !== null ? (
           <p role="alert" className="gn-shell__refusal">

@@ -304,6 +304,40 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
 
 ### What was NOT measured, stated so it is a known absence
 
+- **NEW, 2026-09-08 — PASSKEY REGISTRATION DOES NOT EXIST. Owner: Task 12 of the HIG per-screen plan,
+  scheduled after the owner's second look at sign-in.** `/sign-in` shipped a `Sign in with a passkey`
+  button that **could not work for any user anywhere**. Not a configuration gap like Google's — a
+  missing feature: the only `addPasskey` occurrences in the tree are inside better-auth's own bundled
+  client, so there is no flow by which a person can ever register one. The server side is correct and
+  always was (`auth.ts`, `rpID: new URL(baseUrl).hostname`; the passkey plugin is mounted), which is
+  exactly what made the gap invisible — every piece was present except the one that lets a credential
+  come into existence.
+  **What 2b did:** removed the dead button, and kept `autocomplete="username webauthn"` on the email
+  field. **The conditional-mediation REQUEST the dispatch specified is deferred to Task 12, on a
+  measurement** — `signInPasskey` issues `GET /passkey/generate-authenticate-options` as its first
+  statement, which is charged against the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX` = 10/60s in
+  `deploy/do/app.yaml`). Review drove ten probes through the assembled app and the eleventh real
+  `POST /sign-in/magic-link` answered **429**, against a zero-probe control that answered 500 and not
+  429; and `apps/server/src/http/rate-limit.ts` records as measured that a web container proxies every
+  browser into ONE client key, so that budget is shared across users. **A request that spends a shared
+  sign-in budget on a flow with zero possible successes is the same defect this round removes, one
+  layer down.** Turning mediation on belongs in the change set that makes a passkey obtainable.
+  *(Refuted limb, recorded so nobody builds against it: the challenge rows are NOT unbounded —
+  `findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
+  phone-OTP verification calls it. No cleanup job is owed.)*
+  **STATE OF THE FEATURE, PLAINLY: passkey sign-in has NO ENTRY POINT on the sign-in screen as of
+  this change — no button, and no autofill offer either.** The `autocomplete="username webauthn"`
+  token is present and inert; it does nothing until something issues a conditional-mediation request.
+  **Task 12 restores the entry point together with registration**, which is the only pairing that makes
+  sense: an offer to use a passkey has no population it can serve until a user can register one. The
+  narrowing was accepted by the controller on the measured 429 rather than taken unilaterally.
+  **That makes the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of
+  this product can hold a passkey, and the method is unavailable however well it is wired.
+  *Recorded here rather than left to the absence of a button, because an unrecorded deferral is defect
+  class 4 from Plan 1 — and because the button's removal is exactly the change that would otherwise
+  make the gap harder to notice, not easier.*
+
+
 - **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were
   read statically and its pairs are included in 6a. One thing found there and **not** fixed:
   `help-screen.tsx:59` resolved every token through `colorOf('light', role)`, so the mobile help screen
