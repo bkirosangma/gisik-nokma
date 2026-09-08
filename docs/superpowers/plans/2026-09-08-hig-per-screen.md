@@ -854,8 +854,34 @@ git commit -m "Sign-in on the HIG surface, with all four methods and no password
 **4a sonnet.** Files: `apps/web/app/workspaces/page.tsx`, `apps/web/app/invite/[token]/page.tsx`, `ui.css`/`globals.css` rules for `.gn-workspaces*`, `.gn-invite*` (borders → surface-raised + radius 12px). Keep the ThemeToggle and the Inbox `UnreadBadge` in `app-nav.tsx` untouched (both are D rows). Gate; commit `"Workspaces and Invite: HIG surface"`.
 
 **4b opus.** Case ids `13.298`–`13.300`. **Spec, verbatim D rows:** Workspaces — *Full loading/error/empty state machine: 'Loading…', `ShellRefusal` on data-fetch failure, `ExpiredSessionNotice` on 401, and the empty-state copy 'No workspaces yet.'*; *The inline 'New workspace' FOUNDING FORM: persistent Name field + 'Create workspace' submit + per-field server refusal display (`FoundingForm`, `page.tsx:108-154`)*; *Personalized header ' — {user.name}'*; *Per-workspace navigation into each project and into 'My Work'*. Invite — the D rows at audit `:205-236` (expired-token refusal, wrong-account notice, the role named in the body copy — **keep `You are invited to join {workspaceName} as {role}.` verbatim; the prototype's version drops the role and is rejected by the copy rule**).
-- [ ] Cases: **13.298** `/workspaces` with `page.route` returning 401 renders `ExpiredSessionNotice` (`role="status"`, class `gn-shell__expired`); **13.299** with an empty list renders `No workspaces yet.` and the founding form's `Create workspace` button; **13.300** `/invite/<token>` body text matches `/You are invited to join .+ as (admin|member|guest)\./`.
-- [ ] Mutation: delete the 401 branch → 13.298 RED. Catalogue, Features §6, gate, commit `"Workspaces and Invite: the states the prototype never drew"`.
+- [ ] Cases: ~~**13.298** `/workspaces` with `page.route` returning 401 renders `ExpiredSessionNotice` (`role="status"`, class `gn-shell__expired`)~~ — **see the correction below**; **13.299** with an empty list renders `No workspaces yet.` and the founding form's `Create workspace` button; **13.300** `/invite/<token>` body text matches `/You are invited to join .+ as (admin|member|guest)\./`.
+- [ ] Mutation: ~~delete the 401 branch → 13.298 RED.~~ **See the correction below.** Catalogue, ~~Features §6~~ **the `Features.md` bullet located BY PATH per Global Constraints — `grep -n 'workspaces/page.tsx' Features.md`; this line's own "§6" is the exact defect that rule was written to stop, and it is struck rather than removed so the next reader sees the plan making the mistake its own constraints name**, gate, commit `"Workspaces and Invite: the states the prototype never drew"`.
+
+**CORRECTED 2026-09-08 (executor measurement, controller ruling), during Task 4:** the two struck
+clauses above were both wrong, and the first was wrong in the way this repo catalogues most — it
+specified a check that cannot fail.
+
+*13.298 as written was unsatisfiable and duplicative.* Measured on a committed tree at `29bc5da`:
+deleting the `expired ? <ExpiredSessionNotice /> :` arm from `apps/web/app/workspaces/page.tsx` and
+running the existing suites gives `EXIT=1`, **19 pass / 1 fail**, and the one failure is a
+PRE-EXISTING case — `apps/web/test/page-refusals.test.tsx:180`, *"Workspaces: a 401 is NOT a refusal
+— it sends the viewer to sign in"* — which already asserts `findByText(EXPIRED_SESSION_COPY)`, the
+`push`, and the absence of the spinner. So "13.298 RED, **alone**" could never have been satisfied:
+the branch was guarded before this plan was written.
+
+*And it could not have been witnessed in a browser at all.* The plan says drive it with `page.route`,
+i.e. Playwright. But `useSignInOnExpiredSession` calls `router.push('/sign-in')`, so a real browser
+NAVIGATES AWAY — the notice exists only "for the frame or two before the router moves"
+(`expired-session.tsx`'s own docblock). Deleting the render arm leaves the push intact, so mutated
+and unmutated both settle on `/sign-in` and no assertion on a settled page can separate them. In
+jsdom the router double never moves, which is precisely why the existing case works and a Playwright
+twin would not. **A case whose mutation cannot redden it is not a guard, it is a decoration.**
+
+**13.298 is therefore RE-POINTED, not returned**, at the one claim in this area nothing has ever
+witnessed: *on `/workspaces`, a 401 from the API leaves the REAL browser settled on `/sign-in`.*
+Every existing case asserts that `push` was called **on a test double**; no test has ever shown the
+navigation happens. The mutation is deleting the `router.push` line — the browser then stays on
+`/workspaces` — and the case cites `page-refusals.test.tsx:180` as the jsdom half it complements.
 
 ### Task 5a / 5b: The project page — Board, Calendar, Timeline (one route, `view` param)
 
