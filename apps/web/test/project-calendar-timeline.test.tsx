@@ -128,6 +128,20 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
   await userEvent.click(await screen.findByRole('tab', { name }));
 }
 
+/**
+ * Scoped to `.gn-view-tabs`, not a bare `screen.findAllByRole('tab')` —
+ * `AppNav`'s `StyleToggle` (Task 14) is a second, unrelated `role="tablist"`
+ * on the same page (`aria-label="Style"`), and an unscoped query over ALL
+ * tabs on the page would count its three alongside these four. The view-tabs
+ * tablist itself carries no `aria-label` to disambiguate by name, so this
+ * scopes by the DOM container instead.
+ */
+async function viewTabs(): Promise<HTMLElement[]> {
+  await screen.findByText('Board');
+  const container = document.querySelector('.gn-view-tabs') as HTMLElement;
+  return within(container).getAllByRole('tab');
+}
+
 describe('the project page mounts four views over one list read', () => {
   it('11.160 offers all four tabs, with Board selected and each tab selected alone', async () => {
     render(
@@ -135,7 +149,7 @@ describe('the project page mounts four views over one list read', () => {
         <ProjectPage />
       </Providers>,
     );
-    const tabs = await screen.findAllByRole('tab');
+    const tabs = await viewTabs();
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Board', 'List', 'Calendar', 'Timeline']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
       'true',
@@ -145,9 +159,12 @@ describe('the project page mounts four views over one list read', () => {
     ]);
 
     await openTab('Timeline');
-    expect(
-      (await screen.findAllByRole('tab')).map((tab) => tab.getAttribute('aria-selected')),
-    ).toEqual(['false', 'false', 'false', 'true']);
+    expect((await viewTabs()).map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true',
+    ]);
   });
 
   /**

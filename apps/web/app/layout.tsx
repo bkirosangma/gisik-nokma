@@ -24,11 +24,20 @@ export const metadata = { title: 'Gisik Nokma' };
 const themeInitScript =
   "try{var stored=localStorage.getItem('gn-theme');if(stored==='light'||stored==='dark'){document.documentElement.dataset.theme=stored;}}catch(error){}";
 
+/**
+ * Applies the stored style, or `neo` (the default, case 13.345) before first
+ * paint — parallel to `themeInitScript`, but style has no "unset" state: `hig`
+ * is only ever reached by an explicit stored choice, never by an absent one.
+ */
+const styleInitScript =
+  "try{var stored=localStorage.getItem('gn-style');document.documentElement.dataset.style=(stored==='hig'||stored==='minimal'||stored==='neo')?stored:'neo';}catch(error){document.documentElement.dataset.style='neo';}";
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: styleInitScript }} />
         <style dangerouslySetInnerHTML={{ __html: themeStylesheet() }} />
       </head>
       <body>

@@ -11,6 +11,15 @@
 export type ThemeName = 'light' | 'dark';
 
 /**
+ * The style axis, added Task 14 (2026-09-09) beside `ThemeName`. `hig` is the
+ * unmarked base — every selector below reaches it through bare `:root`, the
+ * same way `light` is the unmarked theme, so `hig` needs no `[data-style]`
+ * selector of its own. `minimal` and `neo` are runtime overrides, parallel to
+ * `[data-theme="dark"]`.
+ */
+export type StyleName = 'hig' | 'minimal' | 'neo';
+
+/**
  * ## Apple HIG increased-contrast, adopted 2026-09-08 (`docs/hig-adoption-brief.md` §8)
  *
  * Every hex below that changed is a real Apple **increased-contrast** system
@@ -65,8 +74,6 @@ export type ThemeName = 'light' | 'dark';
  */
 export const primitives = {
   white: '#ffffff',
-  paper: '#f2f2f7',
-  sand: '#e5e5ea',
   ink: '#000000',
   inkMuted: '#3c3c43',
   /** Untouched — the border story is atomic and lands with its sweep. */
@@ -89,9 +96,6 @@ export const primitives = {
   violet300: '#da8fff',
   magenta600: '#d30f45',
   magenta300: '#ff6482',
-  coal: '#000000',
-  coalRaised: '#1c1c1e',
-  coalSunken: '#2c2c2e',
   fog: '#ffffff',
   fogMuted: '#ebebf5',
   /** Untouched — see `line`. */
@@ -106,34 +110,136 @@ export const primitives = {
    */
   grayAccessible: '#6c6c70',
   grayAccessibleDark: '#98989d',
+
   /**
-   * HIG's four-step FILL hierarchy — the thing R1(c) separates by, now that it
-   * is no longer separating by hairlines.
+   * ## The neo-round palette (owner ruling #386, 2026-09-09)
    *
-   * Eight-digit hex rather than `rgba()` because `primitives` is asserted to be
-   * hex literals and `scrimLight` already set that precedent; these are Apple's
-   * documented system-fill greys with the alpha encoded in the last byte
-   * (`0.20 → 33`, `0.16 → 29`, `0.12 → 1f`, `0.08 → 14`; dark uses Apple's
-   * heavier `0.36 / 0.32 / 0.24 / 0.18`, because a fill has to work against
-   * black).
+   * Every value below was extracted programmatically by Task 13's probe
+   * (`design-system/tools/neo_tokens_probe.py`) from the owner's exported
+   * prototype (`design-system/interactive/{desktop,mobile}.dc.html`) —
+   * `design-system/neo-tokens.json` is the record. **The ruling adopted this
+   * palette for `surface`/`surfaceRaised`/`surfaceSunken`/`surfaceOverlay`/the
+   * fill ladder/radii/shadows in EVERY style, including `hig`** — the shipped
+   * cool palette is replaced (its `paper`/`sand`/`coal*` primitives are now
+   * unused and removed), not kept as a `hig`-only holdout. `hig` and `minimal`
+   * share one set (they render
+   * identically except for shadow and non-text-boundary treatment); `neo`
+   * has its own, distinguished below.
    *
-   * ## These are ALPHA, and no `CONTRAST_PAIRS` row may name them
-   *
-   * `relativeLuminance` ignores alpha by documented design, so a declared pair
-   * on any of these would compute the fill's own colour against a background it
-   * is actually blended INTO — the checklist records that exact mode reading
-   * 11.87 where the truth is 1.85, **a false green**. The fills are measured
-   * where they are real: the rendered sweep in
-   * `apps/web/e2e-stack/helpers/non-text-contrast.ts`, which composites.
+   * Every hex is LOWERCASE — `primitives` is asserted against
+   * `/^#[0-9a-f]{6}([0-9a-f]{2})?$/`, and the export's own casing is upper.
    */
-  fillPrimary: '#78788033',
-  fillSecondary: '#78788029',
-  fillTertiary: '#7878801f',
-  fillQuaternary: '#74748014',
-  fillPrimaryDark: '#7878805c',
-  fillSecondaryDark: '#78788052',
-  fillTertiaryDark: '#7878803d',
-  fillQuaternaryDark: '#7474802e',
+  warmPaper: '#efe7df',
+  warmRaised: '#fbf7f3',
+  warmSunken: '#e4d8cc',
+  navyBase: '#141a2e',
+  navyRaised: '#20294a',
+  navySunken: '#2a3560',
+  /** `neo` light: rule (c) (dark-only fill separation) leaves light alone — the export's neo surface, raised and sunken are one hex, relying on shadow for elevation. */
+  neoPaper: '#ede4db',
+  /** `neo` dark surface — the export's own value, unlike raised/sunken below. */
+  neoNavy: '#1b2340',
+  /**
+   * **DERIVED, not measured — ruling item 3(b).** The export's `neo` dark
+   * raised and sunken are the SAME hex as surface (separation 1.00, rule (c)
+   * fails outright). The ruling requires deriving steps giving at least
+   * `hig`/`minimal` dark's own separation (surface↔raised 1.214,
+   * surface↔sunken 1.460, measured against `#141a2e`/`#20294a`/`#2a3560`).
+   *
+   * **`surfaceRaised` falls narrowly short of that floor (1.204 vs 1.214,
+   * −0.8%) and this is deliberate, not an error.** Lightening `neoNavy`
+   * (`#1b2340`) far enough to hit 1.214 pushes its luminance past what keeps
+   * `accent` (`#409cff`, kept SHIPPED by ruling item 2) at ≥4.5 against it —
+   * a declared `CONTRAST_PAIRS` row (`accent` on `surfaceRaised`). The two
+   * requirements are mathematically incompatible for this base/accent pair:
+   * the luminance window `raised` would need occupies is empty by about
+   * 0.00002 (an accent-side ceiling of L≈0.03242 against a separation-side
+   * floor of L≈0.03262), independent of which hue is chosen — not a
+   * near-miss to be nudged away, a genuine collision between the amendment's
+   * two rulings. Recorded here rather than escalated because the accessible
+   * value is the one already gated by a passing test (`CONTRAST_PAIRS` is
+   * the harder, tested invariant across the whole project); the separation
+   * shortfall is 99.2% of the target and both raised↔sunken (1.292 vs
+   * 1.202) and surface↔sunken (1.555 vs 1.460) clear their floors with
+   * margin. `accent` on `neoNavyRaised` measures 4.528.
+   */
+  neoNavyRaised: '#29314c',
+  neoNavySunken: '#3b425b',
+
+  /**
+   * The four-step FILL hierarchy R1(c) separates by. Eight-digit hex, not
+   * `rgba()`, matching `scrimLight`'s precedent — `primitives` is asserted
+   * hex-only. **These are ALPHA, and no `CONTRAST_PAIRS` row may name them**:
+   * `relativeLuminance` ignores alpha by documented design, so a declared
+   * pair on any of these would compute the fill's own colour against a
+   * background it is actually blended INTO — a false green. They are
+   * measured where they are real: the rendered sweep in
+   * `apps/web/e2e-stack/helpers/non-text-contrast.ts` (which composites),
+   * and `fillTertiary`'s own accent-on-filled check in `tokens.test.ts`.
+   *
+   * `hig`/`minimal`/`neo` share fill1/fill2 in LIGHT theme — same export
+   * value both places.
+   */
+  fillWarmShared1: '#273a6333',
+  fillWarmShared2: '#273a6326',
+  /** `hig`/`minimal` light fill3/fill4 — untouched export values (no accessibility gate needs a nudge here; see fillNavyHig3 below for the theme that does). */
+  fillWarmHig3: '#273a631c',
+  fillWarmHig4: '#273a630f',
+  /** `neo` light fill3/fill4 — a warmer (surface-toned) primitive than hig/minimal's, per the export. */
+  fillWarmNeo3: '#b0988429',
+  fillWarmNeo4: '#b098841a',
+
+  /** `hig`/`minimal`/`neo` share fill1/fill2 in DARK theme. */
+  fillNavyShared1: '#d8ccc142',
+  fillNavyShared2: '#d8ccc136',
+  /**
+   * **NUDGED, not the export value — a regression Task 13's report never
+   * measured.** `packages/ui/test/tokens.test.ts`'s existing case ("identifies
+   * a non-primary control by its label, not its fill") composites
+   * `fillTertiary` over `surface` and requires `accent` on the result ≥4.5 —
+   * separate from the declared `CONTRAST_PAIRS` roster, so Task 13's sweep
+   * never saw it. The export's dark fill3 (`rgba(216,204,193,0.16)`) composited
+   * over the adopted navy surface (`#141a2e`) measures **4.222**, below 4.5 —
+   * a genuine drop from the shipped palette's 5.944, because the adopted dark
+   * surface is lighter than the shipped pure black. Nudged alpha
+   * 0.16→0.13 (same hue, same rule the ruling uses elsewhere: "the nearest
+   * value in the same hue") restores it to **4.558**. `fillNavyHig4` is
+   * untouched — no gate composites it.
+   */
+  fillNavyHig3: '#d8ccc121',
+  fillNavyHig4: '#d8ccc11a',
+  /** `neo` dark fill4 — the export's own value, a different hue than hig/minimal's (surface-toned, not warm-white). No gate composites fill4, so it is untouched. */
+  fillNavyNeo4: '#b098841a',
+  /**
+   * **NUDGED — the same regression as `fillNavyHig3`, worse here** because
+   * `neo`'s dark surface (`#1b2340`) is lighter still: the export's own value
+   * (`rgba(176,152,132,0.16)`) composited over it measures **4.191**. Nudged
+   * alpha 0.16→0.115, same hue, restores **4.569**.
+   */
+  fillNavyNeo3: '#b098841d',
+
+  overlayWarmHig: '#273a6357',
+  overlayNavyHig: '#0a0e1a9e',
+  overlayWarmNeo: '#b0988473',
+  overlayNavyNeo: '#00000099',
+
+  /**
+   * Shadow LAYER COLOURS only — never a full `box-shadow` value, which is
+   * geometry (unitless numbers, not a colour the token-discipline scanner
+   * polices) plus one of these. `neo`'s raised and sunken treatments use
+   * different alpha colours even within one theme (see `themeStylesheet`'s
+   * `shadows` table), so each layer gets its own named primitive rather than
+   * one shared "shadow" colour standing in for all four.
+   */
+  shadowHigLight: '#273a6329',
+  shadowHigDark: '#060a16a8',
+  shadowNeoRaisedDarkLight: '#b098848c',
+  shadowNeoHighlightLight: '#fffffff2',
+  shadowNeoSunkenDarkLight: '#b0988499',
+  shadowNeoRaisedDarkDark: '#060a169e',
+  shadowNeoRaisedHighlightDark: '#f2e9e112',
+  shadowNeoSunkenDarkDark: '#00000099',
+  shadowNeoSunkenHighlightDark: '#ffffff0d',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -199,21 +305,27 @@ export const TOKEN_ROLES = [
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
 
+/**
+ * The `hig`-style role→primitive mapping, doubling as the `minimal` mapping
+ * (identical for every colour role — the two styles diverge only in
+ * `radii`/`shadows` below). `neo`'s divergent roles are layered on top by
+ * `styleColorOverrides`; `colorOf` resolves style before falling back here.
+ */
 export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
   light: {
-    surface: 'paper',
-    surfaceRaised: 'white',
-    surfaceSunken: 'sand',
-    surfaceOverlay: 'scrimLight',
+    surface: 'warmPaper',
+    surfaceRaised: 'warmRaised',
+    surfaceSunken: 'warmSunken',
+    surfaceOverlay: 'overlayWarmHig',
     text: 'ink',
     textMuted: 'inkMuted',
     textInverted: 'white',
     border: 'grayAccessible',
     borderStrong: 'grayAccessible',
-    fillPrimary: 'fillPrimary',
-    fillSecondary: 'fillSecondary',
-    fillTertiary: 'fillTertiary',
-    fillQuaternary: 'fillQuaternary',
+    fillPrimary: 'fillWarmShared1',
+    fillSecondary: 'fillWarmShared2',
+    fillTertiary: 'fillWarmHig3',
+    fillQuaternary: 'fillWarmHig4',
     focusRing: 'blue600',
     shadow: 'scrimLight',
     accent: 'blue600',
@@ -234,19 +346,19 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     customMarker: 'violet600',
   },
   dark: {
-    surface: 'coal',
-    surfaceRaised: 'coalRaised',
-    surfaceSunken: 'coalSunken',
-    surfaceOverlay: 'scrimDark',
+    surface: 'navyBase',
+    surfaceRaised: 'navyRaised',
+    surfaceSunken: 'navySunken',
+    surfaceOverlay: 'overlayNavyHig',
     text: 'fog',
     textMuted: 'fogMuted',
     textInverted: 'ink',
     border: 'grayAccessibleDark',
     borderStrong: 'grayAccessibleDark',
-    fillPrimary: 'fillPrimaryDark',
-    fillSecondary: 'fillSecondaryDark',
-    fillTertiary: 'fillTertiaryDark',
-    fillQuaternary: 'fillQuaternaryDark',
+    fillPrimary: 'fillNavyShared1',
+    fillSecondary: 'fillNavyShared2',
+    fillTertiary: 'fillNavyHig3',
+    fillQuaternary: 'fillNavyHig4',
     focusRing: 'blue300',
     shadow: 'scrimDark',
     accent: 'blue300',
@@ -267,6 +379,135 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     customMarker: 'violet300',
   },
 };
+
+/**
+ * `neo`'s divergence from the `themes` map above — only the 8 roles the
+ * ruling actually varies by style. `minimal` needs no entry: its colours are
+ * byte-identical to `hig`'s (it differs only in `radii`/`shadows`).
+ */
+const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial<Record<TokenRole, PrimitiveName>>>>> = {
+  neo: {
+    light: {
+      surface: 'neoPaper',
+      surfaceRaised: 'neoPaper',
+      surfaceSunken: 'neoPaper',
+      surfaceOverlay: 'overlayWarmNeo',
+      fillTertiary: 'fillWarmNeo3',
+      fillQuaternary: 'fillWarmNeo4',
+    },
+    dark: {
+      surface: 'neoNavy',
+      surfaceRaised: 'neoNavyRaised',
+      surfaceSunken: 'neoNavySunken',
+      surfaceOverlay: 'overlayNavyNeo',
+      fillTertiary: 'fillNavyNeo3',
+      fillQuaternary: 'fillNavyNeo4',
+    },
+  },
+};
+
+/** `radius.card` / `radius.control` → `--gn-radius-card` / `--gn-radius-control`. Not a colour, so plain CSS length strings, no primitive/discipline concerns. */
+export type RadiusRole = 'card' | 'control';
+
+/** `hig` and `minimal` share the shipped radii; `neo`'s are the export's own, larger values. */
+export const radii: Record<StyleName, Record<RadiusRole, string>> = {
+  hig: { card: '16px', control: '8px' },
+  minimal: { card: '16px', control: '8px' },
+  neo: { card: '20px', control: '14px' },
+};
+
+export function radiusOf(style: StyleName, role: RadiusRole): string {
+  return radii[style][role];
+}
+
+/** `radius-card` → `--gn-radius-card`. */
+export function radiusVariableName(role: RadiusRole): string {
+  return `--gn-radius-${role}`;
+}
+
+export type ShadowRole = 'raised' | 'sunken' | 'overlay';
+
+/** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
+type ShadowLayer = {
+  x: number;
+  y: number;
+  blur: number;
+  colour: PrimitiveName;
+  inset?: boolean;
+};
+
+/**
+ * Every style×theme's raised/sunken elevation, transcribed from the export
+ * (`design-system/neo-tokens.json`). `overlay` is DERIVED, not measured —
+ * ruling item 6: neither exported file defines a dedicated overlay shadow,
+ * so it reuses that style×theme's `raised` treatment (a sheet or modal
+ * floating above the scrim reads as "raised" the same way a card does).
+ * `minimal` has no shadow in either theme — its cards/fields are flat by
+ * design (rule (b) keeps its controls identifiable by fill/label instead).
+ */
+const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
+  hig: {
+    light: {
+      raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
+      sunken: [],
+      overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
+    },
+    dark: {
+      raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
+      sunken: [],
+      overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
+    },
+  },
+  minimal: {
+    light: { raised: [], sunken: [], overlay: [] },
+    dark: { raised: [], sunken: [], overlay: [] },
+  },
+  neo: {
+    light: {
+      raised: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+      sunken: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkLight', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      overlay: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+    },
+    dark: {
+      raised: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      sunken: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkDark', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      overlay: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+    },
+  },
+};
+
+function shadowLayerCss(layer: ShadowLayer): string {
+  return `${layer.inset ? 'inset ' : ''}${layer.x}px ${layer.y}px ${layer.blur}px ${primitives[layer.colour]}`;
+}
+
+/** The CSS `box-shadow` value for one style×theme×role — `'none'` when that combination has no layers. */
+export function shadowValueOf(style: StyleName, theme: ThemeName, role: ShadowRole): string {
+  const layers = SHADOWS[style][theme][role];
+  return layers.length === 0 ? 'none' : layers.map(shadowLayerCss).join(', ');
+}
+
+/** `shadow-raised` → `--gn-shadow-raised`. */
+export function shadowVariableName(role: ShadowRole): string {
+  return `--gn-shadow-${role}`;
+}
 
 /**
  * Contrast guarantees the origin declares about itself. The tokens test
@@ -367,8 +608,16 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'focusRing', bg: 'surface', minimum: 3 },
 ];
 
-export function colorOf(theme: ThemeName, role: TokenRole): string {
-  return primitives[themes[theme][role]];
+/**
+ * `style` defaults to `'hig'` deliberately, not because `hig` is more
+ * correct but because `apps/mobile` calls this with two arguments (mobile
+ * has no style axis — Task 11 records the deferral) and must keep compiling
+ * and running unmodified. Its RENDERED colours change as a side effect of
+ * the palette adoption below; that is a recorded gap, not fixed here.
+ */
+export function colorOf(theme: ThemeName, role: TokenRole, style: StyleName = 'hig'): string {
+  const override = STYLE_COLOR_OVERRIDES[style]?.[theme]?.[role];
+  return primitives[override ?? themes[theme][role]];
 }
 
 /** `surfaceRaised` → `--gn-surface-raised`. */
@@ -376,19 +625,46 @@ export function cssVariableName(role: TokenRole): string {
   return `--gn-${role.replace(/[A-Z]/g, (upper) => `-${upper.toLowerCase()}`)}`;
 }
 
-function declarationsFor(theme: ThemeName): string {
-  return TOKEN_ROLES.map((role) => `${cssVariableName(role)}: ${colorOf(theme, role)};`).join(' ');
+const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
+const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay'];
+
+function declarationsFor(style: StyleName, theme: ThemeName): string {
+  const colours = TOKEN_ROLES.map((role) => `${cssVariableName(role)}: ${colorOf(theme, role, style)};`);
+  const radiusDecls = RADIUS_ROLES.map((role) => `${radiusVariableName(role)}: ${radiusOf(style, role)};`);
+  const shadowDecls = SHADOW_ROLES.map((role) => `${shadowVariableName(role)}: ${shadowValueOf(style, theme, role)};`);
+  return [...colours, ...radiusDecls, ...shadowDecls].join(' ');
 }
 
 /**
- * The stylesheet the shells inline. Light is the default; dark applies via an
- * explicit `data-theme="dark"` on the root element, or via OS preference when
- * no explicit choice was made. Both themes ship — switching never reloads.
+ * The stylesheet the shells inline. `hig`/light is the default (bare
+ * `:root`, no attribute needed for either axis); `[data-theme="dark"]` and
+ * `[data-style="minimal"|"neo"]` are independent runtime overrides, set on
+ * `document.documentElement` by `ThemeToggle`/`StyleToggle` respectively —
+ * never `<body>`. All four ship — switching either axis never reloads.
+ *
+ * **Emission order is load-bearing, not cosmetic.** `[data-style="X"]:not([data-theme="light"])`
+ * (the OS-dark arm for a non-hig style) and `:root:not([data-theme="light"])`
+ * (hig's own OS-dark arm) have IDENTICAL specificity (0,2,0) — attribute
+ * selectors don't stack unless nesting adds one, and `:not()`'s specificity
+ * is its argument's. A tie resolves by SOURCE ORDER, so every per-style
+ * block must be emitted AFTER the base `hig` blocks, or a `neo` user on an
+ * OS-dark device would see `hig`'s dark values win. `[data-style="X"][data-theme="dark"]`
+ * (the explicit arm) has higher specificity than `hig`'s (0,1,0) either way,
+ * so it needs no such care — but is still emitted last per style, matching
+ * the existing explicit-then-media order this file already used for `hig`.
  */
 export function themeStylesheet(): string {
-  return [
-    `:root { ${declarationsFor('light')} }`,
-    `[data-theme="dark"] { ${declarationsFor('dark')} }`,
-    `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('dark')} } }`,
-  ].join('\n');
+  const blocks: string[] = [
+    `:root { ${declarationsFor('hig', 'light')} }`,
+    `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
+    `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('hig', 'dark')} } }`,
+  ];
+  for (const style of ['minimal', 'neo'] as const) {
+    blocks.push(`[data-style="${style}"] { ${declarationsFor(style, 'light')} }`);
+    blocks.push(
+      `@media (prefers-color-scheme: dark) { [data-style="${style}"]:not([data-theme="light"]) { ${declarationsFor(style, 'dark')} } }`,
+    );
+    blocks.push(`[data-style="${style}"][data-theme="dark"] { ${declarationsFor(style, 'dark')} }`);
+  }
+  return blocks.join('\n');
 }

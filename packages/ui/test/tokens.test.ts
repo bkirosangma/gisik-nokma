@@ -8,12 +8,24 @@ import {
   colorOf,
   cssVariableName,
   primitives,
+  radiusVariableName,
+  shadowValueOf,
+  shadowVariableName,
   themeStylesheet,
   themes,
+  type ShadowRole,
+  type StyleName,
   type ThemeName,
 } from '../src/tokens.js';
 
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
+const STYLE_NAMES: StyleName[] = ['hig', 'minimal', 'neo'];
+const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay'];
+
+/** `hig` needs no `[data-style]` predicate — it is the unmarked base, reached through bare `:root`/`[data-theme]`. */
+function styleSelectorPredicate(style: StyleName): string {
+  return style === 'hig' ? '' : `[data-style="${style}"]`;
+}
 
 /** WCAG channel luminance from one `rr`/`gg`/`bb` hex pair. */
 function channelLuminance(pair: string): number {
@@ -56,13 +68,21 @@ describe('token structure', () => {
   });
 });
 
+/**
+ * 13.337-adjacent: every style now resolves its own surface/fill primitives
+ * (the neo-round ruling), so this loop gained a STYLE dimension 2026-09-09 —
+ * previously `hig` was the only style and this suite could not have caught
+ * `minimal`/`neo` breaking a declared pair.
+ */
 describe('declared contrast pairs meet their minimums (the base test case 1.1, reborn)', () => {
-  for (const theme of THEME_NAMES) {
-    for (const pair of CONTRAST_PAIRS) {
-      it(`${theme}: ${pair.fg} on ${pair.bg} ≥ ${pair.minimum}`, () => {
-        const ratio = contrastRatio(colorOf(theme, pair.fg), colorOf(theme, pair.bg));
-        expect(ratio).toBeGreaterThanOrEqual(pair.minimum);
-      });
+  for (const style of STYLE_NAMES) {
+    for (const theme of THEME_NAMES) {
+      for (const pair of CONTRAST_PAIRS) {
+        it(`${style}/${theme}: ${pair.fg} on ${pair.bg} ≥ ${pair.minimum}`, () => {
+          const ratio = contrastRatio(colorOf(theme, pair.fg, style), colorOf(theme, pair.bg, style));
+          expect(ratio).toBeGreaterThanOrEqual(pair.minimum);
+        });
+      }
     }
   }
 });
@@ -95,7 +115,12 @@ describe('CSS variable emission', () => {
   it('every var(--gn-…) in ui.css names a declared role', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const referenced = [...new Set([...css.matchAll(/var\((--gn-[a-z0-9-]*)\)/g)].map((hit) => hit[1]))];
-    const declared = new Set<string>(TOKEN_ROLES.map(cssVariableName));
+    const declared = new Set<string>([
+      ...TOKEN_ROLES.map(cssVariableName),
+      radiusVariableName('card'),
+      radiusVariableName('control'),
+      ...SHADOW_ROLE_NAMES.map(shadowVariableName),
+    ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
     // list would pass the assertion above by finding nothing at all.
@@ -104,6 +129,73 @@ describe('CSS variable emission', () => {
     // merely declared in TypeScript.
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
+  });
+});
+
+describe('the style axis (Task 14, 2026-09-09)', () => {
+  /**
+   * 13.337 — every token role has a value for every (style × theme), and it
+   * reaches `themeStylesheet()`'s output under the right selector. Mutation:
+   * drop one style×theme combination from the emitted stylesheet → RED
+   * naming that combination (not a generic "something changed").
+   */
+  it('every role appears under every style×theme selector in themeStylesheet()', () => {
+    const stylesheet = themeStylesheet();
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        for (const role of TOKEN_ROLES) {
+          const declaration = `${cssVariableName(role)}: ${colorOf(theme, role, style)};`;
+          expect(
+            stylesheet,
+            `${style}/${theme}/${role} — expected "${declaration}" under a selector combining ${styleSelectorPredicate(style) || '(bare :root)'} and ${theme === 'dark' ? '[data-theme="dark"] (or its OS-preference arm)' : '(unmarked light)'}`,
+          ).toContain(declaration);
+        }
+      }
+    }
+  });
+
+  it('the OS-dark arm exists for every non-hig style, not only hig', () => {
+    const stylesheet = themeStylesheet();
+    for (const style of ['minimal', 'neo'] as const) {
+      expect(stylesheet).toContain(`[data-style="${style}"]:not([data-theme="light"])`);
+      expect(stylesheet).toContain(`[data-style="${style}"][data-theme="dark"]`);
+    }
+  });
+
+  /**
+   * 13.338 — every shadow layer colour is an alpha primitive (8-digit hex),
+   * and `CONTRAST_PAIRS` names none of them — `relativeLuminance` ignores
+   * alpha, so a declared row on one would be exactly the false-green mode
+   * the fill primitives' own docblock warns against. Mutation: add a
+   * `CONTRAST_PAIRS` row naming a `shadow*` primitive → this reddens.
+   */
+  it('every shadow colour is an 8-digit alpha primitive named by no CONTRAST_PAIRS row', () => {
+    const shadowPrimitiveNames = Object.keys(primitives).filter((name) => name.startsWith('shadow'));
+    expect(shadowPrimitiveNames.length).toBeGreaterThan(0);
+    for (const name of shadowPrimitiveNames) {
+      const value = primitives[name as keyof typeof primitives];
+      expect(value, name).toMatch(/^#[0-9a-f]{6}[0-9a-f]{2}$/);
+    }
+    const shadowPrimitiveValues = new Set(shadowPrimitiveNames.map((name) => primitives[name as keyof typeof primitives]));
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        for (const pair of CONTRAST_PAIRS) {
+          expect(shadowPrimitiveValues.has(colorOf(theme, pair.fg, style))).toBe(false);
+          expect(shadowPrimitiveValues.has(colorOf(theme, pair.bg, style))).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('shadowValueOf renders "none" where a style×theme has no layers, and a real box-shadow otherwise', () => {
+    for (const theme of THEME_NAMES) {
+      for (const role of SHADOW_ROLE_NAMES) {
+        expect(shadowValueOf('minimal', theme, role)).toBe('none');
+      }
+    }
+    expect(shadowValueOf('hig', 'light', 'sunken')).toBe('none');
+    expect(shadowValueOf('hig', 'light', 'raised')).not.toBe('none');
+    expect(shadowValueOf('neo', 'light', 'sunken')).toContain('inset');
   });
 });
 
