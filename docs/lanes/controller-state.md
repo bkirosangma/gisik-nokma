@@ -1,5 +1,68 @@
 # Cross-lane controller — live state
 
+## ▶ TUESDAY ~17:1x IST — THE PER-SCREEN PLAN IS ON `main` AND TASK 0 (THE ACCESSIBLE-NAME GATE) IS MERGED. Execution is now **ONE TASK AT A TIME, owner reviews sign-in live before anything spreads.** `main` is `e5a2054`, gate GREEN, executor on Task 1 at ctx 58%. **Two of my own errors are recorded here first, because a restart would otherwise re-inherit both.**
+
+### MY #357 MERGE PUT `main` RED, AND MY CHECK OF THAT CLAIM WAS A FALSE GREEN
+
+**The plan PR (#357) landed `docs/superpowers/plans/2026-09-08-hig-per-screen.md` — a dated plan with
+`### Task N:` headings — and I merged it as "docs-only, gate result transfers".** That was wrong for
+this file specifically: since the MCP plan's Task 11, `scripts/check-task-ledger.mjs` READS dated plans
+and demands a ledger row per task, exiting 1 when none exist. **`pnpm check:tasks` went red on `main` at
+`93afc12` and I did not run it.** My own plan text says *"ledger rows must be added when each merges"*;
+I wrote the rule and skipped it. **Refinement, adopted: a plan file is not docs-only. Any PR touching
+`docs/superpowers/plans/*.md` gets the six project checks, `check:tasks` first.**
+
+**Then the second error, while verifying the first.** The executor reported the red and proved it
+inherited (a control on unmodified `main` failed identically). I ran `pnpm check:tasks > log; echo
+EXIT=$?` and got **`EXIT=0`** — and nearly wrote that the executor was wrong. The log's last line was
+`ELIFECYCLE Command failed with exit code 1`; the raw exit via `rtk proxy` was **1**. **`$?` measured
+the proxy hook, not pnpm** — the recorded rtk mode, hit while checking someone else's number.
+**Standing practice: an exit code that matters is read via `rtk proxy <cmd>`, or the log's own last
+line, never `$?` after a bare proxied command.** The executor was right on both counts and fixed the
+eight rows inside #358.
+
+### WHAT LANDED
+
+- **#357 — the plan.** 12 tasks, model per task by the coordination doc's failure-cost table: sonnet for
+  transcription (the plan carries complete CSS/markup), opus for the (b) "states" tasks and all
+  reviewers, Fable not dispatched. **Task 0 is a gate, not a screen** — the owner's copy rule protects
+  46 `aria-label` + 140 `role` that nothing watched. The executor's line is the design principle: *"a
+  rule enforced by a test survives a delegation; a rule enforced by attention does not."* The plan's
+  self-review caught four of my own from-memory claims the tree contradicted (no `within` import; no
+  border on the shell refusal to replace; **zero** `.gn-members` rules, not six; sign-in already a
+  `Card`) — Plan 1's defect class 1, caught before landing.
+- **#358 — Task 0.** `accessible-names.ts` sweeps the RENDERED DOM (better than my plan, which would
+  have scanned `.tsx` and counted attributes never emitted), two one-way baselines (signed-out and
+  signed-in are different populations: `/p/:projectId` alone has 13 roles and 4 `aria-selected` no
+  signed-out sweep can reach), the selector control asserted HARD before the ratchet, and
+  **mutation-witnessed**: dropping `aria-selected` from one tab reddens all three viewports naming
+  `/sign-in`. Baseline for `phone-390|/sign-in` is `role: 3, ariaSelected: 2` — exactly the plan's
+  prediction. Plus the eight ledger rows. Cases 13.285–13.287.
+- **Verified by me, not taken:** #358 drop check **with NO path filter** — 0 bytes, control 29,571.
+  My `-- $F` path-filtered control printed 0 bytes for the second time (also on #347) and is retired;
+  the no-filter form is the rule and it works. Forced gate at `e5a2054`: 33/33, `Cached: 0`, node
+  v22.22.2. **And I ran `test:e2e:viewport` on `main` myself — 19 passed, raw exit 0** — because
+  Playwright is not in the turbo gate, so the forced gate never exercises Task 0's own test.
+
+### SEQUENCING CHANGE (owner): one task at a time, sign-in first, owner feedback between screens
+
+0 → 1 → 2, each its own PR, then **STOP**: the owner reviews the login screen live against their
+reference image before 3a starts. Tasks 1 and 2 are the pieces sign-in is built from, not separate
+deliverables in the owner's view. **When Task 2 merges: rebuild the web container so the owner sees it,
+then hold.** Feedback on the shared pieces (segmented control, field, page header) is far cheaper before
+they spread to eighteen more screens than after.
+
+**Executor restart policy this stretch (owner: "check the ctx and restart if required, keep an eye on
+it"):** ctx 58% at Task 0's merge — below threshold, and the owner had typed an unsubmitted `go ahead
+with task 1` into its input box, which a kill would have destroyed. Not restarted. **Planned restart
+point: the pause after Task 2**, when nothing is queued and the owner is reviewing. Check ctx at every
+merge.
+
+**Ledger note for whoever adds rows for Tasks 4–8:** the checker parsed eight tasks from the plan
+(0, 1, 2, 3a, 3b, 9, 10, 11). The `### Task 4a / 4b:` … `### Task 8a / 8b:` headings were NOT parsed —
+those ten tasks have no rows and are invisible to `check:tasks` until either the headings are split or
+the checker learns the `Na / Nb` form. Not fixed here; recorded so it is not discovered as a surprise.
+
 ## ▶ TUESDAY ~16:2x IST — **WORK RESUMED; THE ENTRY BELOW SAYING IT STOPPED IS SUPERSEDED.** HIG adoption: palette and border sweep LANDED, the reconciliation audit is IN, and it says **no prototype can be applied literally**. `main` is `07c6cc0`, gate GREEN, zero open PRs, executor HOLDING on two owner decisions.
 
 **The stop was real and lasted about twenty minutes.** The owner resumed with *"merge #351 and apply the
