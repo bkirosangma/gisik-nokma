@@ -20,6 +20,22 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, at
+> `8172d67cdf047b6d30c636fe61b5c951cba8c273`. Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**, load 1.43, zero orphaned
+> vitest workers; `check-case-ids`, `check-case-citations`, `check-env-example`, `check-task-ledger`
+> and `check-runbook-commands` all EXIT 0. Viewport suite 19 passed / 2 skipped; stack sweep green on
+> five routes. Both type-scale baselines are committed at 0.
+>
+> **All four PRs are MERGEABLE: #326, #327, #328 (rebased this session onto `main` after #325 landed)
+> and #334.** #326/#327/#328 each merged `origin/main` in; conflicts were `Features.md`, this file and
+> `test-cases/13-*.md`, purely additive, resolved keep-both with main's side first and verified by
+> counting ANCHORED markers in the COMMITTED blobs — an unanchored check hits this file's own prose at
+> the line that describes the hazard.
+>
+> **The queue after #334 is empty of assigned work.** All five of the owner's 2026-09-08 rulings now
+> have PRs. What is OWED and not done: the four unwitnessed type-scale fixes (see below) and Plan 9's
+> client-side notification consumer (`controller-state.md` #287).
+
 # ▶ TUESDAY 2026-09-08 ~07:5x IST — **TYPE SCALE: THE FINDING HAD NO INSTRUMENT, AND THE OBVIOUS ROUTES WERE THE WRONG ONES.**
 
 *Branch `exec/117-type-scale`, off `main` (`8cb4cd5`, i.e. AFTER #325 landed). Deliberately NOT stacked
