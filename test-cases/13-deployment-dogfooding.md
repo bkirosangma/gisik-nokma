@@ -1953,15 +1953,30 @@ what works, then style what remains**.*
   `APPLE_APP_BUNDLE_IDENTIFIER` is OMITTED rather than present-and-undefined, via `Object.keys` —
   `toEqual` treats a key holding `undefined` as absent and would pass against the shape being avoided.
   — (`apps/server/test/routes/auth-methods.test.ts`)
-- **13.326** ✅ The page renders exactly the social methods the server accepts, **asserted in both
-  directions because each alone passes on a broken page**: a page that never renders a social button
-  satisfies the negative half, and a page that renders both unconditionally satisfies the positive.
-  With the server answering all-false, count 0 for Google, Apple and the old passkey button; with it
-  answering all-true, both resolve by their exact shipped accessible names, have empty text content
-  (icon-only), and each reaches the provider it names — a mark wired to the wrong provider would
-  satisfy every other assertion. Passkey is asserted as `signIn.passkey({ autoFill: true })`, **the
-  argument and not merely the call**, because a bare `passkey()` would satisfy "was called" while being
-  the dead modal-triggering thing it replaces. — (`apps/web/test/sign-in.test.tsx`)
+- **13.326** ✅ The page renders exactly the social methods the server accepts. The load-bearing shape
+  is a **DISCRIMINATION case, and it replaced a negative that could not fail** — the second instance of
+  that defect in this one change set, found by mutation and not by reading.
+  *The first version answered `{google:false, apple:false}` and wrapped the absence in `waitFor`.
+  **`waitFor` waits for nothing when its callback asserts an absence**: it retries until the callback
+  PASSES, and "the button is not there" passes on the first tick, before the fetch resolves and before
+  the page has been told anything. The mutation that drops the per-provider check and renders the row
+  on any answer left it GREEN. It asserted the absence of a state update, not the presence of a gate —
+  and the comment at the site claimed `waitFor` handled it, which is what made the gap read as covered.*
+  The replacement answers **asymmetrically** — `apple: true, google: false`, then the reverse. The
+  enabled button appearing is a positive, genuinely awaited signal (`findByRole` waits because it waits
+  for something to EXIST) and the other's absence is read off the same settled DOM; no tick passes
+  vacuously. Both orderings run, because a page rendering whichever provider it checked first satisfies
+  one of them. The all-disabled answer is kept for the one thing the asymmetric pair cannot show — that
+  the marks ROW disappears rather than rendering empty — anchored on the fetch having been made and its
+  body consumed plus a microtask flush, which is weaker by construction and labelled so at the site.
+  With the server answering all-true, both buttons resolve by their exact shipped accessible names,
+  have empty text content (icon-only), and each reaches the provider it names — a mark wired to the
+  wrong provider would satisfy every other assertion. Passkey is asserted as
+  `signIn.passkey({ autoFill: true })`, **the argument and not merely the call**, because a bare
+  `passkey()` would satisfy "was called" while being the dead modal-triggering thing it replaces.
+  Mutation-witnessed: the provider check dropped reddens the discrimination case and the all-disabled
+  case; the `google:true, apple:false` ordering correctly stays green because that mutation leaves
+  Apple's branch intact, which is why two orderings run. — (`apps/web/test/sign-in.test.tsx`)
 
 > **Case 3.84 was amended in the same change set** (`apps/web/test/sign-in.test.tsx`): it asserted that
 > all four methods render as controls, and asserting the presence of the two that could not work is what
