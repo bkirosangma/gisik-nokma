@@ -1225,6 +1225,97 @@ close the unambiguous part, defer CSP.*
 > forced the distinction. It now names the header that must be absent and asserts the others are there,
 > which fails if the protocol gate is removed AND if the function stops being wired.
 
+
+## Tap targets, measured and moved (owner-assigned, 2026-09-08)
+
+*Pre-launch item 6/7 recorded tap targets as "reported, not fixed — an owner call about the design".
+Assigned 2026-09-08. No new case ids: the viewport suite's ratchet (13.254–13.255) already IS the test,
+and minting cases that restate a committed baseline would be numbering the same evidence twice. What
+changed is the baseline, and this is the reading behind it.*
+
+| route × viewport | before | after |
+|---|---|---|
+| `/sign-in` × phone-390 · tablet-768 · desktop-1512 | 6 each | **0 each** |
+| `/help` × phone-390 | 10 | 10 |
+| `/help` × tablet-768 · desktop-1512 | 16 each | 16 each |
+| **total** | **60** | **42** — 18 removed |
+
+**Three fixes, each traced to a measurement rather than a guess:**
+
+- `.gn-button` was **`340x38`** — six pixels short of 44, *everywhere it is used*, which made the shared
+  button the single largest source of offenders in the product. `display: inline-flex` is the
+  load-bearing half: a button whose height was padding plus one line of text ignores `min-height`
+  otherwise.
+- `.gn-view-tabs button` was **`55x21`**. The same class carries the board's view tabs, which the
+  pre-launch review measured at `52x21` — one rule, both surfaces.
+- `.gn-sign-in__method label input` was **`340x21`**. Unclassed `<input>`s inside their labels, so the
+  label is the only handle. `font-size: 1rem` went with the height: under 16px iOS Safari zooms the
+  viewport on focus.
+
+**`/help` does not move, and that is a decision rather than a leftover.** Its offenders are
+`a.gn-help__toc-link`, raised from **23px to 24px** — WCAG **2.5.8**'s floor, which they now meet. The
+suite enforces **2.5.5**'s enhanced 44px, and a nineteen-entry table of contents at 44px each is 836px
+tall on a 390px phone. Dense in-list links stay at 24; standalone controls use 44. The ratchet holds the
+count so it can fall again but never rise.
+
+### The signed-in shell had no tap-target guard at all
+
+The pre-launch review measured 48 interactive elements under 24×24 on the board and recorded them as
+"reported, not fixed". **Nothing pinned them.** `e2e-stack/viewport.spec.ts` measured OVERFLOW only, and
+the unauthed suite cannot see these pages — so the one place those counts existed was a prose note in a
+checklist, which no run can contradict. It now carries the same sweep, the same 44px threshold and the
+same ratchet, against `e2e-stack/tap-target-baseline.json`.
+
+| signed-in `/my-work` at 390px | offenders | smallest examined |
+|---|---|---|
+| with `.gn-button` fixed (first reading) | 9 | `89x23` — the nav's links |
+| after `.gn-nav a, .gn-nav button` → 44px | 7 | `249x23` — `button.gn-attention__title` |
+| after the nav MIN-WIDTH and the title buttons → 24px | **6** | `249x24` |
+
+**Forcing the ratchet to 0 to print all seven, instead of re-reading the smallest, is what finished
+this.** The list was not what the previous fix assumed:
+
+```
+ 39x44  a.gn-nav__inbox "Inbox"          <- tall enough, six pixels too NARROW
+249x23  button.gn-attention__title  (x4)
+249x23  button.gn-my-work__title    (x2)
+```
+
+`.gn-nav a, .gn-nav button` had only `min-height`. **A tap target is a box**, a short word is a narrow
+target, and re-reading the COUNT would never have shown it — the count was 7 either way. Same shape as
+the `340x38` miss earlier in this section, one axis over.
+
+The six title buttons went to 24px, WCAG 2.5.8's floor, and deliberately not 2.5.5's 44: they are bare
+text buttons sharing a baseline with a chip and a reason on the same row (`.gn-attention__item` is
+`align-items: baseline`), and 44px would break that alignment and turn a compact strip into a list of
+slabs. `inline-flex` is the load-bearing half — `padding: 0` means the button's height IS its line box,
+so `min-height` alone does nothing to it.
+
+The sweep is IMPORTED from `e2e-viewport/tap-targets.ts`, a plain module. The first attempt imported it
+from `responsive.spec.ts` and **Playwright loaded that spec's `test()` registrations into the stack
+config** — six `project "" has no entry in VIEWPORTS` failures from an import that typechecked and read
+as harmless. A spec is not a library. The move was verified not to shift any number: the unauthed suite
+re-ran 19 passed with byte-identical readings.
+
+**The remaining 7 are dense in-list controls** — attention-row titles at `249x23`, the same shape as
+`/help`'s TOC links. By the rule this change follows they should go to 24px (2.5.8) rather than 44px.
+**Not shipped, deliberately:** the compose `web` container serves a pre-built image, so verifying one
+more CSS rule costs a full rebuild — and this session has already had one of those die on `ENOSPC`
+mid-run. An unverified CSS change is exactly what the two process notes below are about. The number is
+recorded so the next person starts from a reading rather than a guess.
+
+> ### Two process notes from this run
+>
+> **A `python3` `.replace()` with no assertion is a silent no-op.** The first attempt at the
+> `.gn-button` fix matched against whitespace-collapsed text that only existed in my own earlier
+> `print`, so nothing was edited — and the re-measurement, unchanged at `340x38`, is what said so before
+> the assertion did. Every edit in this change asserts its anchor is present first.
+>
+> **`UPDATE_TAP_BASELINE=1` does not lower a number.** `recordTapBaseline` writes only ABSENT keys, on
+> purpose, so a branch that made things worse cannot re-baseline itself upward — the file's own docblock
+> says falling numbers are re-recorded by deleting it. Two runs reported "0 removed" before that was
+> read rather than assumed.
+
 ## The ledger guard for a PR that never merged (2026-09-08)
 
 *`mcp-server/12` read `in-flight  324  -` while the work had landed through **#329**. Merging #323

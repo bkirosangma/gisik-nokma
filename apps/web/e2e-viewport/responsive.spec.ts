@@ -1,6 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
 import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
 
 /**
@@ -243,112 +242,6 @@ async function measureOverflow(page: Page): Promise<Overflow> {
       bodyScrollWidth: document.body.scrollWidth,
       offenders: offenders.slice(0, 10),
       examined,
-    };
-  });
-}
-
-type TapTargets = {
-  /**
-   * How many nodes the SELECTOR matched, before any visibility or exemption
-   * filtering. This is the anti-broken-selector control, and it is separate
-   * from `examined` on purpose: `examined` can legitimately be 0 on a prose
-   * page whose only control is one inline link, but `rawMatches` can only be 0
-   * if the selector itself stopped matching. A floor on `examined` would
-   * therefore redden a true reading; a floor on `rawMatches` reddens exactly
-   * the thing it is named for.
-   */
-  rawMatches: number;
-  examined: { selector: string; w: number; h: number }[];
-  offenders: { selector: string; w: number; h: number }[];
-  inlineExempt: { selector: string; w: number; h: number }[];
-  invisibleSkipped: number;
-  smallestExamined: { selector: string; w: number; h: number } | null;
-};
-
-/**
- * WCAG 2.5.8 "Target Size (Minimum)" is 24x24; the 44x44 this task asks for is
- * the stricter 2.5.5 / platform-HIG number, and it is also the number this
- * repo's own CSS is written against — `packages/ui/src/ui.css:1250` sets
- * `min-height: 2.75rem` with the comment "44px — the minimum touch target".
- *
- * THE EXEMPTION, AND WHY IT IS NOT A LOOPHOLE. Both success criteria exempt a
- * target that is "in a sentence or its size is otherwise constrained by the
- * line-height of non-target text" — an inline link inside a paragraph cannot be
- * 44px tall without breaking the paragraph. `/privacy` and `/terms` are almost
- * entirely prose with inline links, so without this the sweep would report
- * dozens of "violations" that the standard itself excuses, and the real
- * offenders would drown.
- *
- * The loophole guard is that exempted elements are COUNTED AND RETURNED, not
- * silently dropped. A run that exempted everything is visible as such in the
- * output. The rule is narrow on purpose: `display: inline` AND a parent
- * carrying text of its own beyond the link. An `inline-block` control, or a
- * link that is its parent's entire content, is NOT exempt.
- */
-async function measureTapTargets(page: Page): Promise<TapTargets> {
-  return page.evaluate(() => {
-    const SELECTOR = [
-      'a[href]',
-      'button',
-      'input:not([type="hidden"])',
-      'select',
-      'textarea',
-      'summary',
-      '[role="button"]',
-      '[role="link"]',
-      '[role="tab"]',
-      '[role="checkbox"]',
-      '[role="switch"]',
-      '[tabindex]:not([tabindex="-1"])',
-    ].join(', ');
-
-    const describe = (el: Element): string => {
-      const id = el.id !== '' ? `#${el.id}` : '';
-      const cls =
-        typeof el.className === 'string' && el.className !== ''
-          ? `.${el.className.trim().split(/\s+/).join('.')}`
-          : '';
-      const text = (el.textContent ?? '').trim().slice(0, 28);
-      return `${el.tagName.toLowerCase()}${id}${cls}${text !== '' ? ` "${text}"` : ''}`;
-    };
-
-    const examined: { selector: string; w: number; h: number }[] = [];
-    const offenders: { selector: string; w: number; h: number }[] = [];
-    const inlineExempt: { selector: string; w: number; h: number }[] = [];
-    let invisibleSkipped = 0;
-
-    const matched = Array.from(document.querySelectorAll(SELECTOR));
-    for (const el of matched) {
-      const cs = getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      if (cs.display === 'none' || cs.visibility === 'hidden' || r.width === 0 || r.height === 0) {
-        invisibleSkipped += 1;
-        continue;
-      }
-      const entry = { selector: describe(el), w: Math.round(r.width), h: Math.round(r.height) };
-      const parentText = (el.parentElement?.textContent ?? '').trim().length;
-      const ownText = (el.textContent ?? '').trim().length;
-      const inlineInProse = cs.display === 'inline' && parentText > ownText;
-      if (inlineInProse) {
-        inlineExempt.push(entry);
-        continue;
-      }
-      examined.push(entry);
-      if (entry.w < 44 || entry.h < 44) offenders.push(entry);
-    }
-
-    const smallestExamined =
-      examined.length === 0
-        ? null
-        : examined.reduce((a, b) => (Math.min(a.w, a.h) <= Math.min(b.w, b.h) ? a : b));
-
-    return {
-      rawMatches: matched.length,
-      examined,
-      offenders,
-      inlineExempt,
-      invisibleSkipped,
-      smallestExamined,
     };
   });
 }
@@ -634,24 +527,6 @@ async function measureContrast(page: Page): Promise<Contrast> {
  * ratchet cannot quietly re-baseline itself upward on the branch that made
  * things worse. Falling numbers are re-recorded by deleting the file.
  * ──────────────────────────────────────────────────────────────────────────*/
-
-const TAP_BASELINE_PATH = fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));
-
-function readTapBaseline(): Record<string, number> {
-  try {
-    return JSON.parse(readFileSync(TAP_BASELINE_PATH, 'utf8')) as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
-
-function recordTapBaseline(key: string, count: number): void {
-  const current = readTapBaseline();
-  if (current[key] !== undefined) return;
-  current[key] = count;
-  const ordered = Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(TAP_BASELINE_PATH, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
-}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * THE TESTS
