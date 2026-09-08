@@ -230,6 +230,89 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~17:2x IST — **HIG PHASE 1: THE PALETTE. AND THE CONTROLLER CAUGHT A TRANSIENT I COULD NOT SEE FROM INSIDE THE CHANGE.**
+
+*Branch `exec/128-hig-tokens`, off `main` `29c5b25`. Block `13.281`–`13.320` allocated to me;
+`13.281`–`13.282` minted. Token layer ONLY — no component CSS.*
+
+## THE PHASE SPLIT, AND WHY MINE CHANGED
+
+I proposed the token/selector seam and the controller adopted it. **Then it removed something from my
+Phase 1 for a reason that was invisible from inside the change: the owner is manually testing `main`
+right now.** Remapping `border` to the 3:1-clearing grey WITHOUT removing the declarations would give
+every card, chip, table cell and column a heavy dark rule — **and no gate would object, because a
+DARKER border fails nothing** — leaving the product visibly wrong between two PRs.
+
+So the border story is **atomic in Phase 2**: remap the role, remove the declarations, add the
+`border`-on-`surface` and `focusRing`-on-`surface` rows, all in one change. **I had already added those
+two rows and reverted them.** The measurement they were added to catch, taken here so Phase 2 starts
+from a number rather than a hunch: **`border` on `surface` is 1.34 light and 1.49 dark against 3:1**,
+and the pair FAILED in both themes the moment it was declared — which is the proof the row is
+load-bearing, banked before it was pulled.
+
+**The general lesson: a gate cannot see a transient that is visually wrong and numerically fine.** My
+reasoning about R1 was right and the controller said so; my SEQUENCING was wrong, and only someone
+watching the product rather than the diff could tell.
+
+## WHAT LANDED
+
+§8 applied. Four values deliberately not Apple's, each argued at its line: `green700` kept (Apple's
+`#248A3D` fails `successText` at **4.40** vs the incumbent's **5.40**); border primitives untouched
+(above); dark status inks untouched (§8 silent, all clear, `accentText` on `accent` 6.38 dark); muted
+greys SOLID rather than the alpha the brief flags as **"a reconstruction, not a citation"** — its own
+author marked that 80% figure not-to-be-quoted-as-Apple's, and compositing it would have baked an
+unverified number into the palette.
+
+**`categoryOpen` stopped sharing `inkMuted` with `textMuted`**, and the reason is measurable: the dot
+grey owes 3:1, read text owes 4.5 on three backgrounds, and Apple's accessible grey **fails the text job
+at 4.16 on `surfaceSunken`**. One grey could not hold both.
+
+## METHOD WORTH REUSING: the pairs picked the values, not me
+
+Before editing anything I wrote a solver that **parses `CONTRAST_PAIRS` out of the real file** (never
+retyped) and scores a candidate palette against all 27 in both themes. First run: **0 failures** — which
+is exactly the shape of a check that is not checking, so the control was to swap in Apple's green and
+require the known **4.40** failure. It fired. Only then was the palette written.
+
+Three independent instruments then agreed on the two load-bearing numbers — the brief's §8 table, my
+solver, and the test runner's own assertion output — printing **4.16** and **4.40/4.395**.
+
+## MUTATIONS — four, no survivors, each naming its own site
+
+| # | mutation | reddens |
+|---|---|---|
+| M1 | "complete the palette": Apple's green | **2** — 13.281 (names the hex) AND the declared pair at **4.395** |
+| M2 | "tidy up": reunite the greys on the safe grey | 1 — 13.282's identity assertion |
+| M3 | the DANGEROUS reunion: `textMuted` onto the dot grey | **2** — 13.282 AND the declared pair at **4.164** |
+| M4 | falsify 13.282's stated REASON (make the dot grey clear 4.5) | 1 — the assertion carrying the *why* |
+
+M4 is the one worth copying: it attacks the case's **explanation** rather than its subject, so the case
+cannot keep passing after the reason it gives has become false.
+
+## ⚠ A CONTROL CAUGHT MY OWN CITATION CHECK SEARCHING THE WRONG SPACE
+
+Checking 13.281/13.282 were cited, my negative control (`13.9999`) returned **1 file, not 0**. The
+"match" was a substring of a duration float inside `node_modules/.vite/vitest/…/results.json`. **The
+search space included build caches, so the POSITIVE readings were untrustworthy too** — 13.282 had
+reported "2 files". Re-run excluding `node_modules`: one real file each, control NONE, and the repo's
+own ratchet (`pnpm check:citations`) passes exactly, 202/202 on this file with 0 uncited.
+
+Wrong-directory enumeration is on this repo's silent-empty list; this is the first time it produced a
+false POSITIVE rather than a false empty.
+
+## STATE
+
+* Gate **33/33 EXIT 0** on **Node v22.22.2** — and only **15 of 33 cached**, so the colour-dependent
+  suites genuinely re-ran (server 1457/5 skipped, app-core 1152, web 152, mobile 27, desktop 8).
+* Both probes re-run clean. `docs/hig-adoption-brief.md` §9 now records step **3a done / 3b pending**
+  so nobody reads step 3 as outstanding-in-full.
+* **NEXT, in order, per the controller:** Phase 2 = the 326 border declarations + the role remap + the
+  two pairs, atomic. **THEN the reconciliation audit — and no per-screen restyle before it is
+  reviewed.** The prototypes are NOT faithful: `SignIn` invents a password method that does not exist
+  in `auth.ts` and drops Phone, Google and passkey. The audit classifies every difference as Styling /
+  Invented / Dropped / Copy, and its purpose is to stop working features being deleted to match a
+  picture.
+
 # ▶ TUESDAY 2026-09-08 ~16:3x IST — **PR #350 OPEN. THE PARITY HEADLINE WAS FALSE AND TWO REVIEWERS FOUND IT INDEPENDENTLY.**
 
 *Branch `exec/127-signin-bucket`, five commits. Read this entry before the one below it: that entry was
