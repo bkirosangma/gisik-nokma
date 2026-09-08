@@ -1,5 +1,97 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY ~11:5x IST — #341 AND #342 MERGED, OWN FORCED GATE GREEN AT `c91bcf6`, EXECUTOR RESTARTED AT THE FIXED POINT. **The standing drop-check rule cried wolf on this merge, and the correction matters more than the merge does.**
+
+**Own forced gate at `c91bcf6`**, run after a real `git checkout main && git merge --ff-only origin/main`:
+`GATE_EXIT=0` · **`Tasks: 33 successful, 33 total`** · node **`v22.22.2`** printed · zero
+`Unsupported engine` · **`Cached: 0 cached, 33 total`** — `--force` genuinely bypassed the cache rather
+than replaying it, which is the specific defence against this file's own turbo-cache-scoping entry.
+**320 test files / 3,908 passed | 5 skipped** (27+4+12+15+8+8+74+3+21+143+5 files;
+464+85+282+178+43+90+1152+8+148+1436+27 tests). **The totals did not move, and that is the point** —
+#342's only code change is a docblock, so a moved count would have been the anomaly. All six project
+checks EXIT 0 under `nvm use 22`: `check:tasks` **190/190 VERIFIED COMPLETE** with `origin/main`
+confirmed `c91bcf6e`, `check:citations` ratchet **holds exactly on every file, 0 uncited**,
+`check-case-ids` **1,777 unique ids, highest 15.17**. Zero orphaned vitest workers (`ppid=1` sweep, the
+narrow form — never `pkill -f vitest`); no gate lock.
+
+**One of those six was my own wrong command, not a red, and rule 4's shape caught it.** `pnpm
+check-case-ids` exited **254** — pnpm's "no such script" code. It is not a root script; the real
+invocation is `node scripts/check-case-ids.mjs`, which exits 0 with a passing self-test. **An exit code
+from a command that never ran is not a measurement of the code**, and the brief's rule 4 ("no `Tasks:`
+line means your command is wrong") is the same instinct one level out. Recorded so the next controller
+runs it correctly the first time.
+
+---
+
+### ⚠ THE DROP CHECK PRINTED 4,310 BYTES AND NOTHING WAS DROPPED. The rule as written has a false-positive mode, and its failure direction is the dangerous one.
+
+The corrected rule this file adopted hours ago reads: **`git diff origin/main <branch-tip>`, no path
+filter, empty is the only proof.** Run on #342 it printed **4,310 bytes**. By the rule's own words, a
+drop.
+
+**It was not.** `main` had advanced: my own #341 merged between the executor's branch being cut and its
+PR being merged, so `main` legitimately held a commit the branch had never seen. `git diff A B` renders
+content-in-A-not-in-B as deletions — **so a branch merely BEHIND `main` is byte-for-byte
+indistinguishable from `main` having LOST the branch's work.**
+
+**Why this is worse than a nuisance.** The rule trains you to read non-empty as a drop. The first time
+it cries wolf the natural repair is the wrong one — *"that's just main moving ahead"* — and from then
+on every non-empty result gets waved through on plausibility. **A real drop and a stale base emit the
+same signal, so any habit that dismisses one dismisses both.** This file has already paid for a drop
+that every available signal reported as success; a check that fails for reasons it does not mean is the
+same disease facing the other way.
+
+**Refined rule, adopted here. When the diff is non-empty, do NOT interpret the byte count — PARTITION it:**
+
+    # 1. the drop question, and the ONLY thing that answers it
+    git diff origin/main <branch-tip> -- <every file the PR touched>     # MUST be empty
+    #    file list from `gh pr diff <n> --name-only`, never from memory
+
+    # 2. account for the remainder
+    git diff --name-only origin/main <branch-tip>
+    #    every file outside the PR's own set must be NAMED and attributed to a
+    #    specific merge main gained independently — not "probably main moved"
+
+    # 3. positive control through the SAME path-filtered pipeline, not the unfiltered one
+
+Step 3 is not ceremony: a control that takes a different path certifies nothing, which is this
+project's most-repeated tooling lesson. **Measured on #342:** unfiltered 4,310 bytes over exactly one
+file (`controller-state.md`, mine, attributable to #341); the PR's own **six files diffed to 0 bytes**;
+positive control on that same six-file pipeline printed **39,656 bytes**, proving the instrument could
+speak. Nothing dropped. Reachability confirmed separately (`c91bcf6` is an ancestor of `origin/main`) —
+content and location, both halves, as this file already requires.
+
+---
+
+**#341 (my own, docs-only) — the owner's three rulings, recorded.** Merged `bda9459`, drop check empty
+with a positive control at 4,310 bytes, reachability confirmed, delta measured docs-only so the prior
+gate transferred rather than being re-asserted.
+
+**#342 (executor) — the widened #287 sweep. Three enumeration holes, each measured.** Its own
+`task-ledger.tsv` row is an **annotation, not a status change** — `done`/`93`/`e09666c` all byte-identical
+across the diff, so the brief's trigger 2 did not fire and this was verified rather than assumed. Its
+code change is a **docblock only**. Findings: (i) `test-cases/11-calendar-notifications.md`'s next-free
+pointer named an id already live, traced through the file's own history to prove `max+1` is the
+convention, that **#293 broke it**, and that **#304 already minted the collision** and escaped a
+duplicate only by carrying the fault forward — nothing validates that line; (ii) a ledger row citing a
+path #293 deleted, annotated rather than rewritten, found by testing **all 166** cited artefact paths
+for existence, a property `check:tasks` never validates — with the honest limit stated, that its own
+regex's recall is unmeasured so 1-of-166 is a **floor, not a count**; (iii) case **7.243** flipped ❌→✅
+legitimately, since it demanded closure *by removing the obstacle, never by softening the assertion*,
+which is exactly what #293 did. It also **self-reported a FAILED positive control** (a `.sh` sweep
+returned 0/4 because the scripts it sought live outside the repo) and repaired it before the conclusion
+rested on it.
+
+**Executor restarted at the fixed point, preconditions verified rather than assumed:** worktree clean,
+local tip `== origin` tip, zero unpushed commits, its PR merged. Relaunched via a launcher script so the
+24,943-byte brief passes as one double-quoted argument and is **never shell-interpreted** — no
+`send-keys` at startup, which also sidesteps the copy-mode hazard entirely. Confirmed live and
+self-orienting from the handoff on a fresh context.
+
+**Next, and deliberately not yet sent:** the owner's three-item dispatch
+(`gisik-nokma-lanes/CTL-RULING-2026-09-08-owner-three.md`). Held until this anchor merges so the gate
+and the executor are not contending for the machine — this file's own load-average lesson.
+
 ## ⚖ TUESDAY ~11:3x IST — OWNER RULED ALL THREE CARRIED ITEMS. Both were "owner-owned, unchanged" in the entry below; neither is any longer. `main` is `5191cf4`, zero open PRs, executor mid-sweep on #287 — **not interrupted.** Dispatch written, deliberately deferred.
 
 **The owner asked for both carried items in plain terms, was given them, and ruled:**
