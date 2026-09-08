@@ -56,6 +56,28 @@ tonight grepped for `×` against a reporter that prints `1.` and read five kills
 **EXIT 0, 1754 unique ids** — so the six new ids collide with nothing.
 
 
+# ▶ TUESDAY 2026-09-08 ~03:1x IST — **THE MOBILE DEV-TOKEN BUILD GUARD (owner-assigned).**
+
+*Off `main`, independent of #323/#324/#325. Overlap is narrative only.*
+
+`EXPO_PUBLIC_DEV_TOKEN` is substituted into the bundle at build time — that is what the prefix means —
+so a build carrying one publishes a working bearer credential to whoever holds the binary. The
+pre-launch checklist recorded it 2026-09-07 with an owner; assigned 2026-09-08.
+
+**The default is REFUSE.** "Fail when this is a release build" is the wrong way round: there is no
+reliable release signal at build time, and a control that needs a signal to be PRESENT before it fires
+fails open the moment it is absent. A non-empty token stops the build unless `GISIK_ALLOW_DEV_TOKEN=1`
+says otherwise.
+
+**It reads `.env*` files, not just `process.env`** — that is how `EXPO_PUBLIC_*` is normally set, so an
+env-only guard is blind on exactly the build most likely to be carrying a token.
+
+Cases 12.390–12.393, six mutations, five killed and **one recorded as equivalent rather than chased**:
+removing the `#`-comment check kills nothing because exact key equality already rejects every commented
+form — measured and printed, not assumed. Weakening a case to kill an equivalent mutant is how a suite
+starts asserting the implementation instead of the property.
+
+
 # ▶ TUESDAY 2026-09-08 ~05:0x IST — **SIGNED-IN TAP TARGETS 7 → 6, AND A TARGET IS A BOX.**
 
 *Folded into `exec/116-tap-targets` / PR #328 rather than opened as a fifth PR — same item, same files,
