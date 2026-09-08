@@ -416,7 +416,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   it('webOrigin: null disables the HTTP-Origin check as well as CORS — one fact, one switch', async () => {
     const { app, recorder } = build({
       webOrigin: null,
-      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60 },
     });
     const response = await app.inject({
       method: 'POST',
@@ -446,7 +446,19 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 describe('rate limiting', () => {
   const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
     webOrigin: null,
-    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60, ...over },
+    rateLimit: {
+      authMax: 100,
+      eventsMax: 100,
+      inviteMax: 100,
+      mcpMax: 100,
+      // Deliberately EQUAL to `authMax` in the default, so that a case which
+      // narrows one bucket is testing that bucket and nothing else. A helper
+      // whose sign-in default were tighter than its auth default would make
+      // every `authMax`-narrowing case ambiguous about which limiter answered.
+      signInMax: 100,
+      windowSec: 60,
+      ...over,
+    },
   });
 
   it('429s the request over the auth limit, names the refusal, sets retry-after', async () => {
@@ -668,7 +680,7 @@ describe('rate limiting', () => {
   it('an OPTIONS preflight is not charged to the auth bucket', async () => {
     const { app } = build({
       webOrigin: WEB_ORIGIN,
-      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60 },
     });
     await app.inject({
       method: 'OPTIONS',
@@ -842,6 +854,173 @@ describe('rate limiting', () => {
       expect(response.statusCode).not.toBe(429);
     }
     await app.close();
+  });
+});
+
+// ── The sign-in bucket ───────────────────────────────────────────────────────
+
+/**
+ * The fifth bucket, and the first that classifies by PATH rather than by
+ * Fastify route pattern.
+ *
+ * ## Why these cases cannot discriminate by response body, and what they use
+ * instead
+ *
+ * #347's guard could name which limiter answered by reading the body, because
+ * the two limiters were written by different authors: ours answers
+ * `{"error":"rate_limited",…}` and better-auth's `{"message":"Too many
+ * requests…"}`. Both buckets here are OURS and share that body byte for byte,
+ * so a body assertion would pass whichever one refused and would prove nothing
+ * about the new one.
+ *
+ * The discriminator is the ORDINAL, with its positive control built into the
+ * same request pair: a sign-in path is refused at the sign-in bucket's ceiling
+ * while a NON-sign-in path from the SAME client, in the SAME app, is still
+ * being served. One assertion cannot be satisfied by "everything is limited"
+ * and the other cannot be satisfied by "nothing is limited".
+ */
+describe('rate limiting — the sign-in bucket', () => {
+  const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
+    webOrigin: null,
+    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60, ...over },
+  });
+
+  /**
+   * 13.275 — a sign-in path is bounded by its own, tighter budget, and the general auth budget is NOT what refused it.
+   *
+   * The load-bearing case. `authMax: 100` against `signInMax: 2` is a
+   * STRUCTURAL separation, not a comment: were the two equal, the general
+   * bucket would refuse at the same ordinal and this test would pass with the
+   * sign-in bucket deleted — the shape of check that #347 shipped first and had
+   * to rewrite.
+   */
+  it('refuses the third sign-in while the same client’s session reads are still served', async () => {
+    const { app } = build(limits({ signInMax: 2, authMax: 100 }));
+    const first = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const second = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const third = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    // The positive control, and the whole reason this is a finding rather than
+    // "the app 429s": the SAME client, one request later, on a path outside the
+    // sign-in family, is still being served out of a 100-request budget that
+    // three sign-ins could not have exhausted.
+    const sessionRead = await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    await app.close();
+    expect(first.statusCode).not.toBe(429);
+    expect(second.statusCode).not.toBe(429);
+    expect(third.statusCode).toBe(429);
+    expect(third.json()).toEqual({ error: 'rate_limited', retryAfterSeconds: 60 });
+    expect(sessionRead.statusCode).not.toBe(429);
+  });
+
+  /**
+   * 13.276 — a sign-in request is charged to the general auth bucket AS WELL, not instead of it.
+   *
+   * This is the anti-LOOSENING guard, and it is the case that would go red if
+   * someone "simplified" the hook by charging a matching path to the sign-in
+   * bucket INSTEAD of the general one. That refactor reads like a tidy-up and
+   * is a real weakening: one client would get `authMax + signInMax` requests
+   * against the mount where it gets `authMax` today, reversing the third ground
+   * of the ruling that authorised this bucket ("per attacker, ours is TIGHTER").
+   *
+   * `signInMax: 100` against `authMax: 2` is the previous case's separation
+   * inverted, so the only bucket that can produce this 429 is the general one.
+   */
+  it('sign-in requests spend the general auth budget too — the bucket adds, it does not replace', async () => {
+    const { app } = build(limits({ authMax: 2, signInMax: 100 }));
+    await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const sessionRead = await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    await app.close();
+    expect(sessionRead.statusCode).toBe(429);
+  });
+
+  /**
+   * 13.278 — a doubled-slash spelling of a sign-in path is charged to the sign-in bucket, at the wire.
+   *
+   * The unit table covers the matcher alone; this covers the seam it sits in,
+   * because `app.ts` hands it `request.url` — the RAW request-target — and a
+   * matcher that is right in isolation can still be wired to the wrong string.
+   *
+   * ## Why this asserts the DOUBLED SLASH and not the dot segment
+   *
+   * The dot segment is the more interesting spelling and it was this case's
+   * first subject. It cannot be witnessed here, and the reason is structural
+   * rather than a gap worth leaving open — MEASURED with a probe against this
+   * same Fastify, `onRequest` recording `request.url` for both transports:
+   *
+   *     app.inject('/api/auth/x/../sign-in/magic-link')  → /api/auth/sign-in/magic-link
+   *     real socket, same target                          → /api/auth/x/../sign-in/magic-link
+   *
+   * **`app.inject` resolves dot segments before any hook runs; a real socket
+   * does not, and the raw target still routes to `/api/auth/*`.** So the
+   * production hazard is real — the unresolved spelling genuinely reaches this
+   * hook from the network — and the injection harness is blind to it by
+   * construction. A case asserting it here PASSED with the matcher's URL
+   * resolution deleted, which makes it a check that cannot fail for the reason
+   * its name gives: the same shape #347 found in its first guard and deleted
+   * rather than keep as a green tick meaning nothing.
+   *
+   * The dot segment is therefore witnessed by the unit row in 13.277, where the
+   * string is handed to the matcher directly and no transport can launder it —
+   * and the mutation that deletes the resolution kills exactly that row.
+   *
+   * The doubled slash is asserted INSTEAD because the probe shows `inject`
+   * delivers it verbatim (`/api/auth//sign-in/magic-link`), so this case does
+   * exercise the real seam with a real alternative spelling, and the mutation
+   * that deletes the slash collapse kills it here as well as in the unit table.
+   */
+  /**
+   * 13.280 — `retry-after` is a LOWER bound when the two buckets' windows opened at different instants, and the caller that obeys it exactly can still be refused.
+   *
+   * Found in review against a comment that asserted the opposite. It is pinned
+   * as a case rather than left as prose for two reasons: the behaviour is
+   * defensible (a hint that is too short costs a wasted round trip and admits
+   * nothing that should be refused) but it is NOT obvious, and a later change
+   * that widens `RateLimitVerdict` to carry each window's end can make this
+   * exact assertion flip — which is what a pinned case is for.
+   *
+   * The mechanism: `auth:` refuses while `signin:` is still allowed but
+   * filling, because a sign-in is charged to `signin:` even when `auth:` has
+   * already refused it. So `signin:`'s window opens LATER than `auth:`'s and
+   * outlives it.
+   */
+  it('tells the caller a wait shorter than the one it will actually serve, when the second bucket’s window opened later', async () => {
+    let t = 1_000_000;
+    const { app } = build({
+      ...limits({ authMax: 10, signInMax: 5 }),
+      now: () => t,
+    });
+    // Spend `auth:` on a path OUTSIDE the sign-in family, so `signin:` is
+    // untouched and its window has not opened.
+    for (let i = 0; i < 10; i += 1) {
+      await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    }
+    // One second before `auth:` rolls over.
+    t += 59_000;
+    const told: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const refused = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+      told.push(refused.json().retryAfterSeconds);
+    }
+    // Every one of those was refused by `auth:` — and charged to `signin:`
+    // anyway, which opened `signin:`'s window HERE, 59 seconds after `auth:`'s.
+    expect(told).toEqual([1, 1, 1, 1, 1]);
+    // The caller obeys exactly.
+    t += 1_000;
+    const onTime = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    // `auth:` has reopened. `signin:` has not, and will not for another 59s.
+    expect(onTime.statusCode).toBe(429);
+    expect(onTime.json().retryAfterSeconds).toBe(59);
+    await app.close();
+  });
+
+  it('charges a doubled-slash spelling of a sign-in path to the sign-in bucket', async () => {
+    const { app } = build(limits({ signInMax: 1, authMax: 100 }));
+    const direct = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const viaDoubledSlash = await app.inject({ method: 'GET', url: '/api/auth//sign-in/magic-link' });
+    await app.close();
+    expect(direct.statusCode).not.toBe(429);
+    expect(viaDoubledSlash.statusCode).toBe(429);
   });
 });
 

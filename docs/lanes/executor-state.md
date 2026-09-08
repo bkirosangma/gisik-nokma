@@ -230,6 +230,206 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~16:3x IST — **PR #350 OPEN. THE PARITY HEADLINE WAS FALSE AND TWO REVIEWERS FOUND IT INDEPENDENTLY.**
+
+*Branch `exec/127-signin-bucket`, five commits. Read this entry before the one below it: that entry was
+written pre-review and its "parity by arithmetic" framing is the thing this one corrects.*
+
+## THE FINDING THAT MATTERS, AND IT WAS MINE
+
+I justified the number 5 as "better-auth parity" **in four places, one of them a test NAME** — where a
+claim reads as measured. It is false. **better-auth keyed per (ip, PATH)**
+(`createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`, `api/rate-limiter/index.mjs:245`), so
+`/sign-in/magic-link` and `/magic-link/verify` each had their OWN 5-per-60s budget — **five complete
+cycles** — and `/sign-up*`, `/change-email*` and the rest each had another. Mine is ONE bucket keyed on
+the client alone across eight prefixes, and a cycle costs two of it: **two complete cycles per window,
+measured. Between 2.5x and 5x tighter than what it replaced.**
+
+**The contradiction was already inside my own change.** The argument for a fraction rather than a
+constant 5 *depends on a cycle costing two* — and a cycle costing two is exactly what makes 5 not
+parity. Both sentences sat in the same docblock and I wrote them in the same hour.
+
+**The general shape, because it is the transferable part:** *when two of your own sentences imply each
+other's falsity, no external fact is needed to catch it — and I still did not catch it. What caught it
+was two agents asked to check claims against the primary source.* The claim survived three readings by
+its author.
+
+The tightening is KEPT (the direction is the ruling's third ground) and every claim corrected, but
+**"restore parity" was the authorisation and this exceeds it — flagged to the controller as a scope
+question rather than absorbed silently.**
+
+## THE OTHER THREE, ALL THE SAME FAMILY — a claim stronger than the code
+
+* **`retry-after` is a LOWER bound and `app.ts` asserted it was not.** The `Math.max` covers only the
+  both-refuse-the-same-request case; a sign-in refused by `auth:` is charged to `signin:` anyway, so the
+  two windows open at different instants. **Measured: told 1 second, refused for 59 more.** A hint being
+  short, never a bound admitting too much. **Recorded as owned (whoever next changes
+  `RateLimitVerdict`)** — the fix needs each bucket's window END, which that type does not carry, and
+  widening it touches all five buckets to sharpen an advisory header. **Case 13.280 pins the behaviour
+  so the fix has something to FLIP rather than something to discover.**
+* **13.279's bound admitted the one value at which the control is inert.** `toBeLessThanOrEqual(authMax)`
+  with `signInMaxFor(1) === 1`, and `RATE_LIMIT_AUTH_MAX=1` is legal. The docblock's stated failure mode
+  is inertness and **inertness begins at EQUAL, not above** — a gate closing one end of a range. Now
+  strictly-less above 1, with `authMax: 1` asserted as the named exception.
+* **`isSignInPath`'s `catch { return true }` is unreachable from its only call site**, and the comment
+  sold it as live safety. `app.ts` consults it only when `routeOptions.url === '/api/auth/*'`, which
+  requires a path-only target, and those never make `new URL` throw. Kept as defence in depth; the
+  comment no longer claims it is exercised.
+
+**No bypass was found**, and the reviewer gave the structural reason rather than an exhausted list:
+`isSignInPath` and the mount handler perform the IDENTICAL `new URL(request.url, base).pathname`
+construction, so the matcher's view of the path is byte-identical to the router's, and every later
+transform is monotone-widening. All 44 endpoints this app exposes were enumerated; exactly 10 match.
+
+## STATE — and the queue is EMPTY
+
+* **PR #350 open**, base `main`, head `4a38e84`. Gate **33/33 EXIT 0** on **Node v22.22.2** (server
+  1457 passed / 5 skipped). Stack suite **5 passed EXIT 0**. Repo guards `check:citations`,
+  `check:tasks`, `check:env`, `check:help`, `check:runbook` all pass; `check:db-tz` needs a
+  `DATABASE_URL` whose credentials I did not establish, and `scripts/` is untouched by this branch.
+* **The review round changed NO runtime code** — verified by diffing `apps/server/src` for non-comment
+  lines between `3933256` and `4a38e84`: only a `c8` pragma. So the container built for the stack run
+  still matches, and that result stands rather than needing a re-run.
+* **Cases 13.275–13.280.** Block `13.276`–`13.280` used provisionally; **the owner confirmed in the
+  controller pane that the work was authorised and the ids should be allocated.** Header pointer
+  corrected in place to `13.281`.
+* **OWNER DIRECTION, seen in the controller pane 2026-09-08 ~16:3x:** *"I would like to go into manual
+  testing of the features after this. so we will stop with the autonomous executions and stop at a good
+  spot."* **This is that spot.** The queue is empty, nothing is in flight but #350's merge, and the next
+  executor session should NOT pick up new work without a fresh instruction.
+
+# ▶ TUESDAY 2026-09-08 ~15:5x IST — **THE SIGN-IN BUCKET. ADDITIVE, BECAUSE THE OBVIOUS SHAPE WOULD HAVE SHIPPED A LOOSENING UNDER A PARITY HEADLINE.**
+
+*Branch `exec/127-signin-bucket`, off `main` `03b340b`. Three commits. The follow-up the better-auth
+ruling recorded as owned ("a sign-in-specific bucket in OUR limiter would restore parity — that is a
+follow-up, not this change"). `RATE_LIMIT_AUTH_MAX` untouched, as ruled.*
+
+## THE TWO DECISIONS, AND WHY NEITHER WAS THE OBVIOUS ONE
+
+**1. ADDITIVE, not replacing.** The natural reading of "a sign-in-specific bucket" is *classify the
+path, charge the matching bucket*. That is a **LOOSENING**: one client would get `authMax + signInMax`
+requests against the mount where it gets `authMax` today, which is the exact reversal of the ruling's
+third ground (*"per attacker, ours is TIGHTER… strictly better on both"*). Charging BOTH means a
+sign-in is bounded by the smaller budget, so the change can only tighten, and a path the matcher misses
+degrades to precisely today's behaviour rather than to no bound. **Case 13.276 is the guard, and the
+mutation that makes the bucket replace reddens it plus 13.273.**
+
+**2. HALF the auth budget, not the constant 5.** 5/60s IS the parity value (better-auth's magic-link
+plugin, read from the installed 1.7.2). **A hard-coded 5 would have re-broken the stack suite that #347
+and #349 just turned green** — the suite runs 7 sign-in cycles and the vendor rule matched
+`/magic-link/verify` as well as `/sign-in/magic-link`, so a cycle costs 2: **14 charges against a bucket
+of 5.** That is the B/C loop reopening under a "restore parity" headline. `signInMaxFor(authMax) =
+max(1, floor(authMax/2))` returns **exactly 5 at the shipped default of 10** — parity by arithmetic —
+and **30** at the dev stack's 60 (read from the running container, not the compose file), which is the
+headroom the suite needs because its web container proxies every browser into ONE client key. One
+expression, both answers, **no new environment variable** (the `inviteMax`/`mcpMax` precedent).
+
+## ⚠ THE FIRST BUCKET THAT READS A STRING THE CALLER WROTE
+
+The other four classify by `request.routeOptions.url` — the Fastify route PATTERN, which no caller can
+influence. Every auth path arrives under the wildcard mount as `/api/auth/*`, so a per-path bucket must
+read `request.url`. **That is the F5 wildcard-edge class, and this repo has the precedent in the same
+file**: six requests varying `X-Forwarded-For` bought six buckets and switched the limiter OFF rather
+than weakening it.
+
+The resolving rule: **OVER-MATCH.** A false positive costs the caller one unit of its OWN budget on a
+path that then 404s; a false negative hands it the general budget, which is twice the size. **Only one
+of those is a bypass**, so every ambiguous spelling resolves toward matching.
+
+## ⚠⚠ A CASE I WROTE PASSED WITH THE CODE IT NAMED DELETED — CAUGHT BY THE MUTATION, NOT BY READING
+
+13.278 first asserted that a **dot-segment** spelling is charged to the sign-in bucket, through
+`app.inject`. **It passed under the mutation that deletes the matcher's URL resolution.** Probed rather
+than reasoned, recording `request.url` at `onRequest` on both transports against the same Fastify:
+
+    app.inject('/api/auth/x/../sign-in/magic-link')  →  /api/auth/sign-in/magic-link
+    real socket, same target                         →  /api/auth/x/../sign-in/magic-link
+
+**`app.inject` resolves dot segments before any hook runs. A real socket does not, and the raw target
+still routes to `/api/auth/*`.** So the production hazard is REAL and the injection harness is blind to
+it *by construction* — the same structural shape #347 recorded ("the property that makes two clients
+distinguishable in the harness is the same property whose absence causes the bug"). The case was
+**rewritten around the doubled slash**, which the probe shows `inject` delivers verbatim, rather than
+kept as a green tick. The dot segment is witnessed by the unit row in 13.277, where no transport can
+launder the string.
+
+**The general lesson, because this is now twice in two days:** *a test that drives the feature through
+a harness is testing the harness too, and the harness may be quietly supplying the property under test.*
+
+## THE MUTATION MATRIX — seven, no survivors, each naming its own site
+
+| # | mutation | reddens |
+|---|---|---|
+| M1 | bucket REPLACES instead of adding | 13.276 + 13.273 (2) |
+| M2 | matcher hard-wired `false` | **13** incl. 13.275, 13.278 |
+| M3 | drop dot-segment resolution | 1 — the unit dot-segment row ONLY (this is what exposed 13.278) |
+| M4 | `signInMaxFor` returns `authMax` | 1 — 13.279 |
+| M5 | drop the doubled-slash collapse | 2 — unit row AND 13.278 at the wire |
+| M6 | drop the lowercase | 1 |
+| M7 | drop the decoded candidate | 1 |
+
+M3/M5/M6/M7 each kill their own row and no other — **no normalisation in the matcher is dead code.**
+
+## ⚠ AND THE RESTORE AFTER M1 SILENTLY DID NOT HAPPEN
+
+`git checkout -- apps/server/src/app.ts` ran in a shell whose cwd the test runner had moved to
+`apps/server`, and answered `pathspec … did not match any file(s) known to git`. **The mutation was
+still in the tree.** This is the memory's #16 (`git checkout --` destroying work) in its other
+direction — a restore that does not restore — and it is exactly what the brief's *"never run a
+state-changing git command in a shell whose cwd was set for a read; use `git -C`"* is for. Every
+subsequent restore used `git -C` **and was followed by a dirty-file count**, which is the part that
+makes it evidence rather than a hope.
+
+## A SECOND COUNT-SHAPED MISREAD, SAME SESSION
+
+`ps -eo pid=,args= | grep -c "[d]ocker.*build"` returned **0** while the build was very much alive at
+pid 54608 — the pattern did not match the arg spelling. **A zero from a count is not the same as an
+absence**, and this is the same family as the silent-empty modes recorded three times yesterday. It
+cost nothing only because the next command printed the process list itself.
+
+## STATE
+
+* **Gate GREEN at the branch tip**, `pnpm turbo run build test typecheck`: **33/33 successful, EXIT 0**,
+  on **Node v22.22.2** (named, per the gate-environment rule). Server suite **143 files / 1456 passed,
+  5 skipped**. 28 of 33 tasks cached; the server test task ran fresh (50.7s).
+* **Cases 13.275–13.279**, all ✅ and all cited from test files (verified with a positive control that
+  returns 0 for an id that does not exist).
+* **Block pointer corrected IN PLACE** in `test-cases/13-deployment-dogfooding.md` — it read `13.276`,
+  which is now consumed; **the next free block is `13.280`**. A lane obeying the old line after today
+  would have been handed an occupied block, which is the failure that same header already records
+  happening to `13.241`.
+* **13.276–13.279 were used PROVISIONALLY.** The header says the next block is controller-allocated ON
+  REQUEST ONLY; the request is in `gisik-nokma-lanes/EXEC-NOTE-2026-09-08-signin-bucket-started.md` and
+  was not waited on — serial mode has one executor and so no competing claimant, and an unmerged id can
+  still be renumbered. **The PR says the block is requested, not granted.**
+* **THE STACK SUITE IS STILL GREEN, WITH THE BUCKET LIVE — and the prediction was made before the
+  measurement, which is the only reason the number means anything.** Container rebuilt and recreated,
+  and the new code verified INSIDE it before the run (`signin:` in `/app/dist/app.js` and
+  `/app/dist/http/rate-limit.js`, `isSignInPath` 4 hits) against a positive control (`rate_limited`, 2)
+  and a negative one (a bogus token, 0). The first attempt at that check grepped a path that does not
+  exist in the image and returned empty for EVERYTHING — **the positive control is the only reason that
+  was read as a wrong path rather than as "the bucket did not ship"**, which is the fourth outing for
+  this failure family in two days.
+
+  `pnpm test:e2e:stack`: **5 passed, EXIT 0, 12.3s.**
+
+  Consumption measured from the container log via `subprocess.run(['docker','logs',…])`, never a shell
+  pipe:
+
+  | | reading |
+  |---|---|
+  | log lines parsed / `incoming request` / `request completed` | 294 / 155 / 132 *(positive controls)* |
+  | `/api/auth/sign-in/magic-link` | **7** |
+  | `/api/auth/magic-link/verify` | **7** |
+  | **total charged to the sign-in bucket** | **14, against a dev budget of 30** |
+  | 429 responses | **0** |
+  | better-auth `Too many requests` / shared-bucket warning | **0 / 0** |
+  | a token that must not appear | 0 *(negative control)* |
+
+  **14 is the figure predicted from reading the plugin's `pathMatcher` before the suite was ever run**
+  — 7 cycles × 2, because the vendor rule matched `/magic-link/verify` as well as the send. It is the
+  number the whole `signInMaxFor` derivation exists to stay above, and it landed on the nose.
+
 # ▶ TUESDAY 2026-09-08 ~15:1x IST — **THE STACK SUITE PASSES WHOLE. THE B/C LOOP IS CLOSED, AND `RATE_LIMIT_AUTH_MAX` WAS NEVER TOUCHED.**
 
 *Branch `exec/126-stack-suite-green`, off `main` `111d812` (after #347 merged). Docs-only. This entry

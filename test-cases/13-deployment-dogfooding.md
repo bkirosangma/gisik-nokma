@@ -22,9 +22,13 @@ NOT Tasks 11–12, which the 07:50 re-task moved to Lane C) · **Lane C 13.201�
 the scheduler-generalisation errand, 13.204–13.209 Lane F Pass 1's citation check; **13.210–13.240 remain
 free in this block**). ~~**The next free BLOCK is `13.241`, controller-allocated ON REQUEST ONLY.**~~ **STALE — CORRECTED
 2026-09-08. `13.241`–`13.265` are CONSUMED** (`13.241` has 4 hits, `13.265` has 2). A lane obeying that
-line would have been handed an occupied block. **Block `13.266`–`13.275` is allocated to the serial
+line would have been handed an occupied block. ~~**Block `13.266`–`13.275` is allocated to the serial
 executor (controller, 2026-09-08); the next free BLOCK is `13.276`, controller-allocated ON REQUEST
-ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`–`13.275` is EXHAUSTED
+and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
+the block was requested from the controller and used provisionally rather than waited on, because
+serial mode has one executor and therefore no competing claimant, and an id that has not merged can
+still be renumbered. **The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1672,3 +1676,74 @@ see #324", pointing whoever restarts from this file at a closed PR for work that
 > citing a PR that never merged is always one of exactly two real problems: the row is stale, or the
 > work is not on `main` at all.
 
+
+## The sign-in bucket (2026-09-08) — the follow-up the better-auth ruling recorded
+
+*Block note: `13.275` is the last id of the executor's `13.266`–`13.275` allocation; `13.276`–`13.280`
+are taken from the next block, **requested from the controller and used provisionally** rather than
+waited on — serial mode has one executor and therefore no other claimant, and an unmerged id can still
+be renumbered. **The next free BLOCK is now `13.280`, controller-allocated ON REQUEST ONLY.** Recount
+the maximum in use against `origin/main` before trusting that pointer; this file records twice that a
+next-free pointer is a cache which goes stale silently, and this line is one more of them.*
+
+- **13.275** ✅ A sign-in path is refused at its own, tighter ceiling while the SAME client's
+  `/api/auth/get-session` — one request later, out of a 100-request general budget that three requests
+  could not have exhausted — is still served. The load-bearing case. Both buckets answer with the same
+  body, so unlike 13.273 the body cannot say which limiter refused; the discriminator is the **ordinal,
+  with its positive control in the same pair**. `authMax: 100` against `signInMax: 2` is a STRUCTURAL
+  separation, not a comment: were the two equal the general bucket would refuse at the same ordinal and
+  the case would pass with the sign-in bucket deleted.
+  *Controlled: a matcher hard-wired to `false` reddens this and 12 others.*
+- **13.276** ✅ A sign-in request is charged to the general auth bucket **as well**, not instead of it —
+  two sign-ins against `authMax: 2` leave `get-session` refused. The anti-**loosening** guard, and the
+  case that goes red if someone "simplifies" the hook into charging one bucket or the other: that
+  refactor reads as a tidy-up and would hand a client `authMax + signInMax` requests against the mount
+  where it gets `authMax` today, reversing the third ground of the ruling that authorised the bucket.
+  *Controlled: making the bucket replace rather than add reddens this and 13.273.*
+- **13.277** ✅ Every alternative spelling of a sign-in path that still reaches the vendor handler is
+  matched — query string, trailing slash, doubled slash, dot segment, mixed case, percent-encoding, and
+  a malformed escape *inside* a sign-in path — while the paths better-auth never tightened are not:
+  `get-session`, `sign-out`, `/phone-number/*`, the mount root, and a path outside the mount. **The
+  negative rows are half the case**: a matcher returning `true` unconditionally satisfies every positive
+  row, and `get-session` is the row that refuses it — sweeping the highest-frequency signed-in path into
+  a half-size budget would be a self-inflicted outage, not a tightening.
+  *Controlled four ways, each killing its own row and no other: deleting the dot-segment resolution, the
+  doubled-slash collapse, the lowercase, or the decoded candidate. No normalisation here is dead code.*
+  *One row asserted the wrong thing when written and the run is what caught it — `/api/auth/%zz` was
+  expected to match on the theory that an unparseable target should get the tighter bucket. `new URL()`
+  does not throw on a bad escape; only `decodeURIComponent` does. The expectation was wrong, not the
+  code.*
+- **13.278** ✅ A **doubled-slash** spelling is charged to the sign-in bucket at the wire, through the
+  real hook rather than the matcher alone.
+  *Scoped deliberately, and the dot segment is NOT what it asserts. Measured with a probe recording
+  `request.url` at `onRequest` on both transports: `app.inject` resolves `/api/auth/x/../sign-in/...`
+  to `/api/auth/sign-in/...` before any hook runs, while a **real socket delivers it verbatim and it
+  still routes to `/api/auth/*`**. So the production hazard is real and the injection harness is blind
+  to it by construction — a case asserting it here PASSED with the matcher's URL resolution deleted,
+  i.e. a check that cannot fail for the reason its name gives. It was rewritten around the doubled
+  slash, which the probe shows `inject` delivers verbatim, rather than kept as a green tick meaning
+  nothing — the same call 13.273's author made in #347.*
+- **13.279** ✅ `signInMaxFor` is half the auth budget — **5** at the shipped `RATE_LIMIT_AUTH_MAX=10`,
+  30 at the dev stack's 60 — never 0, and **strictly** smaller than `authMax` for every budget above 1,
+  with `authMax: 1` asserted as the one named exception. Both invariants are load-bearing: a bucket of 0
+  refuses the FIRST request, and a bucket that equals `authMax` refuses at the same ordinal as the
+  general one and so changes no verdict.
+  *Controlled: returning `authMax` unchanged reddens it.*
+  *Two corrections from review, both in this one case. Its NAME was "returns better-auth's magic-link
+  max at the shipped default" — **a false claim pinned where it reads as measured.** 5 is the same
+  integer, but better-auth keyed per (ip, PATH), so each leg of a sign-in cycle had its own 5; this is
+  one bucket across the family and a cycle costs two of it, i.e. 2 complete cycles per window against
+  better-auth's 5. And the bound was `toBeLessThanOrEqual(authMax)`, which **admitted the single value
+  (`authMax: 1`) at which the docblock's own stated failure — inertness — actually occurs**: a gate
+  closing one end of a range, the exact shape this file catalogues.*
+- **13.280** ✅ `retry-after` is a **lower** bound when the two buckets' windows opened at different
+  instants: a caller refused by `auth:` is charged to `signin:` anyway, so `signin:`'s window opens
+  later and outlives it. Measured at production-shaped config — told **1 second**, refused for **59
+  more** — and the case asserts exactly that, `[1,1,1,1,1]` then a 429 carrying 59.
+  *Pinned rather than fixed, and pinned rather than left as prose. It is a HINT being short, never a
+  bound admitting too much: the early caller gets another 429 with a fresh figure. The correct fix
+  needs each bucket's window END, which `RateLimitVerdict` does not carry, and widening that contract
+  touches all five buckets to sharpen an advisory header. **Owner: whoever next changes
+  `RateLimitVerdict`** — and this case is what that change flips.*
+  *Found in review against a comment in `app.ts` that asserted the OPPOSITE as an invariant the code
+  upheld. The `Math.max` it pointed at covers only the both-refuse-the-same-request shape.*

@@ -5,7 +5,7 @@ import type { Pool } from 'pg';
 import { hstsHeaderFor } from './http/hsts.js';
 import { SECURITY_HEADERS } from './http/security-headers.js';
 import { FORBIDDEN_ORIGIN_BODY, httpOriginRefused, normalizeOrigin } from './http/http-origin.js';
-import { makeFixedWindowLimiter, rateLimitKeyFor } from './http/rate-limit.js';
+import { isSignInPath, makeFixedWindowLimiter, rateLimitKeyFor } from './http/rate-limit.js';
 import type { Auth } from './auth/auth.js';
 import { NoopErrorAlerter, alertWithoutWaiting, type ErrorAlerter } from './alerts/error-alerter.js';
 import { registerAuthRoutes } from './auth/routes.js';
@@ -216,6 +216,31 @@ export type SecurityOptions = {
      * not be able to spend the sign-in budget.
      */
     mcpMax: number;
+    /**
+     * The sign-in family's own bucket, charged ON TOP OF `authMax` — the fifth
+     * bucket, and the only one that classifies by PATH rather than by Fastify
+     * route pattern (`isSignInPath`).
+     *
+     * It exists to repay a loss the controller ruling of 2026-09-08 named when
+     * it disabled better-auth's built-in limiter: that vendor limiter gave
+     * `/sign-in*` and `/magic-link*` tighter rules than its global default, and
+     * with it off the whole mount sat behind one flat `authMax` budget, so a
+     * client could spend its entire auth allowance on sign-in attempts.
+     *
+     * **ADDITIVE, not replacing, and the arithmetic is the reason.** Were a
+     * matching path to be charged to THIS bucket INSTEAD of `auth:`, one client
+     * would get `authMax + signInMax` requests against the mount where it gets
+     * `authMax` today — a LOOSENING shipped under a parity headline, and the
+     * exact reversal of the ruling's third ground ("per attacker, ours is
+     * TIGHTER"). Charging both means a sign-in is bounded by the SMALLER of the
+     * two budgets, so this can only ever tighten, and a path the matcher misses
+     * degrades to precisely today's behaviour rather than to no bound at all.
+     *
+     * Fed from `RATE_LIMIT_AUTH_MAX` at the wire site — the `inviteMax` and
+     * `mcpMax` precedent, no new environment variable. See `index.ts` for the
+     * derivation and why it is a fraction rather than a constant.
+     */
+    signInMax: number;
     windowSec: number;
   } | null;
   /**
@@ -447,7 +472,7 @@ export function buildApp(
   // request for a different reason.
   const security = options.security;
   if (security?.rateLimit) {
-    const { authMax, eventsMax, inviteMax, mcpMax, windowSec } = security.rateLimit;
+    const { authMax, eventsMax, inviteMax, mcpMax, signInMax, windowSec } = security.rateLimit;
     const now = security.now ?? Date.now;
     // Three INDEPENDENT limiters, not one keyed by prefix. A sign-in storm must
     // not spend the invite budget, and an offline client flushing a sync batch
@@ -456,6 +481,7 @@ export function buildApp(
     const eventsLimiter = makeFixedWindowLimiter(eventsMax, windowSec);
     const inviteLimiter = makeFixedWindowLimiter(inviteMax, windowSec);
     const mcpLimiter = makeFixedWindowLimiter(mcpMax, windowSec);
+    const signInLimiter = makeFixedWindowLimiter(signInMax, windowSec);
     app.addHook('onRequest', async (request, reply) => {
       const routeUrl = request.routeOptions.url;
       const method = request.method;
@@ -476,7 +502,58 @@ export function buildApp(
         // window. Preflights reach this hook with `routeOptions.url` undefined
         // today, so this is belt-and-braces against the day `@fastify/cors`
         // matches one to a route.
-        if (method !== 'OPTIONS') verdict = authLimiter.check(`auth:${clientKey}`, now());
+        if (method !== 'OPTIONS') {
+          verdict = authLimiter.check(`auth:${clientKey}`, now());
+          // The fifth bucket, and the only PATH-classified one. Charged in
+          // ADDITION to `auth:` above, never instead of it — see
+          // `SecurityOptions.rateLimit.signInMax` for why replacing would
+          // loosen the mount rather than tighten it.
+          //
+          // Charged even when `auth:` has ALREADY refused, deliberately: a
+          // refused attempt is still an attempt, and letting it go unrecorded
+          // would hand a client that has exhausted its general budget a fresh
+          // sign-in budget the moment the general window rolls over.
+          if (isSignInPath(request.url)) {
+            const signInVerdict = signInLimiter.check(`signin:${clientKey}`, now());
+            // Whichever bucket refuses, refuses, and when BOTH do the caller
+            // is told the longer of the two waits.
+            //
+            // ## `retry-after` IS A LOWER BOUND HERE, and the earlier version
+            // ## of this comment claimed it was not
+            //
+            // It read: "a `retry-after` that expires while the other bucket is
+            // still shut is an invitation to come back and be refused again" —
+            // stated as an invariant this code upholds. It does not. The
+            // `Math.max` below covers only the case where both buckets refuse
+            // the SAME request. The other shape is reachable and was MEASURED:
+            // `auth:` refuses while `signin:` is still allowed but filling (it
+            // is charged anyway, two lines up), so the two windows OPEN AT
+            // DIFFERENT INSTANTS and `signin:` can stay shut long after `auth:`
+            // reopens. At the shipped `RATE_LIMIT_AUTH_MAX=10` / 60s, a caller
+            // was told **1 second** and was in fact refused for **59 more**.
+            //
+            // The overshoot is bounded by `windowSec` and it is a HINT, never a
+            // bound: the caller that comes back early gets another 429 carrying
+            // a fresh figure, and no request is admitted that should not be. It
+            // is left as a lower bound rather than fixed here because the fix
+            // is not local — a correct answer needs each bucket's window END,
+            // which `RateLimitVerdict` does not carry, and widening that
+            // contract touches all five buckets to sharpen an advisory header.
+            // **Owner: whoever next changes `RateLimitVerdict`.** Case 13.280
+            // pins the current behaviour so the fix has something to flip.
+            if (!signInVerdict.allowed) {
+              verdict = verdict.allowed
+                ? signInVerdict
+                : {
+                    allowed: false,
+                    retryAfterSeconds: Math.max(
+                      verdict.retryAfterSeconds,
+                      signInVerdict.retryAfterSeconds,
+                    ),
+                  };
+            }
+          }
+        }
       } else if (method === 'POST' && (routeUrl === '/v1/events' || routeUrl === '/v1/sync')) {
         verdict = eventsLimiter.check(`events:${clientKey}`, now());
       } else if (method === 'GET' && routeUrl === '/v1/sync/bootstrap') {
