@@ -1,5 +1,54 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY 10:4x IST — ALL FIVE OWNER-RULED 2026-09-08 ITEMS ARE ON `main`. #327/#328/#334 landed after FOUR rebase rounds; a genuine idle-nudger finding; two items flagged for the owner, not decided here.
+
+**Every branch from this morning's restart is merged: #325 (security headers), #326 (dev-token guard),
+#327 (mobile dark theme), #328 (tap targets) and #334 (type scale). `main` is `188abb6`.** Same
+corrected-verification method on every one — `baseRefName` checked fresh immediately before merge, no
+branch deleted, reachability confirmed (`git merge-base --is-ancestor <merge-sha> origin/main`), source
+files checksummed PR-head-vs-merge-commit (all MATCH, none the empty-input constant). Own forced gate at
+`188abb6`, run after a real `git checkout main && git merge --ff-only origin/main` (not just `fetch`):
+**`INSTALL_EXIT=0`, `REBUILD_EXIT=0`, `GATE_EXIT=0`**, `Tasks: 33 successful, 33 total`, node `v22.22.2`,
+no `Unsupported engine`, **320 test files / 3,908 passed | 5 skipped**. All six project checks EXIT 0:
+`check:tasks` **190/190 VERIFIED COMPLETE, unchanged** (none of these five PRs touch the ledger),
+`check:citations` **1,683 checked / 1,683 cited / 0 uncited**, `check-case-ids` **1,777 unique ids**.
+
+**#327/#328/#334 needed FOUR separate rebase rounds, not one, because every one of the five branches
+touches `Features.md` and `docs/lanes/executor-state.md` additively** — merging any one invalidates
+every sibling still open, every time, confirmed empirically this session (326→327/328/334 conflicting;
+327→328/334; 328→334). Round four's #334 rebase hit a REAL code conflict for the first time, not just
+narrative: `apps/web/e2e-viewport/viewport.spec.ts`'s import block, where #328's tap-target sweep and
+#334's type-scale sweep both live. The executor inspected rather than auto-resolved, verified both
+suites' tests survived the merge, then re-ran the containerized stack suite (a layer this controller's
+own gate does not cover) before pushing — real, not assumed, verification.
+
+**A genuinely new tooling finding, worth its own line: the idle-nudger's documented 2026-09-01 Enter-fix
+does not work against this specific TUI in vim `-- INSERT --` mode.** Its own README says the fix
+("`send-keys -l <text>`, then a separate `send-keys Enter` after a 0.4s pause") was verified *"against a
+shell pane, which answered `continue: too many arguments`"* — a plain shell, not the Claude Code TUI.
+Confirmed here independently: a stuck, unsubmitted nudge sat in the executor's prompt for several
+minutes; `tmux send-keys Enter` (separate call, as documented), then `Escape` + `Enter`, then literal
+`C-m` — three distinct attempts, all failed to submit. **What worked: `printf '\r' | tmux load-buffer -b
+cr - && tmux paste-buffer -b cr -t <pane>`** — a raw carriage-return byte delivered as a paste, not a
+symbolic key. This matches and extends this controller's own standing memory
+(`idle-nudger-still-broken.md`) with a working manual recovery, and is worth the nudger's own next
+maintenance pass, not just a note here — the fix it shipped was never actually tested against the pane
+it exists to keep moving.
+
+**Two items the executor surfaced and correctly declined to act on itself — neither decided here either:**
+1. **A stale reference, not re-verified in this session**: the executor states `controller-state.md`'s
+   own #287 (Plan 9's client-side notification-consumer residual) is stale — this file's own history
+   (the `PLAN 9'S RESIDUAL CLOSED` entry, PR #293, six gated cases 11.190–11.195) already shows it CLOSED
+   well before today. Left for a dedicated pass to confirm exactly which document(s) still point at it
+   as open (this file's own text was not found to, on this session's read of it) rather than corrected
+   blind here.
+2. **An owner question, explicitly not this controller's to rule on**: whether a `13.33px` UA-default
+   font-size case needs its own remedy — the executor names 26 controls resting on the UA default and a
+   one-line fix, recorded in `docs/pre-launch-checklist.md`. Flagged for the owner, per rule 1.
+
+**Executor is now starting the ticket-sheet type-scale sweep**, the piece it named as hard-depending on
+#334 (`type-scale.ts` exists only there). Nothing further merged or blocked as this entry is written.
+
 ## ✅ TUESDAY 08:1x IST — PR #326 (MOBILE DEV-TOKEN GUARD) MERGED, INDEPENDENTLY VERIFIED. `main` is `d9d831c`. #327/#328 CONFLICTING again as a direct consequence (same narrative-file pattern as #325) — the executor is mid-work on a fifth PR (#334, type-scale) and hasn't rebased them yet.
 
 **Same corrected-verification method as #325, this time without the stale-checkout near-miss** —
