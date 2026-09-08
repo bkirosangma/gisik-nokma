@@ -230,6 +230,74 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~16:3x IST — **PR #350 OPEN. THE PARITY HEADLINE WAS FALSE AND TWO REVIEWERS FOUND IT INDEPENDENTLY.**
+
+*Branch `exec/127-signin-bucket`, five commits. Read this entry before the one below it: that entry was
+written pre-review and its "parity by arithmetic" framing is the thing this one corrects.*
+
+## THE FINDING THAT MATTERS, AND IT WAS MINE
+
+I justified the number 5 as "better-auth parity" **in four places, one of them a test NAME** — where a
+claim reads as measured. It is false. **better-auth keyed per (ip, PATH)**
+(`createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`, `api/rate-limiter/index.mjs:245`), so
+`/sign-in/magic-link` and `/magic-link/verify` each had their OWN 5-per-60s budget — **five complete
+cycles** — and `/sign-up*`, `/change-email*` and the rest each had another. Mine is ONE bucket keyed on
+the client alone across eight prefixes, and a cycle costs two of it: **two complete cycles per window,
+measured. Between 2.5x and 5x tighter than what it replaced.**
+
+**The contradiction was already inside my own change.** The argument for a fraction rather than a
+constant 5 *depends on a cycle costing two* — and a cycle costing two is exactly what makes 5 not
+parity. Both sentences sat in the same docblock and I wrote them in the same hour.
+
+**The general shape, because it is the transferable part:** *when two of your own sentences imply each
+other's falsity, no external fact is needed to catch it — and I still did not catch it. What caught it
+was two agents asked to check claims against the primary source.* The claim survived three readings by
+its author.
+
+The tightening is KEPT (the direction is the ruling's third ground) and every claim corrected, but
+**"restore parity" was the authorisation and this exceeds it — flagged to the controller as a scope
+question rather than absorbed silently.**
+
+## THE OTHER THREE, ALL THE SAME FAMILY — a claim stronger than the code
+
+* **`retry-after` is a LOWER bound and `app.ts` asserted it was not.** The `Math.max` covers only the
+  both-refuse-the-same-request case; a sign-in refused by `auth:` is charged to `signin:` anyway, so the
+  two windows open at different instants. **Measured: told 1 second, refused for 59 more.** A hint being
+  short, never a bound admitting too much. **Recorded as owned (whoever next changes
+  `RateLimitVerdict`)** — the fix needs each bucket's window END, which that type does not carry, and
+  widening it touches all five buckets to sharpen an advisory header. **Case 13.280 pins the behaviour
+  so the fix has something to FLIP rather than something to discover.**
+* **13.279's bound admitted the one value at which the control is inert.** `toBeLessThanOrEqual(authMax)`
+  with `signInMaxFor(1) === 1`, and `RATE_LIMIT_AUTH_MAX=1` is legal. The docblock's stated failure mode
+  is inertness and **inertness begins at EQUAL, not above** — a gate closing one end of a range. Now
+  strictly-less above 1, with `authMax: 1` asserted as the named exception.
+* **`isSignInPath`'s `catch { return true }` is unreachable from its only call site**, and the comment
+  sold it as live safety. `app.ts` consults it only when `routeOptions.url === '/api/auth/*'`, which
+  requires a path-only target, and those never make `new URL` throw. Kept as defence in depth; the
+  comment no longer claims it is exercised.
+
+**No bypass was found**, and the reviewer gave the structural reason rather than an exhausted list:
+`isSignInPath` and the mount handler perform the IDENTICAL `new URL(request.url, base).pathname`
+construction, so the matcher's view of the path is byte-identical to the router's, and every later
+transform is monotone-widening. All 44 endpoints this app exposes were enumerated; exactly 10 match.
+
+## STATE — and the queue is EMPTY
+
+* **PR #350 open**, base `main`, head `4a38e84`. Gate **33/33 EXIT 0** on **Node v22.22.2** (server
+  1457 passed / 5 skipped). Stack suite **5 passed EXIT 0**. Repo guards `check:citations`,
+  `check:tasks`, `check:env`, `check:help`, `check:runbook` all pass; `check:db-tz` needs a
+  `DATABASE_URL` whose credentials I did not establish, and `scripts/` is untouched by this branch.
+* **The review round changed NO runtime code** — verified by diffing `apps/server/src` for non-comment
+  lines between `3933256` and `4a38e84`: only a `c8` pragma. So the container built for the stack run
+  still matches, and that result stands rather than needing a re-run.
+* **Cases 13.275–13.280.** Block `13.276`–`13.280` used provisionally; **the owner confirmed in the
+  controller pane that the work was authorised and the ids should be allocated.** Header pointer
+  corrected in place to `13.281`.
+* **OWNER DIRECTION, seen in the controller pane 2026-09-08 ~16:3x:** *"I would like to go into manual
+  testing of the features after this. so we will stop with the autonomous executions and stop at a good
+  spot."* **This is that spot.** The queue is empty, nothing is in flight but #350's merge, and the next
+  executor session should NOT pick up new work without a fresh instruction.
+
 # ▶ TUESDAY 2026-09-08 ~15:5x IST — **THE SIGN-IN BUCKET. ADDITIVE, BECAUSE THE OBVIOUS SHAPE WOULD HAVE SHIPPED A LOOSENING UNDER A PARITY HEADLINE.**
 
 *Branch `exec/127-signin-bucket`, off `main` `03b340b`. Three commits. The follow-up the better-auth
