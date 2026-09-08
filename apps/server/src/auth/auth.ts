@@ -82,6 +82,69 @@ export function createAuth(deps: AuthDeps) {
     //     set by hand in `deploy/do/app.yaml`, so the path is reachable.
     trustedOrigins: [trustedWebOrigin(deps.webOrigin)],
     emailAndPassword: { enabled: false }, // the spec forbids passwords
+    /**
+     * ONE LIMITER ON `/api/auth/*`, AND IT IS OURS. Controller ruling
+     * 2026-09-08, delegated by the owner.
+     *
+     * ═══════════════════════════════════════════════════════════════════════
+     * WHAT WAS MEASURED, BECAUSE THIS IS NOT A PREFERENCE
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     * better-auth's own limiter **cannot tell clients apart here**. Its key is
+     * built as `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`
+     * (`dist/api/rate-limiter/index.mjs:245`), `getIP()` returns falsy in this
+     * runtime, and `NO_TRUSTED_IP_KEY` is the literal `"no-trusted-ip"`
+     * (`:233`) — **one shared bucket per path, for everybody.**
+     *
+     * Measured on the dev stack with two clients on genuinely different
+     * addresses, hitting the server DIRECTLY with no proxy in the path:
+     * `192.168.65.1` spent 5 and was refused on its 6th; `127.0.0.1`, which had
+     * spent nothing, was refused on its VERY FIRST request. So any one person
+     * retrying sign-in could lock out every other user — a trivial
+     * unauthenticated denial of service on the first screen a new user sees.
+     *
+     * The library says so itself, at `:241`, and nobody had read it: *"Rate
+     * limiting could not determine a client IP and is falling back to a single
+     * shared per-path bucket."* It is gated by `ipWarningLogged`, so it prints
+     * **once per process**, into startup noise, and never again. *A
+     * once-per-process warning is a finding with a half-life.*
+     *
+     * ═══════════════════════════════════════════════════════════════════════
+     * WHY DISABLE RATHER THAN FIX ITS IP RESOLUTION
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     * "Fix it" means `advanced.ipAddress.ipAddressHeaders` — reading a header
+     * the CALLER writes. `app.ts` already records the measurement that six
+     * requests varying `X-Forwarded-For` bought six buckets, which is exactly
+     * why `rateLimitKeyFor` takes the RIGHTMOST entry and only under
+     * `TRUST_PROXY`. Configuring better-auth to read XFF would put a second,
+     * differently-trusted IP derivation on the same path — a spoofable bucket
+     * beside a hardened one. **Two limiters with different keying on one path
+     * IS the defect class**, and our coverage is a strict superset: `app.ts`
+     * charges every non-`OPTIONS` method on `/api/auth/*` to the `auth:` bucket,
+     * and better-auth is mounted at exactly that one pattern.
+     *
+     * This also makes `RATE_LIMIT_AUTH_MAX` the control everyone already
+     * believed it was. It was never the binding constraint before.
+     *
+     * **THE NAMED LOSS, so nobody finds it by surprise:** better-auth's
+     * per-path tightening goes away. `plugins/magic-link/index.mjs:197-203`
+     * gives `/sign-in/magic-link` its own `window || 60` / `max || 5`, which
+     * overrides the generic `/sign-in*` rule of 10s/3 (`:302-308`) — that
+     * override is why the black-box measurement read 5-per-60s and not 3-per-10s.
+     * Ours is a flat budget across the whole mount. A sign-in-specific bucket in
+     * OUR limiter would restore parity and is a RECORDED FOLLOW-UP, deliberately
+     * not built here.
+     *
+     * **Stated explicitly for the same reason `advanced` below is:
+     * better-auth's default for this depends on `NODE_ENV`** —
+     * `enabled: options.rateLimit?.enabled ?? isProduction`
+     * (`dist/context/create-context.mjs:171`). So it was ON in production and
+     * OFF under vitest, which is precisely why no server test ever exercised it
+     * and why this shipped unseen. **That is not a property a security control
+     * may have**, whichever way it resolves.
+     */
+    rateLimit: { enabled: false },
     advanced: {
       /**
        * Stated because better-auth's default for it depends on `NODE_ENV`, and
