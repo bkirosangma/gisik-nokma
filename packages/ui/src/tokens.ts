@@ -106,6 +106,34 @@ export const primitives = {
    */
   grayAccessible: '#6c6c70',
   grayAccessibleDark: '#98989d',
+  /**
+   * HIG's four-step FILL hierarchy — the thing R1(c) separates by, now that it
+   * is no longer separating by hairlines.
+   *
+   * Eight-digit hex rather than `rgba()` because `primitives` is asserted to be
+   * hex literals and `scrimLight` already set that precedent; these are Apple's
+   * documented system-fill greys with the alpha encoded in the last byte
+   * (`0.20 → 33`, `0.16 → 29`, `0.12 → 1f`, `0.08 → 14`; dark uses Apple's
+   * heavier `0.36 / 0.32 / 0.24 / 0.18`, because a fill has to work against
+   * black).
+   *
+   * ## These are ALPHA, and no `CONTRAST_PAIRS` row may name them
+   *
+   * `relativeLuminance` ignores alpha by documented design, so a declared pair
+   * on any of these would compute the fill's own colour against a background it
+   * is actually blended INTO — the checklist records that exact mode reading
+   * 11.87 where the truth is 1.85, **a false green**. The fills are measured
+   * where they are real: the rendered sweep in
+   * `apps/web/e2e-stack/helpers/non-text-contrast.ts`, which composites.
+   */
+  fillPrimary: '#78788033',
+  fillSecondary: '#78788029',
+  fillTertiary: '#7878801f',
+  fillQuaternary: '#74748014',
+  fillPrimaryDark: '#7878805c',
+  fillSecondaryDark: '#78788052',
+  fillTertiaryDark: '#7878803d',
+  fillQuaternaryDark: '#7474802e',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -120,6 +148,16 @@ export const TOKEN_ROLES = [
   'textInverted',
   'border',
   'borderStrong',
+  /**
+   * The four fill steps, added with the border sweep (2026-09-08). Ruling
+   * R1(c) separates by fill and spacing instead of by hairline, which needs
+   * the fills to be roles rather than literals — no colour literal is legal
+   * outside this file.
+   */
+  'fillPrimary',
+  'fillSecondary',
+  'fillTertiary',
+  'fillQuaternary',
   'focusRing',
   'shadow',
   'accent',
@@ -170,8 +208,12 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     text: 'ink',
     textMuted: 'inkMuted',
     textInverted: 'white',
-    border: 'line',
-    borderStrong: 'lineStrong',
+    border: 'grayAccessible',
+    borderStrong: 'grayAccessible',
+    fillPrimary: 'fillPrimary',
+    fillSecondary: 'fillSecondary',
+    fillTertiary: 'fillTertiary',
+    fillQuaternary: 'fillQuaternary',
     focusRing: 'blue600',
     shadow: 'scrimLight',
     accent: 'blue600',
@@ -199,8 +241,12 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     text: 'fog',
     textMuted: 'fogMuted',
     textInverted: 'ink',
-    border: 'seam',
-    borderStrong: 'seamStrong',
+    border: 'grayAccessibleDark',
+    borderStrong: 'grayAccessibleDark',
+    fillPrimary: 'fillPrimaryDark',
+    fillSecondary: 'fillSecondaryDark',
+    fillTertiary: 'fillTertiaryDark',
+    fillQuaternary: 'fillQuaternaryDark',
     focusRing: 'blue300',
     shadow: 'scrimDark',
     accent: 'blue300',
@@ -292,6 +338,33 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'pending', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'restricted', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'contested', bg: 'surfaceRaised', minimum: 3 },
+  /**
+   * Added with the border sweep, and ONLY with it — `docs/hig-adoption-brief.md`
+   * §7: *"Whichever wins, a `border`-on-`surface` pair should be ADDED to
+   * `CONTRAST_PAIRS`, because the current gap is how this got to 17/24
+   * unnoticed."*
+   *
+   * **These could not land in the palette PR and the reason is worth keeping.**
+   * Against the pre-sweep primitives they measured **1.34** light and **1.49**
+   * dark — so declaring them alone is a red gate, while remapping alone would
+   * have put a heavy dark rule on every card, chip, table cell and column,
+   * which **no gate would object to, because a *darker* border fails nothing.**
+   * Enforcement and remedy had to be one commit; this is it.
+   *
+   * What `border` still paints after the sweep is the point of the remap: not
+   * structure — structure now separates by fill and spacing — but **state**.
+   * The dashed markers for an unplaceable calendar item, a clipped timeline bar
+   * and a drive-reference attachment are exactly the "components and STATES"
+   * WCAG 1.4.11 names, so they are the borders that most needed to clear 3:1
+   * and were the least likely to be noticed failing.
+   *
+   * `focusRing` is here for a different reason: it is never text and never
+   * decorative, it is the only thing a keyboard user has to locate themselves
+   * with, and it was undeclared.
+   */
+  { fg: 'border', bg: 'surface', minimum: 3 },
+  { fg: 'borderStrong', bg: 'surface', minimum: 3 },
+  { fg: 'focusRing', bg: 'surface', minimum: 3 },
 ];
 
 export function colorOf(theme: ThemeName, role: TokenRole): string {

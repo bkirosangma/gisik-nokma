@@ -1,0 +1,72 @@
+{
+  "belowCount": 0,
+  "totalClasses": 6,
+  "examined": 19,
+  "highestReading": 18.82,
+  "routes": [
+    "/my-work",
+    "/p/:projectId",
+    "/members",
+    "/settings/ticket-types",
+    "/settings/workflows"
+  ],
+  "roster": [
+    {
+      "selector": "input",
+      "ratio": 4.07,
+      "border": "rgba(118,118,118,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/members"
+      ]
+    },
+    {
+      "selector": "select",
+      "ratio": 4.07,
+      "border": "rgba(118,118,118,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/members"
+      ]
+    },
+    {
+      "selector": "aside.gn-attention",
+      "ratio": 4.66,
+      "border": "rgba(178,80,0,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/my-work",
+        "/p/:projectId"
+      ]
+    },
+    {
+      "selector": "button",
+      "ratio": 18.82,
+      "border": "rgba(0,0,0,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/p/:projectId",
+        "/settings/ticket-types",
+        "/settings/workflows"
+      ]
+    },
+    {
+      "selector": "button.ticket-type-list__new",
+      "ratio": 18.82,
+      "border": "rgba(0,0,0,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/settings/ticket-types"
+      ]
+    },
+    {
+      "selector": "button.workflow-list__new",
+      "ratio": 18.82,
+      "border": "rgba(0,0,0,1)",
+      "backdrop": "rgb(242,242,247)",
+      "routes": [
+        "/settings/workflows"
+      ]
+    }
+  ]
+}

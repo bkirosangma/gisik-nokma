@@ -164,3 +164,56 @@ describe('HIG adoption — the deliberate departures', () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+/**
+ * The control affordance after R1(c), asserted at the token level because that
+ * is where the two candidate signals can be computed exactly.
+ */
+describe('a control without a boundary — which signal identifies it', () => {
+  /**
+   * 13.284 — the fill does NOT carry identification and the accent label does, and the case asserts both halves.
+   *
+   * Ruling R1(c) removes the boundary from non-primary controls, and the
+   * controller's ruling of 2026-09-08 explicitly declined to assert whether
+   * what replaces it satisfies WCAG 1.4.11 — *"that is a reading, not a
+   * measurement, and it is not mine to assert into your case text."* So the
+   * measurement lives here and the reading lives in the catalogue.
+   *
+   * **Both halves are asserted, and the first is the one that would be tempting
+   * to omit.** A test that only checked the label passes just as well in a world
+   * where someone has quietly given the fill a 3:1 value and changed what the
+   * control means — and, more importantly, it would let a reader believe the
+   * fill was doing work it is not. The fill is asserted to be BELOW 3:1
+   * precisely so the case states the uncomfortable half of its own conclusion.
+   */
+  it('identifies a non-primary control by its label, not its fill — and says so in both directions', () => {
+    /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+    const over = (src: string, dst: string): string => {
+      const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+      const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+      const channel = (i: number): number =>
+        Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+      return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+    };
+
+    for (const theme of THEME_NAMES) {
+      const surface = colorOf(theme, 'surface');
+      const filled = over(colorOf(theme, 'fillTertiary'), surface);
+
+      // (1) The fill cannot be the identifying signal. Stated as an assertion
+      // rather than left implicit, because it is the half a reader would
+      // otherwise assume went the other way.
+      expect(
+        contrastRatio(filled, surface),
+        `${theme}: the tertiary fill is being treated as the thing that identifies a control`,
+      ).toBeLessThan(3);
+
+      // (2) The label is, and it clears the 4.5 it owes as TEXT — which is more
+      // than the 3:1 1.4.11 asks of a non-text identifier.
+      expect(
+        contrastRatio(colorOf(theme, 'accent'), filled),
+        `${theme}: the accent label on a filled control no longer clears 4.5`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});

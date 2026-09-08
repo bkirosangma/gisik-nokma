@@ -89,7 +89,7 @@ button { font: inherit; }
    box was 88px tall and `Sign out` was the one child whose rect crossed the
    viewport edge. After: 104px, every child fully inside, scrollWidth equal to
    clientWidth. The button wraps onto another line; it is not hidden. */
-.gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
+.gn-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: 0.8rem 0; }
 .gn-nav__spacer { flex: 1; }
 
 /* Measured on the signed-in shell at 390px: `89x23` on the nav's links — nine
@@ -142,13 +142,13 @@ button { font: inherit; }
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
-.gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--gn-border); padding-top: 0.9rem; }
+.gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
 
 /* A refusal is a first-class rendering, not an error state: six of the twelve
    `DataSourceQuery` methods answer with a `ServingGapError` naming the facts the
    shipped routes do not serve, and this is where the shell shows those words
    rather than a spinner that never stops. */
-.gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--gn-border); border-radius: 0.4rem; color: var(--gn-text-muted); }
+.gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border-radius: 0.4rem; color: var(--gn-text-muted); }
 .gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }
 
 /* ── The 404, and the two legal pages ────────────────────────────────────────
@@ -205,7 +205,6 @@ button { font: inherit; }
   max-width: 68ch;
   margin: 0 0 1.75rem;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--gn-border);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
   color: var(--gn-text-muted);
@@ -306,7 +305,6 @@ button { font: inherit; }
    would fail contrast against this surface. */
 .gn-legal__flag {
   padding: 0.9rem 1rem;
-  border: 1px solid var(--gn-border);
   border-left: 3px solid var(--gn-warning);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
@@ -321,7 +319,6 @@ button { font: inherit; }
   max-width: 68ch;
   margin-top: 2.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--gn-border);
   color: var(--gn-text-muted);
 }
 
@@ -354,7 +351,6 @@ button { font: inherit; }
 .gn-mcp-authorize__consent {
   margin: 0 0 1.25rem;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--gn-border);
   border-left: 3px solid var(--gn-accent);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
@@ -429,7 +425,6 @@ button { font: inherit; }
 .gn-mcp-authorize__refusal {
   margin: 1rem 0 0;
   padding: 0.75rem 0.9rem;
-  border: 1px solid var(--gn-border);
   border-left: 3px solid var(--gn-danger);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
@@ -463,7 +458,6 @@ button { font: inherit; }
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--gn-border);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
 }
@@ -501,7 +495,6 @@ button { font: inherit; }
 .gn-mcp-tokens__refusal {
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--gn-border-strong);
   border-radius: 0.4rem;
   background: var(--gn-surface-sunken);
   color: var(--gn-text);
