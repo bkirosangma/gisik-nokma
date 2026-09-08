@@ -388,10 +388,34 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   person retrying sign-in locks out every other user, and it is a trivial unauthenticated
   denial-of-service on the **first screen a new user ever sees**.
 
-  **⚠ WHAT IS NOT ESTABLISHED — do not let this be inherited as settled.** The **effect** is measured
-  and reproducible; the **cause is not pinned.** No `x-forwarded-for` appears anywhere in better-auth's
-  `dist`, and the `key: ""` that looked like a smoking gun is a no-data placeholder in `decideConsume`,
-  not the key derivation. **And this was measured on the DEV STACK ONLY** — not against the real
+  **THE CAUSE IS PINNED (2026-09-08, after this entry was first written).**
+  `better-auth@1.7.2/dist/api/rate-limiter/index.mjs`:
+
+      const ip = getIP(req, ctx.options);                          // :239 — returns falsy here
+      const key = createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path); // :245
+      const NO_TRUSTED_IP_KEY = "no-trusted-ip";                    // :233
+
+  **When the IP cannot be resolved the key falls back to a literal constant — one shared bucket per
+  path, for everybody.** The fallback is unconditional on IP resolution failing, which is why the
+  two-client control showed sharing *with no proxy in the path*. My earlier "the Next proxy collapses
+  the addresses" reading is refuted by the same line: the proxy is irrelevant.
+
+  **AND THE LIBRARY SAID SO, IN THIS SERVER'S OWN LOG.** Line :241 logs *"Rate limiting could not
+  determine a client IP and is falling back to a single shared per-path bucket."* It is gated by
+  `ipWarningLogged`, so it prints **once per process** — into startup noise, never repeated. *A
+  once-per-process warning is a finding with a half-life.*
+
+  **⚠ THE NUMBERS: 5 per 60s, and NOT the 3-per-10s the generic rule would suggest.** `/sign-in*` does
+  carry a default special rule of `window: 10, max: 3` (`:302-308`) — **but a plugin rule overrides it**
+  (`:251-257`), and `magic-link/index.mjs:197-203` declares `pathMatcher` `/sign-in/magic-link`,
+  `window: opts.rateLimit?.window || 60`, `max: opts.rateLimit?.max || 5`. **The magic-link path is
+  governed by the plugin's 5-per-60s, not the generic 3-per-10s**, which is exactly what the black-box
+  measurement found. Reading one rule table and stopping would have produced a confident wrong number;
+  the measurement and the source agree only after the override is followed.
+
+  *(The `phone-number` plugin declares its own too: `/phone-number`, 60s, max 10.)*
+
+  **⚠ STILL NOT ESTABLISHED: this was measured on the DEV STACK ONLY**, not against the real
   deployment.
 
   **This CORRECTS an earlier reading of my own.** I first reported the cause as `next.config.ts:94`

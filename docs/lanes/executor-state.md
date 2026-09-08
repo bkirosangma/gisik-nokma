@@ -277,15 +277,26 @@ addresses sharing a budget with no proxy involved is the finding, and I nearly f
 instrument. *When a control and a subject agree, ask whether the control just answered a different and
 better question.*
 
-## ⚠ WHAT IS NOT ESTABLISHED — do not inherit these as settled
+## ✅ THE CAUSE IS NOW PINNED, AND ITEM 3 BELOW RECONCILED — the black box and the source agree
 
-1. **The cause is NOT pinned.** No `x-forwarded-for` anywhere in better-auth's `dist`; the `key: ""` I
-   suspected is a no-data placeholder in `decideConsume`, not the key derivation. **Effect measured,
-   mechanism unknown.**
-2. **Dev stack only.** Never tested against the real deployment.
-3. **`max: 3` read out of better-auth's bundle does not reconcile with the observed 5.** I did not
-   resolve that and the conclusion does not depend on it — the response body identifies the limiter
-   regardless.
+`better-auth@1.7.2/dist/api/rate-limiter/index.mjs:239-245`: `getIP()` returns falsy, so
+`createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)` keys on the literal `"no-trusted-ip"` — **one
+shared bucket per path, for everybody.** Unconditional on IP resolution failing, which is why the
+no-proxy control still showed sharing. **My "the Next proxy collapses the addresses" reading is refuted
+by that same line.**
+
+**The library WARNED US, once, in this server's own log** (`:241`): *"Rate limiting could not determine
+a client IP and is falling back to a single shared per-path bucket."* Gated by `ipWarningLogged` →
+**once per process**, into startup noise. ***A once-per-process warning is a finding with a half-life.***
+
+**⚠ AND THE `max: 3` THAT WOULD NOT RECONCILE — it reconciles, and the answer corrects the ruling.**
+`/sign-in*` does carry a default special rule of `window: 10, max: 3` (`:302-308`). **But a plugin rule
+overrides it at `:251-257`**, and `magic-link/index.mjs:197-203` declares `/sign-in/magic-link` with
+`window: … || 60`, `max: … || 5`. **The magic-link path is 5-per-60s, not 3-per-10s.** That is exactly
+what the black-box measurement found, and the two only agree once the override is followed. *Reading
+one rule table and stopping produces a confident wrong number — the shape this repo keeps recording.*
+
+**STILL NOT ESTABLISHED: dev stack only**, never tested against the real deployment.
 
 ## A FALSE DROP-ALARM I RAISED AGAINST MYSELF, worth carrying
 
