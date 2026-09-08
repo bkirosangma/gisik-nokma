@@ -1415,8 +1415,19 @@
   outline-offset: 1px;
 }
 
-/* ── The ghost button, which had NO rule at all (the 2.49:1 border was the
-   only affordance). Fill + accent 600 label, no boundary — the ruling. ──── */
+/* ── The ghost button gets its own rule at last. It had none, and the plan's
+   reason for adding it — "the 2.49:1 border was its only affordance" — was
+   TRUE OF THE PRE-#354 TREE AND IS NOT TRUE NOW, which review caught before
+   this shipped. That border came off in the border sweep, and the base
+   `.gn-button` above already carries `border: none`, the tertiary fill, the
+   accent colour and weight 600, so a ghost button has rendered correctly since
+   #354 — `button.tsx` always emits `gn-button gn-button--ghost` together and
+   never the modifier alone.
+
+   So every declaration here duplicates the base and this rule changes NOTHING
+   today. It is kept, explicitly, for one reason: `.gn-button--ghost` is what
+   the variant MEANS, and pinning it here is what makes 13.289 able to say so.
+   It is not repairing anything. ─────────────────────────────────────────── */
 .gn-button--ghost {
   background: var(--gn-fill-tertiary);
   border-color: transparent;

@@ -139,11 +139,17 @@ describe('SegmentedControl (13.288)', () => {
     const list = screen.getByRole('tablist', { name: 'Sign-in method' });
     const tabs = within(list).getAllByRole('tab');
     expect(tabs).toHaveLength(2);
-    expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
-    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
-    expect(tabs[1]).toHaveClass('gn-segmented__item--on');
-    expect(tabs[0]).not.toHaveClass('gn-segmented__item--on');
-    await userEvent.click(tabs[0]);
+    // `!` because this repo runs `noUncheckedIndexedAccess`, so an index into
+    // `getAllByRole`'s array is `HTMLElement | undefined`. The plan's literal
+    // spelling typechecks nowhere in this tree, and `pnpm vitest run` cannot
+    // see it — only the gate's `typecheck` task does. The length assertion two
+    // lines up is what makes the `!` honest.
+    const [phoneTab, emailTab] = [tabs[0]!, tabs[1]!];
+    expect(phoneTab).toHaveAttribute('aria-selected', 'false');
+    expect(emailTab).toHaveAttribute('aria-selected', 'true');
+    expect(emailTab).toHaveClass('gn-segmented__item--on');
+    expect(phoneTab).not.toHaveClass('gn-segmented__item--on');
+    await userEvent.click(phoneTab);
     expect(onChange).toHaveBeenCalledWith('phone');
   });
 });
