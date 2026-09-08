@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1825,3 +1825,38 @@ compute against one specific background — which is exactly why they are cases 
 > already-recorded finding as the 26 controls rendering at the browser's font. **The sweep did not
 > break it; the sweep made it visible**, because the controls beside it stopped looking browser-default
 > too. Per-screen work, so it belongs to the reconciliation audit, recorded here rather than fixed.
+
+
+## Task 0 of the HIG per-screen plan (2026-09-08) — the accessible-name gate
+
+*Built BEFORE any screen is touched, and that ordering is the point: the per-screen work is delegated
+to smaller models, and **a rule enforced by a test survives a delegation while a rule enforced by
+attention does not.** The owner's rule is "reject anything that loses information or an aria-label";
+before this, **46 `aria-label` and 140 `role` attributes existed across 53 source files and NOT ONE
+ASSERTION TOUCHED ANY OF THEM** — a restyle could have deleted every accessible name in the product and
+the gate would have stayed 33/33.*
+
+- **13.285** ✅ Accessible names and roles on the signed-out surface are a one-way ratchet: `aria-label`,
+  `role`, `aria-selected` and `aria-describedby` counts per `viewport|route` may rise and never fall.
+  Lowering one is a deliberate deletion of the key in a commit that names the element — the same
+  contract as the tap-target and type-scale baselines, and `recordAccessibleBaseline` writes ABSENT keys
+  only so a branch that lowered a count cannot re-baseline over it.
+  *Mutation-witnessed, and the witness is the whole reason to believe the rest: deleting
+  `aria-selected` from the Phone tab alone (`sign-in/page.tsx:104`) reddens it on all three viewports,
+  naming the route and printing **"LOST ariaSelected: baseline 2, now 1"**. Committed first, then
+  mutated, then restored — `git checkout --` restores from HEAD and has destroyed uncommitted work here
+  twice.*
+- **13.286** ✅ The sweep's selector control, asserted HARD and BEFORE the ratchet: `*` over a rendered
+  document must examine more than zero elements. *A sweep that stopped matching reports zero losses and
+  is byte-for-byte indistinguishable from a page that lost nothing — the failure this file catalogues
+  more than any other. Measured populations range from 48 elements on `/sign-in` to 999 on `/help`.*
+- **13.287** ✅ The signed-in twin, over the stack suite's five routes, with its own baseline file
+  because it is a different population. *It is not redundant with 13.285 and the numbers show why:
+  `AppNav`, the view tabs, the board and every settings screen exist only behind a session, so the
+  signed-out ratchet is structurally blind to them — `/p/:projectId` alone carries 13 roles and 4
+  `aria-selected`, and the signed-out sweep sees none of it.*
+
+> **What this gate deliberately does NOT do.** It counts; it does not read. A restyle that swaps one
+> accessible name for another of equal count passes here, and should — whether the new words are better
+> is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
+> can be mechanised and the half a delegated implementer is most likely to cause by accident.
