@@ -1,5 +1,19 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~03:1x IST — **TASK 13 MERGED (#385 → `777c5b1`): the neo measurement is on `main`, the PALETTE IS RULED, Task 14 is next.** `main` is `777c5b1` + this PR; zero open PRs; executor holding at the fixed point (ctx 24 %, sonnet), to be restarted onto Task 14.
+
+### The merge, fixed order
+Freeze line by cross-session message: `09e52d7` (the executor's handoff-refresh commit on top of `ac58eed`, correctly re-verified before it reported — its handoff block still names `ac58eed` as "frozen", the same self-naming limit that file records about itself). Guard: head `09e52d7`, base `main`, MERGEABLE. `MERGE_EXIT=0`, MERGED `777c5b1`, platform `main` = `777c5b1`, reachable, **all three trees identical (`a2bd5f0a`)**, unfiltered diff lists no file outside the PR's six. **My first drop check used the `-- $F` variable form this file already retires — both it and its control printed 0 bytes, so that reading was void; re-run with literal paths: drop 0 bytes / empty stderr, same-pipeline control non-zero** (numbers in the scratchpad). Tree identity was the criterion that held throughout. Six checks raw-green at `777c5b1` (195/212 · 1,818 ids · `Unsupported engine` 0). Docs + `design-system/` only; no gate owed.
+
+### What Task 13 measured (`docs/neo-token-report.md`, probe `design-system/tools/neo_tokens_probe.py`, tokens `design-system/neo-tokens.json`)
+Every style moves surface/raised/sunken away from the shipped palette in both themes (light warm paper `#EFE7DF`/`#EDE4DB` vs `#f2f2f7`; dark navy `#141A2E`/`#1B2340` vs `#000000`); the cascade's accent default is `#3A6DB0` vs shipped `#0040DD`; **neo/dark has NO fill separation (surface = raised = sunken = `#1B2340`, ratio 1.00)**; light `label3` on surface 2.96–2.99 and the export accent on surface 4.19–4.3 fail 4.5; the neo sunken input's shadow edge is 1.24/1.16 (the owner's waiver, recorded). Instrument gaps stated, not passed: cascade-only reading (no rendered/inline values), `--fill2` missing in mobile, no overlay shadow variable, mobile lacks `:focus-visible`.
+
+### RULING (this PR, in the plan directly above Task 14) — the palette
+The export's palette is ADOPTED for all three styles × both themes (it is the design the owner asked for; my "palette carries over" was a screenshot reading, superseded by measurement). **The accent stays SHIPPED pending the owner** — the probe read a cascade default, the design session's picker has the shipped blue selected, and `#3A6DB0` fails 4.19 anyway. The accessibility floor is kept by MINIMAL NUDGES recorded against each export value (the #353 shape): every `CONTRAST_PAIRS` row passes, `label3` reaches 4.5, neo/dark gets derived raised/sunken steps matching the export's own hig/minimal separation (1.21 / 1.46) with the shadows on top. Rule (b) clarified: the "fill below 3:1" rows are the accepted post-#354 state, not failures. Rule (a): waived, numbers quoted in 13.339. **Owner question, one word: keep the blue accent (`#0040DD`)?**
+
+### Next
+Restart the executor at this fixed point (sonnet, the Task 14 tier) with an override: #385 merged, **begin Task 14** (the style axis hig/minimal/neo with neo default, the `StyleToggle` beside `ThemeToggle`, the four shared pieces, cases 13.337–13.347, the palette ruling as input). Then Task 15 → the owner's look. Session meter 68 % at 03:0x (resets 05:20); the controller keeps its turns sparse.
+
 ## ⚖ WEDNESDAY ~02:4x IST — **THE OWNER UNBLOCKED THE NEO ROUND: files delivered, four rulings, plus a style switcher. TASK 13 DISPATCHED.** `main` is `c367a32` + this PR; zero open PRs; executor holding on sonnet, about to receive Task 13.
 
 ### The owner's words tonight, verbatim, each applied in the plan amendment (this PR)
