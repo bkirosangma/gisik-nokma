@@ -1,5 +1,58 @@
 # Cross-lane controller — live state
 
+## ⏹ WEDNESDAY ~01:5x IST — **OWNER DIRECTION: "I want to make the platform in the neomorphism style."** The controller's context is at ~77% and it anchors here for its own restart. `main` is `03180df` + this anchor; zero open PRs; executor holding (Task 12 NOT started; the fabricated-release incident is closed, #378). **The Task 4 owner look was never given — the owner moved to the design direction instead.**
+
+### What the owner pointed at, read tonight (browser; DesignSync cannot reach it)
+- Design session `claude.ai/design/p/d6123fd8-…` ("Interactive prototype building", 3 pages: `Gisik Nokma - Desktop.dc.html`,
+  `- Mobile.dc.html`, …). It is a **regular design project**, so `DesignSync list_projects` does not list it and its
+  iframe is `srcdoc` — **the file is not fetchable from the page; the owner must export/download it or add it to the
+  design-system project.** The design-system project DesignSync CAN read is `Gisik Nokma — Apple HIG UI`
+  (`74709f67-353f-447e-96f9-05c6cb98682c`, updated 2026-09-08 09:11Z): the ORIGINAL 23 static prototypes +
+  `tokens.json` + `MASTER.md` — exactly #351's snapshot. Nothing newer is there.
+- The interactive prototype has switches `styleName: hig | minimal | neo`, `theme: light | dark`, four accents, and 22
+  start screens. **`neo` = neumorphism:** raised cards/pills with diffuse drop shadows on the same paper colour, sunken
+  inputs with inner shadows and NO border, the accent palette unchanged; dark theme separates by slightly lighter
+  fills (shadows nearly invisible). Screenshots taken of sign-in, workspaces, board, list (light+dark), members, my-work.
+- **The prototype has grown far past the audited 23** (audit #355 was against #351's set): a List view with a
+  Columns picker, Group-by (epic/workflow/type/status/assignee), hierarchy with progress, a "claim" suffix on dates;
+  a **workflow selector on the board** (projects hold tickets on different workflows; columns come from the chosen
+  workflow); **subtasks as real tickets** (own state/type/assignee/description/history, "Subtask of…" chip); **breadcrumbs**
+  workspace → project → sprint → epic → parent → ticket; **full-screen ticket**; an **Asana-style mobile calendar**. The
+  audit's I-rows are still drawn (member counts, active/blocked chips, role labels, initials tiles, "One invitation is
+  waiting", Help/Account nav, avatar) and the C-row subtitle is present ("3 workspaces you belong to."). **None of the new
+  material is audited; several items may already exist in the product (hierarchy, list view, type→workflow binding).**
+
+### Controller's assessment, for the owner's decision (NOT dispatched)
+1. **Neo is a surface treatment, not a rewrite.** The palette (#353, Apple accessible variants), the states work (every
+   (b) task), Task 0's accessible-name gate and the copy rule all carry over. What changes: tokens gain shadow/radius
+   roles; Task 1's four shared pieces are restyled; the two done screens (sign-in #362/#366/#369/#372, workspaces #374)
+   get a restyle pass; every later screen is built in neo. Cost: ONE extra round (a "neo tokens + shared pieces +
+   restyle of the two done screens" task) before Task 12 and the rest.
+2. **Three gate-level conflicts to carry, each already a repo rule:** (a) **inputs**: neo's sunken field has no border;
+   13.291/13.284 say an empty field keeps a ≥3:1 boundary because it has no label to identify it — a soft inner shadow
+   does not deliver 3:1; keep the boundary (or measure the shadow edge with the sweep, 13.283's instrument). (b)
+   **controls**: keep fill-or-accent-label (post-#354 rule); shadow is not a boundary the sweep or WCAG 1.4.11 credits.
+   (c) **dark theme**: separation must come from fills, not shadows — measured, not assumed. Text pairs unchanged.
+3. **The invented data stays invented** unless the owner scopes features: no member counts, chips, role labels, tiles,
+   invitation banner, Help/Account nav, avatar — the audit's D/I discipline applies to neo exactly as to HIG.
+4. **The new features need a SECOND reconciliation audit** (read-only executor task, docs-only, can run now): classify
+   list columns/group-by, workflow selector, subtasks-as-tickets, breadcrumbs, full-screen, mobile calendar as
+   exists / partial / absent against the code, then a plan addendum for what the owner wants built.
+5. **Precondition for any of it:** the interactive prototype files in the repo (`design-system/` snapshot, #351's
+   precedent) — the owner exports them or adds them to the design-system project so DesignSync can pull them.
+
+### Owner decisions pending (asked in chat ~01:5x)
+Neo for the whole product incl. restyling the two done screens? · run the second audit now? · export the prototype
+files? · plus the older items: Task 4 look (behaviour, since the surface will change), 2c Help copy, manual "five
+things", invite line, emulator images.
+
+### Restart mechanics for THIS controller (context ~77%)
+`tmux respawn-window -k -t gisik:0 "claude --model fable --permission-mode
+bypassPermissions \"\$(cat /Users/kiro/my_projects/gisik-nokma-lanes/dispatch-controller-serial.md)\""` — the
+owner runs it (a controller cannot restart itself). **Never `do-restart.sh` / `kill-session`**: the executor holds
+`gisik:1`. The fresh controller reads this entry, then #378's, then re-arms the two Monitors (open-PR set; executor
+pane), re-measures the six checks at the sha it reports, and does NOT dispatch anything until the owner answers above.
+
 ## ⚠ WEDNESDAY ~00:1x IST — **A FABRICATED OWNER RULING, BY MECHANISM: the idle nudger's pasted Enter "answered" the executor's `AskUserQuestion` with its own first options. Nothing landed; withdrawn; rule written into the brief.** `main` is `f45fdc5` + this anchor (#376 and #377 were the executor's docs-only handoff corrections, merged in the fixed order). **The hold on Task 4's owner look STANDS — the owner has not looked.** Zero open PRs.
 
 ### What happened, measured from two logs
