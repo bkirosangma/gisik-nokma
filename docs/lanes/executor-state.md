@@ -179,8 +179,105 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > a naive check hits it.
 >
 > **The queue after #334 is empty of assigned work.** All five of the owner's 2026-09-08 rulings now
-> have PRs. What is OWED and not done: the four unwitnessed type-scale fixes (see below) and Plan 9's
-> client-side notification consumer (`controller-state.md` #287).
+> have PRs. What is OWED and not done: the four unwitnessed type-scale fixes (see below).
+> ~~and Plan 9's client-side notification consumer (`controller-state.md` #287)~~ — **struck 2026-09-08:
+> that was already CLOSED by #293 (cases 11.190–11.195) when I wrote it. I repeated the stale claim
+> from `controller-state.md` without checking it, which is how a stale item survives: each reader
+> copies it forward because the previous reader looked careful.**
+
+> # ⏸ RESTART HANDOFF — #287 STALENESS TASK, PAUSED MID-FLIGHT FOR A BRIEF REFRESH
+>
+> **Branch `exec/120-287-staleness`, off `main` `8b0d15e`. Committed and pushed. NO PR OPENED — the
+> controller instructed not to open one before the restart.** Read this block, then the entry below it
+> for the detail.
+>
+> ## WHAT IS ESTABLISHED (verified, not assumed)
+>
+> * **The premise holds.** #293 MERGED; merge commit `9c0af02` is an ancestor of `origin/main`
+>   (`git merge-base --is-ancestor`, not `cat-file`); `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
+>   present on `main`; cases **11.190–11.195** all catalogued in `test-cases/11-calendar-notifications.md`.
+>   Six tests, zero `vi.mock`, real Postgres, EXIT 0, collected by the gate via `test/**/*.test.ts`.
+> * **Three documents corrected** in commit `a400569`: `test-cases/12-offline-sync-apps.md` (12.325),
+>   `docs/superpowers/plans/2026-08-20-00-series-coordination.md:1002`, and this file's position block.
+> * **Four confirmed already-correct** and deliberately untouched; **one false positive** read and
+>   rejected (Plan 9's plan file `:1719` — that sentence is about Plan 5's helpers).
+> * **Gate 33/33 EXIT 0, `Cached: 0`** (forced), Node v22.22.2, load 1.02. All five catalogue checks
+>   EXIT 0. Change is **docs-only** — `git status` showed exactly three `.md` files.
+>
+> ## WHAT IS *NOT* VERIFIED — do not report these as done
+>
+> 1. **The sweep covered `.md`, `.ts`, `.tsx` only.** `.json`, `.yml`, `.sh`, `Dockerfile`s and
+>    `README`s were NOT swept. A stale reference in CI config or a README would not have been found.
+>    Re-running with a widened extension list is cheap and has not been done.
+> 2. **The pattern set is mine, not exhaustive.** Widening it once mid-task surfaced a file the first
+>    pass missed (`cannot` vs `could not`). Other phrasings may exist — e.g. "outside `apps/server`'s
+>    dependency graph" as a standalone claim, or "Lane F" + "residual".
+> 3. **`controller-state.md:694-696` was left unedited BY DECISION, not because it is clean.** It does
+>    assert the item open. That file's convention is correct-by-later-entry, and `:551`
+>    (`PLAN 9'S RESIDUAL CLOSED`) plus `:133` already supersede it — so nothing is owed, but a reader
+>    landing at `:694` still sees an open item. **The controller's own note says its file "was not
+>    found to" point at it as open; that read was wrong.** Controller's call, flagged not made.
+> 4. **The DISPATCH BRIEF still carries the stale claim** under *TWO KNOWN GAPS #1*. It is not in the
+>    repo, so no commit can fix it — it needs editing wherever the brief is authored, or the next
+>    executor will read the stale version and repeat it. **I repeated it twice myself before checking.**
+> 5. **No PR exists.** The branch is pushed; nothing has been proposed for merge.
+>
+> ## NEXT CONCRETE STEP, in order
+>
+> 1. **Open the PR** from `exec/120-287-staleness` → `main`, docs-only, gate already green at the sha
+>    below. Nothing further needs running unless `main` has moved (then merge `origin/main` in first —
+>    expect additive narrative conflicts in `Features.md` / this file, resolve keep-both with main's
+>    side first, and verify with **anchored** markers in the COMMITTED blobs).
+> 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
+>    PR rather than a second one.
+> 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
+>
+> **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
+> That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
+> while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
+>
+# ▶ TUESDAY 2026-09-08 ~11:xx IST — **#287 STALENESS SETTLED: THREE DOCUMENTS CORRECTED, FOUR ALREADY RIGHT, ONE FALSE POSITIVE.**
+
+*Branch `exec/120-287-staleness`, off `main` (`8b0d15e`). Docs-only, controller-assigned.*
+
+**Premise verified before sweeping, not assumed from the assignment.** #293 is MERGED, its merge commit
+`9c0af02` is an ancestor of `origin/main`, `notifications-consumer-roundtrip.test.ts` is present on
+`main`, and cases **11.190–11.195** are all catalogued in `test-cases/11-calendar-notifications.md`.
+
+**The sweep enumerated 829 files** (`docs`, `test-cases`, `apps`, `packages`) and ran a positive control
+first — `"consumer residual"`, which fires in two known places. **`rtk find` refused the compound
+predicate and returned ZERO files**, which would have produced a confident "no stale references
+anywhere"; the file count is printed for exactly that reason, and `rtk proxy find` was used instead.
+
+| document | state | action |
+|---|---|---|
+| `test-cases/12-offline-sync-apps.md` (12.325) | **STALE** — present tense *"the adapter **lives**… the consumer **cannot be executed**"* | **corrected** |
+| `…/2026-08-20-00-series-coordination.md:1002` | **STALE** — *"is being closed as assigned work"* | **corrected** |
+| `docs/lanes/executor-state.md` position block | **STALE** — I listed it as OWED | **corrected (struck)** |
+| `fixture-witnesses.test.ts:397` | already corrected in place 09-07 | none |
+| `notifications-consumer-roundtrip.test.ts:25` | quotes the old claim to refute it | none |
+| `executor-state.md:1273-1279` | older entry, superseded above | none (file convention) |
+| `controller-state.md:694-696` | older entry, superseded by `PLAN 9'S RESIDUAL CLOSED` at :551 | none (file convention) |
+| `…/2026-08-20-09-calendar-notifications.md:1719` | **FALSE POSITIVE** — *"cannot be executed against a checkout that lacks it"* is about **Plan 5's helpers** | none |
+
+**THE SHARPEST FINDING: THE CATALOGUE DRIFTED FROM THE CODE IT CITES.** `fixture-witnesses.test.ts` got
+its correction on 09-07 — a "CLOSED 2026-09-07" paragraph directly under the original limit. **Its
+catalogue entry, 12.325, did not**, and went on asserting in the present tense that the adapter *lives*
+in `apps/web` and the consumer *cannot* be executed. Both are sources of truth by this workspace's own
+rules, and the one a person greps is the catalogue. **Correcting code and leaving its case entry is a
+half-correction that reads as a whole one.**
+
+**A NOTE FOR THE CONTROLLER, precisely.** `controller-state.md`'s own note says *"this file's own text
+was not found to [point at it as open], on this session's read of it."* **It does — at :694-696**,
+*"the client gateway has never been executed… Owner: whoever next touches Plan 9's client-side
+notification consumer."* **No edit is owed**: that file's convention is to correct by a later entry
+rather than rewrite, and :551 (`PLAN 9'S RESIDUAL CLOSED`) plus :133 already do it. The read was wrong;
+the file is fine. Flagged rather than edited, same as before.
+
+**Why this class survives, stated because it is the third instance today:** each reader copies the claim
+forward because the previous reader looked careful. I did it myself — twice, to the controller — before
+checking. A present-progressive claim (*"is being closed"*) is the worst shape of all: true when
+written, false on merge, and nothing rereads it the day it lands.
 
 # ▶ TUESDAY 2026-09-08 ~07:5x IST — **TYPE SCALE: THE FINDING HAD NO INSTRUMENT, AND THE OBVIOUS ROUTES WERE THE WRONG ONES.**
 

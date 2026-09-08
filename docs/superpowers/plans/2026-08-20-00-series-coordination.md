@@ -998,9 +998,16 @@ when the ruling was about *who*, not *what*.
 >    trigger or its own description: **step 10 ran 2026-09-02 (`ac187e8`, PR #70) but covered only
 >    Plan 5's `applyCommitted` fake and Plan 6a's client contract** — it could not have covered Plans
 >    8 and 9, whose fakes landed later — and **Plans 8 and 9 were witnessed 2026-09-06 by Lane F
->    (`e33c429`, PR #187)** under a different name. The live residual is **Plan 9's notifications
->    consumer**, witnessed producer-side only; it is owned in `docs/lanes/controller-state.md`, not
->    here, and is being closed as assigned work rather than by any "trigger".
+>    (`e33c429`, PR #187)** under a different name. The residual was **Plan 9's notifications
+>    consumer**, witnessed producer-side only. **It is CLOSED — #293, cases 11.190–11.195**, and this
+>    line is corrected rather than deleted because it read "is being closed as assigned work", which
+>    was true in flight and became false on merge. A present-progressive claim about work in flight
+>    expires silently: nothing rereads it the day it lands.
+>    `apps/server/test/integration/notifications-consumer-roundtrip.test.ts` drives the real
+>    `createHttpNotificationsGateway` over a real `createHttpClient` against the real route, store and
+>    Postgres, with zero `vi.mock`. The blocker was never the dependency graph — the adapter was
+>    misfiled in `apps/web` despite importing nothing web-specific, and `apps/server` already
+>    devDepended on `@gisik-nokma/app-core`.
 > 2. **The `TZ` figure is wrong by an order of magnitude** — see the correction inline below.
 
 **The wave-boundary integration checkpoint no longer fires, and it guarded the signature defect.** The
