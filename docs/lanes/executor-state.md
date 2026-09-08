@@ -103,13 +103,25 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## STILL OUTSTANDING
 >
-> * ~~The controller's merge of #374~~ **DONE — merged as `b7464f6`.** What remains is exactly one
->   thing: **the owner's look at `http://localhost:3001/workspaces`**. Per the Task 4 dispatch,
->   *nothing after Task 4 starts until they have*. Task 12 is next in the queue and is HELD behind
->   that look — do not start it from this file alone.
-> * If you are a relaunched executor reading this: the queue is EMPTY pending that ONE event.
->   Hold. Do not re-derive work from the brief's retired sequence.
-> * **NOT this task's, and the OWNER's to act on: GitHub Actions has not RUN since at least #371.**
+> * ~~The controller's merge of #374~~ **DONE — merged as `b7464f6`.** ~~What remains is exactly one
+>   thing: the owner's look at `http://localhost:3001/workspaces`. Per the Task 4 dispatch, *nothing
+>   after Task 4 starts until they have*. Task 12 is next in the queue and is HELD behind that look.~~
+>   **SUPERSEDED — the live position is `controller-state.md`'s #379 and #380 anchors.** The Task 4
+>   look **was never given**: the owner moved to a design direction instead — *"I want to make the
+>   platform in the neomorphism style"* — and then ruled *"yes. yes. yes."* to neo for the whole
+>   product **including a restyle of the two finished screens**, to running the second reconciliation
+>   audit now, and to exporting the interactive prototype files.
+> * **DO NOT DERIVE THE NEXT TASK FROM THIS FILE.** The fresh controller's plan amendment gates
+>   everything. **Task 12 is NOT next** — the amendment is expected to put a neo round (tokens +
+>   shared pieces + restyle of sign-in and workspaces) ahead of it. Task 12 and every restyle stay
+>   HELD until that controller dispatches them.
+> * **The one task released** (controller, 2026-09-09 ~02:0x) is this branch's: the **second
+>   reconciliation audit**, read-only and docs-only, per
+>   `gisik-nokma-lanes/CTL-DISPATCH-2026-09-09-second-audit-neo.md`. **Part A** classifies the
+>   interactive prototype's new features against the CODE; **Part B waits** for the exported files to
+>   land in `design-system/` (check `git log -- design-system/`).
+> * **NOT this task's, and NOT owed to the owner — RULED AND CLOSED (see the ruling five lines
+>   down before you act on anything here): GitHub Actions has not RUN since at least #371.**
 >   #371, #372, #373 and #374 all carry an identical signature — four `FAILURE`s (`scope`,
 >   `check-runbook`, `check-citations`, `check-help`), `gate` `FAILURE`, and every real job
 >   (`build`, `typecheck`, `server-tests`, `other-tests`, `e2e`, `check-tasks`, `check-env`)
