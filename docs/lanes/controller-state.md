@@ -1,5 +1,158 @@
 # Cross-lane controller — live state
 
+## ⚠ TUESDAY ~13:5x IST — A LIVE, UNAUTHENTICATED DoS ON SIGN-IN WAS FOUND AND CLOSED. `main` is `6e0183f`, gate GREEN. **Four PRs (#345 #346 #347 merged, #344 closed-as-superseded), an owner-delegated ruling, a stack outage, and THREE bad checks of my own — two of which I nearly acted on.**
+
+**Read this first if you are restarting:** the headline is not the merges. It is that **better-auth's own
+rate limiter could not tell clients apart at all**, so any one person retrying sign-in refused *every
+other user* — a trivial unauthenticated DoS on the first screen a new user sees. It is closed. The rest
+of this entry is how, and what nearly went wrong finding it.
+
+### THE DEFECT, and the owner-delegated ruling that closed it
+
+**Cause, pinned in the vendor source** (`better-auth@1.7.2/dist/api/rate-limiter/index.mjs:239-245`):
+
+    const ip = getIP(req, ctx.options);
+    if (!ip && !ipWarningLogged) { ctx.logger.warn("… falling back to a single shared per-path bucket …"); }
+    const key = createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path);
+
+`getIP()` returns falsy here, so the key is `NO_TRUSTED_IP_KEY` — **one shared bucket per path, for
+everybody.** The executor measured the effect before either of us had the cause: two clients on
+genuinely different addresses, **no proxy in the path**, one spent 5 and was refused on its 6th; the
+other, having spent *nothing*, was refused on its **first request**.
+
+**The library had been telling us the whole time.** That warning sits in the running server's log
+**verbatim, 2 hits** — gated by `ipWarningLogged`, so it prints **once per process**, buried in startup,
+never repeated. **A once-per-process warning is a finding with a half-life.** Worth generalising: the
+loudness of a diagnostic is not proportional to its importance, and nothing in this project reads
+startup logs.
+
+**Owner delegated the remedy to this controller ("go with what you think is best"). RULED: disable
+better-auth's limiter (`rateLimit: { enabled: false }`, now `auth.ts:147`); our own limiter is the single
+authority on `/api/auth/*`.** Grounds, each measured not preferred: (1) coverage is a strict superset —
+ours keys on `/api/auth/*` (`app.ts:471`), better-auth mounts at exactly that one pattern
+(`auth/routes.ts:76`), so nothing becomes unbounded; (2) the obvious alternative — fixing better-auth's
+IP resolution — means having it read a **caller-written** header, which would put a spoofable bucket
+beside the hardened one `rateLimitKeyFor` exists to be; (3) **per attacker ours is TIGHTER** (theirs is
+shared, so one attacker spends the whole budget; ours is per address), so this is not a trade;
+(4) two limiters with different keying on one path *is* the defect class. **Named loss, recorded not
+hidden:** better-auth's magic-link-specific bucket goes away; a sign-in-specific bucket in our limiter is
+an owned follow-up, deliberately **not** built. `RATE_LIMIT_AUTH_MAX` untouched throughout — it was never
+the constraint, and now finally means what everyone assumed.
+
+### THE EXECUTOR CORRECTED ME, AND WAS RIGHT — the method is the point
+
+I ruled that the magic-link path got better-auth's generic `/sign-in*` rule of **3 per 10s**. **Wrong.**
+`magic-link/index.mjs:197-203` declares its own `window: 60, max: 5`, and the plugin loop at `:251-258`
+**overrides** the generic rule. It is **5 per 60s** — the executor's measured figure.
+
+**I had quoted that override loop in the same output I read the special rules from, and did not follow
+it.** I stopped at the first rule that matched my expectation. What the executor did instead is the
+whole discipline in one move: its *measurement* (5) disagreed with my *code reading* (3), and **it
+trusted neither until it found the reconciling code.** Deferring to the controller would have put a wrong
+number on `main` under my authority.
+
+### ITS FIRST GUARD PASSED 59/59 AGAINST ITS OWN DEFECT — two new catalogue entries
+
+1. **The mutation was not a mutation.** better-auth defaults `enabled: options.rateLimit?.enabled ??
+   isProduction` (`:171`) and vitest sets `NODE_ENV=test` — so *deleting* the config line leaves the
+   limiter **already disabled**. The guard compared disabled against disabled. The mutation had to be
+   `enabled: true`. **Verified independently here.**
+2. **The harness structurally cannot exhibit the bug.** The `X-Forwarded-For` that makes two
+   `app.inject` clients distinguishable is *the same thing* that lets `getIP()` resolve — which is
+   exactly what removes the defect. **The instrument that makes the test possible is what makes the bug
+   impossible.** It rewrote the case around what it can actually witness, said so in the case text, and
+   **deleted a test of its own that passed under mutation.**
+
+`13.273`'s replacement is genuinely discriminating: seven requests at `authMax: 6`, exploiting the gap
+between their `max: 5` and ours at 6 — request six is past *their* limit but inside *ours*, so if theirs
+still answered, six would carry *their* body. It does not; seven carries ours.
+
+### THREE BAD CHECKS OF MY OWN. Two were false REDS, which is the direction nobody plans for.
+
+1. **`--is-ancestor` against a SQUASH-merged branch head printed "work not on main" — and I nearly
+   refused to restart the executor on it.** A squash makes a new commit whose only parent is the old
+   `main`, so **a squashed branch head can never be an ancestor.** The check cannot pass, by
+   construction. Reachability is valid only against the **merge commit**. Confirmed safe by content
+   instead (`grep` on `main` for the actual rules).
+2. **A positive control piped into `wc -c` INSIDE a command substitution printed 0** — so my drop check
+   on #347 certified nothing. Re-run with explicit paths: 31,911 bytes whole, 4,995 for `auth.ts` alone,
+   drop check a genuine 0. **This is the repo's own recorded rule — when a COUNT is the evidence, capture
+   EXIT STATUS and STDERR — and I broke it.** Caught only because 0 was implausible.
+3. **The unfiltered drop check cried wolf on #342** (4,310 bytes, nothing dropped — `main` had merely
+   advanced past the branch). Refined rule now in use and it held for #345/#346/#347: **partition, never
+   interpret the byte count** — the PR's own files must diff empty, every file outside that set must be
+   individually attributed, and the control must run through the SAME path-filtered pipeline.
+
+**The through-line: a check that fails for reasons it does not mean trains you to explain failures away,
+and the next real one gets explained away too.** Both false reds here had plausible innocent readings,
+and that is precisely what makes them dangerous.
+
+### COMMS: TRUNCATION IS BIDIRECTIONAL, AND I DID NOT KNOW
+
+The executor logged one of my messages arriving as **`"ION 2"`** — the head of "ACTION 2" eaten. Two of
+its messages reached me with *their* heads eaten, one carrying a question I never saw and correctly
+refused to guess at. **Both directions truncate and neither end can see it happening to the other.** A
+truncated message does not fail; it **arrives looking complete and coherent with the load-bearing half
+missing.** Standing practice, both directions, now in force: **anything over ~3 lines goes to a FILE and
+the tmux message carries only a pointer.**
+
+### THE STACK WENT DOWN, AND WAS FIXED WITHOUT TOUCHING DATA
+
+The executor's web rebuild filled the **Docker VM disk** (the host had 77 GiB free — the VM did not);
+Postgres crash-looped on `No space left on device`, the server exited behind it. It restored with a
+**build-cache-only** prune and verified the seeded world intact. **Owner then approved an image prune and
+I ran it — `docker image prune -f`, dangling only, NO `-a`, no volumes:** 5.93 GB reclaimed, images
+65 → 36, all 29 removed being untagged `gisik-nokma-dev-*` layers. Volumes untouched (still 100);
+seeded world re-verified against the executor's own baseline — **131 events, 2 users, 26 tickets**.
+**36 GB is still reclaimable and deliberately left: it is tagged images belonging to the owner's OTHER
+projects.** That is `-a` territory and it is not ours.
+
+### MERGES, and why #344 was CLOSED rather than merged
+
+- **#344 CLOSED as SUPERSEDED, branch NOT deleted.** `exec/123` was verified a clean linear superset
+  (`merge-base --is-ancestor 85b0eb8 71ab574` → true, and it already contained `main`). Merging #344
+  first would have put its own stale claim on `main` (it froze `13.267` as amber; it had since gone
+  green) and left `exec/123` carrying commits `main` held only in squashed form — the shape this file
+  records as manufacturing conflicts that read as real.
+- **#345** — the P1 magic-link redirect (a relative `callbackURL` resolved against the API origin, so
+  sign-in dead-ended on a JSON 404; **production has the same split-origin shape**) plus item A's
+  `font: inherit`. **`signIn.social` had the identical bug** and was fixed in the same change — two call
+  sites, one defect. The e2e sign-in helper's only assertion had been *"the path no longer contains
+  /sign-in"*, **which a 404 page satisfies** — a check that cannot fail, now asserting ORIGIN.
+- **#346** — the shared-bucket finding. **Held unmerged at my request until its title stopped saying
+  "cause not pinned"**, which was about to be false; I committed not to merge until the executor said
+  go, which inverts the squash-drop danger window instead of risking it.
+- **#347** — the remedy.
+
+### GATE, at the sha it names
+
+**`6e0183f`**: `GATE_EXIT=0` · `Tasks: 33 successful, 33 total` · node **`v22.22.2`** ·
+**`Cached: 0 cached, 33 total`** · zero `Unsupported engine` · server **1434 passed | 5 skipped**
+(+1 = case `13.273` exactly), web 152, files unchanged. Six project checks EXIT 0: `check:tasks`
+**190/190**, `check:citations` ratchet holds exactly, `check-case-ids` **1,786** (+2 = `13.273`/`13.274`).
+**Zero orphaned vitest workers.** Earlier gate at `9468eb0` also green: 320 files / **3,914 passed |
+5 skipped**, ids 1,784.
+
+**Every delta reconciled, not eyeballed.** The one number that looked wrong — server test FILES static at
+143 while a "new" test file appeared in #345 — resolves: `trusted-origins.test.ts` dates to `f4a8cca`
+(PR #205) and was *modified*, not added.
+
+### STILL OPEN, all owner-owned, nothing blocked
+
+1. **Non-text contrast, product-wide** — 17 of 24 bordered classes below 3:1 in both themes.
+2. **`surfaceOverlay` cannot be enforced at all** until `relativeLuminance` composites alpha — it would
+   print a false red on one pair and, worse, a **false green** on another.
+3. **7 tap-target offenders** on `/my-work` at 390px.
+4. **Privacy + terms are unreviewed boilerplate.**
+5. **A sign-in-specific bucket** in our own limiter — the named loss above.
+6. **The production deployment has never been tested** — every rate-limit measurement here is the dev
+   stack. `deploy/do/app.yaml` states outright it is a written spec applied to no live app.
+
+Also standing: a **design-system canvas** was published for the owner this session, built from the real
+tokens (**32 primitives, 27 roles, 27 contrast pairs** — earlier counts of 33/28 were wrong, off a
+truncated read). It surfaces item 1 visually. `/design-sync` is user-invocable only; the controller
+cannot run it or reproduce its workflow.
+
 ## ✅ TUESDAY ~11:5x IST — #341 AND #342 MERGED, OWN FORCED GATE GREEN AT `c91bcf6`, EXECUTOR RESTARTED AT THE FIXED POINT. **The standing drop-check rule cried wolf on this merge, and the correction matters more than the merge does.**
 
 **Own forced gate at `c91bcf6`**, run after a real `git checkout main && git merge --ff-only origin/main`:
