@@ -550,6 +550,37 @@ for (const route of UNAUTHED_ROUTES) {
     const name = testInfo.project.name as ViewportName;
     const spec = VIEWPORTS[name];
 
+    /* THIS SUITE IS NOT HERMETIC UNLESS THIS STUB IS HERE, and the comment three
+     * hundred lines down that says "this suite's dev server has no API behind
+     * it" was FALSE — measured, not suspected.
+     *
+     * `next.config.ts` rewrites `/v1/*` to the API origin, so the dev server
+     * this suite starts on its own port happily proxies to WHATEVER is listening
+     * on the API port — in practice the developer's compose stack. On
+     * 2026-09-08 that stack had just been given real Google credentials, and
+     * `/sign-in` rendered `Continue with Google` in this suite as a result.
+     *
+     * That is not a cosmetic difference: it lands in the ACCESSIBLE-NAMES
+     * BASELINE, which is recorded from whatever the sweep sees. The `/sign-in`
+     * baseline was `ariaLabel: 1` before this round (the segmented control) and
+     * measured `ariaLabel: 1` after it (the Google button) — **the same number
+     * for an entirely different reason, which is exactly what hid it.** Recorded
+     * that way, the ratchet fails with "LOST ariaLabel" on any machine where the
+     * stack is down, and in CI, where there is no stack at all. Measured both
+     * ways against this tree: API reachable → 1, request aborted → 0.
+     *
+     * So the answer is fixed here, before the first navigation, at the state a
+     * deployment has configured NOTHING. Only `/sign-in` fetches it; the other
+     * routes are unaffected. Route-specific cases override it further down with
+     * their own `page.route`, which is why this one is registered first. */
+    await page.route('**/v1/auth/methods', (apiRoute) =>
+      apiRoute.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ google: false, apple: false, phone: false }),
+      }),
+    );
+
     const response = await page.goto(route.path, { waitUntil: 'networkidle' });
     // The 404 route legitimately answers 404; everything else must be 200.
     expect(response?.status(), `${route.path} responded unexpectedly`).toBe(
@@ -1030,7 +1061,11 @@ for (const route of UNAUTHED_ROUTES) {
        * returns a `NullOtpSender` that refuses every code with 501, so the tab
        * the screen OPENED ON was the third dead control on this page. Email
        * link is the one genuinely unconditional method, and it is what this
-       * suite — whose dev server answers no `/v1/auth/methods` at all — sees. */
+       * suite sees — because the stub registered before the first navigation
+       * fixes the answer at "nothing configured". It used to say this suite's
+       * dev server "answers no `/v1/auth/methods` at all", which was false: it
+       * proxies to whatever is on the API port. See that stub for the
+       * measurement. */
       await expect(page.getByLabel('Email')).toBeVisible();
       await expect(page.getByRole('tablist', { name: 'Sign-in method' })).toHaveCount(0);
 
