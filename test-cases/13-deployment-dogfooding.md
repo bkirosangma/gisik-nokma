@@ -1301,6 +1301,54 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
 > 0 from a fixed one print identically, and the recorded trap on the previous pass was a measurement
 > taken against an image that predated the change.
 
+## Controls render in the product's font, not the browser's (owner-assigned, 2026-09-08)
+
+*The owner ruled on 2026-09-08 to apply `font: inherit` against `docs/pre-launch-checklist.md`'s
+`NEW, 2026-09-08` bullet: 22 unclassed `button` + 2 `.ticket-type-list__new` + 2 `.workflow-list__new`,
+all at exactly 13.3333px on the signed-in surface at 390px. The ruling was widened to the signed-out
+surface on a measurement taken before the rule was written (see 13.266).*
+
+*IDS ARE PROVISIONAL. §13's header requires block allocation by the controller ON REQUEST and says
+never to mint from the maximum. The controller was asked and was mid-incident on a production
+sign-in-redirect bug; 13.266–13.267 are the recounted next-free (maximum in use against `origin/main`
+is 13.265, and both are free repo-wide) and are to be renumbered if the controller assigns otherwise.
+**Recount trap for whoever does this next: `grep -oE '13\.[0-9]+'` matches `13.3333px` and reports a
+maximum of `13.3333` — the id pattern collides with the pixel value this very section is about.***
+
+- **13.266** ✅ **No control on the signed-out surface is painted in the browser's font.**
+  `apps/web/e2e-viewport/responsive.spec.ts` asserts `measureTypeScale`'s `uaFont` is empty on all five
+  routes at all three widths — every examined element's computed `font-family` equals the one `body`
+  resolves to. Before → after on `/sign-in`: `{13.3333px: 2, 16px: 3}` → `{16px: 5}`, the two
+  `<button role="tab">` in `.gn-view-tabs` (which sets `min-height` and `padding-inline` and no font). —
+  (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-viewport/type-scale.ts`,
+  `apps/web/app/globals.css`)
+  *Mutation RUN, not reasoned: delete `button { font: inherit }` from `globals.css` → **EXIT 1, 6
+  failed** — `/sign-in` AND `/help` at all three widths, each naming its own selectors. Restored with
+  `git checkout --` from a commit made BEFORE the mutation (never from an uncommitted tree) and re-run
+  green: 19 passed, EXIT 0.*
+  *THE MUTATION FOUND A SITE NO SIZE INSTRUMENT COULD HAVE: `button.gn-help__tab` was rendering at
+  **16px in Arial**. `ui.css:1321` sets `font-size: 1rem` and no `font-family`, so its SIZE was already
+  correct and the defect was invisible to the 12px floor, to the size histogram, and to the raised-floor
+  enumeration that found the original 26. **This is the case for reading font-FAMILY rather than
+  asserting the `13.3333px` bucket is absent** — the bucket form would have passed here, and would pass
+  again the day a UA constant changes.*
+  *`font: inherit` is the SHORTHAND and carries `font-weight` and `line-height` too, so the row was
+  read for those and not just for size: `.gn-help__tab[aria-pressed='true']`'s deliberate
+  `font-weight: 600` SURVIVES (0,2,0 beats 0,0,1), measured 600/400 before and after. Boxes: help tabs
+  unchanged at 366x44; sign-in tabs 67x44 → 74x44 and 85x44 → 96x44 — wider, never shorter, because
+  `min-height: 2.75rem` holds the height. Tap-target offender counts are byte-identical before and
+  after on every signed-out route (10/16/16 on `/help`, 0 elsewhere), so no ratchet moved.*
+- **13.267** 🟡 **The same guard on the signed-in surface, over the five stack routes.**
+  The assertion is written in `apps/web/e2e-stack/viewport.spec.ts` beside the existing type-scale
+  ratchet and is collected by that suite. — (`apps/web/e2e-stack/viewport.spec.ts`)
+  *🟡 AND NOT ✅ FOR ONE STATED REASON: it has not been RUN. The signed-in suite measures the compose
+  web container, which must be rebuilt to carry the new stylesheet, and at the time of writing those
+  containers are serving the owner, who is testing the product by hand. The controller instructed that
+  they not be rebuilt or restarted without clearance. **The 26 controls this ruling is actually about
+  are therefore fixed-but-unwitnessed**, exactly the status `.gn-transition-edge__label` carries above,
+  and for a comparable reason: the instrument is unavailable, not absent. Flip to ✅ on a green run
+  after the rebuild window; do not flip it on the strength of the signed-out result.*
+
 
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)
 

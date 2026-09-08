@@ -428,8 +428,9 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       )
       .toEqual([]);
 
-    /* Every control renders in the PRODUCT's font. This is the guard for the
-       owner-ruled 2026-09-08 `font: inherit` fix, and it exists because the
+    /* Case 13.267 — every control renders in the PRODUCT's font, not the
+       browser's. The signed-in half of the guard for the owner-ruled
+       2026-09-08 `font: inherit` fix, and it exists because the
        ratchet beside it could not have caught the thing it fixed: the 26
        controls sat at 13.3333px, ABOVE the 12px floor, so `offenders` was 0
        and the baseline stayed 0 through the whole defect. A fix whose only

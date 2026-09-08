@@ -375,14 +375,35 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   repo's own shared control `.gn-button` opens with `font: inherit`. So this is a departure from a
   pattern this codebase already established, not a competing choice.
 
-  **Why it is not fixed here.** The one-line remedy is `font: inherit`, and it is almost certainly
-  right — but it resizes twenty-six live controls, and the owner's 2026-09-08 "take it" ruling was
-  given against the reading in the paragraph below (12.5px labels), not against this. That ruling
-  cannot be stretched to cover a finding that did not exist when it was made. **Same treatment the tap
-  targets got: measured, written down with its numbers, and left to a person.**
+  **~~Why it is not fixed here.~~ FIXED 2026-09-08 — the owner ruled "apply it", having been shown and
+  accepted that it visibly resizes the twenty-six.** `button { font: inherit; }` in
+  `apps/web/app/globals.css`. The remedy was never in doubt; the acceptance was the only thing holding
+  it, and the earlier "take it" ruling (given against the 12.5px labels below) correctly could not be
+  stretched to cover a finding that did not exist when it was made.
 
-  **It is under a ratchet either way.** These sit above the 12px floor, so nothing here is red; if a
-  future change pushes one below, cases 13.264–13.265 catch it.
+  **The count was 26 when this bullet was written and it is 30. Both later sites were found by
+  measuring before writing the rule, and neither was reachable from this bullet's method:**
+
+  | surface | site | before | why this enumeration missed it |
+  |---|---|---|---|
+  | signed-in ×5 routes | 22 `button` + 2 `.ticket-type-list__new` + 2 `.workflow-list__new` | 13.3333px | — (this bullet's own 26) |
+  | `/sign-in` ×3 widths | 2 `<button role="tab">` in `.gn-view-tabs` | 13.3333px | the raised-floor run was **signed-in only** |
+  | `/help` ×3 widths | 2 `button.gn-help__tab` | **16px, Arial** | **no size instrument could see it** |
+
+  **The `/help` pair is the finding worth carrying.** `ui.css:1321` sets `font-size: 1rem` and no
+  `font-family`, so those controls were already the *right size* in the *wrong font*. Raising the floor
+  to 16px — the exact technique that produced this bullet — cannot surface a 16px reading. They were
+  found only by a mutation run against a guard that reads font-FAMILY, and they are the reason that
+  guard is not simply an assertion that the `13.3333px` bucket is absent: that form would have passed
+  over them, and would pass again the day a UA constant changes.
+
+  **30 is a floor, not a total.** Ten of the product's nineteen routes are swept by neither suite, and
+  unstyled controls on them (calendar, timeline, contest banner, the workflow-builder inspectors,
+  editor chrome) are corrected by the same rule and are not measurable by either instrument.
+
+  **~~It is under a ratchet either way.~~ It is under a ratchet of its own now**, which it was not
+  before: these sat ABOVE the 12px floor, so 13.264–13.265 were green throughout the entire defect and
+  could never have caught it. Cases **13.266–13.267** guard the font-family property directly.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,

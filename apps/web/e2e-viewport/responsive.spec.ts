@@ -894,8 +894,9 @@ for (const route of UNAUTHED_ROUTES) {
       )
       .toEqual([]);
 
-    /* Every control renders in the PRODUCT's font — the signed-out half of the
-       guard for the owner-ruled 2026-09-08 `font: inherit` fix. See the sibling
+    /* Case 13.266 — every control renders in the PRODUCT's font, not the
+       browser's. The signed-out half of the guard for the owner-ruled
+       2026-09-08 `font: inherit` fix. See the sibling
        assertion in `e2e-stack/viewport.spec.ts` for why this is a font-FAMILY
        reading and not a second floor: the defect it guards sat ABOVE the 12px
        floor, so no size ratchet could ever have reddened on it.
