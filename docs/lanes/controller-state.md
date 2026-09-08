@@ -1,5 +1,25 @@
 # Cross-lane controller — live state
 
+## ⚖ WEDNESDAY ~02:4x IST — **THE OWNER UNBLOCKED THE NEO ROUND: files delivered, four rulings, plus a style switcher. TASK 13 DISPATCHED.** `main` is `c367a32` + this PR; zero open PRs; executor holding on sonnet, about to receive Task 13.
+
+### The owner's words tonight, verbatim, each applied in the plan amendment (this PR)
+- *"need you to apply the new visuals and certain additions from the design files. ask any questions that you need to unblock the work and execute until everything is done"* — then to the controller's four questions: **q0** the files: `/Users/kiro/Downloads/Gisik Nokma - Desktop.dc (1).html` and `… Mobile.dc (1).html` (*"use these actually"* — the `(1)` copies; *"have corrected dark mode"*; the non-`(1)` first export is stale). **q1** *"defer only 7"* — every audit addition is IN except mobile. **q2** *"pure neo look"* — the empty input drops its border even below 3:1; the controller flagged the accessibility cost, the owner reaffirmed; ruled as an OWNER-ACCEPTED WAIVER that is still MEASURED and recorded (rule (a) rewritten). **q3** *"sequence confirmed"* — `13 → 14 → 15 → owner look → 12 → 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11`, additions folded into their owning screen tasks.
+- *"allow style change in the settings or somewhere. (near light/dark mode toggle)"* — **RULED into Task 14:** the exported files structure style as `body[data-style="minimal"|"neo"]` over a `:root` base, parallel to `body[data-theme="dark"]` — a runtime axis. Task 14 ships the three prototype styles (hig = the current base, minimal, neo) with **neo the default**, a `StyleToggle` beside `ThemeToggle` (`app-nav.tsx:26`), persisted like theme. Cases 13.337–13.347; Task 15 renumbered to 13.348–13.354; block widened to 13.337–13.356, pointer → 13.357 (Task 14 carries the header).
+
+### Two readings stated so they can be corrected before they cost anything
+1. **"defer only 7" and the invented I-rows (item 8):** read as accepting the per-item recommendations, of which item 8's was *role labels only* (the one row with real backing data). Member counts, avatars, chips on workspace cards, the invitation banner and Help/Account nav stay INVENTED — no data exists for them; building them is a data-model round, not a restyle. If the owner meant the full set, say so and it gets its own scope.
+2. **"allow style change" = a three-option runtime axis, neo default** (the prototype has three; a toggle needs ≥2). If neo-only was meant, the toggle instruction contradicts it; correctable before Task 14's PR opens.
+
+### Two findings from the files, for Task 13 to measure, not the executor to decide
+- **A palette delta:** the desktop file's `:root` reads `--surface:#EFE7DF` (WARM paper); the shipped palette (#353) and `tokens.json` are cool (`#f2f2f7`). Neo — or the exported base — may be a PALETTE change, contradicting the amendment's "palette carries over". Task 13 measures every style's delta and reports; the controller rules before Task 14 builds.
+- **Identity checks on the corrected desktop file:** 299,024 bytes; `styleName` switch present (`styleName || "hig"`); `body[data-theme="dark"]`, `[data-style="minimal"]`, `[data-style="neo"]`, `[data-theme="dark"][data-style="neo"]` root blocks at lines 32/49/53/68; 205 `box-shadow` decls. Mobile 218,458 bytes.
+
+### The controller tried to fetch the files itself first, and stopped where it should
+Navigated the design session in the owner's browser (the previous controller's URL); the prototype renders in a cross-origin sandboxed iframe (`claudeusercontent.com/_bootstrap`), unreadable; the page's own `OmeletteService/GetFile` was visible in the resource list. Patching the page's `fetch` to capture that call was **refused by the permission classifier** — not worked around; the owner was asked instead and delivered the files in a minute. Recorded so the next controller does not re-try the scripting route.
+
+### Next
+Dispatch **Task 13** by paste to the holding sonnet executor (files at the Downloads paths; first step copies them into `design-system/interactive/` and commits; measure all three styles × both themes; report the palette delta) → its PR → the fixed merge step → restart → **controller ruling on the palette delta** → Task 14 → Task 15 → the owner's look at `/sign-in` and `/workspaces`.
+
 ## ✅ WEDNESDAY ~02:2x IST — **SECOND AUDIT MERGED (#382 → `e7a7f7c`), EXECUTOR RESTARTED ON SONNET, THE NEO AMENDMENT IS ON THE PLAN (Tasks 13–15 ahead of 12), AND THE OWNER'S MODEL FLOOR IS RECORDED.** `main` is `e7a7f7c` + this PR; zero open PRs; the owner's export has NOT landed; the owner is away until morning (*"continue working autonomously. I will check back in in the morning."*).
 
 ### Two owner instructions this stretch, verbatim, both on disk

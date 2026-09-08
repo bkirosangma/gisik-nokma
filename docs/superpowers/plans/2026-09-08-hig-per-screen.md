@@ -1025,10 +1025,14 @@ invisible. **It is a surface treatment, not a rewrite:** the palette (#353), eve
 accessible-name gate and the copy rule all carry over unchanged.
 
 **Three rules, binding, not negotiable without the owner — each is already a repo rule:**
-- **(a) An EMPTY INPUT keeps a ≥3:1 boundary** (13.284/13.291: it has no label to identify it). A soft inner shadow is
-  not one by assumption. If Task 13 measures the sunken field's shadow edge at ≥3:1 in BOTH themes with the 13.283
-  sweep's instrument, the boundary MAY be the shadow and the case says so with the number; otherwise
-  `border: 1px solid var(--gn-border)` stays.
+- **(a) OWNER RULING 2026-09-09: the empty input takes the PURE NEO look — sunken, no border** — even where the shadow
+  edge measures below 3:1. The controller flagged the cost (13.284/13.291's own reason: an empty field then carries no
+  ≥3:1 boundary to identify it) and the owner reaffirmed *"pure neo look."* So the border is dropped, **but the number
+  is still taken and recorded, because accepting a deviation is not hiding it:** Task 13 measures the sunken field's
+  shadow-edge contrast in both themes; Task 14 records it as an OWNER-ACCEPTED WAIVER — exempt the input boundary from
+  the non-text sweep with a comment citing this ruling and the measured number, the shape `tokens.ts` already uses to
+  exempt alpha primitives from `CONTRAST_PAIRS`. If that cannot be done without tripping the one-way non-text roster
+  ratchet, escalate before shipping rather than lowering a ratchet.
 - **(b) A CONTROL keeps a fill or an accent 600-weight label** (the post-#354 control-affordance ruling). A shadow is
   not a boundary WCAG 1.4.11 or the sweep credits.
 - **(c) DARK theme separates by FILL, measured** — a shadow does not count toward separation there. Text pairs in
@@ -1047,19 +1051,38 @@ of the task, not its size":**
 - **Task 12:** unchanged, opus / high. **Task 9:** re-scoped below to an (a) task, sonnet.
 - A cheaper tier is not a licence to skip a gate, a control, a mutation, or a ruling. One subagent at a time.
 
-**Case-id block for the amendment: `13.337`–`13.350`** (measured at `e7a7f7c`: highest §13 id in use is `13.336`).
-Task 13 mints none; **Task 14 takes 13.337–13.343; Task 15 takes 13.344–13.350.** Task 14's PR writes this allocation
-into `test-cases/13-deployment-dogfooding.md`'s header and moves the pointer to `13.351` (the first PR that mints from a
-block carries the header — the standing §12/§13 rule). Recount the maximum against `origin/main` at rebase as the
-control, never mint from it.
+**Case-id block for the amendment: `13.337`–`13.356`** (measured at `e7a7f7c`: highest §13 id in use is `13.336`).
+Task 13 mints none; **Task 14 takes 13.337–13.347 (tokens + the style axis + the toggle + the shared pieces); Task 15
+takes 13.348–13.356.** Task 14's PR writes this allocation into `test-cases/13-deployment-dogfooding.md`'s header and
+moves the pointer to `13.357` (the first PR that mints from a block carries the header — the standing §12/§13 rule).
+Recount the maximum against `origin/main` at rebase as the control, never mint from it.
 
 ### Task 13: Part B — measure the `neo` style from the exported prototype files
 
 **Model: sonnet / medium.** Measurement with the repo's own instruments; no design decisions are taken here.
 
-**Precondition — owner action:** `Gisik Nokma - Desktop.dc.html` and `Gisik Nokma - Mobile.dc.html` (or their
-equivalents) present under `design-system/`, i.e. `git log --oneline -1 origin/main -- design-system/` no longer reads
-`#351`. **Until then this task does not start and the executor holds** — there is nothing to measure.
+**Precondition MET 2026-09-09 — the owner exported the files (corrected dark mode).** Use the `(1)` copies:
+`/Users/kiro/Downloads/Gisik Nokma - Desktop.dc (1).html` (292 KB) and `/Users/kiro/Downloads/Gisik Nokma - Mobile.dc (1).html`
+(213 KB) — the owner replaced the first export to fix dark mode; the non-`(1)` files are stale, do not use them.
+**Task 13's FIRST step: copy both into `design-system/interactive/` under space-free names
+(`desktop.dc.html`, `mobile.dc.html`) and commit them.** Verify each is the interactive prototype before trusting it.
+
+**The style system is a TWO-AXIS `[data-*]` cascade on `<body>`, read from the desktop file — this shapes Task 14:**
+`:root{…}` is the base; `body[data-theme="dark"]` overrides for dark; `body[data-style="minimal"]` and
+`body[data-style="neo"]` override for style; `body[data-theme="dark"][data-style="neo"]` is the neo-dark corner. So
+STYLE is a runtime axis exactly parallel to THEME — which is what makes the owner's style switcher (below) a
+token-layer change, not a per-screen one.
+
+**Measure ALL THREE styles (hig=base, minimal, neo) × BOTH themes — it is only reading, and Task 14 needs every set.**
+For each style×theme: the surface/raised/sunken/overlay values, the fill ladder, radii, and the `box-shadow`
+raised/sunken/overlay treatments; run every resulting surface and text pair through `CONTRAST_PAIRS`'s arithmetic and
+the sunken input's shadow edge through the 13.283 sweep instrument; report dark-theme fill separation per pair.
+**A palette-delta finding is already visible and MUST be reported, not resolved by the executor:** the desktop file's
+`:root` reads `--surface:#EFE7DF` (WARM paper) where the shipped palette (#353) and `tokens.json` are cool
+(`paper #f2f2f7`). Neo — or the whole exported base — may be a PALETTE change, not only a surface treatment. **Measure
+the delta for every style, write it in `docs/neo-token-report.md` as a decision for the controller; adopt nothing
+silently and keep nothing silently.** Deliverable: one PASS/FAIL table per rule (a)(b)(c) per style, so Task 14
+transcribes and never decides.
 
 **Files:** Create `design-system/neo-tokens.json` — a proposal beside `tokens.json`, the same shape (`color`/`fill`
 light AND dark, `radius`, plus the new `shadow` block: raised, sunken, overlay; every value with the prototype
@@ -1075,44 +1098,73 @@ never decides. Anything below 3:1 is reported, not rounded, not "close".
 - [ ] Extract from the exported files (light and dark, desktop and mobile variants where they differ); measure; write
   both files with the probe script; one PR, docs + `design-system/` only, frozen-head protocol.
 
-### Task 14: Neo tokens in code, and the four shared pieces restyled in neo
+### Task 14: The style axis (hig / minimal / neo) as a runtime toggle, neo default, and the four shared pieces
 
-**Model: sonnet / medium** implementer (transcription from `neo-tokens.json` and the exported prototype's CSS through
-Task 1's pieces), **sonnet / medium** reviewer; the instruments are the check.
+**Model: sonnet / medium** implementer, **sonnet / medium** reviewer; the instruments are the check. **Escalate to an
+opus reviewer only if the token-axis change touches the visibility/refusal surface** (it should not — this is the token
+layer and one nav control).
 
-**Two Global-Constraint lifts, scoped to THIS task only:** (1) `packages/ui/src/tokens.ts` MAY gain shadow and radius
-roles — never a palette change, `success` stays `green700`; shadow colours are ALPHA primitives and the existing rule
-holds that *no `CONTRAST_PAIRS` row may name them* (`tokens.ts:120`); `themeStylesheet()` (`:388`) emits the new roles
-through `cssVariableName` (`:375`) unchanged. (2) The "31 `TOKEN_ROLES`" figure in the Global Constraints is a fact about
-`77b2ee8`; after this task it is whatever `TOKEN_ROLES` reads.
+**What the owner asked, 2026-09-09, verbatim:** *"allow style change in the settings or somewhere (near light/dark mode
+toggle)."* The exported prototype already structures style as `body[data-style="minimal"|"neo"]` over a `:root` base,
+so this is a runtime axis parallel to theme, NOT per-screen work: the screens consume `--gn-*` variables and the
+cascade swaps their values. **Ship all three styles the prototype defines (hig = the current shipped base, minimal,
+neo), with NEO as the default applied value**, and a toggle beside the existing `ThemeToggle`. *(Controller's reading:
+"allow style change … near the light/dark toggle" + a three-value prototype switch = a three-option runtime axis, neo
+default. If the owner wanted neo-only with no switch, the toggle instruction contradicts that; proceeding on the
+three-style reading, correctable before this task's PR opens.)*
 
-**Files:** Modify `packages/ui/src/tokens.ts` (roles + both themes + `themeStylesheet`), `packages/ui/src/ui.css`
-(`.gn-segmented*` 4 rules, `.gn-field*` 5, `.gn-button*` 8, `.gn-refusal*` 3, `.gn-page-header*` 4, `.gn-card` 1,
-`.gn-chip*` 9, `.gn-sheet*` 8, `.gn-avatar*` 3 — counts at `e7a7f7c`), `apps/web/app/globals.css` (`.gn-shell__refusal` 3,
-`.gn-shell__expired` 1, `.gn-card*` 7, `.gn-button*` 4), `packages/ui/test/components.test.tsx`,
-`packages/ui/test/token-discipline.test.ts` only if the roster of client roots changes (it should not), `Features.md`
-(locate the tokens/shared-pieces bullets by path), `test-cases/13-deployment-dogfooding.md` (the block header + rows).
+**Two Global-Constraint lifts, scoped to THIS task only:** (1) `packages/ui/src/tokens.ts` gains a **StyleName axis**
+(`'hig' | 'minimal' | 'neo'`) beside `ThemeName`, plus shadow and radius roles — **never a palette change to the
+accent set**, `success` stays `green700`; shadow colours are ALPHA primitives and the existing rule holds that *no
+`CONTRAST_PAIRS` row may name them* (`tokens.ts:120`). If Task 13's report shows the exported BASE palette differs from
+shipped (the warm-paper delta), that is a **controller ruling before this task builds** — do not fold a palette change
+into a token-axis task on your own. `themeStylesheet()` (`:388`) emits base + each `[data-style]` override + the dark
+combinations through `cssVariableName` (`:375`). (2) The "31 `TOKEN_ROLES`" figure in the Global Constraints is a fact
+about `77b2ee8`; after this task it is whatever `TOKEN_ROLES` reads.
 
-**Cases 13.337–13.343, each pinned by a test that cites the id literally:**
-- **13.337** every new token role has a light and a dark value and appears in `themeStylesheet()`'s output as a
-  `--gn-*` variable. Mutation: drop one theme's value → RED naming the role.
-- **13.338** every shadow colour is an alpha primitive and no `CONTRAST_PAIRS` row names it (the existing test's own
-  assertion widened to the new primitives; mutation: add a row naming one → RED).
-- **13.339** `.gn-field__input`'s boundary measures ≥3:1 in BOTH themes on the rendered page — the border unless Task
-  13's report says the shadow edge passes; the case text quotes the report's number.
-- **13.340** ghost/secondary buttons keep fill + accent label after the restyle — 13.289 stays green; mutation:
-  remove the fill → 13.289 RED, alone.
-- **13.341** dark theme: every raised/sunken surface pair separates by fill by at least the value Task 13's report
-  measured; mutation: equalise the two fills → RED.
-- **13.342** the accessible-name ratchet (13.285–13.287) does not fall on any route — run both viewport suites
-  (`test:e2e:viewport`, `test:e2e:stack`) with NO seeding variable set.
-- **13.343** `apps/web/e2e-stack/non-text-contrast-roster.json` does not grow — the ratchet is one-way and the restyle
-  adds no sub-3:1 boundary.
+**The style toggle:** a `StyleToggle` component (sibling of `apps/web/src/theme-toggle.tsx`), mounted in
+`apps/web/src/app-nav.tsx` beside `<ThemeToggle />` (`:26`), so it lands inside the accessible-name ratchet's
+signed-in population. It sets `data-style` on the same element `ThemeToggle` sets `data-theme` on, persists the choice
+the same way (whatever `theme-toggle.tsx` uses — read it, match it), and **defaults to `neo` when nothing is stored**.
+Options carry real `aria-label`s. **Pure neo look for inputs applies under `data-style="neo"` per the owner ruling
+above (rule (a)); under `hig`/`minimal` the field keeps whatever boundary that style defines.**
 
-- [ ] Transcribe the tokens; restyle the pieces; gate (verbatim, Node 22) + six checks raw; both viewport suites;
-  mutation-witness 13.337, 13.340, 13.341 (commit before mutating; restore with `git checkout HEAD -- <path>`);
-  catalogue + `Features.md` in the same commit; one PR; frozen-head protocol.
-  Commit: `"Neo tokens: the shared pieces raise and sink by shadow, and every boundary still measures"`.
+**Files:** `packages/ui/src/tokens.ts` (StyleName axis, roles, all style×theme sets, `themeStylesheet`),
+`packages/ui/src/ui.css` (`.gn-segmented*` 4, `.gn-field*` 5, `.gn-button*` 8, `.gn-refusal*` 3, `.gn-page-header*` 4,
+`.gn-card` 1, `.gn-chip*` 9, `.gn-sheet*` 8, `.gn-avatar*` 3 — counts at `e7a7f7c` — most rules become variable-driven
+so the cascade does the styling), `apps/web/app/globals.css` (`.gn-shell__refusal` 3, `.gn-shell__expired` 1,
+`.gn-card*` 7, `.gn-button*` 4), create `apps/web/src/style-toggle.tsx`, modify `apps/web/src/app-nav.tsx`,
+`packages/ui/src/index.ts` (export), `packages/ui/test/components.test.tsx`, `apps/web/e2e-stack/accessible-names-baseline.json`
+(the toggle raises the signed-in floor — one-way), `Features.md`, `test-cases/13-deployment-dogfooding.md`.
+
+**Cases 13.337–13.347, each pinned by a test citing the id literally:**
+- **13.337** each new token role has a value for every (style × theme) and appears in `themeStylesheet()`'s output as a
+  `--gn-*` variable under the right `[data-style]`/`[data-theme]` selector. Mutation: drop one combination → RED naming it.
+- **13.338** every shadow colour is an alpha primitive and no `CONTRAST_PAIRS` row names it (mutation: add a row → RED).
+- **13.339** under `data-style="neo"` the empty input renders the sunken no-border treatment (owner ruling (a)); the
+  measured shadow-edge contrast from Task 13's report is quoted in the case and its waiver comment. Under `hig`/`minimal`
+  the field keeps its defined boundary. Mutation: the neo input grows a border → RED.
+- **13.340** ghost/secondary buttons keep fill + accent label in every style — 13.289 stays green; mutation: remove the
+  fill under neo → 13.289 RED, alone.
+- **13.341** dark theme, per style: every raised/sunken surface pair separates by fill by at least Task 13's measured
+  value; mutation: equalise the two fills → RED.
+- **13.342** the accessible-name ratchet (13.285–13.287) does not FALL on any route, and RISES by exactly the style
+  toggle on the signed-in nav; both viewport suites, no seeding variable set.
+- **13.343** `apps/web/e2e-stack/non-text-contrast-roster.json` does not grow **except** the owner-accepted neo input
+  waiver (13.339), which is added with its measured number and this ruling cited — no other sub-3:1 boundary appears.
+- **13.344** the `StyleToggle` renders one control per style with an `aria-label`, sets `data-style` on the theme
+  element, and `aria-pressed`/selected tracks the active style. Mutation: drop the `aria-label` → RED.
+- **13.345** with nothing stored, the applied `data-style` is `neo` (the default); mutation: default to `hig` → RED.
+- **13.346** the stored style survives a reload (persistence), asserted the same way `theme-toggle`'s persistence is;
+  mutation: stop writing storage → RED.
+- **13.347** switching style changes a witnessed rendered value (e.g. a card's computed `box-shadow` differs between
+  `hig` and `neo`) — the positive control that the axis actually does something; mutation: make both styles emit the
+  same value → RED.
+
+- [ ] Build the axis and the toggle; restyle the pieces variable-driven; gate (verbatim, Node 22) + six checks raw;
+  both viewport suites; mutation-witness 13.337, 13.339, 13.345, 13.347 (commit before mutating; restore with
+  `git checkout HEAD -- <path>`); catalogue + `Features.md` same commit; one PR; frozen-head protocol.
+  Commit: `"Style is a runtime axis now — hig, minimal, neo beside light and dark, neo the default"`.
 
 ### Task 15: The two finished screens restyled in neo — sign-in, workspaces, invite
 
@@ -1146,11 +1198,26 @@ restyle `packages/app-core/src/views/ticket-list.tsx`'s markup and CSS in neo, k
 partials — the `workflow` axis on Group by and Columns, and `field:` columns unreachable from the picker — are
 **product scope for the owner, not this plan's**. Its case ids stay as allocated to it.
 
-**Owner decisions the audit raised — HELD for the owner, NOT dispatched:** a board workflow picker (a permissions
-question, `board.tsx:61-64`, and an API change: `getBoard(projectId)` takes no workflow); breadcrumbs (must degrade
-to the three-state parent display, `ticket-sheet.tsx:334-343`); the full-screen ticket toggle; a week view; the
-mobile calendar; the *"Subtask of…"* label on the visible-parent branch; the workflow axis on List. Every I-row
-stays invented.
+### The additions — owner-decided 2026-09-09, folded into their owning screen tasks (NOT new numbered tasks)
+
+The owner ruled *"apply the new visuals and certain additions"* and, on the audit's list, **"defer only 7" (mobile)**.
+So every addition below is IN scope except mobile, each built as part of the screen task that owns its surface, after
+the owner looks at Task 15. Feature additions beyond a restyle keep an **opus reviewer** where they carry a permission
+or data semantic; the rest are sonnet, per the model floor.
+
+| addition | owning task | model | the constraint (binding) |
+|---|---|---|---|
+| *"Subtask of…"* label on the visible-parent branch | **6b** | sonnet + sonnet | one label on `ticket-sheet.tsx:342`, matching the self-describing style of the other two branches; the audit's one-word gap |
+| Full-screen ticket toggle | **6b** | sonnet + sonnet | `SheetProps` gains an optional presentation mode; state/tabs/edits survive the toggle; no new refusal path |
+| Breadcrumbs | **6b** | sonnet + **opus review** | MUST degrade to the three-state parent display (`ticket-sheet.tsx:334-343`) — a restricted parent stays *"exists, but you can't see it"*, never a silent gap or a vanish; builds on `epicAncestorOf` (cycle-safe, answers null) |
+| Board workflow picker | **5b** | sonnet + **opus review** | the SAFE form ONLY (owner-approved): the picker lists just the workflow groups the board ALREADY renders for this viewer, with counts of visible cards — **no full-workflow list (that is the `board.tsx:61-64` leak), no `getBoard` signature change.** A narrowing over what is already served, not a new server read |
+| Week view on the calendar | **5b** | sonnet + sonnet | a second view mode beside month; no data the month view lacks |
+| Workflow axis on List (Group by + Columns) | **9** | sonnet + sonnet | carry `workflowId`/`workflowName` onto `ListRow` first (the server's `ListCard` has it and drops it); then the axis and the column |
+| Role labels on cards | **3 (Members) / 15 (Workspaces)** | sonnet | the ONE invented I-row with real backing data — the server carries the caller's role; only the display is missing. **The other seven I-rows (member counts, avatars, chips on workspace cards, the invitation banner, Help/Account nav) stay INVENTED** — no data exists for them and building them would invent data the product forbids. *(Controller's reading of "defer only 7": item 8's recommendation was "role labels only"; if the owner meant the full invented set, that is a data-model round beyond a restyle and gets its own scope.)*
+
+**DEFERRED by the owner — mobile (audit #7):** the mobile calendar, and any mobile restyle/subtask surface.
+`apps/mobile` is React Native; `--gn-*` CSS variables do not exist there. Task 11 records this deferral durably.
+Every remaining I-row stays invented.
 
 
 ## Execution order and merge cadence
