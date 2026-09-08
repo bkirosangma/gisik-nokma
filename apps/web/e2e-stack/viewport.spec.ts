@@ -577,14 +577,111 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
  *   ad-hoc measurement also carried (the primary button at 19.43 light).
  *
  * The moment the sweep lands, this becomes an assertion.
+ *
+ * ## 13.356 — TWO ROUTES ADDED, and a gap the sweep still cannot close, disclosed rather than hidden
+ *
+ * This sweep never visited `/sign-in` or `/workspaces` before Task 15 — the
+ * five routes above are all SIGNED-IN, `/sign-in` never can be and
+ * `/workspaces` was simply omitted. That is exactly where Task 14's neo
+ * pure-look ruling (case 13.339: the empty `.gn-field__input` under
+ * `[data-style="neo"]` is sunken with `border: none`, its identifying
+ * boundary a `box-shadow` the owner accepted below 3:1) actually renders —
+ * so a sweep that never looked there could not have recorded the waiver it
+ * was measuring FOR, and `docs/lanes/executor-state.md`'s Task 14 entry
+ * says so in as many words: "`.gn-field__input` renders only on
+ * `/workspaces` … and `/sign-in` … NEITHER is among the five routes this
+ * sweep visits."
+ *
+ * Both routes are added below. That closes the "never looked" half. The
+ * "cannot compute a box-shadow's contrast ratio" half is NOT closed —
+ * `sweepBorders` composites `border-{side}-width/style/color` only
+ * (`helpers/non-text-contrast.ts`), by design, and an element with
+ * `border: none` contributes nothing for it to measure regardless of what
+ * its `box-shadow` paints. So visiting `/sign-in` and `/workspaces` now
+ * finds the field, confirms empirically (DOM checks below, on the actual
+ * rendered route) that it has no border and does have a shadow, and then
+ * — because that shadow's ratio is exactly the thing this instrument
+ * cannot compute — records Task 13's measured numbers (1.24 light / 1.16
+ * dark, `docs/neo-token-report.md`, quoted verbatim in `ui.css`'s
+ * `[data-style="neo"] .gn-field__input` docblock and case 13.339) as a
+ * SANCTIONED entry in the persisted roster, citing the owner's ruling.
+ * "Sanctioned" means: known, measured elsewhere, accepted — appended to the
+ * FILE for a human reading the roster to see, and deliberately never to
+ * `below` — an instrument cannot fail an assertion over a number it did
+ * not itself compute. The gap this closes is the roster silently NOT
+ * growing (case 13.343's finding) and looking like "nothing to disclose"
+ * rather than "the owner accepted something outside what this can see".
  */
 test('records non-text contrast across the signed-in surface, with a positive control', async ({
   page,
 }) => {
   await page.setViewportSize(PHONE);
+
+  const worst = new Map<string, { ratio: number; border: string; backdrop: string; routes: string[] }>();
+  const sweptRoutes: string[] = [];
+  let examinedTotal = 0;
+  let bestSeen = 0;
+
+  function absorb(routeKey: string, sweep: Awaited<ReturnType<typeof sweepBorders>>): void {
+    sweptRoutes.push(routeKey);
+    examinedTotal += sweep.examined;
+    for (const reading of sweep.readings) {
+      bestSeen = Math.max(bestSeen, reading.ratio);
+      const existing = worst.get(reading.selector);
+      if (existing === undefined) {
+        worst.set(reading.selector, {
+          ratio: reading.ratio,
+          border: reading.border,
+          backdrop: reading.backdrop,
+          routes: [routeKey],
+        });
+      } else {
+        if (!existing.routes.includes(routeKey)) existing.routes.push(routeKey);
+        if (reading.ratio < existing.ratio) {
+          existing.ratio = reading.ratio;
+          existing.border = reading.border;
+          existing.backdrop = reading.backdrop;
+        }
+      }
+    }
+  }
+
+  /** The neo sunken-input DOM ground-truth this waiver rests on, checked on the ACTUAL rendered route rather than trusted from prose. */
+  async function assertSunkenNoBorderField(routeLabel: string): Promise<void> {
+    const field = page.locator('.gn-field__input').first();
+    await expect(field).toBeVisible();
+    const style = await field.evaluate((el) => {
+      const computed = getComputedStyle(el);
+      return { borderStyle: computed.borderStyle, boxShadow: computed.boxShadow };
+    });
+    expect(
+      style.borderStyle,
+      `13.356: .gn-field__input on ${routeLabel} has a border (${style.borderStyle}) — the pure-neo ` +
+        `no-border ruling (13.339) no longer holds, so the sanctioned waiver below is unearned.`,
+    ).toBe('none');
+    expect(
+      style.boxShadow,
+      `13.356: .gn-field__input on ${routeLabel} has no box-shadow — there is no boundary at all here, ` +
+        `not merely one this sweep cannot compute, which is a worse defect than the waiver discloses.`,
+    ).not.toBe('none');
+  }
+
+  // 13.356 — visited BEFORE signing in: this is the one signed-out route the
+  // sweep now walks, and the only place `.gn-field__input` renders without a
+  // session.
+  await page.goto('/sign-in', { waitUntil: 'networkidle' });
+  absorb('/sign-in', await sweepBorders(page));
+  await assertSunkenNoBorderField('/sign-in');
+
   await signIn(page, OWNER_EMAIL);
 
-  await page.goto('/workspaces');
+  // 13.356 — `/workspaces` was never in this sweep's route list even though
+  // every OTHER stack instrument (the accessible-names ratchet, `:382` above)
+  // already covers it; its founding form is the other place the field renders.
+  await page.goto('/workspaces', { waitUntil: 'networkidle' });
+  absorb('/workspaces', await sweepBorders(page));
+  await assertSunkenNoBorderField('/workspaces');
+
   const workspaceLink = page.locator('a[href^="/w/"]').first();
   await workspaceLink.waitFor({ timeout: 15_000 });
   const workspaceHref = await workspaceLink.getAttribute('href');
@@ -604,37 +701,44 @@ test('records non-text contrast across the signed-in surface, with a positive co
     { path: `/w/${workspaceId}/settings/workflows`, key: '/settings/workflows' },
   ];
 
-  const worst = new Map<string, { ratio: number; border: string; backdrop: string; routes: string[] }>();
-  let examinedTotal = 0;
-  let bestSeen = 0;
-
   for (const route of routes) {
     await page.goto(route.path, { waitUntil: 'networkidle' });
-    const sweep = await sweepBorders(page);
-    examinedTotal += sweep.examined;
-    for (const reading of sweep.readings) {
-      bestSeen = Math.max(bestSeen, reading.ratio);
-      const existing = worst.get(reading.selector);
-      if (existing === undefined) {
-        worst.set(reading.selector, {
-          ratio: reading.ratio,
-          border: reading.border,
-          backdrop: reading.backdrop,
-          routes: [route.key],
-        });
-      } else {
-        if (!existing.routes.includes(route.key)) existing.routes.push(route.key);
-        if (reading.ratio < existing.ratio) {
-          existing.ratio = reading.ratio;
-          existing.border = reading.border;
-          existing.backdrop = reading.backdrop;
-        }
-      }
-    }
+    absorb(route.key, await sweepBorders(page));
   }
 
   const roster = [...worst.entries()].sort((a, b) => a[1].ratio - b[1].ratio);
   const below = roster.filter(([, r]) => r.ratio < 3);
+
+  /*
+   * 13.356 — the SANCTIONED waiver. Not a `worst` entry (nothing this sweep
+   * measured produced it — `sweepBorders` never scored `.gn-field__input`
+   * under neo at all, per the docblock above), so it is appended to the
+   * PERSISTED roster only, after `below` is already computed: it can never
+   * trip the zero-below-3 assertion, because that assertion is about what
+   * THIS instrument measured, and this number is Task 13's, cited, not
+   * remeasured. Both figures are recorded even though only light is
+   * DOM-confirmed above — dark is Task 13's own measurement, structurally
+   * out of reach of a suite with no theme-switching (`docs/lanes/executor-state.md`'s
+   * Task 14 entry names the theme this sweep runs under as light-only, and
+   * that has not changed here).
+   */
+  const sanctionedWaivers = [
+    {
+      selector: '[data-style="neo"] .gn-field__input',
+      sanctioned: true as const,
+      ratioLight: 1.24,
+      ratioDark: 1.16,
+      border: 'none — sunken box-shadow only, not compositable by this instrument',
+      backdrop: 'surface (neo)',
+      routes: ['/sign-in', '/workspaces'],
+      citation:
+        'Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo ' +
+        'look (sunken, no border) even below 3:1. Measured by Task 13 (docs/neo-token-report.md); ' +
+        'quoted in packages/ui/src/ui.css\'s [data-style="neo"] .gn-field__input docblock and case ' +
+        '13.339. Light confirmed by this run\'s own DOM check; dark is Task 13\'s measurement, cited.',
+    },
+  ];
+
   /*
    * Written to a FILE, not only logged. Two reasons, one of them measured
    * today: the console output of this run reached the operator EMPTY because a
@@ -651,7 +755,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
         totalClasses: roster.length,
         examined: examinedTotal,
         highestReading: Number(bestSeen.toFixed(2)),
-        routes: routes.map((r) => r.key),
+        routes: sweptRoutes,
         roster: roster.map(([selector, r]) => ({
           selector,
           ratio: Number(r.ratio.toFixed(2)),
@@ -659,6 +763,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
           backdrop: r.backdrop,
           routes: r.routes,
         })),
+        sanctionedWaivers,
       },
       null,
       2,
@@ -666,8 +771,9 @@ test('records non-text contrast across the signed-in surface, with a positive co
   );
   console.log(
     `[non-text-contrast] ${below.length} of ${roster.length} distinct bordered classes below 3:1 ` +
-      `(${examinedTotal} bordered elements examined across ${routes.length} routes; ` +
-      `highest reading ${bestSeen.toFixed(2)} as the positive control)`,
+      `(${examinedTotal} bordered elements examined across ${sweptRoutes.length} routes; ` +
+      `highest reading ${bestSeen.toFixed(2)} as the positive control; ` +
+      `${sanctionedWaivers.length} sanctioned waiver(s) recorded separately)`,
   );
   for (const [selector, r] of roster) {
     console.log(

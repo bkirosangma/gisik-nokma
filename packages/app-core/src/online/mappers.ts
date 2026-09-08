@@ -1028,8 +1028,10 @@ export function toServerPreferences(preferences: UserPreferences): Record<string
  * than the "invented empty list" the old refusal feared. The difference between
  * the two is the difference between withholding a name and asserting an absence.
  *
- * The `workspaceId` → `id` rename is adaptable and `role` is a field the server
- * discloses that the client does not read; neither was ever a gap.
+ * The `workspaceId` → `id` rename is adaptable. **`role` is READ now (Task 15,
+ * the audit's approved role-label addition)** — it was a field the server
+ * discloses that the client did not read, and the display, not the data, was
+ * the gap.
  */
 export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
   const record = asRecord(raw, 'workspaces');
@@ -1039,6 +1041,7 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
     return {
       id: asString(workspace['workspaceId'], `${path}.workspaceId`),
       name: asString(workspace['name'], `${path}.name`),
+      role: asString(workspace['role'], `${path}.role`),
       // A PARTIAL LIST IS THE CORRECT ANSWER, not a defect (rulings P32/P38).
       // Every role except owner is served only the projects it holds a
       // membership in, because a project's NAME is itself a disclosure. The

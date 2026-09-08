@@ -78,6 +78,7 @@ button { font: inherit; }
    only one rule left in the cascade, there is no tie for import order to
    settle. These two surfaces now simply render `.gn-card`'s own radius, at
    whatever the active style says: 16px (hig/minimal) or 20px (neo). */
+.gn-workspace-list__role { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 
 /* The founding form has no `.gn-card` ancestor of its own — it sits beside the
