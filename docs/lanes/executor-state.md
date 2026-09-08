@@ -20,19 +20,21 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**.
-> HEAD is `4ed3be671d3ca8d7460fe77136938398ef5b9bce`; the GATE was run at `8172d67`, one commit below, and the only commit since is
-> this handoff edit — stated that way rather than implying the gate ran at a sha it did not.
-> Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**, load 1.43, zero orphaned
-> vitest workers; `check-case-ids`, `check-case-citations`, `check-env-example`, `check-task-ledger`
-> and `check-runbook-commands` all EXIT 0. Viewport suite 19 passed / 2 skipped; stack sweep green on
-> five routes. Both type-scale baselines are committed at 0.
+> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, HEAD
+> `3ab1f9e`. Gate re-run AT THAT SHA after merging `origin/main` in: **33/33 EXIT 0, `Cached: 0`**
+> (forced), Node **v22.22.2**, load 9.88, zero orphaned vitest workers. All five catalogue checks
+> EXIT 0. Viewport suite 19 passed / 2 skipped; stack sweep green on five routes; both type-scale
+> baselines committed at 0.
 >
-> **All four PRs are MERGEABLE: #326, #327, #328 (rebased this session onto `main` after #325 landed)
-> and #334.** #326/#327/#328 each merged `origin/main` in; conflicts were `Features.md`, this file and
-> `test-cases/13-*.md`, purely additive, resolved keep-both with main's side first and verified by
-> counting ANCHORED markers in the COMMITTED blobs — an unanchored check hits this file's own prose at
-> the line that describes the hazard.
+> **#326 MERGED (`d9d831c`). #327, #328 and #334 are all MERGEABLE**, rebased onto `main` a SECOND
+> time this session.
+>
+> **EVERY MERGE INVALIDATES THE REST, and that is now measured rather than suspected.** These four
+> branches all touch `Features.md`, this file and the `test-cases/*.md` catalogues, so each landing
+> merge re-conflicts every branch still open — #325 conflicted three, #326 conflicted the remaining
+> three again. Both rounds were purely additive and resolved keep-both in a throwaway worktree, but
+> the cost repeats per merge. **Worth the controller merging the remaining three back-to-back rather
+> than spaced**, or accepting one rebase round per merge. Not a defect in any branch.
 >
 > **The queue after #334 is empty of assigned work.** All five of the owner's 2026-09-08 rulings now
 > have PRs. What is OWED and not done: the four unwitnessed type-scale fixes (see below) and Plan 9's
