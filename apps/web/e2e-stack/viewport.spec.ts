@@ -606,10 +606,44 @@ test('records non-text contrast across the signed-in surface, with a positive co
     );
   }
 
-  // A sweep that matched nothing reports zero offenders — the best possible
-  // result and the least trustworthy one.
-  expect(examinedTotal).toBeGreaterThan(20);
-  expect(roster.length).toBeGreaterThan(5);
-  // The instrument can still tell red from green.
-  expect(bestSeen).toBeGreaterThan(3);
+  /*
+   * ## This ASSERTS now, where it only recorded before
+   *
+   * When this case was written the defect was live — 13 of 20 — so it printed
+   * the roster and asserted only that the instrument worked. The sweep has
+   * closed it, so the case becomes the guard: zero classes below 3:1, product
+   * wide, on every route it walks.
+   *
+   * ## The population assertion it USED to carry was retired deliberately
+   *
+   * It read `expect(examinedTotal).toBeGreaterThan(20)`, guarding the real
+   * hazard that a sweep matching nothing reports zero offenders — the best
+   * possible result and the least trustworthy one. **The sweep then removed 54
+   * borders and the count fell to 19, and this went red.** The guard was
+   * working; its threshold had become an assumption about a population the
+   * change itself was designed to shrink.
+   *
+   * It is NOT lowered to 19, which would be moving a bar to meet a result. It
+   * is replaced by a control that cannot be satisfied by an instrument that has
+   * stopped working: **the same sweep, on the same rendered page, run again at
+   * an absurd threshold, must report offenders.** A sweep that answers "zero
+   * below 3" AND "zero below 25" is not measuring anything — and that check
+   * stays honest no matter how many borders the product ends up with.
+   */
+  expect(
+    below.map(([selector, r]) => `${selector} ${r.ratio.toFixed(2)}`),
+    'non-text contrast regressed — these classes render below WCAG 1.4.11 3:1',
+  ).toEqual([]);
+
+  // The negative control, run through the SAME path as the measurement: at a
+  // threshold nothing could clear, the instrument must find offenders.
+  const absurd = await sweepBorders(page, 25);
+  expect(
+    absurd.below.length,
+    'the sweep reported no offenders even at 25:1 — it is not measuring, and its ' +
+      'zero above means nothing',
+  ).toBeGreaterThan(0);
+
+  // And it can still tell red from green in the ordinary range.
+  expect(bestSeen).toBeGreaterThan(15);
 });

@@ -1,7 +1,7 @@
 {
-  "belowCount": 13,
-  "totalClasses": 20,
-  "examined": 107,
+  "belowCount": 0,
+  "totalClasses": 6,
+  "examined": 19,
   "highestReading": 18.82,
   "routes": [
     "/my-work",
@@ -11,136 +11,6 @@
     "/settings/workflows"
   ],
   "roster": [
-    {
-      "selector": "span.gn-chip.gn-chip--blocked",
-      "ratio": 1.16,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(229,229,234)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "span.gn-chip.gn-chip--active",
-      "ratio": 1.16,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(229,229,234)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "span.gn-chip.gn-chip--open",
-      "ratio": 1.16,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(229,229,234)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "div.gn-card.gn-board-card",
-      "ratio": 1.16,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(229,229,234)",
-      "routes": [
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "span.gn-chip.gn-chip--terminal",
-      "ratio": 1.16,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(229,229,234)",
-      "routes": [
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "nav.gn-nav",
-      "ratio": 1.3,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId",
-        "/members",
-        "/settings/ticket-types",
-        "/settings/workflows"
-      ]
-    },
-    {
-      "selector": "div.gn-card.gn-my-work__item",
-      "ratio": 1.3,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/my-work"
-      ]
-    },
-    {
-      "selector": "section.gn-board__column",
-      "ratio": 1.3,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "li.ticket-type-list__row",
-      "ratio": 1.3,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/settings/ticket-types"
-      ]
-    },
-    {
-      "selector": "span.gn-chip.gn-chip--pending",
-      "ratio": 1.45,
-      "border": "rgba(217,214,207,1)",
-      "backdrop": "rgb(255,255,255)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "button.gn-button.gn-button--ghost",
-      "ratio": 2.23,
-      "border": "rgba(168,164,154,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId",
-        "/members",
-        "/settings/ticket-types",
-        "/settings/workflows"
-      ]
-    },
-    {
-      "selector": "aside.gn-attention",
-      "ratio": 2.23,
-      "border": "rgba(168,164,154,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/my-work",
-        "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "span.ticket-type-list__badge",
-      "ratio": 2.23,
-      "border": "rgba(168,164,154,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/settings/ticket-types"
-      ]
-    },
     {
       "selector": "input",
       "ratio": 4.07,
@@ -160,22 +30,13 @@
       ]
     },
     {
-      "selector": "section.gn-board__column.gn-board__column--blocked",
-      "ratio": 4.83,
-      "border": "rgba(215,0,21,1)",
+      "selector": "aside.gn-attention",
+      "ratio": 4.66,
+      "border": "rgba(178,80,0,1)",
       "backdrop": "rgb(242,242,247)",
       "routes": [
+        "/my-work",
         "/p/:projectId"
-      ]
-    },
-    {
-      "selector": "button.gn-button.gn-button--primary",
-      "ratio": 6.78,
-      "border": "rgba(0,64,221,1)",
-      "backdrop": "rgb(242,242,247)",
-      "routes": [
-        "/p/:projectId",
-        "/members"
       ]
     },
     {

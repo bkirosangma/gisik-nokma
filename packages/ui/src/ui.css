@@ -17,11 +17,22 @@
   justify-content: center;
   min-height: 2.75rem;
   font: inherit;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0.4rem 0.85rem;
-  border: 1px solid var(--gn-border-strong);
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
+  /* R1(c): no boundary. The affordance is fill + an accent-coloured semibold
+     label — three signals replacing one hairline, and it is what the design
+     specifies (`.btn { border:none; background: fill3; color: accent;
+     font-weight: 600 }`, 18 `border:none` across 23 prototypes and not one
+     border on any control).
+
+     MEASURED, because this is the one thing the ruling declined to assert:
+     the FILL is 1.09-1.15 against every surface and does NOT carry
+     identification. The LABEL does, at 5.31-6.81 - comfortably past the 4.5
+     it owes as text. See `13.284` for what that does and does not settle. */
+  border: none;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-accent);
+  font-weight: 600;
   cursor: pointer;
 }
 .gn-button:focus-visible {
@@ -30,12 +41,10 @@
 }
 .gn-button--primary {
   background: var(--gn-accent);
-  border-color: var(--gn-accent);
   color: var(--gn-accent-text);
 }
 .gn-button--danger {
   background: var(--gn-danger);
-  border-color: var(--gn-danger);
   color: var(--gn-danger-text);
 }
 .gn-button:disabled {
@@ -47,7 +56,6 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border: 1px solid var(--gn-border);
   border-radius: 999px;
   padding: 0.1rem 0.6rem;
   font-size: 0.8rem;
@@ -70,7 +78,6 @@
 
 .gn-card {
   background: var(--gn-surface-raised);
-  border: 1px solid var(--gn-border);
   border-radius: 8px;
   padding: 0.75rem;
   box-shadow: 0 1px 2px var(--gn-shadow);
@@ -83,7 +90,6 @@
   border-radius: 50%;
   background: var(--gn-surface-sunken);
   color: var(--gn-text);
-  border: 1px solid var(--gn-border);
   font-weight: 600;
 }
 .gn-avatar--medium { width: 2rem; height: 2rem; font-size: 0.8rem; }
@@ -109,7 +115,6 @@
 .gn-sheet {
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  border: 1px solid var(--gn-border);
   box-shadow: 0 8px 24px var(--gn-shadow);
   display: flex;
   flex-direction: column;
@@ -131,7 +136,6 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 1.1rem;
-  border-bottom: 1px solid var(--gn-border);
 }
 .gn-dialog__title,
 .gn-sheet__title { font-size: 1.05rem; margin: 0; }
@@ -163,12 +167,10 @@
   text-align: left;
   font-weight: 600;
   color: var(--gn-text-muted);
-  border-bottom: 2px solid var(--gn-border-strong);
   padding: 0.45rem 0.6rem;
   white-space: nowrap;
 }
 .gn-table__cell {
-  border-bottom: 1px solid var(--gn-border);
   padding: 0.45rem 0.6rem;
   vertical-align: top;
 }
@@ -180,7 +182,6 @@
 .gn-board__columns { display: flex; gap: 0.9rem; overflow-x: auto; align-items: flex-start; }
 .gn-board__column {
   background: var(--gn-surface-sunken);
-  border: 1px solid var(--gn-border);
   border-radius: 10px;
   padding: 0.6rem;
   min-width: 16rem;
@@ -240,7 +241,6 @@
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
 .gn-attention {
-  border: 1px solid var(--gn-border-strong);
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;
   background: var(--gn-surface-raised);
@@ -304,7 +304,6 @@
 .gn-ticket-sheet__tabs { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
 .gn-ticket-sheet__tabs [role='tab'] {
   font: inherit;
-  border: 1px solid var(--gn-border);
   background: var(--gn-surface-sunken);
   color: var(--gn-text-muted);
   border-radius: 6px 6px 0 0;
@@ -415,7 +414,6 @@
   pointer-events: all;
   background: var(--gn-surface-raised);
   color: var(--gn-text-muted);
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   padding: 0.15rem 0.5rem;
   /* 0.75rem, not 0.7rem: 11.2px, below this product's own bottom rung. This
@@ -472,7 +470,6 @@
 .advisories-panel__footer { margin: 0.4rem 0 0; font-size: 0.75rem; }
 
 .system-rules-panel {
-  border: 1px solid var(--gn-border);
   color: var(--gn-text-muted);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
@@ -518,7 +515,6 @@
 .state-mapping-dialog {
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  border: 1px solid var(--gn-border-strong);
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
@@ -532,7 +528,6 @@
 .state-mapping-dialog__actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
 .state-mapping-dialog__cancel,
 .state-mapping-dialog__confirm {
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
   font: inherit;
@@ -561,7 +556,6 @@
   width: 2rem;
   height: 2rem;
   padding: 0;
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   background: var(--gn-surface);
   color: var(--gn-text-muted);
@@ -586,7 +580,6 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   background: var(--gn-surface);
 }
@@ -597,7 +590,6 @@
   font-size: 0.75rem;
   padding: 0.1rem 0.35rem;
   border-radius: 999px;
-  border: 1px solid var(--gn-border-strong);
   color: var(--gn-text-muted);
 }
 .ticket-type-list__rank,
@@ -645,7 +637,6 @@
 .ticket-type-editor__invalid p { margin: 0 0 0.2rem; }
 
 .ticket-type-editor__divergence {
-  border: 1px solid var(--gn-border);
   border-left: 3px solid var(--gn-warning);
   border-radius: 6px;
   background: var(--gn-surface-raised);
@@ -664,7 +655,6 @@
    they are is a choice the admin makes, not a button the design discourages. */
 .ticket-type-editor__divergence-move,
 .ticket-type-editor__divergence-leave {
-  border: 1px solid var(--gn-border-strong);
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
   font: inherit;
@@ -686,7 +676,6 @@
 .ticket-type-editor__divergence-refused p { margin: 0 0 0.2rem; }
 
 .workflow-rebind-dialog {
-  border: 1px solid var(--gn-border);
   border-radius: 8px;
   background: var(--gn-surface-overlay);
   color: var(--gn-text);
@@ -703,7 +692,6 @@
 .workflow-rebind-dialog__actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
 .workflow-rebind-dialog__cancel,
 .workflow-rebind-dialog__confirm {
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
   font: inherit;
@@ -719,7 +707,6 @@
 
 .read-only-banner {
   margin: 0;
-  border: 1px solid var(--gn-border);
   border-radius: 8px;
   padding: 0.375rem 0.625rem;
   background: var(--gn-surface-sunken);
@@ -752,7 +739,6 @@
   padding: 0.5rem;
 }
 .gn-calendar__nav {
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   background: var(--gn-surface-raised);
   color: var(--gn-text);
@@ -781,7 +767,6 @@
   gap: 0.75rem;
   margin: 0 0.5rem 0.5rem;
   padding: 0.35rem 0.5rem;
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
 }
 .gn-calendar__legend-row {
@@ -795,7 +780,6 @@
 .gn-calendar__days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-top: 1px solid var(--gn-border);
 }
 .gn-calendar__day {
   padding: 0.25rem;
@@ -852,7 +836,6 @@
 .gn-calendar__slot { min-width: 0; }
 
 .gn-calendar__fold {
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   background: var(--gn-surface-raised);
   color: var(--gn-text-muted);
@@ -894,7 +877,6 @@
   padding: 0.5rem;
 }
 .gn-timeline__nav {
-  border: 1px solid var(--gn-border);
   border-radius: 6px;
   background: var(--gn-surface-raised);
   color: var(--gn-text);
@@ -926,12 +908,11 @@
   grid-template-columns: 12rem var(--timeline-week-columns);
   align-items: center;
 }
-.gn-timeline__weeks { border-bottom: 1px solid var(--gn-border); }
+.gn-timeline__weeks { }
 .gn-timeline__week {
   padding: 0.25rem;
   font-size: 0.75rem;
   color: var(--gn-text-muted);
-  border-left: 1px solid var(--gn-border);
 }
 
 .gn-timeline__group-heading {
@@ -987,7 +968,6 @@
 
 .gn-timeline__side {
   padding: 0.5rem;
-  border-top: 1px solid var(--gn-border);
 }
 .gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
@@ -1036,7 +1016,7 @@
   color: var(--gn-text);
 }
 .gn-inbox__list { list-style: none; margin: 0; padding: 0; }
-.gn-inbox__item { border-bottom: 1px solid var(--gn-border); }
+.gn-inbox__item { }
 .gn-inbox__row {
   display: flex;
   align-items: baseline;
@@ -1084,7 +1064,6 @@
 .gn-inbox__more {
   margin: 0.5rem;
   padding: 0.25rem 0.75rem;
-  border: 1px solid var(--gn-border);
   border-radius: 4px;
   background: transparent;
   color: var(--gn-text);
@@ -1127,7 +1106,6 @@
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--gn-border);
 }
 .gn-saved-filters__apply {
   flex: 1;
@@ -1157,7 +1135,6 @@
   flex: 1;
   min-width: 0;
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--gn-border);
   border-radius: 4px;
   background: var(--gn-surface-sunken);
   color: var(--gn-text);
@@ -1165,7 +1142,6 @@
 }
 .gn-saved-filters__submit {
   padding: 0.25rem 0.75rem;
-  border: 1px solid var(--gn-border);
   border-radius: 4px;
   background: transparent;
   color: var(--gn-text);
@@ -1226,7 +1202,6 @@
 .gn-contest-banner__action {
   font: inherit;
   padding: 0.25rem 0.75rem;
-  border: 1px solid var(--gn-border);
   border-radius: 4px;
   background: var(--gn-surface-raised);
   color: var(--gn-text);
@@ -1261,7 +1236,6 @@
   font-size: 0.85rem;
   color: var(--gn-text-muted);
   background: var(--gn-surface);
-  border-top: 1px solid var(--gn-border);
   padding: 0.3rem 0.75rem;
 }
 .gn-sync-status-bar__label { color: var(--gn-text); }
@@ -1294,7 +1268,6 @@
   font-size: 1rem;                /* never below 16px: iOS zooms the page otherwise */
   color: var(--gn-text);
   background: var(--gn-surface-raised);
-  border: 1px solid var(--gn-border-strong);
   border-radius: 0.4rem;
 }
 .gn-help__search-input:focus-visible,
@@ -1306,7 +1279,7 @@
   outline-offset: 2px;
 }
 
-.gn-help__results { margin-bottom: 2rem; padding: 0.9rem 1rem; border: 1px solid var(--gn-border); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__results { margin-bottom: 2rem; padding: 0.9rem 1rem; border-radius: 0.4rem; background: var(--gn-surface-sunken); }
 .gn-help__results-count { margin: 0 0 0.6rem; font-weight: 600; }
 .gn-help__results-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 .gn-help__result { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -1315,13 +1288,12 @@
 .gn-help__result-where { font-size: 0.9rem; color: var(--gn-text-muted); }
 .gn-help__result-excerpt { color: var(--gn-text-muted); }
 
-.gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border: 1px solid var(--gn-border); border-left: 3px solid var(--gn-warning); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border-left: 3px solid var(--gn-warning); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
 
 .gn-help__tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .gn-help__tab {
   min-height: 2.75rem; padding: 0 1rem; cursor: pointer;
   color: var(--gn-text); background: var(--gn-surface-raised);
-  border: 1px solid var(--gn-border-strong); border-radius: 0.4rem;
   font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
 }
 .gn-help__tab:hover { background: var(--gn-surface-sunken); }
@@ -1329,7 +1301,7 @@
    is not an indicator, and `aria-pressed` carries it to assistive tech. */
 .gn-help__tab[aria-pressed='true'] { border-color: var(--gn-accent); background: var(--gn-surface-sunken); font-weight: 600; }
 
-.gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gn-border); }
+.gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; }
 /* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
    body text on a phone — and these are the only navigation links on the page. */
 /* `inline-flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. Measured at
@@ -1357,14 +1329,14 @@
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.05rem; line-height: 1.35; }
 .gn-help__p { margin: 0 0 0.75rem; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border: 1px solid var(--gn-border); border-left: 3px solid var(--gn-accent); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-left: 3px solid var(--gn-accent); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
 .gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-size: 0.92em; }
 .gn-help__link { color: var(--gn-accent); }
 
 /* Wide content scrolls INSIDE its own box; the page never scrolls sideways. */
 .gn-help__table-scroll { overflow-x: auto; margin: 0 0 1rem; }
 .gn-help__table { border-collapse: collapse; width: 100%; }
-.gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; border: 1px solid var(--gn-border); text-align: left; vertical-align: top; }
+.gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
 .gn-help__table th { background: var(--gn-surface-sunken); }
 
 @media (max-width: 40rem) {
