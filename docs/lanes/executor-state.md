@@ -230,6 +230,90 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~19:0x IST — **HIG PHASE 2: THE BORDERS COME OFF. 13-of-20 → 0-of-6, MEASURED BY ONE INSTRUMENT AT BOTH ENDS.**
+
+*Branch `exec/129-hig-border-sweep`, off `main` `c71e58b`. Block `13.281`–`13.320`; `13.283`–`13.284`
+minted. Atomic as ruled: remap + 54 removals + three new `CONTRAST_PAIRS` rows in one change.*
+
+## THE NUMBERS, both, same instrument, same five routes
+
+| | before (`b7fd4df`, committed before anything moved) | after |
+|---|---|---|
+| classes below 3:1 | **13 of 20** | **0 of 6** |
+| bordered elements | 107 | 19 |
+| positive control | 18.82 | 18.82 |
+
+Twelve classes **left the roster entirely** rather than being recoloured — that is what R1(c) is for.
+The six left all pass: `input`/`select` 4.07 on the UA's own border, `.gn-attention` 4.66 on its
+warning rule, three `button` variants at 18.82.
+
+**The before was taken and COMMITTED before a single declaration changed**, because a before/after built
+from two instruments compares two populations while reading as meaningful. **And it is NOT the
+checklist's 17-of-24** — one viewport, full class-signature grouping, post-palette surfaces. Both are
+reported with their populations; the controller's ruling was explicit that reconciling them would
+manufacture a false continuity.
+
+## ⚠ THE CASE'S OWN GUARD WENT RED, AND LOWERING IT WOULD HAVE BEEN THE DEFECT
+
+13.283 carried `expect(examinedTotal).toBeGreaterThan(20)` — guarding the real hazard that **a sweep
+matching nothing reports zero offenders, the best possible result and the least trustworthy one.** The
+sweep removed 54 borders, the population fell to **19**, and it failed.
+
+The guard was working. **Its threshold was an assumption about a population this change was designed to
+shrink.** It was NOT lowered to 19 — that is moving a bar to meet a result. It was replaced with a
+control that traverses the SAME PATH as the measurement: **the same sweep, same rendered page, re-run at
+25:1, must report offenders.** "Zero below 3" and "zero below 25" from one instrument means the
+instrument is dead. That control survives any future population.
+
+## THE AFFORDANCE QUESTION, measured because the ruling refused to assert it
+
+I proposed keeping a `#6C6C70` boundary on controls. **The controller overruled me toward an option I had
+myself named, with an argument I could not answer:** the narrower scope puts the heavy rule on the MOST
+visible elements — every button — so **shrinking the population concentrates the cost rather than
+reducing it.** My "an option priced as unacceptable is sometimes an option scoped too widely" was a good
+instinct applied to the wrong case.
+
+Measured: **fill 1.09–1.15 (carries nothing); accent semibold label 5.31–6.81 (carries it all).** My
+reading, stated as a reading in 13.284, with its weak point named: **this product colours links with the
+same accent, so accent-plus-semibold is not uniquely a button.**
+
+## THE HONEST HALF OF REQUIREMENT 4 — three fields NOT swept
+
+`.gn-sign-in__method label input`, `.gn-mcp-authorize__input`, `.gn-notfound__link` keep their borders.
+**13.284's argument does not transfer: an EMPTY field has no accent label inside it**, so removing its
+boundary leaves a 1.09 fill as the only marker. The ruling says come back rather than quietly ADD a
+boundary; the same logic forbids quietly REMOVING one. **Looked at directly, the bordered phone field
+reads correctly** — that is the evidence for leaving it. Owner's call.
+
+`borderStrong` maps to the clearing grey, not the darker `#3c3c43` it first got: with those fields still
+bordered, the dark value would have put a **9.80** rule around every input — **the transient this whole
+phasing exists to avoid, reintroduced by the fix for it.**
+
+## ⚠ `packages/ui` WAS NOT THE WHOLE SURFACE
+
+`apps/web/app/globals.css` carried **13** more token borders. A sweep declared complete against `ui.css`
+alone would have left ten failing classes on the signed-out routes — and the rendered instrument is what
+caught it, because the shipped CSS still showed 10 matches after `ui.css` was clean.
+
+## REQUIREMENT 6 — I LOOKED, and it showed something no count could
+
+On `/sign-in`: the swept `Continue with Google` and `Sign in with a passkey` read correctly as controls.
+All four real methods present, no invented password. **But the `Phone | Email link` segmented control
+renders as two browser-default boxes**, now visibly inconsistent beside them.
+
+**Verified, not assumed, that this is NOT this change's doing:** `.gn-view-tabs button` sets
+`min-height` and `padding-inline` and nothing else — globals.css says exactly that in its own comment —
+and `git diff` over this change touches none of it. Same finding as the 26 controls rendering at the
+browser's font. **The sweep did not break it; the sweep made it VISIBLE**, because everything around it
+stopped looking browser-default. Per-screen work → the audit owns it. Recorded, not fixed.
+
+## STATE
+
+* Gate **33/33 EXIT 0**, Node **v22.22.2**, 15 of 33 cached. Stack suite **6 passed EXIT 0**. All five
+  repo guards pass. Mutations on 13.284: both redden it by name.
+* **NEXT: the reconciliation audit** — 23 prototypes → 19 real routes, classified S/I/D/C. **No
+  per-screen restyle until it is reviewed.** The segmented control above is its first input.
+
 # ▶ TUESDAY 2026-09-08 ~17:2x IST — **HIG PHASE 1: THE PALETTE. AND THE CONTROLLER CAUGHT A TRANSIENT I COULD NOT SEE FROM INSIDE THE CHANGE.**
 
 *Branch `exec/128-hig-tokens`, off `main` `29c5b25`. Block `13.281`–`13.320` allocated to me;
