@@ -325,6 +325,12 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   *(Refuted limb, recorded so nobody builds against it: the challenge rows are NOT unbounded —
   `findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
   phone-OTP verification calls it. No cleanup job is owed.)*
+  **STATE OF THE FEATURE, PLAINLY: passkey sign-in has NO ENTRY POINT on the sign-in screen as of
+  this change — no button, and no autofill offer either.** The `autocomplete="username webauthn"`
+  token is present and inert; it does nothing until something issues a conditional-mediation request.
+  **Task 12 restores the entry point together with registration**, which is the only pairing that makes
+  sense: an offer to use a passkey has no population it can serve until a user can register one. The
+  narrowing was accepted by the controller on the measured 429 rather than taken unilaterally.
   **That makes the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of
   this product can hold a passkey, and the method is unavailable however well it is wired.
   *Recorded here rather than left to the absence of a button, because an unrecorded deferral is defect

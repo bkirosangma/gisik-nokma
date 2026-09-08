@@ -230,6 +230,66 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~20:1x IST — **2b ITEM 2: REVIEWED, FIX ROUND APPLIED, HEAD FROZEN.** The entry below is superseded on position.
+
+## THE REVIEW'S BEST FINDING, AND IT REVERSED AN INSTRUCTION
+
+**The conditional-mediation request the dispatch specified (item 2(d)) is NOT shipped.** It is
+deferred to Task 12, and the controller accepted the scope change on the measurement:
+`signInPasskey` issues `GET /passkey/generate-authenticate-options` as its FIRST statement, charged
+to the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX` = **10**/60s in production). A reviewer drove
+ten probes through the assembled app and the eleventh real `POST /sign-in/magic-link` answered
+**429**, against a zero-probe control answering 500 and not 429. And `http/rate-limit.ts` already
+records as MEASURED that a web container proxies every browser into ONE client key.
+
+**A request that spends a shared sign-in budget on a flow with ZERO possible successes is the same
+defect the dead button was, one layer down.** State of the feature, plainly, in Features.md and the
+checklist: **passkey sign-in has NO ENTRY POINT until Task 12 restores it with registration.**
+
+*Refuted limb, recorded so nobody builds against it: challenge rows are NOT unbounded.
+`findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
+phone-OTP verification calls it. **No cleanup job is owed.***
+
+## THE OTHER THING THAT WOULD HAVE SHIPPED BROKEN
+
+`APPLE_APP_BUNDLE_IDENTIFIER` set alone REPLACES the Services ID as better-auth's id-token audience
+(`options.audience ?? options.appBundleIdentifier ?? options.clientId` — ONE audience per provider,
+not one per flow), so every Apple WEB sign-in would have failed validation **the day the owner set
+that variable for the native app** — and my documentation said it was harmless. Now ships an explicit
+`audience: [servicesId, bundleId]`, mutation-witnessed.
+
+## FOUR CHECKS THAT COULD NOT FAIL, ALL FOUND IN THIS ONE CHANGE SET
+
+1. 13.292's negative half — no API behind the viewport suite, so nothing rendered whatever the gate did.
+2. 13.326's negative half — **`waitFor` around an ABSENCE waits for nothing**; it passes on the first
+   tick. The comment claimed otherwise, which is what made it read as covered.
+3. The env gate saw `GOOGLE_CLIENT_ID` only because a COMMENT quoted the access. **A comment that
+   quotes a scanner's pattern is a code site to that scanner** — and the fix's own explanatory
+   paragraph re-triggered it with a placeholder key.
+4. `readSocialProviderEnv()` — the only path a real deployment's credentials take — exercised by nothing.
+
+Plus `smoke.spec.ts`, which is Playwright and **NOT in the turbo gate**: it asserted both removed
+controls and stayed green through the entire change, turning red only when someone ran it directly.
+
+## METHOD MISTAKES THAT EACH COST A ROUND — carry these
+
+- **A patch script that writes at the END turns a failed later assertion into a silent no-op**, and
+  the green run afterwards reads as confirmation. It happened four times today, and once it produced
+  a COMMIT MESSAGE asserting work that was not in the tree. **Verify the write, then write the message.**
+- **A mutation that crashes the page measures nothing.** Its red looks exactly like the red you wanted;
+  mine was an empty-DOM population check.
+- **A read-only fan-out is not read-only.** A review agent wrote a probe file into the shared tree,
+  `git add -A` swept it into a commit, and it reddened the gate two commits later. It is gone —
+  verified by `git diff --name-only origin/main HEAD`, not by `git status`.
+- **`git checkout -- <path>` from the wrong cwd errored, and that error was lucky**: the file was
+  uncommitted and it would have destroyed the whole rewrite.
+
+## ANCHORS
+
+`origin/main` `62dbaff` (merged in). Branch `exec/135-signin-auth-methods`. PR **#369**.
+
+---
+
 # ▶ TUESDAY 2026-09-08 ~19:4x IST — **2b IS BUILT. Items 1+3 merged (#366); item 2 is on `exec/135-signin-auth-methods` and its PR is the next thing to open.** The entry below is superseded on position and still correct on method.
 
 ## ANCHORS — reachable, checked with `merge-base --is-ancestor`, never `cat-file`
