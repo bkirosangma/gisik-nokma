@@ -20,8 +20,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, at
-> `8172d67cdf047b6d30c636fe61b5c951cba8c273`. Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**, load 1.43, zero orphaned
+> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**.
+> HEAD is `4ed3be671d3ca8d7460fe77136938398ef5b9bce`; the GATE was run at `8172d67`, one commit below, and the only commit since is
+> this handoff edit — stated that way rather than implying the gate ran at a sha it did not.
+> Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**, load 1.43, zero orphaned
 > vitest workers; `check-case-ids`, `check-case-citations`, `check-env-example`, `check-task-ledger`
 > and `check-runbook-commands` all EXIT 0. Viewport suite 19 passed / 2 skipped; stack sweep green on
 > five routes. Both type-scale baselines are committed at 0.
