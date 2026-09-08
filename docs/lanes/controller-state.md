@@ -1,5 +1,89 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY ~21:4x IST — **ROUND 2c MERGED (#372 → `469602f`), FORCED GATE GREEN, EXECUTOR RESTARTED AND ON TASK 4 (Workspaces + Invite) BY THE OWNER'S SEQUENCING. Google sign-in and real SMTP are live on the dev stack. `main` is `469602f` + this anchor. Zero open PRs.**
+
+### Owner decisions this stretch, each on disk
+1. **Sign-in signed off** ("done. Lets move on to the next one. the workspace page") — Task 4 is next; **Task 12 waits behind it.**
+2. **SMS: "follow the rendering-only-what-can-work principle … leave the SMS for now"** → round 2c
+   (`CTL-DISPATCH-2026-09-08-2c-phone-gating.md`): the Phone tab renders only where an SMS channel exists.
+3. **Google OAuth credentials provisioned** (client JSON with both redirect URIs already registered) → the two
+   values sit in the gitignored root `.env` (mode 600, never printed); `docker compose … up -d server`;
+   `GET /v1/auth/methods` → `{"google":true,"apple":false}`; the Google mark renders on `/sign-in`.
+4. **Email through Google Workspace**: the mailbox's ACCOUNT password was refused by Gmail SMTP with
+   `534 5.7.9 Application-specific password required` (measured, one login attempt each on 465 and 587, no mail
+   sent); an **app password** was then accepted, `SMTP_URL=smtps://contact%40artsourced.in:…@smtp.gmail.com:465`
+   written to `.env`, and **one real message sent through `SmtpMagicLinkSender` from the built dist** (4.2 s, From
+   `contact@artsourced.in`, subject `Sign in to Gisik Nokma`) to the owner's address — received. **The dev stack
+   stays on Mailpit ON PURPOSE**: `docker-compose.dev.yml` hard-codes `smtp://mailpit:1025` for the server and the
+   stack suite reads magic links out of Mailpit; real mail begins with DO's `SMTP_URL` secret. Owner told to change
+   the account password (it passed through chat) and to keep the client JSON safe.
+5. Copy: 2c's manual/FAQ rewrites were quoted before/after to the owner for veto (none yet); the executor's
+   point that manual item 1 no longer earns its place in "five things" is with the owner.
+
+### #372 — merged in the fixed order, every number re-measured
+Frozen head `1abb687` by the executor's own line (forced gate there 33/33 `Cached: 0`); re-fetched at merge time,
+base `main`, MERGEABLE, worktree clean, 0 unpushed, branch contained `1115e24`. Merged (CI waived, owner 15:20):
+`MERGE_EXIT=0`, MERGED `469602f`, reachable, **trees identical**. Unfiltered diff 0 files. **Partitioned drop
+check, 17 literal paths: 0 bytes / empty stderr; same-pipeline control 91,143 bytes.** Six checks raw-green at
+`469602f` (`check:tasks` 193/199 · ids **1,815** · `check:help` regenerated copy matches). **Forced gate at
+`469602f`** (lock pid 7477): `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · **`EXIT=0` · 33/33 · `Cached: 0` · 1m51s ·
+node v22.22.2 · `Unsupported engine` 0 · `CHECK_ENV_EXIT=0` · no orphans · 3,978 passed | 5 skipped (3,983) /
+321 files** (server 1475|5 · app-core 1152 · web 161 — = the executor's figures). **Executor restarted at the
+fixed point** with `override-task4-after-372.md` (position + "read the Task 4 dispatch and begin"); fresh at 8%,
+verified the merge itself, read the dispatch, and was reading the plan/audit rows within a minute.
+
+### What 2c shipped and found — kept because each generalises
+- `/v1/auth/methods` gains `phone`, read off **the sender instance the auth object actually awaits**
+  (`auth.otpSender`), not env, not a threaded dep: no configuration under which the page offers phone and the
+  server refuses. On the page the method is DERIVED, so "no tab" and "phone form showing" cannot both hold.
+- **The viewport suite was NOT hermetic** — `next.config.ts` rewrites `/v1/*` to the API origin, so the suite's
+  own dev server proxied to whatever compose stack was up; its docblock said "no API behind it" and was believed.
+  It surfaced only because the owner turned Google on: the `/sign-in` accessible-names floor read `ariaLabel: 1`
+  before (the segmented control) and `1` after (the Google button) — **the same number for a different reason**,
+  which is what hid it; any machine with the stack down would have failed 13.285 on a page that lost nothing.
+  Fixed with a `page.route` stub ("nothing configured") before first navigation, baseline re-recorded.
+- **Consequence, accepted and written AT THE CASE (13.285) and in `accessible-names.ts`:** `/sign-in`'s ratchet is
+  a floor of ZERO until a labelled control returns (Task 12, or a configured provider); 13.286 still guards the
+  sweep; the mechanism is witnessed on `/privacy`. A floor of zero cannot fall — stated, not buried.
+- Two Playwright files outside the turbo gate would have kept asserting the removed tab (`e2e-stack/helpers/
+  sign-in.ts` — the whole stack suite would have died at step one; `e2e/smoke.spec.ts`, the same file that stayed
+  green last round asserting a deleted passkey button). **Files the gate cannot see are where dead assertions
+  live.**
+- A mutation that measured nothing, reported rather than filed: deleting `ThemeToggle`'s label left the suite
+  green because `/sign-in` never renders it — a green run there is indistinguishable from a slack ratchet.
+
+### Executor findings between rounds, and the rule they produced
+- Its "Task 12 does not own the manual/FAQ fix" claim was measured on its worktree at `e2add78` (965 lines) while
+  `origin/main` (987 lines) carried the entry at plan line 931 — and the same stale tree had mislabelled its
+  staleness sweep's anchor. **Its rule, adopted: any claim ABOUT `main` is read from `git show origin/main:<path>`,
+  never the worktree copy** — a worktree that is BEHIND reports clean in `git status`. The sweep itself (1,183
+  files, zero hits outside gitignored `graphify-out/`, control alive) stands.
+- Its own line in #371 named `main`'s sha inside a file merged INTO `main` — wrong the instant it lands; the
+  durable fix is phrasing ("`5b4f8fc` plus this document's own merge"), carried into its next PR (now #372, done).
+
+### Task 4 — dispatched (`CTL-DISPATCH-2026-09-08-task4-workspaces.md`), one PR, frozen-head protocol
+4a surface (sonnet allowed; the plan's text does NOT carry the CSS/markup in full, so it is derived from
+`design-system/prototypes/Workspaces.dc.html` + tokens through Task 1's pieces); 4b states (opus; ids
+`13.298`–`13.300`, verified unminted, the plan's own allocation). Audit I-rows are binding the other way: no
+member counts, ticket chips, role labels, initials tiles, pending-invite banner, Help link, avatar —
+`WorkspaceRef` is `{id, name, projects}`. C-row subtitle flagged to the owner, not adopted. **The PR also teaches
+`scripts/check-task-ledger.mjs` the `Na / Nb` heading form with a fixture case and adds the ten `todo` rows
+(4a–8b) in the same commit** — the gate reads 199 tasks where the plan has 209 — with 4a/4b flipped to
+`in-flight`; I flip them to `done` at the merge. It **rebuilds both dev images from the frozen head, runs the
+stack suite against them, then `docker builder prune -f`** (VM at 83%); that is the stack the owner looks at.
+Until then the dev stack runs pre-2c images (Phone tab still visible there; production never showed it).
+
+### Carried
+- Docker VM 83% (9.4 GB free); 36 GB of the images are the owner's other projects (`-a` territory, theirs).
+- Task 12 text corrected in #370 (entry point returns WITH registration; 13.333 = zero auth-bucket charges on an
+  anonymous load; DO-ingress limb unsettled; manual/FAQ passkey passages in its Files).
+- SMS: no channel; `NullOtpSender` refuses 501; needs TRAI DLT registration + a provider + a sender — owner
+  deferred ("leave the SMS for now"). Production `SMTP_URL` = the `.env` value, to be pasted as the DO secret.
+
+### Next
+Task 4 PR → the fixed merge step → owner looks at `http://localhost:3001/workspaces` → their feedback → Task 12
+(or the next screen they name), one at a time.
+
 ## ✅ TUESDAY ~20:2x IST — **2b ITEM 2 MERGED (#369 → `5b4f8fc`), FORCED GATE GREEN, EXECUTOR RESTARTED AT THE FIXED POINT, STACK VERIFIED BY CONTENT. `main` is `5b4f8fc` + this anchor. HOLD: the owner looks at `http://localhost:3001/sign-in` before anything after 2b starts.** Zero open PRs.
 
 ### The merge, in the fixed order — every number re-measured at the sha it names
