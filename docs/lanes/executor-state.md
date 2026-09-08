@@ -20,6 +20,51 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ⚠ THE SQUASH-DROPS-LATE-PUSHES TRAP FIRED, ON THIS BRANCH, TODAY — and this entry is the proof
+>
+> The finding below was committed as `5ef45d6` and pushed to `exec/117-type-scale`. **#334 was
+> squash-merged moments later and captured the branch WITHOUT it.** Everything earlier landed; only
+> the last push vanished. `188abb6` is a genuine ancestor of `origin/main`, the PR reads MERGED, the
+> branch-side signals were all green — **and 23 lines were gone.**
+>
+> Caught by the check the memory prescribes and nothing else would have found:
+> `git diff origin/main <branch-tip> -- <the files that mattered>`. It printed
+> `docs/lanes/executor-state.md | 23 +++`. **Empty is the only proof; anything else is a dropped
+> push.** A reachability check on the merge commit passes either way and says nothing about this — I
+> ran that too, and it was green while the content was missing.
+>
+> Recovered by **CHERRY-PICKING onto a fresh branch off `main`** (`exec/119-dropped-push-recovery`),
+> never by rebasing `exec/117`: a rebase re-applies commits `main` already holds in squashed form and
+> manufactures conflicts that read as real.
+>
+> **The operational lesson, sharpened by having it happen while watching for it:** the danger window
+> is not "pushing to a merged PR", it is **pushing to an OPEN PR that someone is about to merge**, and
+> the pusher cannot see the merge coming. After any squash of your own work, diff the files that
+> mattered against `main` — every time, not only when something feels wrong.
+>
+> ### ▸ THE STACK SUITE NOW TRIPS THE AUTH RATE LIMIT WHEN RUN WHOLE — pre-existing, and both this PR and #328 add pressure
+>
+> After #328 merged and the container was rebuilt to carry BOTH branches' CSS, the full
+> `playwright.stack.config.ts` run reports **3 passed, 2 failed** — and **both failures are
+> `sign-in.ts:28` timeouts on "Check your inbox", not assertions.** Run individually, spaced ~75s
+> apart, **both pass**: the type-scale case (7.4s) and `visibility.spec.ts`'s guest case (3.2s). The
+> server log shows **429s** in the same window, so this is the auth limiter, not a defect.
+>
+> **The suite signs in once per test and now has five tests.** #328 added one and this branch added
+> one; before them it had three. Nothing here is broken, but the suite has crossed a threshold where
+> running it whole is unreliable, and **CI runs it whole**.
+>
+> **What I did NOT establish, stated so nobody inherits a wrong number:** I counted 24 auth-route
+> requests during a run, but the `docker logs --since 3m` window also covered the two isolated runs
+> immediately before it, so **24 is a three-minute figure, not a per-run one**, and the exact
+> bucketing (per-IP, per-email, or both) is uncharacterised. An earlier reading this session showed a
+> 429 for `accountant@…` while `kiro@…` still had budget, which points at per-email but does not
+> settle it.
+>
+> **Owner: whoever next touches the stack suite or sees it red in CI.** The obvious remedies —
+> reusing one session across tests, or raising `RATE_LIMIT_AUTH_MAX` for the e2e profile — are both
+> design choices about a security control, not an executor's call to make silently.
+>
 > ### ▸ ONE UNREPRODUCIBLE `git log` READING — RECORDED AS AN OBSERVATION, NOT A MECHANISM
 >
 > Counting #328's commits, `git log origin/main..origin/exec/116-tap-targets --oneline | wc -l`
