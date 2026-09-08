@@ -24,8 +24,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and ~~its PR is OPEN:
 > #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.~~
-> MERGED as `b7464f6` (PR #374) at 2026-09-08 17:12:59Z. `origin/main` IS `b7464f6`. There are
-> ZERO open PRs. THE QUEUE IS EMPTY — HOLD.**
+> MERGED as `b7464f6` (PR #374) at 2026-09-08 17:12:59Z. `main` carries that merge **plus later
+> docs-only merges**. THE QUEUE IS EMPTY — HOLD.**
+>
+> **Two facts above are deliberately NOT written as shas, and the rule is general: this file cannot
+> name the tip it lands on.** Any "`origin/main` IS `<sha>`" written here is false the moment the
+> commit carrying it merges — the file would have to contain the hash of the commit that contains
+> it. An earlier draft of this very block asserted `origin/main` IS `b7464f6` and was stale on
+> arrival. **Name the PR, never the tip.** For the live answers run `git rev-parse origin/main` and
+> `gh pr list --state open`; both are one command and neither can go stale in prose.
 >
 > **Verified 2026-09-08 ~22:4x, not adopted from the controller's relaunch note.** The squash
 > dropped nothing: `git diff origin/main 4483e442`, NO path filter, printed **0 bytes at EXIT=0**,
@@ -109,13 +116,33 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >   `SKIPPED`. The run annotation gives the cause, and it is not code: *"The job was not started
 >   because recent account payments have failed or your spending limit needs to be increased."*
 >   The jobs never started, so those `FAILURE`s are not test failures and name no defect.
->   **Why this matters beyond bookkeeping:** the standing auto-merge authorization's second
->   condition — *"an independent CI run green"* — is currently **unsatisfiable**, and four PRs have
->   merged on the local turbo gate alone. The uniformity is what hid it: a red that never varies
->   reads as the normal background. Note `gh run view <id> --log-failed` returns *"log not found"*
->   at **EXIT=0** for these runs — a silent-empty mode; the cause is in `gh run view <id>`
->   ANNOTATIONS, not the logs. **Owner: the repo owner (GitHub → Billing & plans), relayed via the
->   controller.** Do not attempt to fix this from a lane.
+>   **WAIVED BY OWNER RULING — DO NOT RE-RAISE THIS.** The block has been live since 2026-09-06
+>   ~14:42; **the owner waived the independent CI run that day at 15:20** (*"authority granted for
+>   merging"*; later *"cant do anything about the github billings"*), reaffirmed as **"do not
+>   re-ask unless the situation changes"**. Every merge since carries `(CI waived, owner 15:20)` in
+>   `controller-state.md` and in the ledger rows, and the controller re-reads the annotation at each
+>   restart. So the standing auto-merge authorization's second condition — *"an independent CI run
+>   green"* — is absent **BY RULING, not unnoticed**, and the merges on the local turbo gate alone
+>   are authorised ones. **Nothing here is owed to the owner. Raising it again spends their
+>   attention on settled ground.**
+>
+>   **Kept because the mechanism is still worth knowing, and the controller asked for it here:** a
+>   red that never varies stops carrying information and reads as the normal background — the
+>   inverse of a stuck-green check, and discarded just as fast, because red *feels* like the
+>   cautious colour. `SKIPPED` on every substantive job beside `FAILURE` on every cheap one is the
+>   signature of a runner that never STARTED, so those `FAILURE`s name no defect. And
+>   `gh run view <id> --log-failed` returns *"log not found"* at **EXIT=0** for these runs — a
+>   silent-empty mode, where the one command you would reach for to diagnose it returns a
+>   clean-looking nothing; the cause is in `gh run view <id>` ANNOTATIONS, not the logs.
+>
+>   **How this bullet got written wrong, which is the transferable part.** It first said "Owner: the
+>   repo owner (GitHub → Billing & plans), relayed via the controller" — owner action PENDING on the
+>   matter the owner had closed. I swept `executor-state.md`, which is mine; the ruling lived in
+>   `controller-state.md`, which is the peer's. **A finding is only NEW if you swept where the
+>   answer would live, and for anything already ruled on that is the OTHER role's state file.**
+>   A "recorded with an owner" note that has not been re-checked against the rulings becomes a
+>   standing instruction to waste someone's attention — a stale known gap, which is worse than an
+>   unknown one because it reads as pre-authorised work.
 > * NOT this task's, recorded with owners: `PLANS_WITH_TASKS` omits `hig-per-screen`;
 >   `check-case-citations` cannot see a case that has no catalogue row; the `13.321` next-free
 >   pointer already collides with a live case (controller owns that one).
