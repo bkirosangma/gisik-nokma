@@ -356,6 +356,53 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   **The route list is the part worth inheriting.** `/my-work` and the board — the pages this very
   paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
   0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a
+- **NEW, 2026-09-08: ONE CLIENT CAN EXHAUST THE MAGIC-LINK BUDGET FOR EVERY USER — measured, cause not
+  pinned, reported not fixed.** Found while measuring item B's rate-limit question, and it supersedes
+  that question rather than answering it.
+
+  **The 429s that break the e2e suite are not ours.** The two limiters answer differently, and the
+  bodies settle it: ours is `{"error":"rate_limited","retryAfterSeconds":N}`
+  (`apps/server/src/app.ts:545`), better-auth's is
+  `{"message":"Too many requests. Please try again later."}`
+  (`better-auth/dist/api/rate-limiter/index.mjs:65`). **Every 429 observed was the latter, byte for
+  byte.** `apps/server/src/auth/auth.ts` has **no `rateLimit` key at all**, so better-auth's limiter
+  runs at its defaults and nothing in `.env` reaches it. **`RATE_LIMIT_AUTH_MAX` is not the binding
+  constraint and raising it would fix nothing.**
+
+  **THE CONTROL IS THE WHOLE FINDING — without it this is just "the suite is flaky".** Two clients with
+  genuinely different source addresses, both hitting the server **directly, no proxy**:
+
+  | client | address | spend before | result |
+  |---|---|---|---|
+  | A | `192.168.65.1` | 5 × 200 | **429** on its 6th |
+  | B | `127.0.0.1` | **none** | **429 on its very first request** |
+
+  Both addresses and the ordering are in the server's own log. **A client that had spent nothing was
+  refused because a different client had spent.** The budget is shared across clients.
+
+  **Measured limits: 5 sends per ~60s window, globally.** Fire until refused from a clean window → the
+  6th is refused; poll after the refusal → allowed again at ~60s.
+
+  **Why it matters beyond the test suite.** The running server is `NODE_ENV=production` and
+  `deploy/do/app.yaml` deploys production too, so this plausibly holds in the real deployment: any one
+  person retrying sign-in locks out every other user, and it is a trivial unauthenticated
+  denial-of-service on the **first screen a new user ever sees**.
+
+  **⚠ WHAT IS NOT ESTABLISHED — do not let this be inherited as settled.** The **effect** is measured
+  and reproducible; the **cause is not pinned.** No `x-forwarded-for` appears anywhere in better-auth's
+  `dist`, and the `key: ""` that looked like a smoking gun is a no-data placeholder in `decideConsume`,
+  not the key derivation. **And this was measured on the DEV STACK ONLY** — not against the real
+  deployment.
+
+  **This CORRECTS an earlier reading of my own.** I first reported the cause as `next.config.ts:94`
+  proxying `/api/auth/*` and collapsing every client onto the proxy's address. **The control above
+  refutes that**: clients are not separated even with no proxy in the path, so removing the proxy would
+  fix nothing. The narrower story was wrong, and it was wrong in the direction of looking solved.
+
+  **The remedy is an owner decision about an auth-path security control**, not an executor's: configure
+  better-auth's own `rateLimit` (`enabled`/`window`/`max`, or `customRules` per path). **Mint case
+  `13.273` when that is ruled on** — no case id is minted here because there is no guard yet, and a
+  green case over an unfixed finding is exactly the shape this catalogue keeps recording.
   finding NAMED is not a ratchet on the pages the defect is ON. Cases 13.264–13.265.
 - **NEW, 2026-09-08: twenty-six controls render at the BROWSER'S default font, not the product's —
   reported, not fixed, because it is an owner call about the design.** Found by the type-scale sweep
