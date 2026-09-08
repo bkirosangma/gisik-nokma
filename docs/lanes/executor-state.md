@@ -22,11 +22,25 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
 >
-> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and its PR is OPEN:
-> #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.**
+> **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and ~~its PR is OPEN:
+> #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.~~
+> MERGED as `b7464f6` (PR #374) at 2026-09-08 17:12:59Z. `origin/main` IS `b7464f6`. There are
+> ZERO open PRs. THE QUEUE IS EMPTY — HOLD.**
 >
-> Local HEAD, `origin/exec/138-task4-workspaces` and the PR's `headRefOid` all read `c2c6313` —
-> checked with `gh pr view 374 --json headRefOid`, not assumed from the push succeeding.
+> **Verified 2026-09-08 ~22:4x, not adopted from the controller's relaunch note.** The squash
+> dropped nothing: `git diff origin/main 4483e442`, NO path filter, printed **0 bytes at EXIT=0**,
+> and a positive control through the SAME pipeline (`git diff origin/main 29bc5da5`) printed
+> 72,626 bytes — so the empty result is a reading, not a silently-failed command. All three trees
+> are identical (`bc89abcc`): branch tip, merge commit, `origin/main`.
+> `git log origin/main..4483e442` still lists nine commits; **that is what a squash always looks
+> like**, not evidence of loss. Tree identity is the criterion here, not commit ancestry.
+>
+> **The frozen head named above is NOT what merged, and the guard caught it.** The freeze was
+> declared at `c2c6313`; the handoff commit `4483e442` then landed past it — the "declare a head
+> FROZEN, then commit to it" shape. The abort guard fired on that push, and the controller records
+> a gate re-run at the actual tip `4483e442` before merging. **I did not witness that gate run —
+> it is attributed to the controller, not measured here.** What is measured is the content
+> identity in the paragraph above. A later reader should treat the two differently.
 >
 > Verified rather than adopted from the controller's relaunch note:
 > `gh pr view 372 --json state,mergeCommit` → `MERGED`, `469602f`; `gh pr list --state open` → none.
@@ -82,11 +96,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## STILL OUTSTANDING
 >
-> * **The controller's merge of #374, and the owner's look at `http://localhost:3001/workspaces`.**
->   Per the Task 4 dispatch, *nothing after Task 4 starts until they have*. Task 12 is next in the
->   queue and is HELD behind that look — do not start it from this file alone.
-> * If you are a relaunched executor reading this: the queue is EMPTY pending those two events.
+> * ~~The controller's merge of #374~~ **DONE — merged as `b7464f6`.** What remains is exactly one
+>   thing: **the owner's look at `http://localhost:3001/workspaces`**. Per the Task 4 dispatch,
+>   *nothing after Task 4 starts until they have*. Task 12 is next in the queue and is HELD behind
+>   that look — do not start it from this file alone.
+> * If you are a relaunched executor reading this: the queue is EMPTY pending that ONE event.
 >   Hold. Do not re-derive work from the brief's retired sequence.
+> * **NOT this task's, and the OWNER's to act on: GitHub Actions has not RUN since at least #371.**
+>   #371, #372, #373 and #374 all carry an identical signature — four `FAILURE`s (`scope`,
+>   `check-runbook`, `check-citations`, `check-help`), `gate` `FAILURE`, and every real job
+>   (`build`, `typecheck`, `server-tests`, `other-tests`, `e2e`, `check-tasks`, `check-env`)
+>   `SKIPPED`. The run annotation gives the cause, and it is not code: *"The job was not started
+>   because recent account payments have failed or your spending limit needs to be increased."*
+>   The jobs never started, so those `FAILURE`s are not test failures and name no defect.
+>   **Why this matters beyond bookkeeping:** the standing auto-merge authorization's second
+>   condition — *"an independent CI run green"* — is currently **unsatisfiable**, and four PRs have
+>   merged on the local turbo gate alone. The uniformity is what hid it: a red that never varies
+>   reads as the normal background. Note `gh run view <id> --log-failed` returns *"log not found"*
+>   at **EXIT=0** for these runs — a silent-empty mode; the cause is in `gh run view <id>`
+>   ANNOTATIONS, not the logs. **Owner: the repo owner (GitHub → Billing & plans), relayed via the
+>   controller.** Do not attempt to fix this from a lane.
 > * NOT this task's, recorded with owners: `PLANS_WITH_TASKS` omits `hig-per-screen`;
 >   `check-case-citations` cannot see a case that has no catalogue row; the `13.321` next-free
 >   pointer already collides with a live case (controller owns that one).
