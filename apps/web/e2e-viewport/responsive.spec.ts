@@ -1645,13 +1645,26 @@ test('13.300 — /invite/<token> body says "You are invited to join <workspace> 
  * not its duplicate: that one owns *what is rendered in the interim*, this one
  * owns *where the browser ends up*.
  *
- * ## The mutation, and why it names its own site
+ * ## The mutation — WITNESSED, and it is NOT the pathname assertion that reddens
  *
  * Delete `if (expired) router.push('/sign-in');` from
- * `apps/web/src/expired-session.tsx`. The browser then STAYS on `/workspaces`
- * showing the notice, and the `pathname` assertion below fails naming both the
- * expected and the actual route. It is the only mutation in this file that can
- * do that, because it is the only assertion here about where a navigation ends.
+ * `apps/web/src/expired-session.tsx`. RUN, not predicted: **RED on all three
+ * viewports, and on this case alone** — 13.299 and 13.300 stayed green in the
+ * same run, so the mutation is specific to what this case names.
+ *
+ * **An earlier draft of this paragraph said the `pathname` assertion below
+ * fails "naming both the expected and the actual route". That is false and the
+ * run proved it.** With the push gone the browser sits on `/workspaces`, so the
+ * POSITIVE CONTROL at the top of the test — `getByLabel('Email')`, which exists
+ * only on `/sign-in` — times out FIRST, and the pathname assertion is never
+ * evaluated. What a reader actually sees is a timeout waiting for the Email
+ * field. The long diagnostic below is therefore unreachable under THIS
+ * mutation; it is kept because it covers a different failure the control cannot
+ * see — arriving somewhere that is neither `/workspaces` nor `/sign-in`.
+ *
+ * Do NOT "fix" that by moving the pathname assertion above the control. Doing
+ * so restores the message and destroys the control's own reason for existing,
+ * which is the next paragraph. The order is correct; the old sentence was not.
  *
  * ## `?next=` is NOT carried, and that is recorded rather than asserted
  *

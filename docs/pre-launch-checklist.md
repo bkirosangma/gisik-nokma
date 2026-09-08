@@ -314,8 +314,9 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   reports green and reads as coverage. Closing it needs a seeded, non-expiring invite token in the
   stack fixture; then the route joins `routes` in `apps/web/e2e-stack/viewport.spec.ts` beside
   `/workspaces`.
-  **What DOES guard the invite surface today, so the gap is not overstated:** twelve jsdom cases in
-  `apps/web/test/invite-page.test.tsx` (3.118–3.123) covering the live link, the dead link, the
+  **What DOES guard the invite surface today, so the gap is not overstated:** **eight** `it` blocks across four `describe`s in `apps/web/test/invite-page.test.tsx`, carrying
+  **six** case ids (3.118–3.123) — counted, after an earlier draft of this very sentence said
+  "twelve", a number nothing had printed covering the live link, the dead link, the
   session-loading and signed-out branches and both acceptance-refusal shapes, plus case **13.300**,
   which drives the real page in a real browser behind a stubbed summary. What is absent is
   specifically the **one-way accessible-name floor** — the instrument that catches a future restyle

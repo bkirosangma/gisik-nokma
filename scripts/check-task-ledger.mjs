@@ -184,8 +184,18 @@ function taskIdsFromHeading(line) {
   //     carries no colon at all.
   //   * `/^#+ Tasks? (\S+)\s*:?\s*(.*)$/` — also colon-loose. Wrongly matches
   //     all four.
-  // Both controls accept every positive below, so the positives alone would
-  // have certified either one. That is the whole point of the negatives.
+  // CORRECTED after review, because the original sentence here overstated its
+  // own argument and this file is the wrong place to do that. It read "both
+  // controls accept every positive below, so the positives alone would have
+  // certified either one." Measured by substituting each control and running
+  // these same cases: Control A fails 0 positives and 3 negatives, so the claim
+  // holds for A and the negatives are what kill it. Control B fails FIVE
+  // positives (`### Task 3a:` yields the id `3a:`, colon included, and
+  // `### Task 4a / 4b:` yields `4a` with the title `/ 4b: ...`), so the
+  // positives alone kill B and the negatives do no work for it. Only A supports
+  // the argument. A comment claiming a control was certified by nothing, when
+  // that control dies to the first positive, is the same overstatement in
+  // miniature that the reader below exists to catch.
   const ok = (line, ids, title) => [line, { ids, title }];
   const no = (line) => [line, null];
   const cases = [
@@ -205,6 +215,16 @@ function taskIdsFromHeading(line) {
     no('#### Task 9: x'),
     no("## Task 8's re-review, run because its first one was contaminated"),
     no('Task 4a / 4b: Workspaces + Invite'),
+    // ADDED after review measured that the nine cases above do NOT pin the
+    // reader as tightly as they read: two looser readers —
+    // `/^### Task ([\d\/a-z\s]+):/` and `/^### Task ([^:s][^:]*):/` — pass all
+    // of them unchanged, because the four null cases about depth and prefix are
+    // every one of them killed by the same `^### ` anchor and so do no
+    // independent work. This case is the one that separates them: an id must be
+    // DIGITS with an optional letter, and `abc` is neither. It is not a shape
+    // these plans contain, which is exactly why nothing else was going to catch
+    // a reader that admitted it.
+    no('### Task abc: an id that is not a number'),
   ];
   const failures = [];
   for (const [line, expected] of cases) {

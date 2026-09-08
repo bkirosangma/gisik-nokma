@@ -52,21 +52,37 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > 2. **`/workspaces` joins the stack sweep; `/invite/<token>` does not** — it has no standing token,
 >    and a token-less visit baselines the DEAD-LINK branch, which is worse than no baseline.
 >
-> ## WHAT IS STILL OUTSTANDING — the queue for whoever holds this next
+> ## WHAT IS DONE — this list was written BEFORE the work and review caught it stale
 >
-> * 13.298's test itself (in `e2e-viewport/responsive.spec.ts`) + its `router.push` mutation witness.
-> * Record `/workspaces`'s accessible-names baseline via `UPDATE_ACCESSIBLE_BASELINE=1`, and seed its
->   type-scale key — **the type-scale path FAILS on a missing key rather than seeding it**, which is
->   the opposite of the accessible-names path in the same file. That asymmetry costs a run if unknown.
-> * `Features.md` — extend the bullets at **:60 (Invite links)** and **:61 (Founding a workspace)**,
->   located BY PATH per Global Constraints. The plan's own "Features §6" pointer is wrong and struck.
-> * `test-cases/13-deployment-dogfooding.md` — catalogue 13.298–13.300. The next-free pointer does
->   NOT move: `13.295`–`13.319` is already reserved to Tasks 3–11, and Task 4 is not the last to merge.
-> * Rebuild both dev images from the frozen head, stack suite 6/6, `docker builder prune -f`.
->   **Docker VM measured BEFORE: 83% — 45.9G used of 58.4G, 9.4G free** (`/dev/vda1`, via
->   `nsenter -t 1 -m`; `docker system df` alone does NOT show the VM disk and is the wrong instrument
->   for this number). Images hold 36.62GB reclaimable. An earlier rebuild filled this once.
-> * Forced gate at the final head, review, PR.
+> *Review finding 5, and it is worth keeping rather than silently overwriting: this block listed six
+> outstanding items and four of them had been completed by later commits ON THIS SAME BRANCH. It
+> fails in the conservative direction — a relaunched executor redoes finished work — which is the
+> direction nobody audits, and it is this file's own recorded failure mode.*
+>
+> * 13.298 written and **witnessed**: mutation `router.push` deleted → RED ×3, on that case alone.
+> * 13.299 and 13.300 written and green. 13.299's stub was WRONG on the first run (`[]` instead of
+>   `{ workspaces: [] }`) and drove the refusal branch while claiming to test the empty one; fixed
+>   at `302781e`. Mutations for both witnessed, each reddening only its own case.
+> * `/workspaces` accessible-names AND type-scale baselines recorded, then the suite re-run with
+>   NEITHER seeding variable set — so the 6/6 is enforcement, not re-recording. Ratchet probed by
+>   raising the floor 1→2: *"13.287: /workspaces LOST ariaLabel"*, naming the route.
+> * `Features.md` bullets at :60 and :61 extended in place; catalogue rows 13.298–13.300 written.
+> * Dev images rebuilt from the frozen head, stack suite 6/6, `docker builder prune -f`.
+>   **Docker VM: 83% before → 88% after the builds → 80% after the prune** (11.2G free; 4.52GB
+>   reclaimed). Ends better than it started. `docker system df` does NOT show this figure —
+>   `nsenter -t 1 -m` onto `/var/lib` does.
+> * Forced gate at the final head: **33/33, 0 cached, 3978 tests / 5 skipped / 321 files.**
+> * Review run (one opus reviewer): **no Critical, one Important, four Minor, three Nits** — all
+>   answered in the fix round. The Important was real: 13.298's docblock stated a mutation outcome
+>   that cannot happen (the positive control reddens, not the pathname assertion) and stated it
+>   unhedged, so it read as measured. Corrected in both the spec and the catalogue.
+>
+> ## STILL OUTSTANDING
+>
+> * The PR itself, and the controller's merge.
+> * NOT this task's, recorded with owners: `PLANS_WITH_TASKS` omits `hig-per-screen`;
+>   `check-case-citations` cannot see a case that has no catalogue row; the `13.321` next-free
+>   pointer already collides with a live case (controller owns that one).
 >
 > ## TWO FLAGS SENT TO THE OWNER VIA THE CONTROLLER — do not act on either
 >

@@ -2146,8 +2146,15 @@ nobody ships and then defend it.
   pathname at `/workspaces` and read as a clean kill for the wrong reason. `?next=` is **not** carried
   by the push (`/invite/[token]` does carry one on its own link, so the product is inconsistent); the
   assertion checks the PATHNAME only and leaves the query free, so adding `next=` later is not a test
-  change. Mutation: delete `router.push('/sign-in')` from `expired-session.tsx` → RED naming both
-  routes. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+  change. Mutation: delete `router.push('/sign-in')` from `expired-session.tsx` → **WITNESSED RED on
+  all three viewports and on this case ALONE** (13.299 and 13.300 green in the same run). **What
+  reddens is the POSITIVE CONTROL, not the pathname assertion** — an earlier draft of this row said
+  "RED naming both routes", which the run disproved: with the push gone the browser sits on
+  `/workspaces`, so `getByLabel('Email')` times out first and the pathname line is never evaluated.
+  Its long diagnostic is unreachable under THIS mutation and is kept for a different one — arriving
+  somewhere that is neither route. The row is corrected rather than the assertions reordered, because
+  putting the pathname check above the control would restore the message and destroy the control's
+  own reason for existing. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 - **13.299** ✅ `/workspaces` with the roster answering `[]` renders the empty-state sentence and the
   founding form's `Create workspace` button. **The empty-state sentence is the positive control and its
   position is load-bearing**: `<FoundingForm />` renders OUTSIDE all four branches of that page — by
@@ -2169,6 +2176,15 @@ nobody ships and then defend it.
   branch is not what was measured — a stubbed body that failed `createHttpInviteGateway`'s validation
   would render that branch and read exactly like a copy regression. Mutation: drop ` as {invite.role}` →
   RED. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+> ### The next-free pointer at the head of this file already collides, and it is NOT this task's doing
+>
+> `13.321` is what the plan's Global Constraints tell the LAST task of the series to set the pointer
+> to — and `13.321` is **already consumed by a live case in this file**. Verified pre-existing on
+> `origin/main`, so nothing on this branch caused it. Recorded because Task 11 will walk into it, and
+> because this branch is the last to touch this section. The pointer is a CACHE — this file warns
+> that twice about itself — and this is the third time one has gone stale here.
+> **Owner: the controller, who allocates the blocks.**
 
 > ### The instrument cannot see a case that has no catalogue row
 >

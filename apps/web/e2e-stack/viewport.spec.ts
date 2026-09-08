@@ -271,7 +271,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
   ).not.toBeNull();
 
   /**
-   * FIVE ROUTES, AND THE LAST THREE ARE THE ONES THAT EARN THEIR KEEP.
+   * SIX ROUTES, AND THREE OF THEM ARE THE ONES THAT EARN THEIR KEEP.
    *
    * `/my-work` and the board were the obvious choices — the checklist's own
    * reading is about the board — and measured first they BOTH came back with
