@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --gray:#6C6C70;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .btn--sm{min-height:36px;padding:0 14px;font-size:15px}
+    .side{width:248px;flex:none;background:var(--raised);border-radius:var(--r-l);padding:8px;
+      display:flex;flex-direction:column;gap:2px;align-self:flex-start}
+    .side a{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;
+      color:var(--label);font-size:15px;font-weight:500}
+    .side a.on{background:var(--accent);color:var(--onColor);font-weight:600}
+    .card{background:var(--raised);border-radius:var(--r-l);padding:18px;display:flex;
+      flex-direction:column;gap:12px}
+    .pill{display:inline-flex;align-items:center;background:var(--fill3);border-radius:var(--r-pill);
+      padding:2px 10px;font-size:12px;line-height:16px;font-weight:500;color:var(--label2)}
+    /* Mini state-flow preview: caps carry the category, no borders. */
+    .mini{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .st{display:inline-flex;align-items:center;font-size:12px;line-height:16px;background:var(--sunken);
+      border-radius:6px;padding:3px 9px;position:relative;overflow:hidden;padding-left:13px}
+    .st::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+    .st--open::before{background:var(--gray)}
+    .st--active::before{background:var(--accent)}
+    .st--terminal::before{background:var(--success)}
+    .arrow{color:var(--label3);font-size:12px}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#" class="on">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+    <div class="col" style="gap:4px;margin-top:26px">
+      <h1 class="lt">Settings</h1><p class="bd muted">Meghalaya Rollout</p>
+    </div>
+
+    <div style="display:flex;gap:24px;margin-top:22px;flex:1;min-height:0">
+      <nav class="side">
+        <a href="#">Ticket types</a><a href="#" class="on">Workflows</a><a href="#">Fields</a>
+        <a href="#">Visibility</a><a href="#">MCP tokens</a><a href="#">Danger zone</a>
+      </nav>
+
+      <div class="col" style="flex:1;min-width:0;gap:16px">
+        <div class="row" style="justify-content:space-between">
+          <div class="col" style="gap:2px">
+            <h2 class="t3">Workflows</h2>
+            <p class="sh muted">Publishing records a version. Nothing already recorded is rewritten.</p>
+          </div>
+          <button class="btn btn--primary">New workflow</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <p class="hl">Delivery v4</p>
+              <span class="pill" style="background:rgba(30,122,52,0.14);color:var(--success)">Published</span>
+            </div>
+            <div class="mini">
+              <span class="st st--open">Triage</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">In progress</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">In review</span><span class="arrow">&rarr;</span>
+              <span class="st st--terminal">Done</span>
+            </div>
+            <p class="c1 muted">5 states &middot; 9 transitions &middot; used by 3 ticket types &middot; 41 tickets</p>
+            <div class="row"><button class="btn btn--sm">Open</button>
+              <button class="btn btn--sm">Duplicate</button></div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <p class="hl">Field ops v2</p>
+              <span class="pill" style="background:rgba(178,80,0,0.14);color:var(--warning)">Draft &middot; 2 issues</span>
+            </div>
+            <div class="mini">
+              <span class="st st--open">Scheduled</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">On site</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">Awaiting sign-off</span><span class="arrow">&rarr;</span>
+              <span class="st st--terminal">Complete</span>
+            </div>
+            <p class="c1 muted">4 states &middot; 6 transitions &middot; used by Field visit &middot; 41 tickets</p>
+            <div class="row"><button class="btn btn--sm">Open</button>
+              <button class="btn btn--sm">Discard draft</button></div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <p class="hl">Incident v1</p>
+              <span class="pill" style="background:rgba(30,122,52,0.14);color:var(--success)">Published</span>
+            </div>
+            <div class="mini">
+              <span class="st st--open">Reported</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">Mitigating</span><span class="arrow">&rarr;</span>
+              <span class="st st--terminal">Resolved</span>
+            </div>
+            <p class="c1 muted">3 states &middot; 4 transitions &middot; used by Incident &middot; 6 tickets</p>
+            <div class="row"><button class="btn btn--sm">Open</button>
+              <button class="btn btn--sm">Duplicate</button></div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <p class="hl">Field ops v1</p>
+              <span class="pill">Superseded</span>
+            </div>
+            <div class="mini">
+              <span class="st st--open">Planned</span><span class="arrow">&rarr;</span>
+              <span class="st st--active">Visiting</span><span class="arrow">&rarr;</span>
+              <span class="st st--terminal">Closed</span>
+            </div>
+            <p class="c1 muted">3 states &middot; 3 transitions &middot; kept because 128 recorded events cite it</p>
+            <div class="row"><button class="btn btn--sm">View history</button></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

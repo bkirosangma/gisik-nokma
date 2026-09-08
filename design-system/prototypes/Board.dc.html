@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --surface:#F2F2F7; --raised:#FFFFFF; --sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20); --fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12); --fill4:rgba(116,116,128,0.08);
+      --label:#000000; --label2:rgba(60,60,67,0.80); --label3:rgba(60,60,67,0.55);
+      --accent:#0040DD; --danger:#D70015; --warning:#B25000; --success:#1E7A34;
+      --gray:#6C6C70; --purple:#8944AB; --pink:#D30F45; --onColor:#FFFFFF;
+      --r-s:8px; --r-m:12px; --r-l:16px; --r-pill:999px;
+    }
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    /* Nav — the border-bottom is gone; the bar is a raised fill instead (R1). */
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;
+      background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+      min-width:44px;padding:0 14px;border-radius:var(--r-s);color:var(--label);
+      font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;
+      background:var(--accent);color:var(--onColor);font-size:12px;line-height:18px;
+      font-weight:600;text-align:center;margin-left:7px}
+    .shell{padding:0 32px 24px;display:flex;flex-direction:column;gap:14px;flex:1;min-height:0}
+    .seg{display:inline-flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{display:inline-flex;align-items:center;justify-content:center;min-height:40px;
+      padding:0 16px;border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+      padding:0 18px;border-radius:var(--r-s);border:none;background:var(--fill3);
+      color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:var(--fill3);
+      border-radius:var(--r-pill);padding:4px 10px;font-size:13px;line-height:18px}
+    .dot{width:9px;height:9px;border-radius:999px;flex:none}
+    /* Column — was surfaceSunken + 1px border. Now fill alone carries the boundary. */
+    .column{background:var(--sunken);border-radius:var(--r-l);padding:12px;
+      min-width:288px;flex:0 0 288px;display:flex;flex-direction:column;gap:10px}
+    .column__head{display:flex;justify-content:space-between;align-items:center;padding:0 4px}
+    .card{background:var(--raised);border-radius:var(--r-m);padding:14px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .card__title{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .card__meta{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .card__prov{font-size:12px;line-height:16px;color:var(--label2);margin:8px 0 0}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;
+      font-weight:600;color:var(--label)}
+    /* Blocked column: the ring is the state, drawn as an inset outline not a border. */
+    .column--blocked{outline:2px solid var(--danger);outline-offset:-2px}
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <nav class="nav">
+    <a href="#" class="on">Board</a>
+    <a href="#">My work</a>
+    <a href="#">Inbox<span class="badge">7</span></a>
+    <a href="#">Members</a>
+    <a href="#">Settings</a>
+    <a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div class="shell">
+
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div class="col" style="gap:4px">
+        <p class="fn muted">Meghalaya Rollout &middot; Delivery</p>
+        <h1 class="lt">Sprint 14</h1>
+      </div>
+      <div class="row">
+        <button class="btn">Filters</button>
+        <button class="btn btn--primary">New ticket</button>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between">
+      <div class="seg">
+        <span class="seg__item seg__item--on">Board</span>
+        <span class="seg__item">List</span>
+        <span class="seg__item">Calendar</span>
+        <span class="seg__item">Timeline</span>
+      </div>
+      <p class="sh muted">Workflow &middot; <strong style="font-weight:600">Delivery v4</strong> &middot; published 2 Sep</p>
+    </div>
+
+    <div style="display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding-bottom:8px;flex:1;min-height:0">
+
+      <div class="column">
+        <div class="column__head"><p class="hl">Triage</p><p class="fn muted">4</p></div>
+        <div class="card">
+          <p class="card__title">Magic link lands on the API origin, not the app</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#6C6C70"></span>Open</span>
+            <span class="fn muted">0/3</span>
+          </div>
+          <p class="card__prov">GN-1183 &middot; raised from MCP</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Seed data drops the Garo locale</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#6C6C70"></span>Open</span>
+            <span class="avatar">RS</span>
+          </div>
+          <p class="card__prov">GN-1179</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Invite email renders the raw token</p>
+          <div class="card__meta"><span class="chip"><span class="dot" style="background:#6C6C70"></span>Open</span></div>
+          <p class="card__prov">GN-1176</p>
+        </div>
+      </div>
+
+      <div class="column">
+        <div class="column__head"><p class="hl">In progress</p><p class="fn muted">3</p></div>
+        <div class="card">
+          <p class="card__title">One client can lock every user out of sign-in</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#0040DD"></span>Active</span>
+            <span class="chip"><span class="dot" style="background:#D30F45"></span>Contested</span>
+            <span class="avatar">AK</span>
+          </div>
+          <p class="card__prov">GN-1188 &middot; 2/4 subtasks</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Workflow builder loses edge labels on republish</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#0040DD"></span>Active</span>
+            <span class="fn muted">1/2</span>
+            <span class="avatar">MS</span>
+          </div>
+          <p class="card__prov">GN-1171</p>
+        </div>
+      </div>
+
+      <div class="column column--blocked">
+        <div class="column__head">
+          <div class="row" style="gap:8px">
+            <p class="hl">Blocked</p>
+            <span class="chip" style="background:rgba(215,0,21,0.12);color:var(--danger)">
+              <span class="dot" style="background:#D70015"></span>2 blocked</span>
+          </div>
+          <p class="fn muted">2</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Drive attachments need an owner-scoped token</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#D70015"></span>Blocked</span>
+            <span class="avatar">RS</span>
+          </div>
+          <p class="card__prov">GN-1164 &middot; waiting on GN-1140</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Restricted field visible to guests</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#8944AB"></span>Restricted</span>
+          </div>
+          <p class="card__prov">GN-1158</p>
+        </div>
+      </div>
+
+      <div class="column">
+        <div class="column__head"><p class="hl">In review</p><p class="fn muted">2</p></div>
+        <div class="card">
+          <p class="card__title">Rate limiter falls back to one shared bucket</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#0040DD"></span>Active</span>
+            <span class="chip" style="background:rgba(178,80,0,0.12);color:var(--warning)">
+              <span class="dot" style="background:#B25000"></span>In transit</span>
+          </div>
+          <p class="card__prov">GN-1190 &middot; claim not yet acknowledged</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Help TOC links miss the 24px floor</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#0040DD"></span>Active</span>
+            <span class="avatar">AK</span>
+          </div>
+          <p class="card__prov">GN-1149</p>
+        </div>
+      </div>
+
+      <div class="column">
+        <div class="column__head"><p class="hl">Done</p><p class="fn muted">11</p></div>
+        <div class="card">
+          <p class="card__title">Controls render in the product&rsquo;s font</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#1E7A34"></span>Terminal</span>
+            <span class="avatar">MS</span>
+          </div>
+          <p class="card__prov">GN-1182 &middot; closed 8 Sep</p>
+        </div>
+        <div class="card">
+          <p class="card__title">Docker VM disk full &mdash; postgres crash loop</p>
+          <div class="card__meta">
+            <span class="chip"><span class="dot" style="background:#1E7A34"></span>Terminal</span>
+          </div>
+          <p class="card__prov">GN-1181 &middot; closed 8 Sep</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

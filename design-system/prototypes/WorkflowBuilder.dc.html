@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --gray:#6C6C70;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .card{background:var(--raised);border-radius:var(--r-l);padding:18px}
+    /* State node: the 2px border + 6px left rule become a filled cap on a raised card. */
+    .node{position:absolute;width:186px;background:var(--raised);border-radius:var(--r-m);
+      padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.10);overflow:hidden}
+    .node::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px}
+    .node--open::before{background:var(--gray)}
+    .node--active::before{background:var(--accent)}
+    .node--terminal::before{background:var(--success)}
+    .node--sel{outline:3px solid var(--accent);outline-offset:0}
+    .node--blocked{outline:2px dashed var(--danger);outline-offset:2px}
+    .node__name{font-size:15px;line-height:20px;font-weight:600;margin:0}
+    .node__cat{font-size:12px;line-height:16px;color:var(--label2);margin:5px 0 0}
+    .anynode{position:absolute;width:186px;background:var(--fill3);border-radius:var(--r-m);
+      padding:12px 14px;color:var(--label2)}
+    .elabel{position:absolute;background:var(--raised);border-radius:6px;padding:2px 8px;
+      font-size:12px;line-height:16px;color:var(--label2);box-shadow:0 1px 3px rgba(0,0,0,0.10)}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#">Board</a><a href="#">My work</a><a href="#">Inbox</a><a href="#">Members</a>
+    <a href="#" class="on">Settings</a><a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px 24px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:16px">
+
+    <div class="row" style="justify-content:space-between;margin-top:24px">
+      <div class="col" style="gap:4px">
+        <p class="fn muted"><a href="#">Settings</a> &nbsp;&rsaquo;&nbsp; <a href="#">Workflows</a></p>
+        <h1 class="lt">Field ops v2</h1>
+      </div>
+      <div class="row">
+        <span class="c1 muted">Draft &middot; last saved 11:58</span>
+        <button class="btn">Add state</button>
+        <button class="btn btn--primary">Publish</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:22px;flex:1;min-height:0">
+
+      <!-- Canvas -->
+      <div style="position:relative;background:var(--raised);border-radius:var(--r-l);overflow:hidden">
+        <svg style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
+          <path d="M226 92 L300 92" stroke="rgba(120,120,128,0.45)" stroke-width="2" fill="none"/>
+          <path d="M486 92 L560 92" stroke="#0040DD" stroke-width="2.5" fill="none"/>
+          <path d="M393 130 L393 214" stroke="rgba(120,120,128,0.45)" stroke-width="2" fill="none"/>
+          <path d="M393 290 L393 360" stroke="rgba(120,120,128,0.45)" stroke-width="2" fill="none"/>
+          <path d="M653 130 L653 398 L486 398" stroke="rgba(120,120,128,0.45)" stroke-width="2" fill="none"/>
+          <path d="M226 130 L133 130 L133 398 L300 398" stroke="rgba(120,120,128,0.45)" stroke-width="2" fill="none"/>
+        </svg>
+
+        <div class="node node--open" style="left:40px;top:64px">
+          <p class="node__name">Scheduled</p><p class="node__cat">Open &middot; initial</p></div>
+
+        <div class="node node--active node--sel" style="left:300px;top:64px">
+          <p class="node__name">On site</p><p class="node__cat">Active</p></div>
+
+        <div class="node node--active node--blocked" style="left:560px;top:64px">
+          <p class="node__name">Awaiting sign-off</p>
+          <p class="node__cat" style="color:var(--danger)">Active &middot; blocked</p></div>
+
+        <div class="anynode" style="left:300px;top:214px">
+          <p class="node__name">Any state</p><p class="node__cat">Cancel is reachable from anywhere</p></div>
+
+        <div class="node node--terminal" style="left:300px;top:360px">
+          <p class="node__name">Complete</p><p class="node__cat">Terminal</p></div>
+
+        <span class="elabel" style="left:236px;top:76px">Start visit</span>
+        <span class="elabel" style="left:492px;top:76px;background:#0040DD;color:#fff">Submit report</span>
+        <span class="elabel" style="left:404px;top:168px">Cancel</span>
+        <span class="elabel" style="left:404px;top:314px">Sign off</span>
+      </div>
+
+      <!-- Inspectors -->
+      <div class="col" style="gap:14px;overflow:hidden">
+        <!-- Issues: 3px left rule becomes a danger-tinted fill. Blocks publishing. -->
+        <div style="background:rgba(215,0,21,0.10);border-radius:var(--r-l);padding:16px">
+          <p class="fn" style="color:var(--danger);font-weight:600;text-transform:uppercase;letter-spacing:0.6px">
+            2 issues &middot; blocks publishing</p>
+          <ul style="margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:15px;line-height:20px">
+            <li><a href="#" style="color:var(--label);text-decoration:underline;text-decoration-style:dotted">
+              Awaiting sign-off</a> is blocked and has no outgoing transition.</li>
+            <li>No transition reaches <a href="#" style="color:var(--label);text-decoration:underline;text-decoration-style:dotted">
+              Complete</a> from Scheduled.</li>
+          </ul>
+        </div>
+
+        <!-- Advisories: dashed warning rule becomes a sunken fill, deliberately quieter. -->
+        <div style="background:var(--sunken);border-radius:var(--r-l);padding:16px">
+          <p class="fn" style="color:var(--warning);font-weight:600;text-transform:uppercase;letter-spacing:0.6px">
+            1 advisory</p>
+          <ul style="margin:10px 0 0;padding-left:18px;font-size:15px;line-height:20px;color:var(--label2)">
+            <li>&ldquo;On site&rdquo; has no assignee rule &mdash; tickets can sit unowned.</li>
+          </ul>
+          <p class="c1 muted" style="margin-top:8px">Advisories never block publishing.</p>
+        </div>
+
+        <div class="card" style="flex:1;min-height:0">
+          <p class="hl">On site</p>
+          <div class="col" style="gap:12px;margin-top:12px">
+            <label class="col" style="gap:6px"><span class="fn muted">Category</span>
+              <span style="display:flex;align-items:center;min-height:44px;padding:0 14px;
+                           border-radius:8px;background:var(--fill4)">Active</span></label>
+            <label class="row" style="gap:10px;justify-content:space-between">
+              <span class="sh">Blocks the ticket</span>
+              <span style="width:51px;height:31px;border-radius:999px;background:var(--fill1);position:relative">
+                <span style="position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:999px;
+                             background:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.2)"></span></span></label>
+            <label class="row" style="gap:10px;justify-content:space-between">
+              <span class="sh">Initial state</span>
+              <span style="width:51px;height:31px;border-radius:999px;background:var(--fill1);position:relative">
+                <span style="position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:999px;
+                             background:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.2)"></span></span></label>
+          </div>
+          <p class="c1 muted" style="margin-top:14px">Publishing records a new version. Nothing already
+            recorded against v1 is rewritten.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --gray:#6C6C70;--purple:#8944AB;--onColor:#FFFFFF;
+      --r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t3{font-size:20px;line-height:25px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 32px;background:var(--raised)}
+    .nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;
+      padding:0 14px;border-radius:var(--r-s);color:var(--label);font-size:15px;font-weight:500}
+    .nav a.on{background:var(--fill3);font-weight:600}
+    .nav__spacer{flex:1}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:var(--fill3);
+      border-radius:var(--r-pill);padding:4px 10px;font-size:13px;line-height:18px}
+    .dot{width:9px;height:9px;border-radius:999px;flex:none}
+    .card{background:var(--raised);border-radius:var(--r-l);padding:20px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:12px}
+    .tile{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;
+      justify-content:center;color:#fff;font-size:17px;font-weight:600;flex:none}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <nav class="nav">
+    <a href="#" class="on">Workspaces</a>
+    <a href="#">Inbox</a>
+    <a href="#">Help</a>
+    <span class="nav__spacer"></span>
+    <a href="#"><span class="avatar" style="margin-right:8px">AK</span>Sign out</a>
+  </nav>
+
+  <div style="padding:0 32px;flex:1;min-height:0;overflow:hidden">
+    <div class="row" style="justify-content:space-between;margin-top:26px">
+      <div class="col" style="gap:4px">
+        <h1 class="lt">Workspaces</h1>
+        <p class="bd muted">Three workspaces you belong to.</p>
+      </div>
+      <button class="btn btn--primary">New workspace</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:26px">
+
+      <div class="card">
+        <div class="row" style="gap:14px;flex-wrap:nowrap">
+          <span class="tile" style="background:#0040DD">MR</span>
+          <div class="col" style="gap:2px;min-width:0">
+            <p class="t3">Meghalaya Rollout</p>
+            <p class="fn muted">12 members &middot; 4 projects</p>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          <span class="chip"><span class="dot" style="background:#0040DD"></span>28 active</span>
+          <span class="chip"><span class="dot" style="background:#D70015"></span>2 blocked</span>
+        </div>
+        <p class="sh muted">You&rsquo;re an <strong style="font-weight:600">admin</strong> here.</p>
+      </div>
+
+      <div class="card">
+        <div class="row" style="gap:14px;flex-wrap:nowrap">
+          <span class="tile" style="background:#1E7A34">FS</span>
+          <div class="col" style="gap:2px;min-width:0">
+            <p class="t3">Field Support</p>
+            <p class="fn muted">7 members &middot; 2 projects</p>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          <span class="chip"><span class="dot" style="background:#0040DD"></span>9 active</span>
+          <span class="chip"><span class="dot" style="background:#B25000"></span>3 pending</span>
+        </div>
+        <p class="sh muted">You&rsquo;re a <strong style="font-weight:600">member</strong> here.</p>
+      </div>
+
+      <div class="card">
+        <div class="row" style="gap:14px;flex-wrap:nowrap">
+          <span class="tile" style="background:#8944AB">NK</span>
+          <div class="col" style="gap:2px;min-width:0">
+            <p class="t3">Nokma Internal</p>
+            <p class="fn muted">3 members &middot; 1 project</p>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          <span class="chip"><span class="dot" style="background:#8944AB"></span>Restricted fields</span>
+        </div>
+        <p class="sh muted">You&rsquo;re a <strong style="font-weight:600">guest</strong> here.</p>
+      </div>
+
+    </div>
+
+    <div style="margin-top:34px;background:var(--fill4);border-radius:var(--r-l);padding:20px;
+                display:flex;gap:16px;align-items:flex-start">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B25000" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>
+      </svg>
+      <div class="col" style="gap:4px">
+        <p class="hl">One invitation is waiting</p>
+        <p class="sh muted">Anjali invited you to <strong style="font-weight:600">Garo Hills Logistics</strong> as a member.
+          The link expires in 4 days.</p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn--primary">Accept</button>
+          <button class="btn">Decline</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

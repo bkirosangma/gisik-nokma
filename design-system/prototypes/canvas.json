@@ -1,0 +1,65 @@
+{
+  "pages": [
+    { "id": "foundations", "name": "Foundations" },
+    { "id": "web", "name": "Web app" },
+    { "id": "mobile", "name": "Mobile" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "page": "foundations", "x": 0, "y": 0, "w": 1440, "h": 1560, "title": "Apple HIG foundations" },
+
+    { "file": "SignIn.dc.html",          "page": "web", "x": 0,    "y": 0,    "w": 1440, "h": 900, "title": "Sign in" },
+    { "file": "Workspaces.dc.html",      "page": "web", "x": 1560, "y": 0,    "w": 1440, "h": 900, "title": "Workspaces" },
+    { "file": "Board.dc.html",           "page": "web", "x": 3120, "y": 0,    "w": 1440, "h": 900, "title": "Board" },
+    { "file": "MyWork.dc.html",          "page": "web", "x": 4680, "y": 0,    "w": 1440, "h": 900, "title": "My work" },
+
+    { "file": "Inbox.dc.html",           "page": "web", "x": 0,    "y": 1060, "w": 1440, "h": 900, "title": "Inbox" },
+    { "file": "TicketSheet.dc.html",     "page": "web", "x": 1560, "y": 1060, "w": 1440, "h": 900, "title": "Ticket sheet" },
+    { "file": "Calendar.dc.html",        "page": "web", "x": 3120, "y": 1060, "w": 1440, "h": 900, "title": "Calendar view" },
+    { "file": "Timeline.dc.html",        "page": "web", "x": 4680, "y": 1060, "w": 1440, "h": 900, "title": "Timeline view" },
+
+    { "file": "Members.dc.html",         "page": "web", "x": 0,    "y": 2120, "w": 1440, "h": 900, "title": "Members" },
+    { "file": "TicketTypes.dc.html",     "page": "web", "x": 1560, "y": 2120, "w": 1440, "h": 900, "title": "Settings · Ticket types" },
+    { "file": "TicketTypeEditor.dc.html","page": "web", "x": 3120, "y": 2120, "w": 1440, "h": 900, "title": "Settings · Edit ticket type" },
+    { "file": "Workflows.dc.html",       "page": "web", "x": 4680, "y": 2120, "w": 1440, "h": 900, "title": "Settings · Workflows" },
+
+    { "file": "WorkflowBuilder.dc.html", "page": "web", "x": 0,    "y": 3180, "w": 1440, "h": 900, "title": "Workflow builder" },
+    { "file": "McpTokens.dc.html",       "page": "web", "x": 1560, "y": 3180, "w": 1440, "h": 900, "title": "Settings · MCP tokens" },
+    { "file": "McpAuthorize.dc.html",    "page": "web", "x": 3120, "y": 3180, "w": 1440, "h": 900, "title": "MCP authorize" },
+    { "file": "Invite.dc.html",          "page": "web", "x": 4680, "y": 3180, "w": 1440, "h": 900, "title": "Accept invitation" },
+
+    { "file": "Help.dc.html",            "page": "web", "x": 0,    "y": 4240, "w": 1440, "h": 900, "title": "Help" },
+    { "file": "NotFound.dc.html",        "page": "web", "x": 1560, "y": 4240, "w": 1440, "h": 900, "title": "Not found" },
+    { "file": "Legal.dc.html",           "page": "web", "x": 3120, "y": 4240, "w": 1440, "h": 900, "title": "Privacy & terms" },
+
+    { "file": "MobileBoard.dc.html",  "page": "mobile", "x": 0,    "y": 0, "w": 390, "h": 844, "title": "Board · phone" },
+    { "file": "MobileTicket.dc.html", "page": "mobile", "x": 510,  "y": 0, "w": 390, "h": 844, "title": "Ticket · phone" },
+    { "file": "MobileHelp.dc.html",   "page": "mobile", "x": 1020, "y": 0, "w": 390, "h": 844, "title": "Help · phone" }
+  ],
+  "annotations": [
+    {
+      "id": "r1-borders",
+      "page": "web",
+      "x": 0,
+      "y": -230,
+      "w": 640,
+      "text": "R1 — borders dropped.\nNo HIG separator clears WCAG's 3:1 on any light background (opaqueSeparator measures 1.53–1.71), and this codebase already carried 17 of 24 bordered classes under 3:1. Every boundary here is a fill: sunken → raised → tertiary fill."
+    },
+    {
+      "id": "r2-type",
+      "page": "web",
+      "x": 700,
+      "y": -230,
+      "w": 640,
+      "text": "R2 — iOS metrics.\nBody 17 / Callout 16 / Subheadline 15 / Footnote 13, clearing the committed 16px body floor. Caption is clamped to 12px rather than HIG's 11 so the label ratchet holds. Controls are 44px; dense in-list rows are 24px, matching the product's own split."
+    },
+    {
+      "id": "palette-note",
+      "page": "foundations",
+      "x": 1560,
+      "y": 0,
+      "w": 460,
+      "text": "Apple's STOCK system colors fail 15 of the 27 pairs declared in packages/ui/src/tokens.ts — white on systemBlue is 4.02:1, and Apple does not target WCAG AA for control fills.\n\nThese are Apple's INCREASED-CONTRAST variants, which fail none. success uses the incumbent green700 #1E7A34 rather than Apple's #248A3D, which lands at 4.40 against a 4.5 minimum.\n\nRe-run docs/hig-probe-accessible.py to check any of these numbers."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "web" }
+}

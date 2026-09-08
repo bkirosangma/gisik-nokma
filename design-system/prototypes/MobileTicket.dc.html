@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --purple:#8944AB;--pink:#D30F45;--onColor:#FFFFFF;
+      --r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none}
+    .sheet{width:390px;height:844px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .chip{display:inline-flex;align-items:center;gap:5px;background:var(--fill3);
+      border-radius:var(--r-pill);padding:3px 9px;font-size:12px;line-height:16px}
+    .dot{width:8px;height:8px;border-radius:999px;flex:none}
+    .avatar{width:22px;height:22px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .btn--danger{background:rgba(215,0,21,0.12);color:var(--danger)}
+    /* HIG grouped list: one raised card, rows separated by alternating fill. */
+    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden}
+    .grow{display:flex;justify-content:space-between;gap:14px;padding:12px 14px;font-size:17px}
+    .grow:nth-child(even){background:var(--fill4)}
+    .grow dt{color:var(--label2);font-size:15px;margin:0}
+    .grow dd{margin:0;text-align:right}
+    .seg{display:flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:34px;
+      border-radius:7px;font-size:14px;font-weight:500}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    .navbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--raised)}
+  </style>
+</helmet>
+
+<div class="sheet">
+
+  <div class="navbar">
+    <a href="#" class="row" style="gap:3px;min-height:44px;min-width:44px;font-size:17px">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+           stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Board</a>
+    <span style="flex:1"></span>
+    <a href="#" style="min-height:44px;min-width:44px;display:flex;align-items:center;
+       justify-content:center" aria-label="More">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg></a>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:14px 16px 20px;display:flex;
+              flex-direction:column;gap:16px">
+
+    <div class="col" style="gap:8px">
+      <p class="fn muted">GN-1188 &middot; Sprint 14</p>
+      <h1 class="t2">One client can lock every user out of sign-in</h1>
+      <div class="row" style="margin-top:2px">
+        <span class="chip"><span class="dot" style="background:#0040DD"></span>In progress</span>
+        <span class="chip" style="background:rgba(211,15,69,0.12);color:var(--pink)">
+          <span class="dot" style="background:#D30F45"></span>Contested</span>
+        <span class="chip"><span class="avatar" style="width:16px;height:16px;font-size:10px">AK</span>Anjali</span>
+      </div>
+    </div>
+
+    <!-- Contest: the one thing that must be resolved, so it leads. -->
+    <div style="background:rgba(211,15,69,0.10);border-radius:var(--r-m);padding:14px">
+      <p class="hl">Two devices disagree</p>
+      <p class="sh muted" style="margin-top:5px">Both claims were recorded offline. Nothing is discarded
+        until you choose.</p>
+      <div class="col" style="gap:8px;margin-top:12px">
+        <button class="btn btn--primary">Keep mine (11:12)</button>
+        <button class="btn">Keep theirs (11:09)</button>
+        <button class="btn btn--danger">Discard mine</button>
+      </div>
+    </div>
+
+    <div class="seg" role="tablist">
+      <span class="seg__item seg__item--on">Details</span>
+      <span class="seg__item">History</span>
+      <span class="seg__item">Files</span>
+    </div>
+
+    <p class="bd">better-auth&rsquo;s built-in limiter cannot determine a client IP behind the proxy, so it
+      falls back to a single shared bucket.</p>
+
+    <dl class="group" style="margin:0">
+      <div class="grow"><dt>Type</dt><dd>Defect</dd></div>
+      <div class="grow"><dt>Priority</dt><dd>P1</dd></div>
+      <div class="grow"><dt>Due</dt><dd>Thu 10 Sep</dd></div>
+      <div class="grow"><dt>Rollout date</dt>
+        <dd style="color:var(--purple)">14 Sep<br><span class="c1 muted">in transit</span></dd></div>
+      <div class="grow"><dt>Blocks</dt><dd>GN-1190, GN-1176</dd></div>
+      <div class="grow"><dt>Progress</dt><dd>2 of 4</dd></div>
+    </dl>
+
+    <div class="col" style="gap:9px">
+      <p class="fn muted" style="text-transform:uppercase;letter-spacing:0.6px">Move to</p>
+      <div class="row" style="gap:8px">
+        <button class="btn" style="flex:1">Blocked</button>
+        <button class="btn btn--primary" style="flex:1">In review</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;align-items:center;gap:9px;padding:8px 16px;background:var(--fill4);
+              font-size:13px;line-height:18px;color:var(--label2)">
+    <span style="width:8px;height:8px;border-radius:999px;background:var(--warning)"></span>
+    <span style="color:var(--label);font-weight:600">Offline</span>
+    <span>2 claims queued</span>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

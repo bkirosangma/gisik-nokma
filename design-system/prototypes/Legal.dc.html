@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--onColor:#FFFFFF;--r-s:8px;--r-m:12px;--r-l:16px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      display:flex;flex-direction:column;overflow:hidden}
+    .lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px;margin:0}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .top{display:flex;align-items:center;gap:10px;padding:12px 32px;background:var(--raised)}
+    .seg{display:inline-flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 18px;
+      border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    .doc{max-width:72ch;width:100%}
+    .toc{display:flex;flex-wrap:wrap;gap:7px 20px}
+    .toc a{display:inline-flex;align-items:center;min-height:24px;font-size:17px}
+    .p{font-size:17px;line-height:22px;margin:0 0 14px}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="top">
+    <span style="width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;
+                 align-items:center;justify-content:center">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z"/></svg>
+    </span>
+    <span class="hl">Gisik Nokma</span>
+    <span style="flex:1"></span>
+    <a href="#" class="sh">Sign in</a>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:hidden;display:flex;justify-content:center;padding:0 32px">
+    <div class="doc col" style="gap:20px;padding-top:30px">
+
+      <div class="row" style="justify-content:space-between">
+        <h1 class="lt">Privacy notice</h1>
+        <div class="seg">
+          <span class="seg__item seg__item--on">Privacy</span>
+          <span class="seg__item">Terms</span>
+        </div>
+      </div>
+      <p class="sh muted" style="margin-top:-12px">Last updated 8 September 2026</p>
+
+      <nav class="toc">
+        <a href="#">What we store</a><a href="#">Why</a><a href="#">Who can see it</a>
+        <a href="#">How long</a><a href="#">Your choices</a><a href="#">Contact</a>
+      </nav>
+
+      <div>
+        <h2 class="t2">What we store</h2>
+        <p class="p" style="margin-top:12px">Your email address, the workspaces you belong to, and everything you
+          record in a ticket &mdash; its text, its state changes, and the times they happened.</p>
+        <p class="p">Because this product keeps a history rather than a current value, a change you make is
+          <em>added</em> to a ticket&rsquo;s record; it does not overwrite what was there. That is the point of the
+          product, and it is also a privacy fact worth stating plainly: editing a field does not erase the
+          earlier value from the history.</p>
+
+        <div style="background:var(--sunken);border-radius:var(--r-m);padding:14px 16px;margin:0 0 16px">
+          <p class="bd">We do not sell anything, run advertising, or share your workspace contents with any
+            third party.</p>
+        </div>
+
+        <h2 class="t2" style="margin-top:24px">Who can see it</h2>
+        <p class="p" style="margin-top:12px">Only members of the same workspace. Fields marked
+          <strong style="font-weight:600">restricted</strong> are hidden from guests in every client and are
+          excluded from MCP entirely &mdash; an assistant connected to your account cannot read them.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

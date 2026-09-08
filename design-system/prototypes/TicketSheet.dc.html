@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{--surface:#F2F2F7;--raised:#FFFFFF;--sunken:#E5E5EA;
+      --fill1:rgba(120,120,128,0.20);--fill2:rgba(120,120,128,0.16);
+      --fill3:rgba(118,118,128,0.12);--fill4:rgba(116,116,128,0.08);
+      --label:#000000;--label2:rgba(60,60,67,0.80);--label3:rgba(60,60,67,0.55);
+      --accent:#0040DD;--danger:#D70015;--warning:#B25000;--success:#1E7A34;
+      --gray:#6C6C70;--purple:#8944AB;--pink:#D30F45;--onColor:#FFFFFF;
+      --r-s:8px;--r-m:12px;--r-l:16px;--r-pill:999px;}
+    body{margin:0;background:var(--surface);color:var(--label);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+      font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    /* Scrim + right sheet, exactly .gn-sheet__scrim's geometry. */
+    .sheet{width:1440px;height:900px;box-sizing:border-box;background:var(--surface);
+      position:relative;overflow:hidden;display:flex;justify-content:flex-end}
+    .scrim{position:absolute;inset:0;background:rgba(0,0,0,0.28)}
+    .panel{position:relative;width:640px;height:100%;background:var(--raised);
+      border-radius:var(--r-l) 0 0 var(--r-l);display:flex;flex-direction:column;
+      box-shadow:-12px 0 40px rgba(0,0,0,0.16)}
+    .t2{font-size:22px;line-height:28px;font-weight:600;margin:0}
+    .hl{font-size:17px;line-height:22px;font-weight:600;margin:0}
+    .bd{font-size:17px;line-height:22px;margin:0}
+    .sh{font-size:15px;line-height:20px;margin:0}
+    .fn{font-size:13px;line-height:18px;margin:0}
+    .c1{font-size:12px;line-height:16px;margin:0}
+    .muted{color:var(--label2)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:var(--fill3);
+      border-radius:var(--r-pill);padding:4px 10px;font-size:13px;line-height:18px}
+    .dot{width:9px;height:9px;border-radius:999px;flex:none}
+    .avatar{width:24px;height:24px;border-radius:999px;background:var(--fill1);
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;
+      border-radius:var(--r-s);border:none;background:var(--fill3);color:var(--accent);
+      font:inherit;font-weight:600;cursor:pointer}
+    .btn--primary{background:var(--accent);color:var(--onColor)}
+    .btn--danger{background:rgba(215,0,21,0.12);color:var(--danger)}
+    /* Tabs: the bordered folder tabs become a HIG segmented control. */
+    .seg{display:flex;background:var(--fill3);border-radius:9px;padding:2px;gap:2px}
+    .seg__item{flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:38px;
+      border-radius:7px;font-size:15px;font-weight:500;cursor:pointer}
+    .seg__item--on{background:var(--raised);font-weight:600;
+      box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
+    /* Field rows: grid, no rules — the label column is the structure. */
+    .field{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:11px 0}
+    .field:nth-child(even){background:var(--fill4);border-radius:var(--r-s);
+      padding-left:12px;padding-right:12px;margin-left:-12px;margin-right:-12px}
+    .field dt{color:var(--label2);font-size:15px;margin:0}
+    .field dd{margin:0;display:flex;flex-direction:column;gap:3px;font-size:17px}
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="scrim"></div>
+
+  <aside class="panel">
+
+    <header style="padding:20px 24px 14px;display:flex;align-items:flex-start;
+                   justify-content:space-between;gap:16px">
+      <div class="col" style="gap:6px;min-width:0">
+        <p class="fn muted">GN-1188 &middot; Meghalaya Rollout / Sprint 14</p>
+        <h2 class="t2">One client can lock every user out of sign-in</h2>
+      </div>
+      <button style="border:none;background:var(--fill3);width:32px;height:32px;border-radius:999px;
+                     display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none"
+              aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.8)"
+             stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <div style="padding:0 24px 16px" class="row">
+      <span class="chip"><span class="dot" style="background:#0040DD"></span>In progress</span>
+      <span class="chip" style="background:rgba(211,15,69,0.12);color:var(--pink)">
+        <span class="dot" style="background:#D30F45"></span>Contested</span>
+      <span class="chip"><span class="avatar" style="width:18px;height:18px;font-size:11px">AK</span>Anjali K.</span>
+      <span class="fn muted">Recorded by MCP &middot; 12:04:18</span>
+    </div>
+
+    <div style="padding:0 24px"><div class="seg" role="tablist">
+      <span class="seg__item seg__item--on">Details</span>
+      <span class="seg__item">History</span>
+      <span class="seg__item">Attachments</span>
+    </div></div>
+
+    <div style="padding:18px 24px 0;overflow-y:auto;flex:1;min-height:0">
+
+      <!-- Contest banner: bordered box becomes a tinted fill in the contested role. -->
+      <div style="background:rgba(211,15,69,0.10);border-radius:var(--r-m);padding:16px">
+        <p class="hl">Two devices disagree about this field</p>
+        <p class="sh muted" style="margin-top:6px">Both claims were recorded while you were offline.
+          Nothing is discarded until you choose.</p>
+        <pre style="margin:12px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;
+                    background:var(--raised);border-radius:var(--r-s);padding:12px;
+                    font-family:ui-monospace,SFMono-Regular,Menlo,monospace">{"state":"in_review","at":"2026-09-08T11:12:04Z","device":"mac-01"}</pre>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn--primary">Keep this one</button>
+          <button class="btn">Keep the other</button>
+          <button class="btn btn--danger">Discard mine</button>
+        </div>
+      </div>
+
+      <p class="bd" style="margin-top:20px">better-auth&rsquo;s built-in limiter cannot determine a client IP behind
+        the proxy, so it falls back to a single shared bucket. Five sign-in attempts from any one client exhaust
+        the window for <em>everyone</em>.</p>
+
+      <dl style="margin:20px 0 0">
+        <div class="field"><dt>Type</dt><dd>Defect</dd></div>
+        <div class="field"><dt>Priority</dt><dd>P1</dd></div>
+        <div class="field"><dt>Assignee</dt>
+          <dd><span class="row" style="gap:8px"><span class="avatar">AK</span>Anjali Kharkongor</span></dd></div>
+        <div class="field"><dt>Due</dt><dd>Thursday 10 Sep<span class="c1 muted">claimed by you, 11:58</span></dd></div>
+        <div class="field"><dt>Rollout date</dt>
+          <dd><span style="color:var(--purple)">14 Sep</span>
+              <span class="c1 muted">workspace field &middot; in transit</span></dd></div>
+        <div class="field"><dt>Blocks</dt><dd>GN-1190, GN-1176</dd></div>
+        <div class="field"><dt>Progress</dt><dd>2 of 4 subtasks</dd></div>
+      </dl>
+    </div>
+
+    <footer style="padding:16px 24px;background:var(--fill4);display:flex;gap:10px;
+                   justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn">Move to Blocked</button>
+      <button class="btn">Reopen</button>
+      <button class="btn btn--primary">Move to In review</button>
+    </footer>
+
+  </aside>
+</div>
+</x-dc>
+</body>
+</html>
