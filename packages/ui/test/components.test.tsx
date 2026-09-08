@@ -1,14 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // `"type": "module"`, so NodeNext resolves its types as CJS and a default
 // import lands on the module namespace (no `.setup`) under this repo's
 // verbatimModuleSyntax / no-esModuleInterop base config.
 import { userEvent } from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { Avatar, initialsOf } from '../src/components/avatar.js';
 import { Button } from '../src/components/button.js';
 import { Chip } from '../src/components/chip.js';
 import { Dialog } from '../src/components/dialog.js';
+import { SegmentedControl } from '../src/components/segmented-control.js';
 import { Sheet } from '../src/components/sheet.js';
 import { Table, type TableColumn } from '../src/components/table.js';
 
@@ -115,5 +119,63 @@ describe('Table', () => {
     expect(screen.getByRole('columnheader', { name: 'Title' })).toBeInTheDocument();
     await user.click(screen.getByText('File the GST return'));
     expect(onRowClick).toHaveBeenCalledWith({ id: 't1', title: 'File the GST return' });
+  });
+});
+
+describe('SegmentedControl (13.288)', () => {
+  it('13.288 renders role=tablist with one role=tab per option and aria-selected on exactly the chosen one', async () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        aria-label="Sign-in method"
+        value="email"
+        onChange={onChange}
+        options={[
+          { value: 'phone', label: 'Phone' },
+          { value: 'email', label: 'Email link' },
+        ]}
+      />,
+    );
+    const list = screen.getByRole('tablist', { name: 'Sign-in method' });
+    const tabs = within(list).getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[1]).toHaveClass('gn-segmented__item--on');
+    expect(tabs[0]).not.toHaveClass('gn-segmented__item--on');
+    await userEvent.click(tabs[0]);
+    expect(onChange).toHaveBeenCalledWith('phone');
+  });
+});
+
+// Not `new URL('../src/ui.css', import.meta.url)` (the plan's literal spelling):
+// Vite statically rewrites that exact pattern into a dev-server asset URL, so
+// under Vitest the base arrives as `http://localhost:3000/@fs/...` and
+// `fileURLToPath` throws "The URL must be of scheme file" (see
+// `test/helpers/colour-scan.ts`'s identical note). Resolving the path after
+// converting `import.meta.url` on its own avoids the rewrite.
+const UI_CSS = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui.css'), 'utf8');
+const rule = (selector: string) => {
+  const m = UI_CSS.match(new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
+  if (!m) throw new Error(`no rule for ${selector}`);
+  return m[1];
+};
+
+describe('R1(c) at the component layer', () => {
+  it('13.289 the ghost button has a fill and no boundary', () => {
+    const body = rule('.gn-button--ghost');
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/border-color:\s*transparent/);
+    expect(body).not.toMatch(/border:\s*1px/);
+  });
+  it('13.290 refusal panels carry tone as an inset fill, never a border', () => {
+    for (const s of ['.gn-refusal--preview', '.gn-refusal--server']) {
+      const body = rule(s);
+      expect(body, s).toMatch(/box-shadow:\s*inset 4px 0 0 var\(--gn-(warning|danger)\)/);
+      expect(body, s).not.toMatch(/\bborder:/);
+    }
+  });
+  it('13.291 the field input KEEPS its border — an empty field has no label to identify it', () => {
+    expect(rule('.gn-field__input')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
   });
 });

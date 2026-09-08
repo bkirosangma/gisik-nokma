@@ -1860,3 +1860,18 @@ the gate would have stayed 33/33.*
 > accessible name for another of equal count passes here, and should — whether the new words are better
 > is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
 > can be mechanised and the half a delegated implementer is most likely to cause by accident.
+
+## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
+
+- **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one
+  `role=tab` per option, `aria-selected` true on exactly the chosen one, and calls `onChange` with the
+  clicked value — the exact roles `.gn-view-tabs` carried, so replacing it registers no loss on 13.285.
+  — (`packages/ui/test/components.test.tsx`)
+- **13.289** ✅ `.gn-button--ghost`, which previously had NO rule (its 2.49:1 border was its only
+  affordance), is fill `--gn-fill-tertiary` + accent 600 label with `border-color: transparent`.
+  Mutation-witnessed: restoring a border reddens it by name. — (`packages/ui/test/components.test.tsx`)
+- **13.290** ✅ `.gn-refusal--preview` / `--server` carry tone as `inset 4px 0 0` box-shadow fills, and
+  declare no `border`. The honesty panels are the last thing that should look decorative. —
+  (`packages/ui/test/components.test.tsx`)
+- **13.291** ✅ `.gn-field__input` keeps `border: 1px solid var(--gn-border)` — the one R1(c) exception,
+  because an empty field has no label to identify it. — (`packages/ui/test/components.test.tsx`)
