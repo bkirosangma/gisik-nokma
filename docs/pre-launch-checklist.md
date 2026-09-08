@@ -304,6 +304,24 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
 
 ### What was NOT measured, stated so it is a known absence
 
+- **NEW, 2026-09-08 — PASSKEY REGISTRATION DOES NOT EXIST. Owner: Task 12 of the HIG per-screen plan,
+  scheduled after the owner's second look at sign-in.** `/sign-in` shipped a `Sign in with a passkey`
+  button that **could not work for any user anywhere**. Not a configuration gap like Google's — a
+  missing feature: the only `addPasskey` occurrences in the tree are inside better-auth's own bundled
+  client, so there is no flow by which a person can ever register one. The server side is correct and
+  always was (`auth.ts`, `rpID: new URL(baseUrl).hostname`; the passkey plugin is mounted), which is
+  exactly what made the gap invisible — every piece was present except the one that lets a credential
+  come into existence.
+  **What 2b did:** removed the dead button and replaced it with WebAuthn conditional mediation
+  (`signIn.passkey({ autoFill: true })` against an `autocomplete="username webauthn"` field), which
+  offers a passkey to somebody who has one and shows nothing to somebody who does not. **That makes
+  the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of this product
+  can hold a passkey, and the method is effectively unavailable however well it is wired.
+  *Recorded here rather than left to the absence of a button, because an unrecorded deferral is defect
+  class 4 from Plan 1 — and because the button's removal is exactly the change that would otherwise
+  make the gap harder to notice, not easier.*
+
+
 - **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were
   read statically and its pairs are included in 6a. One thing found there and **not** fixed:
   `help-screen.tsx:59` resolved every token through `colorOf('light', role)`, so the mobile help screen

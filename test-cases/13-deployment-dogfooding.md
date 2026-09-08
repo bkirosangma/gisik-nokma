@@ -1899,9 +1899,24 @@ the gate would have stayed 33/33.*
 
 ## Sign-in on the HIG surface (2026-09-08) — Task 2 of the per-screen plan
 
-- **13.292** ✅ The sign-in restyle keeps all four shipped methods — Phone (default), Email link,
-  Continue with Google, Sign in with a passkey — where the prototype drew two. Mutation-witnessed:
-  removing the passkey button reddens this. **13.285 (the accessible-name/role ratchet) was
+- **13.292** ✅ **AMENDED 2026-09-08 (controller ruling). Its property is now: _every method the server
+  will accept is offered, and no control the server will refuse is rendered._** The struck property
+  below is kept rather than deleted, per the ruling, because it is the finding: ~~The sign-in restyle
+  keeps all four shipped methods — Phone (default), Email link, Continue with Google, Sign in with a
+  passkey — where the prototype drew two. Mutation-witnessed: removing the passkey button reddens
+  this.~~ **Two of those four could not work — Google was unconfigured on the dev stack and passkey has
+  no registration flow anywhere in app code — so a case that pinned their presence was pinning the
+  defect.** The case now drives `/v1/auth/methods` through `page.route` in BOTH directions at each
+  viewport: with `{google:false, apple:false}`, count 0 for Google, Apple and the passkey button and no
+  `.gn-sign-in__marks` row; with `{google:true}`, `Continue with Google` at count 1, visible, and
+  `toHaveText('')` because it is icon-only with the shipped wording in `aria-label`. Passkey is asserted
+  by `autocomplete="username webauthn"` on the email input, never by a button.
+  **THE NEGATIVE HALF WAS A CHECK THAT COULD NOT FAIL BEFORE THE ANSWER WAS DRIVEN, and a mutation
+  proved it rather than a reading.** This suite runs `next dev` with no API behind it, so
+  `/v1/auth/methods` never resolved, the page's availability state stayed `null`, and nothing rendered
+  whatever the gate did — a mutation dropping the provider check and rendering the row on any answer
+  left all three viewports GREEN. With the empty answer supplied and a positive control asserting the
+  page came back, the same mutation reddens: Expected 0, Received 1, ×3. **13.285 (the accessible-name/role ratchet) was
   expected to also redden and did NOT** — `Button` (`packages/ui/src/components/button.tsx`)
   renders a plain `<button>` with no explicit `role`, `aria-label`, `aria-selected` or
   `aria-describedby` attribute, so removing one moves none of the four counts
@@ -1912,6 +1927,56 @@ the gate would have stayed 33/33.*
   only, not on Phone. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 - **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method
   (`emailAndPassword: { enabled: false }`). — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+## The owner's sign-in feedback round (2026-09-08) — item 2, the methods that can work
+
+*The owner's item 2 read "Google and Apple, as logo marks". The work underneath it was not icons: two
+of the four visible sign-in options could not succeed for anybody. Item 2 is therefore **render only
+what works, then style what remains**.*
+
+- **13.324** ✅ `GET /v1/auth/methods` answers which social providers this server will accept, and the
+  answer is read off `auth.options.socialProviders` — **the constructed better-auth instance**, not the
+  environment and not a copy any caller kept. `toEqual` and not a partial match, because the point is
+  that the route says NOTHING else: a body that grew a client id would satisfy `toMatchObject`. Each
+  provider is asserted alone as well as together, since `{google:true,apple:true}` and
+  `{google:false,apple:false}` are both satisfied by a route returning one boolean twice. One case also
+  pins that **better-auth preserves the ABSENCE of an unconfigured provider in `options`** — if a future
+  version normalised absent keys into present-and-disabled ones, every boolean would silently become
+  true and the dead button would come back. — (`apps/server/test/routes/auth-methods.test.ts`)
+- **13.325** ✅ "Empty disables" is a property of this repo rather than a vendor coincidence. The whole
+  cross-product of the four variables, asserted twice per row — once on the config
+  `socialProvidersFromEnv` builds, once through the real route on a real auth instance built from it,
+  because asserting the config alone would pass against a route that never consulted it. **The mixed
+  rows are the ones that matter**: an id with no secret is the state a deployment is in for the seconds
+  between setting two variables, and it must read as OFF, not as ON-and-broken. Empty strings and
+  whitespace are included; `.env.example` ships the empty pair. A separate case asserts the optional
+  `APPLE_APP_BUNDLE_IDENTIFIER` is OMITTED rather than present-and-undefined, via `Object.keys` —
+  `toEqual` treats a key holding `undefined` as absent and would pass against the shape being avoided.
+  — (`apps/server/test/routes/auth-methods.test.ts`)
+- **13.326** ✅ The page renders exactly the social methods the server accepts, **asserted in both
+  directions because each alone passes on a broken page**: a page that never renders a social button
+  satisfies the negative half, and a page that renders both unconditionally satisfies the positive.
+  With the server answering all-false, count 0 for Google, Apple and the old passkey button; with it
+  answering all-true, both resolve by their exact shipped accessible names, have empty text content
+  (icon-only), and each reaches the provider it names — a mark wired to the wrong provider would
+  satisfy every other assertion. Passkey is asserted as `signIn.passkey({ autoFill: true })`, **the
+  argument and not merely the call**, because a bare `passkey()` would satisfy "was called" while being
+  the dead modal-triggering thing it replaces. — (`apps/web/test/sign-in.test.tsx`)
+
+> **Case 3.84 was amended in the same change set** (`apps/web/test/sign-in.test.tsx`): it asserted that
+> all four methods render as controls, and asserting the presence of the two that could not work is what
+> kept them on screen. Its property is now *phone and email are offered unconditionally, and nothing
+> password-shaped is*; the social pair and passkey are 13.326's subject. The password absence is
+> unchanged — `auth.ts:84` forbids the method, so the prototype's Password tab is not merely absent.
+
+> **What the `/sign-in` accessible-name floor raise does and does not guard, stated because the
+> difference is not visible from the number.** The key was recorded at Task 0, before Tasks 1 and 2
+> added labels, and `recordAccessibleBaseline` refuses to overwrite an existing key — so the tree
+> emitted one `aria-label` against a floor of `0` and a deletion would have cleared it. Raised to 1 and
+> witnessed: deleting `SegmentedControl`'s label reddens 13.285 at all three viewports. **It does NOT
+> guard the two icon buttons' labels**, because those render only when a provider is configured and this
+> suite's server has no credentials. Those are guarded by 13.326 in the unit suite. A floor that cannot
+> see the thing it was raised for is worth naming rather than counting.
 
 ## The owner's sign-in feedback round (2026-09-08) — items 1 and 3
 

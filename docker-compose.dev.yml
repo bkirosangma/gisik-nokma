@@ -187,6 +187,27 @@ services:
       MAGIC_LINK_FROM: sign-in@gisik-nokma.local
       BETTER_AUTH_SECRET: dev-only-secret-do-not-deploy-0123456789
       BETTER_AUTH_URL: http://localhost:3000
+      # Social sign-in, DECLARED AND EMPTY. Real values never come here — this
+      # file is committed. The owner supplies them from an untracked `.env`
+      # beside it (compose substitutes `${VAR}` from that file automatically) or
+      # from their shell.
+      #
+      # The keys are present rather than absent on purpose: an empty pair is
+      # what makes the provider OFF, and this is the file that shows an operator
+      # WHICH knobs exist. Before this round the dev stack set nothing at all
+      # and `/sign-in` still rendered a Google button — the exact defect, and it
+      # was invisible partly because nothing here named the variable.
+      #
+      # Google works on localhost; register
+      # `http://localhost:3000/api/auth/callback/google` as a redirect URI (the
+      # API's port, not the web app's). APPLE DOES NOT WORK ON LOCALHOST — Sign
+      # in with Apple requires HTTPS and a verified domain, so these three stay
+      # empty here and the button stays hidden on the dev stack by design.
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      APPLE_CLIENT_ID: "${APPLE_CLIENT_ID:-}"
+      APPLE_CLIENT_SECRET: "${APPLE_CLIENT_SECRET:-}"
+      APPLE_APP_BUNDLE_IDENTIFIER: "${APPLE_APP_BUNDLE_IDENTIFIER:-}"
       # Deviation 2: OBJECT_STORE_S3_* — the names store-config.ts actually
       # reads — not the plan's bare S3_* names.
       OBJECT_STORE: s3
