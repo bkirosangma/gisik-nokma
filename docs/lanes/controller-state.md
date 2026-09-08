@@ -1,5 +1,58 @@
 # Cross-lane controller — live state
 
+## ⏹ TUESDAY 11:1x IST — BOTH SESSIONS RESTARTING to pick up the fixed briefs (owner-directed). `main` is `cd050c8`, **nothing in flight, no open PRs, no branch to hand over.** This is the documented fixed point, reached deliberately rather than by luck.
+
+**If you are the controller reading this after the restart: the channel to the executor was broken and
+is now fixed — read the entry below this one before you try to message it.** The short version:
+`tmux send-keys` is swallowed while a pane is in copy mode, a pane enters copy mode silently whenever
+anyone scrolls it, and the corrected procedure (pastes for both the text and the submitting CR) is in
+`dispatch-controller-serial.md` under "Reaching the executor". **Arm the open-PR `Monitor` described
+there as your first act** — the executor has no channel to you at all, and this session only learned
+that after it sat blocked, unheard, for a stretch.
+
+**The restart was sequenced, not fired blind.** The executor was mid-task with **uncommitted work in
+three files** on a fresh branch; killing it then would have destroyed exactly what
+`git checkout --`-style losses have destroyed repeatedly in this project. Followed the documented
+mid-step procedure instead: told it to flush a handoff first, **waited for the remote ref rather than a
+claim in its pane** (`git ls-remote`, a fact; a pane saying "pushed" is a claim), read the handoff
+myself to confirm it covered the seam, and only then merged and restarted. Its branch is now merged as
+**#339**, so no override file was needed at all — the restarted executor starts clean.
+
+**A mechanical hazard worth recording for anyone scripting this:** the controller lives in `gisik:0`,
+so `tmux kill-session -t gisik && start-serial.sh` **cannot work** — the `&&` never runs because the
+shell executing it dies with the session, and the result is *no sessions at all*. The restart must be
+detached (`nohup` + `disown`), and the detachment was proven with a positive control before being used
+destructively. Script kept at the scratchpad path named in the restart log.
+
+**The executor's handoff corrected me on two things, and both were right:**
+1. **`controller-state.md:694` DOES assert the Plan 9 consumer residual open.** My previous anchor said
+   this file "was not found to" — **that read was wrong.** A forward-pointer is now added at that
+   paragraph. This exposes the one failure mode of this file's *correct-by-later-entry* convention: a
+   reader landing at the old paragraph sees an open item and has no reason to doubt it.
+2. **`dispatch-executor-serial.md`'s TWO KNOWN GAPS #1 still carried the stale claim** — and being
+   outside the repo, no commit could fix it, so every restart re-inherited it. **Now struck and
+   corrected**, which is the whole reason this restart was worth doing before dispatching anything.
+
+**The stale claim's own lesson, since it was repeated three times before anyone checked:** #287 (Plan
+9's client-side consumer "unwitnessed") closed on 2026-09-07 via **#293** — six cases 11.190–11.195,
+real route, real Postgres, zero `vi.mock`, verified by ancestry not by `cat-file`. It outlived its fix
+by a day and was restated twice by the executor and once by this controller. **A stale "known gap" is
+more dangerous than an unknown one: it is pre-authorised work that no longer needs doing.**
+
+**Carried, explicitly NOT verified** (from the executor's handoff, so it is not lost in the restart):
+the #287 sweep covered `.md`/`.ts`/`.tsx` only — `.json`, `.yml`, `.sh`, Dockerfiles and READMEs were
+never swept — and the pattern set is not exhaustive (widening it mid-task surfaced a file the first
+pass missed). Re-running wider is cheap and has not been done.
+
+**Still owner-owned, unchanged:** the `13.33px` UA-default font-size question, and the Playwright stack
+suite tripping the auth rate limit when run whole (3 passed / 2 failed, both `sign-in.ts:28` timeouts,
+both passing individually; the remedies — session reuse or raising `RATE_LIMIT_AUTH_MAX` for the e2e
+profile — are design choices about a security control, and neither executor nor controller took them).
+
+**Models on relaunch are the documented defaults** (`start-serial.sh`: controller Sonnet, executor
+Opus), matching the 2026-09-02 ruling and the owner's standing token-economy instruction. The Opus
+session that did this work was an escalation, not a new default.
+
 ## 🔧 TUESDAY 11:0x IST — THE CONTROLLER↔EXECUTOR CHANNEL IS FIXED, ROOT CAUSE MEASURED. Owner-directed. `main` is `a6d05cf`. **Reading the executor's pane is what was breaking the ability to talk to it.**
 
 **ROOT CAUSE — `tmux send-keys` is swallowed whenever the pane is in COPY MODE.** Keys sent to a
@@ -695,6 +748,13 @@ with it:** Lane F's own file states it plainly (`:380-403`) — Plan 9's notific
 dependency graph. The wire contract is proven end to end; the client gateway has never been executed.
 **Owner: whoever next touches Plan 9's client-side notification consumer** — prove it against the real
 producer before trusting the fake, the same principle step 10 and Lane F both exist to enforce elsewhere.
+
+> **⛔ CLOSED — do not act on the paragraph above.** It was true when written and stopped being true on
+> 2026-09-07 with **PR #293** (adapter moved to `packages/app-core/src/online/`, cases **11.190–11.195**
+> against the real route and real Postgres, zero `vi.mock`). Verified 2026-09-08. The forward-pointer is
+> added here because this file's convention is *correct by a later entry, never rewrite* — and that
+> convention has one failure mode this paragraph demonstrates: **a reader landing HERE sees an open item
+> and no reason to doubt it.** Superseded by the entries at `PLAN 9'S RESIDUAL CLOSED` and by #339.
 
 **Corrects an old line rather than editing it in place, per this file's own convention:** at line **4603** (written as "~4552"; this file grows at the top, so the target drifted +51 below the citation),
 *"The integration checkpoint no longer fires — replacement trigger is the Phase 2/3 boundary"* — the
