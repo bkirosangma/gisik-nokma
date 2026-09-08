@@ -2116,3 +2116,65 @@ because the finding underneath it is a product gap, not a styling one.*
 > already happened — but the plan called Task 2 transcription, and this is a departure from it.
 > **13.293 cannot see the difference**, since it never sends; that is a limit of the case, not evidence
 > the placement is right.
+
+## Task 4a / 4b of the HIG per-screen plan (2026-09-08) — Workspaces + Invite
+
+The surface half is transcription and carries no new ids: `/workspaces` and `/invite/<token>` move onto
+`surface-raised` at 12px with no container borders, the founding form adopts the shared `.gn-field`, and
+the guard is the existing suites plus the ratchet. **The ratchet is the part that needed fixing first**:
+Task 4's dispatch said the signed-in sweep already watched `/workspaces`, and it did not — the baseline
+held five keys and neither of this task's routes was among them. `/workspaces` joins it here.
+`/invite/<token>` does NOT, and the reason is recorded in `docs/pre-launch-checklist.md` with a named
+owner rather than left as an absence a later reader mistakes for coverage: this suite holds no standing
+invite token, and a token-less visit renders the DEAD-LINK branch, so the baseline would pin a page
+nobody ships and then defend it.
+
+- **13.298** ✅ A 401 from `/v1/me/workspaces` leaves the **real browser settled on `/sign-in`** — the
+  navigation itself, which nothing had ever witnessed. **This is NOT the case the plan specified, and
+  the substitution was measured rather than argued.** The plan asked for *401 renders
+  `ExpiredSessionNotice`, mutation: delete the 401 branch → RED, **alone***. Deleting that arm on a
+  committed tree gives `EXIT=1`, **19 pass / 1 fail**, and the failure is a PRE-EXISTING case —
+  `apps/web/test/page-refusals.test.tsx:180` — which already asserts the notice, the `push` and the
+  absence of the spinner, so "alone" was unsatisfiable before the plan was written. And it could not
+  have been witnessed in a browser at all: `useSignInOnExpiredSession` pushes to `/sign-in`, so the
+  notice is transient and mutant and original both SETTLE there. **A case whose mutation cannot redden
+  it is not a guard.** Re-pointed by controller ruling at the claim every other case only assumes:
+  `page-refusals.test.tsx:180` awaits `expect(push).toHaveBeenCalledWith('/sign-in')` — *a double that
+  records a call is not a browser that moved*. The two are complements: that one owns what is rendered
+  in the interim, this one owns where the browser ends up. The positive control is `/sign-in`'s Email
+  field and deliberately **not** the redirect, because a page that failed to load would leave the
+  pathname at `/workspaces` and read as a clean kill for the wrong reason. `?next=` is **not** carried
+  by the push (`/invite/[token]` does carry one on its own link, so the product is inconsistent); the
+  assertion checks the PATHNAME only and leaves the query free, so adding `next=` later is not a test
+  change. Mutation: delete `router.push('/sign-in')` from `expired-session.tsx` → RED naming both
+  routes. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.299** ✅ `/workspaces` with the roster answering `[]` renders the empty-state sentence and the
+  founding form's `Create workspace` button. **The empty-state sentence is the positive control and its
+  position is load-bearing**: `<FoundingForm />` renders OUTSIDE all four branches of that page — by
+  design, so a person who cannot be told which workspaces they are in can still found one — which means
+  `Create workspace` is visible on a page that never received an answer at all. Asserting it first would
+  establish nothing about the stub. The sentence is the only thing on the screen gated on `[]`.
+  Reordering the two assertions destroys the case without reddening it. The `<h1>` is deliberately NOT
+  asserted: it renders `Workspaces — {user.name}` from a session request `next.config.ts` proxies to the
+  running stack, so its text is whichever developer is signed in on the machine — the same class of leak
+  that put a live Google credential in a baseline on 2026-09-08. Mutation: delete the
+  `workspaces.length === 0` arm → RED. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.300** ✅ `/invite/<token>` names the workspace **and the role** —
+  `/You are invited to join .+ as (admin|member|guest)\./`. The role is the whole point: the prototype's
+  sentence drops it and the copy rule rejects that, because a person accepting an invitation is being
+  told what they will be able to do. The alternation is the shipped `InviteSummary['role']` union, not a
+  guess. Matched on the `.gn-invite` container rather than one element, because the sentence is split
+  across three text nodes and a `<strong>`. Two assertions that do not subsume each other: removing the
+  `<strong>` reddens the name assertion but **not** the regex. The last assertion says the DEAD-LINK
+  branch is not what was measured — a stubbed body that failed `createHttpInviteGateway`'s validation
+  would render that branch and read exactly like a copy regression. Mutation: drop ` as {invite.role}` →
+  RED. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+> ### The instrument cannot see a case that has no catalogue row
+>
+> Found while writing these: `check-case-citations` runs catalogue → test, so an id **cited by a test
+> with no row in this file is invisible to it**. Both id checkers stayed green with 13.299 and 13.300
+> cited from `responsive.spec.ts` and no rows here. The direction it guards — deleting the last citing
+> test for a catalogued case — is real; the opposite direction is not guarded at all, and nothing in the
+> repo would have reminded anyone to write these three rows. Recorded rather than fixed: widening it is
+> a change to a shared instrument, not part of Task 4.

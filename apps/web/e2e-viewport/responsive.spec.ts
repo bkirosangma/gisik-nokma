@@ -1441,3 +1441,262 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
   ).not.toBe(desktop.sig.shellContentWidth);
   expect(desktop.sig.shellContentWidth ?? 0).toBeGreaterThan(phone.sig.shellContentWidth ?? 0);
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TWO ROUTES THAT NEED THEIR ANSWER SUPPLIED — /workspaces and /invite/<token>
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Each is its OWN top-level block rather than a row in `UNAUTHED_ROUTES`, and
+ * that is a decision rather than a convenience. The loop at :548 drags the
+ * tap-target, type-scale and accessible-name SWEEPS across every route it
+ * names, and those sweeps write ratcheted baselines; `/invite/<token>` would
+ * additionally render its DEAD-LINK branch in all of them, so the baseline
+ * would record a page nobody ships.
+ *
+ * Both stubs are registered BEFORE THE FIRST NAVIGATION, and neither block
+ * reloads or unroutes. Both halves of that are load-bearing:
+ *
+ *  - `next.config.ts` rewrites `/v1/*` to the API origin, so an UNSTUBBED read
+ *    proxies to whatever compose stack the developer happens to be running and
+ *    the case silently measures that machine. That is exactly how a live Google
+ *    credential reached the accessible-names baseline on 2026-09-08.
+ *  - `unroute` followed by `reload({ waitUntil: 'networkidle' })` leaves the
+ *    request unanswered and networkidle never arrives — the recorded stall.
+ *    Each test owns its own page, so a stub registered here cannot leak
+ *    sideways and never needs removing.
+ */
+
+/**
+ * 13.299 — `/workspaces` WITH THE ROSTER ANSWERING AN EMPTY LIST.
+ *
+ * THE POSITIVE CONTROL IS THE EMPTY-STATE SENTENCE, AND IT MUST STAY FIRST.
+ * `<FoundingForm />` renders OUTSIDE all four branches of this page — loading,
+ * expired, refusal and list alike, deliberately, so that a person who cannot be
+ * told which workspaces they are in can still found one. "Create workspace" is
+ * therefore visible on a page that never received an answer at all, and
+ * asserting it first would establish nothing about the stub. The empty-state
+ * sentence is the ONLY thing on this screen gated on `[]`, which is what makes
+ * it the control. Reordering these two assertions destroys that.
+ *
+ * THE `<h1>` IS DELIBERATELY NOT ASSERTED. It renders
+ * `Workspaces — {user.name}` from a better-auth session request that
+ * `next.config.ts` proxies to the same stack, so its text is whichever
+ * developer happens to be signed in on the machine running the suite. Pinning
+ * it would re-commit the 2026-09-08 defect in a new place.
+ *
+ * PREDICTED RED under two mutations — PREDICTED, **not witnessed**: this suite
+ * needs a running dev server and starting one is the orchestrator's job, so
+ * nothing below has been executed by its author. Deleting the
+ * `workspaces.length === 0` arm reddens the first assertion; deleting
+ * `<FoundingForm />` reddens the second. The orchestrator runs both.
+ */
+test('13.299 — /workspaces with an EMPTY roster renders the empty state and the founding form', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/v1/me/workspaces', (apiRoute) =>
+    apiRoute.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
+
+  const response = await page.goto('/workspaces', { waitUntil: 'networkidle' });
+  expect(response?.status(), '/workspaces responded unexpectedly').toBe(200);
+  // Where the page ENDED UP, not where it was sent. A 401 on this read
+  // redirects to `/sign-in` (`useSignInOnExpiredSession`), and every assertion
+  // below would then be describing a different page while still passing or
+  // failing for reasons of its own.
+  expect(new URL(page.url()).pathname).toBe('/workspaces');
+  await assertViewportTookEffect(page, testInfo);
+
+  // ── POSITIVE CONTROL. Awaited, and gated on the stubbed `[]`.
+  await expect(
+    page.getByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
+  ).toBeVisible();
+  // `toHaveCount(1)` rather than `toBeVisible`: two submits sharing this
+  // accessible name would satisfy visibility and would be a real defect.
+  await expect(page.getByRole('button', { name: 'Create workspace' })).toHaveCount(1);
+  // Only meaningful AFTER the positive above, and worth having: it separates
+  // "answered `[]`" from "never answered", the latter being this page's normal
+  // resting state against a server that refuses the read.
+  await expect(page.getByText('Loading…')).toHaveCount(0);
+});
+
+/**
+ * 13.300 — `/invite/<token>` NAMES THE WORKSPACE **AND THE ROLE**.
+ *
+ * The role is the whole point of the regex. The prototype's version of this
+ * sentence drops it, and the copy rule rejects that: a person accepting an
+ * invitation is being told what they will be able to do, and "you are invited
+ * to join Rongram Range" alone does not say. `(admin|member|guest)` is the
+ * shipped `InviteSummary['role']` union
+ * (`packages/app-core/src/online/invites.ts`), so the alternation is the type,
+ * not a guess.
+ *
+ * MATCHED ON THE CONTAINER, not on one element, because the sentence is not in
+ * one element: `You are invited to join <strong>{workspaceName}</strong> as
+ * {role}.` splits it across three text nodes and a `<strong>`. The container is
+ * the single `.gn-invite` Card (`Card` forwards `className` onto its root,
+ * `packages/ui/src/components/card.tsx:7`) rather than `main`, so `.+` never
+ * has to reach across a paragraph boundary.
+ *
+ * NO SESSION IS STUBBED, and none is needed: `GET /v1/invites/:token` requires
+ * no session by the server's own design — the token IS the credential — and the
+ * invitation sentence renders above the three-way session branch, so it is on
+ * screen for a signed-in, signed-out or still-loading viewer alike. Only the
+ * accept affordance below it differs, and this case asserts nothing about that.
+ *
+ * THE STUBBED BODY MUST SURVIVE `createHttpInviteGateway`, which validates:
+ * a non-string `workspaceId`/`workspaceName` or an unrecognised `role` is
+ * mapped to `null` and the page then renders its DEAD-LINK branch — a red that
+ * would read exactly like a copy regression. Hence the last assertion, which
+ * says the dead branch is not what was measured.
+ *
+ * PREDICTED RED under dropping ` as {invite.role}` from the sentence —
+ * PREDICTED, **not witnessed**, for the same reason as 13.299. Stated because
+ * it is not obvious: removing the `<strong>` does NOT redden the regex (it
+ * reddens only the `strong` assertion), so the two assertions guard different
+ * things and neither subsumes the other.
+ */
+test('13.300 — /invite/<token> body says "You are invited to join <workspace> as <role>."', async ({
+  page,
+}, testInfo) => {
+  const token = 'e2e-viewport-invite-13300';
+  await page.route('**/v1/invites/*', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        workspaceId: 'ws-13300',
+        workspaceName: 'Rongram Range',
+        role: 'admin',
+      }),
+    }),
+  );
+
+  const response = await page.goto(`/invite/${token}`, { waitUntil: 'networkidle' });
+  expect(response?.status(), `/invite/${token} responded unexpectedly`).toBe(200);
+  // The route SEGMENT is half of a contract the server already shipped:
+  // `POST /v1/workspaces/:id/invites` mints `${WEB_ORIGIN}/invite/${token}`.
+  // Asserting the path stayed put is a free partial guard on the rename this
+  // page's own docblock says nothing would notice.
+  expect(new URL(page.url()).pathname).toBe(`/invite/${token}`);
+  await assertViewportTookEffect(page, testInfo);
+
+  // ── POSITIVE CONTROL. Awaited, and it can only pass once the stubbed summary
+  // has arrived and been rendered: the card holds "Checking the invitation…"
+  // until then.
+  const card = page.locator('.gn-invite');
+  await expect(card).toHaveText(/You are invited to join .+ as (admin|member|guest)\./);
+  // The name is in the `<strong>`, which the regex above cannot see.
+  await expect(card.locator('strong')).toHaveText('Rongram Range');
+  // Not the dead-link branch — see the block comment.
+  await expect(page.locator('.gn-invite__dead')).toHaveCount(0);
+});
+
+/**
+ * 13.298 — A 401 ON `/workspaces` LEAVES THE REAL BROWSER SETTLED ON `/sign-in`.
+ *
+ * ## This case is not what the plan asked for, and the substitution is the point
+ *
+ * The plan (Task 4b) specified: *`/workspaces` with `page.route` returning 401
+ * renders `ExpiredSessionNotice` (`role="status"`, class `gn-shell__expired`)*,
+ * mutation *delete the 401 branch → 13.298 RED, **alone***. That case was
+ * retired on a measurement, not an argument, and both halves of the retirement
+ * matter to anyone tempted to write it again:
+ *
+ *  1. **It could not have gone red alone.** Deleting the `expired ?` arm from
+ *     `app/workspaces/page.tsx` on a committed tree gives `EXIT=1`, 19 pass and
+ *     ONE fail, and the failure is a PRE-EXISTING jsdom case —
+ *     `apps/web/test/page-refusals.test.tsx:180`, *"Workspaces: a 401 is NOT a
+ *     refusal — it sends the viewer to sign in"* — which already asserts
+ *     `EXPIRED_SESSION_COPY`, the push, and the absence of the spinner. The
+ *     branch was guarded before the plan was written.
+ *  2. **It could not have been witnessed HERE at all.** `useSignInOnExpiredSession`
+ *     calls `router.push('/sign-in')`, so in a real browser the notice is
+ *     transient — the component's own docblock says "for the frame or two
+ *     before the router moves". Delete the render arm and the push still fires:
+ *     mutant and original both SETTLE on `/sign-in`, and no assertion on a
+ *     settled page can separate them. In jsdom the router double never moves,
+ *     which is exactly why the case above works and a Playwright twin would not.
+ *
+ * So the id is spent on the one claim in this area that nothing has ever
+ * witnessed: **that the navigation actually happens.** Every existing case
+ * asserts `push` was called ON A TEST DOUBLE (`page-refusals.test.tsx:180`
+ * awaits `expect(push).toHaveBeenCalledWith('/sign-in')`). That the real
+ * Next.js router then moves a real browser to a real page has been assumed by
+ * three pages and proven by none. This case is the jsdom case's complement,
+ * not its duplicate: that one owns *what is rendered in the interim*, this one
+ * owns *where the browser ends up*.
+ *
+ * ## The mutation, and why it names its own site
+ *
+ * Delete `if (expired) router.push('/sign-in');` from
+ * `apps/web/src/expired-session.tsx`. The browser then STAYS on `/workspaces`
+ * showing the notice, and the `pathname` assertion below fails naming both the
+ * expected and the actual route. It is the only mutation in this file that can
+ * do that, because it is the only assertion here about where a navigation ends.
+ *
+ * ## `?next=` is NOT carried, and that is recorded rather than asserted
+ *
+ * `useSignInOnExpiredSession` pushes the bare string `'/sign-in'` — no `next`
+ * parameter, so an expired session loses the page the person was on and lands
+ * them at the workspace list after re-authenticating. `/invite/[token]` DOES
+ * carry `?next=` on its own sign-in link, so the product is inconsistent here.
+ * That is a CANDIDATE, not a defect this case decides: pinning the current bare
+ * form would make the improvement a test change, so the assertion is written to
+ * accept either — it checks the PATHNAME only, and the query is left free
+ * deliberately. Whoever adds `next=` should tighten this line in that change.
+ *
+ * ## Why `/v1/auth/methods` is stubbed when this case never looks at sign-in
+ *
+ * Because the redirect LANDS there and that page reads it. Unstubbed, the read
+ * proxies through `next.config.ts` to whatever compose stack is running, which
+ * is how a live Google credential reached a baseline on 2026-09-08. Nothing
+ * below asserts on it; it is stubbed so this case cannot depend on the machine.
+ */
+test('13.298 — a 401 on /workspaces settles the REAL browser on /sign-in', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/v1/me/workspaces', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'UNAUTHENTICATED' }),
+    }),
+  );
+  // The page the redirect lands on, pinned so this case measures the product
+  // and not the developer's machine. See the block comment.
+  await page.route('**/v1/auth/methods', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ google: false, apple: false, phone: false }),
+    }),
+  );
+
+  await page.goto('/workspaces', { waitUntil: 'networkidle' });
+  await assertViewportTookEffect(page, testInfo);
+
+  // ── POSITIVE CONTROL FIRST, and it is NOT the redirect. `/sign-in` renders
+  // its Email field on every machine whether or not the 401 ever arrived, so
+  // the arrival at sign-in cannot be its own evidence — a page that failed to
+  // load at all would leave `pathname` at `/workspaces` and read as a clean
+  // mutant kill for the wrong reason. The awaited field says the destination
+  // actually RENDERED before the pathname below is believed.
+  await expect(page.getByLabel('Email')).toBeVisible();
+
+  // ── THE CLAIM. Pathname only — the query is deliberately unpinned, see the
+  // `?next=` paragraph above.
+  expect(
+    new URL(page.url()).pathname,
+    'a 401 from /v1/me/workspaces must move the browser to /sign-in. This is the ' +
+      'half that page-refusals.test.tsx:180 CANNOT prove: it asserts router.push was ' +
+      'called on a test double, and a double that records a call is not a browser ' +
+      'that moved. If this fails while that case still passes, the push is firing ' +
+      'and the navigation is not.',
+  ).toBe('/sign-in');
+
+  // And the interim notice is GONE once settled — the direct evidence that the
+  // plan's original case was unwitnessable here, kept as an assertion so the
+  // claim in the block comment above is measured rather than merely asserted.
+  await expect(page.getByText('Your session has ended. Taking you to sign in…')).toHaveCount(0);
+});
