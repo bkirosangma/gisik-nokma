@@ -134,25 +134,37 @@ describe('isSignInPath', () => {
  */
 describe('signInMaxFor', () => {
   /**
-   * 13.279 — the sign-in budget is better-auth's own magic-link max at the shipped default, is never zero, and is never larger than the budget it tightens.
+   * 13.279 — the sign-in budget is half the auth budget, is never zero, and is STRICTLY smaller than the budget it tightens wherever it can be.
    *
-   * The first row is the parity claim this whole change is justified by, pinned
-   * as an assertion so it cannot drift into being merely asserted in prose. The
-   * other two are the invariants that make the control real: a bucket of 0
-   * refuses the FIRST request (a total sign-in outage, reachable at the legal
-   * `RATE_LIMIT_AUTH_MAX=1`), and a bucket larger than `authMax` can never be
-   * the binding constraint, which would make the whole bucket dead code.
+   * **This case used to be named "returns better-auth's magic-link max" and
+   * that name was a false claim, caught in review.** 5 is the same integer
+   * better-auth used, but better-auth keyed per (ip, path) so each leg of a
+   * sign-in cycle had its own 5; this is one bucket across the family and a
+   * cycle costs two of it. The name is now the arithmetic the function actually
+   * performs, because a case NAME is read as measured.
+   *
+   * The `strictly smaller` bound is the second correction from the same review.
+   * It was `toBeLessThanOrEqual`, and `signInMaxFor(1) === 1` — so the one
+   * budget an operator can legally configure (`RATE_LIMIT_AUTH_MAX=1`) at which
+   * the two buckets refuse at the SAME ordinal, making this control inert, was
+   * the single value the guard admitted. The docblock's stated failure mode is
+   * inertness, and inertness begins at EQUAL, not above: a gate closing one end
+   * of a range. `authMax: 1` is now asserted as the named exception it is.
    */
-  it('returns better-auth’s magic-link max at the shipped default, and stays a real bound everywhere else', () => {
-    // `RATE_LIMIT_AUTH_MAX` default is 10 (`config.ts`); better-auth's
-    // magic-link plugin enforced `max: 5` (`plugins/magic-link/index.mjs:202`).
+  it('is half the auth budget: never zero, and strictly smaller wherever it can be', () => {
+    // `RATE_LIMIT_AUTH_MAX` default is 10 (`config.ts`).
     expect(signInMaxFor(10)).toBe(5);
     // The dev stack's value, read from the running container, against which the
     // e2e suite spends 14 charges.
     expect(signInMaxFor(60)).toBe(30);
-    for (const authMax of [1, 2, 3, 4, 5, 9, 10, 11, 60, 1000]) {
+    // `authMax: 1` is the ONE budget where the bucket cannot be strictly
+    // tighter, and therefore the one where it changes no verdict. Asserted as a
+    // named exception rather than swept under a `<=` that would have admitted
+    // it silently.
+    expect(signInMaxFor(1)).toBe(1);
+    for (const authMax of [2, 3, 4, 5, 9, 10, 11, 60, 1000]) {
       expect(signInMaxFor(authMax)).toBeGreaterThanOrEqual(1);
-      expect(signInMaxFor(authMax)).toBeLessThanOrEqual(authMax);
+      expect(signInMaxFor(authMax)).toBeLessThan(authMax);
     }
   });
 });

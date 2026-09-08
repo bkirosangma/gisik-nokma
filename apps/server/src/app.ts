@@ -515,10 +515,32 @@ export function buildApp(
           // sign-in budget the moment the general window rolls over.
           if (isSignInPath(request.url)) {
             const signInVerdict = signInLimiter.check(`signin:${clientKey}`, now());
-            // Whichever bucket refuses, refuses. When BOTH do, the caller is
-            // told the longer of the two waits — a `retry-after` that expires
-            // while the other bucket is still shut is an invitation to come
-            // back and be refused again.
+            // Whichever bucket refuses, refuses, and when BOTH do the caller
+            // is told the longer of the two waits.
+            //
+            // ## `retry-after` IS A LOWER BOUND HERE, and the earlier version
+            // ## of this comment claimed it was not
+            //
+            // It read: "a `retry-after` that expires while the other bucket is
+            // still shut is an invitation to come back and be refused again" —
+            // stated as an invariant this code upholds. It does not. The
+            // `Math.max` below covers only the case where both buckets refuse
+            // the SAME request. The other shape is reachable and was MEASURED:
+            // `auth:` refuses while `signin:` is still allowed but filling (it
+            // is charged anyway, two lines up), so the two windows OPEN AT
+            // DIFFERENT INSTANTS and `signin:` can stay shut long after `auth:`
+            // reopens. At the shipped `RATE_LIMIT_AUTH_MAX=10` / 60s, a caller
+            // was told **1 second** and was in fact refused for **59 more**.
+            //
+            // The overshoot is bounded by `windowSec` and it is a HINT, never a
+            // bound: the caller that comes back early gets another 429 carrying
+            // a fresh figure, and no request is admitted that should not be. It
+            // is left as a lower bound rather than fixed here because the fix
+            // is not local — a correct answer needs each bucket's window END,
+            // which `RateLimitVerdict` does not carry, and widening that
+            // contract touches all five buckets to sharpen an advisory header.
+            // **Owner: whoever next changes `RateLimitVerdict`.** Case 13.280
+            // pins the current behaviour so the fix has something to flip.
             if (!signInVerdict.allowed) {
               verdict = verdict.allowed
                 ? signInVerdict

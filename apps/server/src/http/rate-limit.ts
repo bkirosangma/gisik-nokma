@@ -235,6 +235,23 @@ function normalizeAuthPath(pathname: string): string {
  * target is a match if either its raw or its decoded spelling matches. Decoding
  * can throw on a malformed escape (`%zz`), and a throw here means "keep the raw
  * spelling", never "give up and return false".
+ *
+ * ## The `catch` around the URL parse is UNREACHABLE from the only call site
+ *
+ * Stated because the earlier comment sold it as live safety, and a comment
+ * asserting a property no input can demonstrate is this repo's own
+ * "check that cannot fail" in prose form. `new URL(t, base)` does throw for
+ * some strings — `http://[`, `http://%%`, `////` and others, measured — but
+ * none can arrive here: `app.ts` consults this function only when
+ * `routeOptions.url === '/api/auth/*'`, which requires a target literally
+ * beginning `/api/auth/`, and such a target is path-only and never throws.
+ * Everything that does throw is either answered 400 by Fastify's URL sanitiser
+ * before any `onRequest` hook runs, or reaches the hook with
+ * `routeOptions.url === undefined` and never enters the auth branch.
+ *
+ * The branch stays, and returns the over-matching value, because it is the
+ * correct answer IF the call site ever widens — but it is defence in depth, not
+ * a path anything exercises today, and no test claims otherwise.
  */
 export function isSignInPath(requestTarget: string): boolean {
   let pathname: string;
@@ -244,9 +261,9 @@ export function isSignInPath(requestTarget: string): boolean {
     // even if a future edit hands the URL to something that fetches.
     pathname = new URL(requestTarget, 'http://rate-limit.invalid').pathname;
   } catch {
-    // Unparseable ⇒ charge the tighter bucket. See OVER-MATCH above: a target
-    // this function cannot read is the last one that should be handed the
-    // larger budget.
+    // Unreachable from the current call site — see the docblock. Kept because
+    // the over-matching answer is the right one if it ever becomes reachable.
+    /* c8 ignore next */
     return true;
   }
   const candidates = [pathname];
@@ -266,14 +283,45 @@ export function isSignInPath(requestTarget: string): boolean {
  * The sign-in bucket's budget, derived from the general auth budget rather than
  * configured beside it.
  *
- * ## Why a fraction and not the constant 5
+ * ## THIS IS NOT PARITY. It is between 2.5x and 5x TIGHTER, and the number 5
+ * ## matching is a coincidence of integers, not of budgets.
  *
- * 5 per 60s is what better-auth's magic-link plugin enforced before the
- * 2026-09-08 ruling disabled its limiter, so 5 IS the parity value — at the
- * shipped default of `RATE_LIMIT_AUTH_MAX=10`, which this returns exactly. But
- * a hard-coded 5 stops being a tightening the moment an operator lowers the
+ * An earlier version of this comment, and of three other places, called 5 "the
+ * parity value" because better-auth's magic-link plugin enforced `max: 5`. That
+ * claim was wrong, and review caught it. **better-auth keyed per (ip, PATH)** —
+ * `createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)`,
+ * `api/rate-limiter/index.mjs:245` — so `/sign-in/magic-link` and
+ * `/magic-link/verify` each had their OWN 5-per-60s bucket, i.e. **five
+ * complete sign-in cycles**, and `/sign-up*`, `/change-email*` and the rest
+ * each had another. This bucket is keyed on the CLIENT alone and spans all
+ * eight prefixes, so a cycle costs two charges of one shared budget:
+ *
+ *     better-auth, per client:   5 complete magic-link cycles per 60s
+ *     this bucket, per client:   2 complete cycles per 60s  (measured)
+ *
+ * The change's own reasoning already contained the contradiction — the
+ * dev-headroom argument below depends on a cycle costing two, and a cycle
+ * costing two is exactly what makes 5 not parity. Both sentences cannot stand.
+ *
+ * It is kept at a half because the DIRECTION is the one the ruling wanted
+ * (tighter per attacker) and because the alternative — restoring better-auth's
+ * per-path keying — would mint eight buckets to repay a loss the ruling
+ * described in one line. **But it is a tightening beyond what was authorised,
+ * so it is named here rather than sold as parity, and the operational cost is
+ * named with it: where one client key covers many humans — a NAT'd office
+ * egress, or the single proxied key the dev stack itself has — the whole key
+ * gets two sign-in cycles a minute.** Under `TRUST_PROXY` in production the key
+ * is the real client address, so this is per-person there.
+ *
+ * ## Why a fraction and not a constant
+ *
+ * A hard-coded 5 stops being a tightening the moment an operator lowers the
  * auth budget beneath it (at `authMax: 4` a bucket of 5 can never bind and is
  * dead code), and stops being proportionate the moment they raise it.
+ *
+ * **It is also not a rate.** This function never sees `windowSec`, so "5" is 5
+ * per `RATE_LIMIT_WINDOW_SEC`, not 5 per 60s: an operator setting the legal
+ * `RATE_LIMIT_WINDOW_SEC=10` gets 5 per 10s and nothing here notices.
  *
  * The half also carries a MEASURED deployment fact. The dev stack sets
  * `RATE_LIMIT_AUTH_MAX=60` because its web container proxies every browser into

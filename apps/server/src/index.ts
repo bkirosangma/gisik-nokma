@@ -189,13 +189,14 @@ async function main(): Promise<void> {
           // Same knob as invites, for the reason `SecurityOptions.rateLimit`
           // gives: a fourth bucket, no fourth environment variable.
           mcpMax: config.rateLimitAuthMax,
-          // HALF the auth budget, and a fraction rather than a constant for a
-          // reason worth stating: at the shipped default of
-          // `RATE_LIMIT_AUTH_MAX=10` this is **5**, which is exactly the max
-          // better-auth's magic-link plugin enforced before the 2026-09-08
-          // ruling switched its limiter off — parity by arithmetic, not by
-          // coincidence — and it stays a real tightening at every other value
-          // an operator might choose, which a hard-coded 5 would not.
+          // HALF the auth budget. At the shipped `RATE_LIMIT_AUTH_MAX=10` this
+          // is 5 — the same integer better-auth's magic-link plugin enforced,
+          // but NOT the same budget and NOT parity: better-auth keyed per
+          // (ip, path), so each leg of a cycle had its own 5, where this is one
+          // bucket across the whole sign-in family and a cycle costs two of it.
+          // Two complete cycles per window, not five. `signInMaxFor`'s docblock
+          // carries the arithmetic and why the tightening is kept anyway; an
+          // earlier version of this comment called it parity and was wrong.
           //
           // A hard-coded 5 was measured and rejected. The e2e stack runs seven
           // sign-in cycles per run, and better-auth's rule matched BOTH

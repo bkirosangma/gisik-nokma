@@ -969,6 +969,51 @@ describe('rate limiting — the sign-in bucket', () => {
    * exercise the real seam with a real alternative spelling, and the mutation
    * that deletes the slash collapse kills it here as well as in the unit table.
    */
+  /**
+   * 13.280 — `retry-after` is a LOWER bound when the two buckets' windows opened at different instants, and the caller that obeys it exactly can still be refused.
+   *
+   * Found in review against a comment that asserted the opposite. It is pinned
+   * as a case rather than left as prose for two reasons: the behaviour is
+   * defensible (a hint that is too short costs a wasted round trip and admits
+   * nothing that should be refused) but it is NOT obvious, and a later change
+   * that widens `RateLimitVerdict` to carry each window's end can make this
+   * exact assertion flip — which is what a pinned case is for.
+   *
+   * The mechanism: `auth:` refuses while `signin:` is still allowed but
+   * filling, because a sign-in is charged to `signin:` even when `auth:` has
+   * already refused it. So `signin:`'s window opens LATER than `auth:`'s and
+   * outlives it.
+   */
+  it('tells the caller a wait shorter than the one it will actually serve, when the second bucket’s window opened later', async () => {
+    let t = 1_000_000;
+    const { app } = build({
+      ...limits({ authMax: 10, signInMax: 5 }),
+      now: () => t,
+    });
+    // Spend `auth:` on a path OUTSIDE the sign-in family, so `signin:` is
+    // untouched and its window has not opened.
+    for (let i = 0; i < 10; i += 1) {
+      await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    }
+    // One second before `auth:` rolls over.
+    t += 59_000;
+    const told: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const refused = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+      told.push(refused.json().retryAfterSeconds);
+    }
+    // Every one of those was refused by `auth:` — and charged to `signin:`
+    // anyway, which opened `signin:`'s window HERE, 59 seconds after `auth:`'s.
+    expect(told).toEqual([1, 1, 1, 1, 1]);
+    // The caller obeys exactly.
+    t += 1_000;
+    const onTime = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    // `auth:` has reopened. `signin:` has not, and will not for another 59s.
+    expect(onTime.statusCode).toBe(429);
+    expect(onTime.json().retryAfterSeconds).toBe(59);
+    await app.close();
+  });
+
   it('charges a doubled-slash spelling of a sign-in path to the sign-in bucket', async () => {
     const { app } = build(limits({ signInMax: 1, authMax: 100 }));
     const direct = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });

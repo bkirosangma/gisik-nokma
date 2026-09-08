@@ -25,10 +25,10 @@ free in this block**). ~~**The next free BLOCK is `13.241`, controller-allocated
 line would have been handed an occupied block. ~~**Block `13.266`–`13.275` is allocated to the serial
 executor (controller, 2026-09-08); the next free BLOCK is `13.276`, controller-allocated ON REQUEST
 ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`–`13.275` is EXHAUSTED
-and `13.276`–`13.279` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
+and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. **The next free BLOCK is `13.280`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. **The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1679,7 +1679,7 @@ see #324", pointing whoever restarts from this file at a closed PR for work that
 
 ## The sign-in bucket (2026-09-08) — the follow-up the better-auth ruling recorded
 
-*Block note: `13.275` is the last id of the executor's `13.266`–`13.275` allocation; `13.276`–`13.279`
+*Block note: `13.275` is the last id of the executor's `13.266`–`13.275` allocation; `13.276`–`13.280`
 are taken from the next block, **requested from the controller and used provisionally** rather than
 waited on — serial mode has one executor and therefore no other claimant, and an unmerged id can still
 be renumbered. **The next free BLOCK is now `13.280`, controller-allocated ON REQUEST ONLY.** Recount
@@ -1723,9 +1723,27 @@ next-free pointer is a cache which goes stale silently, and this line is one mor
   i.e. a check that cannot fail for the reason its name gives. It was rewritten around the doubled
   slash, which the probe shows `inject` delivers verbatim, rather than kept as a green tick meaning
   nothing — the same call 13.273's author made in #347.*
-- **13.279** ✅ `signInMaxFor` returns better-auth's own magic-link max (**5**) at the shipped
-  `RATE_LIMIT_AUTH_MAX=10`, returns 30 at the dev stack's 60, and across ten budgets is never 0 and
-  never above `authMax`. The parity claim pinned as an assertion so it cannot drift into prose. Both
-  invariants are load-bearing: a bucket of 0 refuses the FIRST request — reachable at the legal
-  `RATE_LIMIT_AUTH_MAX=1` — and a bucket above `authMax` could never bind, making the control dead code.
+- **13.279** ✅ `signInMaxFor` is half the auth budget — **5** at the shipped `RATE_LIMIT_AUTH_MAX=10`,
+  30 at the dev stack's 60 — never 0, and **strictly** smaller than `authMax` for every budget above 1,
+  with `authMax: 1` asserted as the one named exception. Both invariants are load-bearing: a bucket of 0
+  refuses the FIRST request, and a bucket that equals `authMax` refuses at the same ordinal as the
+  general one and so changes no verdict.
   *Controlled: returning `authMax` unchanged reddens it.*
+  *Two corrections from review, both in this one case. Its NAME was "returns better-auth's magic-link
+  max at the shipped default" — **a false claim pinned where it reads as measured.** 5 is the same
+  integer, but better-auth keyed per (ip, PATH), so each leg of a sign-in cycle had its own 5; this is
+  one bucket across the family and a cycle costs two of it, i.e. 2 complete cycles per window against
+  better-auth's 5. And the bound was `toBeLessThanOrEqual(authMax)`, which **admitted the single value
+  (`authMax: 1`) at which the docblock's own stated failure — inertness — actually occurs**: a gate
+  closing one end of a range, the exact shape this file catalogues.*
+- **13.280** ✅ `retry-after` is a **lower** bound when the two buckets' windows opened at different
+  instants: a caller refused by `auth:` is charged to `signin:` anyway, so `signin:`'s window opens
+  later and outlives it. Measured at production-shaped config — told **1 second**, refused for **59
+  more** — and the case asserts exactly that, `[1,1,1,1,1]` then a 429 carrying 59.
+  *Pinned rather than fixed, and pinned rather than left as prose. It is a HINT being short, never a
+  bound admitting too much: the early caller gets another 429 with a fresh figure. The correct fix
+  needs each bucket's window END, which `RateLimitVerdict` does not carry, and widening that contract
+  touches all five buckets to sharpen an advisory header. **Owner: whoever next changes
+  `RateLimitVerdict`** — and this case is what that change flips.*
+  *Found in review against a comment in `app.ts` that asserted the OPPOSITE as an invariant the code
+  upheld. The `Math.max` it pointed at covers only the both-refuse-the-same-request shape.*
