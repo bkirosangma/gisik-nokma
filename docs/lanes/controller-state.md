@@ -1,5 +1,72 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY 07:5x IST — CONTROLLER RESTARTED. PR #325 (SECURITY HEADERS) MERGED, INDEPENDENTLY VERIFIED. `main` is `ee507f4`. PRs #326/#327 now CONFLICTING (need rebase, executor's to fix); PR #328 deliberately HELD — the executor is mid-investigation on it right now.
+
+**This session started from a full restart** (both controller and executor killed and relaunched this
+morning, owner's own command). `docs/lanes/controller-state.md` and `docs/lanes/executor-state.md` (on
+`exec/116-tap-targets`, the executor's live branch) were both read in full per this file's own FIRST
+ACTION instruction before anything else.
+
+**Recovering an undocumented HOLD from the prior session.** claude-mem (not this file) recorded that the
+previous controller, after merging #331/#332, deliberately held further merges "to give the executor a
+stable rebase target at `14b8480`" while PRs #325–#328 were CONFLICTING on the old `mcp-server/12`
+branch. **That hold was never written here** — a restart reading only this file would not have known it
+existed. Recording it now so the gap doesn't repeat: the hold existed, its purpose (a stable target to
+rebase four stranded PRs onto) was served, and by this session's start all four had gone MERGEABLE
+against `main` — the executor had already rebased them before this restart. The hold is released.
+
+**PR #325 merged and independently re-verified — not taken on the branch's own report.** `baseRefName`
+confirmed `main` before merging; **no branch deleted** (`exec/113-security-headers`'s own text
+independently arrives at the same rule this file already carries: "merge a stack tip-first, or merge
+without deleting branches" — these four aren't stacked, but the rule costs nothing to keep here too).
+Reachability confirmed (`git merge-base --is-ancestor ee507f4 origin/main`); five source files
+checksummed PR-head-vs-merge-commit, all MATCH, none hashing to the empty-input constant.
+
+**A real near-miss, caught before it became a false anchor: my own local `main` never advanced past
+`14b8480` after the merge — I had `fetch`ed but never `pull`ed/fast-forwarded.** The first forced-gate
+run I took as evidence (`33/33 EXIT 0`, `3894 passed | 5 skipped, 317 files`) matched the OLD `267c104`
+baseline **exactly**, digit for digit — the tell, in hindsight, since #325 added a whole new test file.
+`git rev-parse HEAD` said `14b8480`; `security-headers.test.ts` didn't exist on disk. Re-synced
+(`git checkout main && git merge --ff-only origin/main`) and re-ran for real: **`33/33 EXIT 0`, node
+`v22.22.2` confirmed, no `Unsupported engine`, `318 test files / 3,901 passed | 5 skipped` (server
+142→143 files / 1427→1431 tests, web 145→148 tests — exactly #325's two new/extended files, nothing
+else moved)**. The first run would have anchored a gate result for code that was never on disk — this
+file's own standing rule ("never trust local checkout without confirming it matches origin") exists for
+exactly this shape, and it worked because the exact-match coincidence was itself the anomaly that
+triggered a second look, not because the process caught it automatically.
+
+**A second, smaller near-miss in the same round: the six project-level checks (`check:env` through
+`check:help`) all failed `ERR_PNPM_UNSUPPORTED_ENGINE` on the first pass** — this shell's default `node`
+is `v24.11.1`, and I ran them without `nvm use 22` first, the exact "no `Tasks:` line, the command is
+wrong not the code" shape rule 4 warns about. Re-run correctly (`nvm use 22` in the same shell call):
+**all six EXIT 0** — `check:env` (56 documented/48 referenced, clean), `check:tasks` (**190/190, 100%
+VERIFIED COMPLETE**, `origin/main` confirmed `ee507f4`), `check:runbook` (17 refs/15 distinct, all
+resolve), `check:citations` (**1,674 checked / 1,674 cited / 0 uncited across 12 files**, ratchet holds
+exactly on every file), `check:help` (2 docs/29 sections/224 entries, generated copy matches source),
+`check-case-ids` (**1,768 unique ids**, highest `15.17`). `check:db-tz` not re-run — out of scope for a
+headers-only change and needs the dev stack, which wasn't brought up this round.
+
+**CI is still the same account-wide GitHub Actions billing block this file has documented for two days
+running** — re-confirmed on `main`'s own HEAD both before and after this merge (`gate`/`scope`/every
+`check-*` job: 3-second run, zero steps, *"recent account payments have failed"*). Same standing owner
+waiver applies (first given ~15:20 two sessions ago, reaffirmed repeatedly, "do not re-ask unless the
+situation changes") — the situation has not changed. Merged on the strength of the branch's own local
+gate (independently reproduced above) plus this waiver, not on any CI signal, per that standing ruling.
+
+**PRs #326 (mobile dev-token guard) and #327 (mobile dark theme) went from MERGEABLE to CONFLICTING the
+moment #325 landed** — both share Features.md/executor-state.md edits with #325 (narrative-only overlap,
+by each branch's own account), and GitHub's post-merge recompute found real conflicts, not just noise.
+**This is the executor's rebase to do, not this controller's** — no PR branch was touched directly here.
+Not yet communicated to the executor as this entry is written; see the tmux message sent alongside this
+PR's own notice.
+
+**PR #328 (tap targets, `exec/116-tap-targets`) is deliberately UNMERGED, on purpose, not overlooked.**
+The executor is live and mid-investigation on this exact branch right now — its own handoff's newest
+entry (`~05:0x IST`, head `cc5b977`, forced gate `33/33 EXIT 0` there too) already looked finished, but
+the pane shows it actively chasing a follow-up scope question (whether a font-size fix belongs in this
+branch, and which suite — the working tree or the built container — actually proves it) that could add
+more commits. **Do not merge #328 on the strength of `cc5b977` alone; wait for the next push.**
+
 ## ✅ MONDAY 22:5x IST — A PREVENTATIVE GATE LANDED FOR THE EXACT STACKED-PR-COLLAPSE FAILURE CLASS. PR #331 merged. `main` is `df3f48f`, `check:tasks` clean (190 tasks / 13 plan files, 0 stale citations).
 
 **`check-task-ledger.mjs` now hard-fails on a ledger row citing a PR that closed without merging** —
