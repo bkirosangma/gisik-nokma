@@ -233,6 +233,78 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
 >
 > **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
+# ▶ TUESDAY 2026-09-08 ~13:5x IST — **THREE THINGS I HAD NOT CHECKED, CHECKED. ONE IS A PRODUCTION LEAD BIGGER THAN THE TASK THAT FOUND IT.**
+
+*Branch `exec/123-signin-redirect`. Closes the mutation-witness gap on 13.270 and answers the "why does
+the web container post magic-link" question the previous entry left open.*
+
+## 1. THE P1 CONVERTS A BAD LANDING INTO A HARD OUTAGE IF THE ORIGINS DISAGREE — CHECKED, AND THEY DO NOT
+
+The old RELATIVE `callbackURL` **could not be refused**: `isTrustedOrigin(url, { allowRelativePaths:
+true })` waves relative paths through. The new absolute one **is validated**, and case 13.269 proves the
+server answers **403 `INVALID_CALLBACK_URL`** on an untrusted origin. So if `WEB_ORIGIN` and the
+browser's real origin ever differ by scheme, host, port, `www` or a trailing slash, the fix turns
+*lands on the wrong page* into ***cannot sign in at all***. I had verified the match only where the two
+are trivially equal.
+
+**Checked against `deploy/do/app.yaml`: `WEB_ORIGIN` is `https://pm.artsourced.in` (line 118-119) and
+the web app is served on `pm.artsourced.in` (`domains:` 268-269, ingress `exact: pm.artsourced.in`).
+Byte-for-byte, no trailing slash, no `www`.** Production is safe. Case 13.188 exists because a trailing
+slash alone was once enough to break this, so it was worth one grep.
+
+## 2. ⚠ WHY THE WEB CONTAINER MAKES AUTH REQUESTS — IT IS A PROXY, AND THIS IS A PRODUCTION LEAD
+
+The previous entry listed "why does `172.30.0.6` post magic-link" as not established. **It is
+`apps/web/next.config.ts:94`:**
+
+```
+{ source: '/api/auth/:path*', destination: `${serverOrigin}/api/auth/:path*` }
+```
+
+**Every browser's auth traffic is proxied through the Next server.** That is why all 69 auth requests
+carried the web container's address and why **every single 429 came from it** while the browser's own
+address never tripped anything.
+
+**Now the part that is not about the test suite.** Three facts, each verified:
+* the running server has **`NODE_ENV=production`**, and better-auth's limiter is demonstrably active
+  there (it produced the 429s);
+* `deploy/do/app.yaml` sets **`TRUST_PROXY=true`** with the comment *"without it every client in the
+  world shares one bucket"* — so **OUR** limiter is proxy-aware in production;
+* **better-auth's own limiter has no `trustedProxyHeaders` configuration at all** (grepped `auth.ts`
+  and `app.ts`: 0 matches).
+
+**So the precaution that was taken for our limiter was not taken for better-auth's, and better-auth's is
+the one actually firing.** If it keys on the socket address, every user's magic-link sends in production
+share one small bucket behind the proxy — a first-run sign-in defect, not a test-suite annoyance.
+
+**STATED AS A LEAD, NOT A FINDING, and here is the exact step I did NOT take:** I did not verify
+better-auth's own IP-derivation default, nor whether the Next rewrite and DO's ingress preserve an
+`X-Forwarded-For` that it would honour. **Do not repeat this as established.** It is one experiment away
+— two clients from different addresses, through the proxy, and see whether they share a budget.
+
+## 3. 13.270 WAS ✅ WITHOUT A MUTATION WITNESS — NOW WITNESSED
+
+The dispatch's requirement 4 said the new assertion must go red and name the site. I had marked 13.270
+green on three passing sign-ins, **which is the same evidence shape as the assertion it replaced** — and
+that one passed for weeks while the defect shipped.
+
+**Witnessed without a rebuild, which is the trick worth keeping: the emitted link carries `callbackURL`
+in its OWN query**, so rewriting it to the pre-fix relative value inside the helper reproduces the
+server's pre-fix state from the test process. **EXIT 1**, naming the site: *"the browser is on
+`http://localhost:3000/workspaces`, not the web app at `http://localhost:3001`"*. Restored, re-run
+green.
+
+**The load-bearing detail: the OLD assertion would have PASSED that same run** — the landing path is
+`/workspaces`, which contains no `/sign-in`. So this is not just "the check fails when the code is
+broken"; it is the direct demonstration that the check it replaced could not tell the defect from
+success.
+
+## ANCHORS
+
+Gate at `cb8e259`: **33/33 EXIT 0, `Cached: 0` (forced)**; all six project checks EXIT 0
+(`check-case-ids` via `node scripts/check-case-ids.mjs`). `exec/122-font-inherit` is **still frozen at
+`85b0eb8`** — verified by `git ls-remote`, not assumed — and PR #344 is OPEN/MERGEABLE against it.
+
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
 # ▶ TUESDAY 2026-09-08 ~13:2x IST — **ITEM B MEASURED. ITEM C'S ESCAPE HATCH FIRES: `RATE_LIMIT_AUTH_MAX` IS NOT THE BINDING CONSTRAINT AND MUST NOT BE RAISED.**
 

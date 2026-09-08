@@ -1408,6 +1408,16 @@ change; two call sites, one bug.*
   *RUN after the rebuild: every stack test that signs in goes through this assertion, and the three
   that reached it passed (`smoke.spec.ts` x2, `viewport.spec.ts:66`). The container was confirmed to
   carry the fix first — the served sign-in chunk contains `location.origin`, fetched over HTTP.*
+  *MUTATION RUN, and it needed no rebuild, which is the trick worth keeping: **the emitted link carries
+  `callbackURL` in its own query**, so rewriting it to the pre-fix relative value in the helper puts the
+  server in exactly the state it was in before the fix, from the test process. Result: **EXIT 1**, and
+  the assertion named the site — `after following the magic link the browser is on
+  http://localhost:3000/workspaces, not the web app at http://localhost:3001`, `Received:
+  "http://localhost:3000"`. Restored and re-run green.*
+  ***THE OLD ASSERTION WOULD HAVE PASSED THAT EXACT RUN.*** The mutated landing path is `/workspaces`,
+  which contains no `/sign-in`. So this is not merely "the new check fails when the code is broken" —
+  it is the direct demonstration that the check it replaced could not distinguish the defect from
+  success. Requirement 4 of the dispatch, satisfied against the property that mattered.*
   *THE ASSERTION IT REPLACES IS A CHECK THAT COULD NOT FAIL, and it is why this defect reached the
   owner's hands: `waitForURL((url) => !url.pathname.includes('/sign-in'))` **is satisfied by a JSON
   404.** It asserted the user LEFT the sign-in page and never that they ARRIVED anywhere.*
