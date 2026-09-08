@@ -206,4 +206,56 @@ describe('R1(c) at the component layer', () => {
   it('13.291 the field input KEEPS its border — an empty field has no label to identify it', () => {
     expect(rule('.gn-field__input')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
   });
+
+  /**
+   * 13.339 — under `data-style="neo"` the empty input renders the sunken,
+   * no-border treatment (Task 14 AMENDMENT rule (a), owner ruling 2026-09-09:
+   * "pure neo look"). `hig`/`minimal` are UNCHANGED by this rule and keep
+   * 13.291's bordered look — the override is scoped to `[data-style="neo"]`.
+   *
+   * **OWNER-ACCEPTED WAIVER, recorded verbatim (Task 13's measurement, the
+   * neo-round ruling item 5): the sunken field's shadow edge measures 1.24
+   * (light) / 1.16 (dark) — both below the 3:1 WCAG 1.4.11 floor a non-text
+   * boundary owes. The owner reaffirmed "pure neo look" knowing this, so the
+   * border is dropped rather than kept as a compromise.** This is the one
+   * exemption from the non-text-contrast sweep the ruling authorises — no
+   * other selector may drop below 3:1 on this ground.
+   *
+   * Two positive controls guard against `rule()`'s substring matching: the
+   * neo selector and the base selector must read back DIFFERENT bodies (the
+   * override selector text contains ".gn-field__input" as a substring, so a
+   * regex bug could silently re-match the base rule and pass either way), and
+   * `border: none` — not merely "no border declaration" — is the asserted
+   * value, because the base rule's `border: 1px solid var(--gn-border)` would
+   * otherwise cascade in and still paint.
+   */
+  it('13.339 under neo the field input is sunken and borderless — hig/minimal keep their border', () => {
+    const base = rule('.gn-field__input');
+    const neo = rule('[data-style="neo"] .gn-field__input');
+    expect(neo, 'the neo override must be a distinct rule, not a re-match of the base').not.toBe(base);
+    expect(base).toMatch(/border:\s*1px solid var\(--gn-border\)/);
+    expect(neo).toMatch(/border:\s*none/);
+    expect(neo).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+    expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+  });
+
+  /**
+   * 13.340 — ghost/secondary controls keep fill + accent label as their
+   * identifying signal in EVERY style, never a style-specific override that
+   * strips it back to a boundary (or to nothing). 13.289 already pins this for
+   * the unconditional base/ghost rules; this case is the POSITIVE scan that no
+   * `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` at all
+   * — so there is no style-specific path for a fill/label removal to hide in,
+   * and 13.289's unconditional assertion is the whole story for every style.
+   *
+   * Mutation: add a `[data-style="neo"] .gn-button { background: none; }` (or
+   * similar) block → this reddens, naming the style, without touching 13.289.
+   */
+  it('13.340 no [data-style] block overrides .gn-button in any style — 13.289 covers every style alone', () => {
+    const styleBlocks = [...UI_CSS.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+    expect(styleBlocks.length, 'the scan found no [data-style] block at all — it is reading nothing').toBeGreaterThan(0);
+    for (const [fullMatch] of styleBlocks) {
+      expect(fullMatch, fullMatch).not.toMatch(/\.gn-button\b/);
+    }
+  });
 });

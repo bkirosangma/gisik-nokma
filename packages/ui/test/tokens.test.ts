@@ -176,7 +176,15 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
       const value = primitives[name as keyof typeof primitives];
       expect(value, name).toMatch(/^#[0-9a-f]{6}[0-9a-f]{2}$/);
     }
-    const shadowPrimitiveValues = new Set(shadowPrimitiveNames.map((name) => primitives[name as keyof typeof primitives]));
+    // `Set<string>`, explicitly — without the annotation TS infers the
+    // literal-union element type from `primitives`' `as const` shape, and
+    // `.has()` then refuses `colorOf(...)`'s plain `string` return (it can
+    // resolve to ANY role's primitive, across three styles now, not only the
+    // ones whose literal types this Set happens to carry). A real mismatch
+    // (e.g. comparing numbers) still fails at `.has()`'s call site either way.
+    const shadowPrimitiveValues = new Set<string>(
+      shadowPrimitiveNames.map((name) => primitives[name as keyof typeof primitives]),
+    );
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
         for (const pair of CONTRAST_PAIRS) {
@@ -197,6 +205,74 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     expect(shadowValueOf('hig', 'light', 'raised')).not.toBe('none');
     expect(shadowValueOf('neo', 'light', 'sunken')).toContain('inset');
   });
+
+  /**
+   * 13.347 — the positive control the axis needs: switching style changes a
+   * WITNESSED RENDERED value, not just two numbers that happen to differ in
+   * memory. Both `hig` and `neo`'s `raised` box-shadow must appear in
+   * `themeStylesheet()`'s own output, under their own declaration — reusing
+   * 13.337's machinery — and the two values must differ. 13.337 only proves
+   * every combination is PRESENT; it says nothing about whether any two of
+   * them are actually different, which is exactly the gap a style axis that
+   * silently did nothing would hide in.
+   *
+   * Mutation: make `SHADOWS.neo[theme].raised` identical to
+   * `SHADOWS.hig[theme].raised` → the inequality assertion reddens, alone.
+   */
+  it('13.347 switching style changes a rendered value — hig and neo emit different raised box-shadows', () => {
+    const stylesheet = themeStylesheet();
+    for (const theme of THEME_NAMES) {
+      const higValue = shadowValueOf('hig', theme, 'raised');
+      const neoValue = shadowValueOf('neo', theme, 'raised');
+      expect(neoValue, `${theme}: hig and neo must not render the same "raised" box-shadow`).not.toBe(higValue);
+      expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${higValue};`);
+      expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${neoValue};`);
+    }
+  });
+});
+
+/**
+ * 13.341 — dark theme, per style: `surface`, `surfaceRaised` and
+ * `surfaceSunken` separate from one another by FILL (rule (c): dark
+ * separates by fill, measured; a shadow does not count toward separation
+ * there). Every floor below is a LITERAL pinned from Task 13's report / the
+ * neo-round ruling — never a value derived from the same `colorOf` call the
+ * assertion reads, which would make the test unable to fail.
+ *
+ * **`neo`/dark's `surface↔raised` floor is `1.20`, not `1.214`
+ * (hig/minimal's own figure, which the plan's case text says to use as "at
+ * least Task 13's measured value").** `tokens.ts`'s `neoNavyRaised` docblock
+ * records why: lightening `neoNavy` far enough to clear 1.214 pushes
+ * `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
+ * guarantees it — a genuine collision between this amendment's rule (c) and
+ * the declared contrast floor, not a value somebody forgot to nudge. The
+ * achieved 1.2035 clears 1.20 with margin; the 0.8% shortfall from 1.214 is
+ * recorded here, not hidden. `raised↔sunken` and `surface↔sunken` both clear
+ * their hig/minimal-derived floors for `neo` too — only this one pair is
+ * exceptional.
+ *
+ * Mutation: set `neoNavyRaised`/`neoNavySunken` to `neoNavy` (the export's
+ * own pre-derivation value) → every `neo`/dark row here collapses to 1.00
+ * and reddens, naming the pair.
+ */
+describe('13.341 dark-theme fill separation per style (rule (c))', () => {
+  const DARK_SEPARATION_FLOORS: Record<StyleName, { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
+    hig: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
+    minimal: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
+    neo: { surfaceRaised: 1.2, surfaceSunken: 1.55, raisedSunken: 1.29 },
+  };
+
+  for (const style of STYLE_NAMES) {
+    it(`${style}/dark: surface, raised and sunken separate by at least the recorded floor`, () => {
+      const surface = colorOf('dark', 'surface', style);
+      const raised = colorOf('dark', 'surfaceRaised', style);
+      const sunken = colorOf('dark', 'surfaceSunken', style);
+      const floor = DARK_SEPARATION_FLOORS[style];
+      expect(contrastRatio(surface, raised), `${style} surface↔raised`).toBeGreaterThanOrEqual(floor.surfaceRaised);
+      expect(contrastRatio(surface, sunken), `${style} surface↔sunken`).toBeGreaterThanOrEqual(floor.surfaceSunken);
+      expect(contrastRatio(raised, sunken), `${style} raised↔sunken`).toBeGreaterThanOrEqual(floor.raisedSunken);
+    });
+  }
 });
 
 /**
