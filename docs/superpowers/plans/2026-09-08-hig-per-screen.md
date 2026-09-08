@@ -1098,6 +1098,38 @@ never decides. Anything below 3:1 is reported, not rounded, not "close".
 - [ ] Extract from the exported files (light and dark, desktop and mobile variants where they differ); measure; write
   both files with the probe script; one PR, docs + `design-system/` only, frozen-head protocol.
 
+### RULING — the neo-round palette (controller as ruling tier, 2026-09-09 ~03:1x IST; revocable by the owner in a word)
+
+**Input:** Task 13's report (`docs/neo-token-report.md`, #385 → `777c5b1`): every style in the export moves surface,
+raised, sunken AND the cascade's `--accent` default away from `packages/ui/src/tokens.ts`, in both themes; neo/dark's
+surface, raised and sunken are one hex (`#1B2340`, separation 1.00); light `label3` on surface 2.96–2.99 and the
+export's accent on surface 4.19–4.3 fail 4.5:1; the neo sunken input's shadow edge is 1.24 light / 1.16 dark.
+
+1. **The exported palette IS the design and is ADOPTED for all three styles × both themes** — surface, raised, sunken,
+   overlay, the fill ladder, radii and the shadow treatments, transcribed from `design-system/neo-tokens.json`. The
+   owner's instruction is *"apply the new visuals from the design files"*; the amendment's "palette carries over" was
+   the controller's reading from screenshots and is superseded by the measurement. The shipped cool palette (#353) is
+   replaced for the `hig` style too — the export's `hig` is warm paper / navy dark. `success` stays `green700`.
+2. **The ACCENT stays SHIPPED (`#0040DD` light / `#409CFF` dark) pending the owner's word.** The probe read the
+   `<style>` cascade default (`--accent:#3A6DB0`); the design session's accent PICKER offers four accents with the
+   shipped blue first and selected (the #379 screenshots), and the report's own gaps section says the instrument cannot
+   see runtime/inline values. A cascade default is not the applied accent. Adopting `#3A6DB0` would also fail 4.19 on
+   surface. **Owner question, one word: keep the blue accent?** Until answered, Task 14 keeps the shipped accent.
+3. **The accessibility floor is kept by MINIMAL NUDGES recorded against the export value** — the #353 shape (Apple's
+   stock colours failed 15 pairs; their accessible variants passed): (a) every `CONTRAST_PAIRS` row passes at the
+   transcribed values — the test is the gate; a failing pair is nudged (the nearest value in the same hue), never
+   deleted from the roster; `label3`/`textMuted` on surface reaches 4.5 in every light style (nudge darker); (b)
+   **neo/dark gets derived `raised` and `sunken` steps** giving at least the export's own sibling-style separation
+   (hig/minimal dark: surface↔raised 1.21, surface↔sunken 1.46), with neo's shadows kept on top — rule (c) as written;
+   every nudge is a line in the token file's docblock: export value → shipped value → why.
+4. **Rule (b) clarified:** the report's "`ctlBg`/`chipBg` vs surface below 3:1" rows are NOT rule-(b) failures. Rule
+   (b) (post-#354) identifies a control by fill + accent 600-weight label, not by a 3:1 fill boundary; those rows are
+   the accepted state in every style. No change.
+5. **Rule (a):** waived by the owner; `1.24 light / 1.16 dark` go verbatim into 13.339's waiver comment.
+6. **Gaps, with owners:** `--fill2` undeclared in `mobile.dc.html` and the missing `:focus-visible` rule there —
+   mobile is deferred, Task 11's note carries both; no overlay shadow variable in either file — Task 14 derives
+   `--gn-shadow-overlay` from the raised treatment and records it as derived, not measured.
+
 ### Task 14: The style axis (hig / minimal / neo) as a runtime toggle, neo default, and the four shared pieces
 
 **Model: sonnet / medium** implementer, **sonnet / medium** reviewer; the instruments are the check. **Escalate to an
@@ -1118,7 +1150,7 @@ three-style reading, correctable before this task's PR opens.)*
 accent set**, `success` stays `green700`; shadow colours are ALPHA primitives and the existing rule holds that *no
 `CONTRAST_PAIRS` row may name them* (`tokens.ts:120`). If Task 13's report shows the exported BASE palette differs from
 shipped (the warm-paper delta), that is a **controller ruling before this task builds** — do not fold a palette change
-into a token-axis task on your own. `themeStylesheet()` (`:388`) emits base + each `[data-style]` override + the dark
+into a token-axis task on your own. **The palette inputs are the RULING directly above this task: the export's palette adopted, the accent kept shipped pending the owner, the accessibility floor kept by recorded nudges, neo/dark raised/sunken derived.** `themeStylesheet()` (`:388`) emits base + each `[data-style]` override + the dark
 combinations through `cssVariableName` (`:375`). (2) The "31 `TOKEN_ROLES`" figure in the Global Constraints is a fact
 about `77b2ee8`; after this task it is whatever `TOKEN_ROLES` reads.
 
