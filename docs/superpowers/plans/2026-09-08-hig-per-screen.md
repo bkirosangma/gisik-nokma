@@ -1126,7 +1126,7 @@ about `77b2ee8`; after this task it is whatever `TOKEN_ROLES` reads.
 `apps/web/src/app-nav.tsx` beside `<ThemeToggle />` (`:26`), so it lands inside the accessible-name ratchet's
 signed-in population. It sets `data-style` on the same element `ThemeToggle` sets `data-theme` on, persists the choice
 the same way (whatever `theme-toggle.tsx` uses — read it, match it), and **defaults to `neo` when nothing is stored**.
-Options carry real `aria-label`s. **Pure neo look for inputs applies under `data-style="neo"` per the owner ruling
+Options carry real `aria-label`s. **Owner naming, 2026-09-09: *"there is neu | minimal | HIG styles"* — the toggle's visible labels are `HIG`, `Minimal`, `Neu`; the `data-style` VALUES stay the prototype's own (`hig`, `minimal`, `neo`) so the transcribed cascade selectors match byte-for-byte.** **Pure neo look for inputs applies under `data-style="neo"` per the owner ruling
 above (rule (a)); under `hig`/`minimal` the field keeps whatever boundary that style defines.**
 
 **Files:** `packages/ui/src/tokens.ts` (StyleName axis, roles, all style×theme sets, `themeStylesheet`),
