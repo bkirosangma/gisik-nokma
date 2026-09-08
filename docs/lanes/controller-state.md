@@ -1,5 +1,31 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY ~22:4x IST — **TASK 4 (Workspaces + Invite) MERGED (#374 → `b7464f6`), FORCED GATE GREEN, LEDGER 4a/4b → done, EXECUTOR RESTARTED AND HOLDING. `main` is `b7464f6` + this anchor. HOLD: the owner looks at `http://localhost:3001/workspaces` before anything after Task 4 starts; Task 12 is next after their word.** Zero open PRs.
+
+### The merge — and the frozen-head protocol did its job
+The executor declared `c2c6313` FROZEN, then committed its handoff (naming the PR) on top and pushed — **my abort guard fired on the re-fetched head (`4483e44` ≠ `c2c6313`)**, and the executor had caught the same breach itself in the same minute: *"I committed after declaring — my error, not a race"*. It **re-ran the forced gate AT `4483e44`** rather than arguing the delta was docs-only (it was: `executor-state.md` +10/−3) — *"docs-only therefore the gate transfers is exactly the reasoning that makes a frozen-head protocol decorative."* Merged at `4483e44` (CI waived, owner 15:20): `MERGE_EXIT=0`, MERGED `b7464f6`, reachable, **trees identical**, unfiltered diff 0 files, **partitioned drop check over 13 literal paths 0 bytes / empty stderr, same-pipeline control 72,627 bytes.** Six checks raw-green at `b7464f6`; **`check:tasks` now reads 209 tasks** (hig-per-screen 19: 3 done → 5 with this PR, 14 todo), **ids 1,818**.
+
+**Forced gate at `b7464f6`** (lock, install 0, rebuild 0): **`EXIT=0` · 33/33 · `Cached: 0` · node v22.22.2 · `Unsupported engine` 0 · `CHECK_ENV_EXIT=0` · no orphans · 3978 passed | 5 skipped (3983) / 321 files (domain 464·ui 98·rule-engine 282·mcp-server 43·editor 178·sync-client 90·app-core 1152·mobile 27·desktop 8·server 1475|5·web 161).**
+
+### Ledger: 4a and 4b promoted to `done` in this PR (controller, ruling tier) — evidence in the rows
+4a's declared `invite/[token]/page.tsx` was NOT modified (the invite surface is CSS over the existing markup) — a deviation named in the row, not hidden. 4b's 13.298 was **re-pointed by ruling** (`CTL-RULING-2026-09-08-task4-two.md`): the plan's mutation was unsatisfiable (already pinned in jsdom by `page-refusals.test.tsx:180`; the notice is transient before `router.push`), so the case now proves what nothing had — a real browser SETTLES on `/sign-in` after a 401. **My dispatch's "13.287 watches `/workspaces`" was FALSE** (no baseline held that route; written from the plan's promise, not the file) — `/workspaces` is in the stack sweep now, `/invite/<token>` recorded as a residual gap with an owner in the checklist.
+
+### Plan corrected in this PR — a pointer instruction that had become a collision
+Two lines (Global Constraints `:58`, Task 11 `:921`) told the last task to set §13's `next free BLOCK` pointer to **`13.321`**, which is a LIVE case since round 2b. Executor finding #3, mine to fix (I allocate the blocks): struck in place; the rule is *one past the highest allocated block as measured then* — `13.337` today.
+
+### What #374 found beyond its task — carried with owners
+- **`check-case-citations` runs catalogue→test only**: an id cited by a test with NO catalogue row is invisible to it; both checkers stayed green with 13.299/13.300 cited and no rows written. Owner: whoever next touches `scripts/check-case-citations.mjs` — a reverse pass (test→catalogue) with a planted defect.
+- **`PLANS_WITH_TASKS` omits `hig-per-screen`**; by the checker's own argument for `mcp-server` it should be there, or a drift that empties this plan drops the gate to a silent 190/190. Owner: the same script's next editor; cheap.
+- Docker: **83% → 88% (build 1) → 80% (prune) → 85% (build 2) → 78% / 12.4 GB (dangling-image + builder prune)**. My "prune first" and "~8 GB stop" instructions arrived AFTER build 2 — the floor was 8.3 GB free: *luck, not compliance*, in the executor's words. **Corrected instrument: the growth is superseded `gisik-nokma-dev-*` images (dangling), not build cache (30 MB) — `docker image prune -f`, dangling only, never `-a`.** The four `budtmo/docker-android` emulator images (~31 GB, unused, 2 years old) are the owner's; put to them.
+- The review's one Important was the executor's own unhedged mutation claim in 13.298's docblock (the positive control times out first, so the pathname assertion never runs) — corrected as a measurement, not a hedge; not "fixed" by reordering, which would have destroyed the control's reason to exist.
+- `invite/[token]/page.tsx:110` "any of the four sign-in methods works" — shipped copy, with the owner.
+
+### Owner items open, none blocking
+Veto/accept the two 2c Help passages · manual "five things" → four? · Workspaces subtitle · the invite line above · remove the emulator images? Google OAuth + Workspace SMTP proven; `.env` holds both (mode 600).
+
+### Next
+Owner looks at `/workspaces` → feedback → (a 4c round if any) → **Task 12** (passkey registration, the amended text) → the next screen they name. Executor fresh at 8%, holding on `override-hold-after-374.md`; restart again at the next merge.
+
 ## ✅ TUESDAY ~21:4x IST — **ROUND 2c MERGED (#372 → `469602f`), FORCED GATE GREEN, EXECUTOR RESTARTED AND ON TASK 4 (Workspaces + Invite) BY THE OWNER'S SEQUENCING. Google sign-in and real SMTP are live on the dev stack. `main` is `469602f` + this anchor. Zero open PRs.**
 
 ### Owner decisions this stretch, each on disk
