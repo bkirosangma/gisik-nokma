@@ -13,8 +13,9 @@ instead. It will not send you hunting for a button that was never built.
 
 Read these five. They are the ones that catch everybody.
 
-1. **On the sign-in screen, do not use the Phone tab.** It is the tab the screen opens on, and it does
-   not work. Use **Email link**, or the Google button, or a passkey. (§1)
+1. **Sign in with the email link.** It is what the screen opens on, and on this deployment it is the
+   way in. A **Phone** tab appears only where SMS delivery is configured, and it is not configured
+   here — so the screen does not offer it. (§1)
 2. **You cannot create a project.** There is no button for it anywhere. If your workspace has no
    projects, there is nowhere to put work, and somebody will have to add a project for you another
    way. (§3)

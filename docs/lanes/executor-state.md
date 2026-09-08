@@ -22,7 +22,13 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~20:3x IST. **READ THIS BLOCK BEFORE ANY OTHER IN THIS FILE.**
 >
-> **`main` is `5b4f8fc`. There are ZERO open PRs. The queue is EMPTY and a HOLD is in force.**
+> **PR #369 is merged. `main` is `5b4f8fc` plus this document's own merge. There were ZERO open PRs
+> when this was written, and the queue was EMPTY under a hold.**
+>
+> *The sha is phrased that way deliberately. The first version of this line read ``main`` is `5b4f8fc`
+> and was **wrong the instant it landed**: a line naming `main`'s commit inside a file that gets merged
+> INTO `main` cannot name the commit that contains it. It was two docs-only commits stale on arrival
+> (#370's anchor, and this block's own merge as `1115e24`). Name the PR, which does not move.*
 >
 > PR **#369** (`exec/135-signin-auth-methods` — 2b item 2, the rebuilt sign-in auth methods) is
 > **MERGED** as `5b4f8fc`. Verified rather than adopted from the controller's word:
@@ -62,9 +68,20 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## STILL OWED, UNASSIGNED — recorded so it is not lost, NOT to be started under the hold
 >
-> * **The widened staleness sweep**, items 1–2 of the #287 block's own "NOT VERIFIED" list: `.json`,
->   `.yml`, `.sh`, `Dockerfile`s and `README`s were never swept, and the pattern set was never
->   exhaustive. Merging #339 did not close either.
+> * ~~**The widened staleness sweep**~~ — **RUN 2026-09-08 and EMPTY; item 1 of the #287 block's
+>   "NOT VERIFIED" list is closed.** 1183 files across every extension that list names (`.json`,
+>   `.yml`, `.sh`, `Dockerfile`s, `README`s, and more), 11 patterns broadened past the original set.
+>   Coverage confirmed by name rather than assumed: `.github/workflows/ci.yml` is the only CI file and
+>   was in the list, along with all 7 READMEs and both Dockerfiles. **25 raw hits, all 25 inside
+>   `graphify-out/`, which is untracked and gitignored (`.gitignore:31`) — hits outside it: ZERO.**
+>   Positive control through the identical pipeline: 62, of which 25 survive the same filter.
+>   **Anchor, stated correctly because the first report of it was not:** the sweep was measured at
+>   `e2add78`, not at `1115e24` as first claimed — a worktree left on a merged branch is a stale tree
+>   that `git status` calls clean. The result still holds for `1115e24`, and that was CHECKED rather
+>   than assumed: the only two files differing between those trees are `docs/lanes/controller-state.md`
+>   and the per-screen plan, both `.md` and neither a README, so neither is inside the swept extension
+>   set — 0 in-scope hits, with a filter control matching 3 of 4 on a list where one entry must not
+>   match. **Item 2 of that list — "the pattern set is mine, not exhaustive" — is REDUCED, not closed.**
 > * **The four unwitnessed type-scale fixes** named further down. *I did not re-check whether they have
 >   since been witnessed — stated as unverified rather than repeated as owed.*
 >

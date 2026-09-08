@@ -54,19 +54,19 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "On the sign-in screen, do not use the Phone tab."
+                  "text": "Sign in with the email link."
                 },
                 {
                   "kind": "text",
-                  "text": " It is the tab the screen opens on, and it does not work. Use "
+                  "text": " It is what the screen opens on, and on this deployment it is the way in. A "
                 },
                 {
                   "kind": "bold",
-                  "text": "Email link"
+                  "text": "Phone"
                 },
                 {
                   "kind": "text",
-                  "text": ", or the Google button, or a passkey. (§1)"
+                  "text": " tab appears only where SMS delivery is configured, and it is not configured here — so the screen does not offer it. (§1)"
                 }
               ],
               [
@@ -5684,15 +5684,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "the-sign-in-screen-opens-on-phone-should-i-use-it",
-            "title": "The sign-in screen opens on \"Phone\". Should I use it?",
+            "id": "why-is-there-no-phone-option-on-the-sign-in-screen",
+            "title": "Why is there no \"Phone\" option on the sign-in screen?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. Type your number, press Send code, and no code will arrive — the product answers with a message saying sign-in is by email. Use the "
+                    "text": "Because this deployment has no way to send you a code. Sending an SMS to an Indian number needs a DLT-registered sender and template, which is a registration rather than a setting, and until that exists the screen does not offer a tab that cannot work. Sign in with the "
                   },
                   {
                     "kind": "bold",
@@ -5700,7 +5700,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " tab, or Google, or a passkey. This is the single most confusing thing on any screen in the product, because the option that fails is the one the screen puts in front of you first."
+                    "text": ". Where SMS delivery is configured, the Phone tab appears on its own."
                   }
                 ]
               }
