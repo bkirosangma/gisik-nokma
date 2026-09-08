@@ -1,5 +1,52 @@
 # Cross-lane controller — live state
 
+## ⚖ TUESDAY ~11:3x IST — OWNER RULED ALL THREE CARRIED ITEMS. Both were "owner-owned, unchanged" in the entry below; neither is any longer. `main` is `5191cf4`, zero open PRs, executor mid-sweep on #287 — **not interrupted.** Dispatch written, deliberately deferred.
+
+**The owner asked for both carried items in plain terms, was given them, and ruled:**
+
+1. **`font: inherit` — APPLY.** The owner accepted, explicitly, that the fix visibly resizes the
+   twenty-six controls `docs/pre-launch-checklist.md`'s `NEW, 2026-09-08` bullet enumerates. That
+   acceptance was the *only* thing holding it: the remedy was never in doubt, and the executor was right
+   that the earlier 2026-09-08 "take it" ruling (given against the 12.5px labels) could not be stretched
+   to cover a finding that did not exist when it was made. **This ruling is scoped to those 26 controls
+   and no further.**
+2. **Nail down the rate-limit evidence — YES.**
+3. **Raise `RATE_LIMIT_AUTH_MAX` for the e2e profile — APPROVED, test profile only.** Production
+   (`deploy/do/app.yaml`) and the `.env.example` default of `10` are explicitly out of scope.
+
+**A measurement taken while writing this ruling, which corrects the executor's own handoff and is the
+reason item 2 is not a formality.** `docs/lanes/executor-state.md` (~505) reads as though the auth
+bucket is keyed per email — *"429 for `accountant@…`, while I had probed `kiro@…`, which still had
+budget."* **The source says otherwise, and it is not close:**
+
+- `apps/server/src/app.ts:465` keys the bucket `auth:${clientKey}` from `rateLimitKeyFor(...)` — **the
+  client address. Never the email, never the user.**
+- `apps/server/src/app.ts:481` charges **the entire `/api/auth/*` mount except `OPTIONS`** to it, not
+  just the magic-link POST.
+
+So both emails shared **one** bucket and `kiro@` "still having budget" was a fresh window, not a
+different bucket. **This is the executor's own "a control that used a different input than the
+measurement" trap, one level below where it caught it** — it corrected the endpoint and never
+questioned the key. Rule 3 of this controller's own brief (a document contradicting a measurement) is
+what makes this an Opus ruling rather than a note; the correction is dispatched with the work.
+
+**It cuts BOTH ways, which is why the ruling ships with an escape hatch rather than a number.** One
+shared IP bucket covering the whole auth mount makes "five browser sign-ins exhaust 60/minute" newly
+plausible — every `get-session` on every page load counts, not just the five sends. That *supports* the
+owner's ruling. But it is still a theory, and the executor's own request-count was never established
+(its window spanned two prior runs). **So: measure first, and if one run's peak comes in comfortably
+under 60, the ceiling was never the binding constraint — STOP, do not raise it, hand the facts back.**
+A ruling given against a theory does not survive the theory's death; the owner gets the new facts
+instead. Raising a ceiling that was never hit would be a change that cannot be shown to work, which is
+this file's most-repeated failure class.
+
+**Dispatch NOT sent as a live interrupt, on purpose.** The executor is ~18 minutes into a five-agent
+widened-#287 sweep (4/5 agents done, ctx 19%). Full orders written to
+`gisik-nokma-lanes/CTL-RULING-2026-09-08-owner-three.md` — the file-plus-short-pointer pattern this
+project adopted after repeated tmux truncation — to be taken up **after its current PR lands and it is
+restarted**, per the loop's own fixed point. Two PRs: item 1 alone, then items 2+3 together (the
+measured peak is what chooses the value).
+
 ## ⏹ TUESDAY 11:1x IST — BOTH SESSIONS RESTARTING to pick up the fixed briefs (owner-directed). `main` is `cd050c8`, **nothing in flight, no open PRs, no branch to hand over.** This is the documented fixed point, reached deliberately rather than by luck.
 
 **If you are the controller reading this after the restart: the channel to the executor was broken and
