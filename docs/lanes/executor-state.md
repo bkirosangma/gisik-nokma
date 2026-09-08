@@ -78,6 +78,29 @@ form — measured and printed, not assumed. Weakening a case to kill an equivale
 starts asserting the implementation instead of the property.
 
 
+# ▶ TUESDAY 2026-09-08 ~03:2x IST — **THE PHONE'S HELP SCREEN FOLLOWS DARK MODE (owner-assigned).**
+
+*Off `main`, independent of #323/#324/#325/#326. Overlap is narrative only.*
+
+**The deferral reason was false and nobody had re-checked it.** The note beside the pinned theme said
+theming one screen "would leave the board and ticket screens light while the help screen went dark".
+Measured: `board-screen.tsx` and `ticket-screen.tsx` declare **no colours at all** — no `StyleSheet`, no
+`color`, no `backgroundColor`. There was nothing for it to become inconsistent with, and the note had
+stood for a month.
+
+`useColorScheme()` selects the palette; `app.json` gains `userInterfaceStyle: automatic`, without which
+the OS never reports dark and the hook answers light forever — a themed screen that can never BE dark,
+which reads exactly like a themed screen that works.
+
+The palette moved to a sibling `.ts` with no React or react-native import, because
+`apps/mobile/vitest.config.ts` is a node runner and its own docblock states the rule. The first attempt
+imported the `.tsx` and failed to parse; the config was right.
+
+Cases 12.394–12.396, three mutations, three killed. Gate **33/33 EXIT 0, `Cached: 0`**, Node
+**v22.22.2**; five checks EXIT 0. Pre-launch item 6's "recorded for the owner, not fixed" note is now
+marked CLOSED with what replaced it.
+
+
 # ▶ TUESDAY 2026-09-08 ~05:0x IST — **SIGNED-IN TAP TARGETS 7 → 6, AND A TARGET IS A BOX.**
 
 *Folded into `exec/116-tap-targets` / PR #328 rather than opened as a fifth PR — same item, same files,

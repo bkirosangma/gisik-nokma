@@ -2715,4 +2715,40 @@ carrying it." This is that mechanism.*
 > because exact key equality already rejects every commented form (`#EXPO_PUBLIC_DEV_TOKEN` and
 > `# EXPO_PUBLIC_DEV_TOKEN` are both keys that are not the name — measured, printed, not assumed). It is
 > an equivalent mutant, so the honest response is to record it rather than weaken a case until it dies.
+## The phone's help screen follows the device appearance (owner-assigned, 2026-09-08)
+
+*Pre-launch item 6 recorded `help-screen.tsx:59` resolving every colour through `colorOf('light', role)`
+— a dark-mode phone got light colours — and left it for the owner because "fixing it means deciding how
+the native app learns the OS preference". The answer is `useColorScheme()` plus one line of Expo config.*
+
+- **12.394** ✅ `themeFor` maps `'dark'` to dark and **everything else to light**, including `null`
+  (what `useColorScheme()` answers when the platform has no opinion), `undefined`, and an unrecognised
+  future string — none of which may silently darken a screen nobody asked to darken. —
+  (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: make anything-but-light mean dark → fails.*
+- **12.395** ✅ The two palettes **differ on every role**, and each is its own theme's token rather than
+  merely different from the other. Until this change every colour came from `colorOf('light', …)`, so a
+  "dark" palette would have been byte-identical to the light one and a case that only checked `themeFor`
+  would still have passed. — (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: pin the palette back to `'light'` → fails.*
+- **12.396** ✅ `app.json` declares `userInterfaceStyle: automatic`. Without it the OS never reports
+  dark, `useColorScheme()` answers light forever, and the screen is a themed screen that can never BE
+  dark — which reads exactly like a themed screen that works. —
+  (`apps/mobile/src/screens/help-theme.test.ts`)
+  *Mutation: remove the declaration → fails.*
+
+> ### The deferral reason was not true, and nobody had re-checked it
+>
+> The note beside the pinned theme said doing it "here for one screen would leave the board and ticket
+> screens light while the help screen went dark". **Measured: `board-screen.tsx` and `ticket-screen.tsx`
+> declare no colours at all** — no `StyleSheet`, no `color`, no `backgroundColor`. There was no light
+> theme for this screen to become inconsistent with. A deferral reason that is never re-checked outlives
+> its own justification.
+>
+> **What is asserted and what is not.** The palette is a sibling `.ts` with no React and no
+> `react-native` import, because `apps/mobile/vitest.config.ts` runs in a node environment and its own
+> docblock already states the rule — the first attempt at these cases imported the `.tsx` and failed to
+> parse. So the mapping and the palettes are driven directly. Whether iOS or Android actually reports
+> dark is NOT claimed here: that needs a device, and 12.396 asserts the declaration that makes it
+> possible rather than a rendered result.
 
