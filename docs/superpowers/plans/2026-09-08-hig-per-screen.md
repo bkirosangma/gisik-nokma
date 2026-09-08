@@ -61,6 +61,7 @@ Every task's requirements implicitly include all of these. Exact values, copied 
 - **`Features.md` and the owning `test-cases/` file change in the same commit as the code.** Never a follow-up.
 - **Model per task follows the coordination doc's table** (`2026-08-20-00-series-coordination.md:596-620`): *"the tier follows the failure cost of the task, not its size."* Transcription implementers (this plan carries the code) → **sonnet / medium**. Core-semantics implementers (view-models carrying honesty semantics — the (b) tasks) → **opus / high**. Per-task reviewers → **opus / high**. **Fable is not dispatched** (owner ruling 2026-08-31, "Fable out entirely").
 - **Mobile (`apps/mobile`, React Native) is NOT restyled by this plan.** CSS tokens do not transfer. Task 11 records the deferral durably with an owner — an unrecorded deferral is defect class 4 from Plan 1.
+- **Locating the `Features.md` bullet — by path, never by section number or title.** This plan's first draft pointed sign-in at "§6 (auth)"; the bullet is in **§3**, and the file's sections are not even in numeric order (§10 and §11 follow §12; there is no §8 heading). Three tasks in a row hit a wrong pointer before this rule replaced them. **Procedure:** `grep -n '<the screen's page.tsx path or component name>' Features.md` — e.g. `grep -n 'sign-in/page.tsx' Features.md`, `grep -n 'MembersPage\|members/page.tsx' Features.md` — and **extend the bullet that cites that path, in place.** If no bullet cites it, add the new bullet directly after the nearest bullet citing the same route family. A keyword grep is not enough: `board` first hits §1 Reference base, which describes the upstream tracker, not this product's board. **Never choose a section by reading its title.**
 
 ---
 
@@ -80,7 +81,7 @@ Every task's requirements implicitly include all of these. Exact values, copied 
 | `packages/ui/test/components.test.tsx` | SegmentedControl unit cases (13.288–13.290) | Task 1 |
 | `apps/web/app/sign-in/page.tsx` | Exemplar restyle | Task 2 |
 | one `apps/web/app/**/page.tsx` (+ its `packages/app-core` view) per screen | (a) surface / (b) states | Tasks 3–10 |
-| `Features.md` §2 / §6 / §14, `test-cases/13-deployment-dogfooding.md` | Same-commit catalogue updates | every task |
+| `Features.md` (locate each bullet per Global Constraints), `test-cases/13-deployment-dogfooding.md` | Same-commit catalogue updates | every task |
 | `docs/lanes/task-ledger.tsv` | One `done` row per merged task | controller, at merge |
 
 ---
@@ -97,7 +98,7 @@ Every task's requirements implicitly include all of these. Exact values, copied 
 - Create: `apps/web/e2e-stack/accessible-names-baseline.json`
 - Modify: `apps/web/e2e-viewport/responsive.spec.ts` (append one `test(...)` block after the 4b label-floor block)
 - Modify: `apps/web/e2e-stack/viewport.spec.ts` (append one `test(...)` block)
-- Modify: `test-cases/13-deployment-dogfooding.md` (cases 13.285–13.287), `Features.md` §2
+- Modify: `test-cases/13-deployment-dogfooding.md` (cases 13.285–13.287), `Features.md` (locate per Global Constraints)
 
 **Case ids:** `13.285` (signed-out ratchet), `13.286` (selector control), `13.287` (signed-in ratchet).
 
@@ -277,7 +278,7 @@ Expected: both `EXIT=0`; the stack baseline has one key per signed-in route the 
 - **13.287** ✅ The signed-in twin of 13.285, over the stack suite's routes. — (`apps/web/e2e-stack/viewport.spec.ts`)
 ```
 
-`Features.md` §2, add a bullet: `⚙️ **Accessible-name ratchet** — the counts of \`aria-label\` / \`role\` / \`aria-selected\` / \`aria-describedby\` per route are baselined one-way, so a restyle that drops one goes red. Built because the HIG adoption is delegated and a rule enforced by attention does not survive a delegation. Cases 13.285–13.287. \`apps/web/e2e-viewport/accessible-names.ts\``
+`Features.md` (locate per Global Constraints; new bullet goes beside the nearest one citing `apps/web/e2e-viewport`), add a bullet: `⚙️ **Accessible-name ratchet** — the counts of \`aria-label\` / \`role\` / \`aria-selected\` / \`aria-describedby\` per route are baselined one-way, so a restyle that drops one goes red. Built because the HIG adoption is delegated and a rule enforced by attention does not survive a delegation. Cases 13.285–13.287. \`apps/web/e2e-viewport/accessible-names.ts\``
 
 - [ ] **Step 8: Gate + commit**
 
@@ -301,7 +302,7 @@ git commit -m "A gate for accessible names, so a delegated restyle cannot drop o
 - Modify: `packages/ui/src/ui.css` (append `.gn-segmented*`, `.gn-field*`, `.gn-page-header*`; add the missing `.gn-button--ghost` rule; replace `.gn-refusal--preview` / `.gn-refusal--server` at lines 355-356)
 - Modify: `apps/web/app/globals.css` (retint `.gn-shell__refusal`, `.gn-shell__expired`)
 - Modify: `packages/ui/test/components.test.tsx` (three cases)
-- Modify: `test-cases/13-deployment-dogfooding.md` (13.288–13.291), `Features.md` §2
+- Modify: `test-cases/13-deployment-dogfooding.md` (13.288–13.291), `Features.md` (locate per Global Constraints)
 
 **Case ids:** `13.288` (SegmentedControl keeps tablist/tab/aria-selected), `13.289` (ghost button has fill and no border), `13.290` (refusal panels have no border), `13.291` (field keeps its border — the empty-field exception).
 
@@ -604,7 +605,7 @@ Run the same command. Expected: `EXIT=1`, failure names `13.289`. Revert with `g
 - **13.291** ✅ `.gn-field__input` keeps `border: 1px solid var(--gn-border)` — the one R1(c) exception, because an empty field has no label to identify it. — (`packages/ui/test/components.test.tsx`)
 ```
 
-`Features.md` §2: add `✅ **Segmented control, filled field, tinted refusal panels, page header** — the four shared HIG pieces (\`SegmentedControl\` in \`packages/ui/src/components/segmented-control.tsx\`; \`.gn-field*\`, \`.gn-page-header*\`, retinted \`.gn-refusal*\` in \`ui.css\`). The ghost button gets the rule it never had. Cases 13.288–13.291.`
+`Features.md` (locate per Global Constraints; new bullet goes beside the nearest one citing `packages/ui`): add `✅ **Segmented control, filled field, tinted refusal panels, page header** — the four shared HIG pieces (\`SegmentedControl\` in \`packages/ui/src/components/segmented-control.tsx\`; \`.gn-field*\`, \`.gn-page-header*\`, retinted \`.gn-refusal*\` in \`ui.css\`). The ghost button gets the rule it never had. Cases 13.288–13.291.`
 
 - [ ] **Step 10: Gate + commit**
 
@@ -632,7 +633,7 @@ git commit -m "The four shared HIG pieces, and the ghost button gets the rule it
 **Files:**
 - Modify: `apps/web/app/sign-in/page.tsx` lines 96-220
 - Modify: `apps/web/app/globals.css` (add `.gn-sign-in*` layout rules)
-- Modify: `apps/web/e2e-viewport/responsive.spec.ts` (one assertion block), `test-cases/13-deployment-dogfooding.md` (13.292–13.294), `Features.md` §6
+- Modify: `apps/web/e2e-viewport/responsive.spec.ts` (one assertion block), `test-cases/13-deployment-dogfooding.md` (13.292–13.294), `Features.md` (locate the sign-in bullet per Global Constraints — §3, not §6)
 
 **Case ids:** `13.292` (all four methods reachable), `13.293` (helper text present on Email only), `13.294` (no Password tab exists).
 
@@ -786,7 +787,7 @@ Remove the `Sign in with a passkey` `<Button>` block. Run the e2e. Expected: `EX
 - **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 ```
 
-`Features.md` §6 (auth): extend the sign-in bullet: `HIG surface (2026-09-08): page header with icon tile and tagline, \`SegmentedControl\` for the method, filled fields, fill-and-accent alternatives, helper text on the email method, Terms/Privacy footer. All four methods retained; no password method (forbidden, \`auth.ts:84\`). Cases 13.292–13.294.`
+`Features.md` (locate the sign-in bullet per Global Constraints — it is in §3, not §6): extend it: `HIG surface (2026-09-08): page header with icon tile and tagline, \`SegmentedControl\` for the method, filled fields, fill-and-accent alternatives, helper text on the email method, Terms/Privacy footer. All four methods retained; no password method (forbidden, \`auth.ts:84\`). Cases 13.292–13.294.`
 
 - [ ] **Step 9: Gate + commit**
 
@@ -846,7 +847,7 @@ git commit -m "Sign-in on the HIG surface, with all four methods and no password
 
 - [ ] Write three stack-suite cases: **13.295** signs in as the seeded guest (`accountant@e2e.gisik-nokma.local`, `helpers/sign-in.ts`), visits `/w/<id>/members`, asserts the `'member'` branch renders `.gn-members__not-admin` with non-empty text and **no** invite form. **13.296** as the owner, intercepts `**/v1/workspaces/*/members` to return 500 via `page.route`, asserts a `role="status"` element containing `cannot be shown yet` (`ShellRefusal`'s fixed text). **13.297** as the owner, asserts a pending row with `expiresAt: null` renders the dead-mint residue text verbatim: `no link behind this one — withdraw it and invite again`.
 - [ ] Mutation: delete the `'member'` branch (`page.tsx:196-200`). 13.295 must go RED. Revert from the pre-mutation commit.
-- [ ] Catalogue three ✅ cases citing the spec file; `Features.md` §6 members bullet gains `HIG surface; guest branch, roster refusal and dead-mint residue redesigned and pinned (13.295–13.297)`. Gate. Commit: `"Members: the role gate and the refusal states, designed and pinned"`.
+- [ ] Catalogue three ✅ cases citing the spec file; `Features.md` (locate the members bullet per Global Constraints) gains `HIG surface; guest branch, roster refusal and dead-mint residue redesigned and pinned (13.295–13.297)`. Gate. Commit: `"Members: the role gate and the refusal states, designed and pinned"`.
 
 ### Task 4a / 4b: Workspaces + Invite
 
@@ -862,7 +863,7 @@ git commit -m "Sign-in on the HIG surface, with all four methods and no password
 
 **5b opus.** Case ids `13.301`–`13.304`. **Spec, verbatim D rows (audit `:` Board section):** *'Only tickets in progress' checkbox + its scope-note (`page.tsx:483-503`)*; *`AttentionStrip` ('What needs your attention', `page.tsx:459-463`)*; *'who · when' provenance-disclosure button on every card (`board.tsx:168-175`, click unfolds `formatStateProvenance`)*; *'reopened — live work added' cause chip (`board.tsx:159-163`, shown when `card.cause !== null` — **the product's founding reopen-rule feature**)*; *zero-groups empty state ('No tickets here yet — create one.' + conditional Create button, `board.tsx:70-81`)*. Plus Calendar and Timeline D rows at their audit sections.
 - [ ] Cases: **13.301** the reopen cause chip renders for a seeded reopened card (seed has 26 tickets; find one with `cause !== null` via `SELECT` against the dev Postgres, or create one through the real door); **13.302** the provenance button unfolds text containing both an actor and a time; **13.303** an empty project renders `No tickets here yet — create one.`; **13.304** the `Only tickets in progress` checkbox exists and toggles the rendered count.
-- [ ] Mutation: delete the `card.cause !== null` branch → 13.301 RED. Catalogue, `Features.md` §2/§3, gate, commit.
+- [ ] Mutation: delete the `card.cause !== null` branch → 13.301 RED. Catalogue, `Features.md` (locate the board bullet per Global Constraints), gate, commit.
 
 ### Task 6a / 6b: TicketSheet (`packages/app-core/src/views/ticket-sheet.tsx`)
 
@@ -883,7 +884,7 @@ git commit -m "Sign-in on the HIG surface, with all four methods and no password
 
 ### Task 9: The List view — the prototype that does not exist
 
-**Model: opus / high.** Audit finding #4: `page.tsx:505` registers four views; `List` has no artboard. Design it in the language of `Board` (same card, same chips, same provenance button), as a single column. Case ids `13.314` (List renders the same tickets Board does, by count), `13.315` (List's rows carry the same `Chip tone` as their Board cards). No prototype = no I/C rows; the D rows are Board's. Mutation: drop the chip from the list row → 13.315 RED. `Features.md` §2: `List view designed without a prototype, from Board's vocabulary (13.314–13.315)`. Commit.
+**Model: opus / high.** Audit finding #4: `page.tsx:505` registers four views; `List` has no artboard. Design it in the language of `Board` (same card, same chips, same provenance button), as a single column. Case ids `13.314` (List renders the same tickets Board does, by count), `13.315` (List's rows carry the same `Chip tone` as their Board cards). No prototype = no I/C rows; the D rows are Board's. Mutation: drop the chip from the list row → 13.315 RED. `Features.md` (locate per Global Constraints): `List view designed without a prototype, from Board's vocabulary (13.314–13.315)`. Commit.
 
 ### Task 10: Help, Legal, NotFound, McpAuthorize, McpTokens
 
