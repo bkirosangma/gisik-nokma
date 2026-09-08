@@ -43,6 +43,23 @@ const serverOrigin = process.env.SERVER_ORIGIN ?? 'http://localhost:3000';
  * socket and does not.
  */
 const nextConfig: NextConfig = {
+  /**
+   * `X-Powered-By: Next.js` off.
+   *
+   * Found by CURLING THE RUNNING APP rather than by reading the source — the
+   * sweep that produced the rest of this block looked for headers that were
+   * MISSING and had no way to notice one that was present and unwanted. The
+   * running web container answered `/sign-in` with `X-Powered-By: Next.js`,
+   * and nothing in this repo had recorded it.
+   *
+   * It is not a vulnerability and removing it is not a defence: anyone can
+   * fingerprint Next.js from `/_next/` asset paths in the HTML. It is removed
+   * because it is a header the product did not choose to send, naming its
+   * framework to every client for no benefit to any of them — and because the
+   * cost of not sending it is one line.
+   */
+  poweredByHeader: false,
+
   // Standalone server output for the Docker image (apps/web/Dockerfile):
   // bundles a minimal server.js plus only the node_modules it needs, at
   // apps/web/.next/standalone/apps/web/server.js in this monorepo layout.
@@ -109,15 +126,36 @@ const nextConfig: NextConfig = {
    * header would not be its most urgent problem.
    */
   async headers() {
-    if (!serverOrigin.startsWith('https://')) return [];
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'strict-transport-security', value: 'max-age=31536000; includeSubDomains' },
-        ],
-      },
+    // Three unconditional, then HSTS only when this build targets https.
+    //
+    // The split matters and the old shape hid it: this function used to return
+    // `[]` outright for an http `SERVER_ORIGIN`, which was right for HSTS and
+    // would be wrong for everything else. `nosniff`, `DENY` and a referrer
+    // policy are safe — and useful — over plain http, and gating them on the
+    // deployment protocol would leave local dev running under a weaker
+    // configuration than production, which is how a header that breaks
+    // something gets discovered by users rather than by a developer.
+    //
+    // `strict-origin-when-cross-origin`, NOT the API server's `no-referrer`,
+    // and the difference is deliberate: this IS a document origin. A page whose
+    // own links stop carrying their origin breaks flows that legitimately read
+    // it, while the API is never a page a browser navigates FROM.
+    //
+    // No `Content-Security-Policy` here yet. It is the one that needs real
+    // design for this app — webpack rather than Turbopack, `output:
+    // 'standalone'`, and a rewrite-based same-origin proxy — and its failure
+    // mode is breaking in production only. Deferred by the owner on 2026-09-08
+    // rather than guessed at; `test/next-config.test.ts` pins the absence so
+    // adding one is a deliberate act.
+    const always = [
+      { key: 'x-content-type-options', value: 'nosniff' },
+      { key: 'x-frame-options', value: 'DENY' },
+      { key: 'referrer-policy', value: 'strict-origin-when-cross-origin' },
     ];
+    const hsts = serverOrigin.startsWith('https://')
+      ? [{ key: 'strict-transport-security', value: 'max-age=31536000; includeSubDomains' }]
+      : [];
+    return [{ source: '/:path*', headers: [...always, ...hsts] }];
   },
 };
 
