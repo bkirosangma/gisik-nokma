@@ -1170,6 +1170,138 @@ is the next free id IN THAT BLOCK, not derived from the file's maximum.*
   committed file and running: EXIT 1, one error per route naming the key and its observed count;
   restored by SHA-256 against `HEAD` and re-run green.*
 
+## Type scale at 390px (owner-assigned, 2026-09-08)
+
+*The other half of the ruling whose tap-target half shipped in #328. The finding was recorded in
+`docs/pre-launch-checklist.md` — "small text is real but mostly legitimate labels
+(`gn-board-card__provenance` at 12.5px x25, chips at 12.8px)" — and the first thing this pass
+established is that **nothing could measure it.** `responsive.spec.ts` has swept body copy against a
+16px floor since item 7, but its population is `p, li, dd, dt, td, figcaption, label`, and every
+element that sentence names is a `span` or a `div`. The reading came from one manual measurement and
+had no guard, which is the state the tap-target note was in while the code drifted under it.*
+
+*THE FLOOR IS 12px AND IT IS NOT A WCAG NUMBER — stated because the tap-target ratchet next door cites
+2.5.5 and 2.5.8 and the symmetry invites a false citation. No WCAG success criterion sets a minimum
+font size: 1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG's 11pt and Material's 12sp are
+native-platform guidance. 12px is the bottom rung of this product's own scale — seventeen rules sit at
+exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labels legitimate.*
+
+- **13.264** ✅ **Label text on the signed-out surface holds the 12px floor, ratcheted per route.**
+  `apps/web/e2e-viewport/responsive.spec.ts` over the shared sweep in `e2e-viewport/type-scale.ts` (a
+  plain module, not a spec — importing a sweep FROM a spec makes Playwright load that spec's `test()`
+  registrations into the other config, which cost a round on the tap-target pass). Measured: `/help`
+  examined 317 label elements, `/privacy` 21, `/terms` 14, the 404 seven, and **every one renders at
+  exactly 16px**. `/sign-in` matched 5 and examined 0 — all five carry no direct text — which is why
+  the hard control is on `rawMatches` and not on `examined`. —
+  (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-viewport/type-scale-baseline.json`)
+  *The selector control is HARD and runs before the ratchet: the population includes `div`, so a
+  rendered document cannot honestly report 0 matches. A sweep whose selector stopped matching finds
+  zero offenders and reads as the best possible result.*
+  *The disjointness that justifies two sweeps instead of one is MEASURED, not asserted in prose:
+  anything matching both this selector and `measureBodyText`'s lands in `bodyOwned` and reddens by
+  name. Two selectors in two files are free to drift into each other; a comment would not notice.*
+  *Mutation: point the label selector at a tag that does not exist → `rawMatches` 0 → fails.*
+  *Mutation: add `p` to the label selector → `bodyOwned` non-empty → fails naming the overlap.*
+  *Mutation RUN, not reasoned: `.gn-help__toc-link` 1rem → 0.7rem. Result `smallest = 11.2px on
+  a.gn-help__toc-link, under-12px=16`, the ratchet failing against baseline 0 and naming the offenders;
+  restored from a copy made before the edit (never from `HEAD`) and re-run green, 6 passed.*
+
+> ### That mutation went red through the WRONG check the first time, and that is how a hole was found
+>
+> Run before `a` was in the population, the same plant went **red — through the TAP-TARGET ratchet**,
+> because the links also lost height, while this sweep reported `under-12px=0` on the same page in the
+> same run. Written down uninspected it would have read as proof.
+>
+> `a` was in NEITHER population: not here, and not in `measureBodyText`'s `p, li, dd, dt, td,
+> figcaption, label`. **Every link and every button in the product had no font-size floor of any
+> kind**, and the mutation designed to test this check could not be seen by it — this repo's recorded
+> shape of a control that does not traverse the same path as the measurement.
+>
+> `a`, `button`, `summary` and `th` are now in the population: `/help` goes from 317 examined to 341,
+> still zero offenders. Headings stay out, matching the body sweep's stated reasoning. **The lesson is
+> not "the mutation worked" — it is that a red result must be read for WHICH check produced it.**
+
+- **13.265** ✅ **Label text on the signed-in surface holds the 12px floor, over five routes.**
+  `apps/web/e2e-stack/viewport.spec.ts`, signing in through the real door and reading every id out of
+  the seeded world rather than hardcoding one. **The route list is the whole case.** `/my-work` and the
+  board were the obvious two — the checklist's own reading is about the board — and measured first they
+  BOTH came back with zero under the floor (smallest 12.8px, the chips; board histogram
+  `{12.8px: 24, 13.6px: 6, 16px: 6}`). A sweep of just those two would have ratcheted 0 and 0, reported
+  green, and been blind to every rule this change fixes. Adding `/members`,
+  `/settings/ticket-types` and `/settings/workflows` found the defect: **four
+  `span.ticket-type-list__badge` at 11.2px**, before → after **4 → 0**. —
+  (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/type-scale-baseline.json`)
+  *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON. Zero
+  offenders on two routes is evidence about two routes.*
+  *WIDENING THE POPULATION FOUND THE CHECKLIST'S OWN NAMED ELEMENT.* Once `a`/`button` joined the
+  sweep, the board went from 36 examined to 104 and reported
+  `smallest = 12.48px on button.gn-board-card__provenance`, x26 — the very thing the checklist
+  recorded as "`gn-board-card__provenance` at 12.5px x25" and which had been invisible to every sweep
+  because it is a `<button>`. It sits ABOVE the 12px floor, so it is not an offender and the
+  checklist's judgment stands; it is now measured on every run instead of once by hand.
+  *Also newly visible: `13.3333px` on buttons such as `button.workflow-list__new` — the user-agent
+  default where a control does not set `font: inherit`. Above the floor, so recorded rather than
+  changed.*
+  *ONE OF THE FIVE FIXED RULES IS WITNESSED, AND THE OTHER FOUR WERE CHASED UNTIL THEY WERE MEASURED
+  RATHER THAN ASSUMED.* `.ticket-type-list__badge` is witnessed (4 → 0) and now also carries a
+  **`MUST_EXAMINE` coverage assertion**: the route must examine an element with that class, so a 0 for
+  a rule that stopped rendering reddens instead of passing. A ratchet at 0 for an absent rule looks
+  exactly like a ratchet at 0 for a healthy one, and that was the gap.
+  *`.gn-transition-edge__label` — TRIED AND MEASURED UNWITNESSABLE. Its route
+  (`/settings/workflows/<id>`) was added, reached by clicking (the list navigates by `router.push`;
+  there is no `<a href>`), and reported `{labelsInDom: 0, rulesInDom: 0, flowNodes: 0, flowEdges: 0}`
+  with the page a shell of five nav elements. The canvas renders nothing at all at 390px in the seeded
+  world. The route was REMOVED rather than kept as a green row meaning nothing — and it was the
+  `MUST_EXAMINE` assertion that said so, in one line naming the selector.*
+  *`.gn-avatar--small` — UNWITNESSABLE, for a reason read out of the seed rather than guessed: it
+  renders only when a card has an assignee, and the Convenience Corner seed **assigns nothing** (zero
+  `assign` mentions across `apps/server/src/seed`). It is a `<span>` with direct text, so this sweep
+  would report it at 10.4px the moment one exists.*
+  *`.escape-chip__hint` and `.upload-chips__chip` are editor chrome inside a ticket's description
+  editor; no route here reaches them. All four are fixed and unproven, owner recorded.*
+  *`/members` examines ZERO elements today — its roster rows are `li`/`p`, which belong to the body
+  sweep's population rather than this one. Its 0 baseline is still a live guard (new label text there
+  would be examined and would redden) but it proves nothing now, and it does NOT cover
+  `.gn-avatar--small`, which is why it was added. Recorded rather than quietly dropped.*
+  *Two route guesses cost a run each and are recorded in the spec so the third person does not pay
+  again: `/my-work` carries no project link (it links to ticket surfaces), and `/w/<id>` is not a page
+  at all — there is no `app/w/[workspaceId]/page.tsx`, so it renders the 404, a document with a nav and
+  prose that would have swept cleanly while measuring nothing. The project links are on `/workspaces`,
+  the same page the workspace id came from.*
+  *Mutation: revert `.ticket-type-list__badge` to `0.7rem` → 13.265 fails naming four offenders.*
+  *Mutation RUN on the coverage assertion itself: point `MUST_EXAMINE` at a class nothing renders →
+  `EXIT 1`, "examined no element matching `.ticket-type-list__badge-THAT-DOES-NOT-RENDER`". Restored
+  from a copy taken before the edit and re-run green. The assertion had already fired once for real,
+  on the workflow-editor route, which is how that route was found to be an empty shell.*
+
+> ### The enumeration that found the offenders was wrong the first time, in the shape this repo collects
+>
+> The first sweep for sub-floor declarations used a digit pattern — `0\.(6[0-9]|7[0-4])[0-9]*rem` —
+> whose alternation requires TWO digits after the point, so it **cannot match `0.7rem`**. It reported
+> three offenders, missed two, and reported them in the confident shape of a complete answer. It was
+> caught only because an earlier value histogram over the same file, taken a different way, had already
+> counted `0.7rem` twice.
+>
+> Redone by parsing each value and converting to px, the set across all three shipped stylesheets is
+> exactly five: `.escape-chip__hint` 10.00px (with `opacity: 0.7` on top of it), `.gn-avatar--small`
+> 10.40px, `.upload-chips__chip` 11.00px, `.gn-transition-edge__label` and `.ticket-type-list__badge`
+> 11.20px. All five now at `0.75rem`.
+>
+> The re-scan reports nothing under 12px, and prints a POSITIVE CONTROL from the same run so the
+> emptiness is a reading rather than a broken scan: at a 12.5px threshold the same scan reports 22
+> declarations in `ui.css`, which reconciles exactly — 20 at 12px plus the two `0.78rem` (12.48px)
+> rules.
+>
+> The after-reading reconciles the same way rather than just reporting a smaller number:
+> `/settings/ticket-types` went from `{11.2px: 4, 12px: 10, 14.4px: 5}` to `{12px: 14, 14.4px: 5}` —
+> the four badges moved onto the 12px rung, 10 + 4 = 14, and nothing else changed.
+>
+> The image was confirmed to CARRY the fix before the 0 was believed: `docker exec` grep of the built
+> stylesheet reports `font-size:.75rem` on all three `ui.css` rules. A 0 from an unchanged image and a
+> 0 from a fixed one print identically, and the recorded trap on the previous pass was a measurement
+> taken against an image that predated the change.
+
+
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)
 
 *Before this the whole product sent exactly ONE security header — `hsts.ts`'s `Strict-Transport-Security`.

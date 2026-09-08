@@ -1,6 +1,12 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
 import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
+import {
+  LABEL_FLOOR_PX,
+  measureTypeScale,
+  readTypeScaleBaseline,
+  recordTypeScaleBaseline,
+} from './type-scale.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -567,6 +573,7 @@ for (const route of UNAUTHED_ROUTES) {
     const overflow = await measureOverflow(page);
     const taps = await measureTapTargets(page);
     const body = await measureBodyText(page);
+    const typeScale = await measureTypeScale(page);
     const contrast = await measureContrast(page);
 
     const tag = `[${name}] ${route.path}`;
@@ -600,6 +607,37 @@ for (const route of UNAUTHED_ROUTES) {
             ? 'n/a'
             : `${body.smallest.fontSizePx}px on ${body.smallest.selector}`
         }, under-16px=${body.offenders.length}`,
+    );
+    console.log(
+      `${tag} — label text: selector matched ${typeScale.rawMatches}, ` +
+        `examined ${typeScale.examined.length}, body-owned ${typeScale.bodyOwned.length}, ` +
+        `skipped ${typeScale.skipped}, smallest = ${
+          typeScale.smallest === null
+            ? 'n/a'
+            : `${typeScale.smallest.fontSizePx}px on ${typeScale.smallest.selector}`
+        }, under-${LABEL_FLOOR_PX}px=${typeScale.offenders.length}`,
+    );
+    /**
+     * The whole distribution, not just the verdict. A ratchet reports one
+     * number, and one number cannot distinguish "this page has no small text"
+     * from "this page has a cliff of text sitting one pixel above the floor" —
+     * which is what the tap-target pass found twice, both times only after
+     * forcing the threshold to print everything instead of re-reading the
+     * smallest. Printing the histogram every run means the next person starts
+     * from the shape of the page rather than from a single count.
+     */
+    console.log(
+      `${tag} — label-text sizes: ${JSON.stringify(
+        Object.fromEntries(
+          Object.entries(
+            typeScale.examined.reduce<Record<string, number>>((acc, s) => {
+              const bucket = `${s.fontSizePx}px`;
+              acc[bucket] = (acc[bucket] ?? 0) + 1;
+              return acc;
+            }, {}),
+          ).sort(([a], [b]) => Number.parseFloat(a) - Number.parseFloat(b)),
+        ),
+      )}`,
     );
     console.log(
       `${tag} — contrast: text-bearing elements ${contrast.rawMatches}, measured ${contrast.examined}, ` +
@@ -799,6 +837,92 @@ for (const route of UNAUTHED_ROUTES) {
             `Offenders: ${JSON.stringify(body.offenders)}`,
         )
         .toEqual([]);
+    }
+
+    /* ── 4b. LABEL TEXT >= 12px, ratcheted. ───────────────────────────────
+     *
+     * Case 13.264 — label text on the signed-out surface holds the 12px floor.
+     *
+     * The population section 4 cannot see. `measureBodyText` sweeps `p, li, dd,
+     * dt, td, figcaption, label`; every element the pre-launch checklist named
+     * as small — `gn-board-card__provenance` at 12.5px, the chips at 12.8px —
+     * is a `span` or a `div`, and so was measured by hand once and never again.
+     *
+     * A RATCHET, not a hard floor, and for the third of the three reasons the
+     * tap-target block above gives: the checklist records these labels as an
+     * OWNER decision about the design, already ruled on ("take it", 2026-09-08,
+     * scoped to the sub-scale strays). A hard floor here would have this suite
+     * block every branch on a design question that belongs to a person.
+     *
+     * `LABEL_FLOOR_PX` carries the derivation, and the one thing worth
+     * repeating here is what it is NOT: no WCAG success criterion sets a
+     * minimum font size. 12px is the bottom rung of this product's own scale.
+     * ──────────────────────────────────────────────────────────────────────*/
+
+    /**
+     * The selector control, asserted HARD and before the ratchet.
+     *
+     * A sweep whose selector stopped matching reports zero offenders and reads
+     * as the best possible result. `div` is in the population, so on any
+     * rendered page this cannot legitimately be 0 — which makes it a control
+     * that can actually fail rather than a decorative one.
+     */
+    expect(
+      typeScale.rawMatches,
+      `the label-text selector matched NOTHING on ${route.path}. A sweep that examined no ` +
+        `elements reports zero offenders and looks identical to a clean page. The population ` +
+        `includes \`div\`, so a rendered document cannot honestly produce 0 here.`,
+    ).toBeGreaterThan(0);
+
+    /**
+     * The disjointness claim, MEASURED rather than asserted in prose.
+     *
+     * `type-scale.ts` justifies existing alongside `measureBodyText` on the
+     * grounds that the two populations do not overlap. That is a claim about
+     * two selectors that live in two files and are free to drift apart. If
+     * either grows into the other's territory, elements land in `bodyOwned`
+     * and this names them — instead of the two sweeps quietly double-counting
+     * and reporting numbers that no longer add up to anything.
+     */
+    expect
+      .soft(
+        typeScale.bodyOwned,
+        `elements matched BOTH the label-text selector and the body-text selector on ` +
+          `${route.path}. The two sweeps are justified by their populations being disjoint; ` +
+          `an overlap means one of the selectors was widened and the counts have stopped ` +
+          `being separable. Overlapping: ${JSON.stringify(typeScale.bodyOwned)}`,
+      )
+      .toEqual([]);
+
+    const typeKey = `${name}|${route.path}`;
+    const typeBaseline = readTypeScaleBaseline();
+    const typeAllowed = typeBaseline[typeKey];
+    if (typeAllowed === undefined) {
+      // A missing baseline FAILS rather than seeding itself — same reasoning as
+      // the tap-target guard above, which an adversarial review forced.
+      if (process.env['UPDATE_TYPE_SCALE_BASELINE'] === '1') {
+        recordTypeScaleBaseline(typeKey, typeScale.offenders.length);
+      } else {
+        expect(
+          typeAllowed,
+          `no type-scale baseline for "${typeKey}" in e2e-viewport/type-scale-baseline.json, and ` +
+            `this suite refuses to invent one: seeding from the current run would record whatever ` +
+            `is broken today and report green. Observed ${typeScale.offenders.length} offenders. ` +
+            `If this is a genuinely new route, re-run once with UPDATE_TYPE_SCALE_BASELINE=1 and ` +
+            `COMMIT the file.`,
+        ).toBeDefined();
+      }
+    } else {
+      expect
+        .soft(
+          typeScale.offenders.length,
+          `label text under ${LABEL_FLOOR_PX}px at ${spec.width}px rose above the recorded ` +
+            `baseline ${typeAllowed} for ${typeKey}. This is a RATCHET — the count may fall, ` +
+            `never rise. The floor is this product's own bottom rung (0.75rem, x17 in ui.css), ` +
+            `NOT a WCAG criterion; none sets a minimum font size. ` +
+            `Offenders: ${JSON.stringify(typeScale.offenders)}`,
+        )
+        .toBeLessThanOrEqual(typeAllowed);
     }
 
     /* ── 5. COMPUTED CONTRAST FROM THE LIVE DOM. ──────────────────────────*/

@@ -91,7 +91,12 @@
   user-select: none;
 }
 .escape-chip__hint {
-  font-size: 0.625rem;
+  /* 0.75rem, not 0.625rem. At 10px this was the smallest text the product
+     rendered anywhere, and it carried `opacity: 0.7` on top — small AND faint,
+     which compound. The hierarchy against `.escape-chip` (also 0.75rem) is
+     already carried by the opacity, so raising the size loses nothing it was
+     doing. Floor and derivation: `apps/web/e2e-viewport/type-scale.ts`. */
+  font-size: 0.75rem;
   opacity: 0.7;
 }
 
@@ -114,7 +119,10 @@
   pointer-events: none;
 }
 .upload-chips__chip {
-  font-size: 0.6875rem;
+  /* 0.75rem, not 0.6875rem (11px). This chip is how an upload reports its own
+     progress and failure, so it is exactly the text a person reads when
+     something has gone wrong. */
+  font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
   border: 1px solid currentColor;
 }

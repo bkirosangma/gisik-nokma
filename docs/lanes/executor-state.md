@@ -20,6 +20,243 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ▸ ONE UNREPRODUCIBLE `git log` READING — RECORDED AS AN OBSERVATION, NOT A MECHANISM
+>
+> Counting #328's commits, `git log origin/main..origin/exec/116-tap-targets --oneline | wc -l`
+> returned **8**, and a `grep` of the same output found **zero** merge commits. The branch tip is
+> itself a merge commit, so that answer could not be right. `git rev-list --count` on the identical
+> range returned **14**, and `--no-merges` returned **8** — i.e. the log output matched the
+> `--no-merges` view of a command that was not given `--no-merges`.
+>
+> **It did not reproduce.** Eight consecutive runs of the same command in the same shell afterwards
+> all returned 14 lines with 6 merge commits, and `rev-list --count` was stable at 14 throughout.
+>
+> **I am deliberately NOT writing down a mechanism.** The obvious story — "the proxy strips merge
+> commits" — is exactly the shape of the overcorrection this same session had to fix two entries
+> above, where a note searched one path, found nothing, and declared a real file fictional. One
+> unreproducible reading does not support a claim about a tool that every session depends on, and a
+> confident wrong warning is more damaging than a hedged true one.
+>
+> **What is safe to carry forward, because it does not depend on the cause:**
+> * **Use `git rev-list --count <range>` for a commit count, not `git log … | wc -l`.** The invariant
+>   was stable across every reading; the formatted one was not.
+> * **A commit count that omits merges when the tip IS a merge is self-contradicting** — that
+>   internal inconsistency is what caught it, not a comparison against a known-good number.
+> * Add it to the standing list of things whose null or low answers must be cross-checked, beside the
+>   proxied `grep -n` line numbers and the `$?`-after-a-proxied-command readings recorded above.
+>
+> ### ▸ NEW OWNER QUESTION: 26 CONTROLS RENDER AT THE BROWSER'S FONT, NOT THE PRODUCT'S
+>
+> Found by turning the sweep's own floor up to 16px for one enumerating run (then restored; the
+> shipped floor is unchanged at 12). On the signed-in surface at 390px: **`button` unclassed x22,
+> `button.ticket-type-list__new` x2, `button.workflow-list__new` x2, all at exactly 13.33px.**
+>
+> **13.33px is the only value in the 12–16px band that no stylesheet chose** — every other reading
+> there traces to a `rem` rule in `ui.css`. It is what a `<button>` renders at when nothing sets
+> `font`. Neither named class carries a `font` declaration; the repo's own `.gn-button` opens with
+> `font: inherit`. A departure from an established pattern, not a competing choice.
+>
+> **Reported, NOT fixed.** The remedy is one line and probably right, but it resizes 26 live controls,
+> and the owner's "take it" ruling was given against the 12.5px-label reading — it cannot be stretched
+> to cover a finding that did not exist when it was made. Same treatment the tap targets got.
+> Recorded in `docs/pre-launch-checklist.md` with the table.
+>
+> ### ⚠ AND THE OTHER RECORDED GAP HAD A CORRECTION IN IT THAT WAS ITSELF WRONG
+>
+> Having found gap #1 stale, I measured gap #2 (the `TZ` one) the same way. **Its rule stands and its
+> numbers have only improved** — 17 of 272 test files varied `TZ` when the brief was amended; at
+> `f8ea0d3` it is **27 of 320**, counted by enumeration with the precedent file as a positive control.
+>
+> **But its exemplar had been "corrected" into fiction.** `playwright.viewport.config.ts:35` read:
+> *"The brief cited `apps/web/test/contests.test.tsx:97` for this; no such file exists. The ist-today
+> lines are the real precedent."*
+>
+> The PATH is wrong — nothing named `contests` exists under `apps/web`. **The file is real**, in
+> another package: `packages/app-core/test/contests.test.tsx:101`, case 12.194, *"renders the IST day
+> under a non-IST TZ, and the TZ actually took effect"* — doing exactly what the brief claimed, and it
+> is the STRONGER of the two precedents: it probes first (same instant, different hour under `UTC`
+> than `America/Los_Angeles`) so a green cannot come from `TZ` being ignored, then renders under three
+> zones including `Pacific/Kiritimati`.
+>
+> **A wrong path is not a missing file.** The earlier note searched the cited path, found nothing, and
+> concluded the citation was invented. **The overcorrection is the more damaging of the two errors**:
+> a stale citation misdirects, while "no such file exists" in a docblock teaches every later reader
+> that a real and better precedent is fiction. Corrected in place at that docblock, not edited away.
+>
+> **Both audits came from the same move — check the claim before repeating it — and both recorded
+> gaps turned out to contain something false.** That is two for two on this session's restart surface.
+>
+> ### ⚠ THE ONE "OPEN" ITEM I WAS ABOUT TO TAKE IS ALREADY CLOSED — #287 IS STALE
+>
+> `controller-state.md` records, and the dispatch brief repeats under **TWO KNOWN GAPS #1**, that
+> Plan 9's notifications fake is witnessed *producer-side only* and that the client consumer "has
+> never been executed", owned by "whoever next touches Plan 9's client-side notification consumer".
+>
+> **That was closed before this session started.** `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
+> is on `origin/main` and drives the REAL `createHttpNotificationsGateway` against the real route:
+>
+> * **6 tests, cases 11.190–11.195**, all catalogued in `test-cases/11-calendar-notifications.md`.
+> * **Zero `vi.mock`.** Real Postgres. Run at this sha: **EXIT 0, 6 passed.**
+> * **In the gate**: `apps/server/vitest.config.ts` includes `test/**/*.test.ts`, which collects it.
+> * Its own docblock opens *"Plan 9's consumer-side residual, closed"* and explains why the move was
+>   possible at all — the adapter was never web-specific; it imports `NotificationsGateway`,
+>   `HttpClient` and `parseNotification`, so `apps/server` can import it and the "outside the
+>   dependency graph" premise no longer holds.
+>
+> **I propagated the stale claim twice before checking it**, naming #287 to the controller as the one
+> remaining engineering gap. It survived because it reads as a careful, honest limitation — Lane F
+> wrote it well, and a well-written caveat is harder to doubt than a sloppy one. Same class as the
+> ledger row citing a closed PR: **a restart surface that lies, and lies in the conservative
+> direction, which is why nobody checks it.**
+>
+> **Correcting `controller-state.md` is the controller's to make, not mine** — flagged, not edited.
+>
+> **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, HEAD
+> `d9624b3`. Gate re-run AT THAT SHA: **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**,
+> load 2.66, zero orphaned vitest workers. All five catalogue checks EXIT 0. Viewport suite 19 passed
+> / 2 skipped; stack sweep green on five routes; both type-scale baselines committed at 0.
+>
+> **MERGED so far: #325, #326, #327. STILL OPEN and both MERGEABLE: #328 and #334.**
+>
+> **THE REBASE CASCADE IS NOW MEASURED AT THREE ROUNDS, NOT SUSPECTED.** Every one of these branches
+> touches `Features.md`, this file and `docs/pre-launch-checklist.md`, so each landing merge
+> re-conflicts every branch still open: #325 conflicted three branches, #326 conflicted three again,
+> #327 conflicted the remaining two. All three rounds were PURELY ADDITIVE — resolved keep-both in a
+> throwaway worktree, verified by counting anchored markers in the COMMITTED blobs — and none was a
+> defect in any branch. **The cost is one rebase round per merge, and it is paid by whoever is left
+> in the queue.** Merging the remaining two back-to-back ends it.
+>
+> **A restarted executor should EXPECT to find #328/#334 conflicting** if a merge landed meanwhile,
+> and should treat that as routine additive narrative overlap rather than a problem to investigate.
+> The resolver is: main's side first, then the branch's, then verify with
+> `git show <branch>:<file> | awk '/^<<<<<<< |^=======$|^>>>>>>> /'` — **anchored**, because this
+> file's own prose at the "grepping the COMMITTED blob" line contains unanchored marker strings and
+> a naive check hits it.
+>
+> **The queue after #334 is empty of assigned work.** All five of the owner's 2026-09-08 rulings now
+> have PRs. What is OWED and not done: the four unwitnessed type-scale fixes (see below) and Plan 9's
+> client-side notification consumer (`controller-state.md` #287).
+
+# ▶ TUESDAY 2026-09-08 ~07:5x IST — **TYPE SCALE: THE FINDING HAD NO INSTRUMENT, AND THE OBVIOUS ROUTES WERE THE WRONG ONES.**
+
+*Branch `exec/117-type-scale`, off `main` (`8cb4cd5`, i.e. AFTER #325 landed). Deliberately NOT stacked
+on `exec/116`: four PRs were mergeable and a controller was actively merging, and a push onto a branch
+being squashed is `squash-merge-drops-late-pushes` firing on cue.*
+
+**The owner ruled "take it" on tap targets AND type scale. #328 shipped the tap-target half. This is
+the other half, and the first finding is that nothing could measure it.** `responsive.spec.ts` has
+swept body copy against 16px since item 7 — population `p, li, dd, dt, td, figcaption, label`. Every
+element the checklist named as small (`gn-board-card__provenance`, the chips) is a `span` or a `div`.
+Not one was in that selector. The number came from one manual measurement and had no guard, which is
+the state the tap-target note was in while the code drifted under it.
+
+**THE FLOOR IS 12px AND IT IS NOT A WCAG NUMBER.** Written down because the tap-target ratchet next
+door cites 2.5.5/2.5.8 and the symmetry invites a false citation: no success criterion sets a minimum
+font size (1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG 11pt and Material 12sp are native
+guidance). 12px is the bottom rung of this product's own scale — seventeen rules at `0.75rem` — which is
+also why the checklist's judgment is NOT overridden: the 12.5px/12.8px labels it calls legitimate sit
+above the floor and were left alone.
+
+**THE ROUTE LIST IS THE PART TO INHERIT.** `/my-work` and the board — the pages the finding itself
+names — both measured **zero** under the floor (smallest 12.8px; board histogram
+`{12.8px: 24, 13.6px: 6, 16px: 6}`). A sweep of only those two would have ratcheted 0 and 0, reported
+green, and been blind to every rule this change fixes. Adding `/members`, `/settings/ticket-types` and
+`/settings/workflows` found it: **four `span.ticket-type-list__badge` at 11.2px, 4 → 0.**
+*A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON.*
+
+**THE MUTATION WENT RED THROUGH THE WRONG CHECK, AND THAT IS THE SESSION'S BEST FINDING.** Planting
+`0.7rem` on `.gn-help__toc-link` turned the suite red — via the TAP-TARGET ratchet, because the links
+lost height — while the type-scale sweep reported `under-12px=0` on the same page in the same run.
+Recorded uninspected, that red is "the ratchet works". **`a` was in neither population** — not mine,
+not `measureBodyText`'s — so **every link and every button in the product had no font-size floor at
+all**, and the mutation built to test the check could not be seen by it. `a, button, summary, th`
+added; `/help` 317 → 341 examined, still 0 offenders; re-run of the same plant now fails as
+`smallest = 11.2px on a.gn-help__toc-link, under-12px=16` against baseline 0. Restored from a copy
+made BEFORE the edit, never from `HEAD`, and re-run green.
+**Read a red for WHICH check produced it. "It failed" is not "it failed for the reason I claim."**
+
+**THE FOUR UNWITNESSED FIXES WERE CHASED UNTIL "UNWITNESSABLE" WAS A MEASUREMENT.** Holding with them
+merely recorded would have been the easy read of "the queue is empty".
+
+- **`.gn-transition-edge__label`** — its route (`/settings/workflows/<id>`) WAS added, reached by
+  clicking because the list navigates with `router.push` and carries no `<a href>`. It measured
+  `{labelsInDom: 0, rulesInDom: 0, flowNodes: 0, flowEdges: 0}`, the page a shell of five nav
+  elements: **the xyflow canvas renders nothing at all at 390px** in the seeded world. Route REMOVED —
+  a green row over five nav links, reached by the most fragile navigation in the file, is worse than
+  no row. **A new `MUST_EXAMINE` assertion is what said so in one line naming the selector.**
+- **`.gn-avatar--small`** — renders only on a card with an assignee, and the Convenience Corner seed
+  **assigns nothing** (zero `assign` mentions across `apps/server/src/seed`). Read out of the seed,
+  not guessed.
+- The two editor chips are inside a ticket's description editor; no swept route reaches them.
+
+**`MUST_EXAMINE` is the durable half.** A ratchet at 0 for a rule that stopped rendering reads exactly
+like a ratchet at 0 for a healthy one; the map asserts the route examines the class it exists to
+witness. Wired to `ticket-type-list__badge`, the one it can actually assert.
+
+**WIDENING TO `a`/`button` FOUND THE CHECKLIST'S OWN NAMED ELEMENT.** The board went 36 → 104 examined
+and reported `smallest = 12.48px on button.gn-board-card__provenance`, x26 — the "12.5px x25" the
+pre-launch note recorded by hand, invisible to every sweep because it is a `<button>`. Above the
+floor, so the judgment stands; it is measured on every run now instead of once. Also newly visible:
+`13.3333px` on buttons that do not set `font: inherit` — the UA default, above the floor, recorded not
+changed.
+
+**ONE OF THE FIVE FIXES IS WITNESSED. FOUR ARE NOT, AND THAT WAS FOUND BY AN ABSENCE.**
+`.ticket-type-list__badge` is the only one on a swept route (4 → 0). `.gn-avatar--small` renders on the
+board and ticket list **only when a card has an assignee** and no seeded card does; it is a `<span>`
+with direct text, so the sweep WOULD have reported it at 10.4px had it rendered — **its absence from
+the before-reading is the evidence, not a green tick.** `.gn-transition-edge__label` is on the workflow
+EDITOR canvas, not the `/settings/workflows` list; the two editor chips are inside a ticket's
+description editor. Recorded as owned rather than fixed-and-claimed: **whoever next seeds an assigned
+card, or sweeps the workflow editor and the description editor.** Guarding against the reading that
+"five rules fixed" beside "suite green" means five rules proven.
+
+**`/members` earns a mention because it examines ZERO elements.** Added to catch `.gn-avatar--small`;
+it does not — the avatar is not used there at all (`board.tsx`, `ticket-list.tsx`), and the roster rows
+are `li`/`p`, which belong to the BODY sweep's population, not the label one. Kept, because a 0
+baseline there still reddens if label text appears later, but it proves nothing today and the route
+list says so.
+
+**The image was confirmed to carry the fix before the 0 was believed.** `docker exec` grep of the
+built stylesheet: `font-size:.75rem` on all three `ui.css` rules. A 0 from an unchanged image and a 0
+from a fixed one print identically, and the previous pass's recorded trap is a measurement taken
+against an image that predates the change. The rebuild itself died once on **ENOSPC** mid-`pnpm
+install` and needed `docker builder prune` (**6.48GB, build cache only** — never images, never volumes;
+the volumes hold the seeded world). Note the shape of that failure report: the background task
+announced **"exited with code 0"**, because that was the shell's status, while the log said
+`failed to solve ... exit code: 1`.
+
+**A ONE-CHARACTER CLASS HOLE IN MY OWN ENUMERATION.** The first sweep for sub-floor declarations used
+`0\.(6[0-9]|7[0-4])[0-9]*rem` — whose alternation requires TWO digits after the point, so it cannot
+match `0.7rem`. It reported three offenders, missed two, and printed them in the shape of a complete
+answer. Caught only because a value histogram taken a different way had already counted `0.7rem`
+twice. Redone numerically (parse the value, convert to px) the set is exactly five. The re-scan prints
+nothing under 12px WITH a positive control from the same run — at 12.5px it reports 22 in `ui.css`,
+reconciling exactly as 20 at 12px plus the two `0.78rem` (12.48px) rules.
+
+**Four silent-wrong-answer modes hit in one session, all well-formed, none an error:**
+1. **zsh applied its `:t` modifier inside double quotes.** `git show "$b:test-cases/..."` became
+   `116-tap-targetsest-cases/...` — the `exec/` prefix eaten, the `:t` consumed. Five branches reported
+   "(EMPTY)" for a file that exists on all five. `"${b}:path"` is the fix.
+2. **An unanchored conflict-marker assertion fired on PROSE.** My check for `<<<<<<<` hit
+   `executor-state.md:1989`, which *describes this exact hazard* and names the right method — grep the
+   COMMITTED blob for `^<<<<<<< ` anchored. Its own advice, ignored by me, then vindicated.
+3. **rtk's proxied `grep -n` returns WRONG LINE NUMBERS** (416/587 for true 383/554). The match COUNT
+   was right, so nothing looked off. `awk '{printf "%d", NR}'` is trustworthy; the proxy is not.
+4. **`$?` after a proxied command measures the proxy.** `git show ... >/dev/null 2>&1; echo $?` printed
+   128 for four branches including one whose read had just succeeded.
+
+**Rate limit, correctly diagnosed this time.** Two stack runs back-to-back → sign-in timeout. Rather
+than probing a different email (the mistake recorded in the ~05:0x entry), I read the server log for
+**the test's own request**: `req-2h0`, `POST /api/auth/sign-in/magic-link`, **429**. `RATE_LIMIT_AUTH_MAX=60`
+per 60s and global-setup spends some of it. Space stack runs ~90s apart.
+
+**Also done this session, at the controller's request:** #326 (`exec/114`) and #327 (`exec/115`) went
+CONFLICTING when #325 landed. Both merged `origin/main` in — conflicts were `Features.md` and this file,
+purely additive, resolved keep-both with main's side first — and both are **MERGEABLE** again and
+pushed. Verified by counting anchored markers in the **committed blobs**, not the worktree.
+**#328 still needs the same merge** and has not been touched.
+
+
 # ▶ TUESDAY 2026-09-08 ~03:0x IST — **SECURITY HEADERS: THE PRODUCT SENT EXACTLY ONE, NOW IT SENDS FOUR.**
 
 *This branch (`exec/113-security-headers`) is off `main` and INDEPENDENT of the MCP stack — it can merge

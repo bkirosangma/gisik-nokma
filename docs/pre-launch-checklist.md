@@ -328,6 +328,61 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   in-list controls that should go to 24px by the same rule as `/help`'s TOC, left unshipped because
   verifying one more CSS rule against the pre-built container costs a full rebuild. Original note
   kept below.
+- **Type scale: CLOSED 2026-09-08** (owner-assigned, the other half of the tap-target ruling). The
+  first thing this pass established is that **nothing in the repo could measure the finding below.**
+  `responsive.spec.ts` has swept body copy against a 16px floor since item 7, but its population is
+  `p, li, dd, dt, td, figcaption, label` — and `gn-board-card__provenance` and the chips, the two
+  things the paragraph below names, are a `span` and a `span`. The reading was a manual measurement
+  taken once, with no guard, which is exactly the state the tap-target note was in.
+  `apps/web/e2e-viewport/type-scale.ts` now sweeps that population in BOTH suites, ratcheted per route.
+  **The floor is 12px and it is not a WCAG number** — no success criterion sets a minimum font size
+  (1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG's 11pt and Material's 12sp are native
+  guidance). It is the bottom rung of this product's own scale, seventeen rules at `0.75rem`, which is
+  also why the paragraph below is NOT overridden: the 12.5px and 12.8px labels it calls legitimate sit
+  ABOVE the floor and were left alone. Five declarations sat below it, each a one-off stray:
+  `.escape-chip__hint` 10.0px (and `opacity: 0.7` on top), `.gn-avatar--small` 10.4px,
+  `.upload-chips__chip` 11.0px, `.gn-transition-edge__label` and `.ticket-type-list__badge` 11.2px.
+  All five now at `0.75rem`. **One is witnessed, four are not** — only `.ticket-type-list__badge` renders on a swept route (**4 → 0** on `/settings/ticket-types`). The
+  others are on the workflow editor canvas, inside a ticket description editor, or on a card with an
+  assignee, and no seeded card has one (zero `assign` mentions across `apps/server/src/seed`). The
+  workflow editor route was ADDED to witness `.gn-transition-edge__label` and then removed: it
+  measured `{labelsInDom: 0, flowNodes: 0, flowEdges: 0}` — the canvas renders nothing at 390px —
+  and a route sweeping five nav links is a green row meaning nothing. Owner for the four: whoever
+  next seeds an assigned card or sweeps the two editor surfaces.
+  **The checklist's own named element is now guarded.** Widening the population to `a`/`button`
+  took the board from 36 examined to 104 and surfaced `button.gn-board-card__provenance` at 12.48px
+  x26 — the "12.5px x25" in the paragraph below, invisible to every sweep until now because it is a
+  `<button>`. Above the floor, so the judgment below stands; it is simply measured now.
+  **The route list is the part worth inheriting.** `/my-work` and the board — the pages this very
+  paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
+  0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a
+  finding NAMED is not a ratchet on the pages the defect is ON. Cases 13.264–13.265.
+- **NEW, 2026-09-08: twenty-six controls render at the BROWSER'S default font, not the product's —
+  reported, not fixed, because it is an owner call about the design.** Found by the type-scale sweep
+  above, which measures computed sizes and so can see what no stylesheet says. Enumerated on the
+  signed-in surface at 390px by temporarily raising the sweep's floor to 16px:
+
+  | selector | size | count |
+  |---|---|---|
+  | `button` (unclassed) | 13.33px | 22 |
+  | `button.ticket-type-list__new` | 13.33px | 2 |
+  | `button.workflow-list__new` | 13.33px | 2 |
+
+  **13.33px is not a size anyone chose.** It is what a `<button>` renders at when no rule sets `font`,
+  and it is the ONLY value in the 12–16px band that is not a deliberate product size — every other
+  reading there resolves to a `rem` rule in `ui.css` (`0.75`, `0.78`, `0.8`, `0.85`, `0.9`). Verified:
+  neither `.ticket-type-list__new` nor `.workflow-list__new` carries any `font` declaration, while the
+  repo's own shared control `.gn-button` opens with `font: inherit`. So this is a departure from a
+  pattern this codebase already established, not a competing choice.
+
+  **Why it is not fixed here.** The one-line remedy is `font: inherit`, and it is almost certainly
+  right — but it resizes twenty-six live controls, and the owner's 2026-09-08 "take it" ruling was
+  given against the reading in the paragraph below (12.5px labels), not against this. That ruling
+  cannot be stretched to cover a finding that did not exist when it was made. **Same treatment the tap
+  targets got: measured, written down with its numbers, and left to a person.**
+
+  **It is under a ratchet either way.** These sit above the 12px floor, so nothing here is red; if a
+  future change pushes one below, cases 13.264–13.265 catch it.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,
