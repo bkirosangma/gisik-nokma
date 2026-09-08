@@ -311,6 +311,25 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   rather than a contrast failure — the light palette is internally consistent, so nothing fails a ratio —
   and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
   fixed**, because it is a design decision rather than a defect with one obvious remedy.
+- **Type scale: CLOSED 2026-09-08** (owner-assigned, the other half of the tap-target ruling). The
+  first thing this pass established is that **nothing in the repo could measure the finding below.**
+  `responsive.spec.ts` has swept body copy against a 16px floor since item 7, but its population is
+  `p, li, dd, dt, td, figcaption, label` — and `gn-board-card__provenance` and the chips, the two
+  things the paragraph below names, are a `span` and a `span`. The reading was a manual measurement
+  taken once, with no guard, which is exactly the state the tap-target note was in.
+  `apps/web/e2e-viewport/type-scale.ts` now sweeps that population in BOTH suites, ratcheted per route.
+  **The floor is 12px and it is not a WCAG number** — no success criterion sets a minimum font size
+  (1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG's 11pt and Material's 12sp are native
+  guidance). It is the bottom rung of this product's own scale, seventeen rules at `0.75rem`, which is
+  also why the paragraph below is NOT overridden: the 12.5px and 12.8px labels it calls legitimate sit
+  ABOVE the floor and were left alone. Five declarations sat below it, each a one-off stray:
+  `.escape-chip__hint` 10.0px (and `opacity: 0.7` on top), `.gn-avatar--small` 10.4px,
+  `.upload-chips__chip` 11.0px, `.gn-transition-edge__label` and `.ticket-type-list__badge` 11.2px.
+  All five now at `0.75rem`, proven **4 → 0** on `/settings/ticket-types`.
+  **The route list is the part worth inheriting.** `/my-work` and the board — the pages this very
+  paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
+  0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a
+  finding NAMED is not a ratchet on the pages the defect is ON. Cases 13.264–13.265.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,

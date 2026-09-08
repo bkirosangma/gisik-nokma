@@ -20,6 +20,65 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+# ▶ TUESDAY 2026-09-08 ~07:5x IST — **TYPE SCALE: THE FINDING HAD NO INSTRUMENT, AND THE OBVIOUS ROUTES WERE THE WRONG ONES.**
+
+*Branch `exec/117-type-scale`, off `main` (`8cb4cd5`, i.e. AFTER #325 landed). Deliberately NOT stacked
+on `exec/116`: four PRs were mergeable and a controller was actively merging, and a push onto a branch
+being squashed is `squash-merge-drops-late-pushes` firing on cue.*
+
+**The owner ruled "take it" on tap targets AND type scale. #328 shipped the tap-target half. This is
+the other half, and the first finding is that nothing could measure it.** `responsive.spec.ts` has
+swept body copy against 16px since item 7 — population `p, li, dd, dt, td, figcaption, label`. Every
+element the checklist named as small (`gn-board-card__provenance`, the chips) is a `span` or a `div`.
+Not one was in that selector. The number came from one manual measurement and had no guard, which is
+the state the tap-target note was in while the code drifted under it.
+
+**THE FLOOR IS 12px AND IT IS NOT A WCAG NUMBER.** Written down because the tap-target ratchet next
+door cites 2.5.5/2.5.8 and the symmetry invites a false citation: no success criterion sets a minimum
+font size (1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG 11pt and Material 12sp are native
+guidance). 12px is the bottom rung of this product's own scale — seventeen rules at `0.75rem` — which is
+also why the checklist's judgment is NOT overridden: the 12.5px/12.8px labels it calls legitimate sit
+above the floor and were left alone.
+
+**THE ROUTE LIST IS THE PART TO INHERIT.** `/my-work` and the board — the pages the finding itself
+names — both measured **zero** under the floor (smallest 12.8px; board histogram
+`{12.8px: 24, 13.6px: 6, 16px: 6}`). A sweep of only those two would have ratcheted 0 and 0, reported
+green, and been blind to every rule this change fixes. Adding `/members`, `/settings/ticket-types` and
+`/settings/workflows` found it: **four `span.ticket-type-list__badge` at 11.2px, 4 → 0.**
+*A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON.*
+
+**A ONE-CHARACTER CLASS HOLE IN MY OWN ENUMERATION.** The first sweep for sub-floor declarations used
+`0\.(6[0-9]|7[0-4])[0-9]*rem` — whose alternation requires TWO digits after the point, so it cannot
+match `0.7rem`. It reported three offenders, missed two, and printed them in the shape of a complete
+answer. Caught only because a value histogram taken a different way had already counted `0.7rem`
+twice. Redone numerically (parse the value, convert to px) the set is exactly five. The re-scan prints
+nothing under 12px WITH a positive control from the same run — at 12.5px it reports 22 in `ui.css`,
+reconciling exactly as 20 at 12px plus the two `0.78rem` (12.48px) rules.
+
+**Four silent-wrong-answer modes hit in one session, all well-formed, none an error:**
+1. **zsh applied its `:t` modifier inside double quotes.** `git show "$b:test-cases/..."` became
+   `116-tap-targetsest-cases/...` — the `exec/` prefix eaten, the `:t` consumed. Five branches reported
+   "(EMPTY)" for a file that exists on all five. `"${b}:path"` is the fix.
+2. **An unanchored conflict-marker assertion fired on PROSE.** My check for `<<<<<<<` hit
+   `executor-state.md:1989`, which *describes this exact hazard* and names the right method — grep the
+   COMMITTED blob for `^<<<<<<< ` anchored. Its own advice, ignored by me, then vindicated.
+3. **rtk's proxied `grep -n` returns WRONG LINE NUMBERS** (416/587 for true 383/554). The match COUNT
+   was right, so nothing looked off. `awk '{printf "%d", NR}'` is trustworthy; the proxy is not.
+4. **`$?` after a proxied command measures the proxy.** `git show ... >/dev/null 2>&1; echo $?` printed
+   128 for four branches including one whose read had just succeeded.
+
+**Rate limit, correctly diagnosed this time.** Two stack runs back-to-back → sign-in timeout. Rather
+than probing a different email (the mistake recorded in the ~05:0x entry), I read the server log for
+**the test's own request**: `req-2h0`, `POST /api/auth/sign-in/magic-link`, **429**. `RATE_LIMIT_AUTH_MAX=60`
+per 60s and global-setup spends some of it. Space stack runs ~90s apart.
+
+**Also done this session, at the controller's request:** #326 (`exec/114`) and #327 (`exec/115`) went
+CONFLICTING when #325 landed. Both merged `origin/main` in — conflicts were `Features.md` and this file,
+purely additive, resolved keep-both with main's side first — and both are **MERGEABLE** again and
+pushed. Verified by counting anchored markers in the **committed blobs**, not the worktree.
+**#328 still needs the same merge** and has not been touched.
+
+
 # ▶ TUESDAY 2026-09-08 ~03:0x IST — **SECURITY HEADERS: THE PRODUCT SENT EXACTLY ONE, NOW IT SENDS FOUR.**
 
 *This branch (`exec/113-security-headers`) is off `main` and INDEPENDENT of the MCP stack — it can merge

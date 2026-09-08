@@ -194,9 +194,40 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       'without the board would report coverage of the page the finding was actually about',
   ).not.toBeNull();
 
+  /**
+   * FIVE ROUTES, AND THE LAST THREE ARE THE ONES THAT EARN THEIR KEEP.
+   *
+   * `/my-work` and the board were the obvious choices — the checklist's own
+   * reading is about the board — and measured first they BOTH came back with
+   * zero elements under the floor (smallest 12.8px, the chips). A sweep of just
+   * those two would have ratcheted 0 and 0, reported green, and been perfectly
+   * blind to every rule this change actually fixes.
+   *
+   * Because the five sub-floor declarations are not on those pages. Measured,
+   * they live on the settings and membership surfaces:
+   *
+   *     .ticket-type-list__badge      /settings/ticket-types
+   *     .gn-transition-edge__label    /settings/workflows
+   *     .gn-avatar--small             /members
+   *
+   * (`.escape-chip__hint` and `.upload-chips__chip` are editor chrome, reached
+   * only inside a ticket's description editor; they are fixed and enumerated in
+   * the commit, but no route here renders them and this file does not claim
+   * they are covered.)
+   *
+   * The general lesson, which is the one this repo keeps paying for: a ratchet
+   * on the pages a finding NAMED is not a ratchet on the pages the defect is
+   * ON. Zero offenders on two routes is evidence about two routes.
+   */
   const routes = [
     { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
     { path: projectHref ?? '', key: 'stack-phone-390|/p/:projectId' },
+    { path: `/w/${workspaceId}/members`, key: 'stack-phone-390|/members' },
+    {
+      path: `/w/${workspaceId}/settings/ticket-types`,
+      key: 'stack-phone-390|/settings/ticket-types',
+    },
+    { path: `/w/${workspaceId}/settings/workflows`, key: 'stack-phone-390|/settings/workflows' },
   ];
 
   for (const route of routes) {

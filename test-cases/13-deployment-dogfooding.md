@@ -1170,6 +1170,77 @@ is the next free id IN THAT BLOCK, not derived from the file's maximum.*
   committed file and running: EXIT 1, one error per route naming the key and its observed count;
   restored by SHA-256 against `HEAD` and re-run green.*
 
+## Type scale at 390px (owner-assigned, 2026-09-08)
+
+*The other half of the ruling whose tap-target half shipped in #328. The finding was recorded in
+`docs/pre-launch-checklist.md` — "small text is real but mostly legitimate labels
+(`gn-board-card__provenance` at 12.5px x25, chips at 12.8px)" — and the first thing this pass
+established is that **nothing could measure it.** `responsive.spec.ts` has swept body copy against a
+16px floor since item 7, but its population is `p, li, dd, dt, td, figcaption, label`, and every
+element that sentence names is a `span` or a `div`. The reading came from one manual measurement and
+had no guard, which is the state the tap-target note was in while the code drifted under it.*
+
+*THE FLOOR IS 12px AND IT IS NOT A WCAG NUMBER — stated because the tap-target ratchet next door cites
+2.5.5 and 2.5.8 and the symmetry invites a false citation. No WCAG success criterion sets a minimum
+font size: 1.4.4 is resize-to-200%, 1.4.12 is text spacing; iOS HIG's 11pt and Material's 12sp are
+native-platform guidance. 12px is the bottom rung of this product's own scale — seventeen rules sit at
+exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labels legitimate.*
+
+- **13.264** ✅ **Label text on the signed-out surface holds the 12px floor, ratcheted per route.**
+  `apps/web/e2e-viewport/responsive.spec.ts` over the shared sweep in `e2e-viewport/type-scale.ts` (a
+  plain module, not a spec — importing a sweep FROM a spec makes Playwright load that spec's `test()`
+  registrations into the other config, which cost a round on the tap-target pass). Measured: `/help`
+  examined 317 label elements, `/privacy` 21, `/terms` 14, the 404 seven, and **every one renders at
+  exactly 16px**. `/sign-in` matched 5 and examined 0 — all five carry no direct text — which is why
+  the hard control is on `rawMatches` and not on `examined`. —
+  (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-viewport/type-scale-baseline.json`)
+  *The selector control is HARD and runs before the ratchet: the population includes `div`, so a
+  rendered document cannot honestly report 0 matches. A sweep whose selector stopped matching finds
+  zero offenders and reads as the best possible result.*
+  *The disjointness that justifies two sweeps instead of one is MEASURED, not asserted in prose:
+  anything matching both this selector and `measureBodyText`'s lands in `bodyOwned` and reddens by
+  name. Two selectors in two files are free to drift into each other; a comment would not notice.*
+  *Mutation: point the label selector at a tag that does not exist → `rawMatches` 0 → fails.*
+  *Mutation: add `p` to the label selector → `bodyOwned` non-empty → fails naming the overlap.*
+
+- **13.265** ✅ **Label text on the signed-in surface holds the 12px floor, over five routes.**
+  `apps/web/e2e-stack/viewport.spec.ts`, signing in through the real door and reading every id out of
+  the seeded world rather than hardcoding one. **The route list is the whole case.** `/my-work` and the
+  board were the obvious two — the checklist's own reading is about the board — and measured first they
+  BOTH came back with zero under the floor (smallest 12.8px, the chips; board histogram
+  `{12.8px: 24, 13.6px: 6, 16px: 6}`). A sweep of just those two would have ratcheted 0 and 0, reported
+  green, and been blind to every rule this change fixes. Adding `/members`,
+  `/settings/ticket-types` and `/settings/workflows` found the defect: **four
+  `span.ticket-type-list__badge` at 11.2px**, before → after **4 → 0**. —
+  (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/type-scale-baseline.json`)
+  *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON. Zero
+  offenders on two routes is evidence about two routes.*
+  *Two route guesses cost a run each and are recorded in the spec so the third person does not pay
+  again: `/my-work` carries no project link (it links to ticket surfaces), and `/w/<id>` is not a page
+  at all — there is no `app/w/[workspaceId]/page.tsx`, so it renders the 404, a document with a nav and
+  prose that would have swept cleanly while measuring nothing. The project links are on `/workspaces`,
+  the same page the workspace id came from.*
+  *Mutation: revert `.ticket-type-list__badge` to `0.7rem` → 13.265 fails naming four offenders.*
+
+> ### The enumeration that found the offenders was wrong the first time, in the shape this repo collects
+>
+> The first sweep for sub-floor declarations used a digit pattern — `0\.(6[0-9]|7[0-4])[0-9]*rem` —
+> whose alternation requires TWO digits after the point, so it **cannot match `0.7rem`**. It reported
+> three offenders, missed two, and reported them in the confident shape of a complete answer. It was
+> caught only because an earlier value histogram over the same file, taken a different way, had already
+> counted `0.7rem` twice.
+>
+> Redone by parsing each value and converting to px, the set across all three shipped stylesheets is
+> exactly five: `.escape-chip__hint` 10.00px (with `opacity: 0.7` on top of it), `.gn-avatar--small`
+> 10.40px, `.upload-chips__chip` 11.00px, `.gn-transition-edge__label` and `.ticket-type-list__badge`
+> 11.20px. All five now at `0.75rem`.
+>
+> The re-scan reports nothing under 12px, and prints a POSITIVE CONTROL from the same run so the
+> emptiness is a reading rather than a broken scan: at a 12.5px threshold the same scan reports 22
+> declarations in `ui.css`, which reconciles exactly — 20 at 12px plus the two `0.78rem` (12.48px)
+> rules.
+
+
 ## Security headers beyond HSTS (owner-assigned, 2026-09-08)
 
 *Before this the whole product sent exactly ONE security header — `hsts.ts`'s `Strict-Transport-Security`.
