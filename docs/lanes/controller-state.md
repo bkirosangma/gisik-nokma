@@ -1,5 +1,36 @@
 # Cross-lane controller — live state
 
+## ✅ TUESDAY 08:1x IST — PR #326 (MOBILE DEV-TOKEN GUARD) MERGED, INDEPENDENTLY VERIFIED. `main` is `d9d831c`. #327/#328 CONFLICTING again as a direct consequence (same narrative-file pattern as #325) — the executor is mid-work on a fifth PR (#334, type-scale) and hasn't rebased them yet.
+
+**Same corrected-verification method as #325, this time without the stale-checkout near-miss** —
+`git checkout main && git merge --ff-only origin/main` run and its resulting sha checked against the
+merge commit BEFORE the gate, not after. `baseRefName` confirmed `main`, no branch deleted, reachability
+confirmed, four source files checksummed PR-head-vs-merge-commit, all MATCH, none the empty constant.
+
+**`apps/mobile/package.json` changed, so `pnpm install --frozen-lockfile` ran first** (per the #304/#302
+precedent) — lockfile was already up to date, no drift. Forced gate: **`INSTALL_EXIT=0`,
+`REBUILD_EXIT=0`, `GATE_EXIT=0`**, `Tasks: 33 successful, 33 total`, node `v22.22.2`, no
+`Unsupported engine`. Mobile went 3→4 test files / 20→24 tests — exactly `check-dev-credentials.test.ts`'s
+four cases, nothing else moved. All six project checks re-run under `nvm use 22` (the second near-miss
+from the #325 round did not recur): `check:env`/`check:tasks`/`check:runbook`/`check:citations`/
+`check:help`/`check-case-ids` all EXIT 0 — `check:tasks` **190/190 VERIFIED COMPLETE** at `d9d831cf`,
+`check:citations` **1,678 checked / 1,678 cited / 0 uncited**, `check-case-ids` **1,772 unique ids**.
+
+**#327 and #328 flipped from MERGEABLE to CONFLICTING the moment #326 landed — the identical mechanism
+as the #325 round**, and expected: all of #326/#327/#328/#334 touch `Features.md` and
+`docs/lanes/executor-state.md` additively. **Not rebased here** — the executor is currently on
+`exec/117-type-scale` (PR #334), actively mutation-testing a coverage assertion, with a local commit
+not yet pushed. Its own handoff already names the resolution method it uses for exactly this shape
+("keep-both, main's side first, verified by counting ANCHORED markers in the COMMITTED blobs") — this
+is its rebase to do once free, not a new problem.
+
+**#334 (type scale, the other half of the same owner ruling #328 shipped the first half of) is
+deliberately UNMERGED** — live, in-progress, uncommitted-to-`origin` work as this entry is written.
+Its most recent pushed handoff (`origin/exec/117-type-scale` at `6d81282`) already reports gate green
+and all four PRs MERGEABLE at that snapshot, but a newer local commit (`63363ac`, "chase the four
+unwitnessed fixes") exists in the executor's worktree and is not yet on `origin`. Do not merge #334 on
+the strength of the pushed handoff alone; wait for the next push.
+
 ## ✅ TUESDAY 07:5x IST — CONTROLLER RESTARTED. PR #325 (SECURITY HEADERS) MERGED, INDEPENDENTLY VERIFIED. `main` is `ee507f4`. PRs #326/#327 now CONFLICTING (need rebase, executor's to fix); PR #328 deliberately HELD — the executor is mid-investigation on it right now.
 
 **This session started from a full restart** (both controller and executor killed and relaunched this
