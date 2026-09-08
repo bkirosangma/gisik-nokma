@@ -239,4 +239,60 @@ describe('WEB_ORIGIN is a trusted origin', () => {
     expect(res.statusCode).toBe(200);
     await app.close();
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE ABSOLUTE `callbackURL` — verified here rather than assumed at the client
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `apps/web/app/sign-in/page.tsx` now sends an ABSOLUTE `callbackURL` on the
+   * web origin, because a relative one is resolved by the browser against the
+   * API origin the emailed link points at — which landed every magic-link
+   * sign-in on the API's JSON 404, in dev and in the two-subdomain production
+   * shape `deploy/do/app.yaml` describes.
+   *
+   * That fix rests on a claim about THIS server: that an absolute callback at
+   * `WEB_ORIGIN` is accepted. The claim was read out of better-auth's
+   * `origin-check.mjs` (`isTrustedOrigin(url, { allowRelativePaths: true })`),
+   * and reading is not measuring, so it is pinned here — on BOTH sides, because
+   * "the absolute URL is accepted" is also true of a server that validates
+   * nothing at all.
+   */
+  /**
+   * 13.268 — an ABSOLUTE callbackURL on WEB_ORIGIN is accepted (200). This is the value the shipped sign-in page now sends; without WEB_ORIGIN in trustedOrigins it would be refused, which is what makes the client-side fix land rather than trade a 404 for a 403.
+   */
+  it('accepts an absolute callbackURL on the WEB_ORIGIN', async () => {
+    const app = buildServer(WEB_ORIGIN);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { origin: WEB_ORIGIN },
+      payload: {
+        email: 'callback-abs-a@example.test',
+        callbackURL: `${WEB_ORIGIN}/workspaces`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('{"status":true}');
+    await app.close();
+  });
+
+  /**
+   * 13.269 — an absolute callbackURL on an UNTRUSTED origin is refused 403 INVALID_CALLBACK_URL. The refusal side of 13.268: without it, 13.268 would also pass on a server that had stopped checking callbackURL entirely, and the sign-in page would be free to hand a token to any host.
+   */
+  it('refuses an absolute callbackURL on an untrusted origin', async () => {
+    const app = buildServer(WEB_ORIGIN);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { origin: WEB_ORIGIN },
+      payload: {
+        email: 'callback-abs-b@example.test',
+        callbackURL: 'https://evil.example/steal',
+      },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('INVALID_CALLBACK_URL');
+    await app.close();
+  });
 });
