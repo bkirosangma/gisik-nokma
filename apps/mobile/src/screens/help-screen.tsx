@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+} from 'react-native';
 import {
   HELP_CONTENT,
   searchHelp,
@@ -7,7 +15,8 @@ import {
   type HelpDocument,
   type HelpSpan,
 } from '@gisik-nokma/app-core';
-import { colorOf } from '@gisik-nokma/ui/tokens';
+import { helpPaletteFor, helpPalette, themeFor } from './help-theme.js';
+import type { ThemeName } from '@gisik-nokma/ui/tokens';
 
 /**
  * The manual and FAQ on the phone.
@@ -51,25 +60,42 @@ import { colorOf } from '@gisik-nokma/ui/tokens';
  * this file turns the branch red — which it did, in the first draft of this
  * screen, exactly as intended.
  *
- * Pinned to the LIGHT theme, stated rather than hidden: honouring the device's
- * dark mode needs `useColorScheme` threaded through these styles, and doing it
- * here for one screen would leave the board and ticket screens light while the
- * help screen went dark. Recorded as a gap for whoever themes the native apps.
+ * It follows the device's appearance, and the reason it did not until 2026-09-08
+ * turned out to be wrong.
+ *
+ * The note that stood here said pinning to light was deliberate because
+ * "doing it here for one screen would leave the board and ticket screens light
+ * while the help screen went dark". Measured: `board-screen.tsx` and
+ * `ticket-screen.tsx` declare **no colours at all** — no `StyleSheet`, no
+ * `color`, no `backgroundColor`. There was no light theme for this screen to
+ * become inconsistent with. A deferral reason that is not checked is a deferral
+ * that outlives its own justification, which is what happened here for a month.
+ *
+ * `useColorScheme()` answers `null` when the platform has no opinion, and `null`
+ * means light — the same default the app had before. The styles are built per
+ * theme and memoised, because `StyleSheet.create` at module scope can only ever
+ * capture one of them.
+ *
+ * What this file CANNOT do alone is make the native shell follow the system:
+ * that is `app.json`'s `userInterfaceStyle`, set to `automatic` in the same
+ * change. Without it the OS never reports dark and this hook returns light
+ * forever — a themed screen that can never be dark, which reads exactly like a
+ * themed screen that works.
  */
-const token = (role: Parameters<typeof colorOf>[1]) => colorOf('light', role);
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: token('surface') },
+export function makeHelpStyles(theme: ThemeName) {
+  const token = helpPalette(theme);
+  return StyleSheet.create({
+  screen: { flex: 1, backgroundColor: token.surface },
   content: { padding: 16, paddingBottom: 48 },
   search: {
     minHeight: 44,
     borderWidth: 1,
-    borderColor: token('borderStrong'),
+    borderColor: token.borderStrong,
     borderRadius: 6,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: token('text'),
-    backgroundColor: token('surfaceRaised'),
+    color: token.text,
+    backgroundColor: token.surfaceRaised,
     marginBottom: 16,
   },
   tabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
@@ -78,52 +104,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: token('borderStrong'),
+    borderColor: token.borderStrong,
     borderRadius: 6,
   },
-  tabOn: { borderColor: token('accent'), backgroundColor: token('surfaceSunken') },
-  tabText: { fontSize: 15, color: token('text') },
+  tabOn: { borderColor: token.accent, backgroundColor: token.surfaceSunken },
+  tabText: { fontSize: 15, color: token.text },
   tabTextOn: { fontWeight: '600' },
   none: {
     padding: 12,
     borderWidth: 1,
-    borderColor: token('border'),
+    borderColor: token.border,
     borderLeftWidth: 3,
-    borderLeftColor: token('warning'),
+    borderLeftColor: token.warning,
     borderRadius: 6,
     marginBottom: 16,
   },
-  resultTitle: { fontSize: 15, fontWeight: '600', color: token('accent'), marginTop: 10 },
-  resultWhere: { fontSize: 13, color: token('textMuted') },
-  h2: { fontSize: 20, fontWeight: '700', color: token('text'), marginTop: 24, marginBottom: 8 },
-  h3: { fontSize: 16, fontWeight: '600', color: token('text'), marginTop: 16, marginBottom: 4 },
-  p: { fontSize: 16, lineHeight: 24, color: token('text'), marginBottom: 10 },
+  resultTitle: { fontSize: 15, fontWeight: '600', color: token.accent, marginTop: 10 },
+  resultWhere: { fontSize: 13, color: token.textMuted },
+  h2: { fontSize: 20, fontWeight: '700', color: token.text, marginTop: 24, marginBottom: 8 },
+  h3: { fontSize: 16, fontWeight: '600', color: token.text, marginTop: 16, marginBottom: 4 },
+  p: { fontSize: 16, lineHeight: 24, color: token.text, marginBottom: 10 },
   quote: {
     paddingLeft: 10,
     borderLeftWidth: 3,
-    borderLeftColor: token('accent'),
+    borderLeftColor: token.accent,
     marginBottom: 10,
   },
   listItem: { flexDirection: 'row', marginBottom: 6 },
-  bullet: { width: 22, fontSize: 16, lineHeight: 24, color: token('textMuted') },
+  bullet: { width: 22, fontSize: 16, lineHeight: 24, color: token.textMuted },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
-  code: { fontFamily: 'Courier', backgroundColor: token('surfaceSunken') },
+  code: { fontFamily: 'Courier', backgroundColor: token.surfaceSunken },
   cellLabel: { fontWeight: '600' },
-});
+  });
+}
 
-function spanStyle(span: HelpSpan) {
+/**
+ * Both sheets, built once at module load. `StyleSheet.create` registers styles
+ * with the native side, so building them per render would churn that registry
+ * on every keystroke in the search box; there are exactly two themes, so there
+ * is nothing to compute lazily.
+ */
+const SHEETS = { light: makeHelpStyles('light'), dark: makeHelpStyles('dark') } as const;
+type HelpStyles = (typeof SHEETS)['light'];
+
+/** The sheet for a device appearance. */
+function helpStylesFor(scheme: string | null | undefined): HelpStyles {
+  return SHEETS[themeFor(scheme)];
+}
+
+function spanStyle(styles: HelpStyles, span: HelpSpan) {
   if (span.kind === 'bold') return styles.bold;
   if (span.kind === 'italic') return styles.italic;
   if (span.kind === 'code') return styles.code;
   return undefined;
 }
 
-function Spans({ spans }: { spans: readonly HelpSpan[] }) {
+function Spans({ spans, styles }: { spans: readonly HelpSpan[]; styles: HelpStyles }) {
   return (
     <>
       {spans.map((span, i) => (
-        <Text key={i} style={spanStyle(span)}>
+        <Text key={i} style={spanStyle(styles, span)}>
           {span.text}
         </Text>
       ))}
@@ -131,11 +172,11 @@ function Spans({ spans }: { spans: readonly HelpSpan[] }) {
   );
 }
 
-function Block({ block }: { block: HelpBlock }) {
+function Block({ block, styles }: { block: HelpBlock; styles: HelpStyles }) {
   if (block.kind === 'paragraph') {
     return (
       <Text style={styles.p}>
-        <Spans spans={block.spans} />
+        <Spans spans={block.spans} styles={styles} />
       </Text>
     );
   }
@@ -143,7 +184,7 @@ function Block({ block }: { block: HelpBlock }) {
     return (
       <View style={styles.quote}>
         <Text style={styles.p}>
-          <Spans spans={block.spans} />
+          <Spans spans={block.spans} styles={styles} />
         </Text>
       </View>
     );
@@ -158,7 +199,7 @@ function Block({ block }: { block: HelpBlock }) {
                 bearing. */}
             <Text style={styles.bullet}>{block.ordered ? `${i + 1}.` : '•'}</Text>
             <Text style={[styles.p, { flex: 1 }]}>
-              <Spans spans={item} />
+              <Spans spans={item} styles={styles} />
             </Text>
           </View>
         ))}
@@ -173,11 +214,11 @@ function Block({ block }: { block: HelpBlock }) {
             <Text key={c} style={styles.p}>
               {block.head[c] !== undefined ? (
                 <Text style={styles.cellLabel}>
-                  <Spans spans={block.head[c]} />
+                  <Spans spans={block.head[c]} styles={styles} />
                   {': '}
                 </Text>
               ) : null}
-              <Spans spans={cell} />
+              <Spans spans={cell} styles={styles} />
             </Text>
           ))}
         </View>
@@ -186,17 +227,22 @@ function Block({ block }: { block: HelpBlock }) {
   );
 }
 
-function Blocks({ blocks }: { blocks: readonly HelpBlock[] }) {
+function Blocks({ blocks, styles }: { blocks: readonly HelpBlock[]; styles: HelpStyles }) {
   return (
     <>
       {blocks.map((block, i) => (
-        <Block key={i} block={block} />
+        <Block key={i} block={block} styles={styles} />
       ))}
     </>
   );
 }
 
 export function HelpScreen() {
+  // The device's appearance, read at render. `useColorScheme()` re-renders when
+  // the OS setting changes, so switching a phone to dark mode with this screen
+  // open moves it — and `null` (no opinion) resolves to light, the behaviour
+  // this screen already had.
+  const styles = helpStylesFor(useColorScheme());
   const [query, setQuery] = useState('');
   const [documentId, setDocumentId] = useState<HelpDocument['id']>('manual');
   const result = useMemo(() => searchHelp(HELP_CONTENT, query), [query]);
@@ -259,15 +305,15 @@ export function HelpScreen() {
 
       {active === undefined ? null : (
         <View>
-          <Blocks blocks={active.intro} />
+          <Blocks blocks={active.intro} styles={styles} />
           {active.sections.map((section) => (
             <View key={section.id}>
               <Text style={styles.h2}>{section.title}</Text>
-              <Blocks blocks={section.intro} />
+              <Blocks blocks={section.intro} styles={styles} />
               {section.entries.map((entry) => (
                 <View key={entry.id}>
                   <Text style={styles.h3}>{entry.title}</Text>
-                  <Blocks blocks={entry.blocks} />
+                  <Blocks blocks={entry.blocks} styles={styles} />
                 </View>
               ))}
             </View>

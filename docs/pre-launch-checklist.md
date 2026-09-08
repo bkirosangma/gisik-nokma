@@ -306,11 +306,13 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
 
 - **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were
   read statically and its pairs are included in 6a. One thing found there and **not** fixed:
-  `help-screen.tsx:59` resolves every token through `colorOf('light', role)`, so **the mobile help screen
-  is hardcoded to the light theme** and a dark-mode phone gets light colours. That is a theme-support gap
-  rather than a contrast failure — the light palette is internally consistent, so nothing fails a ratio —
-  and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
-  fixed**, because it is a design decision rather than a defect with one obvious remedy.
+  `help-screen.tsx:59` resolved every token through `colorOf('light', role)`, so the mobile help screen
+  was hardcoded to the light theme and a dark-mode phone got light colours. **CLOSED 2026-09-08** on the
+  owner's assignment: the screen reads `useColorScheme()` and `app.json` declares
+  `userInterfaceStyle: automatic`, without which the OS never reports dark and the hook answers light
+  forever. The deferral reason recorded here — that theming one screen would leave the board and ticket
+  screens inconsistent — was measured and found false: those two declare no colours at all. Cases
+  12.394–12.396.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,

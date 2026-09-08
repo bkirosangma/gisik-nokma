@@ -10,6 +10,7 @@
     },
     "android": {
       "package": "in.artsourced.gisiknokma"
-    }
+    },
+    "userInterfaceStyle": "automatic"
   }
 }
