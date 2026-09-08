@@ -236,6 +236,130 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
 > while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
 >
+# ▶ TUESDAY 2026-09-08 ~12:1x IST — **ITEM A (`font: inherit`): THE COUNT WAS 26, IT IS 30, AND TWO OF THEM WERE INVISIBLE TO EVERY SIZE INSTRUMENT IN THE REPO.**
+
+*Branch `exec/122-font-inherit`, off `main` (`3be4f01`). Owner ruling
+`gisik-nokma-lanes/CTL-RULING-2026-09-08-owner-three.md` item A. PR 1 of 2; B+C are NOT started.*
+
+## POSITION
+
+| | |
+|---|---|
+| **branch** | `exec/122-font-inherit`, 2 commits (`6f1ab13` code, `d2f3a6e` docs), ahead 2 / behind 0 of `origin/main` `3be4f01` |
+| **gate** | **33/33 EXIT 0, `Cached: 0` (forced)**, Node v22.22.2, server 143 files / 1431 passed + 5 skipped, **zero orphaned vitest workers** |
+| **checks** | `check:citations` `check:tasks` `check:runbook` `check:help` `check:env` all EXIT 0; `node scripts/check-case-ids.mjs` EXIT 0 (1779 ids). **`check:citations` was RED first** — a ✅ case must be cited by a test; fixed by putting the ids in the assertions. |
+| **queue** | item A awaiting merge. **Items B+C NOT STARTED and currently BLOCKED — see below.** |
+
+## WHAT CHANGED
+
+One line: `button { font: inherit; }` in `apps/web/app/globals.css`, an ELEMENT selector. Plus the
+guard, plus docs. **Why an element selector and not a list of 26:** the 26 are RENDERED INSTANCES on
+five routes, not 26 code sites — a handful of JSX sites render N rows each — so "change exactly those
+26" is not expressible in source. At 0,0,1 it also enforces the ruling's "and no further": every class
+rule still wins, measured (`.gn-board-card__provenance` stays 12.48px x26, every other bucket unmoved).
+
+## THE FINDING — carry this one, it generalises
+
+**`button.gn-help__tab` was rendering at 16px in ARIAL.** `ui.css:1321` sets `font-size: 1rem` and no
+`font-family`. **Its SIZE was already correct**, so the 12px floor, the size histogram, and the
+raised-floor-to-16px enumeration that produced the original 26 were ALL structurally incapable of
+seeing it — you cannot surface a 16px reading by raising a floor to 16px.
+
+It was found by the MUTATION, not by the fix: deleting the rule reddened the new guard on `/help` as
+well as `/sign-in`. **This is the entire argument for reading font-FAMILY instead of asserting the
+`13.3333px` bucket is absent.** The bucket form is one line, looks equivalent, passes straight over
+`/help`, and would pass again the day a UA constant changes. *A check keyed to the symptom of one
+browser version is not a check on the property.*
+
+## COUNT: 26 → 30, AND 30 IS A FLOOR
+
+| surface | site | before | why the original enumeration missed it |
+|---|---|---|---|
+| signed-in ×5 routes | 22 `button` + 2 `.ticket-type-list__new` + 2 `.workflow-list__new` | 13.3333px | — (the owner's 26) |
+| `/sign-in` ×3 widths | 2 `<button role="tab">` in `.gn-view-tabs` | 13.3333px | the raised-floor run was **signed-in only** |
+| `/help` ×3 widths | 2 `button.gn-help__tab` | **16px Arial** | **no size instrument could see it** |
+
+**Ten of nineteen routes are swept by NEITHER suite** (`/`, `/inbox`, `/invite/[token]`,
+`/mcp/authorize`, `/mcp/tokens`, `/workspaces`, ticket-type new/[typeId], workflow new/[workflowId]).
+Unstyled controls there are corrected by the same rule and are **not measurable by either instrument**.
+Enumerating the absence rather than calling it partial: 26 + 2 + 2 measured, an unmeasured tail.
+
+**The owner ratified 28 on the /sign-in measurement, BEFORE /help was known.** The extra 2 are the same
+defect class and arrived from the mutation afterwards. Flagged to the controller; not re-ratified.
+
+## WHAT WAS MEASURED, AND THE INSTRUMENT THAT LIED FIRST
+
+* **Signed-out, before → after:** `/sign-in` `{13.3333px:2, 16px:3}` → `{16px:5}` at 390 AND 768 AND
+  1512. `/help` 341 examined, all 16px, two of them Arial before and none after. Zero `13.3333` in the
+  whole log after. **19 passed, EXIT 0.**
+* **Mutation RUN:** delete the rule → **EXIT 1, 6 failed**, naming its own selectors on both routes.
+  Restored with `git checkout --` **from a commit made before the mutation** (memory #16 — the same
+  trap destroyed 16 citations once and recurred with the memory loaded), re-run green.
+* **Tap targets: byte-identical before and after** on every signed-out route (10/16/16 on `/help`, 0
+  elsewhere). No ratchet moved. Heights held by `min-height: 2.75rem`; boxes grew WIDER only
+  (67x44→74x44, 85x44→96x44), help tabs unchanged 366x44.
+* **`font: inherit` is the SHORTHAND** — weight and line-height ride along, and a size histogram cannot
+  show either. Read explicitly: `.gn-help__tab[aria-pressed='true']`'s deliberate `font-weight: 600`
+  SURVIVES (0,2,0 beats 0,0,1), measured 600/400 before and after.
+* **⚠ MY OWN BEFORE-INSTRUMENT WAS WRONG FIRST AND I CAUGHT IT BY READING IT.** The screenshot "before"
+  is reconstructed by injecting the UA font rather than editing the stylesheet. The first version used
+  `!important`, which beat the CLASS rules too and reported all five sign-in buttons at 13.3333px —
+  over-reporting the defect. Without `!important` it reproduces the independently-measured histogram
+  exactly (2 at 13.3333px, 3 at 16px). **A reconstruction that disagrees with the real measurement is
+  the instrument failing, not the finding growing.**
+
+## ⚠ WHAT IS NOT VERIFIED — do not report these as done
+
+1. **THE 26 CONTROLS THE RULING IS ACTUALLY ABOUT ARE FIXED BUT UNWITNESSED.** The signed-in guard
+   (13.267) is **written and unrun**, marked 🟡 for exactly that reason. It measures the compose web
+   container, which must be rebuilt to carry the new stylesheet, and **the controller instructed that
+   the dev containers not be rebuilt or restarted — the OWNER is using them by hand right now.**
+   Flip 13.267 to ✅ only on a green run after the rebuild window. **Do not flip it on the strength of
+   the signed-out result**; different surface, different routes.
+2. **Case ids 13.266–13.267 are PROVISIONAL.** §13 requires controller block allocation ON REQUEST and
+   says never to mint from the maximum. I asked; the controller was mid-incident on a production
+   sign-in-redirect bug. These are the recounted next-free (max in use 13.265, both free repo-wide).
+   **Recount trap: `grep -oE '13\.[0-9]+'` matches `13.3333px` and reports a maximum of `13.3333` —
+   the id pattern collides with the pixel value this task is about.**
+3. **The unswept tail is unquantified.** I know WHICH routes are unswept; I have not counted the
+   controls on them. "30 is a floor" is honest; "30 + N" would not be.
+4. **The visual pass covered the signed-out surface only** — `/sign-in` and `/help` at 390px, read for
+   wrap/clip/collision and for weight, and routed through `ui-ux-pro-max` (its `Readable Font Size`
+   rule is High severity, minimum 16px on mobile: the change moves these controls from VIOLATING it to
+   satisfying it, and `Font Size Scale` — no arbitrary sizes — is the second). The signed-in 26 have
+   not been looked at, same blocker as (1).
+
+## ⛔ ITEMS B + C ARE BLOCKED, BY INSTRUCTION, NOT BY DIFFICULTY
+
+The controller: the **owner is signing in through the dev stack by hand**, and those sign-ins hit
+`/api/auth/*` from the same host, so they land in the **same `auth:<clientKey>` bucket** B has to
+count. Measuring now reproduces the exact defect that made the previous count unusable (a window that
+spanned other traffic). **Do not start B until the controller says the machine is clear.**
+
+Two things to settle BEFORE building B's harness, so the expensive order is not discovered late:
+* **Does the server log each request with method+path?** If not, the counter needs another source
+  (instrument the limiter, or the access log) and finding that out after building the harness is the
+  costly sequence.
+* **B's positive control must plant one extra `/api/auth/*` request and show the count rise by exactly
+  1.** An instrument that has only ever printed the expected number has certified nothing.
+* **`makeFixedWindowLimiter` is a FIXED window** (its own docblock): a caller can spend `max` at the end
+  of one window and `max` again at the start of the next, so up to `2 × max` across a boundary. A value
+  chosen against one run's peak is not automatically safe for two back-to-back runs.
+* **C's escape hatch is load-bearing and the controller restated it:** if one run's peak is comfortably
+  under 60, the ceiling was never binding — **STOP, do not raise it, hand the facts back.**
+
+## ANCHORS — verify, do not adopt
+
+`exec/122-font-inherit` off `main` `3be4f01`; commits `6f1ab13` (code) and `d2f3a6e` (docs). Verify
+with `git branch --contains` — empty output means orphaned; `git cat-file` passes on reflog-only
+commits and will hand you pre-rebase content while looking like it worked.
+
+**After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.** Not
+boilerplate: that trap fired on `exec/117` on 2026-09-08, reachability passed while 23 lines were
+missing, and per-file checksums missed it because they skipped the narrative files. Note the refined
+form too — a branch merely BEHIND main is byte-for-byte indistinguishable from main having LOST work,
+so a non-empty result is a partition to attribute, never a verdict to report.
+
 # ▶ TUESDAY 2026-09-08 ~11:3x IST — **THE WIDENED SWEEP: THE PRIOR PASS HAD THREE ENUMERATION HOLES, NOT ONE, AND THE #287 CLOSURE ITSELF BROKE A NEXT-FREE POINTER.**
 
 *Branch `exec/121-widened-staleness-sweep`, off `main` (`5191cf4`). Closes items 1-2 of the previous
