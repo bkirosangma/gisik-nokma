@@ -20,6 +20,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ⚠ THE ONE "OPEN" ITEM I WAS ABOUT TO TAKE IS ALREADY CLOSED — #287 IS STALE
+>
+> `controller-state.md` records, and the dispatch brief repeats under **TWO KNOWN GAPS #1**, that
+> Plan 9's notifications fake is witnessed *producer-side only* and that the client consumer "has
+> never been executed", owned by "whoever next touches Plan 9's client-side notification consumer".
+>
+> **That was closed before this session started.** `apps/server/test/integration/notifications-consumer-roundtrip.test.ts`
+> is on `origin/main` and drives the REAL `createHttpNotificationsGateway` against the real route:
+>
+> * **6 tests, cases 11.190–11.195**, all catalogued in `test-cases/11-calendar-notifications.md`.
+> * **Zero `vi.mock`.** Real Postgres. Run at this sha: **EXIT 0, 6 passed.**
+> * **In the gate**: `apps/server/vitest.config.ts` includes `test/**/*.test.ts`, which collects it.
+> * Its own docblock opens *"Plan 9's consumer-side residual, closed"* and explains why the move was
+>   possible at all — the adapter was never web-specific; it imports `NotificationsGateway`,
+>   `HttpClient` and `parseNotification`, so `apps/server` can import it and the "outside the
+>   dependency graph" premise no longer holds.
+>
+> **I propagated the stale claim twice before checking it**, naming #287 to the controller as the one
+> remaining engineering gap. It survived because it reads as a careful, honest limitation — Lane F
+> wrote it well, and a well-written caveat is harder to doubt than a sloppy one. Same class as the
+> ledger row citing a closed PR: **a restart surface that lies, and lies in the conservative
+> direction, which is why nobody checks it.**
+>
+> **Correcting `controller-state.md` is the controller's to make, not mine** — flagged, not edited.
+>
 > **POSITION AS OF THIS ENTRY.** `exec/117-type-scale` is **PR #334, open and MERGEABLE**, HEAD
 > `d9624b3`. Gate re-run AT THAT SHA: **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**,
 > load 2.66, zero orphaned vitest workers. All five catalogue checks EXIT 0. Viewport suite 19 passed
