@@ -38,9 +38,13 @@ a { color: var(--gn-accent); }
    declares that file BEM-classes-only.
 
    SCOPE BEYOND THE 26, STATED BECAUSE A COUNT CANNOT SHOW IT: this also
-   corrects `/sign-in`'s two method tabs (unclassed `<button role="tab">` in
-   `.gn-view-tabs`, which sets `min-height` and `padding-inline` and no font) —
-   13.3333px x2 at 390, 768 and 1512, measured. Same defect, one page earlier.
+   corrected `/sign-in`'s two method tabs — 13.3333px x2 at 390, 768 and 1512,
+   measured. **That description is now history rather than the tree:** those
+   tabs were unclassed `<button role="tab">` inside `.gn-view-tabs`, and the HIG
+   sign-in restyle replaced them with `SegmentedControl`, whose
+   `.gn-segmented__item` sets its own `font: inherit`. `.gn-view-tabs` survives
+   only on the project page. The rule below still earns its place there and on
+   every other unclassed control; only its `/sign-in` example has moved on.
    Unstyled controls on surfaces NEITHER sweep visits (calendar, timeline,
    contest banner, the workflow-builder inspectors, editor chrome) change too
    and are not measurable by this instrument. Enumerating the absence rather
@@ -115,34 +119,15 @@ button { font: inherit; }
   min-width: 2.75rem;
 }
 
-.gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
+.gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-radius: 16px; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
-.gn-sign-in__method label { display: flex; flex-direction: column; gap: 0.3rem; }
 
-/* Measured at 390px before this: `340x21` — the sign-in inputs were the last
-   four tap-target offenders on this page after the method tabs were fixed. They
-   are unclassed `<input>`s inside their labels, so the label is the only handle.
-
-   `font-size: 1rem` is load-bearing and not cosmetic: under 16px, iOS Safari
-   zooms the viewport on focus and the layout jumps under the thumb — the same
-   note the MCP code input carries. The tokens and the 0.4rem radius match every
-   other input this product ships. */
-.gn-sign-in__method label input {
-  min-height: 2.75rem;
-  padding: 0 0.75rem;
-  border: 1px solid var(--gn-border-strong);
-  border-radius: 0.4rem;
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
-  font-family: inherit;
-  font-size: 1rem;
-}
-
-.gn-sign-in__method label input:focus-visible {
-  outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 2px;
-}
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
+/* 1rem, not the plan's 0.8rem (12.8px) — under the 16px floor for body copy
+   on a phone, the same defect `.gn-notfound__aside` (globals.css:239) and
+   `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */
+.gn-sign-in__hint,
+.gn-sign-in__legal { margin: 0; text-align: center; font-size: 1rem; color: var(--gn-text-muted); }
 
 /* A refusal is a first-class rendering, not an error state: six of the twelve
    `DataSourceQuery` methods answer with a `ServingGapError` naming the facts the

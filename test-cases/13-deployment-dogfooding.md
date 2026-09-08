@@ -1836,6 +1836,24 @@ before this, **46 `aria-label` and 140 `role` attributes existed across 53 sourc
 ASSERTION TOUCHED ANY OF THEM** — a restyle could have deleted every accessible name in the product and
 the gate would have stayed 33/33.*
 
+> **⚠ WHAT 13.285/13.287 CANNOT SEE, measured 2026-09-08 by the mutation that was supposed to prove
+> the opposite.** The plan's Task 2 required deleting the passkey button to redden **both** 13.292 and
+> 13.285. **Only 13.292 fired.** Root cause, read from `button.tsx`: `Button` renders a bare
+> `<button>` whose role is IMPLICIT in the tag and whose accessible name comes from its TEXT — so none
+> of the four counted attributes moves when an entire unlabelled control is deleted.
+>
+> **The gate counts ARIA ATTRIBUTES, not accessible roles**, and it therefore cannot see the loss of
+> any control named by its own text — which is most buttons in this product. The case wording below is
+> accurate (it names the four attributes) but **Task 0's rationale oversold it**: "a rule enforced by a
+> test survives a delegation" is true only for the population the test counts. Every remaining
+> per-screen task leans on this gate, so the limit is written here rather than left to be rediscovered.
+>
+> **It is a real gap, not a nuisance, and it is recorded rather than fixed** — closing it means
+> counting computed accessible roles instead of attributes, which is a different instrument.
+> **Owner: whoever next touches `sweepAccessibleNames`.** What still holds: explicit `role`,
+> `aria-label`, `aria-selected` and `aria-describedby` cannot fall, which is what caught the
+> SegmentedControl transcription and what the sign-in restyle was measured against.
+
 - **13.285** ✅ Accessible names and roles on the signed-out surface are a one-way ratchet: `aria-label`,
   `role`, `aria-selected` and `aria-describedby` counts per `viewport|route` may rise and never fall.
   Lowering one is a deliberate deletion of the key in a commit that names the element — the same
@@ -1878,3 +1896,45 @@ the gate would have stayed 33/33.*
   (`packages/ui/test/components.test.tsx`)
 - **13.291** ✅ `.gn-field__input` keeps `border: 1px solid var(--gn-border)` — the one R1(c) exception,
   because an empty field has no label to identify it. — (`packages/ui/test/components.test.tsx`)
+
+## Sign-in on the HIG surface (2026-09-08) — Task 2 of the per-screen plan
+
+- **13.292** ✅ The sign-in restyle keeps all four shipped methods — Phone (default), Email link,
+  Continue with Google, Sign in with a passkey — where the prototype drew two. Mutation-witnessed:
+  removing the passkey button reddens this. **13.285 (the accessible-name/role ratchet) was
+  expected to also redden and did NOT** — `Button` (`packages/ui/src/components/button.tsx`)
+  renders a plain `<button>` with no explicit `role`, `aria-label`, `aria-selected` or
+  `aria-describedby` attribute, so removing one moves none of the four counts
+  `sweepAccessibleNames` tracks; its accessible name comes from text content and its role is
+  implicit from the tag. 13.285 is inert against the loss of a whole unlabelled button — a real
+  gap in that guard, reported rather than papered over. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.293** ✅ The adopted helper text ("It expires in 15 minutes.") renders on the Email method
+  only, not on Phone. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method
+  (`emailAndPassword: { enabled: false }`). — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+
+> ### Two things Task 2 corrected that belong to earlier PRs, recorded here because nothing else would
+>
+> **The segmented control shipped 4px under the tap-target floor.** `.gn-segmented__item` landed in
+> #360 with `min-height: 2.5rem` — 40px against the 44px this repo's own ratchet enforces and every
+> other control here uses. **It was invisible for exactly one PR because nothing rendered the component
+> yet**; sign-in is the first screen to use it, and the ratchet reddened on all three viewports the
+> moment it did. Raised to 2.75rem, with the reason written at the site. *Controlled: reverting the
+> line to #360's value reddens `/sign-in` at 390, 768 and 1512.* **A number that only becomes wrong
+> when something finally uses it is the kind a component library ships most easily.**
+>
+> **13.292 claimed a default it did not assert.** Its own text says "Phone (default)", and review
+> showed the whole viewport suite stayed green with `useState<Method>('phone')` flipped to `'email'` —
+> the only thing that reddened was an unnamed vitest case that types into "Phone number" without
+> clicking the tab, i.e. it caught the default by accident. The assertion is now explicit.
+> *Controlled: the same flip now reddens three viewports.*
+
+> ### One deviation from the plan's literal JSX, declared rather than left for a reader to find
+>
+> The plan puts the adopted helper text *before* the `{emailSent ? …}` ternary; it shipped inside the
+> not-yet-sent branch, so the hint disappears once the link is on its way rather than sitting above the
+> confirmation. Kept, because a hint about what a button will do reads oddly beside a message saying it
+> already happened — but the plan called Task 2 transcription, and this is a departure from it.
+> **13.293 cannot see the difference**, since it never sends; that is a limit of the case, not evidence
+> the placement is right.
