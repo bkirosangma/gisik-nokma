@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Card } from '@gisik-nokma/ui';
+import Link from 'next/link';
+import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
 import { authClient } from '../../src/auth-client.js';
 
 type Method = 'phone' | 'email';
@@ -95,32 +96,33 @@ function SignInForm() {
 
   return (
     <main className="gn-shell">
-      <h1 className="gn-page-title">Gisik Nokma</h1>
-      <Card className="gn-sign-in">
-        <div role="tablist" className="gn-view-tabs">
-          <button
-            role="tab"
-            type="button"
-            aria-selected={method === 'phone'}
-            onClick={() => setMethod('phone')}
-          >
-            Phone
-          </button>
-          <button
-            role="tab"
-            type="button"
-            aria-selected={method === 'email'}
-            onClick={() => setMethod('email')}
-          >
-            Email link
-          </button>
+      <header className="gn-page-header">
+        <div className="gn-page-header__icon" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
+            <path d="M8 13h8" /><path d="M8 16.5h5" />
+          </svg>
         </div>
+        <h1 className="gn-page-header__title">Gisik Nokma</h1>
+        <p className="gn-page-header__tagline">The keeper of memory</p>
+      </header>
+      <Card className="gn-sign-in">
+        <SegmentedControl
+          aria-label="Sign-in method"
+          value={method}
+          onChange={setMethod}
+          options={[
+            { value: 'phone', label: 'Phone' },
+            { value: 'email', label: 'Email link' },
+          ]}
+        />
 
         {method === 'phone' ? (
           <div className="gn-sign-in__method">
-            <label>
-              Phone number
+            <label className="gn-field">
+              <span className="gn-field__label">Phone number</span>
               <input
+                className="gn-field__input"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 placeholder="+91…"
@@ -141,9 +143,13 @@ function SignInForm() {
               </Button>
             ) : (
               <>
-                <label>
-                  One-time code
-                  <input value={code} onChange={(event) => setCode(event.target.value)} />
+                <label className="gn-field">
+                  <span className="gn-field__label">One-time code</span>
+                  <input
+                    className="gn-field__input"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                  />
                 </label>
                 <Button
                   variant="primary"
@@ -162,9 +168,10 @@ function SignInForm() {
           </div>
         ) : (
           <div className="gn-sign-in__method">
-            <label>
-              Email
+            <label className="gn-field">
+              <span className="gn-field__label">Email</span>
               <input
+                className="gn-field__input"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -173,18 +180,23 @@ function SignInForm() {
             {emailSent ? (
               <p>Check your inbox — the link signs you in.</p>
             ) : (
-              <Button
-                variant="primary"
-                onClick={() =>
-                  void authClient.signIn
-                    .magicLink({ email, callbackURL: webOriginCallback(next) })
-                    .then(({ error: linkError }) =>
-                      linkError ? fail(linkError.message) : setEmailSent(true),
-                    )
-                }
-              >
-                Send magic link
-              </Button>
+              <>
+                <p className="gn-sign-in__hint">
+                  We&rsquo;ll email you a link that signs you in. It expires in 15 minutes.
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    void authClient.signIn
+                      .magicLink({ email, callbackURL: webOriginCallback(next) })
+                      .then(({ error: linkError }) =>
+                        linkError ? fail(linkError.message) : setEmailSent(true),
+                      )
+                  }
+                >
+                  Send magic link
+                </Button>
+              </>
             )}
           </div>
         )}
@@ -219,6 +231,10 @@ function SignInForm() {
           </p>
         ) : null}
       </Card>
+      <p className="gn-sign-in__legal">
+        By continuing you agree to the <Link href="/terms">Terms</Link> and{' '}
+        <Link href="/privacy">Privacy notice</Link>.
+      </p>
     </main>
   );
 }

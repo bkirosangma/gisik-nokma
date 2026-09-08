@@ -1359,12 +1359,19 @@
   border-radius: 9px;
   background: var(--gn-fill-tertiary);
 }
+/* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
+   the 44px floor this repo's own tap-target ratchet enforces (WCAG 2.5.5, and
+   the same 2.75rem every other control here uses), and it was invisible for one
+   PR because NOTHING RENDERED THE COMPONENT YET — sign-in is the first screen to
+   use it, and the ratchet went red the moment it did. A number that only becomes
+   wrong when something finally uses it is the kind a component library ships
+   most easily. Reverting this line reddens `/sign-in` on all three viewports. */
 .gn-segmented__item {
   flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   border: none;
   border-radius: 7px;
   background: transparent;

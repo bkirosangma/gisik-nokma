@@ -909,10 +909,14 @@ for (const route of UNAUTHED_ROUTES) {
        floor, so no size ratchet could ever have reddened on it.
 
        This surface is where the ruling's own count came from being a floor
-       rather than a total: `/sign-in`'s two method tabs are unclassed
-       `<button role="tab">` inside `.gn-view-tabs`, which sets `min-height`
-       and `padding-inline` and no font. The signed-in enumeration found 26 and
-       could not see these two. */
+       rather than a total: `/sign-in`'s two method tabs WERE unclassed
+       `<button role="tab">` inside `.gn-view-tabs`, which set `min-height` and
+       `padding-inline` and no font, and the signed-in enumeration of 26 could
+       not see them. **Past tense as of the HIG sign-in restyle** — they are
+       `.gn-segmented__item` now and carry their own `font: inherit`, so this
+       check stays green here for a different reason than the one that
+       originally made it necessary. The provenance is kept because it is why
+       the check exists; it is no longer a description of this route. */
     expect
       .soft(
         typeScale.uaFont,
@@ -992,6 +996,39 @@ for (const route of UNAUTHED_ROUTES) {
             `that says which element and why.`,
         ).toBeGreaterThanOrEqual(accessibleBaseline[attr]);
       }
+    }
+
+    if (route.path === '/sign-in') {
+      // 13.292 — every shipped method survives the restyle. The prototype drew
+      // two and the product ships four; the audit's D column is binding.
+      const list = page.getByRole('tablist', { name: 'Sign-in method' });
+      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
+      await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
+      // Phone is the DEFAULT, and this case's own name says so — added because
+      // review found the claim unasserted. Flipping `useState<Method>('phone')`
+      // to `'email'` left this suite fully green; the only thing that reddened
+      // was an unnamed vitest case that types into "Phone number" without
+      // clicking the tab, i.e. it caught the default by accident.
+      await expect(list.getByRole('tab', { name: 'Phone' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+
+      // 13.294 — the prototype's Password tab does not exist and must never appear.
+      // auth.ts:84 sets emailAndPassword { enabled: false } with "the spec forbids passwords".
+      await expect(list.getByRole('tab', { name: 'Password' })).toHaveCount(0);
+
+      // 13.293 — the adopted helper text is on the Email method only.
+      await list.getByRole('tab', { name: 'Email link' }).click();
+      await expect(
+        page.getByText("We’ll email you a link that signs you in. It expires in 15 minutes."),
+      ).toBeVisible();
+      await list.getByRole('tab', { name: 'Phone' }).click();
+      await expect(
+        page.getByText("We’ll email you a link that signs you in. It expires in 15 minutes."),
+      ).toHaveCount(0);
     }
 
     /* ── 5. COMPUTED CONTRAST FROM THE LIVE DOM. ──────────────────────────*/
