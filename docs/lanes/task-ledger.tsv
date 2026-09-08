@@ -239,3 +239,6 @@ hig-per-screen	9	todo			The List view — the prototype that does not exist. Fou
 hig-per-screen	10	todo			Help, Legal, NotFound, McpAuthorize, McpTokens.
 hig-per-screen	11	todo			Mobile — record the deferral durably, with an owner. CSS tokens do not transfer to React Native; an unrecorded deferral is defect class 4 from Plan 1.
 hig-per-screen	12	todo			Passkey registration — /account with a Passkeys section on @better-auth/passkey 1.7.2 (addPasskey/listUserPasskeys/deletePasskey); case 13.330 is the CDP virtual-authenticator end-to-end witness. Owner-scoped 2026-09-08 after the live look found sign-in-with-passkey was a dead end for every user. After Task 2b and the owner second look. Block 13.327-13.332.
+hig-per-screen	13	todo			AMENDMENT 2026-09-09 — Part B: measure the neo style from the exported prototype files into design-system/neo-tokens.json + docs/neo-token-report.md; sonnet; precondition = the owner's export landing in design-system/
+hig-per-screen	14	todo			AMENDMENT 2026-09-09 — neo tokens in tokens.ts (shadow/radius roles; the one lift) + the four shared pieces restyled; cases 13.337–13.343; sonnet impl + sonnet review
+hig-per-screen	15	todo			AMENDMENT 2026-09-09 — sign-in, workspaces and invite restyled in neo; cases 13.344–13.350; sonnet impl (haiku ok for CSS-only) + sonnet review; owner look after

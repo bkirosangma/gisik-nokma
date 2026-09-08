@@ -1002,9 +1002,160 @@ catalogue), and any cross-device / QR flow.
 
 ---
 
+---
+
+## AMENDMENT 2026-09-09 — the neomorphism direction, and the model floor
+
+**Written by the controller (Fable 5.1) 2026-09-09 ~02:2x IST** from `docs/hig-second-audit.md` (#382) and three owner
+rulings of ~01:5x–02:1x, verbatim: *"I want to make the platform in the neomorphism style"* → *"yes. yes. yes. and do the
+restart yourself"* (neo for the whole product including a restyle of the two finished screens; the second audit now;
+the owner exports the interactive prototype files) → *"make sure you coordinate and plan the work properly, assigning
+them to the cheapest possible models for those tasks. The main work here is UI."* Every path and line below was read
+from the tree at `e7a7f7c`, not recalled.
+
+**What changes in the sequence:** three tasks go AHEAD of Task 12 and of everything from 3a onward — **Task 13**
+measures the `neo` style from the exported files; **Task 14** lands the neo tokens and restyles the four shared pieces;
+**Task 15** restyles the two finished screens. Every later (a) task then transcribes in neo, not HIG-flat. Nothing in
+the Global Constraints changes except the two lifts named under Task 14.
+
+**What neo is, as read from the design session (`controller-state.md`, the #379 entry):** raised cards, pills and
+buttons carry diffuse drop shadows on the SAME paper colour as the page; inputs are sunken (inner shadow, no border in
+the prototype); the accent palette is unchanged; the dark theme separates by slightly lighter fills, shadows nearly
+invisible. **It is a surface treatment, not a rewrite:** the palette (#353), every (b) states task, Task 0's
+accessible-name gate and the copy rule all carry over unchanged.
+
+**Three rules, binding, not negotiable without the owner — each is already a repo rule:**
+- **(a) An EMPTY INPUT keeps a ≥3:1 boundary** (13.284/13.291: it has no label to identify it). A soft inner shadow is
+  not one by assumption. If Task 13 measures the sunken field's shadow edge at ≥3:1 in BOTH themes with the 13.283
+  sweep's instrument, the boundary MAY be the shadow and the case says so with the number; otherwise
+  `border: 1px solid var(--gn-border)` stays.
+- **(b) A CONTROL keeps a fill or an accent 600-weight label** (the post-#354 control-affordance ruling). A shadow is
+  not a boundary WCAG 1.4.11 or the sweep credits.
+- **(c) DARK theme separates by FILL, measured** — a shadow does not count toward separation there. Text pairs in
+  `CONTRAST_PAIRS` (`packages/ui/src/tokens.ts:276`) are unchanged by this amendment.
+
+**Model floor (owner, 2026-09-09) — applied on top of the coordination doc's table, "the tier follows the failure cost
+of the task, not its size":**
+- **The executor SESSION is relaunched per task on that task's tier** (the controller does this at the fixed point):
+  sonnet for surface, transcription and measurement tasks; opus only for Task 12 (auth path).
+- **(a)/surface tasks and Task 13:** sonnet / medium implementer; **haiku is acceptable for a pure CSS transcription
+  commit when the plan carries the complete CSS and a mechanical gate exists** (`CONTRAST_PAIRS`, the accessible-name
+  ratchet 13.285–13.287, the token-discipline scanner, the tap-target/type-scale ratchets, the non-text roster).
+  Per-task reviewer: sonnet / medium.
+- **(b) states tasks:** sonnet / medium implementer, **opus / high REVIEWER** — their point is a refusal state, and the
+  standing rule escalates the reviewer wherever a task's point is a refusal or a disclosure. (Down from opus + opus.)
+- **Task 12:** unchanged, opus / high. **Task 9:** re-scoped below to an (a) task, sonnet.
+- A cheaper tier is not a licence to skip a gate, a control, a mutation, or a ruling. One subagent at a time.
+
+**Case-id block for the amendment: `13.337`–`13.350`** (measured at `e7a7f7c`: highest §13 id in use is `13.336`).
+Task 13 mints none; **Task 14 takes 13.337–13.343; Task 15 takes 13.344–13.350.** Task 14's PR writes this allocation
+into `test-cases/13-deployment-dogfooding.md`'s header and moves the pointer to `13.351` (the first PR that mints from a
+block carries the header — the standing §12/§13 rule). Recount the maximum against `origin/main` at rebase as the
+control, never mint from it.
+
+### Task 13: Part B — measure the `neo` style from the exported prototype files
+
+**Model: sonnet / medium.** Measurement with the repo's own instruments; no design decisions are taken here.
+
+**Precondition — owner action:** `Gisik Nokma - Desktop.dc.html` and `Gisik Nokma - Mobile.dc.html` (or their
+equivalents) present under `design-system/`, i.e. `git log --oneline -1 origin/main -- design-system/` no longer reads
+`#351`. **Until then this task does not start and the executor holds** — there is nothing to measure.
+
+**Files:** Create `design-system/neo-tokens.json` — a proposal beside `tokens.json`, the same shape (`color`/`fill`
+light AND dark, `radius`, plus the new `shadow` block: raised, sunken, overlay; every value with the prototype
+selector it was read from). **`MASTER.md`'s rule holds: no number hand-authored — every measurement reproducible by a
+probe script beside it** (`design-system/tools/`). Create `docs/neo-token-report.md`: each proposed surface pair
+through `CONTRAST_PAIRS`'s own arithmetic; the sunken input's shadow edge against its surroundings through the 13.283
+sweep's instrument (`apps/web/e2e-stack/viewport.spec.ts`), both themes; dark-theme fill separation per raised/sunken
+pair. **Deliverable:** one table per rule (a)(b)(c) — PASSES / FAILS with the number — so Task 14 transcribes and
+never decides. Anything below 3:1 is reported, not rounded, not "close".
+
+**Not in scope:** any source, test, token or CSS change; no ledger status change; no case id.
+
+- [ ] Extract from the exported files (light and dark, desktop and mobile variants where they differ); measure; write
+  both files with the probe script; one PR, docs + `design-system/` only, frozen-head protocol.
+
+### Task 14: Neo tokens in code, and the four shared pieces restyled in neo
+
+**Model: sonnet / medium** implementer (transcription from `neo-tokens.json` and the exported prototype's CSS through
+Task 1's pieces), **sonnet / medium** reviewer; the instruments are the check.
+
+**Two Global-Constraint lifts, scoped to THIS task only:** (1) `packages/ui/src/tokens.ts` MAY gain shadow and radius
+roles — never a palette change, `success` stays `green700`; shadow colours are ALPHA primitives and the existing rule
+holds that *no `CONTRAST_PAIRS` row may name them* (`tokens.ts:120`); `themeStylesheet()` (`:388`) emits the new roles
+through `cssVariableName` (`:375`) unchanged. (2) The "31 `TOKEN_ROLES`" figure in the Global Constraints is a fact about
+`77b2ee8`; after this task it is whatever `TOKEN_ROLES` reads.
+
+**Files:** Modify `packages/ui/src/tokens.ts` (roles + both themes + `themeStylesheet`), `packages/ui/src/ui.css`
+(`.gn-segmented*` 4 rules, `.gn-field*` 5, `.gn-button*` 8, `.gn-refusal*` 3, `.gn-page-header*` 4, `.gn-card` 1,
+`.gn-chip*` 9, `.gn-sheet*` 8, `.gn-avatar*` 3 — counts at `e7a7f7c`), `apps/web/app/globals.css` (`.gn-shell__refusal` 3,
+`.gn-shell__expired` 1, `.gn-card*` 7, `.gn-button*` 4), `packages/ui/test/components.test.tsx`,
+`packages/ui/test/token-discipline.test.ts` only if the roster of client roots changes (it should not), `Features.md`
+(locate the tokens/shared-pieces bullets by path), `test-cases/13-deployment-dogfooding.md` (the block header + rows).
+
+**Cases 13.337–13.343, each pinned by a test that cites the id literally:**
+- **13.337** every new token role has a light and a dark value and appears in `themeStylesheet()`'s output as a
+  `--gn-*` variable. Mutation: drop one theme's value → RED naming the role.
+- **13.338** every shadow colour is an alpha primitive and no `CONTRAST_PAIRS` row names it (the existing test's own
+  assertion widened to the new primitives; mutation: add a row naming one → RED).
+- **13.339** `.gn-field__input`'s boundary measures ≥3:1 in BOTH themes on the rendered page — the border unless Task
+  13's report says the shadow edge passes; the case text quotes the report's number.
+- **13.340** ghost/secondary buttons keep fill + accent label after the restyle — 13.289 stays green; mutation:
+  remove the fill → 13.289 RED, alone.
+- **13.341** dark theme: every raised/sunken surface pair separates by fill by at least the value Task 13's report
+  measured; mutation: equalise the two fills → RED.
+- **13.342** the accessible-name ratchet (13.285–13.287) does not fall on any route — run both viewport suites
+  (`test:e2e:viewport`, `test:e2e:stack`) with NO seeding variable set.
+- **13.343** `apps/web/e2e-stack/non-text-contrast-roster.json` does not grow — the ratchet is one-way and the restyle
+  adds no sub-3:1 boundary.
+
+- [ ] Transcribe the tokens; restyle the pieces; gate (verbatim, Node 22) + six checks raw; both viewport suites;
+  mutation-witness 13.337, 13.340, 13.341 (commit before mutating; restore with `git checkout HEAD -- <path>`);
+  catalogue + `Features.md` in the same commit; one PR; frozen-head protocol.
+  Commit: `"Neo tokens: the shared pieces raise and sink by shadow, and every boundary still measures"`.
+
+### Task 15: The two finished screens restyled in neo — sign-in, workspaces, invite
+
+**Model: sonnet / medium** implementer (haiku acceptable for a CSS-only commit), **sonnet / medium** reviewer.
+
+**Files:** `apps/web/app/globals.css` (`.gn-sign-in*` 7 rules, `.gn-invite*` 5, `.gn-card*` 7 — read
+`apps/web/app/workspaces/page.tsx` for the classes it renders; there are no `.gn-workspaces*` rules at `e7a7f7c`),
+`apps/web/app/sign-in/page.tsx` and `apps/web/app/workspaces/page.tsx` only where markup must change (say why per
+hunk), baselines only upward, `Features.md` (the sign-in bullet is in §3 — locate by `page.tsx` path), `test-cases/13`.
+
+**Cases 13.344–13.350:**
+- **13.344** `/sign-in` still renders every method the server offers and no control the server refuses (13.292's
+  property) — unchanged by the restyle.
+- **13.345** `/workspaces`' three-state machine (13.298–13.300: loading / refusal / empty, and the 401 settle on
+  `/sign-in`) is unchanged — the restyle deletes no state.
+- **13.346** accessible-name floors on `/sign-in`, `/workspaces` and `/invite/<token>`'s reachable states do not fall.
+- **13.347** tap-target and type-scale ratchets do not fall on either route (both suites, no seeding variable).
+- **13.348** the Back control on `/privacy` and `/terms` survives.
+- **13.349** `apps/web/app/invite/[token]/page.tsx` markup is byte-identical unless a hunk is named in the PR body
+  (the Task 4a precedent: the invite surface is CSS over existing markup).
+- **13.350** the stack suite signs in through the restyled page and reaches `/workspaces` (6/6 as at #374).
+
+- [ ] Restyle; gate + six checks; both suites; rebuild the dev images from the frozen head, run the stack suite
+  against them, `docker image prune -f` (dangling only, never `-a`); hand the controller `http://localhost:3001/sign-in`
+  and `/workspaces` for the owner's look; catalogue + `Features.md` same commit; one PR.
+
+**Task 9, re-scoped by the audit:** the List view EXISTS (`docs/hig-second-audit.md` §1: header, Group by, Columns,
+hierarchy, progress, claim-attributed dates all ship). Task 9 becomes an **(a) surface task — sonnet / medium** —
+restyle `packages/app-core/src/views/ticket-list.tsx`'s markup and CSS in neo, keeping every D-row the audit names
+(the `activeOnly` header swap, the `· N restricted` suffix, the persisted `listColumns`/`grouping` records). Its two
+partials — the `workflow` axis on Group by and Columns, and `field:` columns unreachable from the picker — are
+**product scope for the owner, not this plan's**. Its case ids stay as allocated to it.
+
+**Owner decisions the audit raised — HELD for the owner, NOT dispatched:** a board workflow picker (a permissions
+question, `board.tsx:61-64`, and an API change: `getBoard(projectId)` takes no workflow); breadcrumbs (must degrade
+to the three-state parent display, `ticket-sheet.tsx:334-343`); the full-screen ticket toggle; a week view; the
+mobile calendar; the *"Subtask of…"* label on the visible-parent branch; the workflow axis on List. Every I-row
+stays invented.
+
+
 ## Execution order and merge cadence
 
-`0 → 1 → 2 → {3a→3b} → {4a→4b} → {5a→5b} → 9 → {6a→6b} → {7a→7b} → {8a→8b} → 10 → 11`. Sign-in (2) goes early because the owner has a reference image for it; List (9) follows the project page it borrows from. Each task is its own PR, controller-merged, with the forced gate re-run at each new `main`. **Task 0 merges before anything else is dispatched** — it is the gate that makes sonnet dispatch safe, and its absence is the reason every earlier restyle in this repo has needed an opus reviewer to catch a dropped affordance.
+~~`0 → 1 → 2 → {3a→3b} → {4a→4b} → {5a→5b} → 9 → {6a→6b} → {7a→7b} → {8a→8b} → 10 → 11`~~ **AMENDED 2026-09-09 (owner sequencing + the neo direction; Tasks 0, 1, 2, 4a, 4b are done): `13 → 14 → 15 → 12 → {3a→3b} → {5a→5b} → 9 → {6a→6b} → {7a→7b} → {8a→8b} → 10 → 11`** — Task 13 waits on the owner's export; the owner looks at sign-in and workspaces after Task 15, before Task 12. Sign-in (2) goes early because the owner has a reference image for it; List (9) follows the project page it borrows from. Each task is its own PR, controller-merged, with the forced gate re-run at each new `main`. **Task 0 merges before anything else is dispatched** — it is the gate that makes sonnet dispatch safe, and its absence is the reason every earlier restyle in this repo has needed an opus reviewer to catch a dropped affordance.
 
 ## Self-review against the spec
 
