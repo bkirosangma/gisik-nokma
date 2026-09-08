@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. **The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.282` minted by the HIG palette adoption, `13.283`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1747,3 +1747,36 @@ next-free pointer is a cache which goes stale silently, and this line is one mor
   `RateLimitVerdict`** — and this case is what that change flips.*
   *Found in review against a comment in `app.ts` that asserted the OPPOSITE as an invariant the code
   upheld. The `Math.max` it pointed at covers only the both-refuse-the-same-request shape.*
+
+
+## The HIG palette adoption (2026-09-08) — block `13.281`–`13.320`
+
+*Both cases pin a place where the adoption deliberately did NOT follow Apple. Neither departure is
+visible from reading the palette — the values look reasonable, and the harm is a ratio you have to
+compute against one specific background — which is exactly why they are cases and not comments.*
+
+- **13.281** ✅ `success` is not Apple's increased-contrast green, and the case computes *why* rather
+  than restating the ruling: `successText` on Apple's `#248A3D` measures **4.40** against 4.5, while the
+  kept `green700` `#1e7a34` measures **5.40**. The counterfactual is calculated in the test against the
+  same foreground the shipped palette actually puts on it, so "complete the palette" arrives as a red
+  test naming the pair instead of a shipped 4.40.
+  *Controlled: swapping in `#248a3d` reddens **two** guards — this case (naming the hex) and the
+  data-driven declared pair, which prints **4.395**. Two independent witnesses for one defect.*
+- **13.282** ✅ `textMuted` and `categoryOpen` must not resolve to the same primitive. They shared
+  `inkMuted` before this change, which is precisely the shape that invites reuniting them. Apple's
+  accessible grey `#6C6C70` is correct for a chip dot's 3:1 and **wrong for read text at 4.16 on
+  `surfaceSunken`** — and `textMuted on surfaceSunken` is a declared pair because `/mcp/tokens` puts
+  muted text on a sunken row.
+  *Controlled three ways, and the second and third matter more than the first: reuniting them on the
+  safe grey reddens the identity assertion; reuniting them on the DOT grey reddens this case **and** the
+  declared pair, which prints **4.164** — the figure §8 predicted and an independent solver computed,
+  agreeing three ways; and making the dot grey clear 4.5 reddens the assertion that states the REASON,
+  so the case cannot keep passing while its own explanation has become false.*
+
+> **Not in this change, and deliberately: the `border`-on-`surface` and `focusRing`-on-`surface` pairs.**
+> Ruling R1(c) drops borders in favour of fill, so the `border` role must be remapped to a grey that
+> clears 3:1 *and* the declarations that paint it must be removed. **Those are one atomic change.**
+> Landing the remap alone would give every card, chip, table cell and column a heavy dark rule, and
+> **no gate would object — a *darker* border fails nothing** — leaving the product visibly wrong on
+> `main` between two PRs while it is being tested by hand. The measurement the sweep starts from, taken
+> here: `border` on `surface` is **1.34** light and **1.49** dark against 3:1.

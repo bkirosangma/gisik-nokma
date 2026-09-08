@@ -106,3 +106,61 @@ describe('CSS variable emission', () => {
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
   });
 });
+
+/**
+ * The two places the HIG adoption did NOT follow Apple, each pinned against the
+ * tidy-up that would undo it.
+ *
+ * Both are cases where the obvious "finish the job" edit — use Apple's green,
+ * reunite two greys that look alike — reintroduces a measured failure. Neither
+ * is visible from reading the palette: the values look reasonable, and the harm
+ * is a ratio you have to compute against a specific background.
+ */
+describe('HIG adoption — the deliberate departures', () => {
+  /**
+   * 13.281 — `success` is NOT Apple's increased-contrast green, and swapping it in is measurably why.
+   *
+   * `docs/hig-adoption-brief.md` §8 records `#248A3D` as the Apple value and
+   * notes it is the ONE pair in the whole roster that still fails. The owner
+   * ruled on 2026-09-08 to keep the incumbent. This asserts the ARITHMETIC
+   * behind that ruling rather than the ruling itself, so the day someone
+   * "completes" the palette the failure arrives as a red test naming the pair,
+   * not as a shipped 4.40.
+   */
+  it('keeps green700 because Apple’s increased-contrast green fails successText at 4.40', () => {
+    expect(primitives.green700).toBe('#1e7a34');
+    const shipped = contrastRatio(colorOf('light', 'successText'), colorOf('light', 'success'));
+    expect(shipped).toBeGreaterThanOrEqual(4.5);
+    // The counterfactual, computed rather than quoted: Apple's value against
+    // the same foreground this palette actually puts on it.
+    const appleGreen = '#248a3d';
+    const withApple = contrastRatio(colorOf('light', 'successText'), appleGreen);
+    expect(withApple).toBeLessThan(4.5);
+    expect(withApple).toBeCloseTo(4.4, 1);
+  });
+
+  /**
+   * 13.282 — `textMuted` and `categoryOpen` must NOT resolve to the same primitive, because one grey cannot hold both jobs.
+   *
+   * They shared `inkMuted` before the HIG adoption, which is exactly the shape
+   * that invites reuniting them again. Apple's accessible grey `#6C6C70` is the
+   * right answer for a chip dot (3:1) and the WRONG one for read text: it
+   * measures **4.16 on `surfaceSunken`** against the 4.5 that pair demands, and
+   * `textMuted on surfaceSunken` is a declared pair precisely because
+   * `/mcp/tokens` puts muted text on a sunken row.
+   *
+   * The second assertion is the load-bearing one — the first would still pass if
+   * both roles were pointed at a grey that happened to satisfy neither job well.
+   */
+  it('splits the status-dot grey from the muted-text grey, and the dot grey would fail the text job', () => {
+    expect(themes.light.textMuted).not.toBe(themes.light.categoryOpen);
+    expect(themes.dark.textMuted).not.toBe(themes.dark.categoryOpen);
+    // Why they cannot be reunited on the dot's grey.
+    const dotGrey = colorOf('light', 'categoryOpen');
+    expect(contrastRatio(dotGrey, colorOf('light', 'surfaceSunken'))).toBeLessThan(4.5);
+    // And that the grey actually carrying the text job clears it.
+    expect(
+      contrastRatio(colorOf('light', 'textMuted'), colorOf('light', 'surfaceSunken')),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});

@@ -10,39 +10,102 @@
 
 export type ThemeName = 'light' | 'dark';
 
+/**
+ * ## Apple HIG increased-contrast, adopted 2026-09-08 (`docs/hig-adoption-brief.md` §8)
+ *
+ * Every hex below that changed is a real Apple **increased-contrast** system
+ * colour — the accessible variants Apple ships beside the stock palette — not
+ * the stock ones. That distinction is the whole reason this landed at all: the
+ * brief measured Apple's STOCK palette against this file's own declared pairs
+ * and **15 of 27 failed**. Adopting the pretty numbers would have meant either
+ * a red gate or lowered minimums.
+ *
+ * ### Four values are deliberately NOT Apple's, and each is a decision
+ *
+ * * **`green700` `#1e7a34` is KEPT** (owner ruling, 2026-09-08). Apple's
+ *   increased-contrast green `#248A3D` is the **single pair in the whole roster
+ *   that still fails**: `successText` on `success` measures **4.40 against
+ *   4.5**, missing by 0.10. The incumbent measures **5.40** and sits within a
+ *   hair of Apple's hue, so the cheapest correct answer was to not move it.
+ *   Verified both ways here rather than taken on trust.
+ * * **`line` / `lineStrong` / `seam` / `seamStrong` are UNTOUCHED**, and that is
+ *   a sequencing decision, not an oversight. Ruling R1 dropped borders in favour
+ *   of fill, which means the `border` role must be remapped to a grey that
+ *   clears 3:1 **and** the declarations that paint it must be removed. Those two
+ *   are one atomic change and they land TOGETHER in the border sweep. Remapping
+ *   here alone would give every card, chip, table cell and column on `main` a
+ *   heavy dark rule that no gate would object to — a *darker* border fails
+ *   nothing — and leave it there between two PRs, while the product is being
+ *   tested by hand. The measurement that sweep starts from, taken here:
+ *   `border` on `surface` is **1.34** light and **1.49** dark against the 3:1
+ *   WCAG 1.4.11 holds a non-text UI component to.
+ * * **`navy900`, `redInk`, `amberInk`, `greenInk` are untouched.** §8 says
+ *   nothing about the text that sits ON a status colour in dark theme; all four
+ *   were re-measured against the new backgrounds and clear their minimums
+ *   (`accentText` on `accent` = 6.38 dark), so changing them would be churn
+ *   wearing the word "consistency".
+ * * **`inkMuted` and `fogMuted` are SOLID, where §8 gives an alpha.** The brief
+ *   flags its own `textMuted` row as *"a reconstruction, not a citation"* —
+ *   Apple's `secondaryLabel` is an alpha over the background and the 80% figure
+ *   is the brief author's, explicitly marked not-to-be-quoted-as-Apple's. A
+ *   composite would bake that unverified number into the palette and would
+ *   differ per background besides. These are the solid base colours instead,
+ *   which is a value Apple does publish, and they clear 4.5 on all three
+ *   backgrounds with margin (light 8.71–10.94, dark 11.77–14.37).
+ *
+ * ### One role stopped sharing a primitive
+ *
+ * `textMuted` and `categoryOpen` both resolved to `inkMuted` before this. §8
+ * gives them different values, and they cannot be reunited: `textMuted` is read,
+ * so it owes 4.5 on `surface`, `surfaceRaised` AND `surfaceSunken`, while
+ * `categoryOpen` reaches the screen as a chip dot's background and owes 3.
+ * Apple's accessible grey `#6C6C70` is right for the dot and **fails the text
+ * job at 4.16 on `surfaceSunken`** — so `grayAccessible` exists rather than one
+ * grey being asked to do both and quietly losing.
+ */
 export const primitives = {
   white: '#ffffff',
-  paper: '#f7f6f3',
-  sand: '#edebe6',
-  ink: '#1c1b18',
-  inkMuted: '#5f5c55',
+  paper: '#f2f2f7',
+  sand: '#e5e5ea',
+  ink: '#000000',
+  inkMuted: '#3c3c43',
+  /** Untouched — the border story is atomic and lands with its sweep. */
   line: '#d9d6cf',
   lineStrong: '#a8a49a',
-  blue600: '#2a5fd0',
-  blue300: '#7aa2ff',
+  blue600: '#0040dd',
+  blue300: '#409cff',
   navy900: '#101625',
-  red600: '#b3261e',
-  red300: '#ff8a80',
+  red600: '#d70015',
+  red300: '#ff6961',
   redInk: '#300a06',
-  amber700: '#8a5a00',
-  amber300: '#e0a94f',
+  amber700: '#b25000',
+  amber300: '#ffb340',
   amberInk: '#241a00',
+  /** KEPT over Apple's `#248A3D`, which fails `successText` at 4.40 vs 4.5. */
   green700: '#1e7a34',
-  green300: '#62c07a',
+  green300: '#30db5b',
   greenInk: '#05230e',
-  violet600: '#6b5ca8',
-  violet300: '#b3a6e3',
-  magenta600: '#a8326e',
-  magenta300: '#e88bb8',
-  coal: '#1b1a17',
-  coalRaised: '#242320',
-  coalSunken: '#121110',
-  fog: '#ece9e2',
-  fogMuted: '#a7a399',
+  violet600: '#8944ab',
+  violet300: '#da8fff',
+  magenta600: '#d30f45',
+  magenta300: '#ff6482',
+  coal: '#000000',
+  coalRaised: '#1c1c1e',
+  coalSunken: '#2c2c2e',
+  fog: '#ffffff',
+  fogMuted: '#ebebf5',
+  /** Untouched — see `line`. */
   seam: '#3a3833',
   seamStrong: '#57544c',
   scrimLight: '#1c1b1866',
   scrimDark: '#000000a6',
+  /**
+   * Apple's accessible grey, for the STATUS-DOT job only. Split out of
+   * `inkMuted` because it fails the text minimum on `surfaceSunken` (4.16 vs
+   * 4.5) while being exactly right at the 3:1 a chip dot owes.
+   */
+  grayAccessible: '#6c6c70',
+  grayAccessibleDark: '#98989d',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -119,7 +182,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     warningText: 'white',
     success: 'green700',
     successText: 'white',
-    categoryOpen: 'inkMuted',
+    categoryOpen: 'grayAccessible',
     categoryActive: 'blue600',
     categoryTerminal: 'green700',
     blocked: 'red600',
@@ -148,7 +211,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     warningText: 'amberInk',
     success: 'green300',
     successText: 'greenInk',
-    categoryOpen: 'fogMuted',
+    categoryOpen: 'grayAccessibleDark',
     categoryActive: 'blue300',
     categoryTerminal: 'green300',
     blocked: 'red300',
