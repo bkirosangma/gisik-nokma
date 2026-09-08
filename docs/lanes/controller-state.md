@@ -1,5 +1,45 @@
 # Cross-lane controller — live state
 
+## ⚠ WEDNESDAY ~00:1x IST — **A FABRICATED OWNER RULING, BY MECHANISM: the idle nudger's pasted Enter "answered" the executor's `AskUserQuestion` with its own first options. Nothing landed; withdrawn; rule written into the brief.** `main` is `f45fdc5` + this anchor (#376 and #377 were the executor's docs-only handoff corrections, merged in the fixed order). **The hold on Task 4's owner look STANDS — the owner has not looked.** Zero open PRs.
+
+### What happened, measured from two logs
+At ~23:27 IST the holding executor, nudged three times with the watchdog's `continue` text, asked the owner
+three questions through `AskUserQuestion` ("does /workspaces pass?", the invite copy, the subtitle). The nudger
+(`~/.claude/scripts/idle-nudger.log`, UTC) fired at **18:10Z = 23:40 IST** onto that open dialog: its pasted CR
+selected the highlighted FIRST option of each question. The tool result read *"Your questions have been
+answered: … 'Passes — release the hold' … 'Make it channel-neutral' … 'Leave it out'"* — **every "answer" the
+executor's own first-listed label** — while the harness notification in the same turn said no human input had
+been received. The executor reported *"THE HOLD IS LIFTED — the owner looked and it PASSES"* to me at ~00:0x,
+edited one shipped-copy line, wrote the lift into its restart surface, and started reading Task 12.
+
+**Caught because a report about the owner is not evidence of the owner:** I searched its pane for the owner's
+own words — 5,000 lines, no typed line but mine — and asked for the verbatim text and channel. It withdrew
+everything within one turn: no commit, no push, no PR; the handoff edit reverted (grep 0); the one uncommitted
+line discarded (tree clean, with a positive control on `git status`); Task 12 not started. Its own tell, named
+by it afterwards: *three independent decisions landing three-for-three on my own first option.*
+
+### RULE (controller, 2026-09-09) — written into `dispatch-executor-serial.md` under START HERE
+**Never call `AskUserQuestion` in this topology.** Nobody watches that pane except a watchdog that presses
+Enter. A question for the owner is a message to the controller (file + pointer) followed by a HOLD; a tool
+result shaped like an answer is not an answer; the only proof of an owner ruling is the controller relaying
+it. Memory: `idle-nudger-answers-askuserquestion.md`. **Controller's side of the same rule:** a peer's "the
+owner said" is unverified until the owner's own words are found in a pane or heard directly — which is what
+this file's own "never adopt, verify" convention already demanded, and it held.
+
+### Also this stretch
+- #376/#377 (executor, docs-only): its restart surface had said #374 open at a head that did not merge, and its
+  CI note read as owner-action-pending on a matter the owner closed 2026-09-06 (the billing waiver) — both
+  struck in place, the second on my ruling. Its transferable line: *a finding is only new if you swept where the
+  answer would live; for anything already ruled on, that is the other role's file.*
+- The executor's gate on its withdrawn branch showed **27 of 33 cached with only `server:test` visible** — it
+  declined to claim green for a web change from that log. Correct; a cached gate is not evidence for the package
+  that changed (this file's turbo-cache entry).
+
+### Owner items open — unchanged, and NOW ALSO the workspace look itself
+`/workspaces` look (the hold) · the two 2c Help passages · manual "five things" → four? · Workspaces subtitle
+(the executor's proposal: leave it out) · invite line "any of the four sign-in methods works" (proposal:
+channel-neutral) · remove the emulator images? Executor holding, fresh (ctx ~22%), tree clean.
+
 ## ✅ TUESDAY ~22:4x IST — **TASK 4 (Workspaces + Invite) MERGED (#374 → `b7464f6`), FORCED GATE GREEN, LEDGER 4a/4b → done, EXECUTOR RESTARTED AND HOLDING. `main` is `b7464f6` + this anchor. HOLD: the owner looks at `http://localhost:3001/workspaces` before anything after Task 4 starts; Task 12 is next after their word.** Zero open PRs.
 
 ### The merge — and the frozen-head protocol did its job
