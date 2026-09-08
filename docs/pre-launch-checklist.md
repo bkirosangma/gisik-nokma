@@ -347,6 +347,32 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   paragraph names — both measured ZERO under the floor. A sweep of only those two would have ratcheted
   0 and 0, reported green, and been blind to every rule the change fixes. A ratchet on the pages a
   finding NAMED is not a ratchet on the pages the defect is ON. Cases 13.264–13.265.
+- **NEW, 2026-09-08: twenty-six controls render at the BROWSER'S default font, not the product's —
+  reported, not fixed, because it is an owner call about the design.** Found by the type-scale sweep
+  above, which measures computed sizes and so can see what no stylesheet says. Enumerated on the
+  signed-in surface at 390px by temporarily raising the sweep's floor to 16px:
+
+  | selector | size | count |
+  |---|---|---|
+  | `button` (unclassed) | 13.33px | 22 |
+  | `button.ticket-type-list__new` | 13.33px | 2 |
+  | `button.workflow-list__new` | 13.33px | 2 |
+
+  **13.33px is not a size anyone chose.** It is what a `<button>` renders at when no rule sets `font`,
+  and it is the ONLY value in the 12–16px band that is not a deliberate product size — every other
+  reading there resolves to a `rem` rule in `ui.css` (`0.75`, `0.78`, `0.8`, `0.85`, `0.9`). Verified:
+  neither `.ticket-type-list__new` nor `.workflow-list__new` carries any `font` declaration, while the
+  repo's own shared control `.gn-button` opens with `font: inherit`. So this is a departure from a
+  pattern this codebase already established, not a competing choice.
+
+  **Why it is not fixed here.** The one-line remedy is `font: inherit`, and it is almost certainly
+  right — but it resizes twenty-six live controls, and the owner's 2026-09-08 "take it" ruling was
+  given against the reading in the paragraph below (12.5px labels), not against this. That ruling
+  cannot be stretched to cover a finding that did not exist when it was made. **Same treatment the tap
+  targets got: measured, written down with its numbers, and left to a person.**
+
+  **It is under a ratchet either way.** These sit above the 12px floor, so nothing here is red; if a
+  future change pushes one below, cases 13.264–13.265 catch it.
 - **Tap targets and text size are reported, not fixed.** On the board at 390px, 48 interactive elements
   measure under 24×24 — but almost all are *wide and 21–23px tall* (e.g. `249×23` attention titles,
   `52×21` view tabs), missing WCAG 2.5.8's 24px by one to three pixels rather than being small targets,

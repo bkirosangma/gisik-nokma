@@ -20,6 +20,22 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> ### ▸ NEW OWNER QUESTION: 26 CONTROLS RENDER AT THE BROWSER'S FONT, NOT THE PRODUCT'S
+>
+> Found by turning the sweep's own floor up to 16px for one enumerating run (then restored; the
+> shipped floor is unchanged at 12). On the signed-in surface at 390px: **`button` unclassed x22,
+> `button.ticket-type-list__new` x2, `button.workflow-list__new` x2, all at exactly 13.33px.**
+>
+> **13.33px is the only value in the 12–16px band that no stylesheet chose** — every other reading
+> there traces to a `rem` rule in `ui.css`. It is what a `<button>` renders at when nothing sets
+> `font`. Neither named class carries a `font` declaration; the repo's own `.gn-button` opens with
+> `font: inherit`. A departure from an established pattern, not a competing choice.
+>
+> **Reported, NOT fixed.** The remedy is one line and probably right, but it resizes 26 live controls,
+> and the owner's "take it" ruling was given against the 12.5px-label reading — it cannot be stretched
+> to cover a finding that did not exist when it was made. Same treatment the tap targets got.
+> Recorded in `docs/pre-launch-checklist.md` with the table.
+>
 > ### ⚠ AND THE OTHER RECORDED GAP HAD A CORRECTION IN IT THAT WAS ITSELF WRONG
 >
 > Having found gap #1 stale, I measured gap #2 (the `TZ` one) the same way. **Its rule stands and its
