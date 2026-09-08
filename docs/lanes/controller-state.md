@@ -1,5 +1,23 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~05:0x IST — **TASK 14 MERGED (#387 → `d28b92a`): STYLE IS A RUNTIME AXIS — hig · minimal · neo beside light · dark, neo the default, a toggle beside the theme toggle. FORCED GATE GREEN. LEDGER 14 → done.** `main` is `d28b92a` + this PR; zero open PRs; executor restarted onto Task 15.
+
+### The merge, fixed order
+Executor's freeze by cross-session message and pane: PR head `54ca016` = its gated head `1966805` + one handoff-refresh commit (the "freeze, then commit" shape again; the delta was `executor-state.md` alone, verified before merging — and this controller's forced gate at merged `main` is the step that covers the final tree regardless; Task 15's override now says: refresh the handoff BEFORE the freeze line). Guard: head `54ca016`, base `main`, MERGEABLE. `MERGE_EXIT=0`, MERGED `d28b92a`, platform `main` = `d28b92a`, reachable, **trees identical (`95f944f4`)**, no file outside the PR's 17, **partitioned drop check over 17 literal paths 0 bytes / empty stderr, same-pipeline control 126,654 bytes.** Six checks raw-green at `d28b92a`: `check:tasks` 212/212 rows · **`check-case-ids` 1,829 (+11 = 13.337–13.347 exactly)** · citations ratchet holds · `Unsupported engine` 0.
+**Forced gate at `d28b92a`** (`gate.sh`, lock pid 49297 acquired at once, install 0, rebuild 0, `check:env` 0): **`GATE_EXIT=0` · 33/33 · `Cached: 0` · 1m55s · node v22.22.2 · `Unsupported engine` 0 ·  passed |  skipped · 322 test files · no orphans, lock released.**
+
+### Ledger: 14 → done (controller, ruling tier) — evidence in the row
+Every file in Task 14's Files block is in #387's diff (`tokens.ts` StyleName axis +332/−56, `style-toggle.tsx` new, `app-nav.tsx`, `ui.css`, `globals.css`, `index.ts`, `components.test.tsx`, the accessible-names baseline raised, `Features.md`, `test-cases/13` with the block header and pointer → 13.357); cases 13.337–13.347 cited by tests; both live Playwright suites 6/6 and 28/28 (+2 skipped) against a rebuilt dev stack, run twice.
+
+### Rulings on what #387 raised (all recorded in its body)
+- **neo/dark `surfaceRaised` 1.2035 vs the ruling's 1.214 floor — RATIFIED as resolved:** the executor proved the luminance window satisfying both that floor and the already-gated `accent`-on-raised ≥4.5 is empty (≈0.00002 short, hue-independent); the tested gate wins, the two other pairs clear with margin. A measured impossibility is not a shortfall.
+- **13.343 — the non-text roster did not grow:** the sweep reads only `border-*` properties (no shadow compositing) and never visits `/sign-in` or `/workspaces`, so it cannot see the waived edge. **Ruled: stands as documented in `ui.css` + 13.339 for this PR; Task 15 (which owns both routes) extends the sweep to them and adds the neo input as a SANCTIONED roster entry with 1.24/1.16 and the owner's waiver cited** — the instrument must record what was waived, not fail to look.
+- Two accessibility regressions the palette adoption introduced (`fillTertiary` over the lighter dark surfaces: accent-on-filled 4.22/4.19) were found and nudged to 4.56/4.57 by the executor; the `CONTRAST_PAIRS` suite now runs per style. Kept.
+- Carried to Task 15 (in its override): the `.gn-card.gn-invite` 12px radius now smaller than neo's 20px base. Carried to Task 11: `apps/mobile` colours changed as a side effect of the palette adoption (`colorOf` defaults to `hig`) — mobile is deferred by the owner.
+
+### Meter and next
+Session meter 86 % at 05:00, reset 05:20 IST. Executor restarted at the fixed point onto **Task 15** (sonnet; `override-task15-after-387.md`): sign-in, workspaces, invite in neo; cases 13.348–13.354; dev images rebuilt; then the owner's look. **Owner question still open, one word: keep the blue accent `#0040DD`?** (kept shipped meanwhile).
+
 ## ✅ WEDNESDAY ~03:1x IST — **TASK 13 MERGED (#385 → `777c5b1`): the neo measurement is on `main`, the PALETTE IS RULED, Task 14 is next.** `main` is `777c5b1` + this PR; zero open PRs; executor holding at the fixed point (ctx 24 %, sonnet), to be restarted onto Task 14.
 
 ### The merge, fixed order
