@@ -473,6 +473,12 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       `13.287: the accessible-name sweep examined NOTHING on ${route.path}.`,
     ).toBeGreaterThan(0);
 
+    // 13.342 (Task 14, 2026-09-09): this is the instrument that proved the
+    // style toggle's accessible-name contribution — one `tablist` + three
+    // `tab`s, `ariaLabel` +1 / `role` +4 / `ariaSelected` +3 / `ariaDescribedby`
+    // +0 — rose on every signed-in route here without falling on any of them,
+    // and that the signed-out twin (`e2e-viewport/responsive.spec.ts`) stayed
+    // byte-identical because `AppNav` never renders there.
     const accessibleKey = route.key;
     const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
     if (accessibleBaseline === undefined) {

@@ -20,8 +20,123 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~03:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE 2026-09-08 ~22:0x ONE, IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~04:5x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~04:4x ONE, IS HISTORY.**
 >
+> **Task 14 is COMPLETE. Its PR is OPEN: #387, head `19668054`, base `main`, MERGEABLE.
+> AWAITING THE CONTROLLER'S MERGE.** Verify with `gh pr view 387 --json state,mergeable,headRefOid`
+> rather than trusting this line. Frozen head `91c19c3b` (origin/main at the time this branch was cut),
+> re-verified unchanged immediately before push.
+>
+> **Reviewer's one finding (Minor) already fixed in a follow-up commit before the PR opened**: a
+> `Features.md` prose line overclaimed `.gn-sheet` got a radius change — it has none (`.gn-dialog` does;
+> `.gn-sheet` docks flush to the screen edge). No other findings. Everything else in this PR — the two
+> accessibility regressions found/fixed, the one genuine measured conflict (neo-dark raised/accent,
+> resolved in favour of the harder gate), and case 13.343's finding (the non-text-contrast roster does
+> NOT grow by the expected waiver — two independently-verified reasons, not a defect) — is in the PR body.
+>
+> **STILL OUTSTANDING: only the controller's merge.** Task 15 (restyle sign-in/workspaces/invite in neo,
+> cases 13.348–13.356) is next per the amendment's sequence — blocked on this PR merging, reads
+> `origin/main` after merge, never a local copy of this branch (the reachability discipline every prior
+> task in this series has needed). Task 12 (passkey) stays behind Task 15.
+>
+> **The implementer subagent (below, ~03:4x block) RETURNED and its work is INDEPENDENTLY VERIFIED —
+> not merely trusted.** Commit `f2d5dbf9` on `exec/144-task14-style-axis`. I personally: read every line
+> of `git diff dc507b43 HEAD` across all 9 changed files; ran `pnpm turbo run build test typecheck --force`
+> (0 cached, 33/33 green — a FULL-TURBO all-cached run is NOT verification on this machine, per this
+> file's own standing lesson, so I forced it); rebuilt the dev stack myself
+> (`docker compose -f docker-compose.dev.yml up -d --build --wait web`) and ran BOTH live Playwright
+> suites myself (`pnpm test:e2e:stack` 6/6, `pnpm test:e2e:viewport` 28/28+2 skipped) — the numbers
+> printed match the committed `non-text-contrast-roster.json`/`accessible-names-baseline.json` exactly
+> (e.g. `input`/`select` 3.62 on backdrop `rgb(237,228,219)`); and ran all six repo checks
+> (`check:env/tasks/db-tz/runbook/citations/help`) green (`db-tz` needs `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`,
+> NOT port 54329 — that's the STANDALONE postgres this brief names, 54330 is the dev-COMPOSE stack's,
+> confirm which one is actually up with `docker compose ps` before guessing).
+>
+> **One real finding, not a defect: case 13.343.** The ruling expected the non-text-contrast roster to
+> grow by one sanctioned waiver entry (the neo field's sunken shadow edge, 1.24/1.16). It does NOT grow —
+> `sweepBorders` has no box-shadow compositing (border-properties only) AND `.gn-field__input` never
+> renders on any of the 5 swept routes anyway. Verified myself, not taken on the implementer's word.
+> Recorded in the catalogue with an explicit "owner/controller: decide" line — not fixed, not hidden.
+> **Worth a line in the PR body; not escalation-worthy** (the ruling's SUBSTANCE — the owner accepted the
+> sub-3:1 edge — is unaffected; only this specific instrument can't see it).
+>
+> **Dispatched a reviewer subagent** (read-only, sonnet) to independently check the diff — CSS
+> correctness, test-mutation validity, scope discipline, the disclosed judgment calls' honesty. Implementer
+> #1 of 2 used against the 6-subagent cap for this task.
+>
+> ## STILL OUTSTANDING
+> * Reviewer's report.
+> * Fix round only if it finds Important-or-worse.
+> * Open ONE PR (frozen head = `91c19c3b`, re-verify `origin/main` hasn't moved immediately before push),
+>   push, report to the controller.
+> * Task 15 next, blocked on this PR merging — read `origin/main` after merge, not a local copy.
+>
+> ---
+>
+> **PR #385/#386 (Task 13 + the palette ruling) are MERGED — `91c19c3b` is on `origin/main`, verified via
+> `gh pr view 385/386 --json state,mergeCommit` and `git rev-parse origin/main`.** Task 14 is IN PROGRESS on
+> branch `exec/144-task14-style-axis` (off `91c19c3b`), NOT YET a PR. **This block lives only on this
+> branch until its PR opens** — read it via `git show exec/144-task14-style-axis:docs/lanes/executor-state.md`
+> if `main`'s copy looks stale.
+>
+> ## WHAT IS DONE AND COMMITTED (`8e6c6d31`, one commit so far on this branch)
+>
+> The token layer (`packages/ui/src/tokens.ts`): a `StyleName` axis (`hig`/`minimal`/`neo`) beside
+> `ThemeName`, adopting the neo-round ruling's export for surface/raised/sunken/overlay/fill-ladder/
+> radii/shadows in every style (hig and minimal share one set; neo its own). `colorOf` keeps its 2-arg
+> form (defaults to `'hig'`) so `apps/mobile` keeps compiling unmodified. `themeStylesheet()` emits the
+> full style×theme cross-product with the selector-specificity ordering the OS-dark media arm needs.
+> Plus the `StyleToggle` component (`apps/web/src/style-toggle.tsx`, wraps the existing `SegmentedControl`,
+> mirrors `ThemeToggle`'s persistence, defaults to neo including a pre-paint script in `layout.tsx`),
+> wired into `AppNav`. **`packages/ui`: 222/222 green (was 98). `apps/web`: 165/165 green** (fixed an
+> EXISTING test, case 11.160, whose unscoped `findAllByRole('tab')` started matching `StyleToggle`'s own
+> tabs — scoped it to `.gn-view-tabs`). Both packages typecheck clean.
+>
+> ## TWO ACCESSIBILITY REGRESSIONS FOUND THAT TASK 13'S OWN SWEEP NEVER MEASURED — fixed, recorded in the docblock
+>
+> `fillTertiary` composited over the newly-adopted (lighter) dark surfaces drops `accent`-on-filled below
+> 4.5 for BOTH `hig` (4.222) and `neo` (4.191) — a regression from the shipped palette's 5.944, invisible
+> to Task 13's sweep because it isn't a declared `CONTRAST_PAIRS` row, it's a separate existing test
+> (`tokens.test.ts`, "identifies a non-primary control by its label, not its fill"). Nudged the alpha
+> (same hue) for both: restores 4.558/4.569. Extended that test AND the whole `CONTRAST_PAIRS` suite to
+> run per-style (was hig-only before this branch), so a future style can't silently break either again.
+>
+> ## ONE GENUINE, MEASURED CONFLICT — recorded, not escalated, because one side was already the harder gate
+>
+> `neo`/dark's derived `surfaceRaised` falls 0.8% short of the ruling's "at least hig/minimal's own
+> separation" floor (1.204 vs 1.214). **Proven, not approximated:** the luminance window `raised` would
+> need to occupy BOTH that floor AND the already-gated `accent`-on-`surfaceRaised` ≥4.5 pair is empty by
+> about 0.00002, independent of hue — no colour choice satisfies both. Resolved in favour of the harder,
+> already-tested gate (`CONTRAST_PAIRS`); `surface↔sunken` (1.555 vs 1.460) and `raised↔sunken` (1.292 vs
+> 1.202) both clear their floors with margin regardless. Full derivation in `primitives`'s docblock in
+> `tokens.ts`. **Not reported to the controller** — a defensible call inside the ruling's own stated
+> methodology ("nudge in the same hue"), doesn't change Task 14's scope, will be named in the PR body.
+>
+> ## IN FLIGHT — one sonnet implementer subagent, dispatched, not yet returned
+>
+> Scope: the CSS restyle of the enumerated class families (`.gn-segmented*`, `.gn-field*`, `.gn-button*`,
+> `.gn-refusal*`, `.gn-page-header*`, `.gn-card`, `.gn-chip*`, `.gn-sheet*`, `.gn-avatar*` in `ui.css`;
+> `.gn-shell__refusal`/`.gn-shell__expired`/`.gn-card*`/`.gn-button*` in `globals.css`) to reference the
+> new `--gn-radius-*`/`--gn-shadow-*` variables instead of hardcoded px/box-shadow; rule (a)'s sunken
+> no-border input under `neo` only (case 13.339, with the owner-accepted waiver numbers 1.24/1.16 cited);
+> the roster/baseline deltas against the LIVE stack (`non-text-contrast-roster.json` — case 13.343, must
+> grow by exactly the one sanctioned waiver — and BOTH `accessible-names-baseline.json` files, `e2e-stack`
+> AND `e2e-viewport` — case 13.342); catalogue + `Features.md`. Told explicitly: commit only, no push, no
+> PR, no merge — I review the diff first. **Do not start a second dispatch for Task 14 until this one
+> reports back** (HARD CAP 6 subagents for this task; this is implementer #1 of a planned ≤3: implementer,
+> reviewer, maybe one fix round).
+>
+> ## STILL OUTSTANDING AFTER THAT SUBAGENT RETURNS
+>
+> * Review its diff, dispatch a reviewer subagent (sonnet; opus ONLY if the token-axis change somehow
+>   reached the visibility/refusal surface — per the amendment it should not).
+>   Fix round only if Important-or-worse.
+> * Run the full gate myself at the final head, push, open ONE PR, frozen-head protocol.
+> * Task 15 (restyle sign-in/workspaces/invite in neo, cases 13.348–13.356) is next per the amendment's
+>   sequence, blocked on this PR merging (reads `origin/main` after merge, same reachability discipline
+>   every prior task has needed — do not start it from a local copy of this branch). Task 12 (passkey)
+>   stays behind Task 15.
+
 > **This block lives only on this branch (`exec/143-task13-neo-measure`) until its PR merges** — the
 > controller reads it via `git show origin/exec/143-task13-neo-measure:docs/lanes/executor-state.md`,
 > per the standing procedure (`main`'s copy of this file lags until merge).

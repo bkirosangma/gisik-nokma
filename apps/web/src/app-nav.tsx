@@ -6,6 +6,7 @@ import { Button } from '@gisik-nokma/ui';
 import { authClient } from './auth-client.js';
 import { InboxNavLink } from './inbox-nav-link.js';
 import { useCurrentUser } from './providers.js';
+import { StyleToggle } from './style-toggle.js';
 import { ThemeToggle } from './theme-toggle.js';
 
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
@@ -23,6 +24,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           gated on a session inside `InboxNavLink`. */}
       <InboxNavLink />
       <span className="gn-nav__spacer" />
+      <StyleToggle />
       <ThemeToggle />
       {user !== null ? (
         <Button

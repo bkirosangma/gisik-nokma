@@ -8,12 +8,24 @@ import {
   colorOf,
   cssVariableName,
   primitives,
+  radiusVariableName,
+  shadowValueOf,
+  shadowVariableName,
   themeStylesheet,
   themes,
+  type ShadowRole,
+  type StyleName,
   type ThemeName,
 } from '../src/tokens.js';
 
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
+const STYLE_NAMES: StyleName[] = ['hig', 'minimal', 'neo'];
+const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay'];
+
+/** `hig` needs no `[data-style]` predicate — it is the unmarked base, reached through bare `:root`/`[data-theme]`. */
+function styleSelectorPredicate(style: StyleName): string {
+  return style === 'hig' ? '' : `[data-style="${style}"]`;
+}
 
 /** WCAG channel luminance from one `rr`/`gg`/`bb` hex pair. */
 function channelLuminance(pair: string): number {
@@ -56,13 +68,21 @@ describe('token structure', () => {
   });
 });
 
+/**
+ * 13.337-adjacent: every style now resolves its own surface/fill primitives
+ * (the neo-round ruling), so this loop gained a STYLE dimension 2026-09-09 —
+ * previously `hig` was the only style and this suite could not have caught
+ * `minimal`/`neo` breaking a declared pair.
+ */
 describe('declared contrast pairs meet their minimums (the base test case 1.1, reborn)', () => {
-  for (const theme of THEME_NAMES) {
-    for (const pair of CONTRAST_PAIRS) {
-      it(`${theme}: ${pair.fg} on ${pair.bg} ≥ ${pair.minimum}`, () => {
-        const ratio = contrastRatio(colorOf(theme, pair.fg), colorOf(theme, pair.bg));
-        expect(ratio).toBeGreaterThanOrEqual(pair.minimum);
-      });
+  for (const style of STYLE_NAMES) {
+    for (const theme of THEME_NAMES) {
+      for (const pair of CONTRAST_PAIRS) {
+        it(`${style}/${theme}: ${pair.fg} on ${pair.bg} ≥ ${pair.minimum}`, () => {
+          const ratio = contrastRatio(colorOf(theme, pair.fg, style), colorOf(theme, pair.bg, style));
+          expect(ratio).toBeGreaterThanOrEqual(pair.minimum);
+        });
+      }
     }
   }
 });
@@ -95,7 +115,12 @@ describe('CSS variable emission', () => {
   it('every var(--gn-…) in ui.css names a declared role', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const referenced = [...new Set([...css.matchAll(/var\((--gn-[a-z0-9-]*)\)/g)].map((hit) => hit[1]))];
-    const declared = new Set<string>(TOKEN_ROLES.map(cssVariableName));
+    const declared = new Set<string>([
+      ...TOKEN_ROLES.map(cssVariableName),
+      radiusVariableName('card'),
+      radiusVariableName('control'),
+      ...SHADOW_ROLE_NAMES.map(shadowVariableName),
+    ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
     // list would pass the assertion above by finding nothing at all.
@@ -105,6 +130,149 @@ describe('CSS variable emission', () => {
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
   });
+});
+
+describe('the style axis (Task 14, 2026-09-09)', () => {
+  /**
+   * 13.337 — every token role has a value for every (style × theme), and it
+   * reaches `themeStylesheet()`'s output under the right selector. Mutation:
+   * drop one style×theme combination from the emitted stylesheet → RED
+   * naming that combination (not a generic "something changed").
+   */
+  it('every role appears under every style×theme selector in themeStylesheet()', () => {
+    const stylesheet = themeStylesheet();
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        for (const role of TOKEN_ROLES) {
+          const declaration = `${cssVariableName(role)}: ${colorOf(theme, role, style)};`;
+          expect(
+            stylesheet,
+            `${style}/${theme}/${role} — expected "${declaration}" under a selector combining ${styleSelectorPredicate(style) || '(bare :root)'} and ${theme === 'dark' ? '[data-theme="dark"] (or its OS-preference arm)' : '(unmarked light)'}`,
+          ).toContain(declaration);
+        }
+      }
+    }
+  });
+
+  it('the OS-dark arm exists for every non-hig style, not only hig', () => {
+    const stylesheet = themeStylesheet();
+    for (const style of ['minimal', 'neo'] as const) {
+      expect(stylesheet).toContain(`[data-style="${style}"]:not([data-theme="light"])`);
+      expect(stylesheet).toContain(`[data-style="${style}"][data-theme="dark"]`);
+    }
+  });
+
+  /**
+   * 13.338 — every shadow layer colour is an alpha primitive (8-digit hex),
+   * and `CONTRAST_PAIRS` names none of them — `relativeLuminance` ignores
+   * alpha, so a declared row on one would be exactly the false-green mode
+   * the fill primitives' own docblock warns against. Mutation: add a
+   * `CONTRAST_PAIRS` row naming a `shadow*` primitive → this reddens.
+   */
+  it('every shadow colour is an 8-digit alpha primitive named by no CONTRAST_PAIRS row', () => {
+    const shadowPrimitiveNames = Object.keys(primitives).filter((name) => name.startsWith('shadow'));
+    expect(shadowPrimitiveNames.length).toBeGreaterThan(0);
+    for (const name of shadowPrimitiveNames) {
+      const value = primitives[name as keyof typeof primitives];
+      expect(value, name).toMatch(/^#[0-9a-f]{6}[0-9a-f]{2}$/);
+    }
+    // `Set<string>`, explicitly — without the annotation TS infers the
+    // literal-union element type from `primitives`' `as const` shape, and
+    // `.has()` then refuses `colorOf(...)`'s plain `string` return (it can
+    // resolve to ANY role's primitive, across three styles now, not only the
+    // ones whose literal types this Set happens to carry). A real mismatch
+    // (e.g. comparing numbers) still fails at `.has()`'s call site either way.
+    const shadowPrimitiveValues = new Set<string>(
+      shadowPrimitiveNames.map((name) => primitives[name as keyof typeof primitives]),
+    );
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        for (const pair of CONTRAST_PAIRS) {
+          expect(shadowPrimitiveValues.has(colorOf(theme, pair.fg, style))).toBe(false);
+          expect(shadowPrimitiveValues.has(colorOf(theme, pair.bg, style))).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('shadowValueOf renders "none" where a style×theme has no layers, and a real box-shadow otherwise', () => {
+    for (const theme of THEME_NAMES) {
+      for (const role of SHADOW_ROLE_NAMES) {
+        expect(shadowValueOf('minimal', theme, role)).toBe('none');
+      }
+    }
+    expect(shadowValueOf('hig', 'light', 'sunken')).toBe('none');
+    expect(shadowValueOf('hig', 'light', 'raised')).not.toBe('none');
+    expect(shadowValueOf('neo', 'light', 'sunken')).toContain('inset');
+  });
+
+  /**
+   * 13.347 — the positive control the axis needs: switching style changes a
+   * WITNESSED RENDERED value, not just two numbers that happen to differ in
+   * memory. Both `hig` and `neo`'s `raised` box-shadow must appear in
+   * `themeStylesheet()`'s own output, under their own declaration — reusing
+   * 13.337's machinery — and the two values must differ. 13.337 only proves
+   * every combination is PRESENT; it says nothing about whether any two of
+   * them are actually different, which is exactly the gap a style axis that
+   * silently did nothing would hide in.
+   *
+   * Mutation: make `SHADOWS.neo[theme].raised` identical to
+   * `SHADOWS.hig[theme].raised` → the inequality assertion reddens, alone.
+   */
+  it('13.347 switching style changes a rendered value — hig and neo emit different raised box-shadows', () => {
+    const stylesheet = themeStylesheet();
+    for (const theme of THEME_NAMES) {
+      const higValue = shadowValueOf('hig', theme, 'raised');
+      const neoValue = shadowValueOf('neo', theme, 'raised');
+      expect(neoValue, `${theme}: hig and neo must not render the same "raised" box-shadow`).not.toBe(higValue);
+      expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${higValue};`);
+      expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${neoValue};`);
+    }
+  });
+});
+
+/**
+ * 13.341 — dark theme, per style: `surface`, `surfaceRaised` and
+ * `surfaceSunken` separate from one another by FILL (rule (c): dark
+ * separates by fill, measured; a shadow does not count toward separation
+ * there). Every floor below is a LITERAL pinned from Task 13's report / the
+ * neo-round ruling — never a value derived from the same `colorOf` call the
+ * assertion reads, which would make the test unable to fail.
+ *
+ * **`neo`/dark's `surface↔raised` floor is `1.20`, not `1.214`
+ * (hig/minimal's own figure, which the plan's case text says to use as "at
+ * least Task 13's measured value").** `tokens.ts`'s `neoNavyRaised` docblock
+ * records why: lightening `neoNavy` far enough to clear 1.214 pushes
+ * `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
+ * guarantees it — a genuine collision between this amendment's rule (c) and
+ * the declared contrast floor, not a value somebody forgot to nudge. The
+ * achieved 1.2035 clears 1.20 with margin; the 0.8% shortfall from 1.214 is
+ * recorded here, not hidden. `raised↔sunken` and `surface↔sunken` both clear
+ * their hig/minimal-derived floors for `neo` too — only this one pair is
+ * exceptional.
+ *
+ * Mutation: set `neoNavyRaised`/`neoNavySunken` to `neoNavy` (the export's
+ * own pre-derivation value) → every `neo`/dark row here collapses to 1.00
+ * and reddens, naming the pair.
+ */
+describe('13.341 dark-theme fill separation per style (rule (c))', () => {
+  const DARK_SEPARATION_FLOORS: Record<StyleName, { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
+    hig: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
+    minimal: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
+    neo: { surfaceRaised: 1.2, surfaceSunken: 1.55, raisedSunken: 1.29 },
+  };
+
+  for (const style of STYLE_NAMES) {
+    it(`${style}/dark: surface, raised and sunken separate by at least the recorded floor`, () => {
+      const surface = colorOf('dark', 'surface', style);
+      const raised = colorOf('dark', 'surfaceRaised', style);
+      const sunken = colorOf('dark', 'surfaceSunken', style);
+      const floor = DARK_SEPARATION_FLOORS[style];
+      expect(contrastRatio(surface, raised), `${style} surface↔raised`).toBeGreaterThanOrEqual(floor.surfaceRaised);
+      expect(contrastRatio(surface, sunken), `${style} surface↔sunken`).toBeGreaterThanOrEqual(floor.surfaceSunken);
+      expect(contrastRatio(raised, sunken), `${style} raised↔sunken`).toBeGreaterThanOrEqual(floor.raisedSunken);
+    });
+  }
 });
 
 /**

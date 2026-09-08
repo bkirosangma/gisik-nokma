@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. `13.327`–`13.333` is ALLOCATED to Task 12 (passkey registration), of which `13.333` is the rate-limit property. `13.334`–`13.336` is ALLOCATED to round 2c, the phone gating (controller, 2026-09-08). The next free BLOCK after that is `13.337`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. `13.327`–`13.333` is ALLOCATED to Task 12 (passkey registration), of which `13.333` is the rate-limit property. `13.334`–`13.336` is ALLOCATED to round 2c, the phone gating (controller, 2026-09-08). ~~The next free BLOCK after that is `13.337`, controller-allocated ON REQUEST ONLY.~~** **`13.337`–`13.356` is ALLOCATED to the neomorphism-amendment's Tasks 14 and 15 (AMENDMENT 2026-09-09 to `docs/superpowers/plans/2026-09-08-hig-per-screen.md`) — `13.337`–`13.347` minted by Task 14 (the style axis, the toggle, and the shared-pieces restyle; this PR), `13.348`–`13.356` reserved for Task 15 (the sign-in/workspaces/invite neo restyle, not yet landed). The next free BLOCK is `13.357`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -2194,3 +2194,124 @@ nobody ships and then defend it.
 > test for a catalogued case — is real; the opposite direction is not guarded at all, and nothing in the
 > repo would have reminded anyone to write these three rows. Recorded rather than fixed: widening it is
 > a change to a shared instrument, not part of Task 4.
+
+## Task 14 of the neomorphism amendment (2026-09-09) — the style axis, the toggle, and the shared pieces
+
+Block `13.337`–`13.347`. `packages/ui/src/tokens.ts` gains a `StyleName` axis (`hig`|`minimal`|`neo`)
+beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay`);
+`StyleToggle` (`apps/web/src/style-toggle.tsx`) ships beside `ThemeToggle`, neo default. That half
+committed separately (`8e6c6d31`); this section is the CSS restyle of the nine shared class families
+(`.gn-segmented*`, `.gn-field*`, `.gn-button*`, `.gn-refusal*`, `.gn-page-header*`, `.gn-card`,
+`.gn-chip*`, `.gn-sheet*`, `.gn-avatar*` in `packages/ui/src/ui.css`; `.gn-shell__refusal`/`.gn-shell__expired`
+in `apps/web/app/globals.css`) onto the two new variable families, plus the owner's pure-neo field
+ruling and the positive/negative controls the amendment's rule (a)–(c) need.
+
+**Judgment calls, recorded rather than made silently.** `.gn-workspace-list .gn-card` and
+`.gn-card.gn-invite` (`globals.css:65,92`) keep their literal `12px` rather than moving to
+`var(--gn-radius-card)` — they are a page-specific BUMP over the base radius (`.gn-card` was 8px, these
+were 12px), and folding them in would make both rules no-ops identical to the base, losing the
+double-class specificity fix `.gn-card.gn-invite` exists for (see that line's own docblock). **Flagged
+for the owner: under `neo` this literal (12px) is now SMALLER than the restyled base `.gn-card`'s own
+radius (20px)**, inverting the original "these are deliberately bigger" intent — Task 15 owns these
+routes and is the natural place to resolve it. `.gn-founding` (`globals.css:71-79`, in the same line
+range but a different class) is OUT OF SCOPE for the same reason: it is `/workspaces`' own surface, not
+one of the nine enumerated families, and Task 15 owns that route.
+
+**Two scale calls the brief's own text didn't settle, made by analogy rather than found in writing.**
+The brief's Goal paragraph names `.gn-card`/`.gn-sheet`/`.gn-page-header` card-scale and
+`.gn-button`/`.gn-field__input`/`.gn-chip`/`.gn-segmented__item` control-scale, but says nothing about
+`.gn-refusal`/`.gn-shell__refusal`/`.gn-shell__expired`. Mapped to `var(--gn-radius-control)` by analogy
+(a small inline banner reads closer to a control than a card) — **this VISIBLY changes the refusal/expired
+panels' radius, 6px/6.4px → 8px under `hig`/`minimal` and → 14px under `neo`** (the shipped default), on
+exactly the kind of surface this repo escalates reviewers for. `.gn-page-header__icon` → `var(--gn-radius-card)`
+(14px → 16px `hig`/`minimal`, → 20px `neo`) DOES follow the brief's explicit text (page-header is listed
+card-scale) and is recorded here only for completeness, not as a call.
+
+- **13.337** ✅ Every token role (colour, radius, shadow) has a value for every (style × theme) and
+  reaches `themeStylesheet()`'s own output under the right `[data-style]`/`[data-theme]` selector.
+  *Mutation-witnessed: dropping `'neo'` from the style loop reddens this case by name (plus the
+  OS-dark-arm test and 13.347, both checking the same removed selector from a different angle) — 225/228
+  pass, 3 fail, all naming `neo`. Restored via `Edit`, checksum-verified byte-identical to the
+  pre-mutation file.* — (`packages/ui/test/tokens.test.ts`)
+- **13.338** ✅ Every shadow layer colour is an 8-digit alpha primitive, and no `CONTRAST_PAIRS` row
+  names one — the same false-green `relativeLuminance`-ignores-alpha hazard the fill ladder's own
+  docblock warns against, now checked across all three styles. — (`packages/ui/test/tokens.test.ts`)
+- **13.339** ✅ Under `data-style="neo"` the empty `.gn-field__input` renders sunken and borderless —
+  `border: none`, `background: var(--gn-surface-sunken)`, `box-shadow: var(--gn-shadow-sunken)` — while
+  `hig`/`minimal` keep 13.291's bordered look unchanged, asserted from the SAME `rule()` helper 13.289–13.291
+  use. **OWNER-ACCEPTED WAIVER (Task 14 AMENDMENT rule (a), 2026-09-09, "pure neo look"): the sunken
+  shadow edge measures 1.24 (light) / 1.16 (dark), both below the 3:1 WCAG 1.4.11 floor — accepted
+  knowingly, not hidden.** A positive control guards `rule()`'s substring matching: the neo selector and
+  the base selector must read back DIFFERENT bodies. *Mutation-witnessed: giving the neo override a
+  border reddens this case alone (227/228 pass). Restored, checksum-verified.* — (`packages/ui/test/components.test.tsx`)
+- **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
+  (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
+  makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
+  fill-plus-accent-label identification in `hig`, `minimal` AND `neo` alike, never a style-specific
+  override stripping it back to a boundary. — (`packages/ui/test/components.test.tsx`)
+- **13.341** ✅ Dark theme, per style: `surface`↔`surfaceRaised`, `surface`↔`surfaceSunken` and
+  `surfaceRaised`↔`surfaceSunken` each separate by fill at or above a LITERAL floor (never derived from
+  the same `colorOf` call the assertion reads). **`neo`'s `surface↔raised` floor is pinned at `1.20`, not
+  the plan's literal "at least Task 13's measured value" (`1.214`, hig/minimal's own figure) — `tokens.ts`'s
+  `neoNavyRaised` docblock records why this is a genuine collision, not an oversight: lightening `neoNavy`
+  far enough to clear 1.214 pushes `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
+  guarantees it, and the luminance window both constraints would need is empty by ~0.00002 independent of
+  hue. The achieved 1.2035 clears the pinned 1.20 floor; the 0.8% shortfall from 1.214 is recorded, not
+  hidden.** `raised↔sunken` (1.29 floor, 1.292 achieved) and `surface↔sunken` (1.55 floor, 1.555 achieved)
+  clear their own floors for `neo` with margin — only the one pair is exceptional. — (`packages/ui/test/tokens.test.ts`)
+- **13.342** ✅ The accessible-name ratchet (13.285–13.287) does not fall on any route and rises by
+  EXACTLY the `StyleToggle`'s contribution on every signed-in route: `ariaLabel` +1, `role` +4,
+  `ariaSelected` +3, `ariaDescribedby` +0 (one `tablist` + three `tab`s), measured live against the
+  rebuilt dev stack on all six `stack-phone-390` keys and hand-verified identical across every one of
+  them before being written back (`apps/web/e2e-stack/accessible-names-baseline.json`). The signed-out
+  ratchet (`apps/web/e2e-viewport/accessible-names-baseline.json`) is UNCHANGED, byte-for-byte — verified
+  by diff before AND after the live run — because `AppNav` (and therefore `StyleToggle`) never renders on
+  `/help`, `/privacy`, `/terms`, `/sign-in` or the 404 (grepped: no signed-out route imports `AppNav`).
+  Both suites pass with no seeding variable set. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.343** 🟡 **FINDING, not a pass on the plan's own terms — reported rather than forced.** The
+  amendment expected `apps/web/e2e-stack/non-text-contrast-roster.json` to grow by exactly one sanctioned
+  entry (the neo field input's sunken shadow edge, 1.24/1.16, citing 13.339's waiver). Measured against
+  the rebuilt stack: **the roster does NOT grow — it stays at the same 6 classes, `belowCount: 0`** (only
+  ratios/backdrop shifted, e.g. `input`/`select` 4.07→3.62, backdrop `rgb(242,242,247)`→`rgb(237,228,219)`
+  — `border`/`borderStrong` do not vary by style, so the shift is the BACKDROP's: the adopted palette
+  (Task 13) landing in the image, composed with `neo` being the DEFAULT style, which is this task's own
+  doing — `rgb(237,228,219)` is `neoPaper`, not `warmPaper`). Two independent reasons, both checked rather than assumed: (1)
+  `sweepBorders` (`e2e-stack/helpers/non-text-contrast.ts`) reads only `border-{side}-width/style/color` —
+  it has no box-shadow compositing at all, so an element with `border: none` is invisible to it regardless
+  of what its `box-shadow` does; (2) `.gn-field__input` renders only on `/workspaces` (the founding form)
+  and `/sign-in` (three fields) — NEITHER is among the five routes this sweep visits
+  (`/my-work`, `/p/:projectId`, `/members`, `/settings/ticket-types`, `/settings/workflows`). The waiver
+  citation therefore lives only in `ui.css`'s docblock and 13.339's test comment, not in the roster file —
+  **rule (a)'s waiver-SCOPE assumption (that this specific instrument would see it) was wrong; the
+  ruling's SUBSTANCE (the owner accepted the sub-3:1 edge) is unaffected.** The roster file itself is
+  updated to the freshly measured (unchanged-membership) state; no entry was invented to match the
+  plan's prediction. **Owner/controller: decide whether this needs its own instrument, an explicit
+  roster-exemption line, or stands as documented and sufficient.** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
+- **13.344** ✅ `StyleToggle` renders one `role=tab` per style inside a `role=tablist` named by a
+  required `aria-label`, `data-style` lands on `document.documentElement`, and `aria-selected` tracks the
+  active style. Mutation: drop the `aria-label` → RED (witnessed on the prior commit that introduced this
+  test). — (`apps/web/test/style-toggle.test.tsx`)
+- **13.345** ✅ With nothing stored, the applied `data-style` is `neo`. *Mutation-witnessed here:
+  defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
+  check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
+- **13.346** ✅ A stored style choice survives a reload — asserted the same way `ThemeToggle`'s
+  persistence is, a fresh mount restoring from `localStorage` rather than drifting from what
+  `layout.tsx`'s pre-paint script already applied. — (`apps/web/test/style-toggle.test.tsx`)
+- **13.347** ✅ The positive control the axis needs: switching style changes a WITNESSED rendered value,
+  not two numbers that merely differ in memory. `hig` and `neo`'s `raised` box-shadow both appear in
+  `themeStylesheet()`'s own output under their own declaration (reusing 13.337's machinery) and the two
+  values differ. *Mutation-witnessed with its OWN, narrower mutation than 13.337's (equalising ONLY
+  `neo.light.raised` to `hig.light.raised`, not removing the whole style): reddens this case ALONE,
+  227/228 pass. Restored, checksum-verified.* — (`packages/ui/test/tokens.test.ts`)
+
+> **Live-suite method, recorded because it is not obvious from the baseline JSON diffs alone.** Both
+> `accessible-names-baseline.json` files were backed up to a scratch directory before any live run. The
+> stack baseline's six keys were verified to hand-derive the identical per-route delta
+> (`+1/+4/+3/+0`/`ariaLabel`/`role`/`ariaSelected`/`ariaDescribedby`) by clearing the file to `{}` and
+> re-running with `UPDATE_ACCESSIBLE_BASELINE=1` (which writes ABSENT keys only, so a cleared file
+> re-records every key from the live DOM rather than from a guess), then diffing the fresh numbers
+> against the backup — a stronger proof than trusting a `>=` check that cannot print what it actually
+> measured. The viewport baseline was left untouched and diffed byte-identical before/after. The dev
+> stack was rebuilt from this branch's working tree (`docker compose -f docker-compose.dev.yml up -d
+> --build --wait web`) before either suite ran, so the measurements are against Task 14's actual CSS, not
+> a stale image.

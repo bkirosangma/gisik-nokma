@@ -17,7 +17,7 @@
   justify-content: center;
   min-height: 2.75rem;
   font: inherit;
-  border-radius: 8px;
+  border-radius: var(--gn-radius-control);
   padding: 0.4rem 0.85rem;
   /* R1(c): no boundary. The affordance is fill + an accent-coloured semibold
      label — three signals replacing one hairline, and it is what the design
@@ -78,9 +78,9 @@
 
 .gn-card {
   background: var(--gn-surface-raised);
-  border-radius: 8px;
+  border-radius: var(--gn-radius-card);
   padding: 0.75rem;
-  box-shadow: 0 1px 2px var(--gn-shadow);
+  box-shadow: var(--gn-shadow-raised);
 }
 
 .gn-avatar {
@@ -115,13 +115,17 @@
 .gn-sheet {
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  box-shadow: 0 8px 24px var(--gn-shadow);
+  /* Both float above the page content, the same elevation a card reads as;
+     `overlay` (not `raised`) because the role is specifically for something
+     sitting ABOVE the surface it obscures, which is what a dialog/sheet does
+     and a card does not. */
+  box-shadow: var(--gn-shadow-overlay);
   display: flex;
   flex-direction: column;
   max-height: 90vh;
 }
 .gn-dialog {
-  border-radius: 10px;
+  border-radius: var(--gn-radius-card);
   width: min(34rem, 92vw);
 }
 .gn-sheet {
@@ -351,7 +355,7 @@
 .gn-transition__field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
 .gn-transition__notice { color: var(--gn-text-muted); }
 .gn-transition__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
-.gn-refusal { border-radius: 6px; padding: 0.5rem 0.7rem; }
+.gn-refusal { border-radius: var(--gn-radius-control); padding: 0.5rem 0.7rem; }
 /* Tinted fills, not borders (R1(c)). A refusal must be unmistakable: the fill
    carries the tone, the text carries the reason. `--gn-fill-secondary` is the
    16% grey; tone comes from the left rule, which is a fill, not a border. */
@@ -1356,7 +1360,7 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 9px;
+  border-radius: var(--gn-radius-control);
   background: var(--gn-fill-tertiary);
 }
 /* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
@@ -1373,7 +1377,7 @@
   justify-content: center;
   min-height: 2.75rem;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--gn-radius-control);
   background: transparent;
   color: var(--gn-text);
   font: inherit;
@@ -1384,7 +1388,7 @@
 .gn-segmented__item--on {
   background: var(--gn-surface-raised);
   font-weight: 600;
-  box-shadow: 0 3px 8px var(--gn-shadow);
+  box-shadow: var(--gn-shadow-raised);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -1408,7 +1412,7 @@
   min-height: 2.75rem;
   padding: 0 0.85rem;
   border: 1px solid var(--gn-border);
-  border-radius: 8px;
+  border-radius: var(--gn-radius-control);
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
@@ -1420,6 +1424,20 @@
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
+}
+/* ── OWNER RULING 2026-09-09 (Task 14 AMENDMENT rule (a)): under `neo` the
+   empty input takes the PURE NEO look — sunken, no border — even though the
+   shadow edge measures below 3:1 (1.24 light / 1.16 dark, both themes, Task
+   13's measurement). The cost was flagged (13.284/13.291's own reasoning: an
+   empty field then carries no ≥3:1 boundary to identify it) and the owner
+   reaffirmed "pure neo look." Case 13.339 pins this and quotes the waived
+   number; `hig`/`minimal` are UNTOUCHED by this rule and keep 13.291's
+   bordered look. Radius is inherited from the base rule above — only the
+   boundary treatment changes here. */
+[data-style="neo"] .gn-field__input {
+  border: none;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
 }
 
 /* ── The ghost button gets its own rule at last. It had none, and the plan's
@@ -1453,7 +1471,7 @@
 .gn-page-header__icon {
   width: 3.5rem;
   height: 3.5rem;
-  border-radius: 14px;
+  border-radius: var(--gn-radius-card);
   background: var(--gn-accent);
   color: var(--gn-accent-text);
   display: flex;
