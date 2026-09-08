@@ -20,7 +20,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~03:0x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE 2026-09-08 ~22:0x ONE, IS HISTORY.**
+>
+> **This block lives only on this branch (`exec/143-task13-neo-measure`) until its PR merges** — the
+> controller reads it via `git show origin/exec/143-task13-neo-measure:docs/lanes/executor-state.md`,
+> per the standing procedure (`main`'s copy of this file lags until merge).
+>
+> **Second reconciliation audit (Part A): MERGED as PR #382 → `e7a7f7c`.** Amendment (neo direction,
+> Tasks 13–15 ahead of Task 12, model floor): MERGED as PR #383/#384 → `a20e152`. Controller dispatched
+> **Task 13** (`gisik-nokma-lanes/CTL-DISPATCH-2026-09-09-task13-neo-measure.md`) — Part B, measure
+> hig/minimal/neo x both themes from the owner's exported prototype files.
+>
+> **Task 13 is COMPLETE. Its PR is OPEN: #385, frozen head `ac58eed5`, base `main`, mergeable.
+> AWAITING THE CONTROLLER'S MERGE.** Verify with `gh pr view 385 --json state,mergeable,headRefOid`
+> rather than trusting this line — it goes stale the moment it merges, same as every prior one.
+>
+> ## WHAT IS ON THE BRANCH
+>
+> One commit lands the owner's corrected exports (dark-mode-fixed `(1)` copies from `~/Downloads`,
+> sha256-verified, structurally verified — the two-axis `[data-theme]`/`[data-style]` cascade at the
+> exact lines the dispatch named) at `design-system/interactive/{desktop,mobile}.dc.html`. A second
+> commit adds `design-system/tools/neo_tokens_probe.py` (extracts the CSS custom-property cascade from
+> both files' `<style>` blocks, scoped extraction with positive+negative controls) and its two outputs:
+> `design-system/neo-tokens.json` and `docs/neo-token-report.md`. No source, test, token or CSS file
+> touched — confirmed via `git diff --stat a20e152 HEAD -- apps/ packages/` (empty). No ledger status
+> change, no case ids, per the dispatch.
+>
+> ## THREE FINDINGS FOR THE CONTROLLER — none resolved here, all measured
+>
+> 1. **The palette-delta finding is bigger than the dispatch's own example.** Not only the light-mode
+>    warm-paper case (`--surface:#EFE7DF` vs shipped `#f2f2f7`) — surface, raised, sunken AND accent all
+>    differ from `packages/ui/src/tokens.ts` in every style, both themes. Dark is the larger delta:
+>    shipped dark surface is pure black `#000000`; the export's `hig`/`minimal` dark surface is navy
+>    `#141A2E`, `neo` dark is `#1B2340`. **`accent` differs too** (`#3A6DB0` vs shipped `#0040DD` light,
+>    `#7FA9E4` vs `#409CFF` dark), uniformly across `hig`/`minimal`/`neo` — this contradicts the
+>    amendment's own reading of the design session, *"the accent palette is unchanged."* Full tables:
+>    `docs/neo-token-report.md`.
+> 2. **Rule (c) FAILS for neo/dark, measured at exactly 1.00.** Surface, raised and sunken are the
+>    identical hex `#1B2340` in both exported files — every pairwise fill-separation ratio is 1.00, no
+>    separation exists. Neo's dark corner relies entirely on `cardShadow` for elevation, which rule (c)
+>    explicitly does not credit. A real gap for Task 14 to close, not decided here.
+> 3. **Rule (a)'s waiver number, recorded per the ruling:** neo sunken-input shadow edge measures 1.24
+>    (light) / 1.16 (dark), both below 3:1 — quote these in Task 14's 13.339 waiver comment.
+>    `hig`/`minimal` have no shadow at all (`fieldShadow: none`) and their own fill-only boundary is
+>    itself below 3:1 in every case — pre-existing, out of this task's scope, reported as a gap.
+>
+> Also recorded as gaps, not passes: `--fill2` is undeclared anywhere in `mobile.dc.html`; no dedicated
+> `overlay` box-shadow variable exists in either exported file; `mobile.dc.html`'s `<style>` block omits
+> the `:focus-visible` outline rule `desktop.dc.html` has.
+>
+> ## STILL OUTSTANDING
+>
+> * The controller's merge of #385.
+> * **Task 14** (style axis + toggle + shared-piece restyle, cases 13.337–13.347) is next per the
+>   amendment's sequence — but it consumes this PR's `neo-tokens.json`/`neo-token-report.md`, so it is
+>   blocked on the merge, not merely queued behind it. **Do not start Task 14 from a local copy of this
+>   branch's files** — read them from `origin/main` after the merge, the same reachability discipline
+>   every other task in this series has needed.
+> * Task 15 (restyle sign-in/workspaces/invite in neo) follows Task 14; Task 12 (passkey) stays behind
+>   both, per the amendment's resequencing.
+>
+> ---
+>
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-08 ~22:0x IST. **HISTORY — superseded by the block above.**
 >
 > **Round 2c is MERGED (PR #372). Task 4 (Workspaces + Invite) is COMPLETE and ~~its PR is OPEN:
 > #374, frozen head `c2c6313`, base `main`, mergeable. AWAITING THE CONTROLLER'S MERGE.~~
