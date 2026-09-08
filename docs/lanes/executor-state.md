@@ -47,6 +47,17 @@ green, and been blind to every rule this change fixes. Adding `/members`, `/sett
 `/settings/workflows` found it: **four `span.ticket-type-list__badge` at 11.2px, 4 → 0.**
 *A ratchet on the pages a finding NAMED is not a ratchet on the pages the defect is ON.*
 
+**THE MUTATION WENT RED THROUGH THE WRONG CHECK, AND THAT IS THE SESSION'S BEST FINDING.** Planting
+`0.7rem` on `.gn-help__toc-link` turned the suite red — via the TAP-TARGET ratchet, because the links
+lost height — while the type-scale sweep reported `under-12px=0` on the same page in the same run.
+Recorded uninspected, that red is "the ratchet works". **`a` was in neither population** — not mine,
+not `measureBodyText`'s — so **every link and every button in the product had no font-size floor at
+all**, and the mutation built to test the check could not be seen by it. `a, button, summary, th`
+added; `/help` 317 → 341 examined, still 0 offenders; re-run of the same plant now fails as
+`smallest = 11.2px on a.gn-help__toc-link, under-12px=16` against baseline 0. Restored from a copy
+made BEFORE the edit, never from `HEAD`, and re-run green.
+**Read a red for WHICH check produced it. "It failed" is not "it failed for the reason I claim."**
+
 **ONE OF THE FIVE FIXES IS WITNESSED. FOUR ARE NOT, AND THAT WAS FOUND BY AN ABSENCE.**
 `.ticket-type-list__badge` is the only one on a swept route (4 → 0). `.gn-avatar--small` renders on the
 board and ticket list **only when a card has an assignee** and no seeded card does; it is a `<span>`

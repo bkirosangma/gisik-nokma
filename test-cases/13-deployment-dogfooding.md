@@ -1202,6 +1202,24 @@ exactly `0.75rem` — and the checklist itself judged the 12.5px and 12.8px labe
   name. Two selectors in two files are free to drift into each other; a comment would not notice.*
   *Mutation: point the label selector at a tag that does not exist → `rawMatches` 0 → fails.*
   *Mutation: add `p` to the label selector → `bodyOwned` non-empty → fails naming the overlap.*
+  *Mutation RUN, not reasoned: `.gn-help__toc-link` 1rem → 0.7rem. Result `smallest = 11.2px on
+  a.gn-help__toc-link, under-12px=16`, the ratchet failing against baseline 0 and naming the offenders;
+  restored from a copy made before the edit (never from `HEAD`) and re-run green, 6 passed.*
+
+> ### That mutation went red through the WRONG check the first time, and that is how a hole was found
+>
+> Run before `a` was in the population, the same plant went **red — through the TAP-TARGET ratchet**,
+> because the links also lost height, while this sweep reported `under-12px=0` on the same page in the
+> same run. Written down uninspected it would have read as proof.
+>
+> `a` was in NEITHER population: not here, and not in `measureBodyText`'s `p, li, dd, dt, td,
+> figcaption, label`. **Every link and every button in the product had no font-size floor of any
+> kind**, and the mutation designed to test this check could not be seen by it — this repo's recorded
+> shape of a control that does not traverse the same path as the measurement.
+>
+> `a`, `button`, `summary` and `th` are now in the population: `/help` goes from 317 examined to 341,
+> still zero offenders. Headings stay out, matching the body sweep's stated reasoning. **The lesson is
+> not "the mutation worked" — it is that a red result must be read for WHICH check produced it.**
 
 - **13.265** ✅ **Label text on the signed-in surface holds the 12px floor, over five routes.**
   `apps/web/e2e-stack/viewport.spec.ts`, signing in through the real door and reading every id out of
