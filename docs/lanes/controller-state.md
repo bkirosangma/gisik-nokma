@@ -1,5 +1,67 @@
 # Cross-lane controller — live state
 
+## ▶ TUESDAY ~19:3x IST — FRESH CONTROLLER (Fable 5.1, owner-set) LIVE AT `371c437`. Six checks re-measured raw-green there; Actions still billing-blocked (annotation read, waiver stands); executor mid-Task-2b item 2 on `exec/135-signin-auth-methods` (unpushed, ctx ~32%); **the 13.292 collision its handoff flagged is RULED and it has acted on the ruling.** Zero open PRs.
+
+### Re-measured at `371c437`, not carried
+
+- `origin/main` = local `main` = `371c437`. Six checks via `rtk proxy`, **raw exit 0 each**: `check:env` 0 ·
+  `check:tasks` 0 (**193/199 verified, 0 in-flight, 6 todo** — 3a, 3b, 9, 10, 11, 12) · `check:runbook` 0
+  (17 refs / 15 distinct) · `check:citations` 0 (ratchet holds exactly) · `check:help` 0 (2/29/224) ·
+  `check-case-ids` 0 (**1,809 ids, highest 15.17**). Node `v22.22.2`; zero `Unsupported engine`.
+- **The forced gate at `371c437` is my predecessor's** (33/33, `Cached: 0`, ~19:11) — not re-run here: no
+  source has moved since, and the next merge re-runs it as the fixed merge step requires. This entry and its
+  ledger note are docs-only (`git diff --name-only origin/main HEAD`: two files under `docs/`).
+- **CI: every job on `main` at `371c437` fails at zero steps** with the annotation verbatim — *"The job was not
+  started because recent account payments have failed or your spending limit needs to be increased."* The
+  2026-09-06 15:20 waiver still governs: a PR merges on its own machinery plus this controller's forced gate
+  at merged `main`, marked "(CI waived, owner 15:20)". Not re-asked — nothing has changed.
+- Open-PR `Monitor` armed at 19:14 (45 s poll; emits on a new PR, a head-sha change, or a mergeability change,
+  never per poll; initial reading: none open). Restart mechanics unchanged from the entry below: a
+  controller-only restart is `tmux respawn-window -k -t gisik:0 …`; **never `do-restart.sh` or
+  `kill-session` while the executor holds work.**
+
+### RULING (controller as ruling tier, ~19:2x) — 13.292 is AMENDED in item 2's change set
+
+The executor's handoff flagged that the item-2 dispatch's requirement 1 (count 0 for `Continue with Google`
+when the provider is disabled) and requirement 3 ("every 13.292–13.294 assertion still passes") cannot both
+hold. **Verified by reading the spec, not taken from the handoff: `responsive.spec.ts:1007-1008` asserts
+`Continue with Google` AND `Sign in with a passkey` VISIBLE under 13.292.** Requirement 3 was written from
+the case NUMBERS, not the case TEXT — the dispatch's error, not the executor's. A visible control that can
+never succeed is the defect this round exists to remove, so the case that pins it is pinning the defect.
+**Ruled: amend 13.292.** Its property becomes *every method the server will accept is offered, and no control
+the server will refuse is rendered* — with the methods route reporting google/apple false (the dev stack's
+real state), Phone and Email link offered and count 0 for the three dead controls at all three viewports;
+with the route driven to google true, the icon-only Google button resolves by its accessible name; the
+passkey conditional UI is asserted via `autocomplete="username webauthn"` on the email input, never a
+button. Old property struck at the case, not deleted. 13.293/13.294 unchanged unless they also pin a dead
+control. Everything else in the dispatch stands. Full text
+`gisik-nokma-lanes/CTL-RULING-2026-09-08-13292-amendment.md`. Delivered by paste at 19:22 (queued behind a
+running turn); **delivery proven at 19:27 by the executor acting on it** — its pane: *"Ruling matches, with
+one addition: it wants the positive direction in the viewport suite too, via a driven route. Adding that."*
+
+### Carried, with owners
+
+- **Ten plan tasks (4a/4b … 8a/8b) have no ledger row and are invisible to `check:tasks`** — the parser
+  reads `### Task N:` only, so the gate's 199 is not the plan's 209. Owner: **the executor, in the PR that
+  dispatches Task 4a** — teach `scripts/check-task-ledger.mjs` the `Na / Nb` form with a fixture case;
+  never add rows against an unparsed heading (a row with no parsed task turns a green gate red).
+- The ledger's HELD note sat on 3b alone; the owner's instruction holds 3a too (*"STOP … before 3a
+  starts"*). **Row 3a's note corrected in this PR** — an annotation, no status change (#342's precedent).
+- Executor restart: at the fixed point after item 2 merges, before Task 12 is dispatched.
+
+### Next, in order — the fixed merge step, then the hold
+
+1. Item-2 PR arrives → **partitioned drop check with literal paths** (the outside-the-PR files will be
+   `controller-state.md` and `task-ledger.tsv`, attributable to #367 and this PR) → the executor's gate at the
+   exact head read from its report, `baseRefName` = `main` → merge "(CI waived, owner 15:20)" →
+   `git merge --ff-only origin/main` → six checks raw → forced gate (`gate-lock/` reference scripts from my
+   scratchpad, `GATE_REPO` set) → **rebuild web** (`docker compose -f docker-compose.dev.yml build web &&
+   … up -d web`), verify the bundle control-first → hand the owner `http://localhost:3001/sign-in` →
+   **HOLD for the owner's second look.**
+2. Restart the executor at that fixed point. Then Task 12, then 3a onward — one at a time, owner review
+   between screens. Google credentials are the owner's (`CTL-NOTE-2026-09-08-credentials.md`); the button
+   appears on the next page load once the dev stack's env carries them.
+
 ## ⏹ TUESDAY ~19:2x IST — **CONTROLLER RESTART DIRECTED BY THE OWNER. If you are the fresh controller, this entry is your position; read it, then the entry below it, then `gisik-nokma-lanes/CTL-DISPATCH-2026-09-08-signin-feedback.md`.** `main` is `cb03d9e` + this anchor, gate GREEN, executor on Task 2b at ctx ~19%, **zero open PRs.**
 
 ### THE RESTART MECHANICS, because the obvious script is destructive right now
@@ -32,8 +94,24 @@ the 2026-09-02 "Sonnet for the loop" ruling for the controller only; the executo
    succeeds without a magic link; skip registration → RED. **Case block `13.327`–`13.332`** allocated.
 3. **The controller restarts** (this entry).
 
+### ⚠ ADDED ~19:4x — I BROKE MY OWN ONE-HOUR-OLD RULE, AND THE FIX IS STRUCTURAL, NOT ANOTHER RULE
+
+**`main` was red on `check:tasks` from `9fe51e7` (#365, the handoff PR above) through #366 — two merges,
+both certified by me.** #365 added `### Task 12:` to the plan without its ledger row: **199 tasks, 198
+rows.** That is the identical mistake to #357, made about sixty minutes after the entry below recorded
+*"a plan file is never docs-only."* The rule was known and not applied, so writing a sharper rule is
+not the fix. **The fix is that the six raw checks are a fixed step of EVERY merge in the loop — run
+after `git merge --ff-only origin/main`, before the next dispatch, with no judgment about whether this
+PR "needs" them.** The judgment is precisely what fails. Row 12 added; `check:tasks` raw 0, 199/199.
+Also confirmed a third time: the `-- $F` variable form of the drop-check control prints 0 in this shell;
+**literal paths work** (57,947 bytes on #366). Do not use the variable form.
+
 ### FOR THE FRESH CONTROLLER — first actions, in order
 
+0. **The merge step, fixed, every time:** verify (literal paths, partitioned) → `git merge --ff-only
+   origin/main` → **six checks via `rtk proxy` (`check:env check:tasks check:runbook check:citations
+   check:help` + `node scripts/check-case-ids.mjs`), all raw exit 0** → forced gate if any source moved
+   → ledger row flipped → dispatch. Not a checklist to consult; the sequence itself.
 1. Arm the open-PR `Monitor` (the brief's "Reaching the executor" section; emit on change only).
 2. **Every exit code you act on: `rtk proxy <cmd>` or the log's last line, never `$?` after a bare
    proxied command.** Three false greens today; the entry below records them.

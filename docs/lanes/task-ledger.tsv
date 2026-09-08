@@ -220,8 +220,9 @@ mcp-server	12	done	329	267c104	artefact in flight: apps/server/src/routes/mcp-to
 hig-per-screen	0	done	358	e5a2054	Task 0 of the HIG per-screen plan — the accessible-name gate. Built FIRST and before any screen is touched, because the per-screen work is delegated to smaller models and a rule enforced by a test survives a delegation while a rule enforced by attention does not. Cases 13.285-13.287.
 hig-per-screen	1	done	360	d323633	The four shared pieces every screen reuses (SegmentedControl, .gn-field, and the rest). Prerequisite for Task 2.
 hig-per-screen	2	done	362	ebb21aa	Sign-in — the exemplar, against the owner's reference image. The owner reviews this live before anything after it is dispatched.
-hig-per-screen	3a	todo			Members — surface.
+hig-per-screen	3a	todo			Members — surface. HELD with 3b: the owner reviews sign-in live before 3a starts (owner-issued sequencing, controller-state.md ~17:1x entry); the HELD note sat on 3b alone until 2026-09-08 ~19:3x, corrected by the controller — an annotation, no status change.
 hig-per-screen	3b	todo			Members — states. HELD: the owner reviews sign-in first and that feedback may change the shared pieces before they spread.
 hig-per-screen	9	todo			The List view — the prototype that does not exist. Found by the reconciliation audit: the project route registers four view tabs and only three have artboards.
 hig-per-screen	10	todo			Help, Legal, NotFound, McpAuthorize, McpTokens.
 hig-per-screen	11	todo			Mobile — record the deferral durably, with an owner. CSS tokens do not transfer to React Native; an unrecorded deferral is defect class 4 from Plan 1.
+hig-per-screen	12	todo			Passkey registration — /account with a Passkeys section on @better-auth/passkey 1.7.2 (addPasskey/listUserPasskeys/deletePasskey); case 13.330 is the CDP virtual-authenticator end-to-end witness. Owner-scoped 2026-09-08 after the live look found sign-in-with-passkey was a dead end for every user. After Task 2b and the owner second look. Block 13.327-13.332.
