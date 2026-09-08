@@ -232,6 +232,97 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    PR rather than a second one.
 > 3. **Controller decisions outstanding:** item 3 (its own `:694`) and item 4 (the brief).
 >
+# ▶ TUESDAY 2026-09-08 ~14:2x IST — **ONE CLIENT CAN LOCK EVERY USER OUT OF SIGN-IN. MEASURED, WITH THE CONTROL THAT MAKES IT A FINDING — AND IT REFUTES MY OWN EARLIER EXPLANATION.**
+
+*Branch `exec/124-better-auth-shared-ratelimit`, cut fresh off `main` `9468eb0` after #345 merged.
+Docs-only: no code change, because the remedy is an owner decision about an auth-path security control.*
+
+## THE FINDING
+
+**better-auth's built-in rate limiter does not separate clients.** A client that has spent nothing is
+refused because a *different* client has spent. **Measured limits: 5 magic-link sends per ~60s window,
+globally.**
+
+| client | address | spend before | result |
+|---|---|---|---|
+| A | `192.168.65.1` | 5 × 200 | **429** on its 6th |
+| B | `127.0.0.1` | **none** | **429 on its very first request** |
+
+Both hitting the server **directly, with no proxy in the path**. Addresses and ordering are in the
+server's own log. `max` found by firing from a clean window until refused (the 6th); the window by
+polling after the refusal (allowed again at ~60s).
+
+**It is not our limiter.** Ours answers `{"error":"rate_limited","retryAfterSeconds":N}`
+(`app.ts:545`); better-auth's answers `{"message":"Too many requests. Please try again later."}`
+(`rate-limiter/index.mjs:65`). Every 429 observed was the latter, byte for byte. `auth.ts` has **no
+`rateLimit` key**, so better-auth runs at its defaults and nothing in `.env` reaches it. **This is why
+`RATE_LIMIT_AUTH_MAX` is not the constraint and item C's escape hatch fired.**
+
+**Why it is bigger than the flaky suite:** the running server is `NODE_ENV=production` and
+`deploy/do/app.yaml` deploys production too. If it holds there, any one person retrying sign-in locks
+out every other user — a trivial unauthenticated DoS on the first screen a new user sees.
+
+## ⚠ THIS REFUTES WHAT I TOLD THE CONTROLLER AN HOUR EARLIER
+
+I reported the cause as `next.config.ts:94` proxying `/api/auth/*` and collapsing every client onto the
+proxy's address. **The control refutes it: clients are not separated even with NO proxy in the path**,
+so removing the proxy would fix nothing. The narrower story was wrong **in the direction of looking
+solved**, which is the dangerous direction. The controller had already relayed it to the owner and is
+correcting it.
+
+**The lesson is about the experiment, not the bug.** My first attempt ran a "control" arm and an
+"experiment" arm that returned *identical* results, and I read that as *inconclusive — the instrument
+cannot discriminate*. It was not inconclusive: **the control arm was itself the answer.** Two different
+addresses sharing a budget with no proxy involved is the finding, and I nearly filed it as a failed
+instrument. *When a control and a subject agree, ask whether the control just answered a different and
+better question.*
+
+## ✅ THE CAUSE IS NOW PINNED, AND ITEM 3 BELOW RECONCILED — the black box and the source agree
+
+`better-auth@1.7.2/dist/api/rate-limiter/index.mjs:239-245`: `getIP()` returns falsy, so
+`createRateLimitKey(ip ?? NO_TRUSTED_IP_KEY, path)` keys on the literal `"no-trusted-ip"` — **one
+shared bucket per path, for everybody.** Unconditional on IP resolution failing, which is why the
+no-proxy control still showed sharing. **My "the Next proxy collapses the addresses" reading is refuted
+by that same line.**
+
+**The library WARNED US, once, in this server's own log** (`:241`): *"Rate limiting could not determine
+a client IP and is falling back to a single shared per-path bucket."* Gated by `ipWarningLogged` →
+**once per process**, into startup noise. ***A once-per-process warning is a finding with a half-life.***
+
+**⚠ AND THE `max: 3` THAT WOULD NOT RECONCILE — it reconciles, and the answer corrects the ruling.**
+`/sign-in*` does carry a default special rule of `window: 10, max: 3` (`:302-308`). **But a plugin rule
+overrides it at `:251-257`**, and `magic-link/index.mjs:197-203` declares `/sign-in/magic-link` with
+`window: … || 60`, `max: … || 5`. **The magic-link path is 5-per-60s, not 3-per-10s.** That is exactly
+what the black-box measurement found, and the two only agree once the override is followed. *Reading
+one rule table and stopping produces a confident wrong number — the shape this repo keeps recording.*
+
+**STILL NOT ESTABLISHED: dev stack only**, never tested against the real deployment.
+
+## A FALSE DROP-ALARM I RAISED AGAINST MYSELF, worth carrying
+
+Verifying #345's squash by CONTENT, my sweep reported the e2e origin assertion **absent from `main`**.
+It is present. **A single-line `grep` for `not the web app at` cannot match it, because the string wraps
+across a line break in the source.** Same class as the recorded multi-line CSS-selector miss. `tr '\n' ' '`
+first, or match a fragment that cannot wrap. **A content check that greps for prose is only as good as
+its tolerance for line breaks, and its false NEGATIVE reads exactly like a dropped push.**
+
+**The controller's matching warning, confirmed my side and worth more than mine:**
+`git merge-base --is-ancestor <branch-tip> origin/main` returns **FALSE after a squash merge and that
+is CORRECT AND MEANINGLESS** — a squash makes a new commit whose only parent is the old main, so a
+squashed branch head can *never* be an ancestor. **Reachability is valid against the MERGE COMMIT only;
+against a squashed branch head it is a check that cannot pass.**
+
+## STATE
+
+**#345 MERGED**, `main` `9468eb0`. Verified by CONTENT, not topology: `globals.css` carries
+`button { font: inherit; }`; `sign-in/page.tsx` carries 2 `webOriginCallback` call sites and the
+`samePathOnly` guard; the e2e origin assertion is present (see the false alarm above);
+`type-scale.ts` carries `uaFont` ×5; cases 13.266–13.272 all present. **Item A and the P1 both landed
+intact.**
+
+**Case `13.273` is reserved** for the guard, to be minted when the owner rules on the remedy. Block
+`13.266`–`13.275` is this executor's; `13.266`–`13.272` are used.
+
 > **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
 # ▶ TUESDAY 2026-09-08 ~13:5x IST — **THREE THINGS I HAD NOT CHECKED, CHECKED. ONE IS A PRODUCTION LEAD BIGGER THAN THE TASK THAT FOUND IT.**
 
