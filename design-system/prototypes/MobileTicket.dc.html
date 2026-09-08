@@ -39,8 +39,11 @@
       font:inherit;font-size:15px;font-weight:600;cursor:pointer}
     .btn--primary{background:var(--accent);color:var(--onColor)}
     .btn--danger{background:rgba(215,0,21,0.12);color:var(--danger)}
-    /* HIG grouped list: one raised card, rows separated by alternating fill. */
-    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden}
+    /* HIG grouped list: one raised card, rows separated by alternating fill.
+       `flex:none` is load-bearing: this sits in a column flex scroller, and
+       without it the list SHRINKS and its `overflow:hidden` silently cuts rows
+       in half rather than letting the parent scroll. Measured at 210px lost. */
+    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden;flex:none}
     .grow{display:flex;justify-content:space-between;gap:14px;padding:12px 14px;font-size:17px}
     .grow:nth-child(even){background:var(--fill4)}
     .grow dt{color:var(--label2);font-size:15px;margin:0}

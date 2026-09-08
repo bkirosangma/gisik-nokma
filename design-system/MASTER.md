@@ -100,7 +100,30 @@ control floor, the 24px in-list floor, the chip/dot vocabulary, the board column
 structure, the sheet geometry, and the dashed-outline treatment for an in-transit claim
 (never a different hue — recolouring it would say it means something else).
 
-## 6. What is deliberately not here
+## 6. The render check, and what it caught
+
+`seed-canvas.mjs --check` proves the canvas *parses*. It looks at no pixels, and a
+fixed-size artboard whose content overruns its frame **clips silently** — no error,
+no warning, just a screen that ends mid-element.
+
+`prototypes/overflow-check.html` is the check that can see it. Serve this directory
+(`python3 -m http.server 8777`) and open it: it loads every artboard at its
+`canvas.json` frame size and reports both frame overflow and *inner* cuts.
+
+It found two real defects that every other check passed:
+
+1. **`Main.dc.html` overran its frame by 411px.** The foundations sheet was taller
+   than the 1560px frame it was given. Frame and sheet are now 2080.
+2. **`MobileTicket`'s field list was being compressed, not scrolled.** The grouped
+   `<dl>` sits in a column flex scroller; without `flex: none` it *shrank*, and its
+   own `overflow: hidden` cut 210px of rows in half. `MobileHelp` had the same
+   latent bug. Both now carry `flex: none`, so the parent scrolls instead.
+
+Five artboards still report inner overflow. Those are `overflow-y: auto` scroll
+regions where content legitimately continues below the fold — the same thing the
+real app does — and they are not defects.
+
+## 7. What is deliberately not here
 
 - **No dark-theme artboards.** `tokens.json` carries the full dark palette and every dark
   ratio is measured, but drawing 23 more artboards would double the surface without

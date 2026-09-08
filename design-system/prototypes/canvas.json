@@ -5,7 +5,7 @@
     { "id": "mobile", "name": "Mobile" }
   ],
   "artboards": [
-    { "file": "Main.dc.html", "page": "foundations", "x": 0, "y": 0, "w": 1440, "h": 1560, "title": "Apple HIG foundations" },
+    { "file": "Main.dc.html", "page": "foundations", "x": 0, "y": 0, "w": 1440, "h": 2080, "title": "Apple HIG foundations" },
 
     { "file": "SignIn.dc.html",          "page": "web", "x": 0,    "y": 0,    "w": 1440, "h": 900, "title": "Sign in" },
     { "file": "Workspaces.dc.html",      "page": "web", "x": 1560, "y": 0,    "w": 1440, "h": 900, "title": "Workspaces" },

@@ -37,8 +37,10 @@
       border-radius:7px;font-size:15px;font-weight:500}
     .seg__item--on{background:var(--raised);font-weight:600;
       box-shadow:0 3px 8px rgba(0,0,0,0.12),0 3px 1px rgba(0,0,0,0.04)}
-    /* Grouped nav list — HIG's disclosure rows, separated by fill not rules. */
-    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden}
+    /* Grouped nav list — HIG's disclosure rows, separated by fill not rules.
+       `flex:none` for the reason MobileTicket's carries it: in a column flex
+       scroller an `overflow:hidden` box shrinks and cuts its own rows. */
+    .group{background:var(--raised);border-radius:var(--r-m);overflow:hidden;flex:none}
     .grow{display:flex;align-items:center;justify-content:space-between;gap:12px;
       min-height:48px;padding:0 14px;font-size:17px;color:var(--label)}
     .grow:nth-child(even){background:var(--fill4)}

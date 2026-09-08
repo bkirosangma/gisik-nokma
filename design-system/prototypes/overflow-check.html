@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>overflow harness</title>
+<style>body{font:13px ui-monospace,Menlo,monospace;margin:0;padding:8px}
+#out{white-space:pre}
+iframe{position:absolute;left:-99999px;top:0;border:0}</style>
+<div id="out">measuring…</div>
+<script>
+// Loads every artboard at its canvas.json frame size and reports whether the
+// content overflows the frame. A frame that clips is silent in the editor —
+// this is the only check that can see it.
+window.RESULT = null;
+(async () => {
+  const bust = '?v=' + Date.now();
+  const canvas = await (await fetch('./canvas.json' + bust, {cache: 'no-store'})).json();
+  const rows = [];
+  for (const ab of canvas.artboards) {
+    const f = document.createElement('iframe');
+    f.width = ab.w; f.height = ab.h; f.src = './' + ab.file + bust;
+    document.body.appendChild(f);
+    await new Promise((res) => { f.onload = res; f.onerror = res; });
+    let row;
+    try {
+      const d = f.contentDocument;
+      const sheet = d.querySelector('.sheet');
+      const ch = sheet ? sheet.scrollHeight : d.documentElement.scrollHeight;
+      const cw = sheet ? sheet.scrollWidth : d.documentElement.scrollWidth;
+      // A fixed-height sheet with inner `flex:1;overflow:hidden` regions reports
+      // its own height even when a child is cut mid-element. So walk the
+      // clippers too: any hidden/auto box whose content exceeds its box.
+      const inner = [];
+      for (const el of d.querySelectorAll('*')) {
+        const cs = getComputedStyle(el);
+        const hides = cs.overflowY === 'hidden' || cs.overflowY === 'auto';
+        if (!hides || el === sheet) continue;
+        const cut = el.scrollHeight - el.clientHeight;
+        if (cut > 2) {
+          inner.push((el.className || el.tagName).toString().slice(0, 34) + ':' + cut);
+        }
+      }
+      row = {
+        file: ab.file, frameW: ab.w, frameH: ab.h,
+        contentH: ch, contentW: cw,
+        overflowY: ch - ab.h, overflowX: cw - ab.w,
+        inner: inner,
+        clips: ch > ab.h + 1 || cw > ab.w + 1,
+      };
+    } catch (e) {
+      row = { file: ab.file, error: String(e) };
+    }
+    rows.push(row);
+    f.remove();
+  }
+  window.RESULT = rows;
+  const bad = rows.filter(r => r.clips || (r.inner && r.inner.length));
+  document.getElementById('out').textContent =
+    (bad.length
+      ? bad.map(r => (r.clips ? 'CLIP ' : 'INNER') + ' ' + r.file +
+          ' frameH ' + r.frameH + ' contentH ' + r.contentH +
+          ' overflowY ' + r.overflowY +
+          (r.inner && r.inner.length ? ' inner[' + r.inner.join(', ') + ']' : '')).join('\n')
+      : 'no frame clips, no inner cuts') +
+    '\n\n' + rows.filter(r => r.clips).length + ' frame clips, ' +
+    rows.filter(r => r.inner && r.inner.length).length + ' with inner cuts, of ' +
+    rows.length + ' artboards';
+})();
+</script>
