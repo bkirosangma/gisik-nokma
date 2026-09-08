@@ -966,6 +966,8 @@ for (const route of UNAUTHED_ROUTES) {
 
     /* ── 4b. LABEL TEXT >= 12px, ratcheted. ───────────────────────────────
      *
+     * Case 13.264 — label text on the signed-out surface holds the 12px floor.
+     *
      * The population section 4 cannot see. `measureBodyText` sweeps `p, li, dd,
      * dt, td, figcaption, label`; every element the pre-launch checklist named
      * as small — `gn-board-card__provenance` at 12.5px, the chips at 12.8px —

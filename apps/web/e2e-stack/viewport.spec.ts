@@ -130,11 +130,12 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
  * through any regression on the board — the same way it would have stayed green
  * through the whole `.gn-nav` overflow bug.
  *
- * TWO ROUTES, NOT ONE. `/my-work` is where the tap-target work measured, but the
- * checklist's own reading is about the BOARD (`gn-board-card__provenance`, x25),
- * which renders on a project page. Sweeping only `/my-work` would ratchet a
- * number for a page the finding was not about and report coverage of one it
- * never loaded.
+ * FIVE ROUTES, AND THE OBVIOUS TWO WERE THE WRONG ONES. `/my-work` and the board
+ * are the pages the finding itself names, and measured first they BOTH reported
+ * zero elements under the floor. The five sub-floor declarations are on the
+ * settings and membership surfaces instead, so a sweep of the named pages alone
+ * would have ratcheted 0 and 0 and been blind to every rule this change fixes.
+ * The route list below carries the detail.
  *
  * The floor and its derivation live in `e2e-viewport/type-scale.ts`. The one
  * thing worth repeating at the call site: **no WCAG success criterion sets a
@@ -147,7 +148,7 @@ const STACK_TYPE_SCALE_BASELINE = fileURLToPath(
 );
 
 /**
- * 13.264 — label text on the signed-in surface holds this product's own 12px
+ * 13.265 — label text on the signed-in surface holds this product's own 12px
  * floor, ratcheted per route. Signs in through the real door, reaches the
  * workspace-scoped pages from the seeded world rather than hardcoding ids,
  * asserts the viewport took effect before believing any measurement, and prints
