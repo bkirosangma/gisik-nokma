@@ -1,6 +1,8 @@
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
+import { sweepBorders } from './helpers/non-text-contrast.js';
 // The plain MODULE, never the spec: Playwright loads an imported spec's
 // `test()` registrations too, and importing `responsive.spec.ts` here made this
 // config try to run all six unauthed cases — six `project "" has no entry in
@@ -476,4 +478,138 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
         .toBeLessThanOrEqual(allowed);
     }
   }
+});
+
+/**
+ * 13.283 — non-text contrast (WCAG 1.4.11) over the rendered signed-in surface, with the number recorded rather than asserted.
+ *
+ * ## What this measures that nothing else did
+ *
+ * "17 of 24 distinct bordered classes below 3:1" was measured ad hoc and never
+ * committed, so the finding could not be RE-measured — and a before/after
+ * comparison built from two different instruments compares two different
+ * populations while reading as meaningful. This is the instrument, committed
+ * before the border sweep changes anything, so the "before" is a fact about a
+ * tree rather than a fact recovered from prose.
+ *
+ * ## It RECORDS, it does not yet gate
+ *
+ * The defect is known, product-wide and owner-recorded. A test that failed on
+ * it today would be red on `main` for a condition nobody has authorised fixing
+ * in this commit — so this prints the roster and asserts only what must be true
+ * for the printed number to MEAN anything:
+ *
+ * * the sweep examined a non-trivial number of bordered elements (a sweep that
+ *   matched nothing reports zero offenders, which is the best possible result
+ *   and the least trustworthy one), and
+ * * the instrument can still tell red from green — the highest reading must
+ *   clear 3:1 by a wide margin, which is the positive control the original
+ *   ad-hoc measurement also carried (the primary button at 19.43 light).
+ *
+ * The moment the sweep lands, this becomes an assertion.
+ */
+test('records non-text contrast across the signed-in surface, with a positive control', async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await signIn(page, OWNER_EMAIL);
+
+  await page.goto('/workspaces');
+  const workspaceLink = page.locator('a[href^="/w/"]').first();
+  await workspaceLink.waitFor({ timeout: 15_000 });
+  const workspaceHref = await workspaceLink.getAttribute('href');
+  const workspaceId = /^\/w\/([^/]+)/.exec(workspaceHref ?? '')?.[1];
+  expect(workspaceId, `could not read a workspace id out of ${workspaceHref}`).toBeDefined();
+
+  const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
+  await projectLink.waitFor({ timeout: 15_000 });
+  const projectHref = await projectLink.getAttribute('href');
+  expect(projectHref, 'no project link — the seed or the session is wrong').not.toBeNull();
+
+  const routes = [
+    { path: `/w/${workspaceId}/my-work`, key: '/my-work' },
+    { path: projectHref ?? '', key: '/p/:projectId' },
+    { path: `/w/${workspaceId}/members`, key: '/members' },
+    { path: `/w/${workspaceId}/settings/ticket-types`, key: '/settings/ticket-types' },
+    { path: `/w/${workspaceId}/settings/workflows`, key: '/settings/workflows' },
+  ];
+
+  const worst = new Map<string, { ratio: number; border: string; backdrop: string; routes: string[] }>();
+  let examinedTotal = 0;
+  let bestSeen = 0;
+
+  for (const route of routes) {
+    await page.goto(route.path, { waitUntil: 'networkidle' });
+    const sweep = await sweepBorders(page);
+    examinedTotal += sweep.examined;
+    for (const reading of sweep.readings) {
+      bestSeen = Math.max(bestSeen, reading.ratio);
+      const existing = worst.get(reading.selector);
+      if (existing === undefined) {
+        worst.set(reading.selector, {
+          ratio: reading.ratio,
+          border: reading.border,
+          backdrop: reading.backdrop,
+          routes: [route.key],
+        });
+      } else {
+        if (!existing.routes.includes(route.key)) existing.routes.push(route.key);
+        if (reading.ratio < existing.ratio) {
+          existing.ratio = reading.ratio;
+          existing.border = reading.border;
+          existing.backdrop = reading.backdrop;
+        }
+      }
+    }
+  }
+
+  const roster = [...worst.entries()].sort((a, b) => a[1].ratio - b[1].ratio);
+  const below = roster.filter(([, r]) => r.ratio < 3);
+  /*
+   * Written to a FILE, not only logged. Two reasons, one of them measured
+   * today: the console output of this run reached the operator EMPTY because a
+   * shell-level tool filtered it, and a sweep whose result can be silently
+   * swallowed is a sweep that reports whatever the reader already believed. The
+   * other is that a before/after comparison needs the BEFORE to still exist
+   * after the tree has changed — prose is not a baseline.
+   */
+  writeFileSync(
+    new URL('./non-text-contrast-roster.json', import.meta.url),
+    `${JSON.stringify(
+      {
+        belowCount: below.length,
+        totalClasses: roster.length,
+        examined: examinedTotal,
+        highestReading: Number(bestSeen.toFixed(2)),
+        routes: routes.map((r) => r.key),
+        roster: roster.map(([selector, r]) => ({
+          selector,
+          ratio: Number(r.ratio.toFixed(2)),
+          border: r.border,
+          backdrop: r.backdrop,
+          routes: r.routes,
+        })),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(
+    `[non-text-contrast] ${below.length} of ${roster.length} distinct bordered classes below 3:1 ` +
+      `(${examinedTotal} bordered elements examined across ${routes.length} routes; ` +
+      `highest reading ${bestSeen.toFixed(2)} as the positive control)`,
+  );
+  for (const [selector, r] of roster) {
+    console.log(
+      `[non-text-contrast]   ${r.ratio < 3 ? 'BELOW' : 'ok   '} ${r.ratio.toFixed(2)}  ${selector}  ` +
+        `border ${r.border} on ${r.backdrop}  [${r.routes.join(' ')}]`,
+    );
+  }
+
+  // A sweep that matched nothing reports zero offenders — the best possible
+  // result and the least trustworthy one.
+  expect(examinedTotal).toBeGreaterThan(20);
+  expect(roster.length).toBeGreaterThan(5);
+  // The instrument can still tell red from green.
+  expect(bestSeen).toBeGreaterThan(3);
 });
