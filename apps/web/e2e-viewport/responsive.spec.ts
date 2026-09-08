@@ -1073,11 +1073,23 @@ for (const route of UNAUTHED_ROUTES) {
        * not suspected.
        *
        * This half used to rely on the suite's own server, and it was a check
-       * that COULD NOT FAIL. This suite runs `next dev` with no API behind it,
-       * so `/v1/auth/methods` never resolves, the page's availability state
-       * stays `null`, and NOTHING renders whatever the gate does. A mutation
-       * that dropped the provider check and rendered the row on any answer left
-       * all three viewports GREEN — run, seen, and the reason this block exists.
+       * that COULD NOT FAIL.
+       *
+       * ~~"This suite runs `next dev` with no API behind it, so
+       * `/v1/auth/methods` never resolves, the page's availability state stays
+       * `null`, and NOTHING renders whatever the gate does."~~ **STRUCK
+       * 2026-09-08, and struck rather than deleted because it was relied on.**
+       * `next.config.ts` rewrites `/v1/*` to the API origin, so this suite's own
+       * dev server PROXIES to whatever is listening on the API port — the
+       * developer's compose stack, in practice. The request resolves, and on
+       * 2026-09-08, once the owner configured Google, it resolved to
+       * `google: true` and this page rendered a real social button. The state is
+       * now pinned by a `page.route` registered before the first navigation; see
+       * that stub for the measurement.
+       *
+       * The rest of this paragraph stands and is why the block exists: a
+       * mutation that dropped the provider check and rendered the row on any
+       * answer left all three viewports GREEN — run, seen, recorded.
        *
        * With the empty answer supplied, the page HAS an answer, the gate is the
        * only thing between it and the DOM, and that same mutation reddens. */

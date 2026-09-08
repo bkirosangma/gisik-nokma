@@ -1864,6 +1864,15 @@ the gate would have stayed 33/33.*
   naming the route and printing **"LOST ariaSelected: baseline 2, now 1"**. Committed first, then
   mutated, then restored — `git checkout --` restores from HEAD and has destroyed uncommitted work here
   twice.*
+  **FLOOR 0 ON `/sign-in` SINCE ROUND 2c (2026-09-08), and it is recorded here rather than left to be
+  discovered.** Gating the Phone tab removed the segmented control, which carried this page's only
+  `aria-label`, its `tablist`/`tab` roles and both `aria-selected`s — so all four ratcheted counts are
+  `0`, and **a floor of zero cannot fall: 13.285 protects nothing on `/sign-in`** until a labelled
+  control returns (Task 12's passkey UI, or a deployment with a provider configured). 13.286 still
+  guards the sweep on that route — `rawMatches` is 54, so a sweep that saw nothing is still caught. The
+  ratchet MECHANISM is witnessed on `/privacy`, whose floor is non-zero: deleting the back button's
+  `aria-label` reddens 6 of 19 with **"LOST ariaLabel: baseline 1"** naming `/privacy` and `/terms` at
+  all three viewports.
 - **13.286** ✅ The sweep's selector control, asserted HARD and BEFORE the ratchet: `*` over a rendered
   document must examine more than zero elements. *A sweep that stopped matching reports zero losses and
   is byte-for-byte indistinguishable from a page that lost nothing — the failure this file catalogues
