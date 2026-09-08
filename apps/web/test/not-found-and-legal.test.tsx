@@ -1,11 +1,33 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * The legal pages are server components, but the Back control they now carry is
+ * a client one, so the module graph reaches `next/navigation` and needs it
+ * stubbed. `back` and `push` are captured rather than merely mocked because
+ * 13.322/13.323 assert WHICH of the two was called, and a shared `vi.fn()` that
+ * both branches could satisfy would make the fallback branch untestable.
+ */
+const nav = { back: vi.fn(), push: vi.fn() };
+vi.mock('next/navigation', () => ({ useRouter: () => nav }));
+
 import NotFound from '../app/not-found.js';
 import PrivacyPolicy from '../app/privacy/page.js';
 import Terms from '../app/terms/page.js';
+
+/**
+ * jsdom's `window.history.length` is 1 and read-only through the normal API, so
+ * the two branches are driven by redefining the property. `configurable: true`
+ * is what lets the next test redefine it again; without it the second call
+ * throws and every case after the first would fail for a reason that has
+ * nothing to do with what it asserts.
+ */
+function setHistoryLength(length: number): void {
+  Object.defineProperty(window.history, 'length', { value: length, configurable: true });
+}
 
 /**
  * Pre-launch checklist items 1–3: the custom 404, the privacy policy and the
@@ -164,4 +186,61 @@ describe('the legal pages', () => {
     expect(screen.getByText(/day is India/i)).toBeInTheDocument();
     expect(screen.getByText(/Parts of it are not built yet/i)).toBeInTheDocument();
   });
+});
+
+/**
+ * 13.322 / 13.323 — a way back off each legal page.
+ *
+ * Both pages linked only to EACH OTHER: from the sign-in card a reader could
+ * open Terms, cross to Privacy, cross back to Terms, and never reach sign-in
+ * again without the browser's own chrome. Owner feedback, 2026-09-08.
+ *
+ * BOTH BRANCHES ARE ASSERTED, and the second is the one that matters. A control
+ * that calls `router.back()` unconditionally is INDISTINGUISHABLE from a correct
+ * one on any page opened with history behind it — which is every page a test
+ * navigates to and most pages a developer clicks through. It only fails for the
+ * reader who opened the link in a new tab, where `back()` is a silent no-op and
+ * the page appears frozen. So the fallback case drives `history.length` to 1 and
+ * demands `push('/sign-in')`; deleting the guard reddens it and nothing else.
+ */
+describe('the way back off a legal page', () => {
+  beforeEach(() => {
+    nav.back.mockClear();
+    nav.push.mockClear();
+  });
+
+  for (const { id, label, node } of [
+    { id: '13.322', label: 'privacy', node: <PrivacyPolicy /> },
+    { id: '13.323', label: 'terms', node: <Terms /> },
+  ]) {
+    it(`${id} ${label} carries a Back control whose accessible name says back to WHERE`, () => {
+      setHistoryLength(4);
+      render(node);
+
+      // The accessible name, not the visible text: `aria-label` is what a screen
+      // reader announces, and "Back" on its own does not say back to where.
+      const back = screen.getByRole('button', { name: 'Back to the previous page' });
+
+      // WCAG 2.5.3 Label in Name — the visible word must be CONTAINED in the
+      // accessible name, or voice control ("click Back") stops matching it.
+      expect(back).toHaveTextContent('Back');
+      expect(back.getAttribute('aria-label')).toContain(back.textContent ?? '');
+
+      fireEvent.click(back);
+      expect(nav.back).toHaveBeenCalledTimes(1);
+      expect(nav.push).not.toHaveBeenCalled();
+    });
+
+    it(`${id} ${label}'s Back goes to sign-in when there is no history to go back to`, () => {
+      setHistoryLength(1);
+      render(node);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back to the previous page' }));
+
+      // `back()` here would be a silent no-op — the failure mode this branch
+      // exists to prevent — so it must NOT have been the call that was made.
+      expect(nav.back).not.toHaveBeenCalled();
+      expect(nav.push).toHaveBeenCalledWith('/sign-in');
+    });
+  }
 });

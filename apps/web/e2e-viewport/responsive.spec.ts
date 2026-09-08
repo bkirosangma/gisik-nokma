@@ -1020,6 +1020,62 @@ for (const route of UNAUTHED_ROUTES) {
       // auth.ts:84 sets emailAndPassword { enabled: false } with "the spec forbids passwords".
       await expect(list.getByRole('tab', { name: 'Password' })).toHaveCount(0);
 
+      /* 13.321 — the sheet is centred in the viewport, both halves.
+       *
+       * MEASURED FROM THE LIVE BOX, not from the computed style. Asserting
+       * `justify-content === 'center'` would pass on a page where the rule
+       * applies to a container that is not full height, which is precisely the
+       * bug the owner reported: `.gn-sign-in` was already `margin: 3rem auto`
+       * and therefore already horizontally centred — what was wrong was the
+       * VERTICAL axis, and no declaration on its own tells you which axis a
+       * reader sees.
+       *
+       * TWO INDEPENDENT PROPERTIES, because either alone passes on a broken
+       * page. A full-height container with the content at the top satisfies the
+       * height check; a shrink-to-fit container satisfies the symmetry check
+       * trivially, since its own padding is all the space there is.
+       *
+       * The tolerance is 2px for sub-pixel layout rounding, not for slack: at
+       * every one of the three viewports the sign-in content is well under half
+       * the viewport height (~565px of 844/1024/982), so a genuinely centred
+       * sheet lands within a pixel and a top-aligned one is out by hundreds.
+       */
+      const centring = await page.evaluate(() => {
+        const main = document.querySelector('main.gn-shell--centred');
+        if (main === null) return null;
+        const box = main.getBoundingClientRect();
+        const children = Array.from(main.children).map((child) =>
+          child.getBoundingClientRect(),
+        );
+        if (children.length === 0) return null;
+        return {
+          mainHeight: box.height,
+          viewportHeight: window.innerHeight,
+          childCount: children.length,
+          spaceAbove: Math.min(...children.map((c) => c.top)) - box.top,
+          spaceBelow: box.bottom - Math.max(...children.map((c) => c.bottom)),
+        };
+      });
+      if (centring === null) {
+        throw new Error(
+          '13.321: /sign-in has no `main.gn-shell--centred` with children. The centring ' +
+            'modifier is what the owner asked for; without it this case measures nothing ' +
+            'and would otherwise report a symmetric zero.',
+        );
+      }
+      expect(
+        centring.mainHeight,
+        `13.321: the sign-in main is ${centring.mainHeight}px tall in a ` +
+          `${centring.viewportHeight}px viewport, so there is nothing to centre WITHIN. ` +
+          'The `min-height: 100dvh` half of the rule is gone.',
+      ).toBeGreaterThanOrEqual(centring.viewportHeight - 1);
+      expect(
+        Math.abs(centring.spaceAbove - centring.spaceBelow),
+        `13.321: the sheet sits ${Math.round(centring.spaceAbove)}px from the top and ` +
+          `${Math.round(centring.spaceBelow)}px from the bottom of a full-height main ` +
+          `(${centring.childCount} children). It is anchored, not centred.`,
+      ).toBeLessThanOrEqual(2);
+
       // 13.293 — the adopted helper text is on the Email method only.
       await list.getByRole('tab', { name: 'Email link' }).click();
       await expect(

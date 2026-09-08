@@ -17,7 +17,7 @@ type Method = 'phone' | 'email';
  */
 export default function SignInPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
+    <Suspense fallback={<main className="gn-shell gn-shell--centred" />}>
       <SignInForm />
     </Suspense>
   );
@@ -95,7 +95,7 @@ function SignInForm() {
   const fail = (message: string | undefined) => setError(message ?? 'Sign-in failed. Try again.');
 
   return (
-    <main className="gn-shell">
+    <main className="gn-shell gn-shell--centred">
       <header className="gn-page-header">
         <div className="gn-page-header__icon" aria-hidden="true">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

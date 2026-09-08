@@ -28,7 +28,7 @@ ONLY.**~~ **SUPERSEDED 2026-09-08 (same day, one change set later).** `13.266`�
 and `13.276`–`13.280` are CONSUMED by the sign-in bucket (see that section at the foot of this file):
 the block was requested from the controller and used provisionally rather than waited on, because
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
-still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.320` free within it. The next free BLOCK after that is `13.321`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
+still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. The next free BLOCK after that is `13.327`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
@@ -1912,6 +1912,44 @@ the gate would have stayed 33/33.*
   only, not on Phone. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 - **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method
   (`emailAndPassword: { enabled: false }`). — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+## The owner's sign-in feedback round (2026-09-08) — items 1 and 3
+
+*Four items came back from the owner's live look at `/sign-in` on `ebb21aa`. Items 1 and 3 are here;
+item 2 (render only the auth methods that can actually work, then style them) is its own change set
+because the finding underneath it is a product gap, not a styling one.*
+
+- **13.321** ✅ The sign-in sheet is centred in the viewport — **both halves, measured from the live
+  box rather than the computed style.** (a) the `<main>` is at least the viewport height, and (b) the
+  space above its first child equals the space below its last within 2px. *Either assertion alone
+  passes on a broken page: a full-height container with the content pinned to the top satisfies (a),
+  and a shrink-to-fit container satisfies (b) trivially because its own padding is all the space
+  there is.* Asserting `justify-content: center` instead would have been the useless check — the card
+  was ALREADY `margin: 3rem auto` and therefore already centred horizontally, and a declaration does
+  not say which axis a reader sees. Mutation: deleting `justify-content` reddens (b) on all three
+  viewports; deleting the two `min-height` lines reddens (a). — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.322** ✅ `/privacy` carries a Back control, and **the branch that matters is the one without
+  history.** The accessible name is `Back to the previous page` while the visible word is `Back` —
+  asserted as containment, which is WCAG 2.5.3 (Label in Name) and what keeps voice control working.
+  With `history.length > 1` the control calls `router.back()` and never `push`; with `history.length`
+  driven to 1 it calls `push('/sign-in')` and never `back()`. *An unconditional `router.back()` is
+  indistinguishable from a correct control on every page a test navigates to — it fails only for the
+  reader who opened the link in a new tab, where `back()` is a silent no-op and the page appears
+  frozen.* Mutation: deleting the `history.length > 1` guard reddens the second case alone. —
+  (`apps/web/test/not-found-and-legal.test.tsx`)
+- **13.323** ✅ The same pair for `/terms`. Both pages get the case because both had the same defect:
+  they linked only to EACH OTHER, so a reader arriving from the sign-in card could cross between them
+  indefinitely without ever returning. — (`apps/web/test/not-found-and-legal.test.tsx`)
+
+> **The accessible-name floors for `/privacy` and `/terms` were RAISED in this change, deliberately.**
+> Both keys read `ariaLabel: 0` and the pages now carry one. The baseline writer refuses to overwrite
+> an existing key (`recordAccessibleBaseline`, `accessible-names.ts:63`) precisely so a regression
+> cannot re-baseline over itself, so raising it means deleting the key and letting the run record it —
+> which is what happened here, in this commit, for these two routes only. **Leaving the floor at 0
+> would have left 13.285 unable to see the new label disappear**, which is the same inertness 13.292
+> already records for an unlabelled button. Raising a floor only ever tightens the gate; lowering one
+> is the move that needs the argument.
+
 
 
 > ### Two things Task 2 corrected that belong to earlier PRs, recorded here because nothing else would

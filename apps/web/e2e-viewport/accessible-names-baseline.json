@@ -6,20 +6,6 @@
     "ariaDescribedby": 0,
     "rawMatches": 999
   },
-  "phone-390|/privacy": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 97
-  },
-  "phone-390|/terms": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 95
-  },
   "phone-390|/sign-in": {
     "ariaLabel": 0,
     "role": 3,
@@ -40,20 +26,6 @@
     "ariaSelected": 0,
     "ariaDescribedby": 0,
     "rawMatches": 999
-  },
-  "tablet-768|/privacy": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 97
-  },
-  "tablet-768|/terms": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 95
   },
   "tablet-768|/sign-in": {
     "ariaLabel": 0,
@@ -76,20 +48,6 @@
     "ariaDescribedby": 0,
     "rawMatches": 999
   },
-  "desktop-1512|/privacy": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 97
-  },
-  "desktop-1512|/terms": {
-    "ariaLabel": 0,
-    "role": 0,
-    "ariaSelected": 0,
-    "ariaDescribedby": 0,
-    "rawMatches": 95
-  },
   "desktop-1512|/sign-in": {
     "ariaLabel": 0,
     "role": 3,
@@ -103,5 +61,47 @@
     "ariaSelected": 0,
     "ariaDescribedby": 0,
     "rawMatches": 56
+  },
+  "phone-390|/privacy": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 98
+  },
+  "phone-390|/terms": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 96
+  },
+  "tablet-768|/privacy": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 98
+  },
+  "tablet-768|/terms": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 96
+  },
+  "desktop-1512|/privacy": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 98
+  },
+  "desktop-1512|/terms": {
+    "ariaLabel": 1,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 96
   }
 }
