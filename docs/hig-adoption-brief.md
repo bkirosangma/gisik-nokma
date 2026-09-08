@@ -196,9 +196,42 @@ concepts and should not be documented as if they were.
 2. **R1 and R2 were ruled on 2026-09-08:** borders dropped in favour of fill;
    iOS metrics with the caption step clamped to 12px. The artboards are built on
    those rulings.
-3. **Still to do:** apply §8 to `tokens.ts`, add the `border`-on-`surface` and
+3. ~~**Still to do:** apply §8 to `tokens.ts`, add the `border`-on-`surface` and
    `focusRing`-on-`surface` pairs to `CONTRAST_PAIRS`, re-run both probes, and
-   let `tokens.test.ts` confirm.
+   let `tokens.test.ts` confirm.~~ **SPLIT IN TWO on 2026-09-08, and the split is
+   not cosmetic — see below.**
 
 Step 3 is the only one that touches shipping code, and it is where the 326
 selectors and two ratcheted baselines get moved.
+
+### Step 3a — the palette (DONE, 2026-09-08)
+
+§8 applied to `packages/ui/src/tokens.ts`; both probes re-run; `tokens.test.ts`
+confirms every declared pair in both themes. Four values deliberately are not
+Apple's and the file says why at each: `green700` kept by owner ruling (Apple's
+`#248A3D` is the one pair that fails, `successText` at **4.40** vs 4.5, against
+the incumbent's **5.40**); the border primitives untouched (step 3b); the dark
+status inks untouched (§8 is silent on them and all clear); and `textMuted`
+solid rather than the alpha this brief flags as *"a reconstruction, not a
+citation"*. `categoryOpen` also stopped sharing a primitive with `textMuted` —
+Apple's accessible grey is right for a chip dot at 3:1 and **fails the text job
+at 4.16 on `surfaceSunken`**, so one grey could not hold both. Cases
+**13.281–13.282** pin the two departures against the tidy-up that would undo
+each.
+
+### Step 3b — the border story, ATOMIC (not yet done)
+
+**The `border` remap and the two new `CONTRAST_PAIRS` rows must land in the SAME
+change as the removal of the border declarations**, and must NOT land with the
+palette. Ruling R1(c) drops borders in favour of fill, so the `border` role has
+to be remapped to a grey that clears 3:1 — it must be honest if used — while the
+declarations that would paint it are removed. Doing only the first would give
+every card, chip, table cell and column a heavy dark rule and **no gate would
+object, because a *darker* border fails nothing.** That state would sit on
+`main` between two PRs while the product is being tested by hand.
+
+The measurement that sweep starts from, taken at the palette change: `border` on
+`surface` is **1.34** light and **1.49** dark, against the 3:1 WCAG 1.4.11 holds
+a non-text UI component to. Adding the pair without the remap is a red gate;
+adding the remap without the sweep is a visibly broken product; doing both at
+once closes the gap that hid 17 of 24 bordered classes.
