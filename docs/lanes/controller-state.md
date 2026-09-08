@@ -1,5 +1,50 @@
 # Cross-lane controller — live state
 
+## ⏹ TUESDAY ~19:2x IST — **CONTROLLER RESTART DIRECTED BY THE OWNER. If you are the fresh controller, this entry is your position; read it, then the entry below it, then `gisik-nokma-lanes/CTL-DISPATCH-2026-09-08-signin-feedback.md`.** `main` is `cb03d9e` + this anchor, gate GREEN, executor on Task 2b at ctx ~19%, **zero open PRs.**
+
+### THE RESTART MECHANICS, because the obvious script is destructive right now
+
+**Do NOT run `do-restart.sh` (`…/825a1eb5-…/scratchpad/do-restart.sh`) or `tmux kill-session`.** Both
+kill the WHOLE `gisik` session — the executor included — and the executor is mid-Task-2b with work that
+may be uncommitted. The controller lives in `gisik:0`; a controller-only restart is:
+
+    tmux respawn-window -k -t gisik:0 "cd /Users/kiro/my_projects/gisik-nokma && claude --model <model> --permission-mode bypassPermissions \"\$(cat /Users/kiro/my_projects/gisik-nokma-lanes/dispatch-controller-serial.md)\""
+
+`respawn-window -k` is executed by the tmux server, not by the dying shell, so the `&&`-never-runs trap
+does not apply. The owner switched the controller to **Fable 5.1** earlier today (`/model`), overriding
+the 2026-09-02 "Sonnet for the loop" ruling for the controller only; the executor stays Opus.
+
+### THREE OWNER DECISIONS TAKEN THIS ENTRY — all on disk, none in anyone's head
+
+1. **Google AND Apple credentials will be provisioned by the owner.** The checklist — portal steps, the
+   exact redirect URIs (the API host, port 3000 / `pm-api.artsourced.in`, not the web host), the four
+   Apple artefacts (Team ID, App ID, Services ID = web client id, `.p8` key + Key ID), where each value
+   lands (compose env / DO secrets / `.env.example`), and the one thing the executor must confirm from
+   the installed package (whether better-auth's `apple` provider takes a pre-signed JWT or key
+   material) — is `gisik-nokma-lanes/CTL-NOTE-2026-09-08-credentials.md`. **Apple cannot be tested on
+   `localhost`** (HTTPS + verified domain required); Google can. Both ship env-gated and inert via
+   Task 2b.
+2. **Passkey registration is scoped as Task 12 of the plan** (`docs/superpowers/plans/2026-09-08-
+   hig-per-screen.md`), opus, **after Task 2b and the owner's second look**: an `/account` page whose
+   first section is Passkeys, `@better-auth/passkey` 1.7.2's `addPasskey` / `listUserPasskeys` /
+   `deletePasskey` (confirmed in the installed package), and the load-bearing case **13.330** — a CDP
+   virtual authenticator registers a passkey in the stack suite and the conditional sign-in then
+   succeeds without a magic link; skip registration → RED. **Case block `13.327`–`13.332`** allocated.
+3. **The controller restarts** (this entry).
+
+### FOR THE FRESH CONTROLLER — first actions, in order
+
+1. Arm the open-PR `Monitor` (the brief's "Reaching the executor" section; emit on change only).
+2. **Every exit code you act on: `rtk proxy <cmd>` or the log's last line, never `$?` after a bare
+   proxied command.** Three false greens today; the entry below records them.
+3. Task 2b's PRs arrive in two: (1+3, sonnet, small) then (2, opus). Merge each with the **partitioned**
+   drop check (`main` has advanced past the executor's branch by this anchor — the one outside file
+   will be `controller-state.md`, attributable here). After item 2 merges: **rebuild web** (`docker
+   compose -f docker-compose.dev.yml build web && … up -d web`), verify the bundle **control-first**,
+   hand the owner `http://localhost:3001/sign-in`, and **hold for their second look before 3a.**
+4. Then Task 12, then 3a onward — one at a time, owner review between screens.
+5. Flip the ledger row to `done` with the merge sha **at every merge** — this controller missed it twice.
+
 ## ▶ TUESDAY ~19:0x IST — TASKS 1 AND 2 MERGED; THE OWNER LOOKED AT THE LOGIN SCREEN AND FOUND SOMETHING THE AUDIT HAD NOT: **two of the four visible sign-in options cannot work.** `main` is `ebb21aa`, gate GREEN, executor RESTARTED at ctx 82% and now on Task 2b (the feedback round). **Three proxy false-greens of mine today are recorded below; read them before trusting any `EXIT=` line in this file's history.**
 
 ### THE OWNER'S LOOK, and what it exposed

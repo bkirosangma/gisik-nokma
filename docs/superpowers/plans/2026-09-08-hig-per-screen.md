@@ -896,6 +896,64 @@ git commit -m "Sign-in on the HIG surface, with all four methods and no password
 
 ---
 
+### Task 12: Passkey registration — the flow that makes "Sign in with a passkey" true
+
+**Model: opus / high.** Auth-path feature; the sign-in side is the honesty case. **Owner-scoped
+2026-09-08** after their live look found the passkey button was a dead end for every user: the product
+shipped sign-in via passkey with **no way to register one** — the only `addPasskey` in the tree was inside
+`@better-auth/passkey`'s own client bundle.
+
+**Spec:** `@better-auth/passkey` 1.7.2 client, methods confirmed in the installed package:
+`addPasskey`, `listUserPasskeys`, `deletePasskey`, `updatePasskey`; server plugin already wired with
+`rpID = new URL(baseUrl).hostname` and `rpName: 'Gisik Nokma'` (`auth.ts:295-297`). Task 2b already
+moved sign-in to conditional UI (`autoFill`), which shows a passkey only when one exists — so this task
+is what makes that option ever appear.
+
+**Files:**
+- Create: `apps/web/app/account/page.tsx` — a signed-in account page whose first (and for now only)
+  section is **Passkeys**. `/account` is the default; the owner may rename it. Reachable from `AppNav`
+  beside `Sign out {user.name}` (`app-nav.tsx`), which keeps it inside the accessible-name ratchet's
+  signed-in population.
+- Create: `packages/app-core/src/account/passkeys.tsx` — the list + add + delete view, framework-free
+  like its siblings under `packages/app-core/src/`.
+- Modify: `apps/web/src/app-nav.tsx` (one link), `Features.md` (locate by path per Global Constraints —
+  there is no account bullet yet; add beside the sign-in bullet), `test-cases/13-deployment-dogfooding.md`.
+
+**Case ids:** `13.327`–`13.332` (a new block, allocated 2026-09-08; the plan's original block ends at
+`13.320` and Task 2b holds `13.321`–`13.326`). Move the header pointer to `13.333`.
+
+**Behaviour, each pinned by a case:**
+- **13.327** — the Passkeys section lists the signed-in user's passkeys via `listUserPasskeys`, and an
+  empty list renders the named empty state `You have no passkeys yet.` with the add control — never a
+  blank region (the audit's happy-path finding applies here too).
+- **13.328** — **Add a passkey** calls `addPasskey({ name })` with a user-supplied label (default: the
+  browser/OS name), and the new row appears without a reload. Any refusal from the server or the
+  authenticator is carried verbatim in a `role="alert"` paragraph — the product's rule, not
+  "something went wrong".
+- **13.329** — Delete asks nothing clever: one control per row, calls `deletePasskey({ id })`, the row
+  goes. A server refusal is shown verbatim.
+- **13.330** — **The end-to-end witness, and the only reason to believe the rest:** in the stack suite,
+  attach a virtual authenticator over CDP (`WebAuthn.enable`, `WebAuthn.addVirtualAuthenticator` with
+  `protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true,
+  isUserVerified: true`), sign in by magic link, register a passkey on `/account`, sign out, and on
+  `/sign-in` the conditional UI signs in **without** a magic link. Mutation: skip registration → the
+  conditional sign-in must NOT succeed (RED). This is the case that proves Task 2b's sign-in change is
+  honest rather than merely quiet.
+- **13.331** — the accessible-name ratchet (13.287) rises, never falls, on `/account`: every row's
+  delete control carries `aria-label="Delete passkey {name}"`.
+- **13.332** — signed-out `/account` renders `ExpiredSessionNotice` / the sign-in redirect, never a
+  blank page — the same treatment as every other signed-in route.
+
+**Not in scope:** rename/edit of a passkey (`updatePasskey` exists; leave it unwired and say so in the
+catalogue), and any cross-device / QR flow.
+
+- [ ] Write 13.330 first (it is the red test that defines done), then 13.327–13.329, then the UI.
+- [ ] Mutation for 13.328: drop the `role="alert"` on the refusal path → RED, and 13.331 must also fire.
+- [ ] Gate, six checks raw, stack suite, catalogue + `Features.md` same commit. Commit:
+  `"Passkeys can be registered, so signing in with one is no longer a dead end"`.
+
+---
+
 ## Execution order and merge cadence
 
 `0 → 1 → 2 → {3a→3b} → {4a→4b} → {5a→5b} → 9 → {6a→6b} → {7a→7b} → {8a→8b} → 10 → 11`. Sign-in (2) goes early because the owner has a reference image for it; List (9) follows the project page it borrows from. Each task is its own PR, controller-merged, with the forced gate re-run at each new `main`. **Task 0 merges before anything else is dispatched** — it is the gate that makes sonnet dispatch safe, and its absence is the reason every earlier restyle in this repo has needed an opus reviewer to catch a dropped affordance.
