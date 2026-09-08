@@ -337,6 +337,105 @@ Cases 12.394–12.396, three mutations, three killed. Gate **33/33 EXIT 0, `Cach
 **v22.22.2**; five checks EXIT 0. Pre-launch item 6's "recorded for the owner, not fixed" note is now
 marked CLOSED with what replaced it.
 
+
+# ▶ TUESDAY 2026-09-08 ~05:0x IST — **SIGNED-IN TAP TARGETS 7 → 6, AND A TARGET IS A BOX.**
+
+*Folded into `exec/116-tap-targets` / PR #328 rather than opened as a fifth PR — same item, same files,
+one merge instead of two. #328's sha moved from `a107ba2` to `5924f5c`; it needs re-confirming.*
+
+**Forcing the ratchet to 0 to print all seven offenders, instead of re-reading the smallest, is what
+finished this.** The list was not what the previous fix assumed:
+
+```
+ 39x44  a.gn-nav__inbox "Inbox"          <- tall enough, six pixels too NARROW
+249x23  button.gn-attention__title  (x4)
+249x23  button.gn-my-work__title    (x2)
+```
+
+`.gn-nav a, .gn-nav button` had only `min-height`. **A tap target is a box**, a short word is a narrow
+target, and the COUNT was 7 either way — same shape as the `340x38` miss, one axis over. The six title
+buttons went to 24px (2.5.8) and deliberately not 44: bare text buttons on a shared baseline with a
+chip and a reason, where 44px turns a compact strip into slabs.
+
+**A control that used a different input than the measurement, again.** A stack run timed out at
+sign-in; I probed `/api/auth/sign-in/magic-link` directly, got **200**, and reported "not the rate
+limit". The next run failed with an explicit **429 — for `accountant@…`, while I had probed
+`kiro@…`**, which still had budget. Same endpoint, different input, so the control certified nothing.
+`RATE_LIMIT_AUTH_MAX=60` per `RATE_LIMIT_WINDOW_SEC=60` in the dev stack, and I had spent it on
+back-to-back suite runs. Waiting out the window cleared it and the ratchet held at 6.
+
+**And one gate result that was NOT mine, checked rather than waved past.** The forced gate went 32/33
+with a single failure — `7.151`, a websocket heartbeat timing case — at load average **36**, alongside
+1426 passes. This branch changes CSS and docs, which cannot touch a heartbeat, but that is an argument
+from plausibility. `apps/server/test/stream/` alone on a quiet machine: **42 passed, 0 failed**, with
+7.151 confirmed to live in `stream-route.test.ts` under that directory rather than assumed to. Full
+forced gate re-run at load 3.82: **33/33 EXIT 0**.
+
+
+# ▶ TUESDAY 2026-09-08 ~03:5x IST — **THE SIGNED-IN SHELL'S TAP TARGETS NOW HAVE A GUARD (9 → 7).**
+
+*Same branch as the signed-out work, `exec/116-tap-targets` / PR #328.*
+
+The pre-launch review's "48 elements under 24×24 on the board" lived **only in a prose note**:
+`e2e-stack/viewport.spec.ts` measured overflow and nothing else, and the unauthed suite cannot see those
+pages. It now carries the same sweep, threshold and ratchet. `/my-work` at 390px: **9 offenders, then 7**
+once `.gn-nav a, .gn-nav button` reached 44px.
+
+**A spec is not a library.** Importing the sweep from `responsive.spec.ts` made Playwright load that
+spec's `test()` registrations into the stack config — six `project "" has no entry in VIEWPORTS`
+failures, from an import that typechecked. It lives in `e2e-viewport/tap-targets.ts` now, and the move
+was verified not to shift a number: the unauthed suite re-ran 19 passed, byte-identical.
+
+**Two environment facts this cost real time to learn again:**
+
+1. **The compose `web` container serves a PRE-BUILT image.** Every CSS change needs
+   `docker compose up -d --build --wait web` — about six minutes — before the stack suite can see it. A
+   measurement taken before that rebuild is a number for code that is not in the image, and it looks
+   exactly like a fix that did not work.
+2. **The Docker VM filled again mid-rebuild** (`ENOSPC` during `pnpm install`). Reclaimed **15.1GB of
+   BUILD CACHE ONLY** — never images, never volumes, because the volumes hold the seeded world.
+
+**Left unshipped on purpose:** the remaining 7 are attention-row titles at `249x23`, which by this
+change's own rule should go to 24px. Verifying one more CSS rule costs another full rebuild on a disk
+that just filled, and shipping it unverified is the failure mode this whole session keeps catching. The
+reading is recorded so the next person starts from a number.
+
+**A gate run taken mid-rebuild came back 31/33** with 104 test FILES failed but only 16 test failures
+and 1048 skipped, at load average **67**. That is contention, not a defect — re-run at load 2.73:
+**33/33 EXIT 0, `Cached: 0`**, Node **v22.22.2**.
+
+
+# ▶ TUESDAY 2026-09-08 ~03:4x IST — **TAP TARGETS: 60 OFFENDERS TO 42, `/sign-in` TO ZERO (owner-assigned).**
+
+*Off `main`, independent of #323–#327. Overlap is narrative only.*
+
+| route × viewport | before | after |
+|---|---|---|
+| `/sign-in` × all three | 6 each | **0 each** |
+| `/help` × phone / tablet / desktop | 10 / 16 / 16 | unchanged, deliberately |
+| **total** | **60** | **42** |
+
+Three fixes, each from a reading: `.gn-button` was **`340x38`** — six pixels short *everywhere it is
+used*, the single largest source of offenders in the product; `.gn-view-tabs button` **`55x21`** (the
+same class carries the board's view tabs, measured at `52x21` in the pre-launch review — one rule, both
+surfaces); `.gn-sign-in__method label input` **`340x21`**.
+
+`/help` stays. Its offenders are TOC links raised **23px → 24px**, which is WCAG **2.5.8**'s floor; the
+suite enforces **2.5.5**'s enhanced 44px, and nineteen TOC entries at 44px is 836px tall on a phone.
+Dense in-list links use 24, standalone controls 44.
+
+**Two things that cost a round each, worth inheriting:**
+
+1. **A `python3` `.replace()` with no assertion is a silent no-op.** The first `.gn-button` attempt
+   matched whitespace-collapsed text that existed only in my own earlier `print`. Nothing was edited,
+   and the RE-MEASUREMENT — unchanged at `340x38` — is what said so before the assertion did.
+2. **`UPDATE_TAP_BASELINE=1` does not lower a number.** `recordTapBaseline` writes only ABSENT keys, by
+   design, so a branch that made things worse cannot re-baseline upward; falling numbers need the file
+   DELETED first, which its own docblock says. Two runs reported "0 removed" before that was read.
+
+Gate **33/33 EXIT 0, `Cached: 0`**, Node **v22.22.2**; five checks EXIT 0. Viewport suite 19 passed at
+the new baseline. The board's own counts still need the authenticated stack.
+
 # ▶ TUESDAY 2026-09-08 ~04:2x IST — **THE LEDGER IS 190/190, AND THE GATE CAN NOW SEE A ROW THAT LIES.**
 
 *Off `main` (`2df88e8`), independent of #325–#328.*

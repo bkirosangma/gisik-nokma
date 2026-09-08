@@ -318,6 +318,16 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   rather than a contrast failure — the light palette is internally consistent, so nothing fails a ratio —
   and fixing it means deciding how the native app learns the OS preference. **Recorded for the owner, not
   fixed**, because it is a design decision rather than a defect with one obvious remedy.
+- **Tap targets: PARTLY CLOSED 2026-09-08** (owner-assigned). The shared `.gn-button` (`340x38`), the
+  view tabs (`55x21`) and the sign-in inputs (`340x21`) now meet 44px, taking the signed-out ratchet
+  from **60 offenders to 42** and `/sign-in` to **0** on all three viewports. `/help`'s table-of-contents
+  links went 23px → 24px — WCAG 2.5.8's floor — and deliberately not to 44px, because nineteen entries
+  at 44px is 836px tall on a phone. The signed-in shell now has a ratchet too — it had **none**, since
+  `e2e-stack/viewport.spec.ts` measured overflow only. `/my-work` at 390px: **9 offenders, then 7**
+  after the nav links went to 44px. The remaining 7 are attention-row titles at `249x23` — dense
+  in-list controls that should go to 24px by the same rule as `/help`'s TOC, left unshipped because
+  verifying one more CSS rule against the pre-built container costs a full rebuild. Original note
+  kept below.
 - **Type scale: CLOSED 2026-09-08** (owner-assigned, the other half of the tap-target ruling). The
   first thing this pass established is that **nothing in the repo could measure the finding below.**
   `responsive.spec.ts` has swept body copy against a 16px floor since item 7, but its population is
