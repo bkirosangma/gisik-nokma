@@ -23,10 +23,12 @@
  * storage `blr1`, and the app's Asia/Kolkata clock are all set there.
  */
 import Link from 'next/link';
+import { BackButton } from '../../src/back-button.js';
 
 export default function PrivacyPolicy() {
   return (
     <main className="gn-shell gn-legal">
+      <BackButton />
       <h1 className="gn-legal__title">Privacy Policy</h1>
       <p className="gn-legal__meta">
         Last updated <strong>[DATE]</strong> · Operated by <strong>[ENTITY NAME]</strong> ·

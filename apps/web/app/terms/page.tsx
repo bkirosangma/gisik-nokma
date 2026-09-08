@@ -23,10 +23,12 @@
  * to be minimised.
  */
 import Link from 'next/link';
+import { BackButton } from '../../src/back-button.js';
 
 export default function Terms() {
   return (
     <main className="gn-shell gn-legal">
+      <BackButton />
       <h1 className="gn-legal__title">Terms &amp; Conditions</h1>
       <p className="gn-legal__meta">
         Last updated <strong>[DATE]</strong> · An agreement between you and{' '}

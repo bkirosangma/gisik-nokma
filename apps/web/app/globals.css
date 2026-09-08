@@ -119,7 +119,48 @@ button { font: inherit; }
   min-width: 2.75rem;
 }
 
-.gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-radius: 16px; }
+/* ── The sign-in sheet is centred in the viewport (owner, 2026-09-08). ──────
+
+   THE MODIFIER GOES ON THE SIGN-IN `<main>`, NOT ON `.gn-shell`. Every other
+   screen in the product scrolls, and a global `min-height` would centre a long
+   policy page's first screenful and leave the rest below the fold with no
+   visual anchor. The prototype's own `.sheet` is a full-height centring flex
+   container and that is what this reproduces, scoped to the one route.
+
+   TWO `min-height` DECLARATIONS, DELIBERATELY. `100dvh` is the DYNAMIC
+   viewport height — on mobile Safari `100vh` is the LARGEST viewport, the one
+   with the toolbars retracted, so a `100vh` sheet sits partly under the toolbar
+   on first paint. `100vh` is declared FIRST as the fallback: an engine that
+   does not parse `dvh` discards the second declaration and keeps the first,
+   while an engine that does parse it takes the later one. Dropping the `100vh`
+   line would leave old engines with no height at all.
+
+   `> *` GIVES ALL THREE CHILDREN ONE COLUMN. The header, the card and the legal
+   line are siblings; `align-items: center` alone would shrink each to its own
+   content width and the three would not share an edge. 26rem is the card's own
+   `max-width`, restated here as the column's rather than inherited by accident.
+
+   The vertical padding is set as LONGHANDS so the `@media (max-width: 60rem)`
+   shorthand above (`padding: 0 0.75rem 2rem`) keeps supplying the narrow-screen
+   HORIZONTAL padding — a shorthand here would have silently reinstated
+   1.25rem sides on a phone. */
+.gn-shell--centred {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+.gn-shell--centred > * { width: 100%; max-width: 26rem; }
+
+/* `margin: 3rem auto` was what centred this card horizontally and pushed it
+   down the page. The centring container now owns both axes, and a residual
+   3rem top margin would offset the sheet from true centre by half of it. */
+.gn-sign-in { max-width: 26rem; margin: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-radius: 16px; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
@@ -154,6 +195,17 @@ button { font: inherit; }
   padding-top: 2rem;
   padding-bottom: 4rem;
 }
+
+/* The way back off a legal page. Both pages linked only to EACH OTHER, so a
+   reader who arrived from sign-in could reach Terms from Privacy and Privacy
+   from Terms and never return to what they were doing. The control sits above
+   the title because that is where a reader looks for it, and it is left-aligned
+   in its own row so it never reads as part of the heading. */
+/* No `align-self`: `.gn-legal` is a block container, not a flex one, so the
+   property would have parsed, applied to nothing, and read as deliberate. The
+   button is `inline-flex` from `.gn-button` and therefore already sits at the
+   left of its own line; only the gap under it needs stating. */
+.gn-legal__back { margin-bottom: 1rem; }
 
 .gn-notfound__title,
 .gn-legal__title {
