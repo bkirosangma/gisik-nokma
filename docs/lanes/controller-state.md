@@ -1,5 +1,90 @@
 # Cross-lane controller — live state
 
+## ▶ TUESDAY ~16:2x IST — **WORK RESUMED; THE ENTRY BELOW SAYING IT STOPPED IS SUPERSEDED.** HIG adoption: palette and border sweep LANDED, the reconciliation audit is IN, and it says **no prototype can be applied literally**. `main` is `07c6cc0`, gate GREEN, zero open PRs, executor HOLDING on two owner decisions.
+
+**The stop was real and lasted about twenty minutes.** The owner resumed with *"merge #351 and apply the
+styling."* Anyone reading the ⏹ entry below in isolation would conclude work ended there; it did not.
+
+### THE AUDIT IS THE IMPORTANT ARTEFACT, and it vindicates sequencing it BEFORE the restyle
+
+`docs/hig-reconciliation-audit.md`, 851 lines, 23 prototypes. **All 23 BOTH invent functionality that
+does not exist AND omit functionality that does** — **108 invented, 116 dropped, 50 copy, 49 styling.**
+
+**The systematic finding, which is bigger than any single screen: THE PROTOTYPES ARE HAPPY-PATH ONLY.**
+41 of the dropped items are loading, empty, signed-out, expired, refusal or error states. **Not one
+prototype depicts a failure.** This product's entire character lives in those states — a refusal that
+says why, an empty state that says what to do next, a server message carried verbatim rather than
+replaced with "something went wrong". **Restyling from these mockups would have quietly stripped the
+honesty machinery and left a happy path that looked finished.** No gate would have objected: every one of
+those states is reachable only by a condition tests set up deliberately.
+
+**Two findings worth carrying past this task:**
+- **`emailAndPassword` is `{ enabled: false }` at `auth.ts:84` — "the spec forbids passwords".** So the
+  prototype's Password tab is not merely absent, it is FORBIDDEN; building it would require adding an
+  auth method the spec rules out, while deleting three that work. **Verified by me, not accepted.**
+- **The executor's line, which generalises:** *"A permission control that is invisible in the mockup is a
+  permission control someone deletes while matching the design."* `Members` shows a populated table where
+  the real page runs a three-state admin check with a refusal panel.
+- **A fourth view, `List`, has no artboard at all** while Board/Calendar/Timeline do. Verified. The audit
+  is careful that this reads as "not designed yet" rather than "deliberately removed" — and which one a
+  future reader assumes is exactly the kind of gap that becomes a silent deletion.
+
+### WHAT LANDED
+
+- **#351** — the prototypes, `tokens.json`, the HIG brief. Held for owner review first because *"every
+  screen on Apple HIG"* is a product design direction; the owner approved it explicitly.
+- **#353 (Phase 1, tokens)** — Apple's accessible variants adopted: `paper #f2f2f7`, `sand #e5e5ea`,
+  `ink #000000`, `inkMuted #3c3c43`. **Four deliberate deviations**, each reasoned. `green700 #1e7a34`
+  KEPT because Apple's green is the single pair that fails (`successText` 4.40 vs 4.5).
+- **#354 (Phase 2, borders)** — atomic remap + removal + both new `CONTRAST_PAIRS` rows.
+  **The 17-of-24 non-text defect is CLOSED: 13-of-20 below 3:1 → 0 of 6** on the executor's own
+  instrument. Twelve classes left the roster entirely rather than being recoloured, which is what R1(c)
+  was for.
+- **#355** — the audit.
+
+### RULINGS MADE THIS STRETCH
+
+- **R1 = (c), drop borders, separate by fill** — and it was answered by the DESIGN, not by argument:
+  across 23 prototypes there are **18 `border:none` and zero borders on any control.**
+- **Control affordance: solid-fill ghost button, NOT a boundary on controls.** I overruled the executor's
+  R1(b)-scoped-to-controls. Its reasoning — *"an option priced as unacceptable is sometimes an option
+  scoped too widely"* — is good and worth keeping, but the narrow scope puts the heavy rule on the MOST
+  visible elements, so shrinking the population concentrates the cost rather than reducing it.
+- **Phase sequencing: the border story must be ATOMIC.** Remapping `border` to the clearing grey in the
+  token PR while the declarations still existed would have grown a heavy dark rule on every card, chip,
+  cell and column — **and no gate would object, because a DARKER border fails nothing.** The executor's
+  own words: *"a gate cannot see a state that is visually wrong and numerically fine."*
+
+### THREE THINGS THE EXECUTOR GOT RIGHT THAT NO GATE COULD HAVE
+
+1. **It caught that dropping borders globally makes ghost buttons invisible** — their fill is 1.09
+   against the page, so the border was the only thing identifying them as controls. It flagged rather
+   than shipped.
+2. **It found the distinction my ruling lacked:** the accent-label argument does NOT transfer to an
+   **empty text field**, which has no label to do the identifying. So inputs keep their borders and
+   buttons do not. Better reasoning than the ruling it was given.
+3. **It refused to move a goalpost.** Its guard `13.283` asserted a population >20 and the sweep shrank
+   it to 19. It did not lower the threshold — it replaced it with a **same-path control**: the same
+   sweep, same page, re-run at 25:1, which must still report offenders. *"Zero below 3 and zero below 25
+   means the instrument is dead."*
+
+### GATES
+
+`c71e58b`: 33/33, `Cached: 0`, ui suite 87. `863c11d`: 33/33, `Cached: 0`, ui suite 94, six checks EXIT
+0, ids 1,796, zero orphaned workers. **Both forced by me because the branch's own run was 15-of-33
+cached** — a cache replaying green is a documented hazard here.
+
+### BLOCKED ON THE OWNER — executor is holding, nothing started
+
+1. **The 50 copy divergences.** Standing rule: the executor may not silently reword shipped copy. Needs
+   either owner review or a delegated rule.
+2. **The happy-path gap.** Per-screen work now means **DESIGNING the missing failure states** in the new
+   language, not restyling what is drawn. That is a materially bigger job than "apply the mockups" and
+   the owner has not yet scoped it.
+
+**Live stack is CURRENT** — both phases are in the running containers (built from the branch pre-merge;
+verified by content, `f2f2f7` ×22 and `6c6c70` ×22, with a control).
+
 ## ⏹ TUESDAY ~15:0x IST — **AUTONOMOUS EXECUTION STOPS HERE, BY OWNER INSTRUCTION.** `main` is `2607191`, gate GREEN, zero open PRs except **#351 deliberately held**. The owner is moving to manual feature testing. This is a deliberate stopping point, not an interruption.
 
 ### ⛑ THE ONE THING A FUTURE LANE MUST READ: case block `13.276`–`13.280` IS ALLOCATED. Do not renumber it.
