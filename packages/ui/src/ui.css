@@ -352,8 +352,11 @@
 .gn-transition__notice { color: var(--gn-text-muted); }
 .gn-transition__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .gn-refusal { border-radius: 6px; padding: 0.5rem 0.7rem; }
-.gn-refusal--preview { border: 1px dashed var(--gn-warning); color: var(--gn-text); }
-.gn-refusal--server { border: 1px solid var(--gn-danger); color: var(--gn-text); }
+/* Tinted fills, not borders (R1(c)). A refusal must be unmistakable: the fill
+   carries the tone, the text carries the reason. `--gn-fill-secondary` is the
+   16% grey; tone comes from the left rule, which is a fill, not a border. */
+.gn-refusal--preview { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
+.gn-refusal--server  { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger);  color: var(--gn-text); }
 
 .gn-attachments { list-style: none; margin: 0.8rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-attachment { display: flex; flex-direction: column; gap: 0.1rem; }
@@ -1345,4 +1348,120 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .gn-help__tab { transition: none; }
+}
+
+/* ── Segmented control (HIG method/view picker). Fill track, raised segment.
+   Replaces `.gn-view-tabs`. No border anywhere (R1(c)). ───────────────── */
+.gn-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--gn-fill-tertiary);
+}
+.gn-segmented__item {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.gn-segmented__item--on {
+  background: var(--gn-surface-raised);
+  font-weight: 600;
+  box-shadow: 0 3px 8px var(--gn-shadow);
+}
+.gn-segmented__item:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Field: label above a filled input. The input KEEPS its border — an empty
+   field has no label inside it to do the identifying (13.284's argument does
+   not transfer; ruled on PR 354 — written without the hash so the colour
+   scanner never has to decide whether a PR number is a hex value). ─────── */
+.gn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.gn-field__label {
+  font-size: 0.8rem;
+  color: var(--gn-text-muted);
+}
+.gn-field__input {
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 8px;
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 1rem;
+}
+.gn-field__input::placeholder {
+  color: var(--gn-text-muted);
+}
+.gn-field__input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* ── The ghost button gets its own rule at last. It had none, and the plan's
+   reason for adding it — "the 2.49:1 border was its only affordance" — was
+   TRUE OF THE PRE-#354 TREE AND IS NOT TRUE NOW, which review caught before
+   this shipped. That border came off in the border sweep, and the base
+   `.gn-button` above already carries `border: none`, the tertiary fill, the
+   accent colour and weight 600, so a ghost button has rendered correctly since
+   #354 — `button.tsx` always emits `gn-button gn-button--ghost` together and
+   never the modifier alone.
+
+   So every declaration here duplicates the base and this rule changes NOTHING
+   today. It is kept, explicitly, for one reason: `.gn-button--ghost` is what
+   the variant MEANS, and pinning it here is what makes 13.289 able to say so.
+   It is not repairing anything. ─────────────────────────────────────────── */
+.gn-button--ghost {
+  background: var(--gn-fill-tertiary);
+  border-color: transparent;
+  color: var(--gn-accent);
+  font-weight: 600;
+}
+
+/* ── Page header: icon tile, title, tagline. Opt-in per screen. ─────────── */
+.gn-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.gn-page-header__icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 14px;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.4rem;
+}
+.gn-page-header__title {
+  margin: 0;
+  font-size: 2.1rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.gn-page-header__tagline {
+  margin: 0;
+  color: var(--gn-text-muted);
 }

@@ -1860,3 +1860,21 @@ the gate would have stayed 33/33.*
 > accessible name for another of equal count passes here, and should — whether the new words are better
 > is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
 > can be mechanised and the half a delegated implementer is most likely to cause by accident.
+
+## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
+
+- **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one
+  `role=tab` per option, `aria-selected` true on exactly the chosen one, and calls `onChange` with the
+  clicked value — the exact roles `.gn-view-tabs` carried, so replacing it registers no loss on 13.285.
+  — (`packages/ui/test/components.test.tsx`)
+- **13.289** ✅ A ghost button renders as fill plus an accent 600 label with **no painting border on either rule** — the modifier AND the base, because `button.tsx` always emits them together and a boundary reintroduced on the base would reach the screen while a modifier-only assertion stayed green.
+  *The plan justified this case with "its 2.49:1 border was its only affordance". **That was true of the pre-#354 tree and is false now** — the border sweep removed it and the base `.gn-button` has carried `border: none` plus the fill, accent and weight ever since, so the new modifier rule is inert duplication that repairs nothing. Corrected here rather than left standing, because this file is read later as a record of what the tree used to be.*
+  *And the guard the plan shipped could not have caught what it names: `not.toMatch(/border:\s*1px/)` sees only the shorthand, so **`border: 2px solid` beside a `border-color: transparent` passed green**, demonstrated. Widened to any border longhand that PAINTS — `-color` and `-radius` excluded because neither draws one, and `none`/`0` excluded because they are how a rule says there is no border, which the first draft of the regex forbade and went red against a correct file.*
+  affordance), is fill `--gn-fill-tertiary` + accent 600 label with `border-color: transparent`.
+  Mutation-witnessed: restoring a border reddens it by name. — (`packages/ui/test/components.test.tsx`)
+- **13.290** ✅ `.gn-refusal--preview` / `--server` carry tone as `inset 4px 0 0` box-shadow fills, and
+  *Same widening as 13.289, and it was needed here too: the shipped `/\bborder:/` let **`border-left: 4px solid` beside the inset shadow** pass green — a visible rule on the one panel whose whole job is to look like content rather than decoration.*
+  declare no `border`. The honesty panels are the last thing that should look decorative. —
+  (`packages/ui/test/components.test.tsx`)
+- **13.291** ✅ `.gn-field__input` keeps `border: 1px solid var(--gn-border)` — the one R1(c) exception,
+  because an empty field has no label to identify it. — (`packages/ui/test/components.test.tsx`)

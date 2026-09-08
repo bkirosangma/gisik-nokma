@@ -269,10 +269,35 @@ describe('11.118 every class the menu renders is a class ui.css styles, and the 
     // custom property the block references must already be referenced
     // elsewhere in the stylesheet.
     const bare = stripComments(css);
-    const blockStart = bare.indexOf('.gn-saved-filters {');
-    expect(blockStart).toBeGreaterThan(-1);
-    const block = bare.slice(blockStart);
-    const outside = bare.slice(0, blockStart);
+    expect(bare.indexOf('.gn-saved-filters {')).toBeGreaterThan(-1);
+    /*
+     * THE BLOCK IS THE RULES THAT NAME IT, NOT THE REST OF THE FILE.
+     *
+     * This read `bare.slice(blockStart)` — everything from `.gn-saved-filters`
+     * to EOF — which was harmless only while this block happened to be last in
+     * the stylesheet. It stopped being last when the HIG shared pieces were
+     * APPENDED (Task 1), and the test then failed claiming
+     * `--gn-fill-quaternary` was "a NEW role" invented by the saved-filters
+     * block. It is used once, in `.gn-field__input`, 300 lines below anything
+     * this test is about.
+     *
+     * That was a real failure of a real property — a role drawn with in exactly
+     * one place — but attributed to the wrong block, and it would have fired
+     * again on every later task that appends CSS. Harvesting by SELECTOR
+     * removes the assumption about file layout entirely; the property the test
+     * name states is unchanged, and 11.121's docblock (which counts this
+     * block's roles at 7) still describes it.
+     */
+    const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    const block = rules
+      .filter((r) => (r[1] ?? '').includes('.gn-saved-filters'))
+      .map((r) => r[2] ?? '')
+      .join('\n');
+    const outside = rules
+      .filter((r) => !(r[1] ?? '').includes('.gn-saved-filters'))
+      .map((r) => r[2] ?? '')
+      .join('\n');
+    expect(block.length).toBeGreaterThan(0);
     const used = [...new Set([...block.matchAll(/var\((--gn-[a-z-]+)\)/g)].flatMap((h) => h[1] ?? []))];
     expect(used.length).toBeGreaterThan(3);
     for (const role of used) {

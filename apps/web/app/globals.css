@@ -148,8 +148,9 @@ button { font: inherit; }
    `DataSourceQuery` methods answer with a `ServingGapError` naming the facts the
    shipped routes do not serve, and this is where the shell shows those words
    rather than a spinner that never stops. */
-.gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border-radius: 0.4rem; color: var(--gn-text-muted); }
+.gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border-radius: 0.4rem; color: var(--gn-text-muted); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger); }
 .gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }
+.gn-shell__expired { margin: 0; padding: 0.75rem 0.9rem; border-radius: 0.4rem; color: var(--gn-text); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); }
 
 /* ── The 404, and the two legal pages ────────────────────────────────────────
    Colours are tokens only, as everywhere in this file — `apps/web/app` is one

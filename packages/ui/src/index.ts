@@ -15,5 +15,7 @@ export { Button, type ButtonProps, type ButtonVariant } from './components/butto
 export { Card, type CardProps } from './components/card.js';
 export { Chip, type ChipProps, type ChipTone } from './components/chip.js';
 export { Dialog, type DialogProps } from './components/dialog.js';
+export { SegmentedControl } from './components/segmented-control.js';
+export type { SegmentedOption, SegmentedControlProps } from './components/segmented-control.js';
 export { Sheet, type SheetProps } from './components/sheet.js';
 export { Table, type TableColumn, type TableProps } from './components/table.js';
