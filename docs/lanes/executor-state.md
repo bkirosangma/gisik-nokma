@@ -235,6 +235,123 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > **After any squash of this branch, run `git diff origin/main <branch-tip>` with NO path filter.**
 > That is not boilerplate here: this exact trap fired on `exec/117` earlier today, reachability passed
 > while 23 lines were missing, and per-file checksums missed it because they skipped narrative files.
+# ▶ TUESDAY 2026-09-08 ~12:5x IST — **P1: THE MAGIC LINK LANDED ON THE API'S 404, AND THE GUARD WAS SATISFIED BY IT. PLUS AN INCIDENT I CAUSED AND CLOSED.**
+
+*Branch `exec/122-font-inherit` (now carries item A **and** the P1), off `main` `3be4f01`. Owner-dispatched
+P1 from `gisik-nokma-lanes/CTL-DISPATCH-2026-09-08-signin-redirect.md`. Items B and C still NOT started.*
+
+## POSITION
+
+| | |
+|---|---|
+| **PR #344** | OPEN, base `main`. **The controller froze it at `85b0eb8` to review; I have NOT pushed to it since.** The P1 commits sit on the same branch locally and go up as a SEPARATE push once the controller says so — see the conflict note below. |
+| **gate** | **33/33 EXIT 0, `Cached: 0` (forced)**, Node v22.22.2, zero orphaned vitest workers |
+| **checks** | all six EXIT 0 (`check-case-ids` is `node scripts/check-case-ids.mjs`, NOT a pnpm script) |
+| **queue** | P1 done and witnessed. **Items B + C next.** |
+
+## ⚠ A SEQUENCING PROBLEM THE CONTROLLER AND I CREATED BETWEEN US — read before merging #344
+
+The controller froze #344 at `85b0eb8` for review, and separately told me one rebuild should witness
+BOTH the P1 guard and item A's amber case 13.267. Those two instructions pull opposite ways: **13.267
+lives in #344, and its flip to ✅ is therefore in the P1 commits, not in the frozen PR.** So #344, as
+frozen, still says 13.267 is 🟡 and unrun. That is not stale — it was true when written — but a reader
+merging #344 alone would inherit an amber case that is in fact green and witnessed. Both PRs are on one
+branch; merging #344 first and then the P1 resolves it in order. **Flagged rather than fixed, because
+fixing it means pushing to the PR I was told not to push to.**
+
+## THE P1 — mechanism, and the part that matters more than the fix
+
+`sign-in/page.tsx` handed better-auth a RELATIVE `callbackURL`. The browser resolves it when the token
+is verified, and at that moment it is on the **API origin**, because that is where the emailed link
+points. Measured: `:3001/workspaces` → **200**, `:3000/workspaces` → **404**. **Not a dev artefact** —
+`deploy/do/app.yaml` ships production as two sibling subdomains, the same split, so this was every new
+user's first screen.
+
+**The dispatch named the magic link. `signIn.social` had the identical shape** and is fixed in the same
+change. Two call sites, one bug; the report named one.
+
+**The e2e guard could not have failed.** Its only assertion was
+`waitForURL((url) => !url.pathname.includes('/sign-in'))` — **a JSON 404 satisfies that.** It asserted
+the user LEFT, never that they ARRIVED. Nothing downstream noticed because on localhost the two ports
+**share cookies**, so the session really was set and every later test navigated explicitly and passed.
+**The property that kept the suite green is the property that hid the defect.** It now asserts the
+landing ORIGIN.
+
+**A second hole opened by the first fix, and closed in the same change.** `?next=` is
+attacker-controllable and was already reaching `router.push`, where `//evil.example` navigates off-site.
+Making the callback absolute would have fed `new URL()` an attacker's absolute URL — a client-side
+redirect promoted to an authenticated one. `?next=` is now constrained to a same-site path.
+
+## WITNESSES — all run, none reasoned
+
+* **13.268 / 13.269** (server): an absolute callback on `WEB_ORIGIN` is **accepted 200**; on an
+  untrusted origin **refused 403 `INVALID_CALLBACK_URL`**. Requirement 1 said verify rather than assume;
+  the behaviour was read out of better-auth's `origin-check.mjs` and then measured, because reading is
+  not measuring. **Both sides**, since "the absolute URL is accepted" is equally true of a server that
+  validates nothing.
+* **13.271 / 13.272** (client): mutation RUN. Revert both call sites to relative → **EXIT 1, 6 failed**.
+  Remove the `?next=` guard → **4 failed**, each naming the URL it was steered to.
+* **13.270** (e2e): green after the rebuild — three signing-in tests reached it.
+* **13.267** (item A, signed-in): **1 passed, EXIT 0, zero `13.3333px` anywhere signed-in.**
+
+## ⚠ AN ASSERTION THAT COULD NOT FAIL, FOUND INSIDE MY OWN NEW TEST BY MUTATION
+
+13.272's first version asserted only the callback's **origin**. Removing the guard killed three of four
+rows — `not-a-path` stayed green, because `new URL('not-a-path', origin)` resolves **same-origin**. One
+row that could not fail, hiding inside a set that could, invisible while everything was green. The
+assertion now pins the whole resolved URL and the same mutation kills **4 of 4**. *The mutation is what
+found it; inspection had already passed over it twice.*
+
+## ⚠ THREE ZEROS THAT MEANT NOTHING, IN ONE TASK
+
+All three looked exactly like success:
+1. **`playwright … viewport.spec.ts:220`** — the line had MOVED (my own edit above it), playwright ran
+   **nothing** in 20ms, and the greps for `13.3333` and for offenders both printed a clean 0.
+   **Address a test by TITLE; a line number is invalidated by any edit above it.**
+2. **The next attempt died in `globalSetup`** and printed the same reassuring zeros.
+3. **A BLOCKED tool call runs NOTHING, including the parts before the offending pipe.** A `python3` edit
+   chained ahead of a `| head` test run never happened, and I went on to run tests against the
+   unmodified file and read the result as real. *Do not assume partial execution of a blocked command.*
+
+The fix for all three is the same and it is cheap: **every null prints a positive control from the same
+run.** The five per-route histograms are what turned the final zero into a reading.
+
+## ⚠ INCIDENT — I TOOK THE DEV STACK DOWN, AND CLOSED IT
+
+The web rebuild filled the **Docker VM** disk (host had 77Gi free; the VM did not). Postgres went into a
+crash-restart loop — `PANIC: could not write to file "pg_logical/replorigin_checkpoint.tmp": No space
+left on device`, first at 07:05:28Z — and the server exited 1 behind it.
+
+**Closed with the safe reclaim only, per the standing rule *BUILD CACHE ONLY — never images, never
+volumes, because the volumes hold the seeded world*:** `docker builder prune -f` freed **3.933GB**;
+postgres healthy in ~6s, server `healthz` 200 in ~6s. **Seeded world verified intact after the
+unclean shutdown, not assumed: 131 events, 2 users.**
+
+**Left for whoever needs it: images are 47.93GB with 44.19GB (92%) reclaimable.** I did NOT prune them —
+that is beyond a safe unilateral action and days of rebuilds are involved, not just mine. **This will
+recur on the next rebuild or two.** Owner/controller call.
+
+## ⚠ THE STACK SUITE STILL 429s WHEN RUN WHOLE — this is items B/C, unchanged
+
+Whole-suite run: **3 passed, 2 failed, and BOTH failures were `sign-in.ts:31` timeouts on "Check your
+inbox"** — the magic-link send got rate-limited. **Confirmed, not inferred: exactly 2 × `"statusCode":429`
+in the server log for that window, matching the 2 failures.** Neither red was an assertion of mine.
+Individually and spaced, they pass. **A whole-suite red here is not evidence about a code change.**
+
+## ITEMS B + C — still not started, and now UNBLOCKED
+
+The owner is off the stack and the rebuild window is open, so B's measurement can run. Carry forward
+from the previous entry, unchanged and still unsettled:
+* **Does the server log each request with method+path?** Settle BEFORE building the harness.
+* **B's positive control must plant one extra `/api/auth/*` request and show the count rise by exactly 1.**
+* **`makeFixedWindowLimiter` is a FIXED window** — up to `2 × max` across a boundary, so a value chosen
+  against one run's peak is not automatically safe for two back-to-back runs.
+* **C's escape hatch:** if one run's peak is comfortably under 60, **STOP, do not raise it, hand the
+  facts back.** The ruling was given against a theory and does not outlive it.
+* **New datum for B:** the two 429s above were produced by a 5-test suite in one window, which is
+  consistent with the shared-bucket theory but is NOT the measurement — it was not attributable to a
+  single clean run.
+
 >
 # ▶ TUESDAY 2026-09-08 ~12:1x IST — **ITEM A (`font: inherit`): THE COUNT WAS 26, IT IS 30, AND TWO OF THEM WERE INVISIBLE TO EVERY SIZE INSTRUMENT IN THE REPO.**
 

@@ -1359,16 +1359,24 @@ maximum of `13.3333` — the id pattern collides with the pixel value this very 
   unchanged at 366x44; sign-in tabs 67x44 → 74x44 and 85x44 → 96x44 — wider, never shorter, because
   `min-height: 2.75rem` holds the height. Tap-target offender counts are byte-identical before and
   after on every signed-out route (10/16/16 on `/help`, 0 elsewhere), so no ratchet moved.*
-- **13.267** 🟡 **The same guard on the signed-in surface, over the five stack routes.**
-  The assertion is written in `apps/web/e2e-stack/viewport.spec.ts` beside the existing type-scale
-  ratchet and is collected by that suite. — (`apps/web/e2e-stack/viewport.spec.ts`)
-  *🟡 AND NOT ✅ FOR ONE STATED REASON: it has not been RUN. The signed-in suite measures the compose
-  web container, which must be rebuilt to carry the new stylesheet, and at the time of writing those
-  containers are serving the owner, who is testing the product by hand. The controller instructed that
-  they not be rebuilt or restarted without clearance. **The 26 controls this ruling is actually about
-  are therefore fixed-but-unwitnessed**, exactly the status `.gn-transition-edge__label` carries above,
-  and for a comparable reason: the instrument is unavailable, not absent. Flip to ✅ on a green run
-  after the rebuild window; do not flip it on the strength of the signed-out result.*
+- **13.267** ✅ **The same guard on the signed-in surface, over the five stack routes.**
+  `apps/web/e2e-stack/viewport.spec.ts` asserts `uaFont` is empty on all five. **RUN after the rebuild
+  window opened: 1 passed, EXIT 0, zero font-family offenders and ZERO `13.3333px` readings anywhere on
+  the signed-in surface** — the 26 controls this ruling is about. —
+  (`apps/web/e2e-stack/viewport.spec.ts`)
+  *The container was confirmed to CARRY the fix before the zero was believed, because a 0 from an
+  unchanged image and a 0 from a fixed one print identically: the served stylesheet contains
+  `button{font:inherit}`, fetched over HTTP from the running container.*
+  *POSITIVE CONTROL ON THE NULL: all five routes printed a histogram, so the zero is a reading rather
+  than a sweep that never ran. That control earned itself twice in this task — an earlier attempt
+  addressed the test by LINE NUMBER (`viewport.spec.ts:220`), the line had moved, and playwright ran
+  **nothing** in 20ms while the greps for `13.3333` and for offenders both returned a clean-looking 0.
+  A second attempt died in `globalSetup` and printed the same reassuring zeros. **Neither zero meant
+  anything, and neither was distinguishable from success without the control.** Address a test by
+  TITLE, not by a line number that any edit above it invalidates.*
+  *SCOPE, MEASURED ON THIS SURFACE TOO: the board still reads `{12.48px: 26, 12.8px: 24, 13.6px: 6,
+  16px: 48}` — `.gn-board-card__provenance` unmoved at 12.48px x26. The element selector loses to every
+  class rule, which is the ruling's "and no further" as a measurement rather than a promise.*
 
 
 ## The magic link lands on the app, not the API (owner-dispatched P1, 2026-09-08)
@@ -1395,10 +1403,11 @@ change; two call sites, one bug.*
   *The refusal side of 13.268, and not optional: **"the absolute URL is accepted" is equally true of a
   server that validates nothing at all.** A bound asserted on one side of its line is the failure this
   very file already records for `sign-in-flows.test.ts`.*
-- **13.270** 🟡 **Following the magic link LANDS THE BROWSER ON THE WEB APP** — origin asserted, not
+- **13.270** ✅ **Following the magic link LANDS THE BROWSER ON THE WEB APP** — origin asserted, not
   merely "the path no longer says /sign-in". — (`apps/web/e2e-stack/helpers/sign-in.ts`)
-  *🟡 because it has not been RUN: it needs the compose stack rebuilt to carry the fixed page, and the
-  rebuild window opened only as this was written. **Flip to ✅ on a green stack run, not before.***
+  *RUN after the rebuild: every stack test that signs in goes through this assertion, and the three
+  that reached it passed (`smoke.spec.ts` x2, `viewport.spec.ts:66`). The container was confirmed to
+  carry the fix first — the served sign-in chunk contains `location.origin`, fetched over HTTP.*
   *THE ASSERTION IT REPLACES IS A CHECK THAT COULD NOT FAIL, and it is why this defect reached the
   owner's hands: `waitForURL((url) => !url.pathname.includes('/sign-in'))` **is satisfied by a JSON
   404.** It asserted the user LEFT the sign-in page and never that they ARRIVED anywhere.*
