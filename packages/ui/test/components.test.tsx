@@ -162,17 +162,39 @@ const rule = (selector: string) => {
 };
 
 describe('R1(c) at the component layer', () => {
-  it('13.289 the ghost button has a fill and no boundary', () => {
-    const body = rule('.gn-button--ghost');
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(body).toMatch(/border-color:\s*transparent/);
-    expect(body).not.toMatch(/border:\s*1px/);
+  /**
+   * Any border declaration that actually PAINTS. `-color` and `-radius` are
+   * excluded deliberately: a colour with no style and no width paints nothing,
+   * and a radius is not a boundary.
+   *
+   * The plan shipped this as `/border:\s*1px/` for 13.289 and `/\bborder:/` for
+   * 13.290, and **both were demonstrated green against a real visible border** —
+   * `border: 2px solid …` beside a `border-color: transparent`, and
+   * `border-left: 4px solid …` beside the inset shadow. A negative pinned to
+   * one spelling of a property is not a negative about the property.
+   *
+   * The value is checked too, and the first draft of this regex proved why: it
+   * matched `border: none` on the base `.gn-button` and went red against a rule
+   * that paints nothing. **`none` and `0` are how a rule SAYS there is no
+   * border**, so a guard that forbids them forbids the correct answer.
+   */
+  const PAINTING_BORDER =
+    /border(-(top|right|bottom|left))?(-(width|style))?\s*:\s*(?!(none|0)\b)/;
+
+  it('13.289 a ghost button renders as fill and label, with no painting border on either rule', () => {
+    // BOTH rules, because what renders is the cascade: `button.tsx` always
+    // emits `gn-button gn-button--ghost` together, so a boundary reintroduced
+    // on the base would reach the screen while a modifier-only assertion stayed
+    // green.
+    expect(rule('.gn-button--ghost')).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(rule('.gn-button--ghost')).not.toMatch(PAINTING_BORDER);
+    expect(rule('.gn-button')).not.toMatch(PAINTING_BORDER);
   });
   it('13.290 refusal panels carry tone as an inset fill, never a border', () => {
     for (const s of ['.gn-refusal--preview', '.gn-refusal--server']) {
       const body = rule(s);
       expect(body, s).toMatch(/box-shadow:\s*inset 4px 0 0 var\(--gn-(warning|danger)\)/);
-      expect(body, s).not.toMatch(/\bborder:/);
+      expect(body, s).not.toMatch(PAINTING_BORDER);
     }
   });
   it('13.291 the field input KEEPS its border — an empty field has no label to identify it', () => {
