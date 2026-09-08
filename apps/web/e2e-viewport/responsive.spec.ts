@@ -1024,9 +1024,15 @@ for (const route of UNAUTHED_ROUTES) {
        * the positive control below asserts the row's own container is absent for
        * the same reason the buttons are, and why 13.326 exists at all.
        */
-      const list = page.getByRole('tablist', { name: 'Sign-in method' });
-      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
-      await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
+      /* 13.292, EXTENDED TO PHONE (round 2c) — and the sentence above that said
+       * "Phone and email need no provider and stay unconditional" was the next
+       * one to go false. Phone needed a provider all along: `selectOtpSender()`
+       * returns a `NullOtpSender` that refuses every code with 501, so the tab
+       * the screen OPENED ON was the third dead control on this page. Email
+       * link is the one genuinely unconditional method, and it is what this
+       * suite — whose dev server answers no `/v1/auth/methods` at all — sees. */
+      await expect(page.getByLabel('Email')).toBeVisible();
+      await expect(page.getByRole('tablist', { name: 'Sign-in method' })).toHaveCount(0);
 
       /* BOTH HALVES DRIVE THE ANSWER, and the negative one has to — MEASURED,
        * not suspected.
@@ -1044,18 +1050,71 @@ for (const route of UNAUTHED_ROUTES) {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ google: false, apple: false }),
+          body: JSON.stringify({ google: false, apple: false, phone: false }),
         }),
       );
       await page.reload({ waitUntil: 'networkidle' });
-      // The page came back, so a zero count below is a fact about the buttons
-      // and not about a blank document.
-      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
+
+      /* 13.334 — WITH THE SERVER SAYING PHONE CANNOT WORK, THE PAGE OFFERS
+       * NEITHER THE TAB NOR THE FORM, at every viewport this suite runs.
+       *
+       * The Email field is asserted FIRST and it is what makes the zero counts
+       * below mean anything: a positive, awaited signal that the answer arrived
+       * and the page re-rendered against it. Without it a blank document
+       * satisfies every `toHaveCount(0)` here — exactly the failure the block
+       * below was written to fix, reintroduced by asserting only absences.
+       *
+       * Mutation witnessed: rendering the control unconditionally (dropping
+       * `phoneAvailable ?` in `sign-in/page.tsx`) reddens this at all three
+       * viewports. */
+      await expect(page.getByLabel('Email')).toBeVisible();
+      await expect(page.getByRole('tablist', { name: 'Sign-in method' })).toHaveCount(0);
+      await expect(page.getByRole('tab', { name: 'Phone' })).toHaveCount(0);
+      await expect(page.getByLabel('Phone number')).toHaveCount(0);
+
       await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
       await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
       await page.unroute('**/v1/auth/methods');
+
+      /* 13.335 — AND WITH A DEPLOYMENT THAT CAN DELIVER, THE TAB IS BACK AND
+       * PHONE IS THE DEFAULT.
+       *
+       * This is the half that stops 13.334 being satisfied by deleting phone
+       * sign-in altogether. `page.route` supplies the answer the real dev server
+       * cannot, the same instrument the social half needed and for the same
+       * reason: a suite with no API behind it cannot tell "gated correctly"
+       * from "gone".
+       *
+       * The Phone FORM is asserted, not just the tab — a selected tab sitting
+       * over the email form is a state this page could reach if `method` were
+       * stored rather than derived, and it is the exact bug the derivation makes
+       * unreachable.
+       *
+       * Mutation witnessed: forcing `method` to `'email'` reddens this and
+       * leaves 13.334 green. */
+      await page.route('**/v1/auth/methods', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: false, apple: false, phone: true }),
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      const list = page.getByRole('tablist', { name: 'Sign-in method' });
+      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
+      await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
+      await expect(page.getByLabel('Phone number')).toBeVisible();
+      /* THE `phone: true` STUB STAYS ACTIVE FROM HERE TO THE END OF THIS TEST,
+       * and removing it is what hung the first run of this file.
+       *
+       * `unroute` followed by `reload({ waitUntil: 'networkidle' })` leaves
+       * `/v1/auth/methods` unanswered — this suite has no API behind it — so
+       * networkidle never arrives and the test sits until it times out. It also
+       * put the page back on the email-only rendering, which every assertion
+       * below needs tabs for. Each route in this suite is its own test, so the
+       * stub cannot leak sideways. */
 
       /* The token the email field keeps for Task 12, asserted as a fact about
        * the DOM. The conditional-mediation REQUEST is deferred (it spends the
@@ -1068,11 +1127,18 @@ for (const route of UNAUTHED_ROUTES) {
         'username webauthn',
       );
       await list.getByRole('tab', { name: 'Phone' }).click();
-      // Phone is the DEFAULT, and this case's own name says so — added because
-      // review found the claim unasserted. Flipping `useState<Method>('phone')`
-      // to `'email'` left this suite fully green; the only thing that reddened
-      // was an unnamed vitest case that types into "Phone number" without
-      // clicking the tab, i.e. it caught the default by accident.
+      // Phone is the DEFAULT where phone can work, and this case's own name says
+      // so — added because review found the claim unasserted.
+      //
+      // The mutation this comment used to name no longer exists: there is no
+      // `useState<Method>('phone')` to flip, because `method` is now DERIVED
+      // (`phoneAvailable ? (chosen ?? 'phone') : 'email'`). The equivalent
+      // mutation is forcing that expression to `'email'`, and it reddens 13.335
+      // above as well as this line. The old note is kept in spirit because its
+      // lesson stands: the previous version of this property was caught only by
+      // an unnamed vitest case that typed into "Phone number" without clicking
+      // the tab — it held the default by accident, and a property held by
+      // accident is one nobody can find when it breaks.
       await expect(list.getByRole('tab', { name: 'Phone' })).toHaveAttribute(
         'aria-selected',
         'true',
