@@ -2,6 +2,13 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
 import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
 import {
+  ACCESSIBLE_BASELINE_PATH,
+  RATCHETED,
+  readAccessibleBaseline,
+  recordAccessibleBaseline,
+  sweepAccessibleNames,
+} from './accessible-names.js';
+import {
   LABEL_FLOOR_PX,
   measureTypeScale,
   readTypeScaleBaseline,
@@ -946,6 +953,45 @@ for (const route of UNAUTHED_ROUTES) {
             `Offenders: ${JSON.stringify(typeScale.offenders)}`,
         )
         .toBeLessThanOrEqual(typeAllowed);
+    }
+
+    /* ── 4c. ACCESSIBLE NAMES AND ROLES, ratcheted one-way. ──────────────
+     * Cases 13.285 (ratchet) and 13.286 (control).
+     * The population the owner's copy rule protects. No test asserted any
+     * accessible name existed before this; a restyle could drop every one
+     * and the gate stayed 33/33.
+     * ──────────────────────────────────────────────────────────────────*/
+    const names = await sweepAccessibleNames(page);
+
+    // 13.286 — the selector control, HARD, before the ratchet. `*` on a rendered
+    // document cannot honestly examine zero elements.
+    expect(
+      names.rawMatches,
+      `13.286: the accessible-name sweep examined NOTHING on ${route.path}. A sweep over ` +
+        `\`*\` that saw zero elements reports zero losses and looks identical to a clean page.`,
+    ).toBeGreaterThan(0);
+
+    const accessibleKey = `${name}|${route.path}`;
+    const accessibleBaseline = readAccessibleBaseline()[accessibleKey];
+    if (accessibleBaseline === undefined) {
+      if (process.env['UPDATE_ACCESSIBLE_BASELINE'] === '1') {
+        recordAccessibleBaseline(ACCESSIBLE_BASELINE_PATH, accessibleKey, names);
+      }
+      test
+        .info()
+        .annotations.push({ type: 'baseline', description: `${accessibleKey}: recorded, not asserted` });
+    } else {
+      for (const attr of RATCHETED) {
+        // 13.285 — a count may fall and never rise. Lowering is a deliberate,
+        // commit-message-carrying deletion of the key, never a re-run.
+        expect(
+          names[attr],
+          `13.285: ${route.path} at ${name} LOST ${attr}: baseline ${accessibleBaseline[attr]}, ` +
+            `now ${names[attr]}. Something that identified an element to assistive tech is gone. ` +
+            `If this is intended, delete the key from accessible-names-baseline.json in a commit ` +
+            `that says which element and why.`,
+        ).toBeGreaterThanOrEqual(accessibleBaseline[attr]);
+      }
     }
 
     /* ── 5. COMPUTED CONTRAST FROM THE LIVE DOM. ──────────────────────────*/

@@ -1,0 +1,107 @@
+{
+  "phone-390|/help": {
+    "ariaLabel": 2,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 999
+  },
+  "phone-390|/privacy": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 97
+  },
+  "phone-390|/terms": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 95
+  },
+  "phone-390|/sign-in": {
+    "ariaLabel": 0,
+    "role": 3,
+    "ariaSelected": 2,
+    "ariaDescribedby": 0,
+    "rawMatches": 48
+  },
+  "phone-390|/no-such-page-e2e-viewport-probe": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 56
+  },
+  "tablet-768|/help": {
+    "ariaLabel": 2,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 999
+  },
+  "tablet-768|/privacy": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 97
+  },
+  "tablet-768|/terms": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 95
+  },
+  "tablet-768|/sign-in": {
+    "ariaLabel": 0,
+    "role": 3,
+    "ariaSelected": 2,
+    "ariaDescribedby": 0,
+    "rawMatches": 48
+  },
+  "tablet-768|/no-such-page-e2e-viewport-probe": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 56
+  },
+  "desktop-1512|/help": {
+    "ariaLabel": 2,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 999
+  },
+  "desktop-1512|/privacy": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 97
+  },
+  "desktop-1512|/terms": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 95
+  },
+  "desktop-1512|/sign-in": {
+    "ariaLabel": 0,
+    "role": 3,
+    "ariaSelected": 2,
+    "ariaDescribedby": 0,
+    "rawMatches": 48
+  },
+  "desktop-1512|/no-such-page-e2e-viewport-probe": {
+    "ariaLabel": 0,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 56
+  }
+}
