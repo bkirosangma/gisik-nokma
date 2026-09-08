@@ -1027,10 +1027,35 @@ for (const route of UNAUTHED_ROUTES) {
       const list = page.getByRole('tablist', { name: 'Sign-in method' });
       await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
       await expect(list.getByRole('tab', { name: 'Email link' })).toBeVisible();
+
+      /* BOTH HALVES DRIVE THE ANSWER, and the negative one has to — MEASURED,
+       * not suspected.
+       *
+       * This half used to rely on the suite's own server, and it was a check
+       * that COULD NOT FAIL. This suite runs `next dev` with no API behind it,
+       * so `/v1/auth/methods` never resolves, the page's availability state
+       * stays `null`, and NOTHING renders whatever the gate does. A mutation
+       * that dropped the provider check and rendered the row on any answer left
+       * all three viewports GREEN — run, seen, and the reason this block exists.
+       *
+       * With the empty answer supplied, the page HAS an answer, the gate is the
+       * only thing between it and the DOM, and that same mutation reddens. */
+      await page.route('**/v1/auth/methods', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: false, apple: false }),
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      // The page came back, so a zero count below is a fact about the buttons
+      // and not about a blank document.
+      await expect(list.getByRole('tab', { name: 'Phone' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
       await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
+      await page.unroute('**/v1/auth/methods');
 
       /* The passkey affordance that REPLACED the dead button, asserted as a
        * fact about the DOM rather than about a call: conditional mediation
