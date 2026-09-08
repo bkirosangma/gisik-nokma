@@ -230,6 +230,95 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~19:0x IST — **THE HIG PER-SCREEN PLAN: TASKS 0, 1, 2 ARE MERGED, AND THE OWNER'S FEEDBACK ROUND IS IN FLIGHT.** This entry is the restart surface for everything after `ebb21aa`.
+
+> **THE THREE ENTRIES BELOW THIS ONE PREDATE THE PER-SCREEN PLAN.** They describe the palette
+> adoption and the border sweep — Phases 1 and 2 of HIG *adoption*, which are finished and merged.
+> The per-screen plan (`docs/superpowers/plans/2026-09-08-hig-per-screen.md`) is a different,
+> later artefact. **Until this entry existed, this file had NO record of Tasks 0, 1 or 2 at all**,
+> so a restart at any point on 2026-09-08 evening would have recovered the border sweep and
+> concluded that was the position. That was the gap; this closes it.
+
+## ANCHORS — verified reachable, not merely resolvable
+
+| what | sha | check |
+|---|---|---|
+| `origin/main` at the time of writing | `ebb21aa` | tip |
+| Task 0 — the accessible-name gate | `e5a2054` | ancestor of `origin/main` |
+| Task 1 — the four shared pieces | `d323633` | ancestor of `origin/main` |
+| Task 2 — sign-in on the HIG surface | `ebb21aa` | tip; PR #362 squash |
+| Features.md path-locator rule | `7ebf681` | ancestor of `origin/main` |
+| **my branch** `exec/134-signin-feedback-1-3` | `665b4de` | 2 commits off `ebb21aa`, pushed |
+
+**`6882f63` and `9c52621` (the pre-squash Task 2 branch commits) are ORPHANED.** `git cat-file`
+passes on both and hands back pre-squash content. `git merge-base --is-ancestor` says no. The
+content reached `main` inside `ebb21aa`.
+
+## POSITION
+
+Ledger rows 0 and 1 are `done`; **row 2 is still `in-flight` on `main` and needs its merge sha
+`ebb21aa`** — that edit belongs to the controller (#361 is the precedent: rows plus shas, controller
+PR). Tasks 3a onward are `todo` and **HELD**: the owner reviews sign-in live between screens, which
+is an owner-issued sequencing instruction recorded in `controller-state.md`, not a preference.
+
+**The owner has now looked, and returned four items** (CTL dispatch,
+`gisik-nokma-lanes/CTL-DISPATCH-2026-09-08-signin-feedback.md`, ~18:5x). Two PRs:
+items 1 + 3 first (this branch), then item 2. Case block `13.321`–`13.326`, controller-allocated.
+
+## THE FINDING UNDER ITEM 2, WHICH IS A PRODUCT GAP AND NOT A STYLING ONE
+
+**Two of the four sign-in methods on the shipped screen cannot succeed for anybody.**
+`GOOGLE_CLIENT_ID` is unset on the dev stack and the button renders unconditionally; passkey has
+**no registration flow anywhere in app code**, so no user can ever hold a passkey to sign in with.
+The audit's principle inverted: *a control that can never succeed and is shown anyway is the same
+defect as a control invisible in the mockup, from the other side.*
+
+## WHAT ITEM 2 WILL COLLIDE WITH — read this before starting it
+
+**The dispatch contains a real internal conflict and it is load-bearing.** Requirement 1 says
+`getByRole('button', { name: 'Continue with Google' })` must have **count 0** when the provider is
+disabled. Requirement 3 says *"every 13.292–13.294 assertion still passes"*. **13.292 asserts that
+exact button is VISIBLE** (`responsive.spec.ts`, inside the `/sign-in` block) and also that
+`Sign in with a passkey` is visible — the control item 2(d) replaces with conditional UI. The two
+requirements cannot both hold. 13.292 must be amended in the same change set, and the amendment
+is the honest one: the case's property becomes *the methods that CAN work are all offered*, not
+*four buttons exist*. **Raise this with the controller before writing the code, not after.**
+
+**And 13.285 will not fire for item 2 unless its floor is raised first.** `/sign-in`'s baseline key
+reads `ariaLabel: 0` while the tree already emits one (`SegmentedControl`'s) — the key was recorded
+at Task 0, before Task 1 and Task 2 added labels, and `recordAccessibleBaseline` refuses to
+overwrite an existing key. So the dispatch's requirement 2 (*drop the aria-label → 13.285 must also
+fire*) is **unsatisfiable at the current floor**: the count would fall to 0 and still clear a floor
+of 0. Delete the three `/sign-in` keys and re-record, in a commit that says why — the same move this
+branch makes for `/privacy` and `/terms`, with the mutation witnessed both before and after.
+
+## WHAT IS ON THIS BRANCH (`exec/134-signin-feedback-1-3`, items 1 + 3)
+
+- `.gn-shell--centred` on the sign-in `<main>` only. Not on `.gn-shell`: every other screen scrolls.
+- A Back control on `/privacy` and `/terms`, which linked only to EACH OTHER.
+- Cases **13.321** (centred, two independent properties), **13.322**/**13.323** (both branches of
+  the history guard). Baseline floor raised on the two legal routes so the new label is watched.
+- Gate 33/33 at node v22.22.2, `Cached: 27`. Viewport suite 19 passed / 2 skipped / exit 0.
+  Four mutations witnessed: drop `justify-content` → 13.321 red ×3; drop both `min-height` →
+  13.321 red ×3; unconditional `router.back()` → exactly the two fallback cases red; drop the
+  `aria-label` → 13.285 red ×6 **after** the floor raise and green before it, which is what makes
+  the raise load-bearing rather than cosmetic.
+
+## TWO ITEMS OWNED BY NOBODY, RECORDED SO THEY ARE NOT DISCOVERED AS A SURPRISE
+
+1. **Ten of the per-screen plan's eighteen tasks have no ledger row and are invisible to
+   `check:tasks`.** The checker parses `### Task N:` headings; `### Task 4a / 4b:` through
+   `### Task 8a / 8b:` are not parsed, so the gate reads `hig-per-screen 8 tasks` and is GREEN at
+   `192/198`. The controller recorded this at the top of `controller-state.md` and left it. **Do not
+   "fix" it by adding ten rows without first reading `scripts/check-task-ledger.mjs`** — a row with
+   no matching plan task may turn a green gate red, which is worse than the invisibility. The fix is
+   whichever the parser rewards: split the headings, or teach it the `Na / Nb` form.
+2. **The ledger marks only 3b as HELD; the hold applies to 3a too.** `controller-state.md`'s
+   owner-issued sequencing is *"then STOP: the owner reviews the login screen live … before 3a
+   starts."* The ledger's note is narrower than the instruction it records. Controller's to fix.
+
+---
+
 # ▶ TUESDAY 2026-09-08 ~19:0x IST — **HIG PHASE 2: THE BORDERS COME OFF. 13-of-20 → 0-of-6, MEASURED BY ONE INSTRUMENT AT BOTH ENDS.**
 
 *Branch `exec/129-hig-border-sweep`, off `main` `c71e58b`. Block `13.281`–`13.320`; `13.283`–`13.284`
