@@ -230,6 +230,80 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    side first, and verify with **anchored** markers in the COMMITTED blobs).
 > 2. **Then, if wanted:** widen the sweep per items 1–2 above and fold any further hits into the same
 >    PR rather than a second one.
+# ▶ TUESDAY 2026-09-08 ~19:4x IST — **2b IS BUILT. Items 1+3 merged (#366); item 2 is on `exec/135-signin-auth-methods` and its PR is the next thing to open.** The entry below is superseded on position and still correct on method.
+
+## ANCHORS — reachable, checked with `merge-base --is-ancestor`, never `cat-file`
+
+| what | sha | state |
+|---|---|---|
+| `origin/main` | `62dbaff` | merged into this branch |
+| items 1+3 | `e53be92` | PR #366, on `main` |
+| Task 12 ledger row | `371c437` | on `main` |
+| **this branch** `exec/135-signin-auth-methods` | `6cf2444` | 5 commits + a merge, off `62dbaff` |
+
+## GATE AT THIS HEAD
+
+`pnpm turbo run build test typecheck` **33/33**, `Cached: 25`, node **v22.22.2**.
+server 1470 passed | 5 skipped / 144 files · app-core 1152/74 · web 159/21 · ui 98/4.
+Viewport suite **19 passed, 2 skipped**, raw exit 0. Stack suite **6/6** against the rebuilt
+compose stack. `check:env` · `check:tasks` · `check:citations` · `check:runbook` · `check-case-ids`
+(1812 ids) all raw exit **0**.
+
+**Empirical confirmation of the finding, from the real stack:**
+`curl localhost:3000/v1/auth/methods` → `{"google":false,"apple":false}`.
+
+## ⚠ #366's SQUASH DROPPED A COMMIT. Fixed here, and the controller needs to know.
+
+`a730768` — the review-fix adding `apps/web/app/globals.css` to both edited `Features.md` bullets —
+was pushed after #366 was opened and is **not an ancestor of `main`**. Proven the way the memory
+requires, not by reading the PR: `git diff origin/main a730768` with **no path filter** shows
+`Features.md` differing by exactly those 2 insertions and 2 deletions, while the **positive control**
+(the accessible-names floor raise, an EARLIER commit on the same branch) IS on `main` at value 1.
+Everything else in that diff is `main` being ahead of the branch — the known false-positive mode —
+so every file was attributed individually rather than the total interpreted. **Third recurrence.**
+Both lines are restored in `6cf2444`.
+
+## THE FOUR THINGS ON THIS BRANCH A REVIEWER SHOULD AIM AT FIRST
+
+1. **`GET /v1/auth/methods` reads `auth.options.socialProviders`** — the constructed better-auth
+   instance, not the env and not a caller's copy. That is what makes drift impossible; if it is ever
+   changed to read the environment, the defect returns and every test still passes.
+2. **13.292's negative half WAS a check that could not fail, and a mutation found it.** This suite
+   runs `next dev` with no API, so `/v1/auth/methods` never resolved and nothing rendered whatever the
+   gate did — a mutation dropping the provider check left all three viewports GREEN. Both halves now
+   drive the answer through `page.route`. The same mutation reddens: Expected 0, Received 1, ×3.
+3. **The env gate could not see any of the five social keys**, and reported `GOOGLE_CLIENT_ID` as read
+   by a file that never read it — the detector walks comments, and my docblock quoted the access it was
+   explaining. `readSocialProviderEnv()` is the fix. *The irony repeated inside the fix: the rewritten
+   paragraph quoted the scanner's pattern with a placeholder key and `check:env` reported a variable
+   named after the placeholder.* **A comment that quotes a scanner's pattern is a code site.**
+4. **The `/sign-in` floor raise does NOT guard the icon buttons.** It guards `SegmentedControl`'s
+   label (witnessed ×3). The icon labels render only when a provider is configured and this suite's
+   server has none; 13.326 guards those. Written down because the number does not show it.
+
+## METHOD NOTES THAT COST A ROUND EACH, TODAY
+
+- **A mutation that crashes the page measures nothing.** Replacing the outer guard with `true`
+  dereferenced a null; the failure printed was an empty-DOM population check, and its red looks
+  exactly like the red you wanted.
+- **An all-or-nothing patch script turns a partial failure into a silent no-op.** My edit scripts write
+  at the END, so a failed second assertion discarded the first replacement and left the file untouched
+  — and the green run immediately after read as confirmation. **Verify the write landed before
+  believing the run.** It happened twice.
+- **`git checkout -- <path>` from the wrong cwd errors, and that error was lucky.** The page was
+  UNCOMMITTED at the time; had the path resolved, it would have destroyed the whole item-2 rewrite
+  rather than the one mutated line. Commit before mutating — and restore by re-applying, not by
+  checkout, when the file carries uncommitted work.
+
+## POSITION
+
+Items 1+3 merged. **Item 2 is complete and gated; its PR is the next action.** Nothing after 2b
+starts until the owner has looked again — controller-issued, and it holds 3a as well as 3b.
+Two questions are with the owner (Apple credentials, passkey-registration scope); Task 12 now exists
+in the plan and in the ledger, and is **not** to be started now.
+
+---
+
 # ▶ TUESDAY 2026-09-08 ~19:0x IST — **THE HIG PER-SCREEN PLAN: TASKS 0, 1, 2 ARE MERGED, AND THE OWNER'S FEEDBACK ROUND IS IN FLIGHT.** This entry is the restart surface for everything after `ebb21aa`.
 
 > **THE THREE ENTRIES BELOW THIS ONE PREDATE THE PER-SCREEN PLAN.** They describe the palette
