@@ -13,7 +13,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { sendOtp, verify, magicLink, social, passkey } = vi.hoisted(() => ({
   sendOtp: vi.fn(async () => ({ data: {}, error: null })),
   verify: vi.fn(async () => ({ data: {}, error: null })),
-  magicLink: vi.fn(async () => ({ data: {}, error: null })),
+  /* Typed argument, so `.mock.calls[n][0]` is a real object rather than an
+     empty tuple — the assertions below read the callbackURL out of it. */
+  magicLink: vi.fn(async (_args: { email: string; callbackURL: string }) => ({
+    data: {},
+    error: null,
+  })),
   social: vi.fn(async () => ({ data: {}, error: null })),
   passkey: vi.fn(async () => ({ data: {}, error: null })),
 }));
@@ -125,7 +130,7 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     await user.type(screen.getByLabelText('Email'), 'anselma@example.com');
     await user.click(screen.getByRole('button', { name: 'Send magic link' }));
 
-    const sent = magicLink.mock.calls.at(-1)?.[0] as { callbackURL: string };
+    const sent = magicLink.mock.calls.at(-1)?.[0];
     /* The whole URL, not just its origin — and that distinction was found by
        MUTATION rather than by inspection. Removing the guard and asserting only
        the ORIGIN left `not-a-path` green, because `new URL('not-a-path', origin)`
@@ -134,8 +139,8 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
        can. Pinning the resolved URL makes every row falsifiable — without the
        guard this one becomes `…/not-a-path`. */
     expect(
-      sent.callbackURL,
-      `?next=${hostile} steered the authenticated callback to ${sent.callbackURL}. ` +
+      sent?.callbackURL,
+      `?next=${hostile} steered the authenticated callback to ${sent?.callbackURL}. ` +
         'better-auth would refuse to send a token off-origin, but the guarantee belongs here — ' +
         'and an on-origin path is not refused by anything at all.',
     ).toBe('http://localhost:3000/workspaces');
@@ -156,9 +161,9 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
       email: 'anselma@example.com',
       callbackURL: 'http://localhost:3000/workspaces',
     });
-    const sent = magicLink.mock.calls[0]?.[0] as { callbackURL: string };
+    const sent = magicLink.mock.calls[0]?.[0];
     expect(
-      sent.callbackURL.startsWith('/'),
+      sent?.callbackURL.startsWith('/'),
       'callbackURL is relative again. The browser resolves it against the API origin the emailed ' +
         'link points at, which is how every magic-link sign-in ended on the API JSON 404.',
     ).toBe(false);
