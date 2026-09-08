@@ -7,6 +7,7 @@ import { selectMagicLinkSender, selectOtpSender } from './auth/select-senders.js
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
+import { signInMaxFor } from './http/rate-limit.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
@@ -188,6 +189,29 @@ async function main(): Promise<void> {
           // Same knob as invites, for the reason `SecurityOptions.rateLimit`
           // gives: a fourth bucket, no fourth environment variable.
           mcpMax: config.rateLimitAuthMax,
+          // HALF the auth budget, and a fraction rather than a constant for a
+          // reason worth stating: at the shipped default of
+          // `RATE_LIMIT_AUTH_MAX=10` this is **5**, which is exactly the max
+          // better-auth's magic-link plugin enforced before the 2026-09-08
+          // ruling switched its limiter off — parity by arithmetic, not by
+          // coincidence — and it stays a real tightening at every other value
+          // an operator might choose, which a hard-coded 5 would not.
+          //
+          // A hard-coded 5 was measured and rejected. The e2e stack runs seven
+          // sign-in cycles per run, and better-auth's rule matched BOTH
+          // `/sign-in/magic-link` and `/magic-link/verify`, so a cycle costs
+          // two: fourteen charges against a bucket of five. The dev stack sets
+          // `RATE_LIMIT_AUTH_MAX=60` precisely because its web container
+          // proxies every browser into ONE client key, and half of that is 30 —
+          // so the same expression that ships parity in production leaves the
+          // suite the headroom that same collapse requires. One knob, two
+          // correct answers.
+          //
+          // `Math.max(1, …)` because `authMax` is only constrained positive:
+          // at `RATE_LIMIT_AUTH_MAX=1` the floor would be 0, and a bucket of
+          // zero refuses the first request, turning a tightening into a total
+          // sign-in outage.
+          signInMax: signInMaxFor(config.rateLimitAuthMax),
           windowSec: config.rateLimitWindowSec,
         },
         // Without this, `request.ip` behind App Platform's router is the ROUTER

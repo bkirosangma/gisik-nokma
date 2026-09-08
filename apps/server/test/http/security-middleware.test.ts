@@ -416,7 +416,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
   it('webOrigin: null disables the HTTP-Origin check as well as CORS — one fact, one switch', async () => {
     const { app, recorder } = build({
       webOrigin: null,
-      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60 },
     });
     const response = await app.inject({
       method: 'POST',
@@ -446,7 +446,19 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
 describe('rate limiting', () => {
   const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
     webOrigin: null,
-    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60, ...over },
+    rateLimit: {
+      authMax: 100,
+      eventsMax: 100,
+      inviteMax: 100,
+      mcpMax: 100,
+      // Deliberately EQUAL to `authMax` in the default, so that a case which
+      // narrows one bucket is testing that bucket and nothing else. A helper
+      // whose sign-in default were tighter than its auth default would make
+      // every `authMax`-narrowing case ambiguous about which limiter answered.
+      signInMax: 100,
+      windowSec: 60,
+      ...over,
+    },
   });
 
   it('429s the request over the auth limit, names the refusal, sets retry-after', async () => {
@@ -668,7 +680,7 @@ describe('rate limiting', () => {
   it('an OPTIONS preflight is not charged to the auth bucket', async () => {
     const { app } = build({
       webOrigin: WEB_ORIGIN,
-      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, windowSec: 60 },
+      rateLimit: { authMax: 1, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60 },
     });
     await app.inject({
       method: 'OPTIONS',
@@ -842,6 +854,105 @@ describe('rate limiting', () => {
       expect(response.statusCode).not.toBe(429);
     }
     await app.close();
+  });
+});
+
+// ── The sign-in bucket ───────────────────────────────────────────────────────
+
+/**
+ * The fifth bucket, and the first that classifies by PATH rather than by
+ * Fastify route pattern.
+ *
+ * ## Why these cases cannot discriminate by response body, and what they use
+ * instead
+ *
+ * #347's guard could name which limiter answered by reading the body, because
+ * the two limiters were written by different authors: ours answers
+ * `{"error":"rate_limited",…}` and better-auth's `{"message":"Too many
+ * requests…"}`. Both buckets here are OURS and share that body byte for byte,
+ * so a body assertion would pass whichever one refused and would prove nothing
+ * about the new one.
+ *
+ * The discriminator is the ORDINAL, with its positive control built into the
+ * same request pair: a sign-in path is refused at the sign-in bucket's ceiling
+ * while a NON-sign-in path from the SAME client, in the SAME app, is still
+ * being served. One assertion cannot be satisfied by "everything is limited"
+ * and the other cannot be satisfied by "nothing is limited".
+ */
+describe('rate limiting — the sign-in bucket', () => {
+  const limits = (over: Partial<SecurityOptions['rateLimit'] & object> = {}): SecurityOptions => ({
+    webOrigin: null,
+    rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 100, signInMax: 100, windowSec: 60, ...over },
+  });
+
+  /**
+   * 13.275 — a sign-in path is bounded by its own, tighter budget, and the general auth budget is NOT what refused it.
+   *
+   * The load-bearing case. `authMax: 100` against `signInMax: 2` is a
+   * STRUCTURAL separation, not a comment: were the two equal, the general
+   * bucket would refuse at the same ordinal and this test would pass with the
+   * sign-in bucket deleted — the shape of check that #347 shipped first and had
+   * to rewrite.
+   */
+  it('refuses the third sign-in while the same client’s session reads are still served', async () => {
+    const { app } = build(limits({ signInMax: 2, authMax: 100 }));
+    const first = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const second = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const third = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    // The positive control, and the whole reason this is a finding rather than
+    // "the app 429s": the SAME client, one request later, on a path outside the
+    // sign-in family, is still being served out of a 100-request budget that
+    // three sign-ins could not have exhausted.
+    const sessionRead = await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    await app.close();
+    expect(first.statusCode).not.toBe(429);
+    expect(second.statusCode).not.toBe(429);
+    expect(third.statusCode).toBe(429);
+    expect(third.json()).toEqual({ error: 'rate_limited', retryAfterSeconds: 60 });
+    expect(sessionRead.statusCode).not.toBe(429);
+  });
+
+  /**
+   * 13.276 — a sign-in request is charged to the general auth bucket AS WELL, not instead of it.
+   *
+   * This is the anti-LOOSENING guard, and it is the case that would go red if
+   * someone "simplified" the hook by charging a matching path to the sign-in
+   * bucket INSTEAD of the general one. That refactor reads like a tidy-up and
+   * is a real weakening: one client would get `authMax + signInMax` requests
+   * against the mount where it gets `authMax` today, reversing the third ground
+   * of the ruling that authorised this bucket ("per attacker, ours is TIGHTER").
+   *
+   * `signInMax: 100` against `authMax: 2` is the previous case's separation
+   * inverted, so the only bucket that can produce this 429 is the general one.
+   */
+  it('sign-in requests spend the general auth budget too — the bucket adds, it does not replace', async () => {
+    const { app } = build(limits({ authMax: 2, signInMax: 100 }));
+    await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const sessionRead = await app.inject({ method: 'GET', url: '/api/auth/get-session' });
+    await app.close();
+    expect(sessionRead.statusCode).toBe(429);
+  });
+
+  /**
+   * 13.278 — a dot-segment spelling of a sign-in path is charged to the sign-in bucket, at the wire.
+   *
+   * The unit table below covers the matcher in isolation; this covers the seam
+   * the matcher sits in, because the two can disagree. `app.ts` hands the
+   * matcher `request.url` — the RAW request-target — and the mount handler
+   * builds better-auth's `Request` from `new URL(request.url, baseUrl)`, which
+   * resolves `..`. A matcher doing a literal `startsWith` on the raw target
+   * would therefore miss a path that the vendor handler goes on to treat as a
+   * sign-in: the request would be charged the general budget, which is twice
+   * the size. That is a bypass, and it is only visible end to end.
+   */
+  it('charges a `..` spelling of a sign-in path to the sign-in bucket', async () => {
+    const { app } = build(limits({ signInMax: 1, authMax: 100 }));
+    const direct = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
+    const viaDotSegment = await app.inject({ method: 'GET', url: '/api/auth/x/../sign-in/magic-link' });
+    await app.close();
+    expect(direct.statusCode).not.toBe(429);
+    expect(viaDotSegment.statusCode).toBe(429);
   });
 });
 
