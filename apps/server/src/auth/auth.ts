@@ -7,6 +7,7 @@ import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
 import { normalizeOrigin } from '../http/http-origin.js';
 import {
+  readSocialProviderEnv,
   socialProvidersFromEnv,
   type SocialProviderConfig,
   type SocialProviderName,
@@ -315,7 +316,7 @@ export function createAuth(deps: AuthDeps) {
      * refuse. See `social-providers.ts` for why it is passed in rather than
      * computed here.
      */
-    socialProviders: deps.socialProviders ?? socialProvidersFromEnv(process.env),
+    socialProviders: deps.socialProviders ?? socialProvidersFromEnv(readSocialProviderEnv()),
     plugins: [
       phoneNumber({
         sendOTP: async ({ phoneNumber: phone, code }) => {

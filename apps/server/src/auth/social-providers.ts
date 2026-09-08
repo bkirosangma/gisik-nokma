@@ -10,11 +10,18 @@
  * the design* — and its mirror is **a control that can never succeed and is
  * shown anyway**.
  *
- * THE OBVIOUS FIX IS THE ONE THAT DRIFTS. A route that answers
- * `{ google: process.env['GOOGLE_CLIENT_ID'] !== undefined }` beside a
- * `createAuth` that builds its config from a slightly different expression is
+ * THE OBVIOUS FIX IS THE ONE THAT DRIFTS. A route that answers the question by
+ * reading the Google client id out of the environment itself, beside a
+ * `createAuth` that builds its config from a slightly different expression, is
  * two sources for one fact, and the day they disagree the page shows a button
  * the server refuses — which is exactly the bug, restored by the fix for it.
+ *
+ * *(That sentence used to SPELL the variable access inline, and the spelling was
+ * a defect: `scripts/check-env-example.mjs` reads raw lines, comments included,
+ * so the prose registered as a code site and the gate reported the key as read
+ * by this file when nothing here read it that way. The gate was green for the
+ * wrong reason on Google and blind on all three Apple keys at the same time.
+ * `SOCIAL_PROVIDER_ENV` below is the fix: one real, literal read per key.)*
  *
  * So there is ONE function. `socialProvidersFromEnv` returns the object handed
  * to better-auth, containing a key **only** for a provider that is fully
@@ -62,6 +69,35 @@ export type SocialProviderConfig = {
 /** Trims, because a variable set to a lone space is not configuration. */
 function readable(env: NodeJS.ProcessEnv, key: string): string {
   return (env[key] ?? '').trim();
+}
+
+/**
+ * THE REAL ENVIRONMENT, READ WITH ONE LITERAL ACCESS PER KEY — and the literals
+ * are the point, not a style choice.
+ *
+ * `socialProvidersFromEnv` takes its environment as an argument so it can be
+ * driven from a fixture, and reads it as `env[key]` with `key` a variable. That
+ * is invisible to `scripts/check-env-example.mjs`, whose detectors anchor on the
+ * the literal environment access with the key spelled inline — so routing every read
+ * through a helper silently removed `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+ * from the gate's view (they were direct accesses in `auth.ts` before) and never
+ * added the three Apple keys. **An operator-facing variable the env gate cannot
+ * see is exactly what that gate exists to prevent, and the refactor that hid
+ * them would have reported clean.**
+ *
+ * So the five keys are spelled here, once, literally. This function is also the
+ * single place that names the contract between this module and an operator: add
+ * a provider above and you must add its keys here or the gate stops watching
+ * them, which is a failure a reader can see rather than one they must remember.
+ */
+export function readSocialProviderEnv(): NodeJS.ProcessEnv {
+  return {
+    GOOGLE_CLIENT_ID: process.env['GOOGLE_CLIENT_ID'],
+    GOOGLE_CLIENT_SECRET: process.env['GOOGLE_CLIENT_SECRET'],
+    APPLE_CLIENT_ID: process.env['APPLE_CLIENT_ID'],
+    APPLE_CLIENT_SECRET: process.env['APPLE_CLIENT_SECRET'],
+    APPLE_APP_BUNDLE_IDENTIFIER: process.env['APPLE_APP_BUNDLE_IDENTIFIER'],
+  };
 }
 
 /**

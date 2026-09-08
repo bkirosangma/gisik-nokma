@@ -1122,6 +1122,38 @@ for (const route of UNAUTHED_ROUTES) {
       await expect(
         page.getByText("We’ll email you a link that signs you in. It expires in 15 minutes."),
       ).toHaveCount(0);
+
+      /* 13.292, the POSITIVE direction — the server's answer DRIVEN rather than
+       * its environment set, per the controller's ruling of 2026-09-08.
+       *
+       * Everything above ran against this suite's own dev server, which has no
+       * credentials, so it proves only that nothing renders when nothing is
+       * configured. That half alone cannot tell *gated correctly* from *the row
+       * was deleted*. `page.route` fulfils `/v1/auth/methods` with
+       * `google: true`, and the reload is what makes the page ask again — the
+       * availability request fires once, on mount.
+       *
+       * `toHaveCount(1)` rather than `toBeVisible`: two controls sharing an
+       * accessible name would satisfy visibility and would be a real defect.
+       */
+      await page.route('**/v1/auth/methods', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: true, apple: false }),
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      const googleMark = page.getByRole('button', { name: 'Continue with Google' });
+      await expect(googleMark).toHaveCount(1);
+      await expect(googleMark).toBeVisible();
+      // Icon-only: the accessible name comes from `aria-label`, not from text.
+      // A button that had kept its words would satisfy the locator above.
+      await expect(googleMark).toHaveText('');
+      // Apple stays off because the SAME answer said so, which is what makes
+      // this a test of the gate rather than of the fetch.
+      await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
+      await page.unroute('**/v1/auth/methods');
     }
 
     /* ── 5. COMPUTED CONTRAST FROM THE LIVE DOM. ──────────────────────────*/
