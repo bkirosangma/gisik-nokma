@@ -17,6 +17,12 @@ import { signInWithPhone } from '../helpers/session.js';
  * **Plan 9's consumer-side residual, closed: the REAL `NotificationsGateway`
  * against the REAL route and a REAL database.**
  *
+ * Closes case **7.243** as well as 12.325's consumer half. 7.243 recorded the
+ * same impossibility from the §7 side — that the web gateway's scripted bodies
+ * were a mirror no server test could reach — and demanded it be closed by
+ * removing the obstacle rather than softening the assertion. It is: the six
+ * cases below (11.190-11.195) are that round trip.
+ *
  * ## The gap this file exists to close, in its own words
  *
  * `fixture-witnesses.test.ts` (case 12.325) pinned the PRODUCER end of the
