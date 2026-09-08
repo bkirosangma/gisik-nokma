@@ -1,5 +1,98 @@
 # Cross-lane controller — live state
 
+## 🔧 TUESDAY 11:0x IST — THE CONTROLLER↔EXECUTOR CHANNEL IS FIXED, ROOT CAUSE MEASURED. Owner-directed. `main` is `a6d05cf`. **Reading the executor's pane is what was breaking the ability to talk to it.**
+
+**ROOT CAUSE — `tmux send-keys` is swallowed whenever the pane is in COPY MODE.** Keys sent to a
+copy-mode pane are interpreted by copy mode's own keymap and never reach the application. **A pane
+enters copy mode silently the moment anyone SCROLLS it** — mouse wheel, PageUp. So a human (or a
+controller) scrolling the executor's pane to read it disables every subsequent `send-keys` message, and
+the text strands unsubmitted in the input box, looking exactly like an executor that is ignoring you.
+That is why this read as intermittent and unreproducible for a week.
+
+**Measured, on a disposable real Claude Code TUI pane** (`--permission-mode bypassPermissions`, global
+`editorMode: vim`, so `-- INSERT --` matched the executor's true state), by submitting a probe and
+**reading the model's answer back** — not by absence of an error:
+
+| pane state | `send-keys Enter` | pasted `"\r"` via `paste-buffer` |
+|---|---|---|
+| normal | submits | submits |
+| **copy mode** | **SWALLOWED** | **submits** |
+
+`send-keys -l TEXT` into a copy-mode pane is worse than swallowed: one attempt **hung the `tmux` call
+itself** until killed. `paste-buffer` writes to the pane's stdin and bypasses copy mode entirely — and
+is preferred over `send-keys -X cancel`, which would yank a reading human's scroll back to the bottom.
+
+**The fix, in all three places it had to land:** both the text and the submitting CR now go as
+`paste-buffer`, never `send-keys`, kept as **two** pastes with a pause (bundled into one buffer the
+newline inserts literally instead of submitting — the older, delivery-independent bug).
+`~/.claude/scripts/idle-nudger.py` patched (new `tmux_paste()`), its README given the finding, and
+`dispatch-controller-serial.md`'s "Reaching the executor" section corrected — it had been prescribing
+the broken method. **Validated by running the REAL nudger against a copy-mode pane** with its own
+documented `IDLE_NUDGER_TARGETS`/`STATE` overrides: the nudge submitted, the model answered, the input
+box came back empty, and the pane stayed in copy mode. The same run gave both controls — sweep 1 read
+`active`, sweep 2 read `IDLE — nudging` — so the detector was not made inert.
+
+**WHY THE PREVIOUS FIX (2026-09-01) SHIPPED BROKEN, because it is the transferable lesson:** its own
+README says it was verified *"against a shell pane."* **A shell pane cannot enter copy mode the way a
+live TUI pane does and has no input widget to strand text in** — the instrument was structurally
+incapable of showing the failure. *The control has to be the same kind of thing as the subject.*
+
+**A measurement trap that bit me twice inside this very investigation, now written down:**
+`grep "^❯ <text>"` over a pane capture **cannot tell the input box from the transcript** — a submitted
+message renders with the same prompt glyph. It reported "still stuck, submit FAILED" for a probe that
+had gone through perfectly, twice, and I nearly shipped a "fix" for a mechanism that was not broken on
+the strength of it. **The input box is the LAST `❯` line. Test that one alone.**
+
+**THE OTHER HALF, and it was the owner's actual complaint: the executor has NO channel to this
+controller at all.** `dispatch-executor-serial.md` contains zero tmux instructions; `SendMessage` is
+dead in that direction too. When the executor is blocked it announces the fact into its own pane and
+waits — this session it sat blocked saying *"that is the only thing standing between here and done, and
+it's the one authority I don't have"* while this controller assumed silence meant progress. **Fixed by
+arming a persistent `Monitor` on the open-PR set that emits on ANY change — new PR, head-sha change (a
+rebase pushes no new number), or mergeability change — emitting on change only, never per poll.**
+Recorded in the brief so a restarted controller arms it too. **It justified itself within one minute of
+being armed** — see below.
+
+## ⚠ TUESDAY 11:0x IST — MY OWN #334 SQUASH DROPPED A PUSH, AND MY VERIFICATION COULD NOT HAVE CAUGHT IT. PR #337 (the executor's recovery) merged; `main` is `a6d05cf`.
+
+**`5ef45d6` — 23 lines of `docs/lanes/executor-state.md` — was pushed to `exec/117-type-scale` moments
+before this controller squash-merged #334, and the squash captured the branch without it.** Verified
+independently rather than taken on the executor's account: the commit exists on
+`origin/exec/117-type-scale`, is **not** an ancestor of `origin/main`, and its distinctive content was
+absent from `main`'s copy of the file — with the positive control run in both directions.
+
+**Why my verification passed anyway, and this is the part worth carrying:** I ran the corrected
+reachability check (`merge-base --is-ancestor`) and it *genuinely passed* — the merge commit really is
+on `main`. **Reachability proves WHERE a commit lives, never WHAT it contains.** This repo already
+learned the mirror of this (the five PRs whose checksums proved content while it sat on the wrong
+branch); this is the same coin's other face, and only the two together close it. And my checksums could
+not have caught it either: **I checksummed the source files and deliberately skipped the narrative
+ones — and the drop was entirely in a narrative file.** A subset check cannot fail on what it excludes.
+
+**Corrected practice, adopted here for every merge from now on — it replaces choosing which files to
+checksum:**
+
+    git diff origin/main <branch-tip>        # ALL files, no -- path filter
+    # EMPTY is the only proof. Anything printed is a drop.
+
+One command, no judgment call about which files "matter," and it subsumes the per-file checksums for
+the drop question. **Applied to my own merge of #337 immediately: empty, exit 0** — and the originally
+dropped content confirmed present on `main` afterward.
+
+**The danger window, stated precisely by the executor and worth repeating:** it is **not** "pushing to
+a merged PR." It is pushing to an **open** PR that someone is about to merge — the pusher cannot see
+the merge coming, and every branch-side signal reports success. Recovery was by **cherry-pick onto a
+branch cut fresh from `main`**, never a rebase of the merged branch, which would re-apply commits
+`main` already holds in squashed form and manufacture conflicts that read as real.
+
+**Still open from #337, an owner decision not taken here:** the Playwright stack suite trips the auth
+rate limit when run whole (3 passed / 2 failed, both `sign-in.ts:28` timeouts, both passing when run
+individually ~75s apart, 429s in the server log for that window). The suite signs in once per test and
+has grown three → five. Reusing one session across tests, or raising `RATE_LIMIT_AUTH_MAX` for the e2e
+profile, are **design choices about a security control** — the executor explicitly declined to make
+them and so does this controller. Its own request counting is stated as **not established** (a
+three-minute `docker logs` window covering two prior runs, bucketing uncharacterised).
+
 ## ✅ TUESDAY 10:4x IST — ALL FIVE OWNER-RULED 2026-09-08 ITEMS ARE ON `main`. #327/#328/#334 landed after FOUR rebase rounds; a genuine idle-nudger finding; two items flagged for the owner, not decided here.
 
 **Every branch from this morning's restart is merged: #325 (security headers), #326 (dev-token guard),
