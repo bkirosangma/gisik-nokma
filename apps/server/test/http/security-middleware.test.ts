@@ -935,24 +935,47 @@ describe('rate limiting — the sign-in bucket', () => {
   });
 
   /**
-   * 13.278 — a dot-segment spelling of a sign-in path is charged to the sign-in bucket, at the wire.
+   * 13.278 — a doubled-slash spelling of a sign-in path is charged to the sign-in bucket, at the wire.
    *
-   * The unit table below covers the matcher in isolation; this covers the seam
-   * the matcher sits in, because the two can disagree. `app.ts` hands the
-   * matcher `request.url` — the RAW request-target — and the mount handler
-   * builds better-auth's `Request` from `new URL(request.url, baseUrl)`, which
-   * resolves `..`. A matcher doing a literal `startsWith` on the raw target
-   * would therefore miss a path that the vendor handler goes on to treat as a
-   * sign-in: the request would be charged the general budget, which is twice
-   * the size. That is a bypass, and it is only visible end to end.
+   * The unit table covers the matcher alone; this covers the seam it sits in,
+   * because `app.ts` hands it `request.url` — the RAW request-target — and a
+   * matcher that is right in isolation can still be wired to the wrong string.
+   *
+   * ## Why this asserts the DOUBLED SLASH and not the dot segment
+   *
+   * The dot segment is the more interesting spelling and it was this case's
+   * first subject. It cannot be witnessed here, and the reason is structural
+   * rather than a gap worth leaving open — MEASURED with a probe against this
+   * same Fastify, `onRequest` recording `request.url` for both transports:
+   *
+   *     app.inject('/api/auth/x/../sign-in/magic-link')  → /api/auth/sign-in/magic-link
+   *     real socket, same target                          → /api/auth/x/../sign-in/magic-link
+   *
+   * **`app.inject` resolves dot segments before any hook runs; a real socket
+   * does not, and the raw target still routes to `/api/auth/*`.** So the
+   * production hazard is real — the unresolved spelling genuinely reaches this
+   * hook from the network — and the injection harness is blind to it by
+   * construction. A case asserting it here PASSED with the matcher's URL
+   * resolution deleted, which makes it a check that cannot fail for the reason
+   * its name gives: the same shape #347 found in its first guard and deleted
+   * rather than keep as a green tick meaning nothing.
+   *
+   * The dot segment is therefore witnessed by the unit row in 13.277, where the
+   * string is handed to the matcher directly and no transport can launder it —
+   * and the mutation that deletes the resolution kills exactly that row.
+   *
+   * The doubled slash is asserted INSTEAD because the probe shows `inject`
+   * delivers it verbatim (`/api/auth//sign-in/magic-link`), so this case does
+   * exercise the real seam with a real alternative spelling, and the mutation
+   * that deletes the slash collapse kills it here as well as in the unit table.
    */
-  it('charges a `..` spelling of a sign-in path to the sign-in bucket', async () => {
+  it('charges a doubled-slash spelling of a sign-in path to the sign-in bucket', async () => {
     const { app } = build(limits({ signInMax: 1, authMax: 100 }));
     const direct = await app.inject({ method: 'GET', url: '/api/auth/sign-in/magic-link' });
-    const viaDotSegment = await app.inject({ method: 'GET', url: '/api/auth/x/../sign-in/magic-link' });
+    const viaDoubledSlash = await app.inject({ method: 'GET', url: '/api/auth//sign-in/magic-link' });
     await app.close();
     expect(direct.statusCode).not.toBe(429);
-    expect(viaDotSegment.statusCode).toBe(429);
+    expect(viaDoubledSlash.statusCode).toBe(429);
   });
 });
 
