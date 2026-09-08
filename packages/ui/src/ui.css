@@ -74,7 +74,12 @@
   font-weight: 600;
 }
 .gn-avatar--medium { width: 2rem; height: 2rem; font-size: 0.8rem; }
-.gn-avatar--small { width: 1.5rem; height: 1.5rem; font-size: 0.65rem; }
+/* 0.75rem, not the 0.65rem this shipped with: 10.4px was the smallest text in
+   the product and the only rule below 0.7rem. The initials stay inside the
+   1.5rem circle — two uppercase glyphs at 12px measure well under 24px — so the
+   size was the whole of the change. See `e2e-viewport/type-scale.ts` for why
+   12px is the floor and why it is not a WCAG number. */
+.gn-avatar--small { width: 1.5rem; height: 1.5rem; font-size: 0.75rem; }
 
 .gn-dialog__scrim,
 .gn-sheet__scrim {
@@ -380,7 +385,10 @@
   border: 1px solid var(--gn-border);
   border-radius: 6px;
   padding: 0.15rem 0.5rem;
-  font-size: 0.7rem;
+  /* 0.75rem, not 0.7rem: 11.2px, below this product's own bottom rung. This
+     label names the transition a workflow edge carries, so it is text a person
+     has to read to know what the arrow does, not decoration. */
+  font-size: 0.75rem;
   max-width: 220px;
 }
 .gn-transition-edge__label--empty { padding: 0; border: none; background: none; }
@@ -551,7 +559,9 @@
 }
 .ticket-type-list__name { font-weight: 600; font-size: 0.9rem; }
 .ticket-type-list__badge {
-  font-size: 0.7rem;
+  /* 0.75rem, not 0.7rem — 11.2px, under the floor. The badge is the only thing
+     distinguishing one ticket type row from another at a glance. */
+  font-size: 0.75rem;
   padding: 0.1rem 0.35rem;
   border-radius: 999px;
   border: 1px solid var(--gn-border-strong);
