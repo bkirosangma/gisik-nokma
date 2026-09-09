@@ -18,6 +18,7 @@ import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
+import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from '../read/membership-roster.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 
 /**
@@ -124,10 +125,6 @@ export const INVALID_MIGRATION_BODY = {
   error: 'invalid',
   message: 'A migration needs fromWorkflowId, toWorkflowId and a stateMap of state id to state id.',
 } as const;
-
-function isWorkspaceAdmin(eff: EffectiveRole): boolean {
-  return eff.workspaceRole === 'owner' || eff.workspaceRole === 'admin';
-}
 
 /**
  * Every workflow id defined in this workspace, in a stable order.
@@ -252,7 +249,7 @@ export async function readMembers(
        JOIN "user" u ON u."id" = m.user_id
       WHERE m.workspace_id = $1
         AND m.scope_kind = 'workspace'
-        AND ($2::boolean OR m.role <> 'guest')
+        AND ${ROSTER_VISIBLE_CLAUSE}
       ORDER BY m.user_id`,
     [workspaceId, includeGuests],
   );

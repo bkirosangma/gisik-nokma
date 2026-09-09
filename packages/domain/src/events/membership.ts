@@ -123,3 +123,40 @@ export type ProjectMemberAddedPayload = z.infer<typeof projectMemberAddedPayload
 
 export const projectMemberRemovedPayload = z.object({ userId: ulidString }).strict();
 export type ProjectMemberRemovedPayload = z.infer<typeof projectMemberRemovedPayload>;
+
+/**
+ * Archiving a project, and putting it back (Task 16 of the HIG per-screen plan,
+ * owner brief 2026-09-09).
+ *
+ * ## An EVENT PAIR, not a boolean somebody sets
+ *
+ * The product's whole shape is that a stored fact is the fold of claims people
+ * made, and `proj_projects.archived` is no exception: it is written by these two
+ * events and by nothing else, so "who archived this, and when" is answerable
+ * from the ledger without a second audit column. The pair is symmetric on
+ * purpose — a single toggle event carrying `archived: boolean` would let a
+ * re-delivery flip a project back, and `project.restored` reads honestly in a
+ * history list where `project.archived { archived: false }` does not.
+ *
+ * ## The payloads are EMPTY, and `.strict()` is what makes that a refusal
+ *
+ * The project is `env.entity.id` — both types are filed against the project
+ * entity, exactly as the two roster events are (`vocabulary.ts`), so there is
+ * nothing left for a payload to name. Empty and `.strict()` rather than
+ * `z.unknown()`: an actor who sends `{ projectId: '<somebody else's>' }` is
+ * REFUSED rather than quietly ignored, which is the same reason
+ * `POST /v1/workspaces` refuses a body naming the workspace it founds.
+ *
+ * ## What they deliberately do NOT mean
+ *
+ * Archiving hides a project from the places that list live work; it is not a
+ * delete, it removes nobody's access, and no read in the product consults it as
+ * a permission. There is still no `project.deleted` event anywhere — the
+ * invitation gate in `apps/server/src/permissions/check-permission.ts` depends
+ * on a founded project staying founded, and this pair keeps that true.
+ */
+export const projectArchivedPayload = z.object({}).strict();
+export type ProjectArchivedPayload = z.infer<typeof projectArchivedPayload>;
+
+export const projectRestoredPayload = z.object({}).strict();
+export type ProjectRestoredPayload = z.infer<typeof projectRestoredPayload>;

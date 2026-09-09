@@ -31,7 +31,23 @@ export const BLOCKED_STATES_CTE = `blocked_states AS (
 
 export type CompiledFilter = { clauses: string[]; needsBlockedCte: boolean };
 
-const BLOCKED_MEMBERSHIP =
+/**
+ * "This ticket stands in a blocked-flagged state", over `proj_tickets` aliased
+ * `t`, against the `blocked_states` CTE above.
+ *
+ * EXPORTED since Task 16, for the reason `read/visible-where.ts` was extracted:
+ * `read/workspace-counts.ts` counts blocked tickets for the workspace card, and
+ * a second copy of this expression would put the card and the attention strip it
+ * links to on two definitions of one word. The CTE and the predicate that reads
+ * it travel together or not at all — importing one and restating the other is
+ * the half-measure that looks like sharing.
+ *
+ * The `workspace_id = t.workspace_id` correlation is load-bearing and belongs to
+ * the expression, not to its callers: `proj_workflows` is keyed
+ * `(workflow_id, version)` globally, so without it one tenant's blocked filter
+ * would answer out of another tenant's definition.
+ */
+export const BLOCKED_MEMBERSHIP =
   '(t.workflow_id, t.state_id) IN (SELECT workflow_id, state_id FROM blocked_states WHERE workspace_id = t.workspace_id)';
 
 /**

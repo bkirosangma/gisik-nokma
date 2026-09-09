@@ -205,6 +205,20 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   // COMMIT, which is the exact escalation that check exists to stop.
   'invite.sent',
   'invite.revoked',
+  // Task 16 (HIG per-screen plan, owner brief 2026-09-09). Archiving a project
+  // takes it out of every list of live work for everyone in the workspace, which
+  // is the same class of act as founding one — `project.created` is two lines
+  // up for the same reason. It is NOT a roster question, so it does not go to
+  // `hasProjectAdminRights` below: a project admin runs their project's people
+  // and their tickets' visibility (`effective-role.ts` says so in words), and
+  // retiring the project itself is the workspace's decision, not theirs.
+  //
+  // Conservative in the reversible direction: widening this later to include
+  // project admins is one line and discloses nothing new, while an archive by
+  // someone the workspace did not intend cannot be un-seen by the people whose
+  // work vanished from their boards.
+  'project.archived',
+  'project.restored',
 ]);
 
 /**
@@ -585,6 +599,13 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
       return [ticketCreatedPayload.parse(env.payload).projectId];
     case 'project.member_added':
     case 'project.member_removed':
+    // Task 16. Both are filed against the project entity, so the id is
+    // `env.entity.id` and never a payload read — their payloads are empty. They
+    // are here so archive/restore inherit the existence precondition: an
+    // `project.archived` naming a project nobody founded is told the project
+    // does not exist, rather than silently writing nothing and answering 201.
+    case 'project.archived':
+    case 'project.restored':
       return [env.entity.id];
     case 'invite.sent':
       return inviteSentPayload.parse(env.payload).projectIds ?? [];

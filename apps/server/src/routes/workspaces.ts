@@ -1,6 +1,7 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { visibleProjects } from '../read/visible-projects.js';
+import { visibleMemberCount, visibleProjectCounts } from '../read/workspace-counts.js';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
@@ -155,21 +156,52 @@ export function registerWorkspaceRoutes(
         ORDER BY workspace_id`,
       [request.currentUserId],
     );
-    const workspaces = [];
+    const workspaces: Array<Record<string, unknown>> = [];
     for (const row of rows) {
       // Resolved PER WORKSPACE, never once for the caller: `eff.projects` is a
       // set within one workspace, and reusing another workspace's resolution
       // here would be a cross-tenancy answer wearing the right shape.
       const eff = await resolveEffectiveRole(deps.pool, request.currentUserId, row.workspace_id);
-      workspaces.push({
-        workspaceId: row.workspace_id,
-        name: await workspaceNameFromLedger(deps.pool, row.workspace_id),
-        role: row.role,
+      const [memberCount, counts, projects] = await Promise.all([
+        visibleMemberCount(deps.pool, eff, row.workspace_id),
+        visibleProjectCounts(deps.pool, eff, request.currentUserId, row.workspace_id),
         // Rulings P32/P38. A viewer outside a project is not told its NAME —
         // and this list being partial is the CORRECT answer, not a defect. See
         // `read/visible-projects.ts` for why that is an application of
         // `resolveEffectiveRole` rather than a new rule.
-        projects: await visibleProjects(deps.pool, eff, row.workspace_id),
+        visibleProjects(deps.pool, eff, row.workspace_id),
+      ]);
+      workspaces.push({
+        workspaceId: row.workspace_id,
+        name: await workspaceNameFromLedger(deps.pool, row.workspace_id),
+        role: row.role,
+        // WITHHELD IS AN ABSENT KEY, NEVER A ZERO (Task 16). A guest resolves
+        // `null` here and the key is not written at all, so the card renders
+        // "Restricted" rather than a number nobody counted. `?? 0` anywhere on
+        // this path would turn a withholding into a false statement, and the
+        // mapper's own refusal (`asNumber` on an absent key) would never fire.
+        ...(memberCount === null ? {} : { memberCount }),
+        projects: projects.map((project) => {
+          const count = counts?.get(project.projectId);
+          return {
+            projectId: project.projectId,
+            name: project.name,
+            // Served to every viewer who is told the project's NAME, guests
+            // included — see `read/visible-projects.ts`. It is not a count.
+            archived: project.archived,
+            // `counts === null` is the WITHHOLDING, decided once in
+            // `visibleProjectCounts` and never re-asked here. Inside a served
+            // map, a project with no row is an honest 0 — the aggregation
+            // groups only projects with visible tickets, and "none you can see"
+            // is a true claim to a caller who is being served counts at all.
+            ...(counts === null
+              ? {}
+              : {
+                  ticketCount: count?.ticketCount ?? 0,
+                  blockedCount: count?.blockedCount ?? 0,
+                }),
+          };
+        }),
       });
     }
     return { workspaces };

@@ -2327,10 +2327,18 @@ cards), requested and used provisionally per this file's standing convention: se
 and therefore no other claimant, and an unmerged id can still be renumbered. ~~**The next free BLOCK is now
 `13.358`** (this PR carries the header, per the standing §12/§13 rule that the first PR minting from a
 block does so) — recount the maximum in use against `origin/main` before trusting this pointer.~~
-**`13.358`–`13.365` is CONSUMED by Round 2d, the owner's `/sign-in` neo design feedback (controller,
+~~**`13.358`–`13.365` is CONSUMED by Round 2d, the owner's `/sign-in` neo design feedback (controller,
 2026-09-09) — see that section at the foot of this file. The next free BLOCK is now `13.366`,
-controller-allocated ON REQUEST ONLY** — recount the maximum in use against `origin/main` before
-trusting this pointer, same caveat as every prior one in this paragraph.
+controller-allocated ON REQUEST ONLY**~~ — `13.358`–`13.365` is consumed by Round 2d as stated, and
+**`13.366`–`13.389` is ALLOCATED to the owner's `/workspaces` cluster, Tasks 16–19 of the neomorphism
+amendment (controller, 2026-09-09): `13.366`–`13.372` minted by Task 16 (this PR), `13.373`–`13.378`
+reserved for Task 17, `13.379`–`13.383` for Task 18, `13.384`–`13.389` for Task 19. The next free BLOCK
+is `13.390`, controller-allocated ON REQUEST ONLY** — recount the maximum in use against `origin/main`
+before trusting this pointer, same caveat as every prior one in this paragraph. **Recounted at
+`1417580` for this PR: the maximum id in use was `13.365`, and `13.366` appeared only in the pointer
+prose above.** Both documented traps were reproduced rather than avoided by memory — a bare
+`13\.[0-9]+` sweep still reports `13.3333` (the user-agent font size cases 13.266–13.267 are about) as
+its maximum under an ordinal sort, and a float sort still puts `13.99` above `13.365`.
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -2543,3 +2551,100 @@ same way).
 > `UPDATE_*` flags that were never set, so a clean status there means "no operator asked to move the
 > baseline", the weaker but still relevant claim for 13.363 (no floor moved) that this run neither needed
 > nor attempted a baseline update.
+
+
+## Task 16 of the neomorphism amendment (2026-09-09) — `/v1/me/workspaces` real counts, archived, visibility-scoped
+
+Block `13.366`–`13.372`. The owner's `/workspaces` reference shows member counts, per-project ticket and
+blocked chips, archived projects, and a GUEST card carrying no numbers at all. This task is **server-first**
+— the card that renders any of it is Task 18. What it builds: `memberCount` per workspace and
+`{ticketCount, blockedCount, archived}` per project on `GET /v1/me/workspaces`, a new `proj_projects.archived`
+column folded from a new `project.archived`/`project.restored` event pair, and the mapper that reads them.
+
+**The premise this task was dispatched on was already stale and is recorded as corrected rather than acted
+on:** the owner brief's *"`getMyWorkspaces` REFUSES whole"* was true in the Plan 5/6 era and was closed by
+rulings P32/P38. The route SERVES `{workspaceId, name, role, projects}` today. There was no refusal to fix;
+the gap was the counts.
+
+**The one rule under all seven cases: every number is the CALLER'S number, and a number the caller may not
+count is ABSENT rather than zero.** Three ways these checks could have passed for the wrong reason, each
+closed by the fixture rather than by an argument:
+
+1. *A visibility-scoped count and a whole-table count are the same number when every fixture ticket is
+   visible to everybody.* 13.368 seeds a ticket in the member's own project with an explicit audience
+   naming only the owner, and asserts the member's count is STRICTLY LESS than the raw `proj_tickets`
+   count while the owner's EQUALS it.
+2. *A blocked count and a ticket count are the same number when every seeded ticket is blocked.* 13.369's
+   project holds one blocked and two unblocked tickets, both unblocked ones in an `active` state — which
+   also pins that `blocked` is not derived from `category === 'active'`.
+3. *`absent` and `0` are the same to any assertion written `toBe(0)` or `?? 0`.* 13.366 and 13.372 assert
+   on KEY PRESENCE (`'memberCount' in entry`), each against a positive control in the same run.
+
+- **13.366** ✅ A guest is served no count at all — `memberCount` and both per-project count keys are
+  ABSENT from the wire, not 0 — while name, role and the visibility-scoped project list are unchanged.
+  Two shapes, because the withholding has to hold in both: a guest on NO project (whose project list is
+  empty anyway, so the counts have nowhere to appear) and a guest who DOES hold a project-scope row and is
+  therefore told that project's name and its `archived` flag and still no counts. The positive control is a
+  member of the same workspace, in the same run, who has the keys — without it, a route that had stopped
+  serving counts to everybody would pass. Mutation witness: permitting the guest branch in
+  `visibleMemberCount` / `visibleProjectCounts` reddens this case and nothing else.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.367** ✅ `memberCount` equals exactly what `readMembers` would list for the same caller, asserted
+  class by class (owner 4, admin 4, member 3 over a fixture of owner+admin+member+guest), and a guest
+  resolves `null`. The cross-check is the point: the count and the directory are two expressions of one
+  rule — a plain member's roster hides the guest, so a naive `COUNT(*)` would have told them the withheld
+  person exists. Either half alone passes for the wrong reason (three constants notice no roster drift; an
+  agreement check alone agrees vacuously on two implementations wrong in the same direction), so both run.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.368** ✅ `ticketCount` counts what THIS caller may see: strictly less than the raw `proj_tickets`
+  count for a member outside a ticket's audience, and equal to it for the owner — the owner half being what
+  proves the `proj_visibility` INNER JOIN drops nothing, so the smaller number is a SCOPE and not a bug.
+  A sibling asserts an explicit `0` (key PRESENT) for a project a caller can name and has no visible work
+  in, which is a claim they are entitled to and a different answer from "restricted". **A third case, added
+  after an opus review found the SURVIVOR the first seven mutations missed**: neutralising the query's
+  `v.workspace_id = $n` left every case green, because the route reads `counts.get()` only for the ids
+  `visibleProjects` returned and `project_id` is a global primary key — from a client's side the tenancy
+  clause is invisible. The world that can see it is the INTERNAL door's, where no existence check runs: a
+  ticket committed under workspace B can carry workspace A's `project_id`. The case seeds exactly that, and
+  asserts the raw table holds TWO rows for the id while A's owner counts ONE — so the `1` cannot be read as
+  "the fixture only made one". Mutation-witnessed: the clause's removal now reddens this case ALONE.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.369** ✅ `blockedCount` counts tickets in a state its own workflow flags `blocked: true` and nothing
+  else: three tickets, one blocked, two in a different `active` state, and the two numbers must differ.
+  The definition is `BLOCKED_STATES_CTE`, imported from `read/compile-filter.ts` rather than restated, so
+  the card counts by the same expression as the board, the list and the attention strip.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.370** ✅ `archived` is a fold of the new event pair, and only an owner or admin may claim it. The
+  REFUSAL is asserted FIRST, so the later success cannot be mistaken for a gate that never ran: a plain
+  member who is ON the project is refused, the flag is unmoved, and the project is still served to them
+  unarchived. Then an owner archives (flag true, served true, and the member — whose access archiving does
+  not touch — is served true as well), and `project.restored` returns it to false. A second case pins the
+  two refusals the event pair inherits: an archive naming a project nobody founded is told the project does
+  not exist (both types are in `projectsNamedBy`), and an empty `.strict()` payload refuses a body that
+  names a project rather than ignoring it. **All three refusals name their RULE, not only their status** —
+  `permission.role`, `project.unknown` (where `permission.role` would mean the existence check stopped
+  running first, since that caller IS an admin) and `invalid`; a refusal for some other reason would satisfy
+  a bare `status: 'refused'` while proving nothing about the gate the case is named for. **A note lives at
+  the payload case because it will mislead the next person**: mutating `.strict()` in
+  `packages/domain/src` proves nothing here — `@gisik-nokma/domain` exports `./dist/index.js` and
+  `apps/server` has no src alias, so the server loads the BUILT artifact. Measured: the src edit leaves
+  9/9 green, the same edit in `dist` reddens this case alone.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.371** ✅ The shape the directory already served is unchanged for a member — the whole entry asserted
+  with `toEqual`, so a future change that quietly dropped `role` or renamed `workspaceId` fails here, and
+  so that the additions are pinned as ADDITIONS. — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.372** ✅ `mapWorkspaceRefs` keeps WITHHELD and a counted zero apart: an absent count maps to `null`
+  and a present `0` maps to `0`, both in one body, so neither the `?? 0` bug nor its mirror (a truthiness
+  check collapsing a real zero to withheld) survives. A count that is present and not a number — `null`,
+  a string, a boolean — is a `MappingError` rather than a second spelling of withheld, because guessing
+  which of the two claims a server meant is the invention this mapper exists to refuse. `archived` is
+  REQUIRED, with a positive control on the same body. — (`packages/app-core/test/online/mappers.test.ts`)
+
+> **One thing this task does NOT build, escalated rather than decided.** The task text asks for a
+> "visible/restricted count" of the projects a caller may not name, so Task 18 can render *"1 project ·
+> name restricted"*. `mapWorkspaceRefs`' own docblock forbids exactly that — *"there is deliberately no
+> 'and N more', because the COUNT would itself be the disclosure the rule withholds"* — and the task text's
+> own "escalate before a new rule" clause fires on the conflict. The field is strictly additive and its
+> absence blocks nothing in this PR; the question, with three options and the asymmetry that decides them,
+> is at `docs/lanes/owner-question-restricted-project-count.md`. **Task 18's card string has no data source
+> until it is answered.**

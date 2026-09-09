@@ -248,6 +248,25 @@ export interface SeedTicketArgs {
    * Seeding one without the other reproduces a corrupt store, not an assignment.
    */
   assigneeId?: string;
+  /**
+   * The `proj_tickets` head row's workflow and state (Task 16).
+   *
+   * Defaults are `SEED_WORKFLOW_ID`/`SEED_WORKFLOW_VERSION`/`SEED_STATE_ID`,
+   * which is what every caller got before these existed, so no fixture that does
+   * not ask changes. They exist for the same reason `stateCategory` does: with
+   * `state_id` hardcoded to `'todo'`, "how many tickets are BLOCKED" was a
+   * number that could not vary, and a count that cannot vary is an assertion
+   * that cannot fail. `blocked` is a flag on the WORKFLOW's state
+   * (`workflow.ts`), never a column here, so moving a ticket into a blocked
+   * state means naming a definition that flags one — see
+   * `seedWorkflowDefWithBlockedState`.
+   *
+   * Passing a `stateId` the named definition does not carry produces a world the
+   * door cannot reach; every caller here passes one that exists.
+   */
+  workflowId?: string;
+  workflowVersion?: number;
+  stateId?: string;
 }
 
 /**
@@ -379,9 +398,9 @@ async function insertTicketHead(
       args.projectId,
       args.typeId ?? 'task',
       args.parentId ?? null,
-      SEED_WORKFLOW_ID,
-      SEED_WORKFLOW_VERSION,
-      SEED_STATE_ID,
+      args.workflowId ?? SEED_WORKFLOW_ID,
+      args.workflowVersion ?? SEED_WORKFLOW_VERSION,
+      args.stateId ?? SEED_STATE_ID,
       args.stateCategory ?? 'open',
       // The COLUMN half of an assignment; the ledger half is appended above.
       args.assigneeId ?? null,
@@ -476,4 +495,70 @@ export function setVisibilityEnv(
     payload: { ticketId, mode, ...(userIds ? { userIds: [...userIds] } : {}) },
     actorId,
   });
+}
+
+/** The workflow id `seedWorkflowDefWithBlockedState` publishes, and the two states worth naming. */
+export const BLOCKED_WORKFLOW_ID = 'wf-blocked';
+export const BLOCKED_WORKFLOW_VERSION = 1;
+/** Carries `blocked: true`. */
+export const BLOCKED_STATE_ID = 'waiting';
+/** Does not. The negative control for every blocked-count assertion. */
+export const UNBLOCKED_STATE_ID = 'doing';
+
+/**
+ * A SECOND workflow, whose `waiting` state carries `blocked: true` (Task 16).
+ *
+ * A second definition rather than a blocked state added to `seedWorkflowDef`'s
+ * `wf-seed`: that one's three states are read by fixtures across this suite —
+ * `state-occupancy` counts them, and `blocked_states` is derived from the
+ * DEFINITION — so adding a fourth would move numbers in tests that never asked
+ * about blocking. Publishing a separate id changes nothing for anyone who does
+ * not name it.
+ *
+ * `blocked: true` is the real flag `workflowStateSchema` declares, and
+ * `BLOCKED_STATES_CTE` reads it out of `definition -> 'states'` — so a ticket
+ * whose head row names `(wf-blocked, waiting)` is blocked by the same expression
+ * the board, the list and the attention strip count with, not by a fixture
+ * convention.
+ *
+ * The event is appended AND projected, for the reason `seedWorkflowDef` gives:
+ * `verify-projections` rebuilds from the ledger and diffs, so a row with no
+ * event behind it fails that comparison.
+ */
+export async function seedWorkflowDefWithBlockedState(
+  pool: Pool,
+  workspaceId: string,
+  actorId: string = SEED_ACTOR,
+): Promise<void> {
+  const env = testEnvelope({
+    workspaceId,
+    entity: { kind: 'workflow', id: BLOCKED_WORKFLOW_ID },
+    type: 'workflow.defined',
+    payload: {
+      id: BLOCKED_WORKFLOW_ID,
+      version: BLOCKED_WORKFLOW_VERSION,
+      name: 'Blocking flow',
+      initialStateId: 'todo',
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: UNBLOCKED_STATE_ID, name: 'Doing', category: 'active' },
+        { id: BLOCKED_STATE_ID, name: 'Waiting', category: 'active', blocked: true },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [
+        { from: '*', to: 'todo', rules: [] },
+        { from: '*', to: UNBLOCKED_STATE_ID, rules: [] },
+        { from: '*', to: BLOCKED_STATE_ID, rules: [] },
+        { from: '*', to: 'done', rules: [] },
+      ],
+    },
+    actorId,
+  });
+  await appendTestEvent(pool, env);
+  const client = await pool.connect();
+  try {
+    await workflowsProjection.apply(env, client);
+  } finally {
+    client.release();
+  }
 }

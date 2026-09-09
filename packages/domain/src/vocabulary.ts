@@ -1,9 +1,11 @@
 import {
   membershipGrantedPayload,
   membershipRevokedPayload,
+  projectArchivedPayload,
   projectCreatedPayload,
   projectMemberAddedPayload,
   projectMemberRemovedPayload,
+  projectRestoredPayload,
   workspaceCreatedPayload,
   workspaceRenamedPayload,
 } from './events/membership.js';
@@ -218,6 +220,27 @@ domainRegistry.register({
   version: 1,
   entityKind: 'project',
   payloadSchema: projectMemberRemovedPayload,
+});
+
+/**
+ * Archive and restore (Task 16, owner brief 2026-09-09). Filed against the
+ * PROJECT, like the two roster events above and for the same reason: the
+ * project is the thing the claim is about, so `entity.id` names it and the
+ * payload is empty. See `events/membership.ts` for why this is a symmetric PAIR
+ * rather than one event carrying a boolean.
+ */
+domainRegistry.register({
+  type: 'project.archived',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectArchivedPayload,
+});
+
+domainRegistry.register({
+  type: 'project.restored',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectRestoredPayload,
 });
 
 domainRegistry.register({

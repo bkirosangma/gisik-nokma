@@ -1011,6 +1011,26 @@ export function toServerPreferences(preferences: UserPreferences): Record<string
 
 
 /**
+ * An optional COUNT: absent means withheld, present must be a number.
+ *
+ * The `in` check is the whole point and a truthiness check would not do: `0` is
+ * a served count and falsy, so `record[key] ? … : null` would map an honest zero
+ * to withheld — the same conflation in the other direction, and the one a test
+ * with tidy non-zero fixtures never catches.
+ *
+ * `undefined` rather than `!(key in record)` because a JSON object never carries
+ * an explicitly-undefined key: absence and `undefined` are the same state here,
+ * and an explicit `null` is neither and reaches `asNumber`, which refuses it.
+ */
+function withheldOrNumber(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+): number | null {
+  return record[key] === undefined ? null : asNumber(record[key], path);
+}
+
+/**
  * `GET /v1/me/workspaces` → `WorkspaceRef[]`. **ANSWERS** since rulings P32/P38.
  *
  * It REFUSED, and the reason it gave was right: "a nav rendering workspaces with
@@ -1032,6 +1052,27 @@ export function toServerPreferences(preferences: UserPreferences): Record<string
  * the audit's approved role-label addition)** — it was a field the server
  * discloses that the client did not read, and the display, not the data, was
  * the gap.
+ *
+ * ## Task 16's counts: ABSENT and `0` are different claims, and both are read
+ *
+ * `memberCount`, `ticketCount` and `blockedCount` are OPTIONAL on the wire and
+ * `number | null` here. The server omits the key when the caller is a guest in
+ * that workspace, and `withheldOrNumber` maps that absence to `null` — which the
+ * card renders as "Restricted". A key that IS present must be a number: `null`,
+ * a string or a boolean on the wire is a `MappingError`, not a second spelling
+ * of withheld, because a server that sent `null` did something this contract
+ * does not describe and the honest response is to say so rather than guess which
+ * of the two claims it meant.
+ *
+ * **There is no `?? 0` on this path and there must not be.** Defaulting the
+ * absence to zero would convert a withholding into the assertion "this project
+ * holds no work", which is the exact lie the withholding exists to avoid, and it
+ * would do it silently — the shape a renderer cannot detect.
+ *
+ * `archived` is REQUIRED, not optional: it is served to every caller who is told
+ * the project's name at all, so an absent key means the route did not answer
+ * this question and `asBoolean` refuses it. That is the same distinction the
+ * `projects` key draws two paragraphs down between absent and `[]`.
  */
 export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
   const record = asRecord(raw, 'workspaces');
@@ -1042,6 +1083,7 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       id: asString(workspace['workspaceId'], `${path}.workspaceId`),
       name: asString(workspace['name'], `${path}.name`),
       role: asString(workspace['role'], `${path}.role`),
+      memberCount: withheldOrNumber(workspace, 'memberCount', `${path}.memberCount`),
       // A PARTIAL LIST IS THE CORRECT ANSWER, not a defect (rulings P32/P38).
       // Every role except owner is served only the projects it holds a
       // membership in, because a project's NAME is itself a disclosure. The
@@ -1060,6 +1102,9 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
         return {
           id: asString(row['projectId'], `${projectPath}.projectId`),
           name: asString(row['name'], `${projectPath}.name`),
+          archived: asBoolean(row['archived'], `${projectPath}.archived`),
+          ticketCount: withheldOrNumber(row, 'ticketCount', `${projectPath}.ticketCount`),
+          blockedCount: withheldOrNumber(row, 'blockedCount', `${projectPath}.blockedCount`),
         };
       }),
     };

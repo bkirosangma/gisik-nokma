@@ -1,18 +1,58 @@
 import type { FieldClaim, StateCategory, TicketState } from '@gisik-nokma/domain';
 
 export type Actor = { id: string; name: string };
-export type ProjectRef = { id: string; name: string };
+/**
+ * `archived` and the two counts arrived with Task 16 (owner brief 2026-09-09).
+ *
+ * **`null` is WITHHELD, and it is not `0`.** The server omits the count keys
+ * entirely when the caller is a guest in that workspace; the mapper turns that
+ * absence into `null`, and the card renders "Restricted". A `0` that reached
+ * here is a number somebody counted — "no work you can see in this project" —
+ * and a renderer that treated the two the same would print a fact nobody
+ * established. `archived` is never withheld: it is a property of a project whose
+ * NAME the caller is already being told (`read/visible-projects.ts`).
+ */
+export type ProjectRef = {
+  id: string;
+  name: string;
+  archived: boolean;
+  /** null = withheld (guest); a number is a count of what THIS caller may see. */
+  ticketCount: number | null;
+  /** null = withheld (guest). Counted by the same rule `FilterSpec.blocked` uses. */
+  blockedCount: number | null;
+};
 /**
  * `role` (Task 15, the audit's one owner-approved invented row — the SAFE
  * form: real backing data, only the display was missing). The server has
  * disclosed it on `GET /v1/me/workspaces` since the route first answered
  * (`role: row.role` in `apps/server/src/routes/workspaces.ts`); `mapWorkspaceRefs`
- * never read it. The seven OTHER invented rows the audit found on this
- * screen (member counts, avatars, chips, the invitation banner, Help/Account
- * nav) stay unbuilt — no data exists for them, and this one field is the
- * single case where "the display is missing" was actually true.
+ * never read it.
+ *
+ * **The "seven other invented rows stay unbuilt" sentence that stood here is
+ * superseded (owner brief 2026-09-09).** The owner's `/workspaces` reference
+ * turned three of them into real features with real data behind them: the
+ * member count and the ticket/blocked chips are `memberCount` and the two
+ * per-project counts below (Task 16), and the invitation banner is Task 17's
+ * caller-scoped invitations read. Avatars are derived from data already served
+ * (a monogram and a deterministic colour from the workspace id, Task 18) rather
+ * than invented. Help/Account nav is Task 18 and carries no data at all. What
+ * has NOT changed is the rule the old sentence was protecting: a field arrives
+ * here only once a server read computes it, and a number nobody counted is
+ * withheld rather than painted — which is what the `| null` below means.
  */
-export type WorkspaceRef = { id: string; name: string; role: string; projects: ProjectRef[] };
+export type WorkspaceRef = {
+  id: string;
+  name: string;
+  role: string;
+  /**
+   * null = withheld (guest). When served it counts exactly the people
+   * `GET /v1/workspaces/:id/members` would list for this caller — guests
+   * included for an admin, excluded for anyone else — because a count and a
+   * directory are one disclosure (`read/membership-roster.ts`).
+   */
+  memberCount: number | null;
+  projects: ProjectRef[];
+};
 
 /**
  * Who claimed it and when — both clocks, always (spec §3: both are true in

@@ -145,13 +145,45 @@ async function stubApi(page: Page): Promise<void> {
     route.fulfill({ json: { version: 1, projects: {}, savedFilters: [] } }),
   );
 
-  // GET /v1/me/workspaces — apps/server/src/routes/workspaces.ts:149. The SHIPPED
-  // shape: `workspaceId`, `name`, `role`, and NO projects. This is the route
-  // whose absence once hid behind this smoke; it exists now, and the stub is
-  // written to the shape it actually serves so that this file cannot be the
-  // reason a shape drift goes unnoticed.
+  // GET /v1/me/workspaces — apps/server/src/routes/workspaces.ts. This is the
+  // route whose absence once hid behind this smoke, and the stub is written to
+  // the shape it actually serves so that this file cannot be the reason a shape
+  // drift goes unnoticed.
+  //
+  // **That claim had already stopped being true, and this is the correction.**
+  // The stub said "`workspaceId`, `name`, `role`, and NO projects", which was
+  // the shape before rulings P32/P38 added a visibility-scoped `projects` — and
+  // `mapWorkspaceRefs` REQUIRES that key (an absent one means the route did not
+  // answer the question; `[]` is a different claim). This spec is not in the
+  // turbo gate, so nothing went red when the two drifted apart. Task 16 adds
+  // `memberCount` and the per-project `{archived, ticketCount, blockedCount}`,
+  // and both halves of the drift are closed here rather than one.
+  //
+  // The values are an ADMIN's, matching `role` below: an admin is served every
+  // count. A guest is served this object with the three count keys ABSENT,
+  // which is what `WorkspaceRef`'s `number | null` means (cases 13.366, 13.372).
   await page.route('**/v1/me/workspaces', (route) =>
-    route.fulfill({ json: { workspaces: [{ workspaceId: WS, name: 'Convenience Corner', role: 'admin' }] } }),
+    route.fulfill({
+      json: {
+        workspaces: [
+          {
+            workspaceId: WS,
+            name: 'Convenience Corner',
+            role: 'admin',
+            memberCount: 3,
+            projects: [
+              {
+                projectId: PRJ,
+                name: 'Shop operations',
+                archived: false,
+                ticketCount: 2,
+                blockedCount: 0,
+              },
+            ],
+          },
+        ],
+      },
+    }),
   );
 
   // GET /v1/invites/:token — apps/server/src/routes/invites.ts:378. No session
@@ -208,25 +240,39 @@ test('sign-in offers the methods that can work, and no control that cannot', asy
 /**
  * THE PLAN'S NAVIGATION STEP IS DROPPED, and this is what replaces it.
  *
- * The plan's second case goes to `/workspaces` and clicks a link named
- * "Registrations". That click can never land: `mapWorkspaceRefs` is an
- * unconditional `throw` — `getMyWorkspaces` is one of the six serving gaps — so
- * `/workspaces` renders the REFUSAL and never draws a project link, whatever
- * body a `page.route` supplies. Stubbing harder cannot fix it, because the
- * refusal is client-side and deliberate. Weakening the mapper to make the click
- * work is the one thing this step is forbidden to do.
+ * **THE CLAIM INVERTED, AND THE CASE WAS PASSING FOR THE WRONG REASON.** This
+ * docblock read: *"`mapWorkspaceRefs` is an unconditional `throw` —
+ * `getMyWorkspaces` is one of the six serving gaps — so `/workspaces` renders
+ * the REFUSAL and never draws a project link, whatever body a `page.route`
+ * supplies."* Rulings P32/P38 closed that refusal: the mapper answers, and the
+ * page renders the list.
  *
- * So the smoke asserts what the page actually does, and asserts the falsehood
- * it must not print: `/workspaces` must not say there are no workspaces, and it
- * must still let a person found one.
+ * The case stayed green anyway, and the reason is the finding. This file's own
+ * `/v1/me/workspaces` stub had gone stale in the same direction — it carried no
+ * `projects` key, which `mapWorkspaceRefs` REQUIRES — so the page really did
+ * render a refusal, from a `MappingError` about a malformed stub rather than
+ * from the serving gap this case names. **A green tick over the right screen
+ * for the wrong reason**, and it survived because this suite is on no gate.
+ * Task 16 fixed the stub (it had to, to add the counts), which is what turned
+ * the case red and exposed both halves.
+ *
+ * So the smoke asserts what the page NOW does — it lists the workspace the stub
+ * serves — plus the falsehood it must never print and the door it must keep
+ * open: `/workspaces` must not say there are no workspaces, and it must still
+ * let a person found one.
  */
 /**
- * 3.137 — The plan's dropped-and-replaced /workspaces navigation renders the refusal out loud (never 'no workspaces yet') while still offering the founding door, proven against Playwright/Chromium.
+ * 3.137 — The plan's dropped-and-replaced /workspaces navigation lists the served workspace (never 'no workspaces yet') while still offering the founding door, proven against Playwright/Chromium.
  */
-test('the workspace list REFUSES out loud, and the founding door is still open', async ({ page }) => {
+test('the workspace list RENDERS what it is served, and the founding door is still open', async ({
+  page,
+}) => {
   await stubApi(page);
   await page.goto('/workspaces');
-  await expect(page.getByRole('status')).toContainText('cannot be shown yet');
+  // The workspace the stub serves, by its own card hook — not by text, which
+  // 'Convenience Corner' also matches inside the invite screen's copy.
+  await expect(page.getByTestId(`workspace-card-${WS}`)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible();
   await expect(page.getByText('No workspaces yet.')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'New workspace' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create workspace' })).toBeVisible();

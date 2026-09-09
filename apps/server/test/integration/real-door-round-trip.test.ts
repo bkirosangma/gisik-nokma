@@ -437,7 +437,16 @@ describe('GET /v1/me/workspaces — the directory', () => {
           workspaceId,
           name: 'Round Trip Corner',
           role: 'owner',
-          projects: [{ projectId, name: 'Shop floor' }],
+          // Task 16's counts, and this file is the one place they are asserted
+          // against a world built ENTIRELY through the real doors — the
+          // founder alone in the workspace, and the two tickets this file
+          // created earlier in the same run, both visible to the owner. A
+          // count computed off the seeded fixtures elsewhere could agree with a
+          // route that had drifted from the real ingest path; these cannot.
+          memberCount: 1,
+          projects: [
+            { projectId, name: 'Shop floor', archived: false, ticketCount: 2, blockedCount: 0 },
+          ],
         },
       ],
     });

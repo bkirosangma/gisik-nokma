@@ -1,7 +1,7 @@
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import type { Queryable } from '../db/queryable.js';
 
-export type VisibleProject = { projectId: string; name: string };
+export type VisibleProject = { projectId: string; name: string; archived: boolean };
 
 /**
  * The projects a viewer may be told the NAME of, in one workspace.
@@ -34,6 +34,15 @@ export type VisibleProject = { projectId: string; name: string };
  * The tie-break, recorded because the alternative is defensible: serving MORE
  * later is a widening and reversible; serving a name and retracting it is not.
  *
+ * ## `archived` rides with the NAME, and is never withheld
+ *
+ * Task 16 added it. A project's archived flag is a fact about a project this
+ * caller is already being told the name of, so there is nothing left to
+ * withhold: the disclosure decision was made one line down, by the filter. It is
+ * deliberately NOT one of the counts — the counts are withheld from a guest
+ * (`workspace-counts.ts`), and giving `archived` the same treatment would make a
+ * guest's card unable to say why a project it CAN name is not in the live list.
+ *
  * ## Ordering
  *
  * By `project_id`, so the answer is a function of the SET and not of insertion
@@ -45,8 +54,8 @@ export async function visibleProjects(
   workspaceId: string,
 ): Promise<VisibleProject[]> {
   if (eff.workspaceRole === null) return [];
-  const { rows } = await db.query<{ project_id: string; name: string }>(
-    `SELECT project_id, name FROM proj_projects
+  const { rows } = await db.query<{ project_id: string; name: string; archived: boolean }>(
+    `SELECT project_id, name, archived FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
@@ -55,7 +64,11 @@ export async function visibleProjects(
   // function restates nothing about who may see what, it asks `eff` — which is
   // what makes it an application of `resolveEffectiveRole` rather than a second,
   // quieter visibility rule living in a query.
-  const visible = rows.map((row) => ({ projectId: row.project_id, name: row.name }));
+  const visible = rows.map((row) => ({
+    projectId: row.project_id,
+    name: row.name,
+    archived: row.archived,
+  }));
   if (eff.workspaceRole === 'owner') return visible;
   return visible.filter((project) => eff.projects.has(project.projectId));
 }
