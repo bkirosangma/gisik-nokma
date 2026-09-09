@@ -65,7 +65,7 @@ function inviteEvent(
     type,
     payload: { inviteId, ...payload },
     actorId,
-    origin: type === 'invite.accepted' ? 'server' : 'web',
+    origin: type === 'invite.accepted' || type === 'invite.declined' ? 'server' : 'web',
   });
 }
 
@@ -125,9 +125,37 @@ describe('proj_invites — pending is a one-way door', () => {
   });
 
   /**
-   * The positive control for both cases above, and it is what separates
+   * Task 17's third terminal state, and the ordering that matters most for it.
+   *
+   * Accept-then-decline is not reachable through the doors — both spend the same
+   * credential row, so exactly one of them can ever win — but it is entirely
+   * reachable in the LEDGER, which is where this projection lives. A decline
+   * without `AND status = 'pending'` would overwrite a membership somebody
+   * already holds with a refusal they did not make after the fact.
+   */
+  it('a decline arriving after an acceptance does not undo it', async () => {
+    const ws = newUlid();
+    const admin = newUlid();
+    const joiner = newUlid();
+    const inviteId = newUlid();
+
+    await record(inviteEvent(ws, inviteId, 'invite.sent', {
+      address: 'c@example.com',
+      channel: 'email',
+      role: 'member',
+    }, admin));
+    await record(inviteEvent(ws, inviteId, 'invite.accepted', { userId: joiner }, joiner));
+    await record(inviteEvent(ws, inviteId, 'invite.declined', {}, joiner));
+
+    expect(await statusOf(inviteId)).toEqual({ status: 'accepted', accepted_user_id: joiner });
+  });
+
+  /**
+   * The positive control for the cases above, and it is what separates
    * "terminal states hold" from "the projection stopped updating at all". Each
-   * transition reached from `pending` DOES land.
+   * transition reached from `pending` DOES land — all THREE of them since Task
+   * 17, because a control that omitted `declined` would let a decline fold that
+   * did nothing at all pass every one-way-door case above it.
    */
   it('each terminal state IS reached from pending', async () => {
     const ws = newUlid();
@@ -135,8 +163,9 @@ describe('proj_invites — pending is a one-way door', () => {
     const joiner = newUlid();
     const accepted = newUlid();
     const revoked = newUlid();
+    const declined = newUlid();
 
-    for (const inviteId of [accepted, revoked]) {
+    for (const inviteId of [accepted, revoked, declined]) {
       await record(inviteEvent(ws, inviteId, 'invite.sent', {
         address: `${inviteId}@example.com`,
         channel: 'email',
@@ -146,9 +175,11 @@ describe('proj_invites — pending is a one-way door', () => {
     }
     await record(inviteEvent(ws, accepted, 'invite.accepted', { userId: joiner }, joiner));
     await record(inviteEvent(ws, revoked, 'invite.revoked', {}, admin));
+    await record(inviteEvent(ws, declined, 'invite.declined', {}, joiner));
 
     expect(await statusOf(accepted)).toEqual({ status: 'accepted', accepted_user_id: joiner });
     expect(await statusOf(revoked)).toEqual({ status: 'revoked', accepted_user_id: null });
+    expect(await statusOf(declined)).toEqual({ status: 'declined', accepted_user_id: null });
   });
 
   it('a duplicate invite.sent for one invitation does not overwrite the original claim', async () => {
@@ -235,6 +266,24 @@ describe('invite_tokens is not a projection', () => {
       role: 'member',
     }, admin));
     await record(inviteEvent(ws, inviteId, 'invite.accepted', { userId: joiner }, joiner));
+    // A DECLINED invitation in the SAME fixture, added by Task 17 and not
+    // optional. Two things are unfalsifiable without it, and the second is the
+    // one that bites: the rebuild's fold of `invite.declined` is never
+    // exercised, and — because `verify-projections` builds its shadow tables
+    // with `LIKE public.<table> INCLUDING ALL` — the widened `status` CHECK is
+    // never asked to admit `'declined'` in the shadow schema. A migration that
+    // widened only the live table would throw HERE and nowhere else. This is
+    // the `proj_projects` trap from Task 16 in its own house: a table holding
+    // no row of the new shape diffs clean for the same reason an empty one
+    // does.
+    const declinedInvite = newUlid();
+    await record(inviteEvent(ws, declinedInvite, 'invite.sent', {
+      address: 'declines@example.com',
+      channel: 'email',
+      role: 'member',
+    }, admin));
+    await record(inviteEvent(ws, declinedInvite, 'invite.declined', {}, joiner));
+    expect(await statusOf(declinedInvite)).toEqual({ status: 'declined', accepted_user_id: null });
     await db.pool.query(
       `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at)
        VALUES ($1, $2, now(), now() + interval '14 days')`,
