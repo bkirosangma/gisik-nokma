@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -235,6 +235,58 @@ describe('13.379 the card renders every element from data the route served', () 
     // And the singular, on a card that HAS one — so the plural above is a
     // choice the code makes rather than the only string it can produce.
     expect(within(card).getByText('1 member')).toBeInTheDocument();
+  });
+
+  /**
+   * The monogram's TINT, which the rest of 13.379 does not reach: `getByLabelText`
+   * finds the avatar and asserts its initials, and the initials are a function of
+   * the NAME. A tint keyed on the name instead of the id therefore survives every
+   * other assertion in this suite — measured, not supposed: that mutation was run
+   * and passed 235/235 in `packages/ui` and every case here.
+   *
+   * Two workspaces sharing a name is the fixture that separates the two keys, and
+   * it is not a contrived one — nothing in the product refuses a duplicate
+   * workspace name, and `initialsOf` gives both cards the same two letters. The
+   * colour is the only thing left that can tell them apart at a glance.
+   *
+   * The exact index is deliberately NOT asserted. That would pin the hash
+   * function rather than the property, and the property is what the docblock
+   * claims: same id ⇒ same tint, different id ⇒ (here) a different one.
+   */
+  it('tints the monogram from the workspace ID, so two workspaces with one name still differ', async () => {
+    mountWith([
+      workspace({ id: 'ws-alpha', name: 'Convenience Corner', memberCount: 1 }),
+      workspace({ id: 'ws-beta', name: 'Convenience Corner', memberCount: 1 }),
+    ]);
+    const first = await screen.findByTestId('workspace-card-ws-alpha');
+    const second = screen.getByTestId('workspace-card-ws-beta');
+    const tintOf = (card: HTMLElement): string => {
+      const avatar = within(card).getByLabelText('Convenience Corner');
+      const tint = [...avatar.classList].find((c) => c.startsWith('gn-avatar--tint-'));
+      expect(tint, `the avatar carries no tint class: ${avatar.className}`).toBeDefined();
+      return tint!;
+    };
+    // The POSITIVE CONTROL first: both cards do carry a tint at all, so the
+    // inequality below cannot pass by both being undefined.
+    expect(tintOf(first)).toMatch(/^gn-avatar--tint-\d+$/);
+    expect(tintOf(second)).toMatch(/^gn-avatar--tint-\d+$/);
+    // Identical names, identical initials, different ids — so a tint keyed on
+    // the name gives these two the same class and reddens here.
+    expect(tintOf(first)).not.toBe(tintOf(second));
+  });
+
+  it('keeps a workspace\'s tint across a rename, because the key is the id', async () => {
+    mountWith([workspace({ id: 'ws1', name: 'Convenience Corner', memberCount: 1 })]);
+    const before = within(await screen.findByTestId('workspace-card-ws1'))
+      .getByLabelText('Convenience Corner')
+      .className;
+    cleanup();
+    mountWith([workspace({ id: 'ws1', name: 'The Corner Shop', memberCount: 1 })]);
+    const after = within(await screen.findByTestId('workspace-card-ws1'))
+      .getByLabelText('The Corner Shop')
+      .className;
+    // A colour a person has learned must survive somebody editing the name.
+    expect(after).toBe(before);
   });
 
   it('says "1 project" in the singular, which a plural-only implementation cannot', async () => {
