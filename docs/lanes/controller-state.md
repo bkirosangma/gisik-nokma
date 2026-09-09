@@ -1,5 +1,19 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~14:1x IST — **TASK 18 MERGED (#402 → `6a34c747`): the neo workspace card + Help/Account nav + the option-2 restricted count. FORCED GATE GREEN. LEDGER 18 → done. THE CARD IS READY FOR THE OWNER'S LOOK.** `main` is `6a34c747` + #403 (handoff) + this PR; executor → Task 19 (opus).
+
+### The merge — even with main, trees identical; a self-launched-`&` gate cleaned up
+Guard head `de6d05c`; MERGED `6a34c747`; **trees identical (`9ac4892c`)**; drop check 0 bytes / empty stderr. **Forced gate at `6a34c747`:** 33/33 · `Cached: 0` · 2m08s · node v22.22.2 · `Unsupported engine` 0 · **4,171 passed | 5 skipped / 327 files** · lock released · no orphans. **Controller slip, recorded:** I launched that gate with a trailing `& ` in a foreground bash call; it reparented to launchd (ppid=1), ran the real gate, released the lock cleanly — no second gate contended. Use `run_in_background`, never `&`, for the gate; polled it to completion with an until-loop.
+
+### What Task 18 shipped (cases 13.379–13.383)
+**Option 2, server-first:** `nameRestrictedProjectCount` = the caller's projects with a visible ticket but a withheld name (read-time derived from Task 16's rows; NO migration/event; Task 16's wire untouched). **`mapWorkspaceRefs` docblock AMENDED** in the same change set (the "no 'and N more'" rationale replaced with option 2's name-vs-existence reasoning). A guest IS served the count; both sibling counts still open `role==='guest' → null`. **The card:** monogram (deterministic tint from workspace ID — a SURVIVOR mutation, tint keyed on name, was caught and fixed), member count, active/blocked chips (a guest shows a single "Restricted" chip, never 0), role as a sentence with gated affordances from one source, per-project ticket counts, archived toggle. **Nav:** Help + Account, with a minimal `/account` stub so the link is not dead (11.185 tripwire widened 3→5 doors in-change-set). Seven mutations; option-3 (count all) reddens. Live: owner card `memberCount 2, 26 tickets · 3 blocked`; guest card `1 project · name restricted` on the real dev world, no seeding. It also **corrected the plan's "18 is sonnet" line** (my inconsistency) and two stale client comments.
+
+### THE OWNER'S LOOK — `http://localhost:3001/workspaces` (dev stack up, rebuilt from this work, Google on)
+The card now matches the owner's reference. Owner cards carry counts; the guest card carries "Restricted" + "1 project · name restricted". Style toggle + Help + Account in the nav.
+
+### Next
+Restart the executor onto **Task 19** (opus; the workspace home route `app/w/[workspaceId]/page.tsx` — projects with counts, admin archive/restore + new-project, links to My Work/Members/Ticket types/Workflows/MCP tokens). Then the owner's look at both, then Task 12. Card feedback becomes a small round.
+
 ## ✅ WEDNESDAY ~13:2x IST — **TASK 17 MERGED (#400 → `d3d0abd`): caller-scoped invitations + Accept/Decline. LEDGER 17 → done; the 18/19 case-id overlap I introduced is FIXED.** `main` is `d3d0abd` + this PR; executor → Task 18 (opus) after the forced gate.
 
 ### The merge — branch even with main, trees identical
