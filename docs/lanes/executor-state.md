@@ -20,12 +20,29 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~14:5x IST. **TASK 18 — WORK COMPLETE, FREEZING.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~15:0x IST. **TASK 18 — MERGED as `6a34c747` (PR #402).**
 >
-> **This block is written BEFORE the freeze, so its last line is a claim about the future and the one to
-> distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open` before
-> acting — a restart surface fails in the conservative direction and that is the direction nobody audits.
+> **The block below was written before the freeze and said "WORK COMPLETE, FREEZING". It is now settled:
+> the controller merged PR #402 while the executor was re-running the gate at the true frozen head.**
+> `gh pr list --state open` returns nothing. Verified rather than reported: `origin/main` is
+> `6a34c747`, the PR's own merge commit with `baseRefName: main`; `git diff origin/main de6d05ce` with
+> **no path filter** is empty (1 byte, a bare newline this shell adds to every capture, exit 0, empty
+> stderr) against a POSITIVE CONTROL of 48,755 bytes through the same pipeline (`git diff origin/main
+> 3a9bdff7`, the pre-task base); and the two TREE HASHES are identical — `9ac4892c` both sides, which is
+> the check a byte count cannot fake. Spot-checked on `main` itself: `/account` present, the server read
+> carries `nameRestrictedProjectCount`, all five case entries 13.379–13.383 minted, the risen
+> accessible-name floor reads `"ariaLabel": 3`.
 >
+> **NEXT: Task 19** — the workspace home, `app/w/[workspaceId]/page.tsx`, cases **13.384–13.389**, opus.
+> Then the owner's look at `/workspaces` and a workspace home → Task 12. The dev stack is UP and rebuilt
+> from this work (`localhost:3001/workspaces`, Google sign-in on) — see the GATE section below.
+>
+> ---
+>
+> # ▣ THE PRE-FREEZE BLOCK, kept verbatim below. **Its last line was a claim about the future; the
+> paragraphs above are what happened.**
+>
+
 > **Anchors, verified rather than remembered.** Branch `exec/18-workspace-card`, cut from `origin/main`
 > at **`3a9bdff7`** and never rebased. Head **`06c7ac6b`**, FIVE commits, ahead 5 / **behind 0**
 > (`git rev-parse origin/main` re-read at the freeze: still `3a9bdff7`). `git branch --contains` on all
