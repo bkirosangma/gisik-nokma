@@ -174,6 +174,34 @@ close to a drop-in swap of the existing controlled pattern.
   calls that target these two selects to click-and-pick interactions. (Exact count of affected calls
   within the file's 18 is for the implementation plan to enumerate.)
 
+## Accessibility review (ui-ux-pro-max consultation + token-system verification, 2026-09-10)
+
+Checked against the actual token system and its existing verification machinery (`CONTRAST_PAIRS` in
+`packages/ui/test/tokens.test.ts`, the e2e non-text-contrast tool and its `sanctionedWaivers` roster),
+not just generic guidelines:
+
+- **Checkmark icon**: `currentColor`, inheriting the selected row's already-verified text color — no new
+  contrast pair needed.
+- **Active/focused row (keyboard nav)**: reuse the existing `focusRing` token rather than inventing a new
+  active-state color. It is already tested at `{ fg: 'focusRing', bg: 'surface', minimum: 3 }` in
+  `CONTRAST_PAIRS` and clears with margin in every style/theme — reusing it inherits that verification
+  instead of needing a new one.
+- **Chip × remove button**: reuse `grayAccessible`/`grayAccessibleDark` — tokens this file already minted
+  specifically for "the 3:1 a chip dot owes" (see the `grayAccessible` docblock) — rather than a new
+  color. Touch target: WCAG 2.2 SC 2.5.8 (AA) requires 24×24px minimum, not the 44×44px mobile-HIG figure
+  a generic checklist reaches for — this app is desktop pointer/keyboard-first, so ≥24×24px hit area with
+  adequate spacing between adjacent chips is the real bar.
+- **"Max selected" inert-but-not-disabled options** (new finding, not previously covered): the inline
+  message must be exposed via an `aria-live="polite"` region (or equivalent), or a screen-reader user gets
+  no explanation at all for why an option stops responding — worse than a plain `disabled` state for that
+  population. This is now a Phase-1 implementation requirement, not an optional polish item.
+- **Neo panel shadow-only elevation**: matches the exact pattern already fixed for
+  `.ticket-type-list__row`/`.fields-editor__row`. The project's automated non-text-contrast tool cannot
+  measure `box-shadow` boundaries (confirmed by the existing `sanctionedWaivers` entry for
+  `[data-style="neo"] .gn-field__input`) — so the panel's neo elevation needs the same treatment: a new
+  `sanctionedWaivers` entry in `non-text-contrast-roster.json` plus manual/visual verification, not an
+  automated pass.
+
 ## Open questions for the implementation plan (not blocking this spec)
 
 - Exact keyboard type-ahead timing/buffer (react-aria's default behavior is expected to be sufficient;
