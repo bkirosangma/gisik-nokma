@@ -118,6 +118,15 @@
    size was the whole of the change. See `e2e-viewport/type-scale.ts` for why
    12px is the floor and why it is not a WCAG number. */
 .gn-avatar--small { width: 1.5rem; height: 1.5rem; font-size: 0.75rem; }
+/* The four tints. Each is a fill/text PAIR `CONTRAST_PAIRS` already holds to
+   4.5:1 in every theme and style, because a monogram is read text and not a
+   decorative dot — see `components/avatar.tsx` for why the palette is these
+   four and not a nicer number. The fill and its own ink are never mixed across
+   pairs: `--gn-accent-text` is measured against `--gn-accent` and nothing else. */
+.gn-avatar--tint-0 { background: var(--gn-accent); color: var(--gn-accent-text); }
+.gn-avatar--tint-1 { background: var(--gn-success); color: var(--gn-success-text); }
+.gn-avatar--tint-2 { background: var(--gn-warning); color: var(--gn-warning-text); }
+.gn-avatar--tint-3 { background: var(--gn-danger); color: var(--gn-danger-text); }
 
 .gn-dialog__scrim,
 .gn-sheet__scrim {

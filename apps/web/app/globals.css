@@ -86,6 +86,27 @@ button { font: inherit; }
    settle. These two surfaces now simply render `.gn-card`'s own radius, at
    whatever the active style says: 16px (hig/minimal) or 20px (neo). */
 .gn-workspace-list__role { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+
+/* ── Task 18: the workspace card. ───────────────────────────────────────────
+   Every colour is a token role. The card's own surface, radius and shadow are
+   `.gn-card`'s and are not restated here — the deleted radius bumps above are
+   the record of what restating them costs. Spacing and alignment only, plus two
+   muted text roles that already exist. Nothing in this block is style-scoped:
+   the pieces it lays out (`.gn-card`, `.gn-chip`, `.gn-avatar`, `.gn-button`)
+   are variable-driven since Task 14, so the card renders in hig, minimal and
+   neo from these rules alone. */
+.gn-workspace-card__head { display: flex; align-items: flex-start; gap: 0.6rem; }
+.gn-workspace-card__titles { display: flex; flex-direction: column; min-width: 0; }
+.gn-workspace-card__titles h2 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.gn-workspace-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.6rem 0 0; }
+.gn-workspace-card__projects { margin: 0.7rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.gn-workspace-card__project { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.gn-workspace-card__project-count { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Indented and muted, so the archived list reads as subordinate to the live one
+   rather than as a second list of equals. */
+.gn-workspace-card__projects--archived { margin-top: 0.4rem; padding-left: 0.6rem; }
+.gn-workspace-card__restricted { margin: 0.55rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+.gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 
 /* The founding form has no `.gn-card` ancestor of its own — it sits beside the

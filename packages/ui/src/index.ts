@@ -18,7 +18,7 @@ export {
   type ThemeName,
   type TokenRole,
 } from './tokens.js';
-export { Avatar, initialsOf, type AvatarProps } from './components/avatar.js';
+export { AVATAR_TINTS, Avatar, initialsOf, tintIndexOf, type AvatarProps } from './components/avatar.js';
 export { Button, type ButtonProps, type ButtonVariant } from './components/button.js';
 export { Card, type CardProps } from './components/card.js';
 export { Chip, type ChipProps, type ChipTone } from './components/chip.js';

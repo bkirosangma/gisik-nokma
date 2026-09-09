@@ -23,6 +23,20 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           a workspace they are not currently looking at. The badge's own read is
           gated on a session inside `InboxNavLink`. */}
       <InboxNavLink />
+      {/* Help and Account (Task 18), both GLOBAL routes and both unconditional
+          on `workspaceId` for the reason the inbox link above is: neither is a
+          fact about the workspace you are currently looking at. `/help` already
+          existed and needed only the link; `/account` ships in the same change
+          set as a stub that enumerates what it does not do, because a nav entry
+          pointing at a 404 is a defect and the alternative was to edit this nav
+          again from a task about passkeys.
+
+          Account is the person's own settings — profile, notifications,
+          sessions — and NOT a workspace's, which live at
+          `/w/[workspaceId]/settings/*`. Anyone who conflates the two will put a
+          workspace control on a global page. */}
+      <Link href="/help">Help</Link>
+      <Link href="/account">Account</Link>
       <span className="gn-nav__spacer" />
       <StyleToggle />
       <ThemeToggle />
