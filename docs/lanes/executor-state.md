@@ -20,7 +20,61 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~06:1x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~09:4x IST. **ROUND 2d IN FLIGHT. READ THIS BLOCK FIRST.**
+>
+> **This block lives only on branch `exec/147-2d-signin-neo-feedback` until its PR merges** — read it
+> via `git show exec/147-2d-signin-neo-feedback:docs/lanes/executor-state.md` if `main`'s copy looks
+> stale (the previous position block, superseded below, is `main`'s live copy as of `caba1f6a`).
+>
+> **The hold from PR #391 is LIFTED.** Controller dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-09-
+> signin-neo-feedback.md` (Round 2d) — the owner looked at `/sign-in`, sent the design session's neo
+> reference screen, and the controller answered the open accent question from it: adopt the export's
+> `--accent` (`#3A6DB0` light / `#7FA9E4` dark) for fills, derive a new `textAccent` role for accent-as-
+> text (links, ghost-button labels), since the export's raw accent value measures 4.19–4.30 on
+> `surface`/`surfaceRaised` — below the existing GATED `CONTRAST_PAIRS` floor of 4.5. Cases block
+> `13.358`–`13.365`; pointer moves to `13.366` in this PR. Sonnet tier, one PR, frozen-head.
+>
+> **Branch cut from `origin/main` at `caba1f6a`** (PR #391's merge). Re-verify `origin/main` hasn't
+> moved before freezing/pushing, same discipline every prior task in this series has needed.
+>
+> **A real, in-scope finding, not scope creep:** the export's accent hue, if simply swapped into the
+> shared `accent` role, breaks two EXISTING gated `CONTRAST_PAIRS` rows (`accent` on `surface`/
+> `surfaceRaised`, margin was 5.33 against a 4.5 floor) — because `a{color:var(--gn-accent)}`
+> (`globals.css:13`, GLOBAL, not sign-in-scoped) and `.gn-button--ghost{color:var(--gn-accent)}`
+> (`ui.css`) both render accent AS TEXT app-wide. The fix (already decided, not escalated): a new
+> `textAccent` role — deliberately NOT named `accentText`, which already means something different
+> (text-drawn-ON-accent-fill, e.g. button labels) — replaces `accent` at those two GLOBAL call sites and
+> in the two renamed `CONTRAST_PAIRS` rows. This widens the file list beyond `.gn-sign-in*` to
+> `globals.css`'s global `a` rule and `ui.css`'s `.gn-button--ghost`/`.gn-page-header__icon`, which is
+> necessary to satisfy the dispatch's OWN "every CONTRAST_PAIRS row passes" requirement, not scope
+> creep. Full reasoning in the implementer dispatch prompt if this needs re-deriving after a restart.
+>
+> ## IN FLIGHT — one sonnet implementer subagent, dispatched, not yet returned
+>
+> Scope: tokens.ts (new `brand`/`textAccent` roles, retire `blue600`/`blue300` hex to the new accent,
+> derive `textAccent`'s primitives via script against every surface/raised background, verify
+> `accentText`-on-`accent` still ≥4.5), `ui.css` (`.gn-page-header__icon` → brand + textInverted,
+> `.gn-button--ghost` → textAccent, an audit of other accent-as-text call sites, `.gn-sign-in__mark`
+> geometry if it belongs here), `globals.css` (`a{color}`, `.gn-sign-in__mark`, footer link hover/focus
+> underline — the export has none but WCAG "more than colour" requires one), `sign-in/page.tsx` (email
+> placeholder only), `Features.md` + `test-cases/13` (cases 13.358–13.365, pointer → 13.366), a witness
+> test for the derived segmented control under `phone:true`. Told: commit only, no push, no PR — review
+> the diff first. HARD CAP 6 subagents for this task; this is implementer #1 of a planned ≤3.
+>
+> ## STILL OUTSTANDING AFTER THAT SUBAGENT RETURNS
+>
+> * Review its diff personally (don't just trust the summary — this file's own standing rule).
+> * Dispatch a sonnet reviewer subagent (opus only if something touches visibility/refusal semantics,
+>   which nothing here should). Fix round only if Important-or-worse.
+> * Run the full gate myself at the final head; rebuild the dev stack with `--env-file
+>   /Users/kiro/my_projects/gisik-nokma/.env` (NOT the plain command — Task 14's rebuild dropped Google
+>   auth, this is the fix); verify `curl localhost:3000/v1/auth/methods` says `"google":true`.
+> * Freeze head, re-verify `origin/main` unchanged, push, open ONE PR. Report per the dispatch's own
+>   required format: accent/textAccent values with ratios, screenshot path if taken.
+> * Report to the controller only when the PR is open (or if a genuine ruling-level ambiguity surfaces —
+>   none has so far; the finding above was resolved in-task, not escalated).
+
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~06:1x IST. **HISTORY — superseded by the block above.**
 >
 > **Task 15 is MERGED — PR #389, merged as `04e061b`.** Verified, not adopted from the controller's
 > relaunch note: `gh pr view 389 --json state,mergeCommit` → `MERGED`/`04e061b`; `git merge-base
