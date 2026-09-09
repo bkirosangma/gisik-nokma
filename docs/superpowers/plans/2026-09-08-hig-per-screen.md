@@ -1334,7 +1334,20 @@ role (P22's brand, one source); a non-admin sees the list and the links but not 
 the route lists projects with counts; a non-admin gets no archive/restore/new-project control (mutate the gate →
 RED, alone); archive hides a project from the default board list and restore returns it; the nav links resolve.
 
-**Sequence:** 2d (sign-in, in flight) → **16 → 17 → 18 → 19** → owner look at `/workspaces` and a workspace home →
+### Round 19b: the workspace screens against the owner's home reference — owner feedback 2026-09-09 ~16:1x IST
+
+**sonnet, sonnet reviewer. No ledger row — a round on Tasks 18/19, as 2d was on Task 2. Block `13.390`–`13.399`; the
+executor moves the §13 pointer to `13.400` in its PR.** The owner, verbatim: *"1. the workspace card should be clickable.
+and on click it should lead into the workspace page which looks like this: [image] 2. From the same image, take note of
+the navigation bar. 3. The create workspace card shouldnt be that big."* The image is the prototype's `workspace` screen
+(neo, dark) — the spec, as the design session's `signin` screen was for 2d. All three premises measured true at
+`b47f0253`. Spec and the four conservative-default rulings (Board renders only with a project in the route; no "0
+archived · show"; "Open board" for archived projects — there is no read-only mode; no description line — there is no
+field) are in `gisik-nokma-lanes/CTL-DISPATCH-2026-09-09-round19b-workspace-feedback.md` and
+`docs/lanes/controller-state.md` (~16:2x). Deferred for the owner: the prototype's "Workspace" card (rename is a mutation
+with no event) and per-restricted-project cards (a new visibility surface). Each default is the owner's to overrule.
+
+**Sequence:** 2d (sign-in, in flight) → **16 → 17 → 18 → 19** → owner look at `/workspaces` and a workspace home → **19b** (the owner's feedback round, 2026-09-09) →
 **12** (passkeys; expands `/account`) → 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. Tasks 16, 17, 19 are opus
 (relaunch the executor on `--model opus` for each); ~~18 is sonnet~~ **— and 18 is opus too, since the
 owner's 2026-09-09 ruling made it a new derivation rule on the visibility surface. This sentence
