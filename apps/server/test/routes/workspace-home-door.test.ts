@@ -24,30 +24,41 @@ import { signInWithPhone } from '../helpers/session.js';
  * in the picture at all**, which is what makes the page's own claim about
  * enforcement rest on something other than the page.
  *
- * ## THE FOUNDING SEQUENCE IS TWO EVENTS, AND THIS FILE PROVES THE ORDER MATTERS
+ * ## WHAT THIS FILE DOES NOT OWN, SAID BEFORE WHAT IT DOES
  *
- * The page submits `project.created` and `project.member_added` in ONE batch,
- * and the reason it can is a property of the door: a batch is processed in
- * order and each event commits independently (`ingest-service.ts`), so the
- * second event's existence check sees the project the first one just made.
+ * Two properties a reader would expect here are already checked elsewhere, and
+ * the mutations that proved it are recorded rather than the reading that
+ * suggested it:
  *
- * A case that submitted the pair in the right order and asserted "both
- * committed" would be green for a door with **no ordering guarantee whatever** —
- * one that applied the batch in a single transaction, or in parallel, could
- * still answer committed for both if it happened to schedule them favourably.
- * So the REVERSED batch is submitted too, in the same run, and its
- * `project.member_added` must be REFUSED under `project.unknown`. That refusal
- * is the evidence; the forward pass alone is not.
+ * - **The archive/restore round trip** — an owner archives, the served flag
+ *   flips, they restore, it flips back. That is case **13.370**
+ *   (`test/routes/workspace-counts.test.ts`), which also refuses a plain
+ *   member's `project.archived` under `permission.role`. Removing
+ *   `'project.archived'` from `ADMIN_ONLY_TYPES` reddens 13.370 and this file's
+ *   first case together. A third case restating it was written here and
+ *   DELETED once that measurement came back: a duplicate case inflates the
+ *   count and moves no floor.
+ * - **The in-batch ordering guarantee** — `project.created` followed by
+ *   `project.member_added` in one `ingestClientBatch`, with the reversed pair
+ *   as its control. That is case **6.81**
+ *   (`test/permissions/check-project-exists.test.ts`), which was written for
+ *   exactly this and says so.
  *
- * ## Why the second event is not decoration
+ * ## WHAT IT DOES OWN
  *
- * `visibleProjects` names every project to an `owner` and filters everyone
- * else — a workspace `admin` included — to `eff.projects`, which is built from
- * `project.member_added` and nothing else. The last assertion below reads the
- * founder's own `GET /v1/me/workspaces` after the batch and finds the project
- * there. Without the roster event that read comes back without it, which is the
- * failure a one-event founding form would ship: an admin creates a project and
- * watches it vanish.
+ * 1. **The door refuses all THREE of the workspace home's mutations from a
+ *    non-admin**, `member` and `guest` both, with the rule and the reason
+ *    asserted and an `admin` positive control in the same workspace. 13.370
+ *    drives one type and one role; this drives three and two, because the page
+ *    offers three controls and hides them from both non-admin roles.
+ * 2. **The visibility consequence that makes the founding form's second event
+ *    non-optional.** 6.81 never reads `/v1/me/workspaces`, and its actor is the
+ *    workspace OWNER, who `visibleProjects` exempts from its filter. Here the
+ *    founder is a workspace ADMIN at the HTTP door, so the filter applies: the
+ *    project whose roster event landed is named back to them, and the one whose
+ *    roster event was refused is not — though it exists, and they founded it.
+ *    That is the failure a one-event founding form would ship, and nothing else
+ *    in the repo would have caught it.
  */
 
 let db: TestDatabase;
@@ -212,7 +223,34 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
     expect(allowed.every((result) => result.status === 'committed')).toBe(true);
   });
 
-  it('commits the two-event founding batch in ONE call, and refuses it reversed', async () => {
+  /**
+   * WHAT THIS CASE OWNS, AND WHAT IT DOES NOT — settled by mutation, not by
+   * reading.
+   *
+   * Removing `case 'project.member_added'` from `projectsNamedBy` reddens THIS
+   * case and **two pre-existing cases in `test/permissions/check-project-exists.
+   * test.ts`**, one of which is case **6.81** — *"a project founded EARLIER IN
+   * THE SAME BATCH is found by the check"* — which already drives the forward
+   * pair AND the reversed control through `ingestClientBatch`, with the same
+   * reasoning. **So the batch-ordering property is 6.81's and this case does not
+   * establish it.** Claiming otherwise would be a case advertising novelty it
+   * does not have, which is worse than no case: it is a green tick over a
+   * property already ticked somewhere else.
+   *
+   * What is NOT covered anywhere else, and is the reason this one exists: the
+   * **visibility consequence** that makes the page's second event non-optional.
+   * 6.81 never reads `/v1/me/workspaces`; it uses the internal door and the
+   * workspace OWNER, who is exempt from `visibleProjects`' filter. Here the
+   * founder is a workspace ADMIN going through the HTTP door, so the filter
+   * applies — and the forward project is named back to them while the reversed
+   * one, whose roster event was refused, is not. That is the failure a
+   * one-event founding form would ship, and nothing else in the repo would have
+   * caught it.
+   *
+   * The reversed batch is therefore a FIXTURE here rather than the claim: it is
+   * how a project that exists and is unnamed to its own founder gets made.
+   */
+  it('an ADMIN founder is named their new project only because the second event landed', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const admin = await signedIn();
@@ -220,7 +258,8 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
 
     // ── The order the page submits. Both commit, and the second commits
     //    BECAUSE the first already did — `checkProjectExists` reads the row
-    //    `project.created` wrote one element earlier in the same call.
+    //    `project.created` wrote one element earlier in the same call. That
+    //    ordering is 6.81's property; here it is the setup.
     const projectId = newUlid();
     const forward = await submitBatch(admin, [
       createSeed(workspaceId, projectId, 'Deliveries'),
@@ -229,10 +268,10 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
     expect(forward[0]!.status).toBe('committed');
     expect(forward[1]!.status).toBe('committed');
 
-    // ── THE SAME PAIR, REVERSED, in one call. This is the assertion that
-    //    witnesses the ordering: a door with no in-batch ordering guarantee
-    //    could answer committed for both above and would have to answer
-    //    committed here too. It must not.
+    // ── THE SAME PAIR, REVERSED, in one call — the fixture for the assertion
+    //    that follows, and a second reading of 6.81's control. It manufactures
+    //    the state this case is actually about: a project that EXISTS and whose
+    //    founder is on no roster for it.
     const reversedId = newUlid();
     const reversed = await submitBatch(admin, [
       joinSeed(workspaceId, reversedId, admin.userId),
@@ -266,26 +305,4 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
     );
   });
 
-  it('archives and restores through the door, and the served flag follows', async () => {
-    const owner = await signedIn();
-    const workspaceId = await found(owner);
-    const projectId = newUlid();
-    await seedProject(db.pool, workspaceId, projectId, 'Old signage');
-
-    const flag = async (): Promise<boolean | undefined> =>
-      (await projectsFor(owner, workspaceId)).find((p) => p.projectId === projectId)?.archived;
-
-    expect(await flag()).toBe(false);
-    expect((await submitBatch(owner, [archiveSeed(workspaceId, projectId)]))[0]!.status).toBe(
-      'committed',
-    );
-    expect(await flag()).toBe(true);
-    expect((await submitBatch(owner, [archiveSeed(workspaceId, projectId, true)]))[0]!.status).toBe(
-      'committed',
-    );
-    // Restore is not merely "not archived" — it must be reachable FROM the
-    // archived state, which is what makes the pair symmetric rather than a
-    // one-way flag with a second name.
-    expect(await flag()).toBe(false);
-  });
 });

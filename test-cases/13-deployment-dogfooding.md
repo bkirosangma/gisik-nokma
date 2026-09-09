@@ -2939,7 +2939,13 @@ true the moment the tree changes.
   printed `0 tickets`, which is exactly the claim the server declined to make by omitting the key. Its
   POSITIVE CONTROL runs in the same test, same component, same one-project fixture with only the role and
   the served keys changed: without it, a page that had stopped rendering counts for EVERYBODY would pass
-  the withholding assertion and the case would certify nothing.
+  the withholding assertion and the case would certify nothing. **Two mutations measured.** Rendering a
+  withheld count as `count ?? 0` reddens the withholding half ALONE — 1 failed / 201 passed across
+  `apps/web`. Removing the archived split (`live = workspace.projects`) reddens FOUR cases here, and that
+  breadth is recorded as a limit rather than as strength: three of the four fail because they click a
+  disclosure the mutation deletes, so it is a shape gate and not a site-specific measurement. The
+  site-specific evidence for the archived split is this case's own assertion pair — absent from the
+  default list, present with an `Archived` chip behind the toggle.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.385** ✅ Every admin affordance is gated on the caller's served role, and the case is the PAIRING.
   Asserting only that an admin has an Archive button passes against a page that shows it to everybody;
@@ -2952,7 +2958,10 @@ true the moment the tree changes.
   assertions by accident. **Mutation measured: widening the client gate (`mayAdminister` returning true
   for `member`) reddens THIS case and nothing else.** The server half is 13.388's, deliberately — the two
   halves of *"hiding a control is not enforcement"* fail at their own sites, and a mutation that reddened
-  both would tell you nothing about which one is load-bearing.
+  both would tell you nothing about which one is load-bearing. The measurement: **1 failed / 201 passed**
+  across the whole of `apps/web` — the complete blast radius, since `src/workspace-viewer.ts` has no
+  consumer outside this app — failing as *"member must not be offered “Archive Shop operations”: expected
+  <button …> to be null"*, which names its own site.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.386** ✅ The screen follows the DOOR'S answer, in both directions. **Committed arm:** archiving
   takes a project out of the default list and restoring brings it back, and the movement comes from the
@@ -2964,7 +2973,8 @@ true the moment the tree changes.
   disappears with nothing behind it. **Refused arm:** the door's own `rule: reason` reaches the screen and
   the row does not move. This is the arm that matters — a `.then()` that reloaded unconditionally passes
   the committed arm and shows a non-admin a screen indistinguishable from success, on the surface whose
-  whole subject is who may do what.
+  whole subject is who may do what. **Mutation measured:** dropping the re-read after a commit (an early
+  `return` where the reload is) reddens this case ALONE, 1 failed / 201 passed.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.387** ✅ The five doors out of the page resolve to routes that exist, asserted as five LITERAL
   paths. **Four are workspace-scoped and the fifth is not**: `/mcp/tokens` is a global route that takes no
@@ -2972,27 +2982,39 @@ true the moment the tree changes.
   `/w/<id>/mcp/tokens`, which resolves to nothing — **and a test building its expectations the same way
   would agree with the bug.** That is the whole reason the paths are literals, and the negative naming the
   defect (`MCP tokens` must NOT point at a workspace-scoped MCP route) is asserted directly. The link
-  count is asserted too, so a sixth link cannot appear unnamed.
+  count is asserted too, so a sixth link cannot appear unnamed. **Mutation measured:** building the MCP
+  href as `/w/<workspaceId>/mcp/tokens` — the exact defect the case is named for — reddens this case
+  ALONE, 1 failed / 201 passed.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.388** ✅ The DOOR decides, not the page — driven with no UI in the picture at all. A `member` and a
   `guest` each submit `project.created`, `project.archived` and `project.restored` at the real client door
   and are refused; the RULE and the REASON are asserted, not merely "not committed", because a refusal
   under some other rule would mean the three types are turned away for something unrelated to the role and
   the case would be certifying the wrong door. Nothing lands: the owner's own read afterwards shows the
-  project still unarchived and the project list unchanged, so a refusal that still wrote — the answer
-  saying no while the world says yes — reddens. **The positive control is an `admin` at the same door in
-  the same workspace with the same types**, without which every assertion above would also pass against a
-  door that refused these types from everybody, and the page would be hiding controls that could never
-  have worked. **The two-event founding batch, and the assertion that actually witnesses the ordering:**
-  `project.created` + `project.member_added` in ONE call both commit — but a door with no in-batch
-  ordering guarantee could answer that way too, so **the same pair REVERSED is submitted in the same run**
-  and its `project.member_added` must be refused under `project.unknown` naming the id. The
-  `project.created` behind it still commits (one bad event never rolls back its neighbours), which leaves
-  a project nobody is on — precisely the state the page's ordering exists to avoid, asserted rather than
-  described. **And why the second event is not decoration:** the founder is a workspace ADMIN, not the
-  owner, so `visibleProjects` filters them to `eff.projects`; the forward project is named back to them by
-  `GET /v1/me/workspaces` and the reversed one is not, with the workspace OWNER told BOTH as the control
-  proving the reversed project exists and is withheld rather than missing.
+  project still unarchived and the list unchanged, so a refusal that still wrote — the answer saying no
+  while the world says yes — reddens. **The positive control is an `admin` at the same door in the same
+  workspace with the same types**, without which every assertion above would also pass against a door that
+  refused these types from everybody, and the page would be hiding controls that could never have worked.
+  **WHAT THIS CASE DOES NOT OWN, established by mutation rather than by reading — and a third `it` was
+  DELETED when the measurement came back.** Removing `'project.archived'` from `ADMIN_ONLY_TYPES` reddens
+  this case AND pre-existing **13.370**, which already drives an owner's archive/restore round trip and a
+  plain member's refusal; a case restating that here was written, measured redundant, and removed rather
+  than kept to inflate a count. Removing `case 'project.member_added'` from `projectsNamedBy` reddens this
+  case AND **two** cases in `test/permissions/check-project-exists.test.ts`, one of them **6.81** — *"a
+  project founded EARLIER IN THE SAME BATCH is found by the check"* — which already drives the forward
+  pair and the reversed control through `ingestClientBatch` with the same argument. **So the in-batch
+  ordering guarantee is 6.81's property and this case does not establish it**; the reversed batch here is
+  a FIXTURE, not the claim, and the case was re-aimed and renamed once that was measured. Advertising
+  novelty a case does not have is worse than no case — it is a second green tick over one property.
+  **What it DOES own beyond 13.370 and 6.81:** three event types rather than one and two non-admin roles
+  rather than one — the page offers three controls and hides them from both; and **the visibility
+  consequence that makes the founding form's second event non-optional.** 6.81 never reads
+  `/v1/me/workspaces` and its actor is the workspace OWNER, whom `visibleProjects` exempts from its
+  filter. Here the founder is a workspace ADMIN at the HTTP door, so the filter applies: the project whose
+  `project.member_added` landed is named back to them and the one whose roster event was refused is NOT —
+  though it exists and they founded it — with the workspace owner told BOTH as the control proving the
+  second project is withheld rather than missing. That is the failure a one-event founding form ships, and
+  nothing else in the repo would have caught it.
   — (`apps/server/test/routes/workspace-home-door.test.ts`)
 - **13.389** ✅ `/w/<workspaceId>` joins the three signed-in ratchets as a seventh route, and its FIRST
   run is given teeth it would not otherwise have. `recordAccessibleBaseline` writes ABSENT keys only, so a
