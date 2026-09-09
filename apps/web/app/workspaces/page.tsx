@@ -11,6 +11,7 @@ import { AppNav } from '../../src/app-nav.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
+import { restrictedLine, viewerOf, type CardViewer } from '../../src/workspace-viewer.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -89,64 +90,13 @@ export default function WorkspacesPage() {
 }
 
 /**
- * What this viewer is, said once (Task 18).
- *
- * ## ONE role value, and the affordances read the SAME one
- *
- * The card makes two decisions about the viewer: what sentence to greet them
- * with, and whether it may print numbers at all. **Both read `role` and nothing
- * else**, which is the point of this function existing rather than the two
- * living at their own call sites. The second source that suggests itself is
- * `memberCount === null` — the server's own withholding — and it is a different
- * fact that happens to agree today: it means *this number was withheld*, not
- * *you are a guest*. Case 13.381 seeds the one body where they disagree (a
- * guest served counts, which the shipped server never sends) and dies if the
- * chip stops reading the role.
- *
- * ## An unknown role is greeted, not gated open
- *
- * `WorkspaceRef.role` is a `string` on the wire, not a union — the server sends
- * `row.role` from `proj_memberships` verbatim. So a role this build has never
- * heard of is reachable, and the two answers pull opposite ways: the SENTENCE
- * falls back to something true and vague, and `countsWithheld` falls back to
- * **true**. Withholding from a role we cannot place is the conservative
- * direction, and it is the only one where being wrong is recoverable.
+ * Task 18's `viewerOf` and `restrictedLine` MOVED to `src/workspace-viewer.ts`
+ * by Task 19, unchanged, because the workspace home became their second caller
+ * and the reasoning they carry — one role value, two questions, withheld is not
+ * zero — is precisely the kind that must not exist twice. The full argument
+ * travelled with them; this page's behaviour did not change, and 13.380/13.381
+ * still drive both through this card.
  */
-type CardViewer = { sentence: string; countsWithheld: boolean };
-
-const ROLE_SENTENCES: Record<string, string> = {
-  owner: "You're an owner here.",
-  admin: "You're an admin here.",
-  member: "You're a member here.",
-  guest: "You're a guest here.",
-};
-
-function viewerOf(role: string): CardViewer {
-  const sentence = ROLE_SENTENCES[role];
-  return {
-    sentence: sentence ?? `Your role here is ${role}.`,
-    countsWithheld: sentence === undefined || role === 'guest',
-  };
-}
-
-/**
- * *"1 project · name restricted"* — or nothing at all.
- *
- * Zero renders NOTHING, and that is the same rule the invitation banner keeps:
- * a person with nothing withheld from them must not be told about withholding.
- * *"0 projects · name restricted"* would be a sentence announcing an absence
- * nobody asked about, and it would appear on every owner's card, where the
- * count is zero by construction.
- *
- * ONE interpolation, not three — the rule this file already records at the
- * banner: React renders each JSX interpolation as its own text node, so a
- * sentence assembled out of several is split in the accessibility tree and in
- * every `getByText` that looks for it.
- */
-function restrictedLine(count: number): string | null {
-  if (count <= 0) return null;
-  return `${count} ${count === 1 ? 'project' : 'projects'} · name restricted`;
-}
 
 /**
  * The two count chips, and the word "active".
