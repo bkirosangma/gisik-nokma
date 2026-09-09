@@ -1300,9 +1300,18 @@ inviter, workspace, role and expiry. Cases 13.373–13.378: only genuine pending
 invite for another email never appears (mutate the email scope → RED); Decline is witnessed as a state change and the
 invite then vanishes; Accept joins the workspace. **Decline and Accept are real mutations — owner-approved features.**
 
-### Task 18: The neo workspace card + Help/Account nav (client)
+### Task 18: The neo workspace card + Help/Account nav (+ the option-2 restricted count)
 
-**sonnet, sonnet reviewer (haiku ok for the pure-CSS card).** The card through the style axis: monogram from the
+**opus / high, opus reviewer** — the owner ruled OPTION 2 (2026-09-09) for the restricted-project count, a new
+derivation rule on the visibility surface. **First, server:** add to `WorkspaceRef`/`GET /v1/me/workspaces` a count of
+the caller's **name-restricted-but-ticket-visible** projects (those they see ≥1 ticket in via `visibleTicketsWhere`
+but whose NAME `visibleProjects` withholds), so the card renders *"N project · name restricted"* truthfully; **AMEND
+the `mapWorkspaceRefs` docblock in the same change set** — its *"no 'and N more', because the COUNT would itself be the
+disclosure"* rationale is replaced with option 2's (a count of projects the caller already holds a ticket in reveals a
+NAME restriction, not an existence — the P32 distinction). Do NOT count projects the caller has no sight into (refused
+option 3). Mutation-witness: the count equals that set; mutate to count all projects → RED. Task 16's shipped wire is
+untouched — this field is additive. **Then the card (the CSS part is sonnet-simple within this opus task):** through the
+style axis: monogram from the
 workspace name (deterministic colour from its id, the `Avatar` primitive), the member count, **chips for active /
 blocked ticket counts — the guest card shows a single "Restricted" chip instead of any number**, the role rendered as
 a SENTENCE (*"You're an owner here."*, never the raw enum) with **every gated affordance derived from that one role
