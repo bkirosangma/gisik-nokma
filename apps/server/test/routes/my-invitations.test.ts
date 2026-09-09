@@ -477,19 +477,33 @@ describe('Accept — from the banner, on the same semantics as the link', () => 
     // needed when three parallel acceptances of one token all committed in 24
     // of 25 trials.
     //
-    // Each trial fires the two doors at one invitation AT ONCE: an acceptance
-    // by link and a decline from the banner. Exactly one may win, because both
-    // spend the same row in one conditional DELETE and one statement is one
-    // transaction. Without the spend both read a pending invitation, both
-    // append, and the ledger holds an invitation that was accepted AND
-    // declined — a membership granted to somebody who refused it.
+    // Each trial fires ALL THREE doors at one invitation AT ONCE: acceptance by
+    // link, acceptance from the banner, and decline from the banner. Exactly one
+    // may win, because all three spend the same row in one conditional DELETE
+    // and one statement is one transaction.
+    //
+    // All three and not a pair, and that is not thoroughness for its own sake —
+    // it was measured. A race between the LINK accept and the banner DECLINE
+    // cannot see a missing spend in the banner ACCEPT, because that handler
+    // never runs in it: with the pair, deleting the banner accept's spend left
+    // every case green. The invariant is about the invitation, so the race has
+    // to be about every door onto it.
+    //
+    // Without a spend, two doors both read a pending invitation, both append,
+    // and the ledger holds an invitation accepted twice — or accepted AND
+    // declined, a membership granted to somebody who refused it.
     for (let trial = 0; trial < 12; trial += 1) {
       const racer = await signedIn();
       const raced = await invite(admin, workspaceId, racer.email);
-      const [accepted, declined] = await Promise.all([
+      const [byLink, byBanner, declined] = await Promise.all([
         app.inject({
           method: 'POST',
           url: `/v1/invites/${raced.token}/accept`,
+          headers: racer.headers,
+        }),
+        app.inject({
+          method: 'POST',
+          url: `/v1/me/invitations/${raced.inviteId}/accept`,
           headers: racer.headers,
         }),
         app.inject({
@@ -498,12 +512,18 @@ describe('Accept — from the banner, on the same semantics as the link', () => 
           headers: racer.headers,
         }),
       ]);
-      const won = [accepted?.statusCode === 200, declined?.statusCode === 204].filter(Boolean);
-      expect(won, `trial ${trial}: accept=${accepted?.statusCode} decline=${declined?.statusCode}`)
-        .toHaveLength(1);
+      const outcome =
+        `link=${byLink?.statusCode} banner=${byBanner?.statusCode} decline=${declined?.statusCode}`;
+      const won = [
+        byLink?.statusCode === 200,
+        byBanner?.statusCode === 200,
+        declined?.statusCode === 204,
+      ].filter(Boolean);
+      expect(won, `trial ${trial}: ${outcome}`).toHaveLength(1);
       // And the ledger agrees with the HTTP answers: one terminal event, not two.
       const types = await inviteEventTypes(raced.inviteId);
-      expect(types.filter((type) => type !== 'invite.sent'), `trial ${trial}`).toHaveLength(1);
+      expect(types.filter((type) => type !== 'invite.sent'), `trial ${trial}: ${outcome}`)
+        .toHaveLength(1);
     }
   });
 });
