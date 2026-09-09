@@ -1525,6 +1525,20 @@ test('13.299 — /workspaces with an EMPTY roster renders the empty state and th
       body: JSON.stringify({ workspaces: [] }),
     }),
   );
+  // Task 17's banner reads this from `/workspaces` too, and an UNSTUBBED read
+  // proxies to whatever compose stack the developer is running — the defect
+  // this block's own comment names, and how a live Google credential reached
+  // the accessible-names baseline on 2026-09-08. `{invitations: []}` is the
+  // common case and the one whose layout this suite should be measuring: the
+  // banner renders NOTHING for it, so the baselines stay about the page that
+  // ships rather than about a failure line.
+  await page.route('**/v1/me/invitations', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ invitations: [] }),
+    }),
+  );
 
   const response = await page.goto('/workspaces', { waitUntil: 'networkidle' });
   expect(response?.status(), '/workspaces responded unexpectedly').toBe(200);
@@ -1698,6 +1712,17 @@ test('13.298 — a 401 on /workspaces settles the REAL browser on /sign-in', asy
   page,
 }, testInfo) => {
   await page.route('**/v1/me/workspaces', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'UNAUTHENTICATED' }),
+    }),
+  );
+  // Same reason as 13.299's, and it matters MORE here: this case is about
+  // where a 401 SETTLES, and an unstubbed invitations read against a live
+  // stack could answer 200 and leave a banner on a page this case asserts has
+  // become `/sign-in`.
+  await page.route('**/v1/me/invitations', (apiRoute) =>
     apiRoute.fulfill({
       status: 401,
       contentType: 'application/json',
