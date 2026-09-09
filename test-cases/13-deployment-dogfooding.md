@@ -2905,3 +2905,131 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   seeded archived project — owner: whoever next extends the CC seed, plausibly Task 19, which builds
   archive/restore.
   — (`apps/web/e2e-stack/viewport.spec.ts`)
+
+## Task 19 — the workspace home, a new route `app/w/[workspaceId]/page.tsx` (2026-09-09)
+
+**Case ids `13.384`–`13.389`, the block allocated to Task 19** by the controller's 2026-09-09
+`13.366`–`13.389` cluster allocation above. **Recounted at `4924dc1` before minting: the maximum id in
+use in this file was `13.383`**, Task 18's last, and every id from `13.384` to `13.390` occurred ONLY in
+reservation prose — this file's allocation paragraph, the plan's Task 19 line, and the two lane state
+files. Checked id by id with `grep -rn` across the whole tree rather than by an ordinal sweep, because
+both documented traps reproduce: `13\.[0-9]+` still reports `13.3333` as its maximum and a float sort
+still puts `13.99` above `13.383`. `13.386`, `13.387` and `13.388` appeared **nowhere at all** before this
+PR; `13.384`/`13.385`/`13.389` appeared only in the prose named above. The next free BLOCK is still
+**`13.390`**, controller-allocated ON REQUEST ONLY — unchanged by this PR, which consumed its own six and
+no more.
+
+**What the route is.** Until this commit `/w/<workspaceId>` was not a page: a workspace was reachable only
+through a project link, and that path rendered the 404. The e2e sweep's own comment said so in as many
+words and is corrected in the same change set — the standing rule that a claim about the tree stops being
+true the moment the tree changes.
+
+- **13.384** ✅ The home lists THIS CALLER'S projects with THIS CALLER'S counts, and a withheld count is
+  rendered as nothing rather than as zero. Every displayed number in the fixture is DIFFERENT from every
+  other and each is asserted INSIDE its own row (`within(row)`), with the sibling's number asserted absent
+  from it — so a page printing one project's count on every row fails, where a bare
+  `getByText('9 tickets')` would pass. **Zero blocked prints no chip at all**: `0 blocked` is a true
+  number and a useless one, and the row carrying it is the row a reader scans past. **Archived is marked
+  AND hidden**: the archived project is absent from the default list, the disclosure's accessible name
+  carries the workspace (two workspaces would otherwise present two identically-named buttons),
+  `aria-expanded` is asserted in both states, and the revealed row carries an `Archived` chip — marking
+  without hiding, or hiding without marking, each fails half of this. The restricted line is ONE text node,
+  which a three-interpolation version fails. **The withheld half is asserted BY SHAPE** — a guest's row
+  must contain no digit at all — because `toBe(0)` and `toBeUndefined()` both pass against a page that
+  printed `0 tickets`, which is exactly the claim the server declined to make by omitting the key. Its
+  POSITIVE CONTROL runs in the same test, same component, same one-project fixture with only the role and
+  the served keys changed: without it, a page that had stopped rendering counts for EVERYBODY would pass
+  the withholding assertion and the case would certify nothing. **Two mutations measured.** Rendering a
+  withheld count as `count ?? 0` reddens the withholding half ALONE — 1 failed / 201 passed across
+  `apps/web`. Removing the archived split (`live = workspace.projects`) reddens FOUR cases here, and that
+  breadth is recorded as a limit rather than as strength: three of the four fail because they click a
+  disclosure the mutation deletes, so it is a shape gate and not a site-specific measurement. The
+  site-specific evidence for the archived split is this case's own assertion pair — absent from the
+  default list, present with an `Archived` chip behind the toggle.
+  — (`apps/web/test/workspace-home.test.tsx`)
+- **13.385** ✅ Every admin affordance is gated on the caller's served role, and the case is the PAIRING.
+  Asserting only that an admin has an Archive button passes against a page that shows it to everybody;
+  asserting only that a member lacks one passes against a page that shows it to nobody. So all four roles
+  are driven against the SAME fixture and each of the three affordances — archive, restore, new-project —
+  is checked present on `owner`/`admin` and absent on `member`/`guest`. **Both non-admin roles are driven
+  because they fail differently**: a gate written `role !== 'member'` admits a guest, and one written
+  `role === 'owner'` locks out an admin. Every role is also asserted to get the LIST and the LINKS, so a
+  page that refused the whole screen to a member would redden here rather than passing the four absence
+  assertions by accident. **Mutation measured: widening the client gate (`mayAdminister` returning true
+  for `member`) reddens THIS case and nothing else.** The server half is 13.388's, deliberately — the two
+  halves of *"hiding a control is not enforcement"* fail at their own sites, and a mutation that reddened
+  both would tell you nothing about which one is load-bearing. The measurement: **1 failed / 201 passed**
+  across the whole of `apps/web` — the complete blast radius, since `src/workspace-viewer.ts` has no
+  consumer outside this app — failing as *"member must not be offered “Archive Shop operations”: expected
+  <button …> to be null"*, which names its own site.
+  — (`apps/web/test/workspace-home.test.tsx`)
+- **13.386** ✅ The screen follows the DOOR'S answer, in both directions. **Committed arm:** archiving
+  takes a project out of the default list and restoring brings it back, and the movement comes from the
+  RE-READ — the stub serves a different directory on the second and third calls, so a client that moved
+  the row in its own copy of the list fails, which a case with a fixed stub could not detect. The
+  submitted claim is asserted too, because "the row moved" is satisfied by any event at all: exactly ONE
+  event, `project.archived`, filed against `{kind:'project', id:'p1'}` in this workspace, actor the
+  signed-in user, envelope-origin `web`. The restore submits `project.restored` and the disclosure then
+  disappears with nothing behind it. **Refused arm:** the door's own `rule: reason` reaches the screen and
+  the row does not move. This is the arm that matters — a `.then()` that reloaded unconditionally passes
+  the committed arm and shows a non-admin a screen indistinguishable from success, on the surface whose
+  whole subject is who may do what. **Mutation measured:** dropping the re-read after a commit (an early
+  `return` where the reload is) reddens this case ALONE, 1 failed / 201 passed.
+  — (`apps/web/test/workspace-home.test.tsx`)
+- **13.387** ✅ The five doors out of the page resolve to routes that exist, asserted as five LITERAL
+  paths. **Four are workspace-scoped and the fifth is not**: `/mcp/tokens` is a global route that takes no
+  `workspaceId`, so a page building its hrefs from one `/w/${id}/` prefix would emit
+  `/w/<id>/mcp/tokens`, which resolves to nothing — **and a test building its expectations the same way
+  would agree with the bug.** That is the whole reason the paths are literals, and the negative naming the
+  defect (`MCP tokens` must NOT point at a workspace-scoped MCP route) is asserted directly. The link
+  count is asserted too, so a sixth link cannot appear unnamed. **Mutation measured:** building the MCP
+  href as `/w/<workspaceId>/mcp/tokens` — the exact defect the case is named for — reddens this case
+  ALONE, 1 failed / 201 passed.
+  — (`apps/web/test/workspace-home.test.tsx`)
+- **13.388** ✅ The DOOR decides, not the page — driven with no UI in the picture at all. A `member` and a
+  `guest` each submit `project.created`, `project.archived` and `project.restored` at the real client door
+  and are refused; the RULE and the REASON are asserted, not merely "not committed", because a refusal
+  under some other rule would mean the three types are turned away for something unrelated to the role and
+  the case would be certifying the wrong door. Nothing lands: the owner's own read afterwards shows the
+  project still unarchived and the list unchanged, so a refusal that still wrote — the answer saying no
+  while the world says yes — reddens. **The positive control is an `admin` at the same door in the same
+  workspace with the same types**, without which every assertion above would also pass against a door that
+  refused these types from everybody, and the page would be hiding controls that could never have worked.
+  **WHAT THIS CASE DOES NOT OWN, established by mutation rather than by reading — and a third `it` was
+  DELETED when the measurement came back.** Removing `'project.archived'` from `ADMIN_ONLY_TYPES` reddens
+  this case AND pre-existing **13.370**, which already drives an owner's archive/restore round trip and a
+  plain member's refusal; a case restating that here was written, measured redundant, and removed rather
+  than kept to inflate a count. Removing `case 'project.member_added'` from `projectsNamedBy` reddens this
+  case AND **two** cases in `test/permissions/check-project-exists.test.ts`, one of them **6.81** — *"a
+  project founded EARLIER IN THE SAME BATCH is found by the check"* — which already drives the forward
+  pair and the reversed control through `ingestClientBatch` with the same argument. **So the in-batch
+  ordering guarantee is 6.81's property and this case does not establish it**; the reversed batch here is
+  a FIXTURE, not the claim, and the case was re-aimed and renamed once that was measured. Advertising
+  novelty a case does not have is worse than no case — it is a second green tick over one property.
+  **What it DOES own beyond 13.370 and 6.81:** three event types rather than one and two non-admin roles
+  rather than one — the page offers three controls and hides them from both; and **the visibility
+  consequence that makes the founding form's second event non-optional.** 6.81 never reads
+  `/v1/me/workspaces` and its actor is the workspace OWNER, whom `visibleProjects` exempts from its
+  filter. Here the founder is a workspace ADMIN at the HTTP door, so the filter applies: the project whose
+  `project.member_added` landed is named back to them and the one whose roster event was refused is NOT —
+  though it exists and they founded it — with the workspace owner told BOTH as the control proving the
+  second project is withheld rather than missing. That is the failure a one-event founding form ships, and
+  nothing else in the repo would have caught it.
+  — (`apps/server/test/routes/workspace-home-door.test.ts`)
+- **13.389** ✅ `/w/<workspaceId>` joins the three signed-in ratchets as a seventh route, and its FIRST
+  run is given teeth it would not otherwise have. `recordAccessibleBaseline` writes ABSENT keys only, so a
+  route joining the sweep records its floor and asserts nothing against it on that run — *"the floor did
+  not fall"* is vacuously true for a floor written from the same numbers it is compared against, and a new
+  route's first pass is green by construction. So this route carries **`MUST_NAME`**, the accessible-name
+  twin of the existing `MUST_EXAMINE`, asserted on every run including the first: the `Workspace sections`
+  navigation, an `Archive <project>` button, and the `Ticket types` link must each be visible before any
+  count taken on the page is believed. A count of 3 for a page that rendered a 404 and a count of 3 for a
+  page that rendered its controls are the same number, which is the failure the sibling map already
+  exists for. **Named absence, carried forward from 13.383 and NOT closed here:** the seeded stack world
+  has no archived project, so the archive DISCLOSURE renders on neither `/workspaces` nor this route and
+  its `aria-label` is in neither floor; that control is witnessed by 13.384 in jsdom instead. Task 19
+  builds archive/restore and was named as the plausible closer — it declines, because seeding one would
+  raise `/workspaces`' floor and force the delete-and-re-record dance on a baseline this task otherwise
+  does not touch, which is a change with its own risk and no case here asking for it. **Owner unchanged:
+  whoever next extends the CC seed.**
+  — (`apps/web/e2e-stack/viewport.spec.ts`)

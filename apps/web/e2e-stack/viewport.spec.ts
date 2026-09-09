@@ -259,11 +259,20 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    *
    * Recorded because two other readings of this looked equally reasonable and
    * both cost a run: `/my-work` lists the tickets assigned to the signed-in
-   * user and links to ticket surfaces, not projects; and `/w/<id>` is not a
-   * page at all — there is no `app/w/[workspaceId]/page.tsx`, so it renders the
-   * 404, which is a document with a nav and some prose and would have swept
-   * cleanly while measuring nothing this test is about. Guessing a route is how
-   * a sweep ends up reporting a green number for a page it never loaded.
+   * user and links to ticket surfaces, not projects; and `/w/<id>` **was not a
+   * page at all** when this was written — there was no
+   * `app/w/[workspaceId]/page.tsx`, so it rendered the 404, which is a document
+   * with a nav and some prose and would have swept cleanly while measuring
+   * nothing this test is about. Guessing a route is how a sweep ends up
+   * reporting a green number for a page it never loaded.
+   *
+   * **CORRECTED 2026-09-09 (Task 19): `/w/<id>` IS a page now** — the workspace
+   * home — and it is swept as a seventh route below. The paragraph is kept
+   * rather than deleted because its reasoning is what makes the new route worth
+   * adding: a sweep of a 404 and a sweep of a real page are indistinguishable
+   * from the numbers alone, which is why the new route carries `MUST_NAME`
+   * probes that fail if the page did not actually render its controls. The
+   * project links are still read from `/workspaces`, unchanged.
    */
   const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
   await projectLink.waitFor({ timeout: 15_000 });
@@ -354,6 +363,36 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     'stack-phone-390|/settings/ticket-types': ['ticket-type-list__badge'],
   };
 
+  /**
+   * ACCESSIBLE NAMES THAT MUST BE ON THE PAGE, per route — and the reason this
+   * map exists at all.
+   *
+   * `recordAccessibleBaseline` writes ABSENT keys only, so a route joining this
+   * sweep for the first time RECORDS its floor and asserts nothing on that run:
+   * "the floor did not fall" is vacuously true for a floor that was written
+   * from the same numbers it is compared against. A new route's first pass is
+   * therefore green by construction, which is the exact shape this repo has a
+   * catalogue of.
+   *
+   * So a route whose POINT is that it carries named controls names them here,
+   * and they are asserted directly, on every run including the first. This is
+   * the accessible-name twin of `MUST_EXAMINE` above and it exists for the same
+   * stated reason: a count of 3 for a page that rendered a 404 and a count of 3
+   * for a page that rendered its controls are the same number.
+   *
+   * Task 19's `/w/<id>` is the first entry. Its probes are the three things the
+   * workspace home adds that nothing else on this route list has: the sections
+   * nav, an archive control named for its project, and the archived disclosure
+   * named for its workspace.
+   */
+  const MUST_NAME: Record<string, Array<{ role: 'navigation' | 'button' | 'link'; name: RegExp }>> = {
+    'stack-phone-390|/w/:workspaceId': [
+      { role: 'navigation', name: /^Workspace sections$/ },
+      { role: 'button', name: /^Archive / },
+      { role: 'link', name: /^Ticket types$/ },
+    ],
+  };
+
   const routes: { path: string; key: string; reach?: () => Promise<void> }[] = [
     { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
     { path: projectHref ?? '', key: 'stack-phone-390|/p/:projectId' },
@@ -390,6 +429,14 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
        Baselines are unchanged and this suite stayed green through Task 15's
        commits. */
     { path: '/workspaces', key: 'stack-phone-390|/workspaces' },
+    /* `/w/<workspaceId>` — the workspace HOME, ADDED 2026-09-09 with Task 19,
+       which is the commit that made it a page. It is the route that most needed
+       a floor of the seven: it is the only one carrying admin-gated MUTATION
+       controls, so a restyle that dropped an `aria-label` here would leave a
+       person with a screen reader unable to tell which project a bare
+       "Archive" button belongs to. Its `MUST_NAME` probes are what give this
+       route's FIRST run teeth — see that map. */
+    { path: `/w/${workspaceId}`, key: 'stack-phone-390|/w/:workspaceId' },
   ];
 
   for (const route of routes) {
@@ -477,6 +524,17 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
      * the board and every settings screen only exist behind a session. Same
      * one-way contract, its own baseline file.
      * ──────────────────────────────────────────────────────────────────*/
+    // 13.389 (Task 19) — the probes that have teeth on a route's FIRST run,
+    // when the ratchet below has none. See MUST_NAME for why.
+    for (const probe of MUST_NAME[route.key] ?? []) {
+      await expect(
+        page.getByRole(probe.role, { name: probe.name }).first(),
+        `13.389: ${route.path} rendered no ${probe.role} named ${probe.name}. This route is in ` +
+          `the sweep to witness that control, so an accessible-name count taken here would be a ` +
+          `number about a page that is not the one under test.`,
+      ).toBeVisible();
+    }
+
     const names = await sweepAccessibleNames(page);
     expect(
       names.rawMatches,

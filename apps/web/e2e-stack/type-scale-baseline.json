@@ -4,5 +4,6 @@
   "stack-phone-390|/p/:projectId": 0,
   "stack-phone-390|/settings/ticket-types": 0,
   "stack-phone-390|/settings/workflows": 0,
+  "stack-phone-390|/w/:workspaceId": 0,
   "stack-phone-390|/workspaces": 0
 }
