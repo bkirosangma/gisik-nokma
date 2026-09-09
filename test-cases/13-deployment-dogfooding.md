@@ -2599,8 +2599,15 @@ closed by the fixture rather than by an argument:
 - **13.368** ✅ `ticketCount` counts what THIS caller may see: strictly less than the raw `proj_tickets`
   count for a member outside a ticket's audience, and equal to it for the owner — the owner half being what
   proves the `proj_visibility` INNER JOIN drops nothing, so the smaller number is a SCOPE and not a bug.
-  Its sibling asserts an explicit `0` (key PRESENT) for a project a caller can name and has no visible work
-  in, which is a claim they are entitled to and a different answer from "restricted".
+  A sibling asserts an explicit `0` (key PRESENT) for a project a caller can name and has no visible work
+  in, which is a claim they are entitled to and a different answer from "restricted". **A third case, added
+  after an opus review found the SURVIVOR the first seven mutations missed**: neutralising the query's
+  `v.workspace_id = $n` left every case green, because the route reads `counts.get()` only for the ids
+  `visibleProjects` returned and `project_id` is a global primary key — from a client's side the tenancy
+  clause is invisible. The world that can see it is the INTERNAL door's, where no existence check runs: a
+  ticket committed under workspace B can carry workspace A's `project_id`. The case seeds exactly that, and
+  asserts the raw table holds TWO rows for the id while A's owner counts ONE — so the `1` cannot be read as
+  "the fixture only made one". Mutation-witnessed: the clause's removal now reddens this case ALONE.
   — (`apps/server/test/routes/workspace-counts.test.ts`)
 - **13.369** ✅ `blockedCount` counts tickets in a state its own workflow flags `blocked: true` and nothing
   else: three tickets, one blocked, two in a different `active` state, and the two numbers must differ.
@@ -2614,7 +2621,15 @@ closed by the fixture rather than by an argument:
   not touch — is served true as well), and `project.restored` returns it to false. A second case pins the
   two refusals the event pair inherits: an archive naming a project nobody founded is told the project does
   not exist (both types are in `projectsNamedBy`), and an empty `.strict()` payload refuses a body that
-  names a project rather than ignoring it. — (`apps/server/test/routes/workspace-counts.test.ts`)
+  names a project rather than ignoring it. **All three refusals name their RULE, not only their status** —
+  `permission.role`, `project.unknown` (where `permission.role` would mean the existence check stopped
+  running first, since that caller IS an admin) and `invalid`; a refusal for some other reason would satisfy
+  a bare `status: 'refused'` while proving nothing about the gate the case is named for. **A note lives at
+  the payload case because it will mislead the next person**: mutating `.strict()` in
+  `packages/domain/src` proves nothing here — `@gisik-nokma/domain` exports `./dist/index.js` and
+  `apps/server` has no src alias, so the server loads the BUILT artifact. Measured: the src edit leaves
+  9/9 green, the same edit in `dist` reddens this case alone.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
 - **13.371** ✅ The shape the directory already served is unchanged for a member — the whole entry asserted
   with `toEqual`, so a future change that quietly dropped `role` or renamed `workspaceId` fails here, and
   so that the additions are pinned as ADDITIONS. — (`apps/server/test/routes/workspace-counts.test.ts`)

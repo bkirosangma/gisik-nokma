@@ -57,12 +57,42 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## WHAT WAS MEASURED, and what it cost
 >
-> **Seven mutations, each killing only its own cases** (tree verified clean after every restore):
+> **EIGHT mutations, each killing only its own cases** (tree verified clean after every restore). The
+> eighth exists because an **opus review found a SURVIVOR the first seven missed** — the count query's
+> tenancy clause, whose removal left every case green (the route reads `counts.get()` only for the ids
+> `visibleProjects` returned, and `project_id` is a global PK, so from a client's side the clause is
+> invisible; the world that sees it is the INTERNAL door's, where no existence check runs). Case 13.368
+> gained a third case that seeds a workspace-B ticket carrying workspace-A's `project_id`; the clause's
+> removal now reddens that case alone. The same review found that **a mutation aimed at
+> `packages/domain/src` measures NOTHING for `apps/server`** — the package exports `./dist/index.js` and
+> the server has no src alias — measured on 13.370's payload case (src edit: 9/9 green; the same edit in
+> `dist`: red, alone). That note lives at the case, because the next person will reach for `src` first.
+>
+> **A TOOLING HAZARD THE REVIEWER HIT, worth more than the findings:** `git status --porcelain` **through
+> the `rtk` filter printed `ok` for a tree that had an uncommitted edit in it**, and `git diff --stat`
+> through the same filter under-reported the file count (20 where there were 22). The reviewer only saw
+> the truth via `rtk proxy`. A filtered "clean" reading is exactly what makes `git checkout HEAD --`
+> destructive — and that destruction DID happen in this task (see the `7bfac1ca` commit message), with
+> the memory loaded. **Use `rtk proxy git status` before any `git checkout HEAD --`.**
+>
+> The eight mutations:
 > guest permitted → 13.366 ×2 + 13.367; `memberCount` without `ROSTER_VISIBLE_CLAUSE` → 13.367 +
 > 13.366; `ticketCount` unscoped → 13.368 alone; `blockedCount` aliased to `ticketCount` → 13.369
 > alone; route paints `0` instead of omitting → 13.366 ×2; archive removed from `ADMIN_ONLY_TYPES` →
 > 13.370 alone; mapper `?? 0` → 13.372 + the older 13.357; and the MIRROR bug (a truthiness check
 > collapsing a real `0` to withheld) → 13.372 ×3.
+>
+> **Four review findings closed in `c240c85a`** (the survivor above, the `dist` note, a docblock citing
+> the wrong door — the "no per-viewer variant" sentence is verbatim at `/ticket-types/:typeId/population`,
+> not at state-occupancy — and two stale claims). **Four stale claims were NOT fixed and are recorded with
+> an owner instead**, all of which went false at rulings P32/P38 and none of which Task 16 touched:
+> `apps/web/src/authoring/builder-wiring.tsx:36` (load-bearing — it justifies routing the caller's role
+> through `/members`), `apps/web/src/authoring/data-source-gateway.ts:84`,
+> `apps/web/src/shell-refusal.tsx:8-9` (four refusals named; only `search` remains), and
+> `packages/app-core/src/online/online-data-source.ts:92-97` ("there is no shipped project-list read at
+> all" — flatly false since `read/visible-projects.ts`). **Owner: whoever next touches the web
+> authoring/refusal surface, or a dedicated sweep.** The ONE such claim Task 16 itself made stale —
+> `replica-data-source.ts`'s `NO_WORKSPACE_TABLE.field` — was fixed here.
 >
 > **The real finding, which a naive implementation would have leaked quietly:** `readMembers` hides
 > guests from non-admins, so a plain `COUNT(*)` over workspace-scope rows tells a member "there are
