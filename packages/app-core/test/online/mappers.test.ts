@@ -1517,6 +1517,10 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
       id: 'ws1',
       name: 'Convenience Corner',
       role: 'admin',
+      // Task 16. This body carries no `memberCount`, and an absent count is
+      // WITHHELD — `null`, never 0. `toEqual` is exact, so this line is also
+      // what would fail if the mapper ever started defaulting the absence.
+      memberCount: null,
       projects: [],
     });
   });
@@ -1526,6 +1530,82 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
     const [entry] = workspaces as Record<string, unknown>[];
     delete entry!['role'];
     expect(() => mapWorkspaceRefs({ workspaces })).toThrow(MappingError);
+  });
+});
+
+/**
+ * 13.372 — Task 16's counts across the mapper, where ABSENT and `0` must stay
+ * two different claims.
+ *
+ * The failure this exists to catch is not a crash. It is a mapper that writes
+ * `?? 0`, after which a guest's withheld count arrives at the card as the
+ * assertion "this workspace holds no people you can see" — a sentence nobody
+ * computed, in a shape no renderer can tell from a real zero.
+ */
+describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted zero', () => {
+  function project(extra: Record<string, unknown>): Record<string, unknown> {
+    return { projectId: 'p1', name: 'Shop operations', archived: false, ...extra };
+  }
+  function withProjects(
+    workspace: Record<string, unknown>,
+    projects: Record<string, unknown>[],
+  ): { workspaces: unknown[] } {
+    return {
+      workspaces: [
+        { workspaceId: 'ws1', name: 'Convenience Corner', role: 'guest', ...workspace, projects },
+      ],
+    };
+  }
+
+  it('maps an absent count to null and a present zero to 0, in one body', () => {
+    const [ref] = mapWorkspaceRefs(
+      withProjects({}, [
+        project({}),
+        project({ projectId: 'p2', name: 'Deliveries', ticketCount: 0, blockedCount: 0 }),
+      ]),
+    );
+    // Absent → withheld. Not 0, and asserted with `toBeNull` rather than a
+    // falsy check, which 0 also satisfies.
+    expect(ref!.memberCount).toBeNull();
+    expect(ref!.projects[0]!.ticketCount).toBeNull();
+    expect(ref!.projects[0]!.blockedCount).toBeNull();
+    // Present zero → 0, in the SAME body, so a mapper that collapsed both to
+    // null (the mirror-image bug, and the one a withheld-only fixture misses)
+    // fails here.
+    expect(ref!.projects[1]!.ticketCount).toBe(0);
+    expect(ref!.projects[1]!.blockedCount).toBe(0);
+  });
+
+  it('reads a real memberCount, including zero, rather than treating any number as present-or-absent', () => {
+    expect(mapWorkspaceRefs(withProjects({ memberCount: 7 }, []))[0]!.memberCount).toBe(7);
+    // 0 is falsy; a truthiness-based reader maps it to null and this is the
+    // only assertion that would notice.
+    expect(mapWorkspaceRefs(withProjects({ memberCount: 0 }, []))[0]!.memberCount).toBe(0);
+  });
+
+  it('refuses a count that is present and not a number, rather than reading it as withheld', () => {
+    // An explicit `null` on the wire is neither absent nor a count. A server
+    // that sent one did something this contract does not describe, and guessing
+    // which of the two claims it meant is exactly the invention the mapper
+    // exists to refuse.
+    expect(() => mapWorkspaceRefs(withProjects({ memberCount: null }, []))).toThrow(MappingError);
+    expect(() => mapWorkspaceRefs(withProjects({ memberCount: '3' }, []))).toThrow(MappingError);
+    expect(() =>
+      mapWorkspaceRefs(withProjects({}, [project({ ticketCount: true })])),
+    ).toThrow(MappingError);
+  });
+
+  it('requires archived, because it is served to every caller who is told the project name', () => {
+    const withoutArchived = { projectId: 'p1', name: 'Shop operations' };
+    expect(() => mapWorkspaceRefs(withProjects({}, [withoutArchived]))).toThrow(MappingError);
+    // The positive control: the same body with the key present maps.
+    expect(mapWorkspaceRefs(withProjects({}, [project({ archived: true })]))[0]!.projects[0]).toEqual({
+      id: 'p1',
+      name: 'Shop operations',
+      archived: true,
+      ticketCount: null,
+      blockedCount: null,
+    });
   });
 });
 
