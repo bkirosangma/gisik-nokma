@@ -170,6 +170,18 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   });
 
   /**
+   * 13.361 (Round 2d, 2026-09-09) — the email placeholder, an ADDITION verbatim
+   * from the owner's neo prototype (`design-system/interactive/desktop.dc.html:149`
+   * has `placeholder="you@example.com"` on the same field). The shipped input had
+   * no placeholder before this change, so this is new coverage, not a regression
+   * guard on existing behaviour.
+   */
+  it('13.361 the email field carries the neo prototype\'s placeholder verbatim', () => {
+    render(<SignInPage />);
+    expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'you@example.com');
+  });
+
+  /**
    * 13.326 — THE DISCRIMINATION CASE, and it replaces a negative that could not
    * fail. **Found by mutation, not by reading.**
    *

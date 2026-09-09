@@ -30,6 +30,10 @@ import {
   recordTypeScaleBaseline,
 } from '../e2e-viewport/type-scale.js';
 
+// 13.364 (Round 2d, 2026-09-09) — this suite is one of the "both viewport
+// suites" that case names as passing against the dev stack rebuilt from this
+// round's frozen head (`../e2e-viewport/responsive.spec.ts` is the other).
+
 /**
  * ## THE ONE VIEWPORT CASE THAT CANNOT LIVE IN `e2e-viewport/`
  *

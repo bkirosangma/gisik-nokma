@@ -339,7 +339,7 @@ describe('HIG adoption — the deliberate departures', () => {
  */
 describe('a control without a boundary — which signal identifies it', () => {
   /**
-   * 13.284 — the fill does NOT carry identification and the accent label does, and the case asserts both halves.
+   * 13.284 — the fill does NOT carry identification and the label does, and the case asserts both halves.
    *
    * Ruling R1(c) removes the boundary from non-primary controls, and the
    * controller's ruling of 2026-09-08 explicitly declined to assert whether
@@ -353,6 +353,14 @@ describe('a control without a boundary — which signal identifies it', () => {
    * control means — and, more importantly, it would let a reader believe the
    * fill was doing work it is not. The fill is asserted to be BELOW 3:1
    * precisely so the case states the uncomfortable half of its own conclusion.
+   *
+   * **`accent` → `textAccent`, Round 2d (2026-09-09).** This case originally
+   * read `colorOf(theme, 'accent')`, because `.gn-button--ghost`'s label was
+   * `var(--gn-accent)` at the time. `ui.css` now sets that label to
+   * `var(--gn-text-accent)` (see `TOKEN_ROLES`'s `textAccent` docblock for why
+   * the split exists), so the role this case measures moved with the CSS it
+   * pins — checking `accent` here would now be testing a colour nothing on
+   * screen actually uses for this label.
    */
   it('identifies a non-primary control by its label, not its fill — and says so in both directions', () => {
     /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
@@ -379,9 +387,158 @@ describe('a control without a boundary — which signal identifies it', () => {
       // (2) The label is, and it clears the 4.5 it owes as TEXT — which is more
       // than the 3:1 1.4.11 asks of a non-text identifier.
       expect(
-        contrastRatio(colorOf(theme, 'accent'), filled),
-        `${theme}: the accent label on a filled control no longer clears 4.5`,
+        contrastRatio(colorOf(theme, 'textAccent'), filled),
+        `${theme}: the textAccent label on a filled control no longer clears 4.5`,
       ).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+/**
+ * Round 2d (2026-09-09) — the sign-in neo alignment's token-level changes:
+ * the retired accent hex, the new `textAccent` role that replaces it as a
+ * text-contrast guarantee, and the new pairless `brand` role.
+ */
+describe('textAccent — Round 2d (2026-09-09)', () => {
+  /**
+   * 13.360 — the retired accent hex measured, both directions. The neo-round
+   * accent (`#3A6DB0`/`#7FA9E4`) is legible as a FILL (`accentText` on
+   * `accent`, below) but NOT as text on a neutral surface — this pins the
+   * actual regression the rest of Round 2d exists to close, so a future
+   * reader can see the number rather than take the split on faith.
+   *
+   * Mutation: reverting `blue600`/`blue300` to the pre-Round-2d hexes
+   * (`#0040dd`/`#409cff`) would flip this case's own assertions (both would
+   * then clear 4.5) without touching `textAccent` at all — the two roles are
+   * independent primitives now, which is the property this pins.
+   */
+  it("13.360 the retired accent hex does not clear 4.5 as text on a bare surface, in either theme", () => {
+    expect(primitives.blue600).toBe('#3a6db0');
+    expect(primitives.blue300).toBe('#7fa9e4');
+    expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surface'))).toBeLessThan(4.5);
+    expect(contrastRatio(colorOf('dark', 'accent'), colorOf('dark', 'surface'))).toBeGreaterThanOrEqual(4.5);
+    // Dark clears bare surface/raised (see `textAccentDark`'s own docblock)
+    // but NOT every sunken background — `accent` carries no guarantee there
+    // at all post-rename, which is exactly why sites that render on a sunken
+    // background (`.gn-help__result-title`) were moved to `textAccent`
+    // instead of staying on `accent`.
+    expect(contrastRatio(colorOf('dark', 'accent'), primitives.neoNavySunken)).toBeLessThan(4.5);
+  });
+
+  /**
+   * 13.360 — `textAccent` clears the two declared `CONTRAST_PAIRS` rows in
+   * EVERY style, which is what the renamed rows above already assert via the
+   * generic "declared contrast pairs meet their minimums" loop. This case
+   * pins the exact derived hexes so a silent re-derivation (a value that
+   * still clears 4.5 by coincidence but was not actually re-measured) shows
+   * up as a diff here rather than passing unnoticed.
+   */
+  it('13.360 textAccent is pinned to its derived hexes', () => {
+    expect(primitives.textAccentLight).toBe('#325d97');
+    expect(primitives.textAccentDark).toBe('#8bb1e6');
+    expect(themes.light.textAccent).toBe('textAccentLight');
+    expect(themes.dark.textAccent).toBe('textAccentDark');
+  });
+
+  /**
+   * 13.360 — the binding constraint `textAccentLight`'s docblock names
+   * (the `.gn-button--ghost` fillTertiary-over-surface composite, `hig` and
+   * `neo`) actually clears 4.5, and the `.gn-help__result-title` sunken
+   * background does too, in both themes. These are NOT declared
+   * `CONTRAST_PAIRS` rows (that array only names `surface`/`surfaceRaised`),
+   * so nothing else in this suite would catch a regression here — this is
+   * the composite/sunken safety margin the derivation bought beyond what the
+   * declared rows require.
+   *
+   * Mutation: reverting either primitive to a value that only clears the two
+   * declared rows (e.g. the intermediate `#33619c`/pre-composite pass this
+   * derivation actually went through) reddens this case alone.
+   */
+  it('13.360 textAccent clears 4.5 against the fillTertiary-composited control background and surfaceSunken', () => {
+    const over = (src: string, dst: string): string => {
+      const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+      const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+      const channel = (i: number): number =>
+        Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+      return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+    };
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        const surface = colorOf(theme, 'surface', style);
+        const composite = over(colorOf(theme, 'fillTertiary', style), surface);
+        expect(
+          contrastRatio(colorOf(theme, 'textAccent', style), composite),
+          `${style}/${theme}: textAccent on the ghost-button composite`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(colorOf(theme, 'textAccent', style), colorOf(theme, 'surfaceSunken', style)),
+          `${style}/${theme}: textAccent on surfaceSunken`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  /**
+   * 13.360 — `accentText` on the RETIRED-hex-replaced `accent` still clears
+   * 4.5 in both themes (the dispatch's own item 10, "verify"). No nudge was
+   * needed; this pins that finding so a future accent change that DOES need
+   * one is caught here rather than assumed away.
+   */
+  it('13.360 accentText on the new accent still clears 4.5 in both themes, unnudged', () => {
+    expect(contrastRatio(colorOf('light', 'accentText'), colorOf('light', 'accent'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('dark', 'accentText'), colorOf('dark', 'accent'))).toBeGreaterThanOrEqual(4.5);
+    expect(primitives.white).toBe('#ffffff');
+    expect(primitives.navy900).toBe('#101625');
+  });
+});
+
+/**
+ * 13.358, 13.365 — `brand`, the one pairless role, and the measured number
+ * that justifies the exemption (see `TOKEN_ROLES`'s `brand` docblock).
+ */
+describe('brand — Round 2d (2026-09-09)', () => {
+  it('13.358 brand has no light/dark split — one primitive, both themes', () => {
+    expect(primitives.brandOrange).toBe('#ee7733');
+    expect(themes.light.brand).toBe('brandOrange');
+    expect(themes.dark.brand).toBe('brandOrange');
+    expect(colorOf('light', 'brand')).toBe(colorOf('dark', 'brand'));
+  });
+
+  /**
+   * 13.358 — a hardcoded literal check, not one derived from `colorOf`/
+   * `themes`, so a `STYLE_COLOR_OVERRIDES` entry someone adds for `brand`
+   * later (which would make it vary, defeating "no dark variant exists")
+   * shows up here even though the generic "every role appears under every
+   * style×theme selector" case above would still pass (it derives its
+   * expectation from the same function this case does not).
+   */
+  it('13.358 themeStylesheet() emits the literal brand hex under both :root and [data-theme="dark"]', () => {
+    const stylesheet = themeStylesheet();
+    const rootLine = stylesheet.split('\n').find((line) => line.startsWith(':root {'));
+    const darkLine = stylesheet.split('\n').find((line) => line.startsWith('[data-theme="dark"] {'));
+    expect(rootLine, ':root block').toBeDefined();
+    expect(darkLine, '[data-theme="dark"] block').toBeDefined();
+    expect(rootLine).toContain('--gn-brand: #ee7733;');
+    expect(darkLine).toContain('--gn-brand: #ee7733;');
+  });
+
+  /**
+   * 13.365 — `brand` is deliberately PAIRLESS (see its `TOKEN_ROLES`
+   * docblock): the tile's actual composition (`textInverted` glyph stroke on
+   * `brand` fill) measures below even the 3:1 a non-text UI component owes,
+   * in light theme specifically. This is not a gap in this file's own
+   * enforcement — it is a measured, recorded exemption for a decorative,
+   * `aria-hidden="true"` glyph — and this case is what keeps the number from
+   * being merely asserted in a docblock nobody re-checks.
+   */
+  it('13.365 the pairless exemption: textInverted on brand measures below 3:1 in light, clears easily in dark', () => {
+    const light = contrastRatio(colorOf('light', 'textInverted'), colorOf('light', 'brand'));
+    const dark = contrastRatio(colorOf('dark', 'textInverted'), colorOf('dark', 'brand'));
+    expect(light).toBeLessThan(3);
+    expect(light).toBeCloseTo(2.87, 1);
+    expect(dark).toBeGreaterThanOrEqual(4.5);
+    // And no CONTRAST_PAIRS row was added to paper over it — the exemption is
+    // stated in the `brand` role's docblock, not silently un-enforced.
+    expect(CONTRAST_PAIRS.some((pair) => pair.fg === 'brand' || pair.bg === 'brand')).toBe(false);
   });
 });

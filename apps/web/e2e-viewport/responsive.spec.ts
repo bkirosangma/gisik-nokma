@@ -1741,3 +1741,102 @@ test('13.298 — a 401 on /workspaces settles the REAL browser on /sign-in', asy
   // claim in the block comment above is measured rather than merely asserted.
   await expect(page.getByText('Your session has ended. Taking you to sign in…')).toHaveCount(0);
 });
+
+/**
+ * 13.362 (Round 2d, 2026-09-09) — the derived segmented control, WITNESSED
+ * live under `data-style="neo"`, the way Task 14's own 13.347 witnesses a
+ * rendered value rather than trusting two numbers that only differ in memory.
+ *
+ * ## Why this is a STANDALONE test, not another row in the `UNAUTHED_ROUTES` loop
+ *
+ * That loop's `/v1/auth/methods` stub is DELIBERATELY `phone:false` (see the
+ * block comment above it) so the `/sign-in` accessible-names baseline stays
+ * machine-independent — a signed-out ratchet the loop itself re-asserts on
+ * every run. Rendering the segmented control (`role=tablist` plus two
+ * `role=tab`s, `aria-selected` on each) inside that loop would ADD `role`/
+ * `ariaSelected`/`ariaLabel` counts to the exact sweep that ratchet reads,
+ * moving a baseline this task's own catalogue entry (13.363) claims is
+ * unchanged. This test answers `phone:true` on its OWN page, outside that
+ * loop, so it proves nothing about — and cannot regress — that ratchet.
+ *
+ * This suite passing (with this case among the rest) is half of 13.364,
+ * "both viewport suites pass" — `../e2e-stack/viewport.spec.ts` is the other.
+ *
+ * ## Why this is real-browser Playwright, not a jsdom render
+ *
+ * `getComputedStyle(...).getPropertyValue('--gn-…')` returns the EMPTY STRING
+ * in `@testing-library/react` + jsdom, because jsdom never parses or applies
+ * the `<style>` tag `layout.tsx` inlines — there is no cascade to resolve a
+ * custom property against. An assertion built on that would pass whether the
+ * token pipeline wired anything correctly or not, which is exactly the
+ * "check that cannot fail" shape this project's own incident catalogue
+ * (`MEMORY.md`'s `checks-that-cannot-fail.md`) warns about. A real Chromium
+ * page (this suite already boots one per viewport project) genuinely
+ * resolves the cascade, so `2c`'s ruling stands unrelated to this: `phone`
+ * here is STILL fully derived from the stubbed `/v1/auth/methods` response,
+ * exactly as production derives it from the real one — this test only
+ * changes what the STUB answers, not the page's own logic.
+ */
+test('13.362 — the segmented control, driven to phone:true, renders under neo\'s own tokens', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/v1/auth/methods', (apiRoute) =>
+    apiRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ google: false, apple: false, phone: true }),
+    }),
+  );
+
+  await page.goto('/sign-in', { waitUntil: 'networkidle' });
+  await assertViewportTookEffect(page, testInfo);
+
+  // ── POSITIVE CONTROL FIRST. `layout.tsx`'s pre-paint script applies
+  // `data-style="neo"` whenever nothing is stored (case 13.345) — this run
+  // sets nothing, so this assertion should hold trivially, but it is the
+  // fact every assertion below is CONDITIONED on: reading `neo`'s own token
+  // values means nothing if the page silently rendered `hig`.
+  const style = await page.evaluate(() => document.documentElement.dataset['style']);
+  expect(style, 'this witness only means something if the page actually rendered under neo').toBe('neo');
+
+  // ── The control actually rendered, driven by the stubbed answer — the same
+  // property 3.84/13.348 already pin, re-asserted here because it is the
+  // precondition for everything that follows.
+  const tablist = page.getByRole('tablist', { name: 'Sign-in method' });
+  await expect(tablist).toBeVisible();
+  const phoneTab = page.getByRole('tab', { name: 'Phone' });
+  const emailTab = page.getByRole('tab', { name: 'Email link' });
+  await expect(phoneTab).toBeVisible();
+  await expect(emailTab).toBeVisible();
+  await expect(phoneTab).toHaveAttribute('aria-selected', 'true');
+  await expect(emailTab).toHaveAttribute('aria-selected', 'false');
+
+  // ── DECLARED value: the token pipeline resolved neo's own fillTertiary for
+  // `.gn-segmented`'s track background, not hig/minimal's. Read from the
+  // root custom property, the same technique `assertViewportTookEffect`
+  // already uses for `--gn-surface`.
+  const fillTertiary = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--gn-fill-tertiary').trim(),
+  );
+  expect(
+    fillTertiary,
+    'the segmented track background should be neo\'s fillTertiary, not hig/minimal\'s',
+  ).toBe('#b0988429');
+
+  // ── RENDERED value, on the actual selected tab element, not just the root
+  // custom property — the same "declared vs. witnessed" gap 13.347's own
+  // docblock names. Distinguishing neo from hig by SHAPE (two shadow layers,
+  // a 16px blur) rather than mere non-'none'-ness: hig's own `raised` shadow
+  // is ALSO non-'none' (a single, tighter layer), so "has a shadow" alone
+  // would not tell the two styles apart.
+  // `.split(',').length >= 2` was tried first and is WRONG: `getComputedStyle`
+  // renders each layer's colour as `rgba(r, g, b, a)`, which itself contains
+  // commas, so a SINGLE hig-style layer already splits into 4+ pieces — the
+  // assertion would pass for hig too and prove nothing about layer count.
+  // Checking both layers' own offset/blur geometry (`tokens.ts`'s `neo`/
+  // `light`/`raised`: `7px 7px 16px` + `-7px -7px 16px`, `SHADOWS.neo.light.raised`)
+  // is what actually distinguishes neo's two-layer shadow from hig's one.
+  const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('7px 7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-7px -7px 16px');
+});
