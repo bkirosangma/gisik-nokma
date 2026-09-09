@@ -2324,7 +2324,9 @@ Block `13.348`–`13.357`. The amendment reserved `13.348`–`13.356` for this t
 resolve, naming Task 15 as the owner of both. `13.357` — one past the reserved block, the amendment's own
 "next free" pointer — is the additions table's one owner-approved invented row (role labels on workspace
 cards), requested and used provisionally per this file's standing convention: serial mode has one executor
-and therefore no other claimant, and an unmerged id can still be renumbered.
+and therefore no other claimant, and an unmerged id can still be renumbered. **The next free BLOCK is now
+`13.358`** (this PR carries the header, per the standing §12/§13 rule that the first PR minting from a
+block does so) — recount the maximum in use against `origin/main` before trusting this pointer.
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -2366,8 +2368,10 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
 - **13.353** ✅ `apps/web/app/invite/[token]/page.tsx` markup is byte-identical — no hunk touches this
   file in this task (verified the same way as 13.352). The invite surface's neo look is entirely CSS over
   existing markup, continuing the Task 4a precedent. — (`git diff` against this task's own commits)
-- **13.354** the stack suite signs in through the restyled `/sign-in` and reaches `/workspaces` (6/6),
-  against dev images rebuilt from this task's frozen head. See the live-run note below.
+- **13.354** ✅ The stack suite signs in through the restyled `/sign-in` and reaches `/workspaces` — **6/6**,
+  witnessed live against the web image rebuilt from this task's frozen head (`docker compose -f
+  docker-compose.dev.yml build web && up -d --wait web`). See the live-run note below.
+  — (`apps/web/e2e-stack/smoke.spec.ts`, `apps/web/e2e-stack/viewport.spec.ts`)
 - **13.355** ✅ No page-specific literal `border-radius` competes with `.gn-card`'s own
   `--gn-radius-card` token on `.gn-workspace-list .gn-card`, `.gn-card.gn-invite` (rule deleted) or
   `.gn-sign-in` (property removed) — a SOURCE scan, because the fix is the absence of a competing
@@ -2376,7 +2380,7 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   real file (not only the in-memory self-test): reintroducing `.gn-card.gn-invite { border-radius: 12px; }`
   reddens this case's `.gn-card.gn-invite` assertion ALONE, 3 pass / 1 fail; restored via
   `git checkout HEAD --`, re-verified 4/4 green.* — (`apps/web/test/neo-card-radius.test.ts`)
-- **13.356** the non-text-contrast sweep (case 13.283) now visits `/sign-in` and `/workspaces` — the two
+- **13.356** ✅ The non-text-contrast sweep (case 13.283) now visits `/sign-in` and `/workspaces` — the two
   routes `.gn-field__input` actually renders on, and therefore the two routes case 13.339's neo pure-look
   waiver actually lives on, which the sweep never looked at before (Task 14's own 13.343 finding: neither
   route "is among the five routes this sweep visits"). The sweep still cannot compute a `box-shadow`'s
@@ -2386,8 +2390,11 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   rather than trusting Task 13's report unverified), and Task 13's own measured numbers (1.24 light / 1.16
   dark) are then recorded as a SANCTIONED entry in the persisted roster — appended after `below` is
   computed, so it can never trip the zero-below-3 assertion, since that assertion is about what this
-  instrument measured and this number is cited, not remeasured. See the live-run note below for the
-  DOM-check result. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
+  instrument measured and this number is cited, not remeasured. **Witnessed live**, against the rebuilt
+  image: both DOM checks passed (`border: none` and a real `box-shadow` on `/sign-in` and `/workspaces`),
+  the roster now sweeps 7 routes (19 elements examined, unchanged — no bordered element exists on either
+  new route), `belowCount: 0`, and `non-text-contrast-roster.json`'s `sanctionedWaivers` carries exactly
+  the entry above. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
 - **13.357** ✅ `WorkspaceRef` gains `role`; `mapWorkspaceRefs` reads it (`GET /v1/me/workspaces` has
   disclosed `role` since the route first answered, per its own docblock — only the client-side read was
   missing) and each `/workspaces` card renders its own caller role. The additions table's one
@@ -2399,3 +2406,14 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   the same property one layer down: a body with no `role` key throws `MappingError` rather than
   defaulting one. — (`apps/web/test/workspaces-cards.test.tsx`,
   `packages/app-core/test/online/mappers.test.ts`)
+
+> **Live-run note (13.354, 13.356).** The web image was rebuilt from this task's frozen head
+> (`docker compose -f docker-compose.dev.yml build web`), the container recreated
+> (`up -d --wait web`), and both suites run against it. `test:e2e:stack`: 6/6 (smoke ×2, the
+> signed-in no-sideways-scroll check, the 12px label-text floor across 7 routes, the non-text-contrast
+> sweep with its 1 sanctioned waiver, and the guest partial-workspace visibility case). `test:e2e:viewport`:
+> 28/28 passed, 2 skipped (the two viewport-comparison cases this suite always skips outside its own
+> three-viewport matrix run). Neither `accessible-names-baseline.json` file changed
+> (`git status` clean on both after the run — `UPDATE_ACCESSIBLE_BASELINE` was never set), so "baselines
+> only upward" holds trivially: nothing moved. `non-text-contrast-roster.json` is the one file the run
+> changed, and its diff is committed alongside this catalogue entry.
