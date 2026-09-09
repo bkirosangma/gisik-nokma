@@ -26,9 +26,19 @@ import type { ServerAppend } from '../routes/invites.js';
  * - `/v1/me/invitations/:inviteId/accept` — proof is **a verified email equal to
  *   the address the invitation names**.
  *
- * The second is STRICTLY NARROWER than the first, which is why adding it widens
- * nothing: a forwarded link admits somebody the invitation was never addressed
- * to, and a verified address cannot. Both spend the same credential row through
+ * The second is STRICTLY NARROWER than the first ON WHO MAY ACCEPT, which is why
+ * adding it widens nothing there: a forwarded link admits somebody the
+ * invitation was never addressed to, and a verified address cannot.
+ *
+ * **The claim is scoped to that axis on purpose.** On WHAT IS DISCLOSED the
+ * caller-scoped read is the wider of the two: `GET /v1/invites/:token`
+ * deliberately answers only `workspaceId`, `workspaceName` and `role` — it must,
+ * because a link can be forwarded and echoing the invitee's own contact details
+ * back to whoever holds it would turn a bearer credential into a disclosure. The
+ * caller-scoped read answers a caller whose verified address the invitation
+ * names, so it may also say who invited them and when it lapses. Saying
+ * "strictly narrower" without naming the axis would be claiming something about
+ * disclosure that is not true. Both spend the same credential row through
  * the same conditional DELETE, so an acceptance-by-link and an
  * acceptance-or-decline-from-the-banner race in the database rather than in a
  * projection — see `spendInviteTokenByInviteId`.

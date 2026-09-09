@@ -151,6 +151,34 @@ describe('proj_invites — pending is a one-way door', () => {
   });
 
   /**
+   * The REVERSE, and it is the direction whose failure is worst: an acceptance
+   * arriving after a decline must not undo it. Without `MARK_ACCEPTED`'s
+   * `AND status = 'pending'` the last event wins and a workspace grants a
+   * membership to somebody who refused it — and unlike the accept-then-decline
+   * pair above, the projection here would be agreeing with a `membership.granted`
+   * that really is in the ledger, so nothing downstream looks wrong.
+   *
+   * Added after a reviewer noticed only one direction was covered. The guard was
+   * already there; nothing had asked it about a `declined` row.
+   */
+  it('an acceptance arriving after a decline does not undo it', async () => {
+    const ws = newUlid();
+    const admin = newUlid();
+    const joiner = newUlid();
+    const inviteId = newUlid();
+
+    await record(inviteEvent(ws, inviteId, 'invite.sent', {
+      address: 'd@example.com',
+      channel: 'email',
+      role: 'member',
+    }, admin));
+    await record(inviteEvent(ws, inviteId, 'invite.declined', {}, joiner));
+    await record(inviteEvent(ws, inviteId, 'invite.accepted', { userId: joiner }, joiner));
+
+    expect(await statusOf(inviteId)).toEqual({ status: 'declined', accepted_user_id: null });
+  });
+
+  /**
    * The positive control for the cases above, and it is what separates
    * "terminal states hold" from "the projection stopped updating at all". Each
    * transition reached from `pending` DOES land — all THREE of them since Task

@@ -98,7 +98,6 @@ type ServedInvitation = {
   workspaceId: string;
   workspaceName: string | null;
   role: string;
-  invitedBy: string;
   invitedByName: string | null;
   invitedAt: string;
   expiresAt: string;
@@ -324,10 +323,21 @@ describe('Decline — the state change the product could not express', () => {
    * The NEGATIVE half is at the bottom: the same claim submitted through the
    * client door by the workspace OWNER is refused and appends nothing.
    *
-   * Mutations this reddens and nothing else does: make the decline a no-op (the
-   * invitation stays in the caller's list); drop the token spend from the
-   * decline handler (the link keeps opening); delete the `invite.declined`
-   * branch from `checkRolePermission` (the owner's forged decline commits).
+   * Mutations this reddens: make the decline a no-op (the invitation stays in
+   * the caller's list); delete the `invite.declined` branch from
+   * `checkRolePermission` (the owner's forged decline commits).
+   *
+   * **What this case CANNOT detect, corrected after a reviewer caught the claim
+   * standing here:** dropping the token spend from the decline handler. Every
+   * assertion above survives it, because `openableInvite` refuses on `status`
+   * BEFORE it consults the credential — so once the projection reads `declined`
+   * the link 404s whether or not the row was spent, the second decline is
+   * refused by `pendingFor`'s own `status = 'pending'`, and the list is empty
+   * for the same reason. The spend is a CONCURRENCY guard and 13.377's race is
+   * the instrument for it. That race reddens on this mutation when the decline's
+   * read lands before the winner's projection write, which over twelve trials is
+   * likely and is **not** guaranteed — stated as the probabilistic thing it is,
+   * because asserting flat coverage here would repeat the error being corrected.
    */
   it('13.376 records invite.declined as the decliner, moves the projection, and kills the link', async () => {
     const admin = await signedIn();

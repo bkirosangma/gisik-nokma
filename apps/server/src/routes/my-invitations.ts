@@ -195,7 +195,11 @@ export function registerMyInvitationRoutes(
           workspaceId: row.workspace_id,
           workspaceName: await workspaceNameFromLedger(deps.pool, row.workspace_id),
           role: row.role,
-          invitedBy: row.invited_by,
+          // The inviter's raw user id is NOT served. It was, until a reviewer
+          // asked who reads it: nothing does — the client type does not declare
+          // it and the mapper drops it — and it is a user identifier handed to
+          // somebody who is not yet in the workspace. An unread field is not
+          // free when it is also a disclosure.
           invitedByName: row.invited_by_name,
           invitedAt: row.invited_at.toISOString(),
           expiresAt: row.expires_at.toISOString(),

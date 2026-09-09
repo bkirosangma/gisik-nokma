@@ -2739,8 +2739,14 @@ auth tables.*
   `declined`, the invitation left the caller's list, and the emailed LINK stops opening — without that last
   one a person could decline and still be admitted by the link they already had. The negative half submits
   the same claim through the client door as the workspace OWNER, the role that reaches the check with every
-  earlier guard passed, and nothing lands. Mutations it reddens: make the decline a no-op; drop the token
-  spend from the decline handler; delete the `invite.declined` branch from `checkRolePermission`.
+  earlier guard passed, and nothing lands. Mutations it reddens: make the decline a no-op; delete the
+  `invite.declined` branch from `checkRolePermission`.
+  **What it does NOT detect, corrected after a reviewer found this entry claiming otherwise eight lines
+  from 13.377's measurement of the opposite:** dropping the token spend from the decline handler. Every
+  assertion here survives it — `openableInvite` refuses on `status` before it consults the credential, so
+  the link 404s once the projection reads `declined` whether or not the row was spent, and `pendingFor`'s
+  own status filter answers the rest. That property belongs to 13.377's race, and even there it reddens
+  probabilistically rather than certainly.
   — (`apps/server/test/routes/my-invitations.test.ts`)
 - **13.377** ✅ Accepting from the caller-scoped door joins the workspace at the invited role, read back
   through `GET /v1/me/workspaces` rather than out of the table, and **spends the link with it**. Then a
@@ -2767,7 +2773,7 @@ auth tables.*
   waiting, which is the same claim from the side that
   matters: a banner rendering its heading unconditionally would pass every assertion about the full case.
   The expiry fixture is deliberately on the far side of the date line (`19:30Z` on the 20th renders *20
-  Sept* in UTC and *20 Sept* in the `Pacific/Niue` the case renders under), so a component formatting in
+  Sept* in the `Pacific/Niue` the case renders under and *21 Sept* in the product's `Asia/Kolkata`), so a component formatting in
   the machine's zone reddens this; a same-day instant could never do that, and neither could an unvaried
   render on a gate machine that is already `Asia/Kolkata`. **The zone has to span the AWAITS and not just
   the `render()` call** — the banner renders twice, formats no date on the first pass, and produces the
@@ -2776,5 +2782,7 @@ auth tables.*
   RE-READ (the stub answers differently the second time and the call count is asserted), because a page that
   edited its own copy would be asserting an outcome instead of reading one. A failed invitations read leaves
   the founding form standing and says so in one muted line — not a `<ShellRefusal>`, and carrying no
-  `role="status"`, so the page still has exactly one live region.
+  `role="status"`: in that scenario the workspace read SUCCEEDED, so the page's only live region
+  (`ShellRefusal`'s) never rendered and the case asserts **zero**. The assertion's point is that this line
+  does not add a SECOND one over the top of the page's own refusal when both reads fail.
   — (`apps/web/test/workspaces-invitation-banner.test.tsx`)

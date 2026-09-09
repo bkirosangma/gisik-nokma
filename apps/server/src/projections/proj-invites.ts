@@ -27,7 +27,7 @@ import type { Projection } from './registry.js';
  *
  * ## One entity stream writes every row, so there is no interleaving question
  *
- * All three invite types are filed against the INVITE entity, and
+ * All four invite types are filed against the INVITE entity, and
  * `parse-event.ts` refuses any whose `entity.id` and `payload.inviteId`
  * disagree. So the key `invite_id` has exactly one totally-ordered writer — the
  * invitation's own stream — and canonical replay order `(entity_kind,

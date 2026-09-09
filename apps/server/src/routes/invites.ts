@@ -156,7 +156,7 @@ type InviteRow = {
   invite_id: string;
   workspace_id: string;
   role: 'admin' | 'member' | 'guest';
-  status: 'pending' | 'accepted' | 'revoked';
+  status: 'pending' | 'accepted' | 'revoked' | 'declined';
   project_ids: string[];
 };
 

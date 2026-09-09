@@ -245,7 +245,9 @@ function InvitationBanner() {
   // response to anything the person did — two live regions announcing at once is
   // worse for a screen reader than one, and the second would be reporting the
   // smaller failure over the top of the bigger one. It is ordinary visible text,
-  // which is what a static description of a failed read is.
+  // which is what a static description of a failed read is. (When only THIS read
+  // fails the page has no live region at all, which is what its case asserts —
+  // the point is that a page whose reads BOTH fail still has exactly one.)
   if (failure !== null) {
     return <p className="gn-invitations__failure">Your invitations could not be loaded: {failure}</p>;
   }

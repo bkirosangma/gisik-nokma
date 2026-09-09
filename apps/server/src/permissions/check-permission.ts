@@ -103,16 +103,20 @@ export const VISIBILITY_AUTHORITY_REASON =
  * holding no claim on the address. The event id and the inviteId are both in the
  * ledger by design; only the token is not.
  *
- * *This paragraph used to say the token was the ONLY entitlement. It was true
- * when written and stopped being true at Task 17, and it is corrected here
- * rather than left standing — a stale rule in a docblock is what the next
- * editor reasons from.*
+ * *This paragraph used to say the token was the ONLY entitlement, and the
+ * SENTENCE below used to say acceptance happens "when the invited person opens
+ * their link". Both were true when written and stopped being true at Task 17.
+ * The docblock is what the next editor reasons from; the sentence is what a
+ * PERSON reads, and a refusal that tells them to open a link they may not have
+ * is worse than a stale comment. Both are corrected, and the sentence is now
+ * proof-neutral in the way `INVITE_DECLINE_IS_THE_SERVERS_REASON` was written
+ * from the start. Case 6.34 pins the new wording.*
  *
  * It is a `permission.role` refusal because it is about WHO may make this claim
  * (nobody, from a client), not about what may be seen.
  */
 export const INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON =
-  'Acceptance is recorded by the server when the invited person opens their link.';
+  'Acceptance is recorded by the server for the person the invitation names.';
 /**
  * Task 17. `invite.declined` is refused from EVERY client envelope-origin, at
  * every role including owner — the same treatment `invite.accepted` gets, and
