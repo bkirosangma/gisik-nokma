@@ -95,7 +95,28 @@ button { font: inherit; }
    the pieces it lays out (`.gn-card`, `.gn-chip`, `.gn-avatar`, `.gn-button`)
    are variable-driven since Task 14, so the card renders in hig, minimal and
    neo from these rules alone. */
-.gn-workspace-card__head { display: flex; align-items: flex-start; gap: 0.6rem; }
+/* Round 19b: `.gn-workspace-card__head` is now the card's DOOR — an anchor,
+   not a div — so it needs the three things a plain container never did: no
+   underline on its own text (an anchor's browser default), and a hover/
+   focus-visible affordance so "this opens something" is legible before the
+   click. `--gn-surface-sunken` on hover is the same role `.gn-table__row--
+   clickable` already uses for exactly this; the focus ring is `.gn-button`'s
+   own `--gn-focus-ring` pair. */
+.gn-workspace-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  color: var(--gn-text);
+  text-decoration: none;
+  border-radius: var(--gn-radius-card);
+  margin: -0.4rem -0.4rem 0;
+  padding: 0.4rem 0.4rem 0;
+}
+.gn-workspace-card__head:hover { background: var(--gn-surface-sunken); }
+.gn-workspace-card__head:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
 .gn-workspace-card__titles { display: flex; flex-direction: column; min-width: 0; }
 .gn-workspace-card__titles h2 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
 .gn-workspace-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.6rem 0 0; }
@@ -110,58 +131,121 @@ button { font: inherit; }
 /* ── Task 19: the workspace home (`/w/[workspaceId]`). ──────────────────────
    Spacing and one muted text role, exactly like the Task 18 block above, and
    for the same reason: the pieces this page lays out (`.gn-card`, `.gn-chip`,
-   `.gn-button`, `.gn-field`, `.gn-founding`) are variable-driven since Task 14,
-   so the home renders in hig, minimal and neo from these rules alone and
-   nothing here is style-scoped. No colour literal appears below — the two
-   colours named are `--gn-text-muted`, the role the card's own count and
-   restricted lines already use.
+   `.gn-button`, `.gn-field`) are variable-driven since Task 14, so the home
+   renders in hig, minimal and neo from these rules alone and nothing here is
+   style-scoped. No colour literal appears below — the two colours named are
+   `--gn-text-muted`, the role the card's own count and restricted lines
+   already use.
 
-   `--links` is a row of destinations rather than a card of its own: fill and
-   spacing separate it from the projects card beneath (R1(c)), and it wraps
-   because five links do not fit a phone in one line — the exact defect
-   13.254 found on `.gn-nav` and fixed the same way. */
-.gn-workspace-home__links { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.6rem 0 1.1rem; }
-.gn-workspace-home__heading { margin: 0 0 0.6rem; font-size: 1.05rem; }
+   `--links` was a row of bare destinations; Round 19b makes each one a raised
+   CARD-BUTTON with a label and a note, transcribing the reference's grid
+   (`repeat(auto-fit, minmax(240px, 1fr))`) — the same responsive pattern
+   `.gn-workspace-home__projects` already uses one card up, so a phone gets one
+   column and a wide screen gets five without a breakpoint. */
+/* Round 19b: the header row — the 56px monogram, the title+meta column, and
+   the Members/Settings buttons at the row's end. `flex-wrap` for the same
+   reason every other nav/list row in this file carries it: the buttons must
+   not push the title off a phone viewport. */
+.gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.gn-workspace-home__header-titles { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
+.gn-workspace-home__header-titles .gn-page-title { margin: 0; }
+.gn-workspace-home__header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 0.6rem 0 1.1rem; }
+.gn-workspace-home__link {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border-radius: var(--gn-radius-card);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--gn-text);
+  text-decoration: none;
+}
+.gn-workspace-home__link:hover { background: var(--gn-surface-sunken); }
+.gn-workspace-home__link:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-workspace-home__link-label { font-size: 1.05rem; font-weight: 600; }
+.gn-workspace-home__link-note { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Round 19b: the archived toggle moved INTO this row, at its end — the
+   reference's layout — so the heading and the disclosure control share one
+   line instead of the toggle trailing the list below. */
+.gn-workspace-home__projects-heading { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin: 0 0 0.6rem; }
+.gn-workspace-home__heading { margin: 0; font-size: 1.05rem; }
 .gn-workspace-home__projects { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.45rem; }
-.gn-workspace-home__project { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+/* Round 19b: each row is now three stacked lines (name+badge, chips,
+   actions) rather than one wrapping line — the reference's card shape, and
+   the reason `.gn-workspace-home__project` changed from a row to a column. */
+.gn-workspace-home__project { display: flex; flex-direction: column; gap: 0.4rem; }
+.gn-workspace-home__project-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.gn-workspace-home__project-name { font-weight: 600; }
+.gn-workspace-home__project-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.gn-workspace-home__project-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 /* Indented and set apart, so the archived list reads as subordinate to the
    live one rather than as a second list of equals — the card's own treatment. */
 .gn-workspace-home__projects--archived { margin-top: 0.5rem; padding-left: 0.6rem; }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
+/* The non-admin refusal note where the founding form would be (Round 19b,
+   owner feedback item 4's last bullet) — `--gn-fill-quaternary`, the role the
+   reference's own "fill4 box" describes, already used elsewhere in this
+   package (`packages/ui/src/ui.css`), so no new token pair needs measuring. */
+.gn-workspace-home__founding-refusal { margin: 1.1rem 0 0; padding: 0.75rem 1rem; border-radius: var(--gn-radius-control); background: var(--gn-fill-quaternary); color: var(--gn-text-muted); }
 
 .gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 
-/* The founding form has no `.gn-card` ancestor of its own — it sits beside the
-   list, not inside a card — so it carries its own surface, per R1(c): fill and
-   spacing separate it, never a border. Task 15: radius and shadow are now the
-   SAME token roles `.gn-card` uses (`--gn-radius-card`, `--gn-shadow-raised`)
-   rather than a literal 12px and no shadow — under `neo` this panel reads as
-   a raised surface exactly like every other card on this route, instead of a
-   flatter, smaller-cornered outlier beside them. */
-.gn-founding {
+/* ── Two founding-form class families (Round 19b, owner feedback item 3). ───
+   Until now both forms shared `.gn-founding`, a raised card. The owner's
+   reference draws them differently and item 3's own words — "shouldn't be
+   that big" — were said of the `/workspaces` one specifically, so a shared
+   class could not answer both at once without either shrinking the home's
+   form or leaving the workspace list's oversized. */
+
+/* `.gn-workspace-founding` — the `/workspaces` "New workspace" block. A bare
+   column beside the list, NOT a raised card: no `.gn-card` ancestor, no
+   surface fill, no shadow, and a `max-width` (420px, the reference's own)
+   that is the whole reason this exists as a separate rule rather than a
+   modifier on the card-shaped one below. */
+.gn-workspace-founding {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  margin-top: 1.1rem;
+  max-width: 26.25rem;
+}
+.gn-workspace-founding__heading { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.gn-workspace-founding__submit { align-self: flex-start; }
+
+/* `.gn-project-founding` — the workspace home's "New project" row. A raised
+   card (Task 15's reasoning for `.gn-card`'s own roles applies unchanged:
+   `--gn-radius-card`/`--gn-shadow-raised`, so it reads as a raised surface
+   under `neo` exactly like the cards beside it) with an INLINE field+button
+   row rather than a stacked column — the reference's layout, and the reason
+   this is not simply `.gn-workspace-founding` reused: that one is deliberately
+   NOT a card, and this one deliberately is. */
+.gn-project-founding {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
   margin-top: 1.1rem;
   padding: 1rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
   box-shadow: var(--gn-shadow-raised);
 }
-.gn-founding__heading { margin: 0; }
+.gn-project-founding__field { flex: 1; min-width: 13.75rem; }
 
-/* Task 17 — the invitations banner. Same surface treatment as `.gn-founding`
-   directly above it, and for the same reason stated there: it sits BESIDE the
-   list rather than inside a card, so it carries its own surface, and fill plus
-   spacing separate it rather than a border (R1(c)). Every value is a token role
-   or a rem — `--gn-radius-card` and `--gn-shadow-raised` are the SAME roles
-   `.gn-card` uses, so under `neo` this panel reads as a raised surface exactly
-   like the cards beside it instead of a flatter outlier. The one thing it does
-   NOT share with `.gn-founding` is the accent edge: an invitation is the only
-   thing on this page addressed to the person personally, and the edge is what
-   says so without a second heading level. */
+/* Task 17 — the invitations banner. Same surface treatment as the two
+   founding forms above (`.gn-project-founding` in particular): it sits BESIDE
+   the list rather than inside a card, so it carries its own surface, and fill
+   plus spacing separate it rather than a border (R1(c)). Every value is a
+   token role or a rem — `--gn-radius-card` and `--gn-shadow-raised` are the
+   SAME roles `.gn-card` uses, so under `neo` this panel reads as a raised
+   surface exactly like the cards beside it instead of a flatter outlier. The
+   one thing it does NOT share with them is the accent edge: an invitation is
+   the only thing on this page addressed to the person personally, and the
+   edge is what says so without a second heading level. */
 .gn-invitations {
   display: flex;
   flex-direction: column;
@@ -235,6 +319,7 @@ button { font: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4rem;
   min-height: 2.75rem;
   /* WIDTH too, and it took a second reading to notice. The first pass set only
      `min-height`, and the signed-in sweep still reported `39x44` on
@@ -243,6 +328,23 @@ button { font: inherit; }
      re-reading only the count leaves the other one exactly as it was. */
   min-width: 2.75rem;
 }
+
+/* Round 19b: the nav is CONTEXTUAL now, so "which item is this" needs its own
+   affordance beyond the tap-target box above. Same PAIR `.gn-button` (ghost,
+   the ubiquitous default) already puts on screen everywhere — background
+   `--gn-fill-tertiary`, foreground `--gn-text-accent` — so this introduces no
+   contrast pair the token-discipline gate has not already measured. */
+.gn-nav a[aria-current='page'],
+.gn-nav button[aria-current='page'] {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font-weight: 700;
+  border-radius: var(--gn-radius-control);
+}
+/* The scope note beside the always-items when no workspace is in the route
+   (Round 19b) — muted, one line, no surface, the same treatment
+   `.gn-workspace-list__role` already gets for a secondary line of nav text. */
+.gn-nav__scope { font-size: 0.85rem; color: var(--gn-text-muted); }
 
 /* ── The sign-in sheet is centred in the viewport (owner, 2026-09-08). ──────
 

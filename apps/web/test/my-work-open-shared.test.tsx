@@ -35,6 +35,7 @@ const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: '01J9WORKSPACE0000000000000' }),
+  usePathname: () => '/w/01J9WORKSPACE0000000000000/my-work',
   useSearchParams: () => new URLSearchParams(),
 }));
 

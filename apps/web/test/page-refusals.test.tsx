@@ -38,6 +38,10 @@ const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: '01J9WORKSPACE0000000000000', projectId: '01J9PROJECT000000000000000' }),
+  // No case in this file asserts on nav content — every page here mounts
+  // `AppNav` only incidentally, on the way to the refusal/redirect each case
+  // is actually about — so one literal, not one per mounted page, is enough.
+  usePathname: () => '/w/01J9WORKSPACE0000000000000/p/01J9PROJECT000000000000000',
   useSearchParams: () => new URLSearchParams(),
 }));
 

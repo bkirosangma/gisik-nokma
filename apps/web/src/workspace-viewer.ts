@@ -28,8 +28,17 @@
  * something true and vague, and `countsWithheld` falls back to **true**.
  * Withholding from a role we cannot place is the conservative direction, and it
  * is the only one where being wrong is recoverable.
+ *
+ * ## `clause`, added Round 19b — the SAME role value, a second English shape
+ *
+ * The home page's header meta line reads *"N members · M active projects ·
+ * you're an owner"* — the role sitting mid-sentence rather than opening one, so
+ * it needs a CLAUSE ("an owner") rather than the card's full SENTENCE ("You're
+ * an owner here."). Both come out of one `viewerOf(role)` call, which is what
+ * "ONE source — the card's sentence and this clause cannot disagree" means:
+ * there is no second read of `role` anywhere that could drift from this one.
  */
-export type CardViewer = { sentence: string; countsWithheld: boolean };
+export type CardViewer = { sentence: string; clause: string; countsWithheld: boolean };
 
 const ROLE_SENTENCES: Record<string, string> = {
   owner: "You're an owner here.",
@@ -38,10 +47,19 @@ const ROLE_SENTENCES: Record<string, string> = {
   guest: "You're a guest here.",
 };
 
+const ROLE_CLAUSES: Record<string, string> = {
+  owner: 'an owner',
+  admin: 'an admin',
+  member: 'a member',
+  guest: 'a guest',
+};
+
 export function viewerOf(role: string): CardViewer {
   const sentence = ROLE_SENTENCES[role];
+  const clause = ROLE_CLAUSES[role];
   return {
     sentence: sentence ?? `Your role here is ${role}.`,
+    clause: clause ?? `a ${role}`,
     countsWithheld: sentence === undefined || role === 'guest',
   };
 }

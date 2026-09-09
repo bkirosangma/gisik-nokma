@@ -21,6 +21,7 @@ const WS = '01J9WORKSPACE0000000000000';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useParams: () => ({ workspaceId: WS }),
+  usePathname: () => `/w/${WS}/members`,
   useSearchParams: () => new URLSearchParams(),
 }));
 

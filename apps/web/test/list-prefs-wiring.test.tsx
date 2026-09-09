@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
     workspaceId: '01J9WORKSPACE0000000000000',
     projectId: '01J9PROJECT000000000000000',
   }),
+  usePathname: () => '/w/01J9WORKSPACE0000000000000/p/01J9PROJECT000000000000000',
   useSearchParams: () => new URLSearchParams(),
 }));
 

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { newUlid, type IngestResult } from '@gisik-nokma/domain';
-import { Button, Card, Chip } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import { makeSubmittedFactory, type EnvelopeSeed } from '@gisik-nokma/app-core';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../src/app-nav.js';
@@ -318,8 +318,23 @@ export default function WorkspaceHomePage() {
 }
 
 /**
- * One project row: its name, the counts this caller may be told, and — for an
- * admin — the one control that retires it or brings it back.
+ * One project row: its name, the counts this caller may be told, an explicit
+ * door to its board, and — for an admin — the one control that retires it or
+ * brings it back.
+ *
+ * ## "Open board" replaces the name-as-link (Round 19b)
+ *
+ * The reference draws the project's name as plain text and "Open board" as
+ * its own accent-fill button — not the name doubling as the door. Two links to
+ * one target is the failure this avoids: 13.387's "assert the exact set"
+ * discipline only means something if a row offers ONE way to each destination.
+ *
+ * **"Open board" for an archived project too, labelled the same as a live
+ * one's.** Archiving is a workspace decision, not a permission (Task 16), and
+ * the board underneath stays writable — the prototype's "Open read-only"
+ * would be a false claim about this product's own rule, so it is not
+ * transcribed. Archive/Restore reads the SAME `isAdmin` value 13.388's server
+ * gate answers independently; this function does not derive a second opinion.
  */
 function ProjectRow({
   workspaceId,
@@ -338,34 +353,46 @@ function ProjectRow({
 }) {
   return (
     <li className="gn-workspace-home__project" data-testid={`project-row-${project.id}`}>
-      <Link href={`/w/${workspaceId}/p/${project.id}`}>{project.name}</Link>
-      {/* The SAME gate the role sentence reads, and the SAME rule the card on
-          `/workspaces` keeps: `null` is WITHHELD and it is not `0`. A `?? 0` on
-          either line would turn "we did not count this for you" into "there is
-          nothing here", which is the claim the server declined to make by
-          omitting the key. */}
-      {countsWithheld || project.ticketCount === null ? null : (
-        <span className="gn-workspace-home__count">
-          {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
-        </span>
-      )}
-      {countsWithheld || project.blockedCount === null || project.blockedCount === 0 ? null : (
-        <Chip tone="blocked">{`${project.blockedCount} blocked`}</Chip>
-      )}
-      {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
-      {isAdmin ? (
-        <Button
-          type="button"
-          disabled={busy}
-          // The accessible name carries the PROJECT, so a list of projects does
-          // not present a column of identically-named buttons — the rule the
-          // archived disclosure and the invitation actions already keep.
-          aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
-          onClick={() => onArchive(project)}
+      <div className="gn-workspace-home__project-head">
+        <span className="gn-workspace-home__project-name">{project.name}</span>
+        {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
+      </div>
+      <div className="gn-workspace-home__project-chips">
+        {/* The SAME gate the role sentence reads, and the SAME rule the card on
+            `/workspaces` keeps: `null` is WITHHELD and it is not `0`. A `?? 0`
+            on either line would turn "we did not count this for you" into
+            "there is nothing here", which is the claim the server declined to
+            make by omitting the key. */}
+        {countsWithheld || project.ticketCount === null ? null : (
+          <span className="gn-workspace-home__count">
+            {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
+          </span>
+        )}
+        {countsWithheld || project.blockedCount === null || project.blockedCount === 0 ? null : (
+          <Chip tone="blocked">{`${project.blockedCount} blocked`}</Chip>
+        )}
+      </div>
+      <div className="gn-workspace-home__project-actions">
+        <Link
+          href={`/w/${workspaceId}/p/${project.id}`}
+          className="gn-button gn-button--primary"
         >
-          {project.archived ? 'Restore' : 'Archive'}
-        </Button>
-      ) : null}
+          Open board
+        </Link>
+        {isAdmin ? (
+          <Button
+            type="button"
+            disabled={busy}
+            // The accessible name carries the PROJECT, so a list of projects does
+            // not present a column of identically-named buttons — the rule the
+            // archived disclosure and the invitation actions already keep.
+            aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
+            onClick={() => onArchive(project)}
+          >
+            {project.archived ? 'Restore' : 'Archive'}
+          </Button>
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -379,19 +406,64 @@ function ProjectRow({
  * `workspaceId` and reads none), so a uniform `/w/${workspaceId}/…` builder
  * would emit `/w/<id>/mcp/tokens`, which resolves to nothing — and a test that
  * built its expectations the same way would agree with the bug. Case 13.387
- * asserts the five paths as literals for exactly that reason.
+ * asserts the five paths as literals for exactly that reason. TARGETS are
+ * unchanged by Round 19b.
+ *
+ * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
+ * transcribed, not invented, except the one place the prototype's copy
+ * assumes a number this route may not have: the Members note reads *"{N}
+ * people · roles and pending invitations."* only when `memberCount` is
+ * served; a guest (withheld, `null`) gets the same sentence with no number
+ * prefix, the same "omit rather than leave a dangling clause" rule the
+ * header's meta line keeps.
  */
-function WorkspaceLinks({ workspaceId }: { workspaceId: string }) {
+function WorkspaceLinks({
+  workspaceId,
+  memberCount,
+}: {
+  workspaceId: string;
+  memberCount: number | null;
+}) {
+  const membersNote =
+    memberCount === null
+      ? 'roles and pending invitations.'
+      : `${memberCount} ${memberCount === 1 ? 'person' : 'people'} · roles and pending invitations.`;
   return (
     <nav className="gn-workspace-home__links" aria-label="Workspace sections">
-      <Link href={`/w/${workspaceId}/my-work`}>My Work</Link>
-      <Link href={`/w/${workspaceId}/members`}>Members</Link>
-      <Link href={`/w/${workspaceId}/settings/ticket-types`}>Ticket types</Link>
-      <Link href={`/w/${workspaceId}/settings/workflows`}>Workflows</Link>
+      <Link href={`/w/${workspaceId}/my-work`} className="gn-workspace-home__link">
+        <span className="gn-workspace-home__link-label">My Work</span>
+        <span className="gn-workspace-home__link-note">
+          Everything assigned to you across this workspace.
+        </span>
+      </Link>
+      <Link href={`/w/${workspaceId}/members`} className="gn-workspace-home__link">
+        <span className="gn-workspace-home__link-label">Members</span>
+        <span className="gn-workspace-home__link-note">{membersNote}</span>
+      </Link>
+      <Link
+        href={`/w/${workspaceId}/settings/ticket-types`}
+        className="gn-workspace-home__link"
+      >
+        <span className="gn-workspace-home__link-label">Ticket types</span>
+        <span className="gn-workspace-home__link-note">
+          Fields and the workflow each type follows.
+        </span>
+      </Link>
+      <Link href={`/w/${workspaceId}/settings/workflows`} className="gn-workspace-home__link">
+        <span className="gn-workspace-home__link-label">Workflows</span>
+        <span className="gn-workspace-home__link-note">
+          States, transitions and published versions.
+        </span>
+      </Link>
       {/* Global, deliberately: an MCP token belongs to a person rather than to a
           workspace. It is listed here because this is where somebody goes
           looking for it, not because this page owns it. */}
-      <Link href="/mcp/tokens">MCP tokens</Link>
+      <Link href="/mcp/tokens" className="gn-workspace-home__link">
+        <span className="gn-workspace-home__link-label">MCP tokens</span>
+        <span className="gn-workspace-home__link-note">
+          Let an assistant act as you, with your permissions.
+        </span>
+      </Link>
     </nav>
   );
 }
@@ -416,18 +488,62 @@ function WorkspaceHome({
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
+  // "N members · M active projects · you're an owner" — every number SERVED,
+  // never derived a second way. `memberCount` is Task 16's own withholding
+  // (null for a guest, and the prefix is omitted rather than left dangling on
+  // an empty clause); `live.length` is this caller's own non-archived named
+  // projects, the same array the list below renders; the role clause is
+  // `viewer.clause` — the SAME `viewerOf` call the card's sentence reads, so
+  // the two cannot disagree about the same person.
+  const memberClause =
+    workspace.memberCount === null
+      ? ''
+      : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'} · `;
+  const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'} · you're ${viewer.clause}`;
 
   return (
     <>
-      <h1 className="gn-page-title">{workspace.name}</h1>
-      {/* The role as a SENTENCE, from the same `viewerOf` the card uses — so a
-          person reads the same thing about themselves on both screens. */}
-      <p className="gn-workspace-list__role">{viewer.sentence}</p>
+      <div className="gn-workspace-home__header">
+        {/* Tint keyed on the workspace ID, never the name — Task 18's own
+            survivor mutation, restated here rather than re-measured: a rename
+            must not change a colour a person has learned. */}
+        <Avatar size="large" name={workspace.name} tint={workspace.id} />
+        <div className="gn-workspace-home__header-titles">
+          <h1 className="gn-page-title">{workspace.name}</h1>
+          <p className="gn-workspace-list__role">{meta}</p>
+        </div>
+        <div className="gn-workspace-home__header-actions">
+          <Link href={`/w/${workspace.id}/members`} className="gn-button">
+            Members
+          </Link>
+          <Link href={`/w/${workspace.id}/settings/ticket-types`} className="gn-button">
+            Settings
+          </Link>
+        </div>
+      </div>
 
-      <WorkspaceLinks workspaceId={workspace.id} />
+      <WorkspaceLinks workspaceId={workspace.id} memberCount={workspace.memberCount} />
 
       <Card>
-        <h2 className="gn-workspace-home__heading">Projects</h2>
+        <div className="gn-workspace-home__projects-heading">
+          <h2 className="gn-workspace-home__heading">Projects</h2>
+          {/* Marked AND hidden, both — the `/workspaces` card's precedent. The
+              toggle sits at THIS ROW's end (Round 19b, transcribing the
+              reference's layout) and, per Task 18/19's own ruling, renders only
+              when there is something behind it: the prototype's "0 archived ·
+              show" is not adopted — a control that reveals nothing lies about
+              the shape of the data. */}
+          {archived.length > 0 ? (
+            <Button
+              type="button"
+              aria-expanded={showArchived}
+              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
+              onClick={onToggleArchived}
+            >
+              {`${showArchived ? 'Hide' : 'Show'} ${archived.length} archived`}
+            </Button>
+          ) : null}
+        </div>
         {live.length === 0 ? (
           // True of THIS CALLER'S list, and said as such. A member outside every
           // project has an empty live list in a workspace full of them, and
@@ -449,36 +565,22 @@ function WorkspaceHome({
           </ul>
         )}
 
-        {/* Marked AND hidden, both — the `/workspaces` card's precedent. The
-            toggle exists only when there is something behind it, because a
-            control that reveals nothing lies about the shape of the data, and
-            its accessible name carries the workspace. */}
-        {archived.length > 0 ? (
-          <>
-            <Button
-              type="button"
-              aria-expanded={showArchived}
-              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
-              onClick={onToggleArchived}
-            >
-              {`${showArchived ? 'Hide' : 'Show'} ${archived.length} archived`}
-            </Button>
-            {showArchived ? (
-              <ul className="gn-workspace-home__projects gn-workspace-home__projects--archived">
-                {archived.map((project) => (
-                  <ProjectRow
-                    key={project.id}
-                    workspaceId={workspace.id}
-                    project={project}
-                    countsWithheld={viewer.countsWithheld}
-                    isAdmin={isAdmin}
-                    busy={busy}
-                    onArchive={archive}
-                  />
-                ))}
-              </ul>
-            ) : null}
-          </>
+        {/* The toggle itself now lives in the heading row above; only the
+            disclosed list is here. */}
+        {archived.length > 0 && showArchived ? (
+          <ul className="gn-workspace-home__projects gn-workspace-home__projects--archived">
+            {archived.map((project) => (
+              <ProjectRow
+                key={project.id}
+                workspaceId={workspace.id}
+                project={project}
+                countsWithheld={viewer.countsWithheld}
+                isAdmin={isAdmin}
+                busy={busy}
+                onArchive={archive}
+              />
+            ))}
+          </ul>
         ) : null}
 
         {restricted !== null ? (
@@ -486,7 +588,20 @@ function WorkspaceHome({
         ) : null}
       </Card>
 
-      {isAdmin ? <NewProjectForm workspaceId={workspace.id} busy={busy} onSubmit={onSubmit} /> : null}
+      {/* Non-admins get the reference's refusal NOTE where the form would be,
+          rather than nothing — the same rule the member sentence above keeps:
+          a caller is told what they cannot do here, not left to wonder why the
+          form is absent. ONE sentence for every non-admin role (member and
+          guest alike); the prototype's guest-specific wording asserts a
+          visibility rule ("you can only see tickets that name you") this round
+          does not verify anywhere else, so it is not transcribed. */}
+      {isAdmin ? (
+        <NewProjectForm workspaceId={workspace.id} busy={busy} onSubmit={onSubmit} />
+      ) : (
+        <p className="gn-workspace-home__founding-refusal">
+          Only an admin can create a project in this workspace.
+        </p>
+      )}
     </>
   );
 }
@@ -524,13 +639,13 @@ function NewProjectForm({
   };
 
   return (
-    <form className="gn-founding" onSubmit={send}>
-      <h2 className="gn-founding__heading">New project</h2>
-      <label className="gn-field" htmlFor="gn-new-project-name">
-        <span className="gn-field__label">Name</span>
+    <form className="gn-project-founding" onSubmit={send}>
+      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-name">
+        <span className="gn-field__label">New project</span>
         <input
           id="gn-new-project-name"
           className="gn-field__input"
+          placeholder="e.g. Phase 2 rollout"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
