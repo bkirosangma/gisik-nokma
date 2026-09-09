@@ -3120,8 +3120,19 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   same rule the header's meta line and the `/workspaces` card both keep. Targets are UNCHANGED from Task
   19 (13.387's own literals) — only the notes are new, transcribed rather than invented. —
   (`workspace-home.test.tsx`)
-- **13.399** 🧪 The accessible-name floor rises and never falls across this round's changes to the four
+- **13.399** ✅ The accessible-name floor rises and never falls across this round's changes to the four
   existing signed-in ratchet routes plus the seventh (13.389's), and the non-text-contrast roster does
-  not grow: measured live against the rebuilt dev stack, both viewport suites (`e2e-stack`,
-  `e2e-viewport`), owner and guest. Recorded once the live pass completes, in the same PR.
-  — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)
+  not grow — measured live against the rebuilt dev stack, `e2e-stack` (6/6) and `e2e-viewport` (31/31,
+  2 skipped), owner and guest, neither baseline JSON touched. **A REAL regression was caught by this
+  measurement, not merely by the suite existing.** The first draft of the five door-card notes (item 4's
+  last bullet) let each note join its link's accessible name by ordinary content concatenation —
+  `/w/<workspaceId>`'s own MUST_NAME probe (13.389's witness on this exact route) names a link
+  `/^Ticket types$/`, exactly, and the widened name *"Ticket types Fields and the workflow each type
+  follows."* no longer matched. Caught within the hour of the live rebuild, not in review. Fixed with
+  `aria-label` (pins each door's accessible name to its label) plus `aria-describedby` (links the note
+  as a DESCRIPTION — the correct ARIA shape for a control with a name and a supplementary note, and
+  still announced by most assistive tech, after the name rather than folded into it); re-measured green.
+  Archive/restore driven through the real page on the live world (owner), left exactly as found
+  (`archived = f`, read back from the database); the guest's restricted view and the non-admin refusal
+  note both verified live. —
+  (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)

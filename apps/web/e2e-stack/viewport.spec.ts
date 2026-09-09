@@ -561,6 +561,21 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     // which is the only way this file permits a rise — and it was safe to do
     // because the run BEFORE it asserted every old baseline and passed, so
     // nothing could be silently lowered by the re-record.
+    //
+    // 13.399 (Round 19b, 2026-09-09): the workspace card door, the five
+    // door-card notes and the contextual nav each add `aria-label`/
+    // `aria-describedby` attributes that were not there before — a RISE on
+    // `ariaLabel`/`ariaDescribedby` for `/workspaces` and `/w/<workspaceId>`,
+    // never a fall, so this ratchet (a floor, not an exact match) passed with
+    // no baseline file touched. **A real regression was caught by the
+    // MUST_NAME loop above, not by this ratchet**: the door-card notes'
+    // first draft let each note join its link's accessible name by ordinary
+    // content concatenation, so `/w/<workspaceId>`'s own `Ticket types` probe
+    // (13.389's literal, `MUST_NAME`) stopped matching — the widened name no
+    // longer equalled the exact string the probe names. Fixed with
+    // `aria-label` pinning each door's name to its label and
+    // `aria-describedby` linking the note as a description instead; this
+    // route's baseline stayed exact and green on re-measure.
     const accessibleKey = route.key;
     const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
     if (accessibleBaseline === undefined) {
