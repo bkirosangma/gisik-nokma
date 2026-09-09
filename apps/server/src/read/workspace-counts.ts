@@ -1,6 +1,6 @@
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { BLOCKED_STATES_CTE } from './compile-filter.js';
+import { BLOCKED_MEMBERSHIP, BLOCKED_STATES_CTE } from './compile-filter.js';
 import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from './membership-roster.js';
 import { SqlParams } from './sql-params.js';
 import { visibleTicketsWhere } from './visible-where.js';
@@ -53,13 +53,15 @@ export type ProjectCounts = { ticketCount: number; blockedCount: number };
  * ## `blockedCount` counts by the ticket's OWN workflow version, and says so
  *
  * `BLOCKED_STATES_CTE` resolves the LATEST version of each `(workspace_id,
- * workflow_id)` and matches `(t.workflow_id, t.state_id)`, so a ticket standing
- * in a state that the newest version flags is counted whatever version the row
- * itself is pinned at. That is inherited, not chosen: it is exactly what
- * `FilterSpec.blocked` does at `compile-filter.ts`, which is what the board, the
- * list and the attention strip already count with. A private definition here
- * would make the card disagree with the strip it links to — and the CTE is
- * imported rather than restated so the two cannot drift.
+ * workflow_id)` and `BLOCKED_MEMBERSHIP` matches `(t.workflow_id, t.state_id)`
+ * against it, so a ticket standing in a state the newest version flags is
+ * counted whatever version its own row is pinned at. That is inherited, not
+ * chosen: BOTH constants are imported from `compile-filter.ts`, so this counts
+ * by the same expression `FilterSpec.blocked` compiles — the one the board, the
+ * list and the attention strip already use. `BLOCKED_MEMBERSHIP` was made
+ * exported for this; restating it here while importing only the CTE would have
+ * been the half-measure that looks like sharing, and it is how the card and the
+ * strip it links to would come to disagree about one word.
  */
 export async function visibleProjectCounts(
   db: Queryable,
@@ -89,11 +91,7 @@ export async function visibleProjectCounts(
     `WITH ${BLOCKED_STATES_CTE}
      SELECT t.project_id,
             COUNT(*) AS ticket_count,
-            COUNT(*) FILTER (
-              WHERE (t.workflow_id, t.state_id) IN (
-                SELECT workflow_id, state_id FROM blocked_states WHERE workspace_id = t.workspace_id
-              )
-            ) AS blocked_count
+            COUNT(*) FILTER (WHERE ${BLOCKED_MEMBERSHIP}) AS blocked_count
        FROM proj_tickets t
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
       WHERE ${workspaceClause} AND t.workspace_id = v.workspace_id AND ${visibleClause}
