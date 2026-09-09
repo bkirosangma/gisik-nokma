@@ -20,7 +20,113 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~15:0x IST. **TASK 18 — MERGED as `6a34c747` (PR #402).**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~16:0x IST. **TASK 19 — WORK COMPLETE, FREEZING.**
+>
+> **Branch `exec/19-workspace-home`, CODE head `ed514444`, ahead 2 / behind 0 at that commit**, cut from
+> `origin/main` at **`4924dc16`** and never rebased (`git rev-parse origin/main` re-read at the freeze:
+> still `4924dc16`). `git branch --contains` on both code commits returns this branch, not empty, so
+> neither is orphaned — `git cat-file` was not used and would have passed on a reflog-only commit either
+> way. Tree clean. 11 files, +1608 / −62.
+>
+> **THE TRUE FROZEN HEAD IS THE COMMIT CARRYING THIS FILE, which this file cannot name** — a sha written
+> here is fixed before the commit that contains it exists, so any sha this paragraph quoted would be the
+> one thing on the branch it could not be. The frozen head is therefore the branch tip: read it with
+> `git rev-parse origin/exec/19-workspace-home`, and the PR body names it and carries the gate result
+> measured AT it. **The gate was re-run at that tip rather than transferred** — "the delta is docs-only so
+> the gate carries over" is the reasoning that makes a freeze protocol decorative, and it is judged by the
+> person who wants the merge.
+>
+> **What Task 19 is.** `/w/<workspaceId>` was NOT A PAGE — a workspace was reachable only through a
+> project link and that path rendered the 404. It is the workspace home now: the projects this caller may
+> be told the name of with the counts they may be told, archived ones marked AND hidden behind a
+> disclosure, the role as a sentence, the restricted line, five doors out, and — for an owner or admin —
+> archive/restore per project and a new-project form.
+>
+> **THE FOUR THINGS A REVIEWER SHOULD CHECK FIRST.**
+>
+> 1. **The read is `GET /v1/me/workspaces` and nothing new.** Every number is Task 16's, so the card on
+>    `/workspaces` and the home a person reaches BY CLICKING it cannot disagree. `viewerOf` and
+>    `restrictedLine` were MOVED to `src/workspace-viewer.ts`, not copied — this page would have been the
+>    second place deciding "may this person be told numbers", which is the defect their own docblock exists
+>    to prevent.
+> 2. **Founding a project is TWO events in one batch** — `project.created` then `project.member_added`
+>    with `projectAdmin: true`, the sequence `seed-dev-workspace.ts` already uses. `visibleProjects` names
+>    every project to an OWNER and filters everyone else, **a workspace ADMIN included**, to
+>    `eff.projects`. An admin founding with one event watches the project vanish on the re-read, and
+>    nobody can ever create a ticket in it.
+> 3. **The admin's list can be NARROWER than what they may archive**, and the absences are enumerated at
+>    the site rather than summarised as "partial": an admin not on project X is not told X's name here, so
+>    X cannot be opened, archived or restored through this screen — though the door would accept their
+>    claim for it. NOT repaired: widening the read is a new visibility rule over project names, which is
+>    what P32/P38 already answered. **Owner: whoever next revisits P32/P38 for the admin role.** The
+>    restricted line discloses only the part the caller already holds a ticket id in.
+> 4. **Two of the six cases were CORRECTED BY MUTATION, and both corrections shrank the claim.** A third
+>    server `it` was DELETED once removing `'project.archived'` from `ADMIN_ONLY_TYPES` reddened
+>    pre-existing **13.370** alongside it. And the founding case was RE-AIMED once removing
+>    `case 'project.member_added'` from `projectsNamedBy` reddened **6.81** — which already owns the
+>    in-batch ordering property, forward pair and reversed control both. 13.388 does not establish that
+>    ordering and no longer says it does; what it owns is the visibility consequence 6.81 cannot see,
+>    because 6.81 never reads `/v1/me/workspaces` and its actor is the exempt OWNER.
+>
+> ## WHAT WAS MEASURED — seven mutations, five landing as predicted
+>
+> Committed BEFORE mutating, restored with `git checkout HEAD -- <path>`, tree verified clean after each.
+> Widening the client gate to a member: **1 failed / 201 passed across `apps/web`** — the complete blast
+> radius, since `src/workspace-viewer.ts` has no consumer outside this app — failing as *"member must not
+> be offered “Archive Shop operations”"*. `count ?? 0` on a withheld count: 1 failed. Dropping the re-read
+> after a commit: 1 failed. The MCP href built from the `/w/<id>/` prefix: 1 failed. Removing the archived
+> split: **FOUR failed, and that breadth is recorded as a LIMIT** — three fail because they click a
+> disclosure the mutation deletes, so it is a shape gate, not a site-specific measurement. The two that
+> changed the work are item 4 above.
+>
+> ## GATE, CHECKS, AND THE DEPLOYED STACK
+>
+> Gate: `pnpm turbo run build test typecheck --force`, Node **v22.22.2** (`which node` checked, not
+> assumed). **GREEN: 33/33 tasks, 0 cached, exit 0** — **4,184 passed | 5 skipped across 329 files**
+> (server 1497+5skipped, app-core 1158, domain 464, rule-engine 282, ui 235, web 202, editor 178,
+> sync-client 90, mcp-server 43, mobile 27, desktop 8). That is **+13 tests and +2 files** over `main`'s
+> 4,171/327, which is exactly the 10 web and 3 server cases this task adds. Zero orphaned vitest workers
+> (`ppid=1` sweep). **RE-RUN AT THE BRANCH TIP** — see the frozen-head paragraph above; the PR body
+> carries that run's sha and numbers.
+>
+> **Six checks raw, all green**: `check:env`, `check:tasks` (200/216 done, 16 todo — row 19 still `todo`,
+> the controller promotes it), `check:db-tz` (needs `DATABASE_URL` —
+> `postgres://gisik:gisik@localhost:54329/postgres`, answers `Asia/Kolkata`), `check:runbook`,
+> `check:citations` (**278** cited / 0 uncited in §13, ratchet exact on every file), `check:help`.
+>
+> **THE DEV STACK WENT DOWN MID-VERIFICATION, and it was not the code.** Docker's disk filled; postgres's
+> checkpointer PANICked on *"could not write to file pg_logical/replorigin_checkpoint.tmp: No space left
+> on device"* and crash-looped, taking the server container with it. Reclaimed **16.4 GB** of build cache
+> and DANGLING images only — `docker builder prune -af` and `docker image prune -f`. **No volume was
+> touched** and the world came back intact. `curl -s localhost:3000/v1/auth/methods` answers
+> `{"google":true,...}` after every compose action, checked each time.
+>
+> **`e2e-stack` 6/6 at this head**, three runs in the order the baseline files require: (1) no flags —
+> asserted every EXISTING route's floor and passed, failing only on the new route's absent type-scale key,
+> which is what makes the recording safe; (2) the three UPDATE flags — diff is **ADDITIONS ONLY**,
+> `stack-phone-390|/w/:workspaceId` at ariaLabel 4 / role 4 / ariaSelected 3 / ariaDescribedby 0 /
+> rawMatches 72 and type-scale offenders 0; (3) no flags — 6/6, baselines untouched by the run.
+> Non-text-contrast roster byte-identical.
+>
+> **The new route's `MUST_NAME` probes were CONTROLLED.** A fourth probe for a button that does not exist
+> ("Delete this workspace") was added and the run FAILED naming it, which is what says the three real
+> probes can fail at all — a new baseline key cannot, because `recordAccessibleBaseline` writes absent
+> keys only and "the floor did not fall" is vacuously true on the run that wrote it.
+>
+> **ARCHIVE AND RESTORE DRIVEN THROUGH THE REAL PAGE, and the LEDGER is the evidence**:
+> `project.archived`(seq 3) → `project.restored`(4) → `project.archived`(5) on the dev world's project,
+> every one envelope-origin `web`. **The world is left exactly as found — `archived = f`, read back from
+> the database after the last run.** The owner's row reads *"Shop operations · 26 tickets · 3 blocked ·
+> Archive"*, all five links carry their literal hrefs, Create project present. The GUEST was verified in
+> the same browser: *"You're a guest here."*, *"1 project · name restricted"*, *"No projects you can open
+> are active here."*, five links, **zero mutation controls**.
+>
+> **FOR THE OWNER'S LOOK: `http://localhost:3001/w/0TZSS5W6ATCTF2YBPMWGGP9JF5`** (Convenience Corner).
+> Sign in as the owner; the guest's own view of the same URL is the restricted one described above.
+>
+> ---
+>
+> # ▣ TASK 18 — MERGED as `6a34c747` (PR #402), and settled. Kept below.
 >
 > **The block below was written before the freeze and said "WORK COMPLETE, FREEZING". It is now settled:
 > the controller merged PR #402 while the executor was re-running the gate at the true frozen head.**
@@ -33,9 +139,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > carries `nameRestrictedProjectCount`, all five case entries 13.379–13.383 minted, the risen
 > accessible-name floor reads `"ariaLabel": 3`.
 >
-> **NEXT: Task 19** — the workspace home, `app/w/[workspaceId]/page.tsx`, cases **13.384–13.389**, opus.
-> Then the owner's look at `/workspaces` and a workspace home → Task 12. The dev stack is UP and rebuilt
-> from this work (`localhost:3001/workspaces`, Google sign-in on) — see the GATE section below.
+> ~~**NEXT: Task 19**~~ — **DONE, and its PR is the block at the top of this file.** This line is struck
+> rather than deleted because a restarted executor reading it as an instruction would redo finished work:
+> Task 19 is built, gated and frozen at `ed514444`. **The next thing after it is the owner's look at
+> `/workspaces` and the workspace home, then Task 12.**
 >
 > ---
 >
