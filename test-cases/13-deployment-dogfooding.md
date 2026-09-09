@@ -3098,9 +3098,16 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   this page's fixed route param cannot produce) and requiring the rendered class to match the id-keyed
   index and NOT the name-keyed one, with a positive control that the fixture's id and name do not
   coincidentally hash to the same tint. The meta line — *"N members · M active projects · you're an
-  X"* — reads only SERVED numbers (`memberCount`, `null`-safe; `live.length`, this caller's own
-  non-archived list) and a role CLAUSE from the SAME `viewerOf` call the `/workspaces` card's sentence
-  reads, so the two cannot disagree about the same person. A guest's line carries no member-count prefix
+  X"* — reads only SERVED numbers (`memberCount`; `live.length`, this caller's own non-archived list)
+  and a role CLAUSE from the SAME `viewerOf` call the `/workspaces` card's sentence reads, so the two
+  cannot disagree about the same person. **The member-count gate is `viewer.countsWithheld`, NOT
+  `memberCount === null` — a SONNET REVIEW of the opened PR caught the first draft reading the second,
+  the exact anti-pattern case 13.381 exists on the sibling `/workspaces` card to forbid.** `=== null`
+  agrees with the role gate on every body the shipped server actually sends and disagrees only on a
+  malformed or unrecognised-role one — precisely the divergence `viewerOf` exists to settle once. Fixed
+  before merge; a second case drives the discriminating fixture (`role: 'guest'` served WITH a
+  `memberCount`, which the server never sends) through both the header and 13.398's Members note in one
+  body, and dies if either reverts to reading the number. A guest's line carries no member-count prefix
   at all, never a `0`. —
   (`workspace-home.test.tsx`)
 - **13.396** ✅ An archived project still offers **"Open board"** — never "Open read-only" — at its own
