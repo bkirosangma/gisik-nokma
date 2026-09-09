@@ -46,6 +46,29 @@ function underZone<T>(zone: string, body: () => T): T {
   }
 }
 
+/**
+ * The ASYNC form, and the reason it has to exist rather than the sync one being
+ * reused with a `mount()` inside it.
+ *
+ * The banner renders TWICE: once with `invitations === null`, which formats no
+ * date at all, and again when the read's promise resolves. The dates are
+ * produced on the SECOND render, on a microtask — so a zone set only around
+ * `render()` is already restored by the time any formatting happens, and the
+ * mutation that deletes the component's explicit `timeZone` survives untouched.
+ * Measured: with the sync wrapper the mutation left all four cases green. The
+ * zone has to span the awaits, not the call.
+ */
+async function underZoneAsync<T>(zone: string, body: () => Promise<T>): Promise<T> {
+  const original = process.env['TZ'];
+  process.env['TZ'] = zone;
+  try {
+    return await body();
+  } finally {
+    if (original === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = original;
+  }
+}
+
 const push = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -115,13 +138,14 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
   });
 
   it('13.378 renders the waiting invitation with its terms, and renders NOTHING when none is waiting', async () => {
-    // Rendered under a NON-IST zone deliberately. The gate's machine is already
-    // Asia/Kolkata, so an unvaried render would pass identically with the
-    // component's explicit `timeZone` deleted — the mutation would survive and
-    // the date assertion below would certify nothing.
-    underZone('Pacific/Niue', () => mount([WAITING]));
-
-    const banner = await screen.findByRole('region', { name: 'One invitation is waiting' });
+    // Rendered AND SETTLED under a NON-IST zone deliberately. The gate's machine
+    // is already Asia/Kolkata, so an unvaried render passes identically with the
+    // component's explicit `timeZone` deleted — the mutation survives and the
+    // date assertion below certifies nothing.
+    const banner = await underZoneAsync('Pacific/Niue', async () => {
+      mount([WAITING]);
+      return screen.findByRole('region', { name: 'One invitation is waiting' });
+    });
     // The offer is a sentence, and the role inside it is a sentence too — never
     // the raw enum, which is a database value rather than terms being offered to
     // a person.

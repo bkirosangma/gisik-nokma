@@ -2710,8 +2710,13 @@ auth tables.*
   address proves the comparison rather than assuming it (`seed/users.ts` already matches addresses that
   way). The ACTIONS carry the same scope as the list, asserted in the same case: a decline of somebody
   else's invitation is 404 with the frozen body and leaves it `pending` — an inviteId is a ULID any member
-  can read out of their own workspace's history, so a list-only assertion would leave that open. Mutation
-  it reddens alone: drop the address predicate from the read.
+  can read out of their own workspace's history, so a list-only assertion would leave that open.
+  **Mutation, and what it actually did:** dropping the address predicate reddens this case — and four
+  others in the same file, because the suite shares one database per file and an unscoped read then
+  serves every caller every invitation any case ever minted. Reported as measured rather than as the
+  "reddens alone" this entry first claimed: the mutation is specific enough to identify its site (the
+  message names the address scope) but it is not isolated, and saying otherwise would misdescribe what a
+  future reader will see.
   — (`apps/server/test/routes/my-invitations.test.ts`)
 - **13.374** ✅ An accepted, declined, revoked or lapsed invitation does not surface, while a fifth to the
   same address still does. All five are asserted LIVE first, so the final `[live]` is a filter working
@@ -2738,10 +2743,17 @@ auth tables.*
   spend from the decline handler; delete the `invite.declined` branch from `checkRolePermission`.
   — (`apps/server/test/routes/my-invitations.test.ts`)
 - **13.377** ✅ Accepting from the caller-scoped door joins the workspace at the invited role, read back
-  through `GET /v1/me/workspaces` rather than out of the table, and **spends the link with it** — the
-  assertion that says the two doors share one credential rather than merely resembling each other. Were
-  they to spend separate state, a person could accept twice and the second acceptance would append a
-  second `membership.granted` for somebody already inside.
+  through `GET /v1/me/workspaces` rather than out of the table, and **spends the link with it**. Then a
+  RACE, twelve trials, firing all three doors at one invitation at once — accept by link, accept from the
+  banner, decline from the banner — asserting exactly one wins and that the ledger holds one terminal
+  event rather than two.
+  **The race is here because the sequential assertions could not see what the spend does.** Deleting the
+  spend from either caller-scoped handler left every sequential check green, measured: `openableInvite`
+  refuses on `status` before it reaches the credential, so the link stops opening the moment the
+  projection moves whether or not the row was spent. The spend guards the CONCURRENT window and only a
+  race can see it — the same reason case 6.129 needed one, after three parallel acceptances of one token
+  committed in 24 of 25 trials. **And the race had to be three-way**: a pair of link-accept and
+  banner-decline never runs the banner ACCEPT handler, so deleting THAT spend survived the pair.
   — (`apps/server/test/routes/my-invitations.test.ts`)
 - **13.378** ✅ The *"One invitation is waiting"* banner renders the offer as a sentence with the role as a
   sentence too (never the raw enum), the dates in the PRODUCT's timezone, and Accept/Decline whose
@@ -2749,8 +2761,12 @@ auth tables.*
   buttons — and renders **nothing at all** when none is waiting, which is the same claim from the side that
   matters: a banner rendering its heading unconditionally would pass every assertion about the full case.
   The expiry fixture is deliberately on the far side of the date line (`19:30Z` on the 20th renders *20
-  Sept* in UTC and *21 Sept* in Asia/Kolkata), so a component formatting in the machine's zone reddens this;
-  a same-day instant could never do that. Accept navigates into the workspace; Decline is witnessed as a
+  Sept* in UTC and *20 Sept* in the `Pacific/Niue` the case renders under), so a component formatting in
+  the machine's zone reddens this; a same-day instant could never do that, and neither could an unvaried
+  render on a gate machine that is already `Asia/Kolkata`. **The zone has to span the AWAITS and not just
+  the `render()` call** — the banner renders twice, formats no date on the first pass, and produces the
+  dates on the microtask after the read resolves, so a zone restored at the end of `render()` is already
+  back to IST by then and the mutation survives. Measured, both ways round. Accept navigates into the workspace; Decline is witnessed as a
   RE-READ (the stub answers differently the second time and the call count is asserted), because a page that
   edited its own copy would be asserting an outcome instead of reading one. A failed invitations read leaves
   the founding form standing and says so in one muted line — not a `<ShellRefusal>`, and carrying no
