@@ -39,6 +39,11 @@ const WORKSPACES: WorkspaceRef[] = [
     // about the card's data-testid keying, not the counts, so the values are
     // held constant across both workspaces on purpose.
     memberCount: 3,
+    // Task 18. An OWNER's is 0 by construction — `visibleProjects` names every
+    // project for an owner, so nothing survives the subtraction. Held at 0 here
+    // deliberately: this suite is about testid keying and the role label, and a
+    // non-zero would put a string on the card that its own cases do not own.
+    nameRestrictedProjectCount: 0,
     projects: [
       { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 4, blockedCount: 1 },
       { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 0, blockedCount: 0 },
@@ -49,6 +54,7 @@ const WORKSPACES: WorkspaceRef[] = [
     name: 'Second Workspace',
     role: 'member',
     memberCount: 2,
+    nameRestrictedProjectCount: 0,
     projects: [{ id: 'p3', name: 'Only project', archived: false, ticketCount: 2, blockedCount: 0 }],
   },
 ];

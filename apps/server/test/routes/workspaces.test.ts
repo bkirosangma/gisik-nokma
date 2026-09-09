@@ -403,8 +403,13 @@ describe('GET /v1/me/workspaces — the directory', () => {
     // owner, so the key must be here.
     expect(workspaces).toEqual(
       [
-        { workspaceId: a, name: 'Alpha', role: 'owner', memberCount: 1, projects: [] },
-        { workspaceId: b, name: 'Beta', role: 'owner', memberCount: 1, projects: [] },
+        // `nameRestrictedProjectCount: 0` since Task 18, and inside the exact
+        // `toEqual` for a third reason on top of the two above: it is the one
+        // count served to EVERY caller, so an absent key here would be a route
+        // that had started withholding it — which is what a guest-guard copied
+        // from `visibleMemberCount` would look like from this door.
+        { workspaceId: a, name: 'Alpha', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: b, name: 'Beta', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -457,7 +462,14 @@ describe('GET /v1/me/workspaces — the directory', () => {
     // told the workspace they are in and the name of no project in it. The
     // empty list is the rule applying, not a fixture that forgot to seed one.
     expect(res.json()).toEqual({
-      workspaces: [{ workspaceId, name: 'Hosted', role: 'guest', projects: [] }],
+      // `nameRestrictedProjectCount: 0` and NOT an absent key: this guest is on
+      // no project and can see no ticket, so the honest answer is zero — and
+      // zero is a claim they are entitled to, unlike `memberCount`, which is
+      // absent from this same object one line above. The two sitting side by
+      // side is Task 18's ruling stated in the smallest possible fixture.
+      workspaces: [
+        { workspaceId, name: 'Hosted', role: 'guest', nameRestrictedProjectCount: 0, projects: [] },
+      ],
     });
   });
 
@@ -494,6 +506,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
       // being listed. A 2 here would mean the count reads rows the directory
       // has already stopped believing.
       memberCount: 1,
+      nameRestrictedProjectCount: 0,
       projects: [],
     });
   });

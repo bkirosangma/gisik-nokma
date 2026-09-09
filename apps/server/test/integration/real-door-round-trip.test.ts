@@ -444,6 +444,13 @@ describe('GET /v1/me/workspaces — the directory', () => {
           // count computed off the seeded fixtures elsewhere could agree with a
           // route that had drifted from the real ingest path; these cannot.
           memberCount: 1,
+          // Task 18, and `0` is the load-bearing value rather than a filler:
+          // this caller is the owner, `visibleProjects` names every project for
+          // an owner, and the subtraction therefore empties. A non-zero here
+          // would mean the count had picked up a project id from outside this
+          // workspace's named set — which is the tenancy failure case 13.382
+          // seeds directly.
+          nameRestrictedProjectCount: 0,
           projects: [
             { projectId, name: 'Shop floor', archived: false, ticketCount: 2, blockedCount: 0 },
           ],

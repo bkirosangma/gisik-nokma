@@ -39,6 +39,12 @@ export type ProjectRef = {
  * has NOT changed is the rule the old sentence was protecting: a field arrives
  * here only once a server read computes it, and a number nobody counted is
  * withheld rather than painted — which is what the `| null` below means.
+ *
+ * **Help/Account nav landed in Task 18** and still carries no data: `/help` was
+ * already a route, and `/account` ships as a minimal stub in the same change
+ * set so the new link is not dead. The one field Task 18 DID add is
+ * `nameRestrictedProjectCount` below, and it is a computed server read like
+ * every other — the owner ruled it before it was built.
  */
 export type WorkspaceRef = {
   id: string;
@@ -51,6 +57,22 @@ export type WorkspaceRef = {
    * directory are one disclosure (`read/membership-roster.ts`).
    */
   memberCount: number | null;
+  /**
+   * How many projects this caller already holds the ID of and may not be told
+   * the NAME of — the card's *"N project · name restricted"* (Task 18, owner
+   * ruling 2026-09-09, "option 2").
+   *
+   * **A plain `number`, never `| null`, and served to a GUEST too.** It is the
+   * one number on this route nobody is withheld from, because it is not a
+   * disclosure of the same kind as the two beside it: those are VOLUME, this is
+   * a count of ids the caller carries on their own ticket cards
+   * (`read/ticket-cards.ts` puts `projectId` there), so it reveals a NAME
+   * restriction rather than an existence — the P32 distinction
+   * `read/visible-projects.ts` draws. An owner's is `0` by construction. What
+   * it is NOT is a count of every project in the workspace; that was option 3
+   * and the owner refused it. See `read/workspace-counts.ts`.
+   */
+  nameRestrictedProjectCount: number;
   projects: ProjectRef[];
 };
 
