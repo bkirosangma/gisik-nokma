@@ -1,5 +1,21 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~12:1x IST — **TASK 16 MERGED (#396 → `d878c45`): real workspace counts + archived, visibility-scoped. FORCED GATE GREEN. LEDGER 16 → done. ONE OWNER RULING OPEN (blocks only Task 18).** `main` is `d878c45` + this PR; zero open PRs; executor → Task 17 (opus).
+
+### The merge — branch EVEN with main (cut from 1417580 = then-main), trees identical
+Guard head `2528e1d`. `MERGE_EXIT=0`, MERGED `d878c45`, reachable, **trees identical (`7b46acf2`)**, unfiltered drop check 0 bytes / empty stderr. **Forced gate at `d878c45`:** `GATE_EXIT=0` · 33/33 · `Cached: 0` · 1m55s · node v22.22.2 · `Unsupported engine` 0 · **4,150 passed | 5 skipped / 325 files** · no orphans.
+
+### What Task 16 shipped (server-first; the card is Task 18)
+`GET /v1/me/workspaces` + `WorkspaceRef` gain `memberCount` per workspace and `{ticketCount, blockedCount, archived}` per project. **Every count is the CALLER'S number** — ticket counts go through `visibleTicketsWhere` (a member outside a ticket's audience counts fewer than the owner, both true); **`memberCount` shares `ROSTER_VISIBLE_CLAUSE`** (moved into `read/membership-roster.ts`, not copied) so a plain `COUNT(*)` cannot tell a member "4 people" beside a 3-name roster that hides the guest — 13.367 asserts `count === readMembers().length` for every viewer class. **A withheld count is ABSENT, not 0**, decided once (`visibleProjectCounts` returns null for a guest). `archived` = a new `proj_projects` column folded from a `project.archived`/`project.restored` **event pair** (admin-only, existence-checked, empty `.strict()` payloads; not a delete, not a permission). Nine mutations each redden only their cases; the ninth is the opus reviewer's SURVIVOR — the count query's tenancy clause, invisible from any client door (a ticket committed under workspace B carrying A's project_id) — 13.368 gained a case that seeds exactly that. Live probe: owner `memberCount:2, ticketCount:26, blockedCount:3`; guest response carries NO count keys. §13 pointer moved to 13.390.
+
+### ⚠ OWNER RULING OPEN — the restricted-project COUNT (`docs/lanes/owner-question-restricted-project-count.md`)
+The owner's reference shows the guest card *"1 project · name restricted"* — a COUNT of projects the guest may not name. The shipped `mapWorkspaceRefs` docblock (rulings P32/P38) forbids exactly that: *"no 'and N more', because the COUNT would itself be the disclosure the rule withholds."* **This reverses a recorded privacy ruling → the owner's call, not the controller's** (P25/P32's own "escalate before a NEW rule" clause). The field is additive and NOT built; nothing in #396 depends on it; **only Task 18's card string is blocked.** Put to the owner with three options (withhold / count only projects the caller already has ticket-sight into / count all) and the recommendation: option 2 (discloses nothing the caller does not already hold, makes the string true). Task 17 does not depend on it and proceeds.
+
+### Recorded, not fixed (owners named in the PR): four stale "getMyWorkspaces refuses" claims on the web authoring/refusal surface (`builder-wiring.tsx:36` is load-bearing); two pre-existing non-gated smoke failures (sign-in Google, board rollup line). None reachable from Task 16.
+
+### Next
+Restart the executor onto **Task 17** (opus; caller-scoped invitations + Accept/Decline, 13.373–13.378). Task 18 waits for the owner's disclosure ruling. Then 19 → owner look → 12.
+
 ## ✅ WEDNESDAY ~11:1x IST — **SIGN-IN ROUND 2d MERGED (#394 → `a87f47e`): the neo sign-in matches the owner's reference; the accent is the export's steel blue with a derived `textAccent`; brand-orange icon. FORCED GATE GREEN.** `main` is `a87f47e` + this PR; zero open PRs; executor to be restarted onto Task 16 (opus).
 
 ### The merge — a branch BEHIND main, verified by PARTITION not tree-identity
