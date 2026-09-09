@@ -1,5 +1,6 @@
 import {
   inviteAcceptedPayload,
+  inviteDeclinedPayload,
   inviteRevokedPayload,
   inviteSentPayload,
 } from '@gisik-nokma/domain';
@@ -36,7 +37,7 @@ import type { Projection } from './registry.js';
  *
  * ## `pending` is a one-way door
  *
- * Both terminal transitions carry `AND status = 'pending'`. That is not
+ * All THREE terminal transitions carry `AND status = 'pending'`. That is not
  * defensive noise: an invitation reaching two terminal claims is exactly what
  * happens when an admin revokes one at the moment somebody opens it, and
  * without the guard the LAST event would win — so a person who genuinely
@@ -44,6 +45,15 @@ import type { Projection } from './registry.js';
  * a revocation of an invitation that no longer existed to revoke. With it, the
  * first terminal claim in the invitation's own stream order stands, and the
  * ledger's order is what decides rather than a projection's write order.
+ *
+ * Task 17's `invite.declined` is the third, and it needs the guard for a
+ * SHARPER version of the same reason: a decline and an acceptance of one
+ * invitation are two people's claims about the same thing, and the product
+ * lets both be attempted (an emailed link in one hand, the `/workspaces` banner
+ * in the other). The concurrent race between them is decided in the database,
+ * by the conditional DELETE on `invite_tokens` that both doors run — this guard
+ * is the SEQUENTIAL net underneath it, and the migration for that table records
+ * why one is not the other.
  *
  * ## Determinism
  *
@@ -67,6 +77,11 @@ const MARK_ACCEPTED = `
 const MARK_REVOKED = `
   UPDATE proj_invites
      SET status = 'revoked'
+   WHERE invite_id = $1 AND status = 'pending'`;
+
+const MARK_DECLINED = `
+  UPDATE proj_invites
+     SET status = 'declined'
    WHERE invite_id = $1 AND status = 'pending'`;
 
 export const projInvites: Projection = {
@@ -97,6 +112,11 @@ export const projInvites: Projection = {
     if (event.type === 'invite.revoked') {
       const payload = inviteRevokedPayload.parse(event.payload);
       await tx.query(MARK_REVOKED, [payload.inviteId]);
+      return;
+    }
+    if (event.type === 'invite.declined') {
+      const payload = inviteDeclinedPayload.parse(event.payload);
+      await tx.query(MARK_DECLINED, [payload.inviteId]);
     }
   },
 

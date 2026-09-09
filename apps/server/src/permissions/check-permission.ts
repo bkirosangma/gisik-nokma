@@ -90,18 +90,49 @@ export const VISIBILITY_AUTHORITY_REASON =
  * every role including owner.
  *
  * Acceptance is the moment an address-shaped claim becomes a person, and the
- * only thing entitled to make that binding is possession of the link's token.
+ * thing entitled to make that binding is PROOF, of which the product now accepts
+ * two: possession of the link's token, and (Task 17) a verified email equal to
+ * the address the invitation names. Both are demonstrated to the SERVER, at a
+ * route, and neither can be demonstrated by an event — which is what this
+ * refusal is about and why it is unchanged by the second one arriving.
+ *
  * A client-submitted `invite.accepted` names an `inviteId` and a `userId` and
- * carries no token at all — so without this refusal an admin who reads an
- * inviteId out of the workspace's own history could bind any pending invitation
- * to any user, themselves included, having never seen the link. The event id and
- * the inviteId are both in the ledger by design; only the token is not.
+ * carries no proof of either kind — so without this refusal an admin who reads
+ * an inviteId out of the workspace's own history could bind any pending
+ * invitation to any user, themselves included, having never seen the link and
+ * holding no claim on the address. The event id and the inviteId are both in the
+ * ledger by design; only the token is not.
+ *
+ * *This paragraph used to say the token was the ONLY entitlement. It was true
+ * when written and stopped being true at Task 17, and it is corrected here
+ * rather than left standing — a stale rule in a docblock is what the next
+ * editor reasons from.*
  *
  * It is a `permission.role` refusal because it is about WHO may make this claim
  * (nobody, from a client), not about what may be seen.
  */
 export const INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON =
   'Acceptance is recorded by the server when the invited person opens their link.';
+/**
+ * Task 17. `invite.declined` is refused from EVERY client envelope-origin, at
+ * every role including owner — the same treatment `invite.accepted` gets, and
+ * the reader who expects the opposite is the one this comment is for.
+ *
+ * "Declining is harmless, so let anyone submit one" is the wrong way round. An
+ * `inviteId` is readable by every member of the workspace (it is in the ledger
+ * by design; only the token is not), so a client-submitted decline would let
+ * any member destroy any pending invitation **while attributing the refusal to
+ * the invited person**. That is strictly worse than a revocation, which reaches
+ * the same terminal state under the name of the admin who chose it and is
+ * admin-only for that reason.
+ *
+ * The only thing entitled to say an address declined is proof of control over
+ * that address, which no client-submitted event can demonstrate. The server
+ * appends this at `/v1/me/invitations/:inviteId/decline`, having matched the
+ * invitation to the caller's VERIFIED email.
+ */
+export const INVITE_DECLINE_IS_THE_SERVERS_REASON =
+  'Declining is recorded by the server for the person the invitation names.';
 /** Task 9 Step 3b. Names the project, because the id is the thing the sender got wrong. */
 export function projectUnknownReason(projectId: string): string {
   return `There is no project ${projectId} in this workspace.`;
@@ -327,7 +358,8 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *   for the types the role gate already names and unexamined for any it does
  *   not. **Task 14 narrowed this entry rather than closing it**: all three
  *   invite types are now named by the role gate — `invite.sent` and
- *   `invite.revoked` in `ADMIN_ONLY_TYPES`, `invite.accepted` refused from every
+ *   `invite.revoked` in `ADMIN_ONLY_TYPES`, `invite.accepted` and (Task 17)
+ *   `invite.declined` refused from every
  *   client door — so the sub-question "who may emit an invite event" is
  *   answered. The entry stays open for `workflow`, `ticket-type`, `project` and
  *   `membership`, whose ordinary events are still unexamined beyond the types
@@ -496,6 +528,13 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   // demonstrate.
   if (env.type === 'invite.accepted') {
     return refuse(INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON);
+  }
+  // Task 17, and it sits HERE for the reason above it rather than beside
+  // `invite.revoked` in `ADMIN_ONLY_TYPES`: an admin is exactly the person this
+  // refusal is about, so a rule that admitted admins would leave the escalation
+  // open. See INVITE_DECLINE_IS_THE_SERVERS_REASON.
+  if (env.type === 'invite.declined') {
+    return refuse(INVITE_DECLINE_IS_THE_SERVERS_REASON);
   }
   // Membership is workspace-scoped only now (owner decision 2026-08-27), so
   // this is one question rather than a branch on scope: managing who is IN the

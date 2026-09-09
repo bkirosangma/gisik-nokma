@@ -142,3 +142,38 @@ export type InviteAcceptedPayload = z.infer<typeof inviteAcceptedPayload>;
 /** Revocation is a claim like everything else: attributed, dated, in the ledger. */
 export const inviteRevokedPayload = z.object({ inviteId: ulidString }).strict();
 export type InviteRevokedPayload = z.infer<typeof inviteRevokedPayload>;
+
+/**
+ * The invited person says no (Task 17, HIG per-screen plan, owner brief
+ * 2026-09-09). A terminal transition out of `pending`, exactly like revocation
+ * and exactly like acceptance.
+ *
+ * ## Why it carries no `userId`, when `invite.accepted` does
+ *
+ * `invite.accepted` names a `userId` because acceptance MAKES a binding — this
+ * address is now this account, and a `membership.granted` follows naming that
+ * same person. Declining makes no binding and nothing follows it, so a `userId`
+ * in this payload would be a second, unused copy of a fact the envelope already
+ * carries: the `actorId` on this event IS the person who declined. Two sources
+ * for one fact is the shape that drifts, and Task 16 settled the same question
+ * the same way when it refused a stored `archived_at` beside a ledger that
+ * already answers "when".
+ *
+ * The vocabulary's structural invariant therefore survives intact: no payload in
+ * this file lets an address and a user id appear together, so no event here can
+ * be read as "this address IS this person".
+ *
+ * ## Refused from every client door, for acceptance's reason mirrored
+ *
+ * `checkRolePermission` refuses `invite.declined` from every client
+ * envelope-origin at every role, exactly as it refuses `invite.accepted`. The
+ * asymmetry a reader might expect — "declining is harmless, let anyone do it" —
+ * is the wrong way round: an inviteId is readable by every member of the
+ * workspace, so a client-submitted decline would let any admin destroy any
+ * pending invitation while attributing the refusal to the invited person. That
+ * is worse than a revocation, which is attributed to the admin who made it. The
+ * server appends this when the person whose VERIFIED address the invitation
+ * names says no, through `/v1/me/invitations/:inviteId/decline`.
+ */
+export const inviteDeclinedPayload = z.object({ inviteId: ulidString }).strict();
+export type InviteDeclinedPayload = z.infer<typeof inviteDeclinedPayload>;
