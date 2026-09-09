@@ -1073,6 +1073,24 @@ function withheldOrNumber(
  * the project's name at all, so an absent key means the route did not answer
  * this question and `asBoolean` refuses it. That is the same distinction the
  * `projects` key draws two paragraphs down between absent and `[]`.
+ *
+ * ## Task 18's `nameRestrictedProjectCount`, and the sentence it amends
+ *
+ * The inline comment on the `projects` key below used to say a count of the
+ * projects a viewer may not name would "itself be the disclosure the rule
+ * withholds". **The owner ruled otherwise on 2026-09-09**, for a narrower count
+ * than the one that sentence was written against: only the projects the caller
+ * can already see a TICKET in, whose `projectId` they therefore already carry.
+ * The full text of the ruling and the two options it refused are in
+ * `docs/lanes/owner-question-restricted-project-count.md`; the reasoning is
+ * restated at the comment site and at `read/workspace-counts.ts`, which is
+ * where the set is computed.
+ *
+ * The field is REQUIRED here, unlike the three counts above: it has no withheld
+ * state, because it is served to a guest too. That asymmetry is the ruling's
+ * whole content and it is worth stating twice — a future reader pattern-
+ * matching the counts beside it would make this optional and hand a guest
+ * `null`, which is the one viewer the number was ruled FOR.
  */
 export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
   const record = asRecord(raw, 'workspaces');
@@ -1084,12 +1102,32 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       name: asString(workspace['name'], `${path}.name`),
       role: asString(workspace['role'], `${path}.role`),
       memberCount: withheldOrNumber(workspace, 'memberCount', `${path}.memberCount`),
+      // REQUIRED, and deliberately not `withheldOrNumber`: this count has no
+      // withheld state on the wire — the server serves it to every caller
+      // including a guest — so an absent key means the route did not answer
+      // this question and `asNumber` should say so. Reading it as optional
+      // would invent a third state (`null`) the card would then need a branch
+      // for, and a renderer given a branch nothing produces is a branch nobody
+      // ever sees fail. Same argument as `archived` two lines down.
+      nameRestrictedProjectCount: asNumber(
+        workspace['nameRestrictedProjectCount'],
+        `${path}.nameRestrictedProjectCount`,
+      ),
       // A PARTIAL LIST IS THE CORRECT ANSWER, not a defect (rulings P32/P38).
       // Every role except owner is served only the projects it holds a
-      // membership in, because a project's NAME is itself a disclosure. The
-      // client renders what it is given and asserts nothing about what it is
-      // not: there is deliberately no "and N more", because the COUNT would
-      // itself be the disclosure the rule withholds.
+      // membership in, because a project's NAME is itself a disclosure.
+      //
+      // **AMENDED, Task 18, owner ruling 2026-09-09.** This comment used to
+      // end: "there is deliberately no 'and N more', because the COUNT would
+      // itself be the disclosure the rule withholds." That sentence was right
+      // about a count of EVERY project — which is the option the owner refused
+      // — and wrong about the one now served. `nameRestrictedProjectCount`
+      // counts only projects this caller can already see a ticket in, and a
+      // visible ticket card carries its own `projectId`, so the number is a
+      // count of ids the reader is holding as they read it. It discloses a NAME
+      // restriction, not an existence: the P32 distinction
+      // `read/visible-projects.ts` draws in its own words. The rule this
+      // comment protects is unchanged — the LIST still names nothing extra.
       //
       // The key is REQUIRED, never defaulted to `[]`. An absent `projects`
       // would mean the route did not answer this question at all; `[]` is a

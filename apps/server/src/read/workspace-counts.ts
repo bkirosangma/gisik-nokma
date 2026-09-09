@@ -165,3 +165,117 @@ export async function visibleMemberCount(
   );
   return Number(rows[0]?.count ?? 0);
 }
+
+/**
+ * The projects this caller can see at least one TICKET in, as a set of ids
+ * (Task 18, owner ruling of 2026-09-09 — "option 2").
+ *
+ * ## Why this is a set of ids and not a number
+ *
+ * The card's string is *"N project · name restricted"*, and N is
+ * `nameRestrictedProjectCount(...)` below — this set MINUS the projects the
+ * caller is told the NAME of. Counting in SQL would either count tickets
+ * (`COUNT(*)`, the wrong number entirely) or force the name-visibility rule to
+ * be re-expressed as a second SQL filter beside `visibleProjects`, which is the
+ * two-sources-of-truth shape this series keeps catching — and here it would let
+ * the count and the served project list disagree about the same project.
+ *
+ * So the subtraction happens in TypeScript against `visibleProjects`' own
+ * output, and this function answers only the half SQL is needed for.
+ *
+ * ## The tenancy clause is LOAD-BEARING here in a way it is not one function up
+ *
+ * `visibleProjectCounts` records that its own `v.workspace_id = $n` mutation
+ * SURVIVES at the client door, because the route reads that map only for ids
+ * `visibleProjects` returned. **This count is over exactly the ids
+ * `visibleProjects` did NOT return**, so the inverse is true: without the
+ * clause, a member of workspace A picks up every workspace-mode ticket in the
+ * table, each foreign `project_id` lands outside A's named set, and A's card
+ * inflates. That is directly observable through the client door and case 13.382
+ * observes it.
+ *
+ * `DISTINCT` rather than `GROUP BY`: the answer is a set of projects, and the
+ * ticket rows behind it are not wanted by anybody.
+ */
+export async function ticketVisibleProjectIds(
+  db: Queryable,
+  eff: EffectiveRole,
+  userId: string,
+  workspaceId: string,
+): Promise<Set<string>> {
+  if (eff.workspaceRole === null) return new Set();
+  const params = new SqlParams();
+  const workspaceClause = `v.workspace_id = ${params.add(workspaceId)}`;
+  const visibleClause = visibleTicketsWhere(eff, userId, params);
+  const { rows } = await db.query<{ project_id: string }>(
+    `SELECT DISTINCT t.project_id
+       FROM proj_tickets t
+       JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+      WHERE ${workspaceClause} AND t.workspace_id = v.workspace_id AND ${visibleClause}`,
+    params.toArray(),
+  );
+  return new Set(rows.map((row) => row.project_id));
+}
+
+/**
+ * *"N project · name restricted"* — how many projects this caller already holds
+ * the ID of, and may not be told the NAME of.
+ *
+ * ## The owner ruled this, and ruled OUT the obvious neighbour
+ *
+ * Owner, 2026-09-09, verbatim: *"go with 2: Count only projects the guest
+ * already has sight into."* The escalation that produced it
+ * (`docs/lanes/owner-question-restricted-project-count.md`) put three options
+ * up. **Option 3 — count every project in the workspace the caller cannot name
+ * — is REFUSED**, and the refusal is the whole content of this function: a
+ * caller with no sight into a project is not told it exists, so a total would
+ * be a plain existence disclosure. Do not "simplify" this to
+ * `allProjects − named`; case 13.382 seeds a project that separates the two and
+ * dies on exactly that change.
+ *
+ * ## Why the number discloses nothing, in the ruling's own terms
+ *
+ * A project in this set is one the caller can see a ticket in, and
+ * `read/ticket-cards.ts` puts `projectId` on the card — so the caller already
+ * HOLDS the id. What is withheld is the NAME (`read/visible-projects.ts`:
+ * *"this list is not an existence secret. It is a NAME one, which is exactly
+ * the distinction P32 drew"*), and a count of ids the reader already carries
+ * says only *some of what you hold has a name you may not be told*. That is the
+ * P32 distinction applied, not a new concession.
+ *
+ * ## A GUEST IS SERVED THIS NUMBER, and that is not an oversight
+ *
+ * Both counts above open with `role === 'guest' → null`. **This one must not,
+ * and copying that guard is the single most likely way to ship this field
+ * broken**: the owner's reference draws *"1 project · name restricted"* on the
+ * GUEST card, so a guest-withheld count is withheld from precisely the viewer
+ * it exists for — and every fixture written from a member passes.
+ *
+ * The two are different disclosures. `ticketCount` is VOLUME, which nothing
+ * else tells the caller. This is a count of ids already in their hands. A guest
+ * reaches tickets only through an explicit audience (`visibleTicketsWhere`'s
+ * guest branch), so their set is exactly the errands handed to them by name.
+ *
+ * ## It is never split by `archived`, and cannot be
+ *
+ * A project whose name is withheld has no `archived` flag as far as this caller
+ * is concerned — `visible-projects.ts` serves that flag only alongside the name
+ * it rides with. Splitting this number by archived state would disclose a
+ * property of a project the caller may not name, so the toggle on the card
+ * governs NAMED projects only and this number sits outside it.
+ *
+ * An owner is always `0` by construction — `visibleProjects` returns every
+ * project for an owner, so nothing survives the subtraction. That is the
+ * correct answer and not a special case, which is why there is no owner branch.
+ */
+export function nameRestrictedProjectCount(
+  ticketVisible: ReadonlySet<string>,
+  named: readonly { projectId: string }[],
+): number {
+  const namedIds = new Set(named.map((project) => project.projectId));
+  let count = 0;
+  for (const projectId of ticketVisible) {
+    if (!namedIds.has(projectId)) count += 1;
+  }
+  return count;
+}

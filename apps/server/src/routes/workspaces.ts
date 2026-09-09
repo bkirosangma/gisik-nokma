@@ -1,7 +1,12 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { visibleProjects } from '../read/visible-projects.js';
-import { visibleMemberCount, visibleProjectCounts } from '../read/workspace-counts.js';
+import {
+  nameRestrictedProjectCount,
+  ticketVisibleProjectIds,
+  visibleMemberCount,
+  visibleProjectCounts,
+} from '../read/workspace-counts.js';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
@@ -162,7 +167,7 @@ export function registerWorkspaceRoutes(
       // set within one workspace, and reusing another workspace's resolution
       // here would be a cross-tenancy answer wearing the right shape.
       const eff = await resolveEffectiveRole(deps.pool, request.currentUserId, row.workspace_id);
-      const [memberCount, counts, projects] = await Promise.all([
+      const [memberCount, counts, projects, ticketVisible] = await Promise.all([
         visibleMemberCount(deps.pool, eff, row.workspace_id),
         visibleProjectCounts(deps.pool, eff, request.currentUserId, row.workspace_id),
         // Rulings P32/P38. A viewer outside a project is not told its NAME —
@@ -170,6 +175,11 @@ export function registerWorkspaceRoutes(
         // `read/visible-projects.ts` for why that is an application of
         // `resolveEffectiveRole` rather than a new rule.
         visibleProjects(deps.pool, eff, row.workspace_id),
+        // Task 18's option-2 half. It runs BESIDE `visibleProjects` rather than
+        // after it — the SQL depends only on `eff`, and the subtraction that
+        // needs both answers is pure and happens below. Sequencing them would
+        // have cost a round trip per workspace to express the same rule.
+        ticketVisibleProjectIds(deps.pool, eff, request.currentUserId, row.workspace_id),
       ]);
       workspaces.push({
         workspaceId: row.workspace_id,
@@ -181,6 +191,15 @@ export function registerWorkspaceRoutes(
         // this path would turn a withholding into a false statement, and the
         // mapper's own refusal (`asNumber` on an absent key) would never fire.
         ...(memberCount === null ? {} : { memberCount }),
+        // ALWAYS PRESENT, for every caller including a guest — the one count on
+        // this route that is not withheld from anybody (owner ruling
+        // 2026-09-09, option 2). `read/workspace-counts.ts` argues why at
+        // length: this is a count of project ids the caller already carries on
+        // their own ticket cards, so it discloses a NAME restriction and not an
+        // existence. An owner's is `0` by construction. Copying the guest guard
+        // from the two counts above would withhold it from the exact viewer the
+        // owner's reference card draws it on.
+        nameRestrictedProjectCount: nameRestrictedProjectCount(ticketVisible, projects),
         projects: projects.map((project) => {
           const count = counts?.get(project.projectId);
           return {

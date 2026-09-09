@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { IST_TIME_ZONE } from '@gisik-nokma/domain';
-import { Button, Card } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import { FoundingError, InvitationActionError, type PendingInvitation } from '@gisik-nokma/app-core/online';
-import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
@@ -59,25 +59,7 @@ export default function WorkspacesPage() {
       ) : (
         <ul className="gn-workspace-list">
           {workspaces.map((workspace) => (
-            <li key={workspace.id} data-testid={`workspace-card-${workspace.id}`}>
-              <Card>
-                <h2>{workspace.name}</h2>
-                {/* 13.357 — the one owner-approved invented row on this screen: the
-                    server has carried `role` on this route since it first answered;
-                    only the display was missing. The other seven I-rows the audit
-                    found (member counts, avatars, chips, the invitation banner,
-                    Help/Account nav) stay unbuilt — no data exists for them. */}
-                <p className="gn-workspace-list__role">{workspace.role}</p>
-                <ul>
-                  {workspace.projects.map((project) => (
-                    <li key={project.id} data-testid={`project-card-${project.id}`}>
-                      <Link href={`/w/${workspace.id}/p/${project.id}`}>{project.name}</Link>
-                    </li>
-                  ))}
-                </ul>
-                <Link href={`/w/${workspace.id}/my-work`}>My Work</Link>
-              </Card>
-            </li>
+            <WorkspaceCard key={workspace.id} workspace={workspace} />
           ))}
         </ul>
       )}
@@ -103,6 +85,233 @@ export default function WorkspacesPage() {
       <InvitationBanner />
       <FoundingForm />
     </main>
+  );
+}
+
+/**
+ * What this viewer is, said once (Task 18).
+ *
+ * ## ONE role value, and the affordances read the SAME one
+ *
+ * The card makes two decisions about the viewer: what sentence to greet them
+ * with, and whether it may print numbers at all. **Both read `role` and nothing
+ * else**, which is the point of this function existing rather than the two
+ * living at their own call sites. The second source that suggests itself is
+ * `memberCount === null` — the server's own withholding — and it is a different
+ * fact that happens to agree today: it means *this number was withheld*, not
+ * *you are a guest*. Case 13.381 seeds the one body where they disagree (a
+ * guest served counts, which the shipped server never sends) and dies if the
+ * chip stops reading the role.
+ *
+ * ## An unknown role is greeted, not gated open
+ *
+ * `WorkspaceRef.role` is a `string` on the wire, not a union — the server sends
+ * `row.role` from `proj_memberships` verbatim. So a role this build has never
+ * heard of is reachable, and the two answers pull opposite ways: the SENTENCE
+ * falls back to something true and vague, and `countsWithheld` falls back to
+ * **true**. Withholding from a role we cannot place is the conservative
+ * direction, and it is the only one where being wrong is recoverable.
+ */
+type CardViewer = { sentence: string; countsWithheld: boolean };
+
+const ROLE_SENTENCES: Record<string, string> = {
+  owner: "You're an owner here.",
+  admin: "You're an admin here.",
+  member: "You're a member here.",
+  guest: "You're a guest here.",
+};
+
+function viewerOf(role: string): CardViewer {
+  const sentence = ROLE_SENTENCES[role];
+  return {
+    sentence: sentence ?? `Your role here is ${role}.`,
+    countsWithheld: sentence === undefined || role === 'guest',
+  };
+}
+
+/**
+ * *"1 project · name restricted"* — or nothing at all.
+ *
+ * Zero renders NOTHING, and that is the same rule the invitation banner keeps:
+ * a person with nothing withheld from them must not be told about withholding.
+ * *"0 projects · name restricted"* would be a sentence announcing an absence
+ * nobody asked about, and it would appear on every owner's card, where the
+ * count is zero by construction.
+ *
+ * ONE interpolation, not three — the rule this file already records at the
+ * banner: React renders each JSX interpolation as its own text node, so a
+ * sentence assembled out of several is split in the accessibility tree and in
+ * every `getByText` that looks for it.
+ */
+function restrictedLine(count: number): string | null {
+  if (count <= 0) return null;
+  return `${count} ${count === 1 ? 'project' : 'projects'} · name restricted`;
+}
+
+/**
+ * The two count chips, and the word "active".
+ *
+ * `ticketCount` is every ticket in this project this caller may see;
+ * `blockedCount` is the subset standing in a state the workflow flags blocked.
+ * Blocked is a subset of the total by construction — `visibleProjectCounts`
+ * computes it as a `FILTER` on the same query — so `total − blocked` is exact
+ * arithmetic over one set and not a third number nobody counted.
+ *
+ * **"active" here means NOT BLOCKED, and that is not `StateCategory.active`.**
+ * The domain has a state category by that name (`open` / `active` / `terminal`)
+ * and a ticket in an `open` state is unblocked without being category-active.
+ * The two would need a server field to tell apart and this route serves none,
+ * so nobody should later wire this chip to the category and call it a fix: the
+ * label would go on being the same word and start being a different claim.
+ */
+function ChipRow({ workspace, viewer }: { workspace: WorkspaceRef; viewer: CardViewer }) {
+  if (viewer.countsWithheld) {
+    // ONE chip, and no number anywhere in it. Printing `0` would be the claim
+    // "nothing here you can see", which is exactly what the server declined to
+    // say by omitting the key.
+    return (
+      <div className="gn-workspace-card__chips">
+        <Chip tone="restricted">Restricted</Chip>
+      </div>
+    );
+  }
+  const total = workspace.projects.reduce((sum, p) => sum + (p.ticketCount ?? 0), 0);
+  const blocked = workspace.projects.reduce((sum, p) => sum + (p.blockedCount ?? 0), 0);
+  return (
+    <div className="gn-workspace-card__chips">
+      {/* Summed over the projects THIS CARD NAMES, which is narrower than "work
+          you can see in this workspace": a project whose name is withheld can
+          still hold tickets this caller sees, and those are not in this total.
+          The line below the list says how many such projects there are, which
+          is what keeps the pair honest rather than either number alone. */}
+      {workspace.memberCount !== null ? (
+        <Chip tone="neutral">{`${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'}`}</Chip>
+      ) : null}
+      <Chip tone="active">{`${total - blocked} active`}</Chip>
+      <Chip tone="blocked">{`${blocked} blocked`}</Chip>
+    </div>
+  );
+}
+
+/** One project row: its name, and the counts this caller may be told. */
+function ProjectRow({
+  workspaceId,
+  project,
+  viewer,
+}: {
+  workspaceId: string;
+  project: ProjectRef;
+  viewer: CardViewer;
+}) {
+  return (
+    <li className="gn-workspace-card__project" data-testid={`project-card-${project.id}`}>
+      <Link href={`/w/${workspaceId}/p/${project.id}`}>{project.name}</Link>
+      {/* The SAME gate as the chips above, read from the same value. A guest is
+          told a project's NAME (rulings P32/P38) and no number about it. */}
+      {viewer.countsWithheld || project.ticketCount === null ? null : (
+        <span className="gn-workspace-card__project-count">
+          {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
+        </span>
+      )}
+      {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
+    </li>
+  );
+}
+
+/**
+ * One workspace, as the owner's `/workspaces` reference draws it (Task 18).
+ *
+ * ## What is derived and what is served
+ *
+ * Served: the name, the role, `memberCount`, `nameRestrictedProjectCount`, and
+ * per project a name, `archived` and two counts. Derived HERE and nowhere else:
+ * the monogram and its tint (from the name and the id — `Avatar`), the role
+ * sentence, the two chip totals, and the archived split. Nothing on this card
+ * is invented: every string traces to a value the route computed.
+ *
+ * ## Archived projects are marked AND hidden, both
+ *
+ * A `<Chip>Archived</Chip>` on the row, and the rows themselves behind a
+ * disclosure that is collapsed by default. The toggle exists only when there is
+ * something behind it — a control that reveals nothing is a control that lies
+ * about the shape of the data — and its accessible name carries the workspace,
+ * because two cards would otherwise present two identically-named buttons.
+ *
+ * The restricted line sits OUTSIDE that toggle and applies to both lists: a
+ * project whose NAME is withheld has no `archived` flag as far as this caller
+ * is concerned (`read/visible-projects.ts` serves the flag only alongside the
+ * name it rides with), so the number cannot be split by archived state without
+ * disclosing more than the owner ruled.
+ */
+function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const viewer = viewerOf(workspace.role);
+  const live = workspace.projects.filter((project) => !project.archived);
+  const archived = workspace.projects.filter((project) => project.archived);
+  const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
+
+  return (
+    <li data-testid={`workspace-card-${workspace.id}`}>
+      <Card>
+        <div className="gn-workspace-card__head">
+          {/* The tint key is the workspace ID, not its name: two workspaces
+              called the same thing must still be told apart, and a rename must
+              not change a colour a person has learned. */}
+          <Avatar name={workspace.name} tint={workspace.id} />
+          <div className="gn-workspace-card__titles">
+            <h2>{workspace.name}</h2>
+            {/* 13.357's role label, now a SENTENCE. The raw enum was a database
+                value on a card; `viewerOf` is the one place it becomes English,
+                and the same object gates every number below. */}
+            <p className="gn-workspace-list__role">{viewer.sentence}</p>
+          </div>
+        </div>
+
+        <ChipRow workspace={workspace} viewer={viewer} />
+
+        <ul className="gn-workspace-card__projects">
+          {live.map((project) => (
+            <ProjectRow
+              key={project.id}
+              workspaceId={workspace.id}
+              project={project}
+              viewer={viewer}
+            />
+          ))}
+        </ul>
+
+        {archived.length > 0 ? (
+          <>
+            <Button
+              type="button"
+              aria-expanded={showArchived}
+              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
+              onClick={() => setShowArchived((open) => !open)}
+            >
+              {`${showArchived ? 'Hide' : 'Show'} ${archived.length} archived`}
+            </Button>
+            {showArchived ? (
+              <ul className="gn-workspace-card__projects gn-workspace-card__projects--archived">
+                {archived.map((project) => (
+                  <ProjectRow
+                    key={project.id}
+                    workspaceId={workspace.id}
+                    project={project}
+                    viewer={viewer}
+                  />
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : null}
+
+        {restricted !== null ? (
+          <p className="gn-workspace-card__restricted">{restricted}</p>
+        ) : null}
+
+        <Link href={`/w/${workspace.id}/my-work`}>My Work</Link>
+      </Card>
+    </li>
   );
 }
 

@@ -116,8 +116,18 @@ describe('AppNav — the mounts, not the components', () => {
    * by href rather than by accessible name because the href is what makes a
    * link a door; a renamed label is a copy change, a changed href is a
    * different destination.
+   *
+   * **THREE BECAME FIVE at Task 18, and this is what a deliberate act looks
+   * like.** `/help` and `/account` joined the nav (the owner's `/workspaces`
+   * reference), the tripwire reddened by name, and the expected set below was
+   * widened in the same change set that added the links — which is the whole
+   * point of the case. Both are GLOBAL doors and sit after the inbox, before
+   * the spacer, for the reason `app-nav.tsx` records: they are destinations
+   * like Workspaces and My Work, not controls like the theme toggle. The
+   * ORDER is asserted too, because `toEqual` on an array is ordered and the
+   * nav's reading order is a design decision rather than an accident.
    */
-  it('11.185 hangs exactly three doors and no more — a fourth link must be a deliberate act', () => {
+  it('11.185 hangs exactly five doors and no more — a sixth link must be a deliberate act', () => {
     render(
       <Providers services={stubServices({}, { notifications: { unreadCount: async () => 0 } })}>
         <AppNav workspaceId="ws_1" />
@@ -125,6 +135,6 @@ describe('AppNav — the mounts, not the components', () => {
     );
 
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/workspaces', '/w/ws_1/my-work', '/inbox']);
+    expect(hrefs).toEqual(['/workspaces', '/w/ws_1/my-work', '/inbox', '/help', '/account']);
   });
 });

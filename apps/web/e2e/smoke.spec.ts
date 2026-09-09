@@ -179,6 +179,11 @@ async function stubApi(page: Page): Promise<void> {
             name: 'Convenience Corner',
             role: 'admin',
             memberCount: 3,
+            // Task 18, and REQUIRED on the wire for every caller — an admin
+            // here, but a guest body would carry it too. `mapWorkspaceRefs`
+            // throws on an absent one, so a stub that omitted it would take
+            // this whole page down and read as a layout failure.
+            nameRestrictedProjectCount: 0,
             projects: [
               {
                 projectId: PRJ,

@@ -1508,7 +1508,9 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 describe('13.357 mapWorkspaceRefs reads role, the server field the client used to ignore', () => {
   function body(role: string): { workspaces: unknown[] } {
     return {
-      workspaces: [{ workspaceId: 'ws1', name: 'Convenience Corner', role, projects: [] }],
+      workspaces: [
+        { workspaceId: 'ws1', name: 'Convenience Corner', role, nameRestrictedProjectCount: 0, projects: [] },
+      ],
     };
   }
 
@@ -1521,6 +1523,11 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
       // WITHHELD — `null`, never 0. `toEqual` is exact, so this line is also
       // what would fail if the mapper ever started defaulting the absence.
       memberCount: null,
+      // Task 18. Unlike the count above it has no withheld state, so a body
+      // carrying it maps it straight through — and `toEqual` being exact is
+      // what makes this line notice a mapper that started reading it as
+      // optional and handing the card `null`.
+      nameRestrictedProjectCount: 0,
       projects: [],
     });
   });
@@ -1552,7 +1559,17 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
   ): { workspaces: unknown[] } {
     return {
       workspaces: [
-        { workspaceId: 'ws1', name: 'Convenience Corner', role: 'guest', ...workspace, projects },
+        {
+          workspaceId: 'ws1',
+          name: 'Convenience Corner',
+          role: 'guest',
+          // A GUEST body, and it carries this count — which is the owner's
+          // ruling in one line. `...workspace` spreads AFTER, so a case that
+          // wants the key absent or malformed can still override it.
+          nameRestrictedProjectCount: 0,
+          ...workspace,
+          projects,
+        },
       ],
     };
   }

@@ -178,11 +178,18 @@ it stayed in `apps/web` when the gateway left.*
 ## Web shell wiring (`apps/web`)
 - **11.170** ✅ Hangs the Inbox link — the only door to `/inbox` anywhere in the product — (`app-nav.test.tsx`)
 - **11.171** ✅ Carries "Workspaces" always, and "My Work" only inside a workspace — (`app-nav.test.tsx`)
-- **11.185** ✅ The nav's link set is CLOSED: the hrefs are exactly `/workspaces`, `/w/<id>/my-work`
-  and `/inbox`, so a fourth door cannot be added silently. Distinct from 11.170/11.171, which assert
-  presence and are therefore blind to an addition — measured by wiring a `settings/workflows` link
-  into `AppNav`: both stayed green and only this case went red. It is the tripwire on the UNOWNED gap
-  the coordination doc records, that nothing in `apps/web` links to Plan 8's six authoring routes —
+- **11.185** ✅ The nav's link set is CLOSED: the hrefs are exactly `/workspaces`, `/w/<id>/my-work`,
+  `/inbox`, `/help` and `/account`, IN THAT ORDER, so a sixth door cannot be added silently. Distinct
+  from 11.170/11.171, which assert presence and are therefore blind to an addition — measured by
+  wiring a `settings/workflows` link into `AppNav`: both stayed green and only this case went red. It
+  is the tripwire on the UNOWNED gap the coordination doc records, that nothing in `apps/web` links to
+  Plan 8's six authoring routes. **AMENDED 2026-09-09 (Task 18): three doors became five.** `/help`
+  and `/account` joined the nav from the owner's `/workspaces` reference; this case reddened by name,
+  which is the tripwire working, and the expected set was widened in the SAME change set that added
+  the links — never in a follow-up, which is the failure mode the case exists to prevent. The order is
+  asserted because `toEqual` on an array is ordered and the nav's reading order is a design decision:
+  both new entries sit after the inbox and before the spacer, with the destinations rather than the
+  controls. —
   (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)

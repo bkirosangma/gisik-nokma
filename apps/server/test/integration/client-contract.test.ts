@@ -1044,9 +1044,15 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     // this caller is the workspace's owner; a GUEST caller would be served this
     // same object with the key ABSENT, which is what `null` on the client means
     // and what case 13.366 pins on the route.
+    // `nameRestrictedProjectCount` joined at Task 18 and IS read by the client
+    // (`WorkspaceRef.nameRestrictedProjectCount`, a plain `number`). Unlike
+    // `memberCount` it is here for EVERY caller, guests included — the owner's
+    // 2026-09-09 ruling — so this sorted key set is the same for a guest,
+    // minus `memberCount`.
     expect(Object.keys(ref).sort()).toEqual([
       'memberCount',
       'name',
+      'nameRestrictedProjectCount',
       'projects',
       'role',
       'workspaceId',

@@ -20,7 +20,127 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~13:2x IST. **TASK 17 — WORK COMPLETE, FREEZING.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~14:5x IST. **TASK 18 — WORK COMPLETE, FREEZING.**
+>
+> **This block is written BEFORE the freeze, so its last line is a claim about the future and the one to
+> distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open` before
+> acting — a restart surface fails in the conservative direction and that is the direction nobody audits.
+>
+> **Anchors, verified rather than remembered.** Branch `exec/18-workspace-card`, cut from `origin/main`
+> at **`3a9bdff7`** and never rebased. Head **`06c7ac6b`**, FIVE commits, ahead 5 / **behind 0**
+> (`git rev-parse origin/main` re-read at the freeze: still `3a9bdff7`). `git branch --contains` on all
+> five returns this branch, not empty, so none is orphaned. Tree clean.
+>
+> **What Task 18 is.** Three things in one PR, server first.
+>
+> 1. **The option-2 restricted count.** `GET /v1/me/workspaces` and `WorkspaceRef` gain
+>    `nameRestrictedProjectCount` — the projects this caller can see ≥1 TICKET in whose NAME
+>    `visibleProjects` withholds. Owner ruling 2026-09-09, verbatim *"go with 2: Count only projects the
+>    guest already has sight into."* The `mapWorkspaceRefs` comment forbidding any such count is AMENDED
+>    in the same change set, quoting the sentence it replaces. **No migration, no event, no projection,
+>    no `verify-projections` change** — it is read-time-derived from rows Task 16 already reads, and the
+>    pattern-match against Task 16 will suggest otherwise.
+> 2. **The neo workspace card.** Monogram (deterministic tint from the workspace ID), role as a
+>    sentence, chips, per-project counts, archived marked AND behind a disclosure, the restricted line.
+> 3. **Help + Account nav**, and a minimal `/account` stub so the new link is not dead — `/account` did
+>    not exist, measured.
+>
+> Cases **13.379–13.383** (five; the ledger row grants five and I used five). Next free block still
+> `13.390`, untouched.
+>
+> ## THREE THINGS A REVIEWER SHOULD CHECK FIRST
+>
+> **A guest IS served the new count**, unlike the two counts beside it, which both open with
+> `role === 'guest' → null`. Copying that guard is the single most likely way to ship this broken: the
+> owner's reference draws *"1 project · name restricted"* on the GUEST card, so the withholding would
+> hit exactly the viewer the field exists for, and every member-written fixture would stay green. The
+> asymmetry is argued at the site: `ticketCount` is VOLUME nobody else tells the caller; this is a count
+> of ids they already hold, because `read/ticket-cards.ts` puts `projectId` on the card. NAME
+> restriction, not existence — the P32 distinction.
+>
+> **The tenancy clause is observable at THIS door**, which is the opposite of its sibling.
+> `visibleProjectCounts` records its own `v.workspace_id = $n` mutation SURVIVING at the client door,
+> because the route reads that map only for ids `visibleProjects` returned. This count is over exactly
+> the ids it did NOT return, so a foreign workspace-mode ticket lands straight in the number.
+>
+> **"active" on the chip means NOT BLOCKED and is deliberately not `StateCategory.active`.** The domain
+> has a category by that name and a ticket in an `open` state is unblocked without being category-active.
+> The number is `total − blocked` over the projects the card names — exact arithmetic on two served
+> counts over one set. Nobody should later wire it to the category and call it a fix.
+>
+> ## WHAT WAS MEASURED — seven mutations, and the one that SURVIVED
+>
+> Tree verified clean after every restore; every mutation committed-before, per the rule that has now
+> fired twice.
+>
+> * **Option 3 (count ALL projects) → RED**, *"expected 2 to be 1"*. The fixture needed a THIRD project
+>   the caller can neither name nor see a ticket in; with only a nameable and an unnameable one, options
+>   2 and 3 give the same answer and the case certifies nothing.
+> * **The tenancy mutation had to be written TWICE.** Deleting the clause outright leaves
+>   `params.add(workspaceId)` bound with no `$n` to reference it — Postgres answers *"bind message
+>   supplies 2 parameters"*, a 500 that reddens 22 cases and measures nothing about the count. Replaced
+>   with a tautology `(v.workspace_id = $1 OR TRUE)`, which keeps the parameter bound and produces the
+>   wrong NUMBER: *"expected 7 to be 1"*.
+> * **The second-source gate (`memberCount === null` instead of the role) → RED on 13.381 and NOT on
+>   13.380.** That asymmetry is the point: 13.380's realistic guest body cannot separate the two
+>   implementations, so the one-source property lives in 13.381's deliberately-unrealistic fixture and
+>   nowhere else.
+> * A guest card printing `0` beside the chip, the `− blocked` subtraction dropped, the archived split
+>   removed, and `count <= 0` loosened to `< 0` — each RED at its own site.
+> * **THE SURVIVOR: `Avatar`'s tint keyed on the NAME instead of the id.** 235/235 in `packages/ui` and
+>   every card case green. The rest of 13.379 reaches the avatar via `getByLabelText` and asserts its
+>   INITIALS — both functions of the name. Two cases now close it: identical names + different ids must
+>   differ, and a re-mount under a changed name must not. **This is the strongest evidence in the task
+>   that the mutation set is real**, and it was found by running the mutation, not by reading.
+>
+> ## GATE, CHECKS, AND THE DEPLOYED STACK
+>
+> Gate: `pnpm turbo run build test typecheck --force`, Node **v22.22.2** (`which node` checked, not
+> assumed). **GREEN AT THE FROZEN HEAD `06c7ac6b`: 33/33 tasks, 0 cached, exit 0, 1m15s** —
+> **4,171 passed | 5 skipped across 327 files** (server 1494+5skipped, app-core 1158, domain 464,
+> rule-engine 282, ui 235, web 192, editor 178, sync-client 90, mcp-server 43, mobile 27, desktop 8).
+> Zero `Unsupported engine`. Zero orphaned vitest workers (`ppid=1` sweep).
+>
+> **Six checks raw, all green**: `check:env`, `check:tasks`, `check:db-tz` (needs `DATABASE_URL` —
+> `postgres://gisik:gisik@localhost:54329/postgres`, answers `Asia/Kolkata`), `check:runbook`,
+> `check:citations` (271 cited / 0 uncited in §13), `check:help`. `check-case-ids` 1865 unique.
+>
+> **Dev stack, real data, real doors** — rebuilt with
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml up -d --build --wait server web`;
+> `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}` AFTER the
+> rebuild, not before. Probed with two short-lived `session` rows, BOTH DELETED afterwards (re-probe →
+> 401, zero rows left):
+> * **owner** — `memberCount: 2`, `nameRestrictedProjectCount: 0`, `Shop operations` at 26 tickets / 3
+>   blocked.
+> * **guest** — `memberCount` key ABSENT, `projects: []`, **`nameRestrictedProjectCount: 1`.** The
+>   owner's reference string *"1 project · name restricted"* is TRUE on the real dev world without
+>   seeding anything for it: the guest holds four explicit-audience tickets in a project whose name they
+>   are not told.
+>
+> **Both viewport suites run.** `e2e-stack` 6/6 three times (assert with the old baseline → re-record →
+> assert with the new one); `e2e-viewport` 31/31, baselines untouched. The accessible-name floor RISES
+> `ariaLabel` 2 → 3 on `/workspaces` (the `Avatar`'s label) and falls nowhere; the five other signed-in
+> routes moved `rawMatches` by exactly +2 and NO ratcheted attribute, because a plain `<a href>` has an
+> implicit role and not a `role` ATTRIBUTE. Roster unchanged (6 classes, 0 below 3:1). Type-scale
+> unchanged — the new rules are 12.8px, above the floor.
+>
+> ## ONE NAMED GAP, and one doc correction
+>
+> **The archive disclosure is not witnessed on the stack**: the seeded CC world has no archived project,
+> so that control never renders there and its `aria-label` is not in the risen floor. 13.379 witnesses
+> it in jsdom. Closing it needs a seeded archived project — owner: whoever next extends the CC seed,
+> plausibly Task 19, which builds archive/restore. Written into 13.383 rather than left in prose here.
+>
+> **The plan contradicted itself about this task's tier** — its Sequence line said *"18 is sonnet"*
+> three lines below a heading reading *"opus / high, opus reviewer"*. Struck and corrected in this PR.
+>
+> ## NEXT
+>
+> **Task 19** — the workspace home, `app/w/[workspaceId]/page.tsx`, cases 13.384–13.389, opus. Then the
+> owner's look at `/workspaces` and a workspace home → Task 12. **Hand the controller
+> `http://localhost:3001/workspaces`**: the stack is up, rebuilt from this branch, Google sign-in on.
+
+> # ▣ HISTORY — WEDNESDAY 2026-09-09 ~13:2x IST. **TASK 17 — MERGED as `d3d0abd` (PR #400); superseded by the block above.**
 >
 > **This block is written BEFORE the freeze, so its last line is a claim about the future and the one to
 > distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open` before
@@ -139,7 +259,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## NEXT
 >
-> **Task 18** — the neo workspace card + nav. **It is NOT blocked any more**: the owner ruled
+> ~~**Task 18** — DONE, see the CURRENT POSITION block at the top of this file. What follows was true
+> when written and is kept for its reasoning only.~~ **Task 18** — the neo workspace card + nav. **It is NOT blocked any more**: the owner ruled
 > **option 2** on the restricted-project count (*"go with 2: Count only projects the guest already has
 > sight into"*), which landed on main as `b00e21ca`, and **Task 18 is now opus** because it amends the
 > `mapWorkspaceRefs` docblock's recorded privacy rationale. Then 19 → owner look → 12. Any sentence

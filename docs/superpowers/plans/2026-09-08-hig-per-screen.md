@@ -1336,7 +1336,10 @@ RED, alone); archive hides a project from the default board list and restore ret
 
 **Sequence:** 2d (sign-in, in flight) → **16 → 17 → 18 → 19** → owner look at `/workspaces` and a workspace home →
 **12** (passkeys; expands `/account`) → 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. Tasks 16, 17, 19 are opus
-(relaunch the executor on `--model opus` for each); 18 is sonnet.
+(relaunch the executor on `--model opus` for each); ~~18 is sonnet~~ **— and 18 is opus too, since the
+owner's 2026-09-09 ruling made it a new derivation rule on the visibility surface. This sentence
+contradicted Task 18's own heading (`opus / high, opus reviewer`) from the moment that heading was
+amended; corrected in Task 18's PR, by the executor the contradiction was aimed at.**
 
 
 ## Execution order and merge cadence
