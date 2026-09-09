@@ -42,6 +42,7 @@ const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: 'ws_1', projectId: 'p_1' }),
+  usePathname: () => '/w/ws_1/p/p_1',
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -137,7 +138,12 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
  * scopes by the DOM container instead.
  */
 async function viewTabs(): Promise<HTMLElement[]> {
-  await screen.findByText('Board');
+  // BY ROLE, not by text, since Round 19b: `AppNav` now offers its own
+  // "Board" link (a door to this same project's board from the nav) beside
+  // this tablist's "Board" TAB, and `findByText` cannot tell a `link` from a
+  // `tab` that happen to share a label — a screen reader can, from the role
+  // each carries.
+  await screen.findByRole('tab', { name: 'Board' });
   const container = document.querySelector('.gn-view-tabs') as HTMLElement;
   return within(container).getAllByRole('tab');
 }

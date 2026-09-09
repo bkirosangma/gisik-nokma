@@ -17,6 +17,7 @@ import { stubServices } from './helpers/stub-services.js';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useParams: () => ({}),
+  usePathname: () => '/workspaces',
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -180,7 +181,16 @@ describe('13.379 the card renders every element from data the route served', () 
     // The monogram. `Avatar` names itself with the workspace's own name, which
     // is what makes two cards' avatars distinguishable to a screen reader —
     // the tint alone is not available to one.
-    expect(within(card).getByLabelText('Convenience Corner')).toHaveTextContent('CC');
+    //
+    // `{ selector: '.gn-avatar' }` disambiguates from the head's own door
+    // (Round 19b): the card's head is now a `<Link aria-label={workspace.name}>`
+    // wrapping the avatar, so TWO elements share this accessible name — the
+    // door and the monogram inside it — and a bare `getByLabelText` cannot
+    // tell them apart. Two elements sharing a name is not itself a defect;
+    // only this query needed to say which one it means.
+    expect(
+      within(card).getByLabelText('Convenience Corner', { selector: '.gn-avatar' }),
+    ).toHaveTextContent('CC');
 
     expect(within(card).getByText('5 members')).toBeInTheDocument();
     // THE TWO CHIP NUMBERS, and every input to them is a different number so
@@ -261,7 +271,10 @@ describe('13.379 the card renders every element from data the route served', () 
     const first = await screen.findByTestId('workspace-card-ws-alpha');
     const second = screen.getByTestId('workspace-card-ws-beta');
     const tintOf = (card: HTMLElement): string => {
-      const avatar = within(card).getByLabelText('Convenience Corner');
+      // `{ selector: '.gn-avatar' }` — see the docblock a few lines above this
+      // describe block's sibling case for why a bare `getByLabelText` is now
+      // ambiguous (the card's head door shares this accessible name).
+      const avatar = within(card).getByLabelText('Convenience Corner', { selector: '.gn-avatar' });
       const tint = [...avatar.classList].find((c) => c.startsWith('gn-avatar--tint-'));
       expect(tint, `the avatar carries no tint class: ${avatar.className}`).toBeDefined();
       return tint!;
@@ -278,12 +291,12 @@ describe('13.379 the card renders every element from data the route served', () 
   it('keeps a workspace\'s tint across a rename, because the key is the id', async () => {
     mountWith([workspace({ id: 'ws1', name: 'Convenience Corner', memberCount: 1 })]);
     const before = within(await screen.findByTestId('workspace-card-ws1'))
-      .getByLabelText('Convenience Corner')
+      .getByLabelText('Convenience Corner', { selector: '.gn-avatar' })
       .className;
     cleanup();
     mountWith([workspace({ id: 'ws1', name: 'The Corner Shop', memberCount: 1 })]);
     const after = within(await screen.findByTestId('workspace-card-ws1'))
-      .getByLabelText('The Corner Shop')
+      .getByLabelText('The Corner Shop', { selector: '.gn-avatar' })
       .className;
     // A colour a person has learned must survive somebody editing the name.
     expect(after).toBe(before);
@@ -383,5 +396,78 @@ describe('13.381 the role sentence and every gated affordance read ONE value', (
     expect(within(card).getByText('Your role here is auditor.')).toBeInTheDocument();
     expect(within(card).getByText('Restricted')).toBeInTheDocument();
     expect(within(card).queryByText('4 members')).toBeNull();
+  });
+});
+
+/**
+ * 13.390 — the card's HEAD is a door to `/w/<id>` (Round 19b, owner feedback
+ * item 1: *"the workspace card should be clickable ... and on click it should
+ * lead into the workspace page"*).
+ *
+ * The accessible name is asserted to be EXACTLY the workspace's name, not that
+ * name padded with the role sentence or repeated — the failure a naive
+ * `aria-label` built from the head's full text content would produce, since
+ * the avatar carries its own `aria-label` and the role sentence sits beside
+ * the heading inside the same link.
+ *
+ * "No nested interactive content" is asserted the only way it can be from
+ * outside the DOM tree: every OTHER control on the card (the project links,
+ * the archived toggle, "My Work") is still reachable as its OWN top-level
+ * role, scoped to the card — which a browser could not do if any of them were
+ * nested inside the door anchor (nested interactive elements are invalid HTML
+ * and most browsers hoist the inner one out of the outer, breaking exactly
+ * this kind of scoped lookup).
+ */
+describe('13.390 the card is a door to /w/<id>', () => {
+  it('the head is a link named by the workspace, and every other control stays reachable on its own', async () => {
+    mountWith([
+      workspace({
+        id: 'ws1',
+        name: 'Convenience Corner',
+        role: 'owner',
+        memberCount: 3,
+        projects: [
+          project({ id: 'p1', name: 'Shop operations', ticketCount: 2, blockedCount: 0 }),
+          project({ id: 'p2', name: 'Old signage', archived: true, ticketCount: 1, blockedCount: 0 }),
+        ],
+      }),
+    ]);
+    const card = await screen.findByTestId('workspace-card-ws1');
+
+    const door = within(card).getByRole('link', { name: 'Convenience Corner' });
+    expect(door).toHaveAttribute('href', '/w/ws1');
+    // EXACTLY the name — not padded with the role sentence, which sits
+    // inside the same link visually but must not join its accessible name.
+    expect(door).not.toHaveAccessibleName(/owner/i);
+
+    // Every OTHER control is still its own top-level reachable role, scoped
+    // to the card — which nesting inside `door` would have broken.
+    expect(within(card).getByRole('link', { name: 'My Work' })).toHaveAttribute(
+      'href',
+      '/w/ws1/my-work',
+    );
+    expect(within(card).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    const toggle = within(card).getByRole('button', {
+      name: 'Show archived projects in Convenience Corner',
+    });
+    await userEvent.click(toggle);
+    expect(within(card).getByRole('link', { name: 'Old signage' })).toBeInTheDocument();
+  });
+
+  it('keeps the door\'s target current when the caller belongs to more than one workspace', async () => {
+    mountWith([
+      workspace({ id: 'ws1', name: 'Convenience Corner', memberCount: 1 }),
+      workspace({ id: 'ws2', name: 'Second Workspace', memberCount: 1 }),
+    ]);
+    const card1 = await screen.findByTestId('workspace-card-ws1');
+    const card2 = screen.getByTestId('workspace-card-ws2');
+    expect(within(card1).getByRole('link', { name: 'Convenience Corner' })).toHaveAttribute(
+      'href',
+      '/w/ws1',
+    );
+    expect(within(card2).getByRole('link', { name: 'Second Workspace' })).toHaveAttribute(
+      'href',
+      '/w/ws2',
+    );
   });
 });

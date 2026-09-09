@@ -18,6 +18,7 @@ const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({}),
+  usePathname: () => '/inbox',
   useSearchParams: () => new URLSearchParams(),
 }));
 

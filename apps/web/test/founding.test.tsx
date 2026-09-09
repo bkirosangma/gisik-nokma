@@ -16,6 +16,7 @@ const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({}),
+  usePathname: () => '/workspaces',
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -72,6 +73,22 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
     const empty = await screen.findByText(/No workspaces yet/);
     expect(empty).toHaveTextContent('Ask an admin for an invite link — or create your own.');
     expect(screen.getByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
+  });
+
+  /**
+   * 13.394 (the `/workspaces` half) — this form is `.gn-workspace-founding`, a
+   * bare column, and NOT `.gn-project-founding` (the raised card the home
+   * page's "New project" row carries — see `workspace-home.test.tsx`'s own
+   * 13.394). Owner feedback item 3, verbatim: *"The create workspace card
+   * shouldnt be that big."*
+   */
+  it('13.394 is a bare column, .gn-workspace-founding, not a raised card', async () => {
+    mount({});
+    const field = await screen.findByLabelText('Name');
+    const form = field.closest('form');
+    expect(form).not.toBeNull();
+    expect(form).toHaveClass('gn-workspace-founding');
+    expect(form).not.toHaveClass('gn-project-founding');
   });
 });
 

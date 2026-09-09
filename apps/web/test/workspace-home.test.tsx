@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import { tintIndexOf } from '@gisik-nokma/ui';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -37,6 +38,7 @@ const KIRO = '01J9USER000000000000000000';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useParams: () => ({ workspaceId: WORKSPACE }),
+  usePathname: () => `/w/${WORKSPACE}`,
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -88,6 +90,17 @@ const COMMITTED = (event: SubmittedEvent): IngestResult => ({
  *
  * The last element is repeated once the queue runs dry, so a case that only
  * cares about the first render does not have to count reloads.
+ *
+ * **The index is the count of committed INGESTS, not of `getMyWorkspaces`
+ * CALLS (Round 19b).** It used to be the latter, and that broke the moment a
+ * second, independent reader of the same route existed: `AppNav` now reads
+ * `getMyWorkspaces` too, for the nav's own workspace-name item, and it does so
+ * on MOUNT — before any archive or restore. A call-counted queue would hand
+ * that extra read the slot this file's "after the archive" snapshot was
+ * written for, and the page would render as already-archived before the test
+ * ever clicked anything. Counting ingests instead ties the snapshot to the
+ * thing that actually changed the world, which is invariant to how many
+ * components independently ask what the directory currently says.
  */
 function mount(
   reads: WorkspaceRef[][],
@@ -96,13 +109,9 @@ function mount(
     answer?: (event: SubmittedEvent) => IngestResult;
   } = {},
 ) {
-  let call = 0;
+  let ingests = 0;
   const services = stubServices({
-    getMyWorkspaces: async () => {
-      const answer = reads[Math.min(call, reads.length - 1)]!;
-      call += 1;
-      return answer;
-    },
+    getMyWorkspaces: async () => reads[Math.min(ingests, reads.length - 1)]!,
   });
   // ALWAYS replaced. `stubServices` hands back `ingest: async () => []`, and an
   // empty results array is not a commit — this page reports it as "the server
@@ -110,14 +119,16 @@ function mount(
   // for a case that only wanted to watch the list reload.
   services.dataSource.ingest = async (events) => {
     options.ingest?.(events);
-    return events.map(options.answer ?? COMMITTED);
+    const results = events.map(options.answer ?? COMMITTED);
+    ingests += 1;
+    return results;
   };
   render(
     <Providers services={services}>
       <WorkspaceHomePage />
     </Providers>,
   );
-  return { reads: () => call };
+  return { ingests: () => ingests };
 }
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
@@ -148,7 +159,13 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     mount([[workspaceAs('member')]]);
 
     expect(await screen.findByRole('heading', { name: 'Convenience Corner' })).toBeInTheDocument();
-    expect(screen.getByText("You're a member here.")).toBeInTheDocument();
+    // The role sentence became a META LINE (Round 19b, owner feedback item 4):
+    // "N members · M active projects · you're a member" — every number SERVED
+    // (`memberCount`, and `live.length` = the 2 non-archived projects THIS
+    // fixture's member sees), the role as a CLAUSE from the same `viewerOf`
+    // the card reads. ONE text node, the same discipline every other
+    // multi-interpolation sentence in this file keeps.
+    expect(screen.getByText("5 members · 2 active projects · you're a member")).toBeInTheDocument();
 
     // Scoped per row, both ways: the number is IN its own row and NOT in the
     // other's. A page that rendered one project's count everywhere passes a
@@ -196,7 +213,13 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     ]);
 
     const only = await screen.findByTestId('project-row-p1');
-    expect(within(only).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    // The name is plain text now (Round 19b): "Open board" is the row's one
+    // door, not the name doubling as a second link to the same target.
+    expect(within(only).getByText('Shop operations')).toBeInTheDocument();
+    expect(within(only).getByRole('link', { name: 'Open board' })).toHaveAttribute(
+      'href',
+      `/w/${WORKSPACE}/p/p1`,
+    );
     // BY SHAPE, not by value: no digit anywhere in the row. `toBe(0)` and
     // `toBeUndefined()` both pass on a page that printed `0 tickets`, which is
     // the exact claim the server declined to make by omitting the key.
@@ -390,6 +413,18 @@ describe('13.386 archive hides a project and restore returns it — read from th
  *
  * The paths are also checked against the app directory itself, in the same run:
  * a link is only proven live by a `page.tsx` existing at the route it names.
+ *
+ * **Names are EXACT, unchanged by Round 19b's notes.** The first draft folded
+ * each note into its link's content and let the accessible name become the
+ * label and the note concatenated; `e2e-stack/viewport.spec.ts`'s MUST_NAME
+ * sweep (13.389's own witness on this exact route) caught it within the hour —
+ * its floor names a link `/^Ticket types$/`, exactly, and a name that grew a
+ * note no longer matched. Fixed with `aria-label` (pins the name to the label)
+ * plus `aria-describedby` (links the note as a DESCRIPTION, which is the
+ * correct ARIA shape for "a control with a name and a supplementary note" and
+ * is still announced by most assistive tech, as a description read after the
+ * name rather than folded into it) — see `page.tsx`'s own docblock on
+ * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.387 the workspace-section links resolve to the real routes', () => {
   it('carries five links, four workspace-scoped and one global', async () => {
@@ -412,6 +447,161 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
       'href',
       `/w/${WORKSPACE}/mcp/tokens`,
     );
+  });
+
+  /**
+   * 13.398 — the notes themselves, verbatim, and the Members one's number.
+   */
+  it("13.398 carries each door's note, and the Members note reads the served member count", async () => {
+    mount([[workspaceAs('member')]]);
+    const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
+    expect(
+      within(nav).getByText('Everything assigned to you across this workspace.'),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByText('5 people · roles and pending invitations.'),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByText('Fields and the workflow each type follows.'),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByText('States, transitions and published versions.'),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByText('Let an assistant act as you, with your permissions.'),
+    ).toBeInTheDocument();
+  });
+
+  it("13.398 a guest's Members note carries no number — memberCount is withheld, not zero", async () => {
+    mount([[workspaceAs('guest', { memberCount: null })]]);
+    const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
+    expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
+    expect(within(nav).queryByText(/\d+ (person|people) ·/)).toBeNull();
+  });
+});
+
+/**
+ * 13.395 — the header: the monogram's tint, the meta line, and the ONE source
+ * the role clause and the `/workspaces` card's sentence both read.
+ */
+describe('13.395 the header reads only served numbers, and its tint is keyed on the id', () => {
+  it('tints the header monogram from the workspace ID, not the name', async () => {
+    // The home page's route pins ONE workspace id (`WORKSPACE`, mocked via
+    // `useParams`), so the `/workspaces` card's "two ids, same name" render
+    // comparison does not apply here — this page cannot render a second id.
+    // Instead: compute the expected tint DIRECTLY from `tintIndexOf`, keyed
+    // both ways, and assert the header agrees with the id-keyed one and NOT
+    // the name-keyed one. `WORKSPACE` and its own name are chosen so the two
+    // keys hash to different tints — asserted as a POSITIVE CONTROL first, so
+    // the negative below cannot pass merely because both keys coincide.
+    const byId = tintIndexOf(WORKSPACE);
+    const byName = tintIndexOf('Convenience Corner');
+    expect(byId, 'fixture is unusable: id and name hash to the same tint').not.toBe(byName);
+
+    mount([[workspaceAs('member', { id: WORKSPACE, name: 'Convenience Corner' })]]);
+    const avatar = await screen.findByLabelText('Convenience Corner', { selector: '.gn-avatar' });
+    expect(avatar).toHaveClass(`gn-avatar--tint-${byId}`);
+    expect(avatar).not.toHaveClass(`gn-avatar--tint-${byName}`);
+  });
+
+  it('carries no member number for a guest, and the role clause matches the /workspaces card\'s own source', async () => {
+    // `viewer.clause` and `viewer.sentence` come out of the SAME `viewerOf`
+    // call — this fixture drives a guest (whose sentence is "You're a guest
+    // here.") through the header and asserts the meta line's clause agrees
+    // ("a guest"), rather than re-deriving the role a second way.
+    mount([
+      [
+        workspaceAs('guest', {
+          memberCount: null,
+          projects: [
+            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+          ],
+        }),
+      ],
+    ]);
+    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
+    expect(screen.queryByText(/members? ·/)).toBeNull();
+  });
+
+  /**
+   * The discriminating body, same technique `workspaces-cards.test.tsx`'s
+   * 13.381 uses on the sibling card: **`role: 'guest'` WITH `memberCount`
+   * served.** The shipped server never sends this combination — it withholds
+   * the count BY ROLE, in the same expression — which is exactly why it is
+   * the fixture that separates the two possible implementations. A review
+   * caught the first draft of this header (and the Members door-note) gating
+   * on `memberCount === null` instead of `viewer.countsWithheld`: that second
+   * source agrees with the role gate on every real body and disagrees only
+   * on a malformed or unrecognised-role one, which is precisely the case
+   * `viewerOf` exists to settle once rather than let two call sites answer
+   * separately.
+   */
+  it('gates the member number and the Members note on the ROLE, not on whether memberCount happens to be served', async () => {
+    mount([
+      [
+        workspaceAs('guest', {
+          memberCount: 7,
+          projects: [
+            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+          ],
+        }),
+      ],
+    ]);
+    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
+    expect(screen.queryByText(/7 members?/)).toBeNull();
+    const nav = screen.getByRole('navigation', { name: 'Workspace sections' });
+    expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
+    expect(within(nav).queryByText(/7 (person|people) ·/)).toBeNull();
+  });
+});
+
+/**
+ * 13.396 — the project card: "Open board" for an archived project too (the
+ * same label a live one gets, never "read-only" — archiving is not a
+ * permission), and Archive/Restore read the same role value the server gate
+ * answers independently (13.388's half; 13.385 already drives the pairing).
+ */
+describe('13.396 archived projects still open, with the same label a live one gets', () => {
+  it('offers "Open board" — not "Open read-only" — for an archived project, at the archived project\'s own href', async () => {
+    mount([[workspaceAs('admin')]]);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Show archived projects in Convenience Corner' }),
+    );
+    const archivedRow = row('p3');
+    expect(
+      within(archivedRow).getByRole('link', { name: 'Open board' }),
+    ).toHaveAttribute('href', `/w/${WORKSPACE}/p/p3`);
+    expect(within(archivedRow).queryByText(/read-only/i)).toBeNull();
+  });
+});
+
+/**
+ * 13.397 — the archived control is ABSENT at zero, on the home page exactly
+ * as on `/workspaces`' card (Task 18/19's own ruling, restated here because
+ * this round moved the control's position, not the rule).
+ */
+describe('13.397 no archived projects means no archived control, on the home too', () => {
+  it('renders neither the toggle nor an archived list when nothing is archived', async () => {
+    mount([[workspaceAs('member', { projects: [{ id: 'p1', name: 'Shop operations', archived: false, ticketCount: 2, blockedCount: 0 }] })]]);
+    await screen.findByTestId('project-row-p1');
+    expect(screen.queryByRole('button', { name: /archived/i })).toBeNull();
+  });
+});
+
+/**
+ * 13.394 (home half) — the "New project" form is `.gn-project-founding`, a
+ * raised card with an inline row, NOT `.gn-workspace-founding` (the bare
+ * column `/workspaces`' "New workspace" form uses, per `founding.test.tsx`).
+ * Two class families for two different reference layouts.
+ */
+describe('13.394 the home\'s new-project form is a raised card, not the workspace list\'s bare column', () => {
+  it('carries .gn-project-founding, and not .gn-workspace-founding', async () => {
+    mount([[workspaceAs('admin')]]);
+    const field = await screen.findByPlaceholderText('e.g. Phase 2 rollout');
+    const form = field.closest('form');
+    expect(form).not.toBeNull();
+    expect(form).toHaveClass('gn-project-founding');
+    expect(form).not.toHaveClass('gn-workspace-founding');
   });
 });
 

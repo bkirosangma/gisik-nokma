@@ -6,7 +6,7 @@
  * avatar shipped with — the tint is opt-in, so nothing that already renders an
  * avatar changes colour.
  */
-export type AvatarProps = { name: string; size?: 'small' | 'medium'; tint?: string };
+export type AvatarProps = { name: string; size?: 'small' | 'medium' | 'large'; tint?: string };
 
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);

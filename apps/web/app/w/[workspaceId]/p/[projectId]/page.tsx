@@ -446,7 +446,7 @@ function ProjectBoard() {
 
   return (
     <main className="gn-shell">
-      <AppNav workspaceId={workspaceId} />
+      <AppNav workspaceId={workspaceId} projectId={projectId} />
       <div className="gn-shell__main">
         {expired ? (
           // ONE notice for the page. Four reads can 401 together and they are one

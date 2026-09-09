@@ -192,6 +192,24 @@ function ProjectRow({
  * is concerned (`read/visible-projects.ts` serves the flag only alongside the
  * name it rides with), so the number cannot be split by archived state without
  * disclosing more than the owner ruled.
+ *
+ * ## The head is a DOOR to `/w/<id>` (Round 19b, owner feedback item 1)
+ *
+ * `aria-label={workspace.name}` on the `<Link>` OVERRIDES the name a browser
+ * would otherwise compute from its content (the avatar's own label, the
+ * heading text, the role sentence) — so the link's accessible name is exactly
+ * the workspace's name, never that name repeated or padded with the sentence
+ * beside it. The `<h2>` inside it keeps its own heading role and text
+ * (`getByRole('heading', ...)` is unaffected by an ancestor's `aria-label`),
+ * and the avatar keeps its own `aria-label` too — two elements sharing one
+ * accessible name is not an error, only something `getByLabelText` alone
+ * cannot disambiguate without its `selector` option, which is why the tint
+ * assertions in `workspaces-cards.test.tsx` now pass one.
+ *
+ * The per-project links, the archived toggle and "My Work" stay OUTSIDE this
+ * link, as separate controls — an anchor wrapping a button is invalid HTML and
+ * reads to assistive tech as one control, so only the head (monogram + name)
+ * is the door; the rest of the card is not nested inside it.
  */
 function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
   const [showArchived, setShowArchived] = useState(false);
@@ -203,7 +221,11 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
   return (
     <li data-testid={`workspace-card-${workspace.id}`}>
       <Card>
-        <div className="gn-workspace-card__head">
+        <Link
+          href={`/w/${workspace.id}`}
+          aria-label={workspace.name}
+          className="gn-workspace-card__head"
+        >
           {/* The tint key is the workspace ID, not its name: two workspaces
               called the same thing must still be told apart, and a rename must
               not change a colour a person has learned. */}
@@ -215,7 +237,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
                 and the same object gates every number below. */}
             <p className="gn-workspace-list__role">{viewer.sentence}</p>
           </div>
-        </div>
+        </Link>
 
         <ChipRow workspace={workspace} viewer={viewer} />
 
@@ -491,6 +513,12 @@ function InvitationBanner() {
  * layer's own `IngestResult`. `HttpError` carries the parsed body precisely so
  * that is possible; before it did, the most this could have shown was
  * `HTTP 422 for /v1/workspaces`.
+ *
+ * `.gn-workspace-founding` (Round 19b, owner feedback item 3), not the
+ * `.gn-founding` this form shared with the home's new-project form until now:
+ * the owner's reference draws the two differently — this one a bare column
+ * beside the list, the home's a raised card with an inline field+button row —
+ * and "shouldn't be that big" was said of exactly this one.
  */
 function FoundingForm() {
   const router = useRouter();
@@ -517,18 +545,24 @@ function FoundingForm() {
   };
 
   return (
-    <form className="gn-founding" onSubmit={submit}>
-      <h2 className="gn-founding__heading">New workspace</h2>
+    <form className="gn-workspace-founding" onSubmit={submit}>
+      <h2 className="gn-workspace-founding__heading">New workspace</h2>
       <label className="gn-field" htmlFor="gn-founding-name">
         <span className="gn-field__label">Name</span>
         <input
           id="gn-founding-name"
           className="gn-field__input"
+          placeholder="Garo Hills Logistics"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <Button variant="primary" type="submit" disabled={sending}>
+      <Button
+        className="gn-workspace-founding__submit"
+        variant="primary"
+        type="submit"
+        disabled={sending}
+      >
         Create workspace
       </Button>
       {refusal !== null ? (

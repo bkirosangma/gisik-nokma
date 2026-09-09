@@ -2344,6 +2344,13 @@ maximum, and it also surfaces `13.9999` and a `13.632866`-shaped hit, none of wh
 `13\.[0-9]+` sweep still reports `13.3333` (the user-agent font size cases 13.266–13.267 are about) as
 its maximum under an ordinal sort, and a float sort still puts `13.99` above `13.365`.
 
+**`13.390`–`13.399` is CONSUMED by Round 19b, the owner's feedback on the workspace screens (controller,
+2026-09-09) — see "Round 19b" at the foot of this file. The next free BLOCK is now `13.400`,
+controller-allocated ON REQUEST ONLY** — recount the maximum in use against `origin/main` before
+trusting this pointer, same caveat as every prior one in this paragraph. **Recounted at `b47f0253`
+(this branch's own merge-base) before minting: the maximum id in use was `13.389`; `13.390` occurred
+only in this pointer's own prose, reproducing the documented trap once more.**
+
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
 the toggle's default — so `/sign-in`, `/workspaces` and `/invite/<token>` already rendered in neo the
@@ -3033,3 +3040,106 @@ true the moment the tree changes.
   does not touch, which is a change with its own risk and no case here asking for it. **Owner unchanged:
   whoever next extends the CC seed.**
   — (`apps/web/e2e-stack/viewport.spec.ts`)
+
+## Round 19b — owner feedback on the workspace screens (Task 19's cluster, revisited)
+
+Three owner words drove this block: *"the workspace card should be clickable ... the navigation bar ...
+the create workspace card shouldnt be that big."* The controller's reading of the owner's reference image
+(neo, dark) elaborated four items from those three sentences; cases 13.390–13.399 are the client-only
+result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every number rendered is one Task
+16/18 already served.
+
+- **13.390** ✅ The `/workspaces` card's HEAD (monogram + name) is a door to `/w/<id>` — `aria-label` set
+  to EXACTLY the workspace's name, which overrides the content-derived name a bare anchor would compute
+  from the avatar's own label, the heading and the role sentence all sitting inside it. Two elements
+  legitimately share that accessible name now (the door and the avatar), which is not an error but did
+  require three pre-existing `getByLabelText` sites to disambiguate with `{ selector: '.gn-avatar' }`.
+  Every OTHER control (project links, the archived toggle, "My Work") stays a sibling, never nested
+  inside the door — asserted by finding each at its own top-level role, which nesting would break. —
+  (`workspaces-cards.test.tsx`)
+- **13.391** ✅ The nav is CONTEXTUAL, transcribing the prototype's `navItems` FILTER rather than its
+  picture: without a workspace in the route, only the four `always` items render (Workspaces, Inbox,
+  Help, Account) plus a scope note; with one, the served workspace name, My Work, Members and Settings
+  join. **Board is a second, narrower filter this product has and the prototype does not**: it renders
+  only when the route ALSO carries a project, applying the prototype's own "a link appears only when its
+  target exists" rule one level down (a workspace has no single board; a project does). The three shapes
+  are three separate `it()`s (11.185, same file) rather than one array, and the Board-only-with-a-project
+  rule is what that split exists to keep mutation-witnessable at all: widening the condition to drop the
+  project check reddens the "with a workspace, no project" arm alone, because it is the one shape whose
+  expected set has no Board entry while a workspace is present. The workspace-name item OMITS while its
+  read is pending or fails — never the raw id — because `getMyWorkspaces` is one of this product's
+  refusing reads and a name that might be wrong is worse than a name not yet shown. —
+  (`app-nav.test.tsx`)
+- **13.392** ✅ Every literal nav target is checked against the app directory itself, not only against
+  what the component renders: a table of nine `[href, page.tsx path]` pairs, each existence-checked with
+  `node:fs`, and the nav's own rendered href set checked both for coverage (every table entry appears)
+  and for closure (every rendered href is in the table) — so a href this table forgot would fail loudly
+  rather than silently passing because nobody asked. —
+  (`app-nav.test.tsx`)
+- **13.393** ✅ The current nav item carries `aria-current="page"`, and it is asserted the ONLY one that
+  does — a page with two "current" items is a page that has not said which one is true. The sign-out
+  control's VISIBLE label shrank to "Sign out" (the monogram beside it carries the rest of the reference's
+  design), and its ACCESSIBLE name is asserted to still be the full "Sign out {name}" sentence via
+  `aria-label` — a floor this shell ratchets elsewhere and must not fall here. The active style reuses
+  `--gn-fill-tertiary`/`--gn-text-accent`, the SAME pair `.gn-button` (ghost, the product's most common
+  control) already renders everywhere — no new `CONTRAST_PAIRS` row is needed because no new pair reaches
+  the screen; the pairing's own measured margin (4.539, `packages/ui/src/tokens.ts`'s `textAccentLight`
+  docblock) already covers it in every style and theme. —
+  (`app-nav.test.tsx`)
+- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column,
+  max-width 420px, no card) for `/workspaces`' "New workspace" block, and `.gn-project-founding` (a
+  raised card, an inline field+button row) for the home's "New project" row. Both asserted by className
+  on the real `<form>` element, positively (carries its own class) and negatively (does not carry the
+  other's) — a shared class regressing back to one family would redden both halves at once. Owner's
+  words, verbatim, on the first: *"shouldn't be that big."* —
+  (`founding.test.tsx`, `workspace-home.test.tsx`)
+- **13.395** ✅ The home's header: the 56px/radius-14 monogram tints from the workspace ID — asserted by
+  computing `tintIndexOf` on the id AND on the name directly (rather than comparing two renders, which
+  this page's fixed route param cannot produce) and requiring the rendered class to match the id-keyed
+  index and NOT the name-keyed one, with a positive control that the fixture's id and name do not
+  coincidentally hash to the same tint. The meta line — *"N members · M active projects · you're an
+  X"* — reads only SERVED numbers (`memberCount`; `live.length`, this caller's own non-archived list)
+  and a role CLAUSE from the SAME `viewerOf` call the `/workspaces` card's sentence reads, so the two
+  cannot disagree about the same person. **The member-count gate is `viewer.countsWithheld`, NOT
+  `memberCount === null` — a SONNET REVIEW of the opened PR caught the first draft reading the second,
+  the exact anti-pattern case 13.381 exists on the sibling `/workspaces` card to forbid.** `=== null`
+  agrees with the role gate on every body the shipped server actually sends and disagrees only on a
+  malformed or unrecognised-role one — precisely the divergence `viewerOf` exists to settle once. Fixed
+  before merge; a second case drives the discriminating fixture (`role: 'guest'` served WITH a
+  `memberCount`, which the server never sends) through both the header and 13.398's Members note in one
+  body, and dies if either reverts to reading the number. A guest's line carries no member-count prefix
+  at all, never a `0`. —
+  (`workspace-home.test.tsx`)
+- **13.396** ✅ An archived project still offers **"Open board"** — never "Open read-only" — at its own
+  href; archiving is a workspace decision (Task 16), not a permission, and the board underneath stays
+  writable, so the prototype's read-only label would be a false claim about this product's own rule.
+  Archive/Restore reads the same `isAdmin` value 13.388's server-side door answers independently — this
+  case does not re-derive a second opinion, it drives the pairing 13.385 already owns. —
+  (`workspace-home.test.tsx`)
+- **13.397** ✅ The home's archived-disclosure control is ABSENT, not merely collapsed, when nothing is
+  archived — the SAME rule Task 18/19 already shipped on the `/workspaces` card, restated here because
+  this round moved the control's POSITION (into the "Projects" heading row, at its end) without touching
+  the rule: a control that reveals nothing lies about the shape of the data. —
+  (`workspace-home.test.tsx`)
+- **13.398** ✅ The five door cards carry NOTES now, verbatim from the prototype's own `wsLinks` — except
+  the Members note, whose *"{N} people · roles and pending invitations."* only prints a number when
+  `memberCount` is served; a guest (withheld) gets the sentence with the prefix OMITTED, never a `0`, the
+  same rule the header's meta line and the `/workspaces` card both keep. Targets are UNCHANGED from Task
+  19 (13.387's own literals) — only the notes are new, transcribed rather than invented. —
+  (`workspace-home.test.tsx`)
+- **13.399** ✅ The accessible-name floor rises and never falls across this round's changes to the four
+  existing signed-in ratchet routes plus the seventh (13.389's), and the non-text-contrast roster does
+  not grow — measured live against the rebuilt dev stack, `e2e-stack` (6/6) and `e2e-viewport` (31/31,
+  2 skipped), owner and guest, neither baseline JSON touched. **A REAL regression was caught by this
+  measurement, not merely by the suite existing.** The first draft of the five door-card notes (item 4's
+  last bullet) let each note join its link's accessible name by ordinary content concatenation —
+  `/w/<workspaceId>`'s own MUST_NAME probe (13.389's witness on this exact route) names a link
+  `/^Ticket types$/`, exactly, and the widened name *"Ticket types Fields and the workflow each type
+  follows."* no longer matched. Caught within the hour of the live rebuild, not in review. Fixed with
+  `aria-label` (pins each door's accessible name to its label) plus `aria-describedby` (links the note
+  as a DESCRIPTION — the correct ARIA shape for a control with a name and a supplementary note, and
+  still announced by most assistive tech, after the name rather than folded into it); re-measured green.
+  Archive/restore driven through the real page on the live world (owner), left exactly as found
+  (`archived = f`, read back from the database); the guest's restricted view and the non-admin refusal
+  note both verified live. —
+  (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)

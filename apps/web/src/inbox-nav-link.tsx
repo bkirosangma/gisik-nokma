@@ -56,7 +56,7 @@ export const REFRESH_MS = 60_000;
  * resolving after unmount would set state on a dead component, and a live
  * interval would keep firing after the nav is gone.
  */
-export function InboxNavLink() {
+export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
   const { notifications } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
@@ -97,7 +97,7 @@ export function InboxNavLink() {
   }, [notifications, signedIn]);
 
   return (
-    <Link href="/inbox" className="gn-nav__inbox">
+    <Link href="/inbox" className="gn-nav__inbox" aria-current={active ? 'page' : undefined}>
       Inbox <UnreadBadge count={unread} />
     </Link>
   );

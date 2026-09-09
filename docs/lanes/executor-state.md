@@ -20,6 +20,129 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~18:0x IST. **ROUND 19b — WORK COMPLETE, RE-FROZEN AFTER REVIEW FIX.**
+>
+> **Branch `exec/19b-workspace-feedback`, HEAD `5628edda`, five commits, cut from `origin/main` at
+> `b47f0253`** (`git checkout -b exec/19b-workspace-feedback origin/main`, NOT from
+> `exec/19-workspace-home`, which the dispatch named explicitly since that branch's tip is
+> unreachable post-squash). **`origin/main` moved to `115fcb21` while this round ran** — a
+> docs-only commit (`controller-state.md` + the hig-per-screen plan), touching none of this
+> branch's files; `git diff b47f0253 115fcb21 --stat` confirms it. `git branch --contains` on
+> `5628edda` returns this branch — not orphaned. Tree clean.
+>
+> **PR #408 opened at `14f45124` (three commits); a sonnet reviewer's Important finding required a
+> fourth and fifth commit before merge — the controller was told "fixing", not "final", and held.**
+> See the finding below.
+>
+> **What Round 19b is.** The controller relayed three owner sentences on the workspace screens —
+> *"the workspace card should be clickable"*, *"take note of the navigation bar"*, *"the create
+> workspace card shouldnt be that big"* — elaborated into four dispatch items. Client only, no
+> server change: (1) the `/workspaces` card's head is now a door to `/w/<id>`, `aria-label` pinned
+> to exactly the workspace's name; (2) `AppNav` is CONTEXTUAL — always-items only without a
+> workspace, the served name + My Work/Members/Settings with one, Board only with a project also in
+> the route (a filter one level narrower than the prototype has any concept of); (3) two founding-
+> form class families, `.gn-workspace-founding` (bare column) vs `.gn-project-founding` (raised
+> card, inline row) — until now both shared `.gn-founding`; (4) the workspace home gained a header
+> (56px/radius-14 monogram, a meta line reading only served numbers, raised Members/Settings
+> buttons), explicit "Open board" buttons (archived projects too — never "read-only"), the archived
+> toggle moved into the "Projects" heading row, notes on the five doors, and a non-admin refusal
+> note. Cases 13.390–13.399 minted; §13 pointer moved to `13.400`. 11.185 split into three closed
+> nav-shape sets in the same change set.
+>
+> **TWO real defects were found and fixed, neither by self-review.**
+>
+> 1. **Live `e2e-stack` caught an accessible-name floor fall.** The door-card notes' first draft let
+>    each note join its link's accessible name by plain content concatenation —
+>    `/w/<workspaceId>`'s own MUST_NAME probe (13.389's literal `Ticket types`) stopped matching once
+>    the name widened to include the note. Fixed with `aria-label` (pins the name) +
+>    `aria-describedby` (links the note as a description — still announced by most assistive tech,
+>    after the name rather than folded into it); re-measured green, cited at the ratchet check in
+>    `viewport.spec.ts`.
+> 2. **A dispatched sonnet reviewer caught a withholding-gate regression** (Important) after PR #408
+>    was already open: the home header's meta line and the Members door-note gated on
+>    `workspace.memberCount === null` directly instead of the shared `viewer.countsWithheld` —
+>    exactly the anti-pattern `src/workspace-viewer.ts`'s own docblock names and case 13.381 exists
+>    on the sibling `/workspaces` card to forbid (`=== null` agrees with the role gate on every real
+>    body and disagrees only on a malformed or unrecognised-role one). Told the controller "fixing",
+>    not "final", before touching anything. Fixed by threading `countsWithheld` into
+>    `WorkspaceLinks`; a new case drives the same discriminating fixture 13.381 uses (`role: 'guest'`
+>    served WITH a `memberCount`) through both sites in one body. Also documented, per the same
+>    review, why `NewProjectForm` carries no heading (the prototype's own two founding blocks differ
+>    the same way — not a dropped heading, a transcribed asymmetry).
+>
+> Three mutation witnesses run and restored (`git checkout HEAD --`, tree verified clean after
+> each): widening Board's filter to drop the project condition reddens ONLY the "workspace, no
+> project" nav-shape arm; keying the header's `Avatar` tint on the name instead of the id reddens
+> ONLY 13.395's tint case; reverting the `countsWithheld` gate back to `memberCount === null`
+> reddens ONLY the new discriminating-fixture case.
+>
+> **Named, not fixed (for the owner, per review):** a guest now sees a real `live.length` count in
+> the home header's *"N active projects"* clause (legitimately derived, not withheld — `live` is the
+> caller's own served project list) while the sibling `/workspaces` card shows a guest NO digits at
+> all (13.380's rule). The two screens now treat a guest's PROJECT COUNT differently between the
+> card and the home; not a rule violation, but a UX asymmetry worth a sentence to the owner. Owner:
+> whoever next revisits the `/workspaces` card's guest-chip design, or rules this is fine as is.
+>
+> ## GATE, CHECKS, AND THE DEPLOYED STACK
+>
+> Gate: `pnpm turbo run build test typecheck --force`, Node **v22.22.2**, re-run AFTER the review
+> fix, at `5628edda`. **GREEN: 33/33 tasks, 0 cached, exit 0 — 4,202 passed | 5 skipped across 329
+> files** (server 1496+5skipped, app-core 1158, domain 464, rule-engine 282, ui 235, **web 221**,
+> editor 178, sync-client 90, mcp-server 43, mobile 27, desktop 8). **Web is +19 over the
+> `origin/main` baseline (202→221)**; every other package's count is UNCHANGED from `origin/main`,
+> confirmed by `git diff b47f0253 HEAD --stat` touching no non-`apps/web`/`packages/ui` source file.
+> **Server reads `1496`, one below the `1497` this file's own Task-19 entry recorded at
+> `b47f0253`** — measured, not explained: this branch touches zero server files (`git show
+> HEAD --stat`, verified across all five commits), so whatever moves that count by one is upstream
+> of this round; **not this round's defect, recorded rather than chased.**
+>
+> **Six checks raw, all green**: `check:env`, `check:tasks`, `check:db-tz` (`Asia/Kolkata`),
+> `check:runbook`, `check:citations` (**288** cited / 0 uncited across all 12 files, ratchet exact),
+> `check:help`.
+>
+> **Live, against the rebuilt dev stack** (`docker compose --env-file
+> /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml up -d --build --wait web`,
+> rebuilt THREE times — the round, the aria-fix, the countsWithheld-fix — `curl -s
+> localhost:3000/v1/auth/methods` answers `{"google":true,...}` every time). `e2e-stack` re-run 6/6
+> after the FINAL rebuild:
+>
+> - **`e2e-stack` 6/6**, including the live MUST_NAME sweep that caught the accessible-name
+>   regression above.
+> - **`e2e-viewport` 31/31 (2 skipped)**, its own `next dev` on port 3021 — no collision with the
+>   stack's 3001.
+> - **Neither accessible-name baseline JSON was touched** — every attribute count this round adds
+>   (`aria-label`/`aria-describedby` on the card door, the nav, the five link-notes) is a RISE the
+>   ratchet's floor already permits without a re-record; no fall anywhere.
+> - **Driven through the real page as the OWNER**: signed in via magic link (mailpit), clicked the
+>   `/workspaces` card door into `/w/0TZSS5W6ATCTF2YBPMWGGP9JF5`, archived "Shop operations",
+>   confirmed "Open board" (not "read-only") on the archived row, restored it — **world left exactly
+>   as found**, `archived = f` read back from `proj_projects` after the run. Settings nav link
+>   verified `aria-current` on `/settings/ticket-types`.
+> - **Driven as the GUEST** (`accountant@e2e.gisik-nokma.local`): "You're a guest here.", "Restricted"
+>   chip on the card, "1 project · name restricted"; the home shows "0 active projects · you're a
+>   guest" (no member-count prefix — withheld, not zero), the Members note with no number, and
+>   *"Only an admin can create a project in this workspace."* where the founding form would be.
+>
+> **FOR THE OWNER'S LOOK: `http://localhost:3001/workspaces` and
+> `http://localhost:3001/w/0TZSS5W6ATCTF2YBPMWGGP9JF5`** (Convenience Corner). Sign in as the owner;
+> the guest's own view of the same URLs is the restricted one described above.
+>
+> **Deviations, for the PR body and the owner's look:** (1) Board renders only with a project in the
+> route — the prototype has one board per workspace, this product has one per project; (2) no
+> "0 archived · show" — a control revealing nothing lies about the shape of the data (Task 18/19's
+> own rule, unmoved); (3) "Open board" for archived projects too, never "read-only" — archiving is
+> not a permission; (4) no description line on project cards — `ProjectRef` carries none; (5)
+> project-card ticket counts stay a plain `<span>`, not a chip, for consistency with the sibling
+> `/workspaces` row and to avoid the `active`-tone/state-category conflation `ChipRow`'s own
+> docblock warns against. **Deferred, not built:** the prototype's "Workspace" card (rename/delete) —
+> the reference crops above it and rename has no event today.
+>
+> **NEXT: none — holding on the controller's merge of PR #408 at `5628edda`.** The controller was
+> told "fixing", not "final", when the review's Important finding landed; this freeze is the "final"
+> line. No task named after this one — Task 12 (passkeys) was the position before this dispatch
+> arrived and remains the position after; the controller relayed the owner's feedback round as an
+> interrupt, not a replacement.
+
 > # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~16:0x IST. **TASK 19 — WORK COMPLETE, FREEZING.**
 >
 > **Branch `exec/19-workspace-home`, CODE head `ed514444`, ahead 2 / behind 0 at that commit**, cut from

@@ -118,6 +118,13 @@
    size was the whole of the change. See `e2e-viewport/type-scale.ts` for why
    12px is the floor and why it is not a WCAG number. */
 .gn-avatar--small { width: 1.5rem; height: 1.5rem; font-size: 0.75rem; }
+/* Round 19b: the workspace home's header monogram (the reference's 56px
+   orange "MR" tile) — a SQUARE-rounded size, unlike `--medium`/`--small`'s
+   full circle, so the border-radius override lives here rather than only the
+   dimensions. 0.875rem = 14px, the reference's own literal; the base rule's
+   `border-radius: 50%` loses to this at equal specificity because this rule is
+   declared after it. */
+.gn-avatar--large { width: 3.5rem; height: 3.5rem; font-size: 1.4rem; border-radius: 0.875rem; }
 /* The four tints. Each is a fill/text PAIR `CONTRAST_PAIRS` already holds to
    4.5:1 in every theme and style, because a monogram is read text and not a
    decorative dot — see `components/avatar.tsx` for why the palette is these
