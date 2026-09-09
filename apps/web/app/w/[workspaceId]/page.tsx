@@ -429,16 +429,30 @@ function ProjectRow({
  * correct ARIA shape for "a control with a name and a supplementary
  * description" in the first place: most assistive tech still announces the
  * note, as a description read after the name, rather than folded into it.
+ *
+ * **The Members note gates on `countsWithheld`, NOT on `memberCount ===
+ * null`, the second source `src/workspace-viewer.ts`'s own docblock names
+ * and rejects.** A review caught the first draft doing exactly that — the
+ * anti-pattern case 13.381 exists on the sibling `/workspaces` card
+ * specifically to forbid, reproduced here with the same discriminating body
+ * that case uses (`role: 'guest'` served WITH a `memberCount`, which the
+ * shipped server never sends but which a looser gate would print anyway).
+ * `viewerOf(role)` is the one place "may this caller be told a count"
+ * gets decided; a second read of `memberCount` is a second opinion the
+ * `/workspaces` card and this page could disagree about for the same
+ * person.
  */
 function WorkspaceLinks({
   workspaceId,
   memberCount,
+  countsWithheld,
 }: {
   workspaceId: string;
   memberCount: number | null;
+  countsWithheld: boolean;
 }) {
   const membersNote =
-    memberCount === null
+    countsWithheld || memberCount === null
       ? 'roles and pending invitations.'
       : `${memberCount} ${memberCount === 1 ? 'person' : 'people'} · roles and pending invitations.`;
   return (
@@ -526,14 +540,19 @@ function WorkspaceHome({
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
   // "N members · M active projects · you're an owner" — every number SERVED,
-  // never derived a second way. `memberCount` is Task 16's own withholding
-  // (null for a guest, and the prefix is omitted rather than left dangling on
-  // an empty clause); `live.length` is this caller's own non-archived named
+  // never derived a second way. The member-count gate is `viewer.
+  // countsWithheld`, NOT `workspace.memberCount === null` — a review caught
+  // the first draft reading the second, the exact anti-pattern case 13.381
+  // exists on the sibling `/workspaces` card to forbid: `memberCount ===
+  // null` agrees with the role gate on every body the shipped server
+  // actually sends and disagrees on the one a malformed or unrecognised
+  // role could carry, which is precisely the divergence `viewerOf` exists
+  // to settle once. `live.length` is this caller's own non-archived named
   // projects, the same array the list below renders; the role clause is
   // `viewer.clause` — the SAME `viewerOf` call the card's sentence reads, so
   // the two cannot disagree about the same person.
   const memberClause =
-    workspace.memberCount === null
+    viewer.countsWithheld || workspace.memberCount === null
       ? ''
       : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'} · `;
   const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'} · you're ${viewer.clause}`;
@@ -559,7 +578,11 @@ function WorkspaceHome({
         </div>
       </div>
 
-      <WorkspaceLinks workspaceId={workspace.id} memberCount={workspace.memberCount} />
+      <WorkspaceLinks
+        workspaceId={workspace.id}
+        memberCount={workspace.memberCount}
+        countsWithheld={viewer.countsWithheld}
+      />
 
       <Card>
         <div className="gn-workspace-home__projects-heading">
@@ -643,6 +666,15 @@ function WorkspaceHome({
   );
 }
 
+/**
+ * No `<h2>` heading here, unlike `/workspaces`' "New workspace" form
+ * (`FoundingForm`, which keeps both a heading AND a "Name" label) —
+ * transcribed asymmetry, not a dropped one. The prototype's own two blocks
+ * differ the same way: the workspace-list block carries a separate `<h2>New
+ * workspace</h2>` above a field labelled "Name"; this row's field label IS
+ * "New project", with nothing above it. Flagged by review as unexplained;
+ * this comment is the explanation.
+ */
 function NewProjectForm({
   workspaceId,
   busy,

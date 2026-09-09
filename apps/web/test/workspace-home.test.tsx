@@ -522,6 +522,37 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
     expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
     expect(screen.queryByText(/members? ·/)).toBeNull();
   });
+
+  /**
+   * The discriminating body, same technique `workspaces-cards.test.tsx`'s
+   * 13.381 uses on the sibling card: **`role: 'guest'` WITH `memberCount`
+   * served.** The shipped server never sends this combination — it withholds
+   * the count BY ROLE, in the same expression — which is exactly why it is
+   * the fixture that separates the two possible implementations. A review
+   * caught the first draft of this header (and the Members door-note) gating
+   * on `memberCount === null` instead of `viewer.countsWithheld`: that second
+   * source agrees with the role gate on every real body and disagrees only
+   * on a malformed or unrecognised-role one, which is precisely the case
+   * `viewerOf` exists to settle once rather than let two call sites answer
+   * separately.
+   */
+  it('gates the member number and the Members note on the ROLE, not on whether memberCount happens to be served', async () => {
+    mount([
+      [
+        workspaceAs('guest', {
+          memberCount: 7,
+          projects: [
+            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+          ],
+        }),
+      ],
+    ]);
+    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
+    expect(screen.queryByText(/7 members?/)).toBeNull();
+    const nav = screen.getByRole('navigation', { name: 'Workspace sections' });
+    expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
+    expect(within(nav).queryByText(/7 (person|people) ·/)).toBeNull();
+  });
 });
 
 /**
