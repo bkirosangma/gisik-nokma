@@ -1266,7 +1266,9 @@ countable state (`packages/domain/src/workflow.ts:13` `blocked: z.boolean()` on 
 
 Case-id block for this cluster: **`13.366`–`13.385`** (2d holds 13.358–13.365 and carries the pointer to 13.366).
 
-- **Task 16 — workspace card data, visibility-scoped (opus / high; opus reviewer).** `WorkspaceRef` and
+### Task 16: Workspaces page — real card data, visibility-scoped
+
+**opus / high, opus reviewer.** `WorkspaceRef` and
   `GET /v1/me/workspaces` gain **`memberCount`, `ticketCount`, `blockedCount`** — computed per workspace
   (`proj_memberships`; `proj_tickets` with `blockedCount` = tickets whose current state has `blocked:true`) and served
   **only where the viewer is owner/member; ABSENT (not 0) for a guest.** The guest's `projects` carry a
@@ -1275,7 +1277,9 @@ Case-id block for this cluster: **`13.366`–`13.385`** (2d holds 13.358–13.36
   inventing a new rule). `mapWorkspaceRefs` reads the new fields. Cases 13.366–13.372, mutation-witnessed: a guest's
   response carries no count and no restricted name (mutate the gate to permit → RED, alone); a member's counts equal
   the DB aggregation; `blockedCount` counts blocked-state tickets and nothing else.
-- **Task 17 — pending invitations + Decline (opus / high; opus reviewer).** Server: a read surfacing invitations
+### Task 17: Pending invitations + Decline
+
+**opus / high, opus reviewer.** Server: a read surfacing invitations
   addressed to the signed-in user's VERIFIED email that are still valid (not expired/accepted/declined), from
   `proj_invites`; a **Decline** mutation (a real state change — the audit noted Decline exists nowhere); *"Open the
   invitation"* links to the existing accept flow. Client: the *"One invitation is waiting"* banner with the inviter,
@@ -1283,7 +1287,9 @@ Case-id block for this cluster: **`13.366`–`13.385`** (2d holds 13.358–13.36
   vanishes; Decline is witnessed as a state change; an invite for another email never appears (mutate the email scope
   → RED). **Decline is destructive-adjacent — the banner asks nothing clever but the mutation is real; recorded as an
   owner-approved feature.**
-- **Task 18 — the neo card + nav additions (sonnet; sonnet reviewer, haiku ok for the pure-CSS card).** The card to
+### Task 18: The neo workspace card + nav additions
+
+**sonnet, sonnet reviewer (haiku ok for the pure-CSS card).** The card to
   the reference through the style axis: initials tile (deterministic colour from workspace id, the `Avatar` primitive),
   *"N members · N projects"*, the tickets/blocked chips (`Chip` tones already exist), the role label, the project
   subtitle, the guest *"name restricted"* line, the chevron→board affordance. Nav gains a **Help** link and the
