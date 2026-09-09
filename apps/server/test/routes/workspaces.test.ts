@@ -397,10 +397,14 @@ describe('GET /v1/me/workspaces — the directory', () => {
     // `found()` creates a workspace and no project, so there is none to name.
     // Inside the exact `toEqual` rather than omitted — an absent key and an
     // empty list are different claims on this surface.
+    // `memberCount: 1` since Task 16 — the founder, alone. Inside the exact
+    // `toEqual` for the same reason `projects` is: a count the caller is
+    // entitled to and an absent key are different claims, and this caller is an
+    // owner, so the key must be here.
     expect(workspaces).toEqual(
       [
-        { workspaceId: a, name: 'Alpha', role: 'owner', projects: [] },
-        { workspaceId: b, name: 'Beta', role: 'owner', projects: [] },
+        { workspaceId: a, name: 'Alpha', role: 'owner', memberCount: 1, projects: [] },
+        { workspaceId: b, name: 'Beta', role: 'owner', memberCount: 1, projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -481,8 +485,15 @@ describe('GET /v1/me/workspaces — the directory', () => {
       name: 'Leaving',
       role: 'owner',
       // `toContainEqual` is a DEEP equality on the whole object, so the new
-      // field belongs here too — this is not a partial match that would have
-      // ignored it.
+      // fields belong here too — this is not a partial match that would have
+      // ignored them.
+      //
+      // `memberCount: 1` (Task 16) is the owner ALONE, and it is the second
+      // reading of this revocation: `revokeMember` deletes the workspace-scope
+      // row, so the person who left stops being counted as well as stopping
+      // being listed. A 2 here would mean the count reads rows the directory
+      // has already stopped believing.
+      memberCount: 1,
       projects: [],
     });
   });

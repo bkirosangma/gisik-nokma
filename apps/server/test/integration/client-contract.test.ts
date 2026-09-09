@@ -1039,9 +1039,21 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     // Controls, same object, same run.
     expect(ref).toHaveProperty('workspaceId');
     expect(ref['workspaceId']).toBe(workspaceId);
-    expect(Object.keys(ref).sort()).toEqual(['name', 'projects', 'role', 'workspaceId']);
-    // And the client type has no `role` at all — the server discloses MORE
-    // here, which is the one direction that is safe.
+    // `memberCount` joined at Task 16 and IS read by the client
+    // (`WorkspaceRef.memberCount`, `number | null`). It is present here because
+    // this caller is the workspace's owner; a GUEST caller would be served this
+    // same object with the key ABSENT, which is what `null` on the client means
+    // and what case 13.366 pins on the route.
+    expect(Object.keys(ref).sort()).toEqual([
+      'memberCount',
+      'name',
+      'projects',
+      'role',
+      'workspaceId',
+    ]);
+    // The client type reads `role` since Task 15 and the counts since Task 16;
+    // where the two still differ the server discloses MORE, which is the one
+    // direction that is safe.
 
     // 7.202 — THE REFUSAL IS GONE, and this is the line that said it would be.
     // It read: "the day this route joins `proj_projects`, the case reddens and
