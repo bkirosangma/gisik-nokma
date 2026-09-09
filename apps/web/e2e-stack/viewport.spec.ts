@@ -378,7 +378,13 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
        the wrong screen. Owner: whoever gives the stack seed a standing invite
        token — Task 4's successor at the invite surface, or Task 10 if it lands
        first. Also written in `docs/pre-launch-checklist.md`, because a gap that
-       lives only in a code comment is a gap nobody reviews. */
+       lives only in a code comment is a gap nobody reviews.
+
+       13.350/13.351 (Task 15, neo restyle): this route's accessible-name,
+       tap-target and type-scale ratchets — the loop below, run against THIS
+       list — are what proves those floors did not fall under the restyle.
+       Baselines are unchanged and this suite stayed green through Task 15's
+       commits. */
     { path: '/workspaces', key: 'stack-phone-390|/workspaces' },
   ];
 

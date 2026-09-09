@@ -142,6 +142,11 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    * The password absence is unchanged and still asserted: `auth.ts:84` sets
    * `emailAndPassword: { enabled: false }` with "the spec forbids passwords", so
    * the prototype's Password tab is not merely absent but forbidden.
+   *
+   * 13.348 (Task 15, neo restyle) — this test is UNCHANGED and still green:
+   * the property it pins ("exactly the methods that can work are offered")
+   * is exactly what 13.348 requires to survive a CSS-only restyle, and this
+   * page's markup was not touched in that task.
    */
   it('3.84 offers magic link always, phone only where SMS can deliver, and nothing password-shaped', async () => {
     render(<SignInPage />);

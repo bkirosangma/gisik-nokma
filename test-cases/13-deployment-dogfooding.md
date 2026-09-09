@@ -2315,3 +2315,87 @@ card-scale) and is recorded here only for completeness, not as a call.
 > stack was rebuilt from this branch's working tree (`docker compose -f docker-compose.dev.yml up -d
 > --build --wait web`) before either suite ran, so the measurements are against Task 14's actual CSS, not
 > a stale image.
+
+## Task 15 of the neomorphism amendment (2026-09-09) — sign-in, workspaces and invite restyled in neo
+
+Block `13.348`–`13.357`. The amendment reserved `13.348`–`13.356` for this task; the plan's own case list
+(§ "Task 15", `docs/superpowers/plans/2026-09-08-hig-per-screen.md`) uses `13.348`–`13.354`. `13.355` and
+`13.356` close the two judgment calls Task 14's own section (above) flagged and explicitly declined to
+resolve, naming Task 15 as the owner of both. `13.357` — one past the reserved block, the amendment's own
+"next free" pointer — is the additions table's one owner-approved invented row (role labels on workspace
+cards), requested and used provisionally per this file's standing convention: serial mode has one executor
+and therefore no other claimant, and an unmerged id can still be renumbered.
+
+**What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
+(`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
+the toggle's default — so `/sign-in`, `/workspaces` and `/invite/<token>` already rendered in neo the
+moment Task 14 merged, with no page-specific rule to write. **What DID need fixing were two radius
+inversions Task 14's cascade change exposed** (13.355) and a real, previously-undocumented specificity
+landmine 13.355 found while auditing the first two: `.gn-sign-in`'s own literal `border-radius: 16px` ties
+`.gn-card`'s token-driven radius at identical specificity and wins ONLY because `layout.tsx` imports
+`globals.css` after `ui.css` — the exact hazard `.gn-card.gn-invite`'s (now-removed) doubled class used to
+guard against, on a selector nobody had audited for it. No markup changed on `/sign-in` or `/invite/<token>`
+at all; `/workspaces` gained one new element (the role label, 13.357).
+
+- **13.348** ✅ `/sign-in` still renders every method the server offers and no control it refuses (13.292's
+  property) — unaffected by a CSS-only restyle with zero markup changes to this page in this task.
+  Continuously asserted by the pre-existing suite. — (`apps/web/e2e-viewport/responsive.spec.ts`,
+  `apps/web/test/sign-in.test.tsx`)
+- **13.349** ✅ `/workspaces`' three-state machine (13.298–13.300: loading / refusal / empty, and the 401
+  settle on `/sign-in`) is unchanged — the only markup edit this task made to this page is additive (the
+  13.357 role label, inside the populated-list branch), and deletes no state. Continuously asserted by the
+  pre-existing suite. — (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/test/workspaces-cards.test.tsx`,
+  `apps/web/test/founding.test.tsx`)
+- **13.350** ✅ Accessible-name floors on `/sign-in` and `/workspaces` do not fall — both already carry a
+  one-way ratchet (`apps/web/e2e-viewport/accessible-names.ts`'s `RATCHETED` baseline; `/sign-in` in the
+  signed-out suite, `/workspaces` in the signed-in stack suite since Task 4) and both suites stayed green
+  through this task with baselines unchanged (the 13.357 role label is a `<p>`, which carries no
+  accessible name of its own to ratchet). `/invite/<token>`'s floor was and remains a KNOWN RESIDUAL GAP
+  in the signed-in ratchet (no standing invite token in the stack seed, recorded at
+  `apps/web/e2e-stack/viewport.spec.ts:375` since Task 4) — untouched by this task, and its markup is
+  byte-identical (13.353), so nothing here could have moved it either way.
+  — (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-stack/viewport.spec.ts`)
+- **13.351** ✅ Tap-target and type-scale ratchets do not fall on `/sign-in` or `/workspaces` — both
+  routes' baselines are unchanged by this task (both suites re-run green, no `UPDATE_*_BASELINE` set).
+  — (`apps/web/e2e-viewport/responsive.spec.ts`, `apps/web/e2e-stack/viewport.spec.ts`)
+- **13.352** ✅ The Back control on `/privacy` and `/terms` survives — this task touches neither
+  `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx` nor `apps/web/src/back-button.tsx` at
+  all (verified: `git diff 73e189de.. -- apps/web/app/privacy apps/web/app/terms apps/web/src/back-button.tsx`
+  is empty), and both routes remain inside the signed-out accessible-name sweep that would catch a
+  regression there. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.353** ✅ `apps/web/app/invite/[token]/page.tsx` markup is byte-identical — no hunk touches this
+  file in this task (verified the same way as 13.352). The invite surface's neo look is entirely CSS over
+  existing markup, continuing the Task 4a precedent. — (`git diff` against this task's own commits)
+- **13.354** the stack suite signs in through the restyled `/sign-in` and reaches `/workspaces` (6/6),
+  against dev images rebuilt from this task's frozen head. See the live-run note below.
+- **13.355** ✅ No page-specific literal `border-radius` competes with `.gn-card`'s own
+  `--gn-radius-card` token on `.gn-workspace-list .gn-card`, `.gn-card.gn-invite` (rule deleted) or
+  `.gn-sign-in` (property removed) — a SOURCE scan, because the fix is the absence of a competing
+  declaration. `.gn-founding` is excluded on purpose: it is not a `.gn-card` sibling, and Task 15 gave it
+  `var(--gn-radius-card)` explicitly rather than deleting a rule. *Mutation-witnessed live against the
+  real file (not only the in-memory self-test): reintroducing `.gn-card.gn-invite { border-radius: 12px; }`
+  reddens this case's `.gn-card.gn-invite` assertion ALONE, 3 pass / 1 fail; restored via
+  `git checkout HEAD --`, re-verified 4/4 green.* — (`apps/web/test/neo-card-radius.test.ts`)
+- **13.356** the non-text-contrast sweep (case 13.283) now visits `/sign-in` and `/workspaces` — the two
+  routes `.gn-field__input` actually renders on, and therefore the two routes case 13.339's neo pure-look
+  waiver actually lives on, which the sweep never looked at before (Task 14's own 13.343 finding: neither
+  route "is among the five routes this sweep visits"). The sweep still cannot compute a `box-shadow`'s
+  contrast ratio (`sweepBorders` composites `border-{side}-*` only, by design), so this does not become a
+  fifth measured route in the ordinary sense: a live DOM check on each route confirms the field genuinely
+  has `border: none` and a non-`none` `box-shadow` (grounding the waiver's premise against THIS tree
+  rather than trusting Task 13's report unverified), and Task 13's own measured numbers (1.24 light / 1.16
+  dark) are then recorded as a SANCTIONED entry in the persisted roster — appended after `below` is
+  computed, so it can never trip the zero-below-3 assertion, since that assertion is about what this
+  instrument measured and this number is cited, not remeasured. See the live-run note below for the
+  DOM-check result. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
+- **13.357** ✅ `WorkspaceRef` gains `role`; `mapWorkspaceRefs` reads it (`GET /v1/me/workspaces` has
+  disclosed `role` since the route first answered, per its own docblock — only the client-side read was
+  missing) and each `/workspaces` card renders its own caller role. The additions table's one
+  owner-approved invented row on this screen; the other seven I-rows the audit found (member counts,
+  avatars, chips, the invitation banner, Help/Account nav) stay unbuilt because no data exists for them.
+  *Mutation-witnessed live against the real file: removing the rendered `<p className="gn-workspace-list__role">`
+  line reddens exactly the 13.357 assertion in `workspaces-cards.test.tsx`, leaving 3.153/3.154 green;
+  restored via `git checkout HEAD --`, re-verified 3/3 green.* A second refusal at the mapper level pins
+  the same property one layer down: a body with no `role` key throws `MappingError` rather than
+  defaulting one. — (`apps/web/test/workspaces-cards.test.tsx`,
+  `packages/app-core/test/online/mappers.test.ts`)
