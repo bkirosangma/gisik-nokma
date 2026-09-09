@@ -21,6 +21,31 @@ import { stubServices } from './helpers/stub-services.js';
  * through is the shipped one.
  */
 
+/**
+ * Run one body with the PROCESS's timezone moved, and put it back.
+ *
+ * This file needs it because the machine every gate runs on is already
+ * `Asia/Kolkata` (owner decision; both clocks match), which makes the obvious
+ * assertion a check that cannot fail: dropping `timeZone: IST_TIME_ZONE` from
+ * the component renders the identical string here, so the mutation survives and
+ * the case certifies nothing. Under a non-IST zone the two renderings separate.
+ *
+ * The delete-when-unset restore is not tidiness. `= undefined` assigns the
+ * STRING "undefined", which ICU resolves to GMT — silently switching every
+ * later file in this worker to UTC, and only when TZ was unset, which is the
+ * default here and in CI. `test/ist-today.test.ts` records the same trap.
+ */
+function underZone<T>(zone: string, body: () => T): T {
+  const original = process.env['TZ'];
+  process.env['TZ'] = zone;
+  try {
+    return body();
+  } finally {
+    if (original === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = original;
+  }
+}
+
 const push = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -70,8 +95,31 @@ function mount(invitations: PendingInvitation[], overrides = {}) {
 }
 
 describe('Workspaces page — the invitation banner (Task 17)', () => {
+  /**
+   * The two controls this file's date assertion rests on, run in the same file
+   * as the assertion so a reader can see what makes it discriminate.
+   */
+  it('CONTROL — the TZ knob moves this process, and this instant really lands on two different days', () => {
+    expect(underZone('UTC', () => new Date(0).getHours())).toBe(0);
+    expect(underZone('Asia/Kolkata', () => new Date(0).getHours())).toBe(5);
+    // Niue is a fixed −11, so 19:30Z on the 20th is 08:30 on the TWENTIETH
+    // there and 01:00 on the TWENTY-FIRST in IST. Computed by arithmetic here,
+    // not by the TZ database and not by anything under test, which is what
+    // makes the assertion below a test rather than a tautology.
+    const naiveDayAt = (offsetHours: number) =>
+      new Date(new Date(WAITING.expiresAt).getTime() + offsetHours * 3600 * 1000)
+        .toISOString()
+        .slice(0, 10);
+    expect(naiveDayAt(-11)).toBe('2026-09-20');
+    expect(naiveDayAt(5.5)).toBe('2026-09-21');
+  });
+
   it('13.378 renders the waiting invitation with its terms, and renders NOTHING when none is waiting', async () => {
-    mount([WAITING]);
+    // Rendered under a NON-IST zone deliberately. The gate's machine is already
+    // Asia/Kolkata, so an unvaried render would pass identically with the
+    // component's explicit `timeZone` deleted — the mutation would survive and
+    // the date assertion below would certify nothing.
+    underZone('Pacific/Niue', () => mount([WAITING]));
 
     const banner = await screen.findByRole('region', { name: 'One invitation is waiting' });
     // The offer is a sentence, and the role inside it is a sentence too — never
@@ -82,7 +130,8 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     ).toBeInTheDocument();
     expect(within(banner).queryByText('member')).toBeNull();
     // The product's timezone, not the machine's: 19:30Z on the 20th is the 21st
-    // in Asia/Kolkata, and formatting in UTC would render "20 Sept" here.
+    // in Asia/Kolkata and the TWENTIETH in the `Pacific/Niue` this renders
+    // under, so a component reading the machine's zone reddens exactly here.
     //
     // "Sept" and not "Sep" — that is what ICU's `en-IN` abbreviates September
     // to, read off the runtime rather than guessed from the American three
