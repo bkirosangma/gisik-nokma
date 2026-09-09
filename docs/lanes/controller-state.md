@@ -1,5 +1,23 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~15:3x IST — **THE WORKSPACE CLUSTER IS COMPLETE: Task 19 MERGED (#405 → `bd30021`). Both workspace screens are ready for the OWNER'S LOOK. HOLD before Task 12.** `main` is `bd30021` + this PR; zero open PRs; executor restarted into a hold. Weekly meter **84%** (resets Sep 14 06:30).
+
+### The merge — even with main, trees identical
+Guard head `ffba191` (freeze `ed514444` + a docs-only handoff commit; post-freeze delta = `executor-state.md` alone); MERGED `bd30021`; **trees identical (`06dee7b0`)**; drop check 0 bytes / empty stderr. Forced gate at `bd30021` running (result folded into the next anchor; the executor re-ran it at the frozen head: 33/33, 0 cached, 4,183 passed | 5 skipped / 329 files).
+
+### What Task 19 shipped (cases 13.384–13.389) — the workspace home `app/w/[workspaceId]/page.tsx`
+`/w/<id>` was a 404; now it lists the caller's nameable projects with Task 16's counts (NO new read — the card and the home cannot disagree; `viewerOf`/`restrictedLine` MOVED to `src/workspace-viewer.ts`, not copied), the role sentence, "N projects · name restricted", the archived chip+toggle, and five doors (My Work, Members, Ticket types, Workflows, MCP tokens). Owner/admin get **archive/restore + an admin-gated new-project form** — founding is the two-event batch (`project.created` + `project.member_added projectAdmin:true`; a one-event founding vanishes on the admin re-read), server-enforced via `resolveEffectiveRole` (hiding a control is not enforcement; 13.388 drives all three mutations at the real door with no UI). **Two cases shrunk by mutation** (a dup of 13.370 deleted; the in-batch ordering re-aimed to 6.81, which already owns it) — discipline, not inflation.
+
+### Named residuals, owners in #405 — none blocking
+An admin's project list can be narrower than what they may archive (a P32/P38 admin-role question — a NEW visibility rule, correctly not built); 13.383's stack-world archived project still unseeded (raising /workspaces' floor is the cost, declined). **Docker disk filled mid-verification** (postgres PANIC crash-loop looked like a test failure) — the executor reclaimed 16.4 GB (builder + dangling only, NO volumes, world intact); ~39.8 GB of images remain, 90% reclaimable; **`docker image prune -a` removes other projects' tagged images — the OWNER's call, not the controller's.** A `--build` may still hit the wall.
+
+### THE OWNER'S LOOK — both screens, dev stack up, Google on
+- `http://localhost:3001/workspaces` — the card (owner cards carry counts; guest card "1 project · name restricted").
+- `http://localhost:3001/w/0TZSS5W6ATCTF2YBPMWGGP9JF5` — the workspace home (Convenience Corner). The guest view of the same URL is the restricted one.
+
+### Next — HOLD, then Task 12
+Executor holds (fresh, `override-hold-after-workspaces.md`). **After the owner's look (and any card/home feedback round): Task 12 (passkey registration, opus).** Then 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. **Pacing note:** weekly 84% with the remaining screens (many opus) will not all fit before the Sep 14 reset; at ~95% merge what is green, push handoffs, pause.
+
 ## ✅ WEDNESDAY ~14:1x IST — **TASK 18 MERGED (#402 → `6a34c747`): the neo workspace card + Help/Account nav + the option-2 restricted count. FORCED GATE GREEN. LEDGER 18 → done. THE CARD IS READY FOR THE OWNER'S LOOK.** `main` is `6a34c747` + #403 (handoff) + this PR; executor → Task 19 (opus).
 
 ### The merge — even with main, trees identical; a self-launched-`&` gate cleaned up
