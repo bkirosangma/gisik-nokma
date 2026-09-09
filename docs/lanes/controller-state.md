@@ -1,5 +1,22 @@
 # Cross-lane controller — live state
 
+## ⚖ WEDNESDAY ~06:5x IST — **OWNER FEEDBACK ON THE TWO SCREENS: sign-in round 2d dispatched; the WORKSPACES PAGE is scoped as a real feature build to the owner's reference; the Google-env regression is fixed; Phone/Apple stay hidden by ruling.** `main` is `caba1f6` + this PR; executor on round 2d (sign-in), holding workspaces behind it.
+
+### "what happened to the google signin?" — a dev-stack env regression, fixed, not a code defect
+Task 14's `docker compose … up -d --build web` ran from the EXECUTOR's worktree, which has no `.env`, so compose substituted `${GOOGLE_CLIENT_ID:-}` EMPTY and recreated the server with `google:false`; the page renders only offered methods, so the button vanished. **Recreated the server from the PRIMARY checkout (`docker compose -f docker-compose.dev.yml up -d server`, root `.env` mode 600): `GET /v1/auth/methods` → `{"google":true,…}`, the button renders.** **Standing rule added to `dispatch-executor-serial.md` (START HERE): every compose command passes `--env-file /Users/kiro/my_projects/gisik-nokma/.env`, and verify the methods route after.** Memory-worthy: a rebuild from a worktree without the secrets silently drops a provider.
+
+### RULING — Phone and Apple stay hidden (owner reaffirmed 2026-09-09)
+*"its fine to remain hidden as they do not have the functionality at the moment."* Render only methods with real functionality; each appears by itself when its channel exists (Phone: an SMS sender; Apple: env credentials). 2c's derivation stands; no segmented control until `phone` is true.
+
+### Sign-in round 2d — DISPATCHED (sonnet, `CTL-DISPATCH-2026-09-09-signin-neo-feedback.md`), cases 13.358–13.365
+The owner sent the neo sign-in reference. **The accent question is ANSWERED by it: the export's steel blue IS the accent** — adopt `accent` (#3A6DB0/#7FA9E4) for fills, DERIVE `accentText` (nearest darker in-hue reaching 4.5 on surface AND raised, both themes) for links/ghost labels, retire #0040DD/#409CFF. Plus the brand-orange app icon (a `brand` token, not the accent), the export's text ladder, raised neumorphic social buttons, card/field/button geometry, footer link treatment, the example-email placeholder. In flight now.
+
+### The WORKSPACES page — owner's reference is the spec; a real FEATURE build, not a restyle (plan cluster added this PR)
+The reference deliberately includes rows both audits called "invented, no data" — the owner has scoped them as real features. **Measured what exists:** WorkspaceRef = `{id,name,role,projects}`; role labels + the New-workspace create form + the nav (Workspaces/MyWork/Inbox+badge/Style/Theme/Sign out) already ship; **member/ticket/blocked counts exist at NO layer; pending-invitation surface and Decline exist NOWHERE; `blocked` IS a real countable state** (`workflow.ts:13`). **Three tasks, honesty-scoped (server parts opus):** Task 16 — the counts + guest name-restriction, computed and VISIBILITY-SCOPED (guest card shows none, matching the reference; the P32/P38 surface); Task 17 — pending invitations + Decline (a real mutation the owner approved); Task 18 — the neo card + nav (Help link, no-selection subtitle, avatar; **Account nav waits for Task 12**, `/account` does not exist). Block 13.366–13.385, ledger rows 16/17/18 todo. **The product cannot lie: every count is computed and scoped, never painted.**
+
+### Sequence
+2d → 16 → 17 → 18 → owner look at `/workspaces` → 12 (passkeys + the Account nav link) → 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. Session meter reset 05:20; controller keeps turns sparse.
+
 ## ✅ WEDNESDAY ~06:0x IST — **TASK 15 MERGED (#389 → `04e061b`): sign-in, workspaces and invite are in neo; FORCED GATE GREEN; LEDGER 15 → done. THE NEO ROUND IS ON `main`. HOLD: the owner looks at `http://localhost:3001/sign-in` and `/workspaces` before Task 12.** `main` is `04e061b` + this PR; zero open PRs; executor restarted into the hold.
 
 ### The merge, fixed order — and the freeze protocol done right this time
