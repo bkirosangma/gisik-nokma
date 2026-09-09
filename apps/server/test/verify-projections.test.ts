@@ -117,6 +117,47 @@ beforeAll(async () => {
     // it to the list below would have been the check that cannot pass.
     ticketType('saga', 2),
     ticketType('chore', 3),
+    // A PROJECT, AND THEN AN ARCHIVE OF IT (Task 16). Two reasons, and the
+    // second is the one that needed a new event.
+    //
+    // `proj_projects` was EMPTY through this verifier: the tickets below name
+    // `project` in their payloads, but nothing appended a `project.created`,
+    // and the internal door runs no existence check. That is this file's own
+    // named trap — "a check that iterates the registry proves nothing for a
+    // projection whose table the seed never filled" — standing open on the one
+    // projection nobody had filled.
+    //
+    // The archive is what makes the row's `archived` column a NON-DEFAULT
+    // value. `archived` is written by an UPDATE, not by the INSERT, and an
+    // UPDATE is the one shape whose live and rebuilt results can differ without
+    // anything throwing: it is a silent no-op against a row that does not exist
+    // yet. Seeded `true` here, both orders must produce `true`, and a rebuild
+    // that replayed the archive before the creation would produce `false` and
+    // be caught by EXCEPT rather than by an argument about stream ordering. The
+    // non-emptiness case below asserts the `true`, because a defaulted `false`
+    // on both sides diffs clean and would make this seed decorative.
+    {
+      id: newUlid(),
+      workspaceId: home.workspaceId,
+      entity: { kind: 'project', id: project },
+      type: 'project.created',
+      version: 1,
+      payload: { name: 'Seed project' },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    },
+    {
+      id: newUlid(),
+      workspaceId: home.workspaceId,
+      entity: { kind: 'project', id: project },
+      type: 'project.archived',
+      version: 1,
+      payload: {},
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    },
     createdTicket(parentTicket, 'saga', null),
     createdTicket(childTicket, 'chore', parentTicket),
     {
@@ -183,6 +224,12 @@ describe('verifyProjections', () => {
       'proj_ticket_types',
       'proj_tickets',
       'proj_rollups',
+      // Task 16. `proj_projects` was covered by the clean verdict and never
+      // filled — the trap this case exists to close, standing open on one
+      // projection because nothing in the seed appended a `project.created`
+      // (the internal door runs no existence check, so the tickets could name
+      // a project that had none).
+      'proj_projects',
     ]) {
       const { rows } = await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`);
       expect(
@@ -190,6 +237,25 @@ describe('verifyProjections', () => {
         `${table} is empty — a clean verdict over it proves nothing`,
       ).toBeGreaterThan(0);
     }
+
+    // Non-emptiness is not enough for `proj_projects.archived` (Task 16). That
+    // column has a DEFAULT, so a table full of rows the archive never touched
+    // diffs clean for the same reason an empty one does — the UPDATE would
+    // never have run on either side. The seed archives its project, so the
+    // value under comparison is the non-default one.
+    //
+    // **What the verdict below proves about this column, stated exactly:** that
+    // live application and ledger re-derivation AGREE, which is the property an
+    // UPDATE can break silently (it is a no-op against a row that does not
+    // exist yet, and a replay that delivered the archive before the creation
+    // would produce `false` here and be caught by EXCEPT). It does NOT prove the
+    // fold is CORRECT — a projection that ignored `project.archived` entirely
+    // would produce `false` on both sides and diff clean. That half is case
+    // 13.370's, through the real door.
+    const archived = await db.pool.query<{ archived: boolean }>(
+      'SELECT archived FROM proj_projects',
+    );
+    expect(archived.rows.map((row) => row.archived)).toEqual([true]);
   });
 
   /**
