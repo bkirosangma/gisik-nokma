@@ -123,6 +123,15 @@ describe('13.361 — the sign-in footer link gets an underline affordance beyond
     // `.gn-legal a:focus-visible` — `ruleFor`'s forward-only walk cannot find
     // the block from this selector's own (last) line, so the whole
     // multi-selector list is matched directly instead.
+    //
+    // ORDER-DEPENDENT ON PURPOSE, not a latent gap: this pattern requires the
+    // three selectors in THIS exact order. If globals.css is ever edited to
+    // reorder that list, this regex simply fails to match — the earlier
+    // "no shared :focus-visible rule ... found" assertion below reddens
+    // loudly rather than silently passing against the wrong block (the
+    // sibling underline rule a few lines down shares the selector text but
+    // not the `outline` declaration this test checks for, so there is no
+    // adjacent block this could mistakenly match instead).
     const block = css.match(
       /\.gn-notfound__link:focus-visible,\s*\n\.gn-legal a:focus-visible,\s*\n\.gn-sign-in__legal a:focus-visible\s*\{([^}]*)\}/,
     );

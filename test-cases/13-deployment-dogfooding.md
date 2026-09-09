@@ -2523,11 +2523,17 @@ same way).
 > no-sideways-scroll check, the 12px label-text floor across 7 routes, the non-text-contrast sweep, the
 > guest partial-workspace visibility case). The non-text-contrast sweep's own summary line: **"0 of 6
 > distinct bordered classes below 3:1 (19 bordered elements examined across 7 routes; ... 1 sanctioned
-> waiver(s) recorded separately)"** — byte-identical membership and counts to Task 15's own run (13.356),
-> confirming 13.365's "the roster does not grow" claim directly rather than by inference.
-> `git status` on both `accessible-names-baseline.json` files, both `tap-baseline.json`/
-> `type-scale-baseline.json` files, and `non-text-contrast-roster.json` was CLEAN after both suites ran —
-> every baseline/roster file is byte-identical to before this round's live run, which is the strongest
-> available evidence for 13.363 (no floor moved) and 13.365 (no new sub-3:1 pairing this instrument can
-> see): not merely "the counts printed match" but "the persisted file this run would have rewritten was
-> never touched at all."
+> waiver(s) recorded separately)"**. `non-text-contrast-roster.json` is written UNCONDITIONALLY by every
+> run of this sweep (`viewport.spec.ts`'s own `writeFileSync`, not gated behind an `UPDATE_*` flag the
+> way the three baseline files below are) — so a clean `git status` on it after this run is a direct
+> byte-for-byte match against whatever this branch already had committed (Task 15's last write, since
+> nothing has touched this file since), not merely "the printed shape looks the same". That is the
+> evidence for 13.365's "the roster does not grow": this round's live measurement reproduced the
+> committed file exactly, ratios and border/backdrop strings included (rounded to 2 decimals by the
+> sweep itself — a sub-hundredth drift in an unrounded ratio would not show here, which is a real but
+> immaterial limit on what "byte-identical" can claim for a membership/count property).
+> `git status` on both `accessible-names-baseline.json` files and both `tap-baseline.json`/
+> `type-scale-baseline.json` files was ALSO clean after both suites ran — those four are gated behind
+> `UPDATE_*` flags that were never set, so a clean status there means "no operator asked to move the
+> baseline", the weaker but still relevant claim for 13.363 (no floor moved) that this run neither needed
+> nor attempted a baseline update.

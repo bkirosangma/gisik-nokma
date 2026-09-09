@@ -36,12 +36,18 @@
      rule's darker fillTertiary-composited one); `textAccent` is the role that
      carries the 4.5 guarantee this comment describes, and it is what
      `.gn-button--ghost` below duplicates deliberately (13.289). This base
-     rule's own `color` is unreachable in practice today — `button.tsx` always
-     pairs `.gn-button` with a variant class, and `--primary`/`--danger`/
-     `--ghost` all set their own `color` at equal specificity, so whichever
-     was declared LAST in this file wins. It is still updated here rather than
-     left on the retired role, so a future bare `.gn-button` (or a reader of
-     just this rule) sees the same guarantee the measured numbers describe. */
+     rule's own `color` LIKELY never wins the cascade today: `button.tsx`'s
+     `variant` defaults to `'ghost'` and its class list is unconditionally
+     `['gn-button', 'gn-button--${variant}', className]`, so every element
+     THIS COMPONENT renders also carries `--primary`/`--danger`/`--ghost`,
+     each of which sets its own `color` at equal specificity and wins by
+     source order. That argument covers every call site THROUGH `Button`; it
+     does not rule out something elsewhere hand-authoring a bare
+     `className="gn-button"` outside the component (a repo-wide grep for
+     `gn-button` in every `*.ts`/`*.tsx` file found none, but a grep is
+     evidence, not a proof). Updated here regardless, so a future bare
+     `.gn-button` — through the component or otherwise — sees the same
+     guarantee the measured numbers describe rather than the retired role. */
   border: none;
   background: var(--gn-fill-tertiary);
   color: var(--gn-text-accent);
