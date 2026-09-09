@@ -266,18 +266,13 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
    * escalation the flag exists to stop (anyone may sign up claiming an address;
    * only the address's holder can prove it).
    */
-  it('13.375 answers a caller with no verified address an empty list, while the same invitation reaches a verified one', async () => {
+  it('13.375 answers a caller with no verified address an empty list, even for an invitation naming that very address', async () => {
     const admin = await signedIn();
     const workspaceId = await found(admin, 'Unproven Address');
     const target = await signedIn();
-    await invite(admin, workspaceId, target.email);
+    const forVerified = await invite(admin, workspaceId, target.email);
 
     const phoneUser = await signInWithPhone(app, otp, '+919000450001');
-    const phoneCaller: Caller = {
-      userId: phoneUser.userId,
-      email: '',
-      headers: { authorization: `Bearer ${phoneUser.token}` },
-    };
     // The account really has an address — better-auth requires one — and it
     // really is unverified. Read rather than assumed, because this case's whole
     // claim is about that column.
@@ -285,11 +280,28 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
       'SELECT "email", "emailVerified" AS verified FROM "user" WHERE "id" = $1',
       [phoneUser.userId],
     );
-    expect(rows[0]?.email).toMatch(/@phone\.gisik-nokma\.invalid$/);
+    const synthetic = rows[0]?.email ?? '';
+    expect(synthetic).toMatch(/@phone\.gisik-nokma\.invalid$/);
     expect(rows[0]?.verified).toBe(false);
+    const phoneCaller: Caller = {
+      userId: phoneUser.userId,
+      email: synthetic,
+      headers: { authorization: `Bearer ${phoneUser.token}` },
+    };
+
+    // THE FIXTURE THAT MAKES THIS CASE MEAN ANYTHING, and it was not here at
+    // first: the invitation is addressed to the unverified account's OWN
+    // address. Without it the empty answer below was produced by the ADDRESS
+    // filter — the synthetic address matched nothing — and deleting
+    // `"emailVerified" = true` from the read left every case in this file
+    // green. Measured, not reasoned about. With this row the two predicates are
+    // separated: the address matches and the proof does not.
+    await invite(admin, workspaceId, synthetic);
 
     expect(await myInvitations(phoneCaller)).toEqual([]);
-    expect((await myInvitations(target)).map((row) => row.inviteId)).toHaveLength(1);
+    // The positive control, in the same run: the read serves invitations, so
+    // the empty answer above is a rule and not a broken query.
+    expect((await myInvitations(target)).map((row) => row.inviteId)).toEqual([forVerified.inviteId]);
   });
 });
 
