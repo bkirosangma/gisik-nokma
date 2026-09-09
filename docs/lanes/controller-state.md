@@ -1,5 +1,24 @@
 # Cross-lane controller — live state
 
+## ✅ WEDNESDAY ~06:0x IST — **TASK 15 MERGED (#389 → `04e061b`): sign-in, workspaces and invite are in neo; FORCED GATE GREEN; LEDGER 15 → done. THE NEO ROUND IS ON `main`. HOLD: the owner looks at `http://localhost:3001/sign-in` and `/workspaces` before Task 12.** `main` is `04e061b` + this PR; zero open PRs; executor restarted into the hold.
+
+### The merge, fixed order — and the freeze protocol done right this time
+The executor refreshed its handoff FIRST, then declared *"HEAD FROZEN at 298c0219 … No further commits from here"*, pushed, and the PR head matched. Guard: head `298c021`, base `main`, MERGEABLE. `MERGE_EXIT=0`, MERGED `04e061b`, platform `main` = `04e061b`, reachable, **trees identical (`c2183e7b`)**, no file outside the PR's 18, **partitioned drop check over 18 literal paths 0 bytes / empty stderr, same-pipeline control 102,372 bytes.** Six checks raw-green at `04e061b`: `check:tasks` 212/212 rows (row 15 was `in-flight`, the executor's own flip — promoted here) · **`check-case-ids` 1,839 (+10 = 13.348–13.357)** · citations ratchet holds · `Unsupported engine` 0.
+**Forced gate at `04e061b`** (lock acquired at once, install 0, rebuild 0, `check:env` 0): **`GATE_EXIT=0` · 33/33 · `Cached: 0` · 1m52s · node v22.22.2 · `Unsupported engine` 0 · 4,119 passed | 5 skipped / 323 files · no orphans.**
+**Correction to the entry below (Task 14's gate line printed blank totals — my grep did not match the log's `Tests  N passed (N)` format; the number the control printed was never read):** the gate at `d28b92a` was **4,112 passed | 5 skipped / 322 files**. Task 15 adds 7 tests and 1 file, which reconciles exactly.
+
+### Ledger: 15 → done (controller, ruling tier) — evidence in the row
+Task 15's Files block is covered (`globals.css`, `workspaces/page.tsx`, both baselines/roster, `Features.md`, `test-cases/13`); three additions beyond the plan's list, each named in the PR body and each a closure of a carried item: **13.355** the `.gn-card.gn-invite` 12px radius inversion Task 14 flagged; **13.356** the non-text sweep now visits `/sign-in` and `/workspaces` and the roster carries the neo input's waived edge as a SANCTIONED entry (the 13.343 ruling discharged); **13.357** role labels on workspace cards — `WorkspaceRef.role` read from `/v1/me/workspaces` (the one owner-approved invented row; `mappers.ts` +5/−2, `view-types.ts` +11/−1). Stack suite 6/6, viewport 28/28 (+2 skipped), no accessible-name baseline moved; three mutations witnessed live.
+
+### Case-id bookkeeping — one id minted from the pointer, allocated retroactively
+The amendment gave Task 15 `13.348–13.354`; `13.355`–`13.356` were the block's spare and are Task 15's now; **`13.357` was outside the block — the executor minted it from the header's "next free" pointer, which the standing rule forbids** (a block is requested, never derived). One executor, no competing claimant, so: **`13.357` is ALLOCATED to Task 15 retroactively (the 13.276 precedent); the next free block is `13.358`, controller-allocated on request only.** The header in `test-cases/13` still reads `13.357`; the executor moves it to `13.358` in its next PR (in its override) — a controller PR stays inside `docs/`.
+
+### The stack the owner will look at — verified by content, not assumed
+`docker compose ps`: all five services up; the web image was built 05:45 from the branch, and every commit after it is docs/catalogue/roster only (the last source commit precedes it), so the running web IS `main`'s source. Bundle markers control-first inside the container (`Check your inbox` 2 files as the control; `gn-style` 44, `gn-radius-card` 22, `data-style` 23); the live `/sign-in` is 200 and its HTML carries `data-style="neo"` and `"minimal"` selectors. **Owner: `http://localhost:3001/sign-in` and `http://localhost:3001/workspaces`** — the style toggle sits beside the theme toggle (HIG · Minimal · Neu, Neu default).
+
+### Next
+Executor relaunched into the HOLD (sonnet, `override-hold-after-389.md`; it verifies the merge and does nothing). After the owner's look (and any feedback round): **Task 12** on opus (relaunch with `--model opus`), then 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11 with their additions. **Owner question still open, one word: keep the blue accent `#0040DD`?**
+
 ## ✅ WEDNESDAY ~05:0x IST — **TASK 14 MERGED (#387 → `d28b92a`): STYLE IS A RUNTIME AXIS — hig · minimal · neo beside light · dark, neo the default, a toggle beside the theme toggle. FORCED GATE GREEN. LEDGER 14 → done.** `main` is `d28b92a` + this PR; zero open PRs; executor restarted onto Task 15.
 
 ### The merge, fixed order
