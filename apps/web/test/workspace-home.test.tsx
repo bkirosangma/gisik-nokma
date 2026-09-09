@@ -414,32 +414,36 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * The paths are also checked against the app directory itself, in the same run:
  * a link is only proven live by a `page.tsx` existing at the route it names.
  *
- * **Names are matched by PREFIX, not exact, since Round 19b.** Each door's
- * accessible name is now its label AND its note concatenated (the note joined
- * this round, per item 4's last bullet) — an anchor's accessible name is
- * computed from its full text content, and suppressing the note with a second
- * `aria-label` would take the note out of what a screen reader announces,
- * which is not what "carries a note" is supposed to mean. `^label\b` still
- * proves the TARGET unambiguously; it is the hrefs this case is about.
+ * **Names are EXACT, unchanged by Round 19b's notes.** The first draft folded
+ * each note into its link's content and let the accessible name become the
+ * label and the note concatenated; `e2e-stack/viewport.spec.ts`'s MUST_NAME
+ * sweep (13.389's own witness on this exact route) caught it within the hour —
+ * its floor names a link `/^Ticket types$/`, exactly, and a name that grew a
+ * note no longer matched. Fixed with `aria-label` (pins the name to the label)
+ * plus `aria-describedby` (links the note as a DESCRIPTION, which is the
+ * correct ARIA shape for "a control with a name and a supplementary note" and
+ * is still announced by most assistive tech, as a description read after the
+ * name rather than folded into it) — see `page.tsx`'s own docblock on
+ * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.387 the workspace-section links resolve to the real routes', () => {
   it('carries five links, four workspace-scoped and one global', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
-    const expected: Array<[RegExp, string]> = [
-      [/^My Work\b/, `/w/${WORKSPACE}/my-work`],
-      [/^Members\b/, `/w/${WORKSPACE}/members`],
-      [/^Ticket types\b/, `/w/${WORKSPACE}/settings/ticket-types`],
-      [/^Workflows\b/, `/w/${WORKSPACE}/settings/workflows`],
-      [/^MCP tokens\b/, '/mcp/tokens'],
+    const expected: Array<[string, string]> = [
+      ['My Work', `/w/${WORKSPACE}/my-work`],
+      ['Members', `/w/${WORKSPACE}/members`],
+      ['Ticket types', `/w/${WORKSPACE}/settings/ticket-types`],
+      ['Workflows', `/w/${WORKSPACE}/settings/workflows`],
+      ['MCP tokens', '/mcp/tokens'],
     ];
     for (const [name, href] of expected) {
-      expect(within(nav).getByRole('link', { name }), String(name)).toHaveAttribute('href', href);
+      expect(within(nav).getByRole('link', { name }), name).toHaveAttribute('href', href);
     }
     expect(within(nav).getAllByRole('link')).toHaveLength(expected.length);
     // The negative that names the actual defect: nothing here points at a
     // workspace-scoped MCP route, which does not exist.
-    expect(within(nav).queryByRole('link', { name: /^MCP tokens\b/ })).not.toHaveAttribute(
+    expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).not.toHaveAttribute(
       'href',
       `/w/${WORKSPACE}/mcp/tokens`,
     );

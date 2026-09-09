@@ -416,6 +416,19 @@ function ProjectRow({
  * served; a guest (withheld, `null`) gets the same sentence with no number
  * prefix, the same "omit rather than leave a dangling clause" rule the
  * header's meta line keeps.
+ *
+ * **Each link's ACCESSIBLE NAME stays exactly its label — `aria-label` pins
+ * it — and the note is linked as a DESCRIPTION via `aria-describedby`,
+ * measured rather than assumed.** The first draft let the note join the
+ * name by ordinary content concatenation, and `e2e-stack/viewport.spec.ts`'s
+ * MUST_NAME sweep (13.389's own witness) caught it within the hour: that
+ * route's floor names a link `/^Ticket types$/`, exactly, and a name that
+ * became "Ticket types Fields and the workflow each type follows." no
+ * longer matched — the accessible-name floor this shell ratchets falling is
+ * exactly the failure that check exists to catch. `aria-describedby` is the
+ * correct ARIA shape for "a control with a name and a supplementary
+ * description" in the first place: most assistive tech still announces the
+ * note, as a description read after the name, rather than folded into it.
  */
 function WorkspaceLinks({
   workspaceId,
@@ -430,37 +443,61 @@ function WorkspaceLinks({
       : `${memberCount} ${memberCount === 1 ? 'person' : 'people'} · roles and pending invitations.`;
   return (
     <nav className="gn-workspace-home__links" aria-label="Workspace sections">
-      <Link href={`/w/${workspaceId}/my-work`} className="gn-workspace-home__link">
+      <Link
+        href={`/w/${workspaceId}/my-work`}
+        className="gn-workspace-home__link"
+        aria-label="My Work"
+        aria-describedby="gn-link-note-my-work"
+      >
         <span className="gn-workspace-home__link-label">My Work</span>
-        <span className="gn-workspace-home__link-note">
+        <span className="gn-workspace-home__link-note" id="gn-link-note-my-work">
           Everything assigned to you across this workspace.
         </span>
       </Link>
-      <Link href={`/w/${workspaceId}/members`} className="gn-workspace-home__link">
+      <Link
+        href={`/w/${workspaceId}/members`}
+        className="gn-workspace-home__link"
+        aria-label="Members"
+        aria-describedby="gn-link-note-members"
+      >
         <span className="gn-workspace-home__link-label">Members</span>
-        <span className="gn-workspace-home__link-note">{membersNote}</span>
+        <span className="gn-workspace-home__link-note" id="gn-link-note-members">
+          {membersNote}
+        </span>
       </Link>
       <Link
         href={`/w/${workspaceId}/settings/ticket-types`}
         className="gn-workspace-home__link"
+        aria-label="Ticket types"
+        aria-describedby="gn-link-note-ticket-types"
       >
         <span className="gn-workspace-home__link-label">Ticket types</span>
-        <span className="gn-workspace-home__link-note">
+        <span className="gn-workspace-home__link-note" id="gn-link-note-ticket-types">
           Fields and the workflow each type follows.
         </span>
       </Link>
-      <Link href={`/w/${workspaceId}/settings/workflows`} className="gn-workspace-home__link">
+      <Link
+        href={`/w/${workspaceId}/settings/workflows`}
+        className="gn-workspace-home__link"
+        aria-label="Workflows"
+        aria-describedby="gn-link-note-workflows"
+      >
         <span className="gn-workspace-home__link-label">Workflows</span>
-        <span className="gn-workspace-home__link-note">
+        <span className="gn-workspace-home__link-note" id="gn-link-note-workflows">
           States, transitions and published versions.
         </span>
       </Link>
       {/* Global, deliberately: an MCP token belongs to a person rather than to a
           workspace. It is listed here because this is where somebody goes
           looking for it, not because this page owns it. */}
-      <Link href="/mcp/tokens" className="gn-workspace-home__link">
+      <Link
+        href="/mcp/tokens"
+        className="gn-workspace-home__link"
+        aria-label="MCP tokens"
+        aria-describedby="gn-link-note-mcp-tokens"
+      >
         <span className="gn-workspace-home__link-label">MCP tokens</span>
-        <span className="gn-workspace-home__link-note">
+        <span className="gn-workspace-home__link-note" id="gn-link-note-mcp-tokens">
           Let an assistant act as you, with your permissions.
         </span>
       </Link>
