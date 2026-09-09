@@ -20,7 +20,43 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — TUESDAY 2026-09-09 ~05:5x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~06:1x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+>
+> **Task 15 is MERGED — PR #389, merged as `04e061b`.** Verified, not adopted from the controller's
+> relaunch note: `gh pr view 389 --json state,mergeCommit` → `MERGED`/`04e061b`; `git merge-base
+> --is-ancestor 04e061b origin/main` → yes; `gh pr list --state open` → `[]`. The controller's docs-only
+> anchor PR (**#390**, `git show --stat` confirms it touches only `controller-state.md` and
+> `task-ledger.tsv`, never this file) promoted ledger row 15 to `done`. **Naming the tip, not the PR, is
+> what goes stale — this file's own rule (see the ROUND 2c section below) — so `origin/main`'s sha is not
+> written here; run `git rev-parse origin/main` for the live answer.**
+>
+> **THE QUEUE IS EMPTY. HOLD.** No task is mine to start. **Task 12** (passkey registration) requires
+> both (a) the owner's look at `http://localhost:3001/sign-in` and `http://localhost:3001/workspaces`,
+> relayed through the controller, and (b) an explicit controller dispatch that relaunches this session on
+> **opus** — this file does not authorize starting it, and a restarted executor must not treat "Task 12 is
+> next in the sequence" as an instruction to begin it. While holding, nothing to poll.
+>
+> **One carried instruction is ALREADY SATISFIED — do not redo it.** The relaunch override said
+> `test-cases/13-deployment-dogfooding.md`'s "next free BLOCK" pointer still read `13.357` and needed
+> moving to `13.358` in the next PR. Checked directly against `origin/main`: it already reads `13.358`
+> (`git log --oneline -- test-cases/13-deployment-dogfooding.md` shows the line landed in `04e061b`
+> itself, Task 15's own merged commit — Task 15 advanced its own pointer before freezing). The override's
+> text was stale by the time it was read. **No file in this PR touches `test-cases/`.**
+>
+> **This PR is docs-only** (this file alone) — **no gate was run**, and none is owed: `git diff --stat
+> origin/main <this-branch> -- apps/ packages/` is empty, so there is no source delta to gate. This does
+> not borrow Task 15's green; it states plainly that no gate applies here.
+>
+> **Not mine to resolve, listed for visibility only:** the controller's open owner question, one word —
+> keep the accent `#0040DD`? See `controller-state.md`'s Task 15 entry for full context.
+>
+> ## STILL OUTSTANDING
+> * Nothing. Push this branch, open one PR, report "PR open" to the controller (authorized reason #3;
+>   nothing here is a ruling or an Important/Critical scope-changing finding), then continue holding.
+> * The controller's next action is the owner's look, then a Task 12 dispatch + opus relaunch — not a
+>   position this file should try to anticipate further.
+
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-09 ~05:5x IST. **HISTORY — superseded by the block above.**
 >
 > **Task 14 is MERGED** — `d28b92a` on `origin/main`, controller anchor `73e189de` on top of it. Verified:
 > `gh pr view 387 --json state,mergeCommit` → MERGED; `git merge-base --is-ancestor d28b92a origin/main` →
@@ -95,13 +131,19 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > CONTROLLER promotes it to `done` with the merge sha, after merge. Do not self-promote it.
 >
 > ## STILL OUTSTANDING
-> * Freeze this head, re-verify `origin/main` is still `73e189de` immediately before push, push
->   `exec/145-task15-neo-restyle`, open ONE PR, report to the controller.
+> ~~* Freeze this head, re-verify `origin/main` is still `73e189de` immediately before push, push
+>   `exec/145-task15-neo-restyle`, open ONE PR, report to the controller.~~ **DONE — pushed, PR #389
+>   opened, merged as `04e061b`. See the CURRENT POSITION block above; do not re-freeze or re-push this
+>   branch, which is now merged-by-squash (further commits to it silently never reach `main`).**
 > * `docker image prune -f` was already run (dangling only) after the live suites; no further cleanup owed.
-> * Per the override that relaunched this session: hand the controller `http://localhost:3001/sign-in` and
->   `http://localhost:3001/workspaces` for the owner's look, once the PR is open.
-> * Task 12 (passkey) is next per the amendment's sequence, after the owner looks at this PR's two routes —
->   blocked on THIS PR merging. Read `origin/main` after merge, never a local copy of this branch.
+> ~~* Per the override that relaunched this session: hand the controller `http://localhost:3001/sign-in`
+>   and `http://localhost:3001/workspaces` for the owner's look, once the PR is open.~~ **DONE — handed
+>   over in the PR/controller-state.md; the owner's look is now the controller's open item, not this
+>   session's.**
+> ~~* Task 12 (passkey) is next per the amendment's sequence, after the owner looks at this PR's two routes
+>   — blocked on THIS PR merging. Read `origin/main` after merge, never a local copy of this branch.~~
+>   **PR merged. Task 12 is still blocked — on the owner's look AND an explicit controller dispatch with
+>   an opus relaunch, per the block above. Do not start it from this sentence.**
 >
 > ---
 >
