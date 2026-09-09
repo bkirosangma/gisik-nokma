@@ -489,6 +489,20 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     // +0 — rose on every signed-in route here without falling on any of them,
     // and that the signed-out twin (`e2e-viewport/responsive.spec.ts`) stayed
     // byte-identical because `AppNav` never renders there.
+    //
+    // 13.383 (Task 18, 2026-09-09): the same instrument, measured the same way
+    // for the workspace card and the two new nav doors. `/workspaces` rose
+    // `ariaLabel` 2 → 3 — the `Avatar`'s own `aria-label`, one per card — and
+    // nothing else moved on it. **The five other signed-in routes rose on
+    // `rawMatches` by exactly +2 and on NO ratcheted attribute**, which is the
+    // measurement, not the prediction: `/help` and `/account` are plain
+    // `<a href>` elements, and an implicit role is not a `role` ATTRIBUTE, so
+    // the sweep's `hasAttribute` counts cannot see them. That +2 is the control
+    // that says the sweep saw the new links at all. The floor was raised by
+    // deleting the keys and re-recording under `UPDATE_ACCESSIBLE_BASELINE=1`,
+    // which is the only way this file permits a rise — and it was safe to do
+    // because the run BEFORE it asserted every old baseline and passed, so
+    // nothing could be silently lowered by the re-record.
     const accessibleKey = route.key;
     const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
     if (accessibleBaseline === undefined) {

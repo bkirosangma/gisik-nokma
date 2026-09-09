@@ -2877,3 +2877,31 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   construction (every project nameable, so the subtraction empties), asserted because it is what proves
   the number is a DIFFERENCE and not a count of unnameable things.
   — (`apps/server/test/routes/workspace-counts.test.ts`)
+- **13.383** ✅ The accessible-name floor RISES with the card's new controls and falls nowhere, and the
+  other two signed-in ratchets do not move. Measured on the real deployed stack, not predicted:
+  `stack-phone-390|/workspaces` goes `ariaLabel` **2 → 3** — the `Avatar`'s own `aria-label`, one per
+  card — with `role`, `ariaSelected` and `ariaDescribedby` unchanged. **The five other signed-in routes
+  rose on `rawMatches` by exactly +2 each and on NO ratcheted attribute**, and that is the interesting
+  half: `/help` and `/account` are plain `<a href>` elements, an implicit role is not a `role`
+  ATTRIBUTE, and `sweepAccessibleNames` counts attributes — so the nav additions contribute nothing to
+  the floor. The +2 is the control proving the sweep saw them at all; without it, "no ratcheted change"
+  and "the sweep never reached the new links" are the same reading. **The rise was recorded in the only
+  way this file permits one** — the keys deleted and re-recorded under `UPDATE_ACCESSIBLE_BASELINE=1`,
+  since `recordAccessibleBaseline` writes ABSENT keys only — and it was safe to re-record all six
+  because the run immediately BEFORE asserted every old baseline and passed 6/6, so nothing could be
+  lowered under cover of the update. Verified again with a THIRD run against the new file, no update
+  flag, asserting: 6/6. **Type-scale is unmoved and the reason is arithmetic**: the card's two new muted
+  rules are `0.8rem` = 12.8px, above the 12px floor, and the sweep's own smallest on `/workspaces` is
+  12.8px on `span.gn-avatar.gn-avatar--medium.gn-avatar--tint-2` — which is also the run's independent
+  confirmation that the deterministic tint really reaches the deployed DOM. **The non-text-contrast
+  roster does not grow**: 6 distinct bordered classes, 0 below 3:1, 19 elements across 7 routes,
+  positive control 16.72 — byte-identical to the file on `main`. `e2e-viewport`, the signed-out twin,
+  is 31/31 with its baselines untouched, which is correct rather than lucky: its `UNAUTHED_ROUTES`
+  render no `AppNav`, and both of its `/workspaces` blocks stub `{workspaces: []}` and a 401, so
+  neither renders a card. **One control in this case is NOT exercised and it is named rather than
+  implied**: the seeded Convenience Corner world has no archived project, so the archive disclosure
+  never renders on the stack and its `aria-label` is not in the risen floor, nor is `button` added to
+  `/workspaces`' roster row. That control is witnessed by 13.379 in jsdom instead. Closing it needs a
+  seeded archived project — owner: whoever next extends the CC seed, plausibly Task 19, which builds
+  archive/restore.
+  — (`apps/web/e2e-stack/viewport.spec.ts`)
