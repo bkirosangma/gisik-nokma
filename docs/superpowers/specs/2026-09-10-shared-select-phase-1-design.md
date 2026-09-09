@@ -20,15 +20,21 @@ see Audit below), the work is split into two independently-specced phases:
   tests.
 - **Phase 2 (separate spec, not written yet):** roll out to the remaining sites.
 
-## Audit (re-verified 2026-09-10, supersedes the 2026-09-09 count)
+## Audit (re-verified 2026-09-10 — corrects a false positive from the first re-verification pass)
 
-- **16 native `<select>` render sites** (was 15 at the original 2026-09-09 audit — a new one appeared in
-  `apps/web/app/account/page.tsx`, part of currently-uncommitted work, not yet audited for migration):
+- **15 native `<select>` render sites — unchanged from the original 2026-09-09 audit**:
   `ticket-type-editor-screen.tsx` (Workflow), `fields-editor.tsx` (Field type), `state-node.tsx`,
   `state-mapping-dialog.tsx`, `rule-editors/require-field-editor.tsx`,
   `rule-editors/require-different-user-editor.tsx`, `workflow-rebind-dialog.tsx`, `transition-dialog.tsx`,
   `new-ticket-dialog.tsx` (×2 — type and parent), `reopen-dialog.tsx`, `ticket-list.tsx` ("group by"),
-  `members/page.tsx` (×2), `style-toggle.tsx`, `account/page.tsx` (new, unaudited).
+  `members/page.tsx` (×2), `style-toggle.tsx`.
+  A `grep -rl "<select"` pass had also flagged `apps/web/app/account/page.tsx` as a 16th site — that was a
+  false positive: the match was a docblock comment ("now a `<select>` rather than `SegmentedControl`")
+  describing `StyleToggle`'s own already-audited render, not a second, distinct `<select>` in that file.
+  `account/page.tsx` only renders `<StyleToggle />`; the real count stands at 15. Worth noting for Phase 2
+  scoping: `style-toggle.tsx` (already in the list above) now mounts on an additional route (`/account`,
+  since Round 19b/19e work), which doesn't change the site count but does widen that one site's blast
+  radius when it migrates.
 - **62 `userEvent.selectOptions(...)` calls across 11 test files** — count re-verified exact against the
   current tree: `style-toggle.test.tsx` (2), `members-page.test.tsx` (1), `ticket-types.test.tsx` (18),
   `access.test.tsx` (2), `publish.test.tsx` (8), `canvas.test.tsx` (1), `rule-editors.test.tsx` (2),
