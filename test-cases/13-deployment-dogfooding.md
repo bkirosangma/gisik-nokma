@@ -2786,3 +2786,94 @@ auth tables.*
   (`ShellRefusal`'s) never rendered and the case asserts **zero**. The assertion's point is that this line
   does not add a SECOND one over the top of the page's own refusal when both reads fail.
   — (`apps/web/test/workspaces-invitation-banner.test.tsx`)
+
+## Task 18 — the neo workspace card, Help/Account nav, and the option-2 restricted count (2026-09-09)
+
+**Case ids `13.379`–`13.383`, the block allocated to Task 18** by the controller's 2026-09-09
+`13.366`–`13.389` cluster allocation above. **Recounted at `11af5bc` before minting: the maximum id in
+use in this file was `13.378`**, Task 17's last, and every id from `13.379` to `13.390`
+occurred ONLY in reservation prose — this file's allocation paragraph, the plan's Task 18/19 lines, and
+the two lane state files. Checked id by id with `grep -rn` across the whole tree, not by an ordinal sweep:
+both documented traps reproduced again, `13\.[0-9]+` still reporting `13.3333` as its maximum and a float
+sort still putting `13.99` above `13.378`, so the pattern used was `\b13\.3[0-9][0-9]\b`. The next free
+BLOCK is still **`13.390`**, controller-allocated ON REQUEST ONLY — unchanged by this PR, which consumed
+its own five and no more.
+
+**The owner ruling this cluster carries.** 2026-09-09, verbatim: *"go with 2: Count only projects the
+guest already has sight into."* The escalation is `docs/lanes/owner-question-restricted-project-count.md`,
+now RESOLVED. Option 3 — count every project the caller cannot name — is refused as a plain existence
+leak. The `mapWorkspaceRefs` comment forbidding any such count ("the COUNT would itself be the disclosure
+the rule withholds") is AMENDED in the same change set, quoting the sentence it replaces.
+
+- **13.379** ✅ The card renders every element from data the route served, and every input to every
+  displayed number is a DIFFERENT number, so a card reading one field off another cannot pass: member
+  count 5, three projects at 9/4/7 tickets and 3/1/2 blocked, restricted count 2. The monogram carries
+  the workspace's own name as its accessible name and `CC` as its text; the chips read `14 active`
+  (`20 − 6`) and `6 blocked`; the per-project counts are asserted INSIDE their own rows, so a card
+  printing one project's number on another's reddens. **Archived is marked AND hidden**: the archived
+  project is absent until a disclosure whose accessible name carries the workspace is clicked, and it
+  then carries an `Archived` chip — marking without hiding, or hiding without marking, each fails half of
+  this. `aria-expanded` is asserted in both states. The restricted line is one text node
+  (`2 projects · name restricted`), which a three-interpolation version fails. **Three negative controls,
+  because zero is where this card lies most easily:** a card with nothing restricted renders no line at
+  all (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
+  construction), a card with nothing archived renders no toggle (a control revealing nothing lies about
+  the shape of the data), and both singulars — `1 member`, `1 project · name restricted` — are asserted
+  on cards that have one, so the plurals above are a choice rather than the only string the code can
+  produce. Mutations, each red at its own site: drop the `− blocked` subtraction from the active chip;
+  stop splitting archived out of the live list; loosen `count <= 0` to `count < 0` so the line prints at
+  zero. **And the TINT, which the rest of this case does not reach**: `getByLabelText` finds the avatar by
+  the workspace NAME and asserts its INITIALS, both functions of the name — so keying the tint on the name
+  instead of the id survives every other assertion here. Measured, not supposed: that mutation was run and
+  passed 235/235 in `packages/ui` and every case in this file. Two cards with IDENTICAL names and
+  different ids now assert different tint classes (nothing refuses a duplicate workspace name, and
+  `initialsOf` gives both the same two letters), and a re-mount under a changed name asserts the SAME
+  class — a colour someone has learned must survive a rename. The exact index is deliberately not
+  asserted; that would pin the hash rather than the property. Positive control: both avatars carry a tint
+  class at all, so the inequality cannot pass on two undefineds.
+  — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number anywhere. The point of the case is
+  the absence, not the presence: a card printing the chip AND a zero passes *"'Restricted' is present"*
+  and fails this. `0` is a claim — *"no work you can see"* — and it is exactly the claim the server
+  declined to make by omitting the key (`13.366` on the route side). The numbers are queried away
+  individually, by shape, so a failure says which one leaked. What the guest IS still told is asserted in
+  the same run: the project's NAME (rulings P32/P38 withhold names, not this), and
+  *"1 project · name restricted"* — the string the whole owner ruling exists to make renderable.
+  Mutation: print `${memberCount ?? 0} members` beside the chip → RED.
+  — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.381** ✅ The role sentence and every gated affordance read ONE value. The fixture is deliberately
+  one the shipped server never sends — **`role: 'guest'` WITH the counts present** — because it is the
+  only body that separates the two possible implementations: reading `role` (what ships) renders
+  `Restricted`; reading `memberCount === null` (the second source that suggests itself, and which agrees
+  on every REAL guest response) renders `7 members` and two chip numbers. A case built from a realistic
+  guest body cannot tell them apart, which is why this one is unrealistic on purpose. Measured both ways:
+  the second-source mutation reddens this case and NOT `13.380`, and `13.380`'s own mutation reddens both
+  — so the one-source property lives here and nowhere else. The unknown-role half is the same value read
+  again: `WorkspaceRef.role` is a `string` on the wire (the server sends `proj_memberships.role`
+  verbatim), so a role this build has never heard of is reachable, and the two answers pull opposite ways
+  on purpose — the sentence stays a sentence (*"Your role here is auditor."*), the counts are WITHHELD,
+  because being wrong in that direction is recoverable and being wrong in the other is not.
+  — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.382** ✅ `nameRestrictedProjectCount` counts what the caller already holds, never what the
+  workspace contains. Three things could each make this pass while the wrong number is served, and each
+  has its own assertion. **(1) Option 2 and option 3 agree whenever every project in the fixture is
+  ticket-visible** — a workspace with one nameable and one unnameable project gives `1` under both rules,
+  so a fixture like that certifies nothing. A THIRD project exists that the caller can neither name nor
+  see a ticket in (its only ticket is explicit to the owner): option 2 counts 1, option 3 counts 2, and
+  the count-all mutation reddens with *"expected 2 to be 1"*. **(2) A guest guard copied from
+  `visibleMemberCount` withholds this one**, and every member-written fixture stays green while the number
+  is missing from the exact card the owner's reference draws it on — so the guest is asserted in the same
+  workspace, key PRESENT, value positive, beside `memberCount`'s key being ABSENT on the same object.
+  **(3) The tenancy clause is observable at THIS door**, unlike `visibleProjectCounts`', whose own note
+  records its mutation surviving because the route reads that map only for ids `visibleProjects` returned;
+  this count is over exactly the ids it did NOT return, so a foreign workspace-mode ticket lands straight
+  in it. A second workspace the caller has no membership in seeds one, with a positive control that the
+  foreign row really is `resolved_mode = 'workspace'` — the kind the member's predicate matches — or the
+  assertion would prove only that the fixture was inert. **The tenancy mutation had to be written twice**:
+  deleting the clause outright leaves `params.add(workspaceId)` bound with no `$n` to reference it and
+  Postgres answers *"bind message supplies 2 parameters"* — a 500, which reddens 22 cases and measures
+  nothing about the count. Replaced with a tautology (`(v.workspace_id = $1 OR TRUE)`), which keeps the
+  parameter bound and produces the wrong NUMBER: *"expected 7 to be 1"*. The owner's own answer is `0` by
+  construction (every project nameable, so the subtraction empties), asserted because it is what proves
+  the number is a DIFFERENCE and not a count of unnameable things.
+  — (`apps/server/test/routes/workspace-counts.test.ts`)
