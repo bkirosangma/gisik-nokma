@@ -2324,9 +2324,13 @@ Block `13.348`–`13.357`. The amendment reserved `13.348`–`13.356` for this t
 resolve, naming Task 15 as the owner of both. `13.357` — one past the reserved block, the amendment's own
 "next free" pointer — is the additions table's one owner-approved invented row (role labels on workspace
 cards), requested and used provisionally per this file's standing convention: serial mode has one executor
-and therefore no other claimant, and an unmerged id can still be renumbered. **The next free BLOCK is now
+and therefore no other claimant, and an unmerged id can still be renumbered. ~~**The next free BLOCK is now
 `13.358`** (this PR carries the header, per the standing §12/§13 rule that the first PR minting from a
-block does so) — recount the maximum in use against `origin/main` before trusting this pointer.
+block does so) — recount the maximum in use against `origin/main` before trusting this pointer.~~
+**`13.358`–`13.365` is CONSUMED by Round 2d, the owner's `/sign-in` neo design feedback (controller,
+2026-09-09) — see that section at the foot of this file. The next free BLOCK is now `13.366`,
+controller-allocated ON REQUEST ONLY** — recount the maximum in use against `origin/main` before
+trusting this pointer, same caveat as every prior one in this paragraph.
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -2417,3 +2421,113 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
 > (`git status` clean on both after the run — `UPDATE_ACCESSIBLE_BASELINE` was never set), so "baselines
 > only upward" holds trivially: nothing moved. `non-text-contrast-roster.json` is the one file the run
 > changed, and its diff is committed alongside this catalogue entry.
+
+## Round 2d of the neomorphism amendment (2026-09-09) — sign-in neo design feedback
+
+Block `13.358`–`13.365`. The owner's post-Task-15 review found `/sign-in` did not fully match the neo
+design reference (`design-system/interactive/desktop.dc.html`'s signin screen and `:root`/
+`body[data-style="neo"]` token blocks) on eight points; this round closes all eight. **The largest single
+finding widens the change beyond `/sign-in` itself:** `tokens.ts` already declared `{ fg: 'accent',
+bg: 'surface'/'surfaceRaised', minimum: 4.5 }`, and the owner's neo-round accent hexes
+(`#3A6DB0`/`#7FA9E4`) measure 4.19–4.30 as TEXT on those same backgrounds — below that floor, though
+comfortably above it as a FILL (5.25+ against `accentText`). A new role, `textAccent` — the
+`text`/`textMuted`/`textInverted` family, and explicitly NOT `accentText` (its opposite: colour ON an
+accent-filled surface, not accent-hued text ON a neutral one) — carries the guarantee instead, derived to
+clear 4.5 against every surface/raised background in every style, the `.gn-button--ghost`
+fillTertiary-composited background, AND `surfaceSunken` (beyond what the two declared rows strictly
+require, at zero extra cost — see `tokens.ts`'s `textAccentLight`/`textAccentDark` docblocks for the exact
+derivation and margins). `blue600`/`blue300` are retired in place to the new hexes (`focusRing`/
+`categoryActive` share them and are re-verified at their own 3:1 floor). A new pairless `brand` role
+(`brandOrange` `#ee7733`) fills the sign-in icon tile with the prototype's one fixed hue, exempted from a
+`CONTRAST_PAIRS` row with the measured number recorded rather than hidden (2.87 light, `textInverted` on
+`brand` — below even 3:1, for a purely decorative `aria-hidden="true"` glyph the export itself renders the
+same way).
+
+- **13.358** ✅ The `brand` role: one primitive (`brandOrange`), both themes, no `STYLE_COLOR_OVERRIDES`
+  entry — `themeStylesheet()` emits the identical literal `--gn-brand: #ee7733;` under both `:root` and
+  `[data-theme="dark"]`, pinned as a hardcoded string rather than derived from the same function under
+  test. `.gn-page-header__icon` fills with `var(--gn-brand)` and labels with the existing `textInverted`
+  role (not a new one) rather than `accent`/`accentText`. *Mutation-witnessed: planting a wrong
+  `brandOrange` hex reddens exactly the three `brand`-suite cases (200/203 pass); restored,
+  re-verified 203/203 green.* — (`packages/ui/test/tokens.test.ts`)
+- **13.359** ✅ The text ladder (`text`/`textMuted`) on `/sign-in` — unchanged values, confirmed still
+  wired: `.gn-sign-in__hint`/`.gn-sign-in__legal` and `.gn-page-header__tagline` read `--gn-text-muted`,
+  a SOURCE scan rather than a rendered one (jsdom applies no stylesheet — see 13.362's own docblock for
+  why that gap matters here too). — (`apps/web/test/sign-in-neo-restyle.test.ts`)
+- **13.360** ✅ `textAccent`'s derivation and the two renamed `CONTRAST_PAIRS` rows (`accent` →
+  `textAccent` on `surface`/`surfaceRaised`), plus the retired accent hex measured in both directions: it
+  no longer clears 4.5 as text on a bare light surface, and even dark — which clears the two declared
+  rows unaided — fails against `neoNavySunken` specifically (4.11), which is why `.gn-help__result-title`
+  (rendered on `surfaceSunken`) moved to `textAccent` rather than staying on `accent`. `accentText` on the
+  new `accent` still clears 4.5 in both themes, unnudged (dispatch item 10, verified rather than assumed).
+  *Mutation-witnessed: reverting `textAccentLight` to an intermediate value that clears the two declared
+  rows but not the ghost-button composite reddens exactly three cases (200/203 pass) — the pinned-hex
+  case, the composite/sunken case, and 13.284's own label-contrast case one describe block up, which is
+  the live CSS site this derivation exists to protect; restored, re-verified 203/203 green.* — (`packages/ui/test/tokens.test.ts`)
+- **13.361** ✅ Sign-in markup/CSS fidelity to the export, four small fixes: (1) `.gn-sign-in__mark`
+  widens to `min-width:56px` (was 44px) and, under `[data-style="neo"]` only, takes a raised
+  neumorphic-square treatment (`background:var(--gn-surface)`, `box-shadow:var(--gn-shadow-raised)`) —
+  `hig`/`minimal` keep the flat ghost fill unchanged, matching the export's own hig rendering of this
+  screen; (2) the email input gains the export's `placeholder="you@example.com"` verbatim, an ADDITION
+  since the shipped field had none; (3) the footer's Terms/Privacy links underline on hover and
+  focus-visible — a deliberate departure from the export's colour-and-opacity-only affordance
+  (`a:hover,a:focus-visible{text-decoration:none;opacity:.68}`), because WCAG's "more than colour alone"
+  is not satisfied by an opacity shift on the same hue — and pick up the branded `--gn-focus-ring` outline
+  they previously lacked; (4) `.gn-notfound__link`, which SELECTOR-OVERRIDES the global `a` rule at equal
+  specificity, is moved to `--gn-text-accent` alongside it — fixing only the global rule would have left
+  this one page's recovery links on the retired, now text-unsafe `--gn-accent`. *Mutation-witnessed:
+  reverting `.gn-notfound__link`'s `color` to `var(--gn-accent)` reddens exactly one case in this file
+  (8/9 pass); restored, re-verified 9/9 green.* — (`apps/web/test/sign-in-neo-restyle.test.ts`,
+  `apps/web/test/sign-in.test.tsx`)
+- **13.362** ✅ The derived segmented control, witnessed live under `data-style="neo"` — a standalone
+  Playwright case (not inside the signed-out `UNAUTHED_ROUTES` sweep, so it cannot move that sweep's
+  accessible-names baseline) drives `/v1/auth/methods` to `phone:true`, confirms the page actually
+  rendered under `neo` (positive control), renders the control with both tabs and correct
+  `aria-selected`, then reads BOTH the declared value (`--gn-fill-tertiary` on the root resolves to
+  `neo`'s own hex, `#b0988429`, not `hig`/`minimal`'s) and the RENDERED one (the selected tab's own
+  `box-shadow`, distinguished from `hig`'s by shape — two layers, a 16px blur — not mere non-`none`-ness,
+  since `hig`'s own raised shadow is also non-`none`). This does not reopen the phone-tab removal
+  decision (2c's ruling stands, reaffirmed by the owner 2026-09-09): `phone` availability is still fully
+  DERIVED from the (here, stubbed) `/v1/auth/methods` response — this case changes only what the stub
+  answers, not the page's own gating logic — and it is a style witness only, run against a fresh browser
+  context where nothing is stored. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.363** ✅ The accessible-name floor on `/sign-in` does not fall — no role or label changed in this
+  round (the only markup edit is the email placeholder, which carries no accessible name of its own), and
+  13.362's phone:true witness runs OUTSIDE the `UNAUTHED_ROUTES` sweep specifically so it cannot move the
+  baseline that ratchet reads. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.364** ✅ Both viewport suites (`test:e2e:stack`, `test:e2e:viewport`) pass against the dev stack
+  rebuilt from this round's frozen head, `--env-file` included so Google sign-in stays configured (Task
+  14's rebuild dropped it; not repeated here). See the live-run note below. — (`apps/web/e2e-stack/viewport.spec.ts`,
+  `apps/web/e2e-viewport/responsive.spec.ts`)
+- **13.365** ✅ The non-text-contrast roster does not grow — a straightforward re-assertion, not a new
+  waiver: this round adds no new sub-3:1 pairing the roster's own instrument can see (`sweepBorders` reads
+  only `border-{side}-*`, and none of this round's changes touch a border). **This is narrower than "no
+  new sub-3:1 pairing exists" — case 13.358 records one this instrument cannot see**: the page-header
+  icon's `textInverted`-on-`brand` measures 2.87 in light, an exempted decorative-glyph pairing with no
+  `CONTRAST_PAIRS` row and no box/border for the roster to sweep. Recorded as an open item with an owner
+  (this catalogue entry), not silently absorbed into "the roster is unchanged". See the live-run note
+  below for the measured roster diff.
+
+> **Live-run note (13.364, 13.365).** The dev stack was rebuilt with `docker compose --env-file
+> /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml up -d --build --wait web` (the
+> `--env-file` form, per this round's own dispatch — Task 14's plain `up -d --build --wait web` had
+> dropped Google sign-in's env vars). `curl -s localhost:3000/v1/auth/methods` confirmed
+> `{"google":true,"apple":false,"phone":false}` before either suite ran. `test:e2e:viewport`: **31
+> passed, 2 skipped** (the two viewport-comparison cases this suite always skips outside its own
+> three-viewport matrix run), including 13.362 on all three viewport projects. The suite's own console
+> output confirms the derived hexes live in a real browser: `.gn-button--primary` (white on the new
+> accent) measures **5.26:1** — matching the computed 5.258 — and `.gn-help__toc-link`/
+> `.gn-notfound__link`/`.gn-legal__back` (all now `textAccent`) measure **5.31:1** and **4.75:1** on
+> their respective backgrounds, `rgb(50,93,151)` being `#325d97` (`textAccentLight`) rendered. `failures=0`
+> on every route's contrast sweep. `test:e2e:stack`: **6/6** (both smoke cases, the signed-in
+> no-sideways-scroll check, the 12px label-text floor across 7 routes, the non-text-contrast sweep, the
+> guest partial-workspace visibility case). The non-text-contrast sweep's own summary line: **"0 of 6
+> distinct bordered classes below 3:1 (19 bordered elements examined across 7 routes; ... 1 sanctioned
+> waiver(s) recorded separately)"** — byte-identical membership and counts to Task 15's own run (13.356),
+> confirming 13.365's "the roster does not grow" claim directly rather than by inference.
+> `git status` on both `accessible-names-baseline.json` files, both `tap-baseline.json`/
+> `type-scale-baseline.json` files, and `non-text-contrast-roster.json` was CLEAN after both suites ran —
+> every baseline/roster file is byte-identical to before this round's live run, which is the strongest
+> available evidence for 13.363 (no floor moved) and 13.365 (no new sub-3:1 pairing this instrument can
+> see): not merely "the counts printed match" but "the persisted file this run would have rewritten was
+> never touched at all."

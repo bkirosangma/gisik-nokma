@@ -27,11 +27,24 @@
 
      MEASURED, because this is the one thing the ruling declined to assert:
      the FILL is 1.09-1.15 against every surface and does NOT carry
-     identification. The LABEL does, at 5.31-6.81 - comfortably past the 4.5
-     it owes as text. See `13.284` for what that does and does not settle. */
+     identification. The LABEL does, at 4.54-5.87 - comfortably past the 4.5
+     it owes as text. See `13.284` for what that does and does not settle.
+
+     `color: var(--gn-text-accent)`, NOT `--gn-accent` — Round 2d (2026-09-09).
+     `accent` stopped being a text-safe colour when the owner's neo-round
+     accent hexes shipped (4.19-4.30 as text on a bare surface, let alone this
+     rule's darker fillTertiary-composited one); `textAccent` is the role that
+     carries the 4.5 guarantee this comment describes, and it is what
+     `.gn-button--ghost` below duplicates deliberately (13.289). This base
+     rule's own `color` is unreachable in practice today — `button.tsx` always
+     pairs `.gn-button` with a variant class, and `--primary`/`--danger`/
+     `--ghost` all set their own `color` at equal specificity, so whichever
+     was declared LAST in this file wins. It is still updated here rather than
+     left on the retired role, so a future bare `.gn-button` (or a reader of
+     just this rule) sees the same guarantee the measured numbers describe. */
   border: none;
   background: var(--gn-fill-tertiary);
-  color: var(--gn-accent);
+  color: var(--gn-text-accent);
   font-weight: 600;
   cursor: pointer;
 }
@@ -400,7 +413,11 @@
 .gn-state-node--terminal.gn-state-node--selected { border-color: var(--gn-category-terminal); }
 .gn-state-node__header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .gn-state-node__name { font-weight: 600; }
-.gn-state-node__initial-badge { color: var(--gn-accent); font-size: 0.75rem; font-weight: 600; }
+/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit. This
+   renders literal readable text ("Start", `state-node.tsx:26`) on
+   `.gn-state-node`'s own `--gn-surface-raised` background, exactly the
+   composition the renamed `CONTRAST_PAIRS` rows guarantee. */
+.gn-state-node__initial-badge { color: var(--gn-text-accent); font-size: 0.75rem; font-weight: 600; }
 .gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
 
@@ -415,6 +432,8 @@
 .gn-any-state-node__hint { font-size: 0.75rem; }
 
 .gn-transition-edge { stroke: var(--gn-border); stroke-width: 2; }
+/* Left on `accent`, Round 2d audit: an SVG edge stroke, not text — 3:1 (WCAG
+   1.4.11), not 4.5, and `accent` clears it (3.75-4.93 light, 4.11-7.15 dark). */
 .gn-transition-edge--selected { stroke: var(--gn-accent); }
 .gn-transition-edge__label {
   position: absolute;
@@ -430,6 +449,8 @@
   max-width: 220px;
 }
 .gn-transition-edge__label--empty { padding: 0; border: none; background: none; }
+/* Left on `accent`, Round 2d audit: only `border-color` uses it (non-text,
+   3:1); the label's own text is already `--gn-text`, not accent. */
 .gn-transition-edge__label--selected { border-color: var(--gn-accent); color: var(--gn-text); }
 
 /* Workflow builder side panels (Plan 8 Task 8). Same discipline as the canvas
@@ -568,6 +589,8 @@
   color: var(--gn-text-muted);
   cursor: pointer;
 }
+/* Left on `accent`, Round 2d audit: only `border-color` uses it (non-text,
+   3:1); the swatch's own text is already `--gn-text`, not accent. */
 .icon-picker__choice--selected { border-color: var(--gn-accent); color: var(--gn-text); background: var(--gn-surface-raised); }
 .icon-picker__choice:disabled { background: var(--gn-surface-sunken); cursor: not-allowed; }
 .icon-picker__choice:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
@@ -825,6 +848,9 @@
   background: var(--gn-accent);
   color: var(--gn-accent-text);
 }
+/* Left on `accent`, Round 2d audit: `aria-hidden="true"` decorative glyph
+   (`calendar-view.tsx:373` — "the glyph carries the colour, the label
+   carries the meaning"), not text — 3:1, and `accent` clears it. */
 .gn-calendar__glyph { color: var(--gn-accent); margin-right: 0.2rem; }
 .gn-calendar__item--custom { color: var(--gn-custom-marker); }
 .gn-calendar__item--custom .gn-calendar__glyph { color: var(--gn-custom-marker); }
@@ -1046,6 +1072,8 @@
    the dot and the headline weight use, never a third colour with a fourth
    meaning. */
 .gn-inbox__glyph { color: var(--gn-text-muted); }
+/* Left on `accent`, Round 2d audit: wraps a `NotificationIcon` SVG
+   (`inbox-view.tsx:84`), a decorative unread indicator, not text. */
 .gn-inbox__row[data-unread] .gn-inbox__glyph { color: var(--gn-accent); }
 .gn-inbox__text { flex: 1; min-width: 0; }
 .gn-inbox__headline { display: block; }
@@ -1114,13 +1142,16 @@
   align-items: baseline;
   gap: 0.5rem;
 }
+/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
+   `.gn-saved-filters` sits on plain `--gn-surface` (its own background rule,
+   above), and this is a clickable text label, not a glyph. */
 .gn-saved-filters__apply {
   flex: 1;
   min-width: 0;
   padding: 0.5rem;
   border: none;
   background: transparent;
-  color: var(--gn-accent);
+  color: var(--gn-text-accent);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -1290,7 +1321,13 @@
 .gn-help__results-count { margin: 0 0 0.6rem; font-weight: 600; }
 .gn-help__results-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 .gn-help__result { display: flex; flex-direction: column; gap: 0.15rem; }
-.gn-help__result-title { color: var(--gn-accent); text-decoration: none; font-weight: 600; }
+/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
+   This is a search-result LINK TITLE on `.gn-help__results`' own
+   `--gn-surface-sunken` background — the one genuine-text site this audit
+   found on a sunken surface, which is why `textAccentLight`/`textAccentDark`
+   are derived to clear `warmSunken`/both dark sunken hexes too, not only the
+   two backgrounds the declared `CONTRAST_PAIRS` rows name. */
+.gn-help__result-title { color: var(--gn-text-accent); text-decoration: none; font-weight: 600; }
 .gn-help__result-title:hover { text-decoration: underline; }
 .gn-help__result-where { font-size: 0.9rem; color: var(--gn-text-muted); }
 .gn-help__result-excerpt { color: var(--gn-text-muted); }
@@ -1320,11 +1357,14 @@
    enhanced floor would make nineteen entries 836px tall on a phone. Standalone
    controls (`.gn-view-tabs button`, the 404's recovery links, the MCP code
    input) use 44px; in-list links use 24px. */
+/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
+   `.gn-help` (the ancestor) sets no background of its own, so this renders on
+   the ambient `body { background: var(--gn-surface) }`. */
 .gn-help__toc-link {
   display: inline-flex;
   align-items: center;
   min-height: 1.5rem;
-  color: var(--gn-accent);
+  color: var(--gn-text-accent);
   text-decoration: none;
   font-size: 1rem;
 }
@@ -1338,7 +1378,10 @@
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-left: 3px solid var(--gn-accent); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
 .gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-size: 0.92em; }
-.gn-help__link { color: var(--gn-accent); }
+/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
+   Inline documentation link text, on the same ambient `--gn-surface` as
+   `.gn-help__toc-link` above. */
+.gn-help__link { color: var(--gn-text-accent); }
 
 /* Wide content scrolls INSIDE its own box; the page never scrolls sideways. */
 .gn-help__table-scroll { overflow-x: auto; margin: 0 0 1rem; }
@@ -1456,7 +1499,7 @@
 .gn-button--ghost {
   background: var(--gn-fill-tertiary);
   border-color: transparent;
-  color: var(--gn-accent);
+  color: var(--gn-text-accent);
   font-weight: 600;
 }
 
@@ -1468,12 +1511,28 @@
   gap: 0.5rem;
   text-align: center;
 }
+/* `background: var(--gn-brand)`, NOT `--gn-accent` — Round 2d (2026-09-09).
+   The owner's neo prototype fills this exact tile with its ONE fixed brand
+   hue (`--brand:#EE7733`), not the theme-varying accent — see the `brand`
+   role's docblock in `tokens.ts` for why it has no light/dark split and why
+   it carries no `CONTRAST_PAIRS` row (the glyph is `aria-hidden="true"`; the
+   `<h1>` beside it is the only thing here a screen reader announces).
+   `color: var(--gn-text-inverted)`, not a new role: `textInverted` already
+   flips light-cream/dark-navy by theme, the same semantic the export's own
+   `--onColor` carries, so reusing it is the one no-new-role option — the
+   dispatch was explicit that inventing a second "colour on a filled surface"
+   role beside `accentText` would be redundant. `border-radius` is UNCHANGED
+   (`--gn-radius-card`) even though the export hardcodes a 14px literal here
+   under every style it ships (including its own hig default) — that literal
+   maps cleanly to neither `card` (20px under neo) nor `control` (14px under
+   neo, but only by coincidence with hig's own hardcoded 14px too), so it is
+   flagged rather than guessed at; see the executor's report for Round 2d. */
 .gn-page-header__icon {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-brand);
+  color: var(--gn-text-inverted);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -10,7 +10,14 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.45;
 }
-a { color: var(--gn-accent); }
+/* `--gn-text-accent`, not `--gn-accent` — Round 2d (2026-09-09). This is the
+   global text colour for every unstyled `<a>` in the product; `accent`
+   stopped carrying a text-contrast guarantee the moment the owner's neo-round
+   accent hexes shipped (measures 4.19-4.30 as text on a bare surface, below
+   the 4.5 this selector owes) — `textAccent` is the role `tokens.ts` derived
+   specifically to keep that guarantee. See `packages/ui/src/tokens.ts`'s
+   `textAccent` role docblock for the full accent/textAccent split. */
+a { color: var(--gn-text-accent); }
 
 /* A control renders in the PRODUCT's font, not the browser's. Owner-ruled
    2026-09-08 against the `NEW, 2026-09-08` bullet in
@@ -230,9 +237,43 @@ button { font: inherit; }
    fails, so it is stated here rather than inherited.
 
    The marks sit in a ROW, centred, because there are at most two of them and a
-   column of two icons reads as a list of one-character items. */
+   column of two icons reads as a list of one-character items.
+
+   `min-width: 3.5rem` (56px), not `2.75rem` (44px) — Round 2d (2026-09-09).
+   The owner's neo prototype sizes these marks `min-height:44px;min-width:56px`
+   (`design-system/interactive/desktop.dc.html:160-165`) — wider than a square
+   at this height on purpose, matching a raised neumorphic tile rather than
+   the 44px-square minimum every OTHER icon-only control in this product
+   uses. `min-height` is UNCHANGED at 2.75rem (44px): that half already
+   matched the export exactly. */
 .gn-sign-in__marks { display: flex; justify-content: center; gap: 0.75rem; }
-.gn-sign-in__mark { min-width: 2.75rem; min-height: 2.75rem; padding: 0.4rem; }
+.gn-sign-in__mark { min-width: 3.5rem; min-height: 2.75rem; padding: 0.4rem; }
+/* Raised neumorphic square, `[data-style="neo"]` ONLY — Round 2d (2026-09-09).
+   The export's own neo social-mark markup is
+   `background:var(--ctlBg);box-shadow:var(--ctlShadow)` (both resolve to a
+   raised tile under neo: `--ctlBg` is the surface itself, `--ctlShadow` a
+   dual-layer light/dark shadow pair) — a genuinely different look from
+   `.gn-button--ghost`'s flat tertiary-fill base this element otherwise
+   inherits (`Button`'s default variant is `ghost`, per `button.tsx`).
+   `hig`/`minimal` are UNCHANGED on purpose: the export's OWN hig rendering of
+   this same screen uses the flat ghost treatment (no distinct `--ctlBg`/
+   `--ctlShadow` departure outside `[data-style="neo"]` in the export's own
+   CSS), so scoping this rule the same way `[data-style="neo"]
+   .gn-field__input` already is (`packages/ui/src/ui.css`) reproduces that
+   distinction rather than forcing the raised look everywhere. `--gn-surface`,
+   not `--gn-fill-tertiary`, for the background: under `neo`, `surface` IS the
+   export's `--ctlBg` (`#EDE4DB`/`#1B2340`, the same hex the export gives
+   `--surface` under this style). `--gn-shadow-raised` is the closest existing
+   shadow role to the export's `--ctlShadow` — same dual-layer light/dark
+   construction, a slightly larger geometry (this token system has no
+   separate "control-scaled" shadow role; `.gn-founding` reuses the same
+   `--gn-shadow-raised` role for the same reason, Task 15). Specificity
+   0,2,0 beats `.gn-button--ghost`'s 0,1,0 regardless of source order, the
+   same reasoning `.gn-field__input`'s neo override already relies on. */
+[data-style="neo"] .gn-sign-in__mark {
+  background: var(--gn-surface);
+  box-shadow: var(--gn-shadow-raised);
+}
 /* 1rem, not the plan's 0.8rem (12.8px) — under the 16px floor for body copy
    on a phone, the same defect `.gn-notfound__aside` (globals.css:239) and
    `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */
@@ -332,7 +373,16 @@ button { font: inherit; }
 }
 
 /* 2.75rem = 44px, the minimum touch target. These are the only controls on the
-   page, and on a phone they are what a lost reader reaches for first. */
+   page, and on a phone they are what a lost reader reaches for first.
+
+   `color: var(--gn-text-accent)`, not `--gn-accent` — Round 2d (2026-09-09).
+   This class SELECTOR-OVERRIDES the global `a { color: var(--gn-accent) }`
+   rule this same round moved to `--gn-text-accent` (both are specificity
+   0,1,0, and this one is declared later); leaving this literal on the
+   retired role would have defeated that fix by specificity on exactly the
+   page it was meant to protect, shipping 4.18 on real recovery-link text
+   (`.gn-notfound__link` renders on `--gn-surface-raised`, one of the two
+   backgrounds `textAccent` guarantees 4.5 against). */
 .gn-notfound__link {
   display: inline-flex;
   align-items: center;
@@ -341,7 +391,7 @@ button { font: inherit; }
   border: 1px solid var(--gn-border-strong);
   border-radius: 0.4rem;
   background: var(--gn-surface-raised);
-  color: var(--gn-accent);
+  color: var(--gn-text-accent);
   text-decoration: none;
   transition: background-color 200ms ease, border-color 200ms ease;
 }
@@ -353,11 +403,37 @@ button { font: inherit; }
 
 /* Focus is drawn with an outline and an offset rather than a background swap:
    a keyboard user needs the ring to be visible against BOTH resting and hover
-   states, and a background-only cue disappears under the pointer. */
+   states, and a background-only cue disappears under the pointer.
+
+   `.gn-sign-in__legal a` joins this list, Round 2d (2026-09-09): the sign-in
+   footer's Terms/Privacy links are their OWN class (`.gn-sign-in__legal`, the
+   paragraph wrapping them — it is not a descendant of `.gn-legal`, which only
+   wraps the standalone `/terms` and `/privacy` PAGES), so they never inherited
+   this branded ring and were relying on the browser's native default focus
+   outline instead. */
 .gn-notfound__link:focus-visible,
-.gn-legal a:focus-visible {
+.gn-legal a:focus-visible,
+.gn-sign-in__legal a:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
+}
+
+/* ── The sign-in footer's link underline, on hover/focus. Round 2d
+   (2026-09-09), and a DELIBERATE departure from the owner's own export.
+
+   The export's global link rule is `a:hover,a:focus-visible{
+   text-decoration:none;opacity:0.68}` — colour and opacity are the ONLY
+   interactive cue it ever gives a link, at rest or on interaction. That is
+   not enough here: WCAG's "identifiable by more than colour alone" is not
+   satisfied by an opacity shift on the SAME hue, which is what an
+   accent-tinted link losing a third of its opacity amounts to. So this
+   product adds what the export does not — an underline, on hover AND
+   focus-visible, scoped to the sign-in footer specifically (`.gn-sign-in__legal
+   a`, not a global `a:hover` rule, to avoid re-litigating hover behaviour
+   for every other link in the product in the same change). */
+.gn-sign-in__legal a:hover,
+.gn-sign-in__legal a:focus-visible {
+  text-decoration: underline;
 }
 
 /* 1rem, not the 0.95rem this first shipped with. Measured in a real browser at

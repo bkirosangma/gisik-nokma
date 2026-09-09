@@ -338,6 +338,11 @@ function SignInForm() {
                    above attaches to. Without it the browser has no field to
                    offer a passkey through and `autoFill: true` does nothing. */
                 autoComplete="username webauthn"
+                /* Verbatim from the owner's neo prototype
+                   (`design-system/interactive/desktop.dc.html:149`), an
+                   ADDITION rather than a copy change — the shipped input had
+                   no placeholder at all. */
+                placeholder="you@example.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
