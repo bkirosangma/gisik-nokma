@@ -47,6 +47,18 @@ export {
   type FoundingGateway,
 } from './founding.js';
 /**
+ * The CALLER-scoped invitations gateway (Task 17). A FOURTH onboarding
+ * gateway on the same argument as the three above: an offline replica cannot
+ * know whether an invitation is still pending, because the answer depends on a
+ * credential row and a clock that live only on the server.
+ */
+export {
+  InvitationActionError,
+  createHttpMyInvitationsGateway,
+  type MyInvitationsGateway,
+  type PendingInvitation,
+} from './my-invitations.js';
+/**
  * The inbox adapter, moved here 2026-09-07 from `apps/web/src/`. It belongs
  * beside the three above — it takes an `HttpClient` exactly as they do, imports
  * no React, no Next and no DOM, and its own docblock already named them as the

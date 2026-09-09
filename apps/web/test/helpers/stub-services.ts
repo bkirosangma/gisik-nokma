@@ -11,6 +11,7 @@ import {
   type FoundingGateway,
   type InviteAdminGateway,
   type InviteGateway,
+  type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
 import type { AppServices } from '../../src/providers.js';
 import type { TicketLocator } from '../../src/ticket-location.js';
@@ -63,6 +64,16 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
 export type GatewayStubs = {
   invites?: Partial<InviteGateway>;
   invitesAdmin?: Partial<InviteAdminGateway>;
+  /**
+   * Task 17's caller-scoped invitations. Same rule as every gateway here:
+   * un-stubbed members reject BY NAME. A case that mounts `/workspaces` and
+   * forgets this one sees the banner say so out loud rather than rendering the
+   * empty list it would have invented — which matters more here than elsewhere,
+   * because "no banner" is this component's CORRECT rendering for an empty
+   * answer, and a default `[]` would make every banner case pass without the
+   * banner ever being asked anything.
+   */
+  myInvitations?: Partial<MyInvitationsGateway>;
   founding?: Partial<FoundingGateway>;
   authoring?: Partial<WorkflowAuthoringGateway>;
   /**
@@ -137,6 +148,12 @@ export function stubServices(
       mintInvite: unstubbedGateway('invitesAdmin.mintInvite'),
       listPending: unstubbedGateway('invitesAdmin.listPending'),
       ...gateways.invitesAdmin,
+    },
+    myInvitations: {
+      list: unstubbedGateway('myInvitations.list'),
+      accept: unstubbedGateway('myInvitations.accept'),
+      decline: unstubbedGateway('myInvitations.decline'),
+      ...gateways.myInvitations,
     },
     founding: {
       foundWorkspace: unstubbedGateway('founding.foundWorkspace'),
