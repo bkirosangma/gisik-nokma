@@ -293,7 +293,7 @@ export type ReplicaDataSourceDeps = {
  * ------------------------------------------------------------------ */
 
 const NO_WORKSPACE_TABLE: ReplicaAbsence = {
-  field: 'WorkspaceRef.name / .memberCount / .projects (with each project's name, archived and two counts)',
+  field: 'WorkspaceRef.name / .memberCount / .projects — each project carrying a name, archived, and two counts',
   because:
     'the local schema (packages/sync-client/src/storage/schema.ts) has no workspaces table and no projects table — bootstrap ships definitions, tickets and `me`, and `Me` carries bare project IDS with no names. A nav rendering an id where a name goes is a nav naming something nobody authored. Task 16 widened the shape rather than this absence: `memberCount` needs a roster this device does not hold, and `archived` plus the two per-project counts need the projects table named above. The counts could NOT be honestly computed from the local ticket set even so — they are VISIBILITY-SCOPED server-side, and a replica holds only what was already visible, so counting locally would answer a different question in the same field',
   owner: 'Plan 10 — the bootstrap payload and the local schema, not a /v1 route',

@@ -68,12 +68,17 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > the server has no src alias — measured on 13.370's payload case (src edit: 9/9 green; the same edit in
 > `dist`: red, alone). That note lives at the case, because the next person will reach for `src` first.
 >
-> **A TOOLING HAZARD THE REVIEWER HIT, worth more than the findings:** `git status --porcelain` **through
-> the `rtk` filter printed `ok` for a tree that had an uncommitted edit in it**, and `git diff --stat`
-> through the same filter under-reported the file count (20 where there were 22). The reviewer only saw
-> the truth via `rtk proxy`. A filtered "clean" reading is exactly what makes `git checkout HEAD --`
-> destructive — and that destruction DID happen in this task (see the `7bfac1ca` commit message), with
-> the memory loaded. **Use `rtk proxy git status` before any `git checkout HEAD --`.**
+> **A TOOLING CLAIM FROM THE REVIEWER THAT I COULD NOT REPRODUCE — recorded as unconfirmed, not as
+> fact.** It reported that `git status --porcelain` through the `rtk` filter printed `ok` for a tree with
+> an uncommitted edit in it, and that `git diff --stat` under-reported the file count (20 where there
+> were 22). **I tried to reproduce it three ways against a deliberately dirty tree — `git status
+> --porcelain`, `rtk git status --porcelain`, `rtk git status`, plus `git diff --stat` and
+> `rtk git diff --stat` — and every one of them reported the modified file correctly.** So either the
+> reviewer's session had a different filter configuration or it misread its own output; I am not able to
+> say which, and the finding must not be quoted as measured. What IS measured, and stands on its own
+> evidence: **`git checkout HEAD -- <path>` destroyed an uncommitted edit in this task** (see the
+> `7bfac1ca` commit message), with the memory about that failure already loaded. **Commit before
+> mutating.** That rule needs no tooling hazard to justify it.
 >
 > The eight mutations:
 > guest permitted → 13.366 ×2 + 13.367; `memberCount` without `ROSTER_VISIBLE_CLAUSE` → 13.367 +
