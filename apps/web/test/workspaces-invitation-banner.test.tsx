@@ -104,6 +104,25 @@ const WAITING: PendingInvitation = {
   expiresAt: '2026-09-20T19:30:00.000Z',
 };
 
+/**
+ * The second invitation, whose two names the server can honestly not supply.
+ *
+ * `invitedByName: ''` is not a hypothetical: better-auth's `"user"."name"` is
+ * `NOT NULL` with no non-blank constraint, and the dev workspace's own owner
+ * carries the empty string — the banner rendered *" invited you to …"* against
+ * the real stack, which is how this was found. `workspaceName: null` is the
+ * server's honest answer for a workspace with no naming event in its ledger.
+ */
+const UNNAMED: PendingInvitation = {
+  inviteId: 'inv2',
+  workspaceId: 'ws8',
+  workspaceName: null,
+  role: 'guest',
+  invitedByName: '',
+  invitedAt: '2026-09-11T06:00:00.000Z',
+  expiresAt: '2026-09-22T06:00:00.000Z',
+};
+
 function mount(invitations: PendingInvitation[], overrides = {}) {
   render(
     <Providers
@@ -143,8 +162,8 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     // component's explicit `timeZone` deleted — the mutation survives and the
     // date assertion below certifies nothing.
     const banner = await underZoneAsync('Pacific/Niue', async () => {
-      mount([WAITING]);
-      return screen.findByRole('region', { name: 'One invitation is waiting' });
+      mount([WAITING, UNNAMED]);
+      return screen.findByRole('region', { name: '2 invitations are waiting' });
     });
     // The offer is a sentence, and the role inside it is a sentence too — never
     // the raw enum, which is a database value rather than terms being offered to
@@ -153,6 +172,14 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
       within(banner).getByText('Rukhang invited you to Convenience Corner as a member.'),
     ).toBeInTheDocument();
     expect(within(banner).queryByText('member')).toBeNull();
+    // A name the server could not supply is words, never a hole in a sentence.
+    // `?? 'Someone'` alone leaves `''` in place — it is neither null nor a name
+    // — and that is the value the dev stack's own workspace owner carries.
+    expect(
+      within(banner).getByText(
+        'Someone invited you to a workspace that has not been named yet as a guest.',
+      ),
+    ).toBeInTheDocument();
     // The product's timezone, not the machine's: 19:30Z on the 20th is the 21st
     // in Asia/Kolkata and the TWENTIETH in the `Pacific/Niue` this renders
     // under, so a component reading the machine's zone reddens exactly here.
@@ -172,6 +199,13 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     ).toBeInTheDocument();
     expect(
       within(banner).getByRole('button', { name: 'Decline the invitation to Convenience Corner' }),
+    ).toBeInTheDocument();
+    // Two waiting invitations, four buttons, four DIFFERENT accessible names —
+    // which is the whole reason the workspace is in them.
+    expect(
+      within(banner).getByRole('button', {
+        name: 'Accept the invitation to a workspace that has not been named yet',
+      }),
     ).toBeInTheDocument();
 
     screen.getByRole('heading', { name: 'New workspace' });

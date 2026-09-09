@@ -136,6 +136,28 @@ function onDay(iso: string): string {
  * exactly three — the door refuses `owner` on the way in — so a fourth would be
  * a type error here rather than a sentence with a hole in it.
  */
+/**
+ * A name the server sent, or `null` when it does not actually name anybody.
+ *
+ * `?? 'Someone'` is not enough and that was MEASURED against the dev stack
+ * rather than imagined: the inviter's display name comes from better-auth's
+ * `"user"."name"`, which is `NOT NULL` and has **no non-blank constraint at
+ * all**, and the dev workspace's owner really does carry `''`. The banner
+ * rendered *" invited you to Convenience Corner as a member."* — a sentence
+ * with a hole in it, from a value that was neither null nor a name.
+ *
+ * Blank-is-not-a-name is the product's own rule elsewhere, argued at length
+ * where an invitation's ADDRESS is validated: `'   '` names nothing while
+ * looking like a name everywhere it is displayed. This applies it to the two
+ * names this banner renders. `workspaceName` gets the same treatment for
+ * symmetry rather than from a measurement — the founding door refuses a
+ * whitespace workspace name, so a blank one should not be reachable, and a
+ * reader deserves to know which of the two facts is which.
+ */
+function named(value: string | null): string | null {
+  return value !== null && value.trim() !== '' ? value : null;
+}
+
 const ROLE_SENTENCE: Record<PendingInvitation['role'], string> = {
   admin: 'as an admin',
   member: 'as a member',
@@ -238,7 +260,8 @@ function InvitationBanner() {
       </h2>
       <ul className="gn-invitations__list">
         {invitations.map((invitation) => {
-          const workspace = invitation.workspaceName ?? 'a workspace that has not been named yet';
+          const workspace = named(invitation.workspaceName) ?? 'a workspace that has not been named yet';
+          const inviter = named(invitation.invitedByName) ?? 'Someone';
           return (
             <li
               key={invitation.inviteId}
@@ -246,9 +269,7 @@ function InvitationBanner() {
               data-testid={`invitation-${invitation.inviteId}`}
             >
               <p className="gn-invitations__offer">
-                {`${invitation.invitedByName ?? 'Someone'} invited you to ${workspace} ${
-                  ROLE_SENTENCE[invitation.role]
-                }.`}
+                {`${inviter} invited you to ${workspace} ${ROLE_SENTENCE[invitation.role]}.`}
               </p>
               {/* ONE interpolation, not three. React renders each JSX
                   interpolation as its own text node, so a sentence assembled
