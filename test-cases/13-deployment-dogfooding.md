@@ -2464,7 +2464,13 @@ same way).
   rows but not the ghost-button composite reddens exactly three cases (200/203 pass) — the pinned-hex
   case, the composite/sunken case, and 13.284's own label-contrast case one describe block up, which is
   the live CSS site this derivation exists to protect; restored, re-verified 203/203 green.* — (`packages/ui/test/tokens.test.ts`)
-- **13.361** ✅ Sign-in markup/CSS fidelity to the export, four small fixes: (1) `.gn-sign-in__mark`
+- **13.361** ✅ Sign-in markup/CSS fidelity to the export. **Dispatch item 4 (card width/padding, field/
+  button/segment geometry) needed no fix, confirmed rather than assumed**: card `26rem`/`1.5rem` padding
+  already equal the export's `416px`/`24px`; `.gn-field__input`/`.gn-button` `2.75rem` min-height already
+  equals the export's `44px`; neo's control radius (`14px`) already equals the export's `--ctlR`; the
+  primary button's full width comes for free from `.gn-sign-in__method`'s `flex-direction:column`
+  (default `align-items:stretch`). Task 14/15 already landed this; nothing here reopens it. What DID need
+  fixing, four small items: (1) `.gn-sign-in__mark`
   widens to `min-width:56px` (was 44px) and, under `[data-style="neo"]` only, takes a raised
   neumorphic-square treatment (`background:var(--gn-surface)`, `box-shadow:var(--gn-shadow-raised)`) —
   `hig`/`minimal` keep the flat ghost fill unchanged, matching the export's own hig rendering of this

@@ -1829,10 +1829,14 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // a 16px blur) rather than mere non-'none'-ness: hig's own `raised` shadow
   // is ALSO non-'none' (a single, tighter layer), so "has a shadow" alone
   // would not tell the two styles apart.
+  // `.split(',').length >= 2` was tried first and is WRONG: `getComputedStyle`
+  // renders each layer's colour as `rgba(r, g, b, a)`, which itself contains
+  // commas, so a SINGLE hig-style layer already splits into 4+ pieces — the
+  // assertion would pass for hig too and prove nothing about layer count.
+  // Checking both layers' own offset/blur geometry (`tokens.ts`'s `neo`/
+  // `light`/`raised`: `7px 7px 16px` + `-7px -7px 16px`, `SHADOWS.neo.light.raised`)
+  // is what actually distinguishes neo's two-layer shadow from hig's one.
   const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('16px');
-  expect(
-    selectedTabShadow.split(',').length,
-    `neo's raised shadow has two layers; rendered: ${selectedTabShadow}`,
-  ).toBeGreaterThanOrEqual(2);
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('7px 7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-7px -7px 16px');
 });
