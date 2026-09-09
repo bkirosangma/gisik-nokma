@@ -20,7 +20,110 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~11:1x IST. **ROUND 2d COMPLETE, ABOUT TO FREEZE AND PUSH.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~12:0x IST. **TASK 16 — WORK COMPLETE, FREEZING.**
+>
+> **This block is written BEFORE the freeze, so its last line is a claim about the future and the one
+> to distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open`
+> before acting — a restart surface fails in the conservative direction and that is the direction
+> nobody audits.
+>
+> **Anchors, verified rather than remembered.** Branch `exec/16-workspace-counts`, cut from
+> `origin/main` at `1417580` (PR #394's merge record). FOUR commits: `3ea111ec` (the change),
+> `1df237c4` (the rebuild verifier), `6d9b3303` (four exact-shape assertions the new keys reddened),
+> `fb02ce2d` (the smoke's stale stub). Ahead 4 / behind 0 at the time of writing; **re-check
+> `git rev-parse origin/main` before doing anything with this branch** — it moved twice under Round 2d
+> and will move again. `git branch --contains` on each returns this branch (not empty), so none is
+> orphaned.
+>
+> **What Task 16 is.** `GET /v1/me/workspaces` gains `memberCount` per workspace and
+> `{ticketCount, blockedCount, archived}` per project; `proj_projects` gains an `archived` column
+> folded from a NEW event pair `project.archived` / `project.restored`. Server-first — the card is
+> Task 18. Cases **13.366–13.372**, §13 pointer moved to **13.390** past the whole workspaces cluster.
+>
+> **The dispatch's premise was already stale and was NOT acted on.** "getMyWorkspaces REFUSES whole"
+> was true in the Plan 5/6 era and closed by rulings P32/P38. The route serves
+> `{workspaceId, name, role, projects}` today. There was no refusal to fix; the route was EXTENDED.
+>
+> ## ⚠ ONE OPEN OWNER QUESTION — `docs/lanes/owner-question-restricted-project-count.md`
+>
+> **Task 18 is blocked on it, this PR is not.** The task text asks for a "visible/restricted count" of
+> the projects a caller may not name, so Task 18 can render *"1 project · name restricted"*.
+> `mapWorkspaceRefs`' docblock forbids exactly that in as many words — *"there is deliberately no
+> 'and N more', because the COUNT would itself be the disclosure the rule withholds"*. Shipping it
+> means rewriting a recorded ruling's rationale, so the task text's own "escalate before a new rule"
+> clause fires. The field is strictly additive; its absence blocks nothing here. Three options and the
+> asymmetry that decides them are in that file. **Do not decide this in-task on a later restart** —
+> it needs the owner, relayed by the controller.
+>
+> ## WHAT WAS MEASURED, and what it cost
+>
+> **Seven mutations, each killing only its own cases** (tree verified clean after every restore):
+> guest permitted → 13.366 ×2 + 13.367; `memberCount` without `ROSTER_VISIBLE_CLAUSE` → 13.367 +
+> 13.366; `ticketCount` unscoped → 13.368 alone; `blockedCount` aliased to `ticketCount` → 13.369
+> alone; route paints `0` instead of omitting → 13.366 ×2; archive removed from `ADMIN_ONLY_TYPES` →
+> 13.370 alone; mapper `?? 0` → 13.372 + the older 13.357; and the MIRROR bug (a truthiness check
+> collapsing a real `0` to withheld) → 13.372 ×3.
+>
+> **The real finding, which a naive implementation would have leaked quietly:** `readMembers` hides
+> guests from non-admins, so a plain `COUNT(*)` over workspace-scope rows tells a member "there are
+> four people here" beside a three-name directory — and the missing one is the guest the roster
+> withholds. Count and directory now share `ROSTER_VISIBLE_CLAUSE` and `isWorkspaceAdmin`, both MOVED
+> into `read/membership-roster.ts` rather than copied, and 13.367 asserts count ===
+> `readMembers(...).length` for every viewer class.
+>
+> **`proj_projects` was covered by `verifyProjections`' clean verdict and never filled** — that
+> file's own named trap, standing open on one projection. The seed now founds AND archives a project,
+> and the non-emptiness case asserts `archived === true`, because the column has a DEFAULT and a table
+> of untouched rows diffs clean for the same reason an empty one does. What that proves is stated in
+> the test: live and rebuild AGREE. It does NOT prove the fold is correct — a projection ignoring
+> `project.archived` produces `false` on both sides. That half is 13.370's, through the real door.
+>
+> **A THIRD check that was green for the wrong reason, found by fixing a stub.**
+> `apps/web/e2e/smoke.spec.ts`'s `/v1/me/workspaces` stub had gone stale before Task 16 — no
+> `projects` key, which `mapWorkspaceRefs` REQUIRES — so its case "the workspace list REFUSES out
+> loud" rendered a refusal from a `MappingError` about the malformed stub, NOT from the serving gap
+> the case names (rulings P32/P38 closed that gap long ago). Fixing the stub to add the counts turned
+> it red and exposed both halves; the case is renamed to what it now measures. **The suite is on no
+> gate**, which is why it survived. Two OTHER failures in it are pre-existing and NOT fixed —
+> recorded with owners rather than absorbed: the sign-in case asserts `Continue with Google` is absent
+> and the dev stack now configures Google (owner: whoever next touches the sign-in smoke — stub
+> `/v1/auth/methods` there the way 13.298 does), and the board case cannot find its
+> `5 of 8 done · 2 restricted` rollup line (owner: whoever next touches the board smoke). Neither is
+> reachable from this task's change.
+>
+> **A round lost to a filtered turbo run.** `pnpm turbo run test --filter` over three packages
+> reported green while turbo had CANCELLED `@gisik-nokma/server#test` after a sibling failed — the
+> four exact-shape assertions the new keys reddened were invisible until the full gate ran.
+> **A filtered run whose summary line for a package is ABSENT is not a package that passed.**
+>
+> ## GATE AND LIVE VERIFICATION
+>
+> Gate: `pnpm turbo run build test typecheck --force`, Node **v22.22.2** (`which node` checked, not
+> assumed). **GREEN at `6d9b3303`: 33/33 tasks, 0 cached, exit 0** (server 1484 passed | 5 skipped,
+> app-core 1158, web 180, domain 464, ui 235, rule-engine 282, editor 178, sync-client 90, mcp-server
+> 43, mobile 27, desktop 8). `fb02ce2d` landed after that run and touches ONE e2e spec that the
+> gate typechecks (`tsconfig.e2e.json`, inside `@gisik-nokma/web#typecheck`) and does not execute —
+> **the gate is re-run at the frozen head before the PR and that line is the one to quote.**
+>
+> **Dev stack, real data, both roles** — rebuilt with
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml up -d --build --wait server web`;
+> `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}`.
+> The migration applied to the real dev database (`pgmigrations` row present, column default `false`).
+> Probed as the dev workspace's real owner and its real guest (two short-lived `session` rows, both
+> DELETED afterwards, re-probe → 401):
+> * owner → `"memberCount":2, projects:[{... "archived":false, "ticketCount":26, "blockedCount":3}]`
+> * guest → **no `memberCount` key at all**, `"projects":[]`
+> The owner's 26 equals `SELECT count(*) FROM proj_tickets` for that project, which is what an
+> owner's number must equal and is the control that the `proj_visibility` INNER JOIN drops nothing.
+>
+> ## NEXT
+>
+> **Task 17** (caller-scoped pending invitations + Accept/Decline, opus, cases 13.373–13.378) once the
+> controller merges this. Task 18 needs the owner ruling above first.
+
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~11:1x IST. **HISTORY — Round 2d MERGED as `a87f47e`
+> (PR #394), verified `git merge-base --is-ancestor` against `origin/main`, `gh pr list --state open`
+> → `[]`. Its "STILL OUTSTANDING" list below is DONE; superseded by the block above.**
 >
 > **This block lives only on branch `exec/147-2d-signin-neo-feedback` until its PR merges** — read it
 > via `git show exec/147-2d-signin-neo-feedback:docs/lanes/executor-state.md` if `main`'s copy looks
