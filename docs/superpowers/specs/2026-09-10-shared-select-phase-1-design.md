@@ -188,15 +188,24 @@ not just generic guidelines:
 
 - **Checkmark icon**: `currentColor`, inheriting the selected row's already-verified text color — no new
   contrast pair needed.
-- **Active/focused row (keyboard nav)**: reuse the existing `focusRing` token rather than inventing a new
-  active-state color. It is already tested at `{ fg: 'focusRing', bg: 'surface', minimum: 3 }` in
-  `CONTRAST_PAIRS` and clears with margin in every style/theme — reusing it inherits that verification
-  instead of needing a new one.
-- **Chip × remove button**: reuse `grayAccessible`/`grayAccessibleDark` — tokens this file already minted
-  specifically for "the 3:1 a chip dot owes" (see the `grayAccessible` docblock) — rather than a new
-  color. Touch target: WCAG 2.2 SC 2.5.8 (AA) requires 24×24px minimum, not the 44×44px mobile-HIG figure
-  a generic checklist reaches for — this app is desktop pointer/keyboard-first, so ≥24×24px hit area with
-  adequate spacing between adjacent chips is the real bar.
+- **Active/focused row (keyboard nav)**: `focusRing`'s `CONTRAST_PAIRS` row (`{ fg: 'focusRing',
+  bg: 'surface', minimum: 3 }`) verifies it as a 2px *outline*, not a full-row background fill — that's
+  exactly how it's already used at `.icon-picker__choice:focus-visible { outline: 2px solid
+  var(--gn-focus-ring); outline-offset: 2px; }` in `ui.css`. The active option row reuses that identical
+  pattern (outline, not fill) rather than inventing a background-fill use of a token verified for a
+  different job. The row's *hover/highlight background* (mouse or keyboard) reuses the existing alpha
+  fill-hierarchy tokens (`fillWarm*`/`fillNavy*`) the same way other hover states already do — those are
+  deliberately excluded from `CONTRAST_PAIRS` (they're alpha, composited over whatever surface sits
+  under them) and aren't independently verified per-row; this doesn't change that, it's the same
+  mechanism already accepted elsewhere.
+- **Chip × remove button**: reuse the `border` role (`color: var(--gn-border)`, resolving to
+  `grayAccessible`/`grayAccessibleDark`) — already verified at `{ fg: 'border', bg: 'surface', minimum: 3
+  }` in `CONTRAST_PAIRS`. That row is only verified against `bg: surface`, so chips render directly on
+  `surface` (the same background as the trigger box itself — an inline tag, not a separately-tinted
+  pill) to keep the already-verified pairing valid without needing a new `CONTRAST_PAIRS` row. Touch
+  target: WCAG 2.2 SC 2.5.8 (AA) requires 24×24px minimum, not the 44×44px mobile-HIG figure a generic
+  checklist reaches for — this app is desktop pointer/keyboard-first, so ≥24×24px hit area with adequate
+  spacing between adjacent chips is the real bar.
 - **"Max selected" inert-but-not-disabled options** (new finding, not previously covered): the inline
   message must be exposed via an `aria-live="polite"` region (or equivalent), or a screen-reader user gets
   no explanation at all for why an option stops responding — worse than a plain `disabled` state for that
