@@ -1,5 +1,36 @@
 # Cross-lane controller — live state
 
+## ⚖ WEDNESDAY ~16:2x IST — **FRESH CONTROLLER (Fable 5.1, rulings in-session) at `b47f0253`; THE OWNER LOOKED AND SENT THE FEEDBACK ROUND — ROUND 19b DISPATCHED (sonnet, by paste to the holding executor).** `main` is `b47f0253` + this PR; zero open PRs; the gate at `bd30021` is GREEN (below). Weekly **85%** (resets Sep 14 06:30).
+
+### Re-measured at `b47f0253`, not carried
+- `origin/main` = local `main` = `b47f0253`, tree clean; zero open PRs; executor `gisik:1` holding on sonnet-5, ctx 22%, still on `exec/19-workspace-home` (`ffba191`, squash-merged and not on origin — it branches from `origin/main`). Six checks under node `v22.22.2`, **raw exit 0 each**: `check:env` · `check:tasks` · `check:runbook` · `check:citations` · `check:help` · `check-case-ids` (**1,871** unique ids; §13's highest is 13.389). `Unsupported engine` 0 in every log. No orphaned workers; no gate lock.
+- **Forced gate at `bd30021`** — the previous controller's run, `gate-bd30021.log`, START 15:30:22, folded here as promised: **`GATE_EXIT=0` · 33/33 · `Cached: 0` · 2m04s · node v22.22.2 · `Unsupported engine` 0 · 4,183 passed | 5 skipped / 329 files** — exactly the executor's frozen-head numbers. `b47f0253` is docs-only over it (#406), so no gate is owed at `b47f0253`.
+- Monitor armed ~16:15 (open-PR set · `origin/main` · the exec window; change-only, 60 s).
+
+### The owner's words, verbatim (~16:1x IST, with a screenshot of the workspace home in neo/dark)
+> 1. the workspace card should be clickable. and on click it should lead into the workspace page which looks like this: [image]
+> 2. From the same image, take note of the navigation bar.
+> 3. The create workspace card shouldnt be that big.
+
+The image is the prototype's `workspace` screen (neo, dark, the "mr" workspace): every visible string in it is verbatim in `design-system/interactive/desktop.dc.html`, so **the prototype is the spec** (the 2d precedent). The controller read the screenshot and copied it to `gisik-nokma-lanes/refs/2026-09-09-workspace-home-neo-dark.png` (macOS puts a narrow no-break space before "PM" in screenshot names — the first copy by typed name failed on it; copy by glob).
+
+### Premises measured at `b47f0253` — all three true
+(1) `WorkspaceCard` has no door to `/w/<id>` — per-project links and "My Work" only. (2) `AppNav` renders Workspaces · [My Work] · Inbox · Help · Account · the two toggles · "Sign out {name}"; the reference nav is workspace-CONTEXTUAL (Workspaces · the current workspace's name, marked · Board · My work · Inbox+badge · Members · Settings · Help · Account · monogram + Sign out), and the prototype's RULE is `navDef.filter(n => !noWorkspace || n.always)` — without a workspace only Workspaces/Inbox/Help/Account render, plus a scope note. (3) `.gn-founding` is a full-width raised card; the prototype's "New workspace" block is a bare column at `max-width:420px`; the class is also the home's New-project form, whose reference IS a raised card with an inline row — two forms, two families.
+
+### Round 19b — DISPATCHED (sonnet, `CTL-DISPATCH-2026-09-09-round19b-workspace-feedback.md`), block 13.390–13.399
+By paste to the holding sonnet executor (the Task 13 precedent: right tier already running, no relaunch). The card's head becomes the door (no interactive element nested in another); the nav transcribed from the prototype's rule with the SERVED workspace name as the one source, `aria-current` on the current item, the toggles kept (Task 14's owner ruling), the sign-out keeping the user's name in its accessible name; the founding block and the home's new-project card as two class families; the home to the reference — 56px monogram tinted by ID, the meta line from served numbers only (a guest gets no member number), Members/Settings buttons, project cards with chips + Open board + Archive/Restore from the same role value 13.388's gate reads, the prototype's non-admin refusal note, five door cards with the prototype's notes. Client only; a server need = stop and ask. **Pointer: the executor moves §13's to 13.400 in its PR** — a controller PR stays inside `docs/`. No ledger row: a round on Tasks 18/19, as 2d was on Task 2.
+
+### Four conservative-default RULINGS (controller), each listed for the owner in the PR body
+1. **Board renders only when the route carries a project** and points at THAT project's page. The prototype has one board per workspace; the product's boards belong to projects; a link with no true target is not rendered — the prototype's own `always` rule applied one level down. Mutation: render Board without a project → RED.
+2. **No "0 archived · show":** the archived control renders only above 0 (Task 18/19's rule — a control that reveals nothing lies about the data); above 0 the labels are the prototype's.
+3. **"Open board" for archived projects too.** Archiving is not a permission (Task 16) and the board is writable, so the prototype's "Open read-only" would be a false claim. A read-only mode is a permission change — opus, its own task, if the owner wants it.
+4. **No description line.** `ProjectRef` carries no description; nothing is painted. A description field is a data-model addition — the owner's call.
+
+Deferred, not built, named for the owner: the prototype's "Workspace" card below the doors (rename / role note / delete — rename is a mutation with no event today; the reference is cropped above it), and the per-restricted-project card ("Project · name restricted" / "Ask to be named") — the wire carries no id for a withheld name and serving one is a new visibility surface (P32/P38: escalate before a new rule). The restricted LINE (option 2) stays.
+
+### Next
+Round 19b's PR → the fixed merge step (partitioned drop check, literal paths) → forced gate at the new `main` → restart the executor ON OPUS with a **Task 12** dispatch (passkeys) — unless the owner's look at the reworked screens sends another round first. Then 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. Weekly 85%: at ~95% merge what is green, push handoffs, pause.
+
 ## ✅ WEDNESDAY ~15:3x IST — **THE WORKSPACE CLUSTER IS COMPLETE: Task 19 MERGED (#405 → `bd30021`). Both workspace screens are ready for the OWNER'S LOOK. HOLD before Task 12.** `main` is `bd30021` + this PR; zero open PRs; executor restarted into a hold. Weekly meter **84%** (resets Sep 14 06:30).
 
 ### The merge — even with main, trees identical
