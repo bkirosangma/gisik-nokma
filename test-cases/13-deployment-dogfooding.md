@@ -2755,10 +2755,16 @@ auth tables.*
   committed in 24 of 25 trials. **And the race had to be three-way**: a pair of link-accept and
   banner-decline never runs the banner ACCEPT handler, so deleting THAT spend survived the pair.
   — (`apps/server/test/routes/my-invitations.test.ts`)
-- **13.378** ✅ The *"One invitation is waiting"* banner renders the offer as a sentence with the role as a
-  sentence too (never the raw enum), the dates in the PRODUCT's timezone, and Accept/Decline whose
-  accessible names carry the workspace so two waiting invitations never present two identically-named
-  buttons — and renders **nothing at all** when none is waiting, which is the same claim from the side that
+- **13.378** ✅ The banner renders the offer as a sentence with the role as a sentence too (never the raw
+  enum), the dates in the PRODUCT's timezone, and Accept/Decline whose accessible names carry the workspace
+  — TWO invitations in the fixture, four buttons, four different accessible names, and the PLURAL heading a
+  singular fixture never reached. The second invitation carries the two names the server can honestly not
+  supply, and one of them is not hypothetical: **`invitedByName: ''`**, because better-auth's
+  `"user"."name"` is `NOT NULL` with no non-blank constraint and the dev workspace's own owner carries the
+  empty string. Found by probing the real stack, where the banner rendered *" invited you to Convenience
+  Corner as a member."* — `?? 'Someone'` does not catch a value that is neither null nor a name. Mutation:
+  drop the blank guard from `named()` and this reddens. It renders **nothing at all** when none is
+  waiting, which is the same claim from the side that
   matters: a banner rendering its heading unconditionally would pass every assertion about the full case.
   The expiry fixture is deliberately on the far side of the date line (`19:30Z` on the 20th renders *20
   Sept* in UTC and *20 Sept* in the `Pacific/Niue` the case renders under), so a component formatting in
