@@ -4,6 +4,8 @@
   "examined": 19,
   "highestReading": 16.72,
   "routes": [
+    "/sign-in",
+    "/workspaces",
     "/my-work",
     "/p/:projectId",
     "/members",
@@ -67,6 +69,21 @@
       "routes": [
         "/settings/workflows"
       ]
+    }
+  ],
+  "sanctionedWaivers": [
+    {
+      "selector": "[data-style=\"neo\"] .gn-field__input",
+      "sanctioned": true,
+      "ratioLight": 1.24,
+      "ratioDark": 1.16,
+      "border": "none — sunken box-shadow only, not compositable by this instrument",
+      "backdrop": "surface (neo)",
+      "routes": [
+        "/sign-in",
+        "/workspaces"
+      ],
+      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Measured by Task 13 (docs/neo-token-report.md); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is Task 13's measurement, cited."
     }
   ]
 }

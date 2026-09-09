@@ -25,6 +25,7 @@ import { WEB as WEB_ORIGIN } from './helpers/stack.js';
  * 13.172 — signIn (invoked at the top of this test) drives the shipped sign-in UI by role/label (getByLabel('Email'), getByRole('button', {name:'Send magic link'})) with no test id added for the suite; the link is fetched from Mailpit and followed, landing the browser authenticated.
  * 13.173 — this test navigates Convenience Corner -> Shop operations to a real board-column-* element and asserts ticket-card-* count is greater than zero, so an empty board (which would satisfy a bare no-error check) fails it.
  * 13.177 — a RECORD rather than an assertion, kept beside the suite it describes: the e2e-stack suite is off the LOCAL gate structurally — reached by `test:e2e:stack`, a script name turbo defines no task for, and excluded by `apps/web/vitest.config.ts`'s `test/**` include — while being deliberately ON CI's `gate` fan-in. Measured as `turbo run test --dry=json` = 16 tasks, 10 `#test`, 0 e2e; no test asserts it at runtime.
+ * 13.354 (Task 15, neo restyle) — this test IS the "signs in through the restyled /sign-in and reaches /workspaces" witness: `signIn` drives the real (now-neo) sign-in page and the test proceeds onto `/workspaces`-derived board links, against the web image rebuilt from Task 15's frozen head.
  */
 test('sign in through the real stack, reach the seeded board, and see the guarded door from both sides', async ({
   page,

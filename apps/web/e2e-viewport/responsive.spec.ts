@@ -1016,6 +1016,10 @@ for (const route of UNAUTHED_ROUTES) {
         .info()
         .annotations.push({ type: 'baseline', description: `${accessibleKey}: recorded, not asserted` });
     } else {
+      // 13.350 (Task 15, neo restyle) — this ratchet, run over EVERY route in
+      // this suite including /sign-in, is what proves the accessible-name
+      // floor did not fall under the restyle: baselines are unchanged and
+      // this loop stayed green through Task 15's commits.
       for (const attr of RATCHETED) {
         // 13.285 — a count may fall and never rise. Lowering is a deliberate,
         // commit-message-carrying deletion of the key, never a re-run.
@@ -1490,6 +1494,12 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
  * nothing below has been executed by its author. Deleting the
  * `workspaces.length === 0` arm reddens the first assertion; deleting
  * `<FoundingForm />` reddens the second. The orchestrator runs both.
+ *
+ * 13.349 (Task 15, neo restyle) — this test, 13.298 and 13.300 are UNCHANGED
+ * and still green: the three-state machine they pin (loading / refusal /
+ * empty, and the 401 settle on `/sign-in`) survives a CSS-only restyle whose
+ * only markup edit on this page is additive (13.357's role label, inside the
+ * populated-list branch none of these three states reach).
  */
 test('13.299 — /workspaces with an EMPTY roster renders the empty state and the founding form', async ({
   page,

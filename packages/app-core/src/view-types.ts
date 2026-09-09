@@ -2,7 +2,17 @@ import type { FieldClaim, StateCategory, TicketState } from '@gisik-nokma/domain
 
 export type Actor = { id: string; name: string };
 export type ProjectRef = { id: string; name: string };
-export type WorkspaceRef = { id: string; name: string; projects: ProjectRef[] };
+/**
+ * `role` (Task 15, the audit's one owner-approved invented row — the SAFE
+ * form: real backing data, only the display was missing). The server has
+ * disclosed it on `GET /v1/me/workspaces` since the route first answered
+ * (`role: row.role` in `apps/server/src/routes/workspaces.ts`); `mapWorkspaceRefs`
+ * never read it. The seven OTHER invented rows the audit found on this
+ * screen (member counts, avatars, chips, the invitation banner, Help/Account
+ * nav) stay unbuilt — no data exists for them, and this one field is the
+ * single case where "the display is missing" was actually true.
+ */
+export type WorkspaceRef = { id: string; name: string; role: string; projects: ProjectRef[] };
 
 /**
  * Who claimed it and when — both clocks, always (spec §3: both are true in

@@ -61,6 +61,12 @@ export default function WorkspacesPage() {
             <li key={workspace.id} data-testid={`workspace-card-${workspace.id}`}>
               <Card>
                 <h2>{workspace.name}</h2>
+                {/* 13.357 — the one owner-approved invented row on this screen: the
+                    server has carried `role` on this route since it first answered;
+                    only the display was missing. The other seven I-rows the audit
+                    found (member counts, avatars, chips, the invitation banner,
+                    Help/Account nav) stay unbuilt — no data exists for them. */}
+                <p className="gn-workspace-list__role">{workspace.role}</p>
                 <ul>
                   {workspace.projects.map((project) => (
                     <li key={project.id} data-testid={`project-card-${project.id}`}>

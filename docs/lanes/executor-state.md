@@ -20,7 +20,95 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~04:5x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT, INCLUDING THE ~04:4x ONE, IS HISTORY.**
+> # ▣ CURRENT POSITION — TUESDAY 2026-09-09 ~05:5x IST. **READ THIS BLOCK FIRST; EVERY POSITION BLOCK BELOW IT IS HISTORY.**
+>
+> **Task 14 is MERGED** — `d28b92a` on `origin/main`, controller anchor `73e189de` on top of it. Verified:
+> `gh pr view 387 --json state,mergeCommit` → MERGED; `git merge-base --is-ancestor d28b92a origin/main` →
+> yes; zero open PRs at session start.
+>
+> **Task 15 (sign-in, workspaces, invite restyled in neo; cases 13.348–13.357) is COMPLETE and ABOUT TO BE
+> FROZEN AND PUSHED**, on branch `exec/145-task15-neo-restyle`, cut from `origin/main` at `73e189de`.
+> Re-verify with `git rev-parse origin/main` before trusting this — if it has moved, this branch's frozen
+> head is stale and needs a rebase-and-re-gate, not a push as-is.
+>
+> **What Task 15 actually needed, and what it turned out NOT to need.** Task 14 already made the shared
+> component classes `/sign-in`, `/workspaces` and `/invite/<token>` all reuse (`.gn-card`, `.gn-field`,
+> `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is the toggle's default — so
+> all three routes already rendered in neo the moment Task 14 merged. **No page had a hunk of new CSS to
+> write**, and neither `/sign-in`'s nor `/invite/<token>`'s markup changed at all. What DID need doing:
+>
+> 1. **Case 13.355 — the radius inversion Task 14 flagged and declined to fix, resolved.**
+>    `.gn-workspace-list .gn-card` and `.gn-card.gn-invite` each carried a literal `border-radius: 12px`
+>    (a deliberate BUMP against `.gn-card`'s then-8px base) that had inverted into an unintended SHRINK
+>    once Task 14 moved that base onto a `--gn-radius-card` token reaching 20px under neo. **A third,
+>    previously undocumented instance of the SAME bug was found auditing the first two**: `.gn-sign-in`'s
+>    own literal `border-radius: 16px` ties `.gn-card`'s token-driven radius at identical specificity and
+>    won only because `layout.tsx` imports `globals.css` after `ui.css` — the exact import-order hazard
+>    `.gn-card.gn-invite`'s own (now-removed) doubled-class docblock warned about, on a selector nobody had
+>    audited for it. All three literals are DELETED (not repointed at the token) — once no rule competes,
+>    there is nothing left to tie. `.gn-founding` (out of Task 14's scope, `/workspaces`' own surface) moved
+>    onto `.gn-card`'s own token roles (`var(--gn-radius-card)` + `box-shadow: var(--gn-shadow-raised)`,
+>    which it never had) rather than deleting its rule, since it isn't a `.gn-card` sibling. Source-scan
+>    test at `apps/web/test/neo-card-radius.test.ts`, mutation-witnessed LIVE against the real file
+>    (reintroduced `.gn-card.gn-invite { border-radius: 12px; }`, reddened that one assertion alone, 3
+>    pass/1 fail, restored via `git checkout HEAD --`, re-verified 4/4 green).
+> 2. **Case 13.356 — the non-text-contrast sweep never visited `/sign-in` or `/workspaces`, which is
+>    exactly where the neo pure-look input (13.339, sunken/no-border, waived below 3:1) renders**, so it
+>    could never record the waiver it was measuring for (Task 14's own 13.343 finding). Both routes added
+>    to the stack sweep. The sweep still cannot compute a `box-shadow`'s contrast ratio (border-only
+>    compositing, by design), so a live DOM check on each route confirms the field genuinely has
+>    `border: none` and a real `box-shadow`, and Task 13's measured numbers (1.24 light / 1.16 dark) are
+>    recorded as a SANCTIONED entry in the persisted roster — appended AFTER `below` is computed, so it can
+>    never trip the zero-below-3 assertion. Witnessed live against the rebuilt dev image (see below):
+>    `non-text-contrast-roster.json` now carries `"routes"` with 7 entries and a `"sanctionedWaivers"` array
+>    with exactly this entry.
+> 3. **Case 13.357 — the additions table's one owner-approved invented row: role labels on workspace
+>    cards.** `GET /v1/me/workspaces` has disclosed `role` since the route first answered; the client never
+>    read it. `WorkspaceRef` gains `role: string`, `mapWorkspaceRefs` reads it, each `/workspaces` card
+>    renders its own caller role beneath the name. Mutation-witnessed live (removed the rendered `<p>`,
+>    reddened exactly the 13.357 assertion in `workspaces-cards.test.tsx`, 3.153/3.154 unaffected, restored
+>    and re-verified 3/3 green); a second refusal at the mapper level (`packages/app-core/test/online/mappers.test.ts`)
+>    pins the same property — a body with no `role` throws `MappingError` rather than defaulting one.
+> 4. **Cases 13.348–13.354 — the plan's own case list, all properties provably UNCHANGED by this task**
+>    (no markup touched on `/sign-in` or `/invite/<token>`; `/workspaces`' only edit is 13.357's additive
+>    role line). Five of these (13.348–13.353) described properties already proven by PRE-EXISTING tests
+>    that had never carried these ids — `check:citations` correctly reddened on the first attempt (baseline
+>    0 uncited, went to 6), and each got a one-line citation at the test that already covers it rather than
+>    a new redundant test. 13.354 (the stack suite signs in and reaches `/workspaces`, 6/6) needed the live
+>    run below.
+>
+> **Live-run verification, against the web image rebuilt from THIS branch's frozen head**
+> (`docker compose -f docker-compose.dev.yml build web && up -d --wait web`): `test:e2e:stack` 6/6,
+> `test:e2e:viewport` 28/28 (+2 skipped, the usual count). Neither `accessible-names-baseline.json` file
+> changed (`UPDATE_ACCESSIBLE_BASELINE` never set) — "baselines only upward" holds trivially, nothing
+> moved. `non-text-contrast-roster.json` is the one file the run changed; its diff is committed.
+>
+> **Gate: forced (`--force`, 0 cached both times it was run), 33/33, twice** — once before the citation
+> fix round, once after. **All six repo checks green**: `check:env`, `check:tasks` (196 done + 1 in-flight
+> [this task] + 15 todo = 212, exit 0), `check:db-tz` (`DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`,
+> the dev-COMPOSE stack's port, NOT 54329 the standalone Postgres this brief names — confirm which is up
+> with `docker compose ps` before guessing), `check:runbook`, `check:citations` (1744/1744 cited after the
+> fix round), `check:help`.
+>
+> **task-ledger.tsv**: Task 15's row flipped `todo` → `in-flight` in its own small first commit on this
+> branch (`f7cc590d`), matching the standing convention (`751a8ea1`, "Ledger: task 2 in flight") — the
+> CONTROLLER promotes it to `done` with the merge sha, after merge. Do not self-promote it.
+>
+> ## STILL OUTSTANDING
+> * Freeze this head, re-verify `origin/main` is still `73e189de` immediately before push, push
+>   `exec/145-task15-neo-restyle`, open ONE PR, report to the controller.
+> * `docker image prune -f` was already run (dangling only) after the live suites; no further cleanup owed.
+> * Per the override that relaunched this session: hand the controller `http://localhost:3001/sign-in` and
+>   `http://localhost:3001/workspaces` for the owner's look, once the PR is open.
+> * Task 12 (passkey) is next per the amendment's sequence, after the owner looks at this PR's two routes —
+>   blocked on THIS PR merging. Read `origin/main` after merge, never a local copy of this branch.
+>
+> ---
+>
+> **PREVIOUS POSITION (2026-09-09 ~04:5x IST) — HISTORY, retained for the two facts still relevant to
+> anyone reading forward: Task 14's PR (`#387`) is what the block above confirms MERGED, and Task 14's own
+> judgment-call docblock — the source of items 1 and, indirectly, 2 above — is quoted in full in this
+> file's Task 14 sections further down.**
 >
 > **Task 14 is COMPLETE. Its PR is OPEN: #387, head `19668054`, base `main`, MERGEABLE.
 > AWAITING THE CONTROLLER'S MERGE.** Verify with `gh pr view 387 --json state,mergeable,headRefOid`

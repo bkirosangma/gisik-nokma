@@ -33,12 +33,18 @@ const WORKSPACES: WorkspaceRef[] = [
   {
     id: 'ws1',
     name: 'Convenience Corner',
+    role: 'owner',
     projects: [
       { id: 'p1', name: 'Shop operations' },
       { id: 'p2', name: 'Deliveries' },
     ],
   },
-  { id: 'ws2', name: 'Second Workspace', projects: [{ id: 'p3', name: 'Only project' }] },
+  {
+    id: 'ws2',
+    name: 'Second Workspace',
+    role: 'member',
+    projects: [{ id: 'p3', name: 'Only project' }],
+  },
 ];
 
 function mount() {
@@ -72,5 +78,23 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     expect(within(p2).getByRole('link', { name: 'Deliveries' })).toHaveAttribute('href', '/w/ws1/p/p2');
     // The other workspace's project never leaks into this one's scope.
     expect(within(ws1).queryByTestId('project-card-p3')).toBeNull();
+  });
+
+  /**
+   * 13.357 — the role label, the one owner-approved invented row on this
+   * screen: real backing data (`GET /v1/me/workspaces` has disclosed `role`
+   * since it first answered), only the DISPLAY was missing. Two different
+   * roles on two cards, scoped by card, so a mutation that renders the wrong
+   * workspace's role — or the same role on both — reddens this rather than a
+   * looser "the word owner appears somewhere" check.
+   */
+  it("13.357 each card shows its OWN caller role, not the other card's", async () => {
+    mount();
+    const ws1 = await screen.findByTestId('workspace-card-ws1');
+    const ws2 = screen.getByTestId('workspace-card-ws2');
+    expect(within(ws1).getByText('owner')).toBeInTheDocument();
+    expect(within(ws1).queryByText('member')).toBeNull();
+    expect(within(ws2).getByText('member')).toBeInTheDocument();
+    expect(within(ws2).queryByText('owner')).toBeNull();
   });
 });

@@ -59,15 +59,35 @@ button { font: inherit; }
 }
 .gn-page-title { margin: 1.2rem 0 0.4rem; }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
-/* HIG surface, Task 4a. `.gn-card` already renders borderless at 8px radius
-   (`packages/ui/src/components/card.tsx`); the plan wants 12px on these two
-   routes specifically, so it is scoped here rather than touched globally. */
-.gn-workspace-list .gn-card { border-radius: 12px; }
+/* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
+
+   Both page-specific radius bumps below (`.gn-workspace-list .gn-card`,
+   `.gn-card.gn-invite`) were a literal `12px`, chosen against the HIG base of
+   `.gn-card`'s then-8px so these two surfaces would read slightly rounder than
+   an ordinary card. Task 14 made `.gn-card`'s radius a `--gn-radius-card`
+   token that VARIES BY STYLE (`hig`/`minimal` 16px, `neo` 20px) and flagged,
+   without fixing, that the literal 12px was now SMALLER than the base under
+   every style — the "deliberately bigger" bump had inverted into a
+   deliberately-looking SMALLER one nobody had chosen.
+
+   Both rules are DELETED rather than repointed at the token, because a rule
+   whose value is now identical to the selector it would otherwise tie
+   (`.gn-card`'s own) is a rule with no remaining job: deleting it removes the
+   inversion AND the import-order hazard `.gn-card.gn-invite`'s doubled class
+   used to guard against (see the removed docblock this used to carry) — with
+   only one rule left in the cascade, there is no tie for import order to
+   settle. These two surfaces now simply render `.gn-card`'s own radius, at
+   whatever the active style says: 16px (hig/minimal) or 20px (neo). */
+.gn-workspace-list__role { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 
 /* The founding form has no `.gn-card` ancestor of its own — it sits beside the
    list, not inside a card — so it carries its own surface, per R1(c): fill and
-   spacing separate it, never a border. */
+   spacing separate it, never a border. Task 15: radius and shadow are now the
+   SAME token roles `.gn-card` uses (`--gn-radius-card`, `--gn-shadow-raised`)
+   rather than a literal 12px and no shadow — under `neo` this panel reads as
+   a raised surface exactly like every other card on this route, instead of a
+   flatter, smaller-cornered outlier beside them. */
 .gn-founding {
   display: flex;
   flex-direction: column;
@@ -75,21 +95,11 @@ button { font: inherit; }
   margin-top: 1.1rem;
   padding: 1rem;
   background: var(--gn-surface-raised);
-  border-radius: 12px;
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
 }
 .gn-founding__heading { margin: 0; }
 
-/* `.gn-invite` already carries `.gn-card`'s borderless surface-raised fill
-   (`Card className="gn-invite"`); only the radius is scoped here.
-
-   WRITTEN AS `.gn-card.gn-invite`, NOT `.gn-invite`, and review caught why.
-   Both classes land on the same element, so a bare `.gn-invite` (0,1,0) ties
-   `.gn-card`'s `border-radius: 8px` (0,1,0) in `ui.css` and wins only because
-   `layout.tsx` imports `ui.css` first. A one-line import reorder would then
-   silently revert this radius with nothing in the suite able to see it — the
-   ratchets count accessible names, not pixels. Doubling the class makes it
-   (0,2,0) and the outcome a property of the rule instead of the import order. */
-.gn-card.gn-invite { border-radius: 12px; }
 .gn-invite__dead { color: var(--gn-text-muted); }
 
 /* 2.75rem = 44px, the floor this product already uses for standalone controls
@@ -190,8 +200,20 @@ button { font: inherit; }
 
 /* `margin: 3rem auto` was what centred this card horizontally and pushed it
    down the page. The centring container now owns both axes, and a residual
-   3rem top margin would offset the sheet from true centre by half of it. */
-.gn-sign-in { max-width: 26rem; margin: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-radius: 16px; }
+   3rem top margin would offset the sheet from true centre by half of it.
+
+   NO `border-radius` HERE, found and fixed in Task 15. `<Card className="gn-sign-in">`
+   renders `class="gn-card gn-sign-in"`, so a literal radius here (this rule
+   shipped with `16px`, the pre-neo `.gn-card` value) is the SAME tie
+   `.gn-card.gn-invite`'s docblock (removed above, this same task) once
+   described for the invite card: both selectors are specificity (0,1,0), and
+   `globals.css`'s rule silently won only because `layout.tsx` imports it
+   AFTER `ui.css`. That pinned this card at 16px through the whole neo round —
+   `.gn-card`'s own radius moved to the `--gn-radius-card` token (20px under
+   neo) and this literal never followed. Removing the property rather than
+   repointing it at the token, for the same reason as the two rules above: a
+   value identical to the one it would tie is a rule with no remaining job. */
+.gn-sign-in { max-width: 26rem; margin: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }

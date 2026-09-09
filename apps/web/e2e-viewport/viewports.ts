@@ -157,6 +157,13 @@ export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as readonly ViewportName[];
  * body is `redirect('/workspaces')`. Its target is an AUTHED route. So `/` is
  * covered as a redirect assertion only; measuring `/workspaces` and filing the
  * numbers under `/` would be reporting a route this suite cannot reach.
+ *
+ * 13.352 (Task 15, neo restyle) — `/privacy` and `/terms` are both swept by
+ * every check this file drives (accessible-names, tap-target, type-scale),
+ * and neither `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx`
+ * nor `apps/web/src/back-button.tsx` was touched by that task, so the Back
+ * control's presence and accessible name on both routes is unaffected by
+ * construction as well as by this suite staying green.
  */
 export const UNAUTHED_ROUTES = [
   { path: '/help', label: 'help' },

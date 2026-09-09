@@ -18,6 +18,11 @@ import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
  * `Providers`/`useAppServices` pair.
  *
  * Cases 3.118–3.123 (`test-cases/03-foundation-ledger.md`).
+ *
+ * 13.353 (Task 15, neo restyle) — every case in this file is UNCHANGED and
+ * still green: `apps/web/app/invite/[token]/page.tsx` carries no hunk in that
+ * task (verified `git diff 73e189de.. -- apps/web/app/invite` is empty), so
+ * the markup this file drives is byte-identical to what it drove before.
  */
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
