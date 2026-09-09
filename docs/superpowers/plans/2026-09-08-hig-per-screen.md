@@ -1251,6 +1251,57 @@ or data semantic; the rest are sonnet, per the model floor.
 `apps/mobile` is React Native; `--gn-*` CSS variables do not exist there. Task 11 records this deferral durably.
 Every remaining I-row stays invented.
 
+### The Workspaces page, built to the owner's reference — owner 2026-09-09 (image + *"this is how the workspace page is supposed to look"*)
+
+**This SUPERSEDES the audit's "these I-rows stay invented" for the workspaces page specifically** — the owner has now
+scoped them as real features. It is NOT a restyle: it is feature + data work on the read/visibility surface (the one
+that produced P19/P22/P23), so the server parts are **opus / high**. **The product cannot lie: every count is COMPUTED
+from real data and VISIBILITY-SCOPED, never painted.** The reference itself honours this — the guest card (Nokma
+Internal) shows NO member/ticket counts, only *"You're a guest here."* and *"1 project · name restricted"*. Match that.
+
+**Already ships (verified at `caba1f6`), do NOT rebuild:** the nav (Workspaces · My Work · Inbox+unread badge · Style
+· Theme · Sign out {name}), the heading *"Workspaces — {user.name}"*, the *"N workspaces you belong to."* subtitle,
+role labels (Task 15), project names, and the **New workspace create form** (`workspace.created`). `blocked` is a real
+countable state (`packages/domain/src/workflow.ts:13` `blocked: z.boolean()` on a workflow state).
+
+Case-id block for this cluster: **`13.366`–`13.385`** (2d holds 13.358–13.365 and carries the pointer to 13.366).
+
+### Task 16: Workspaces page — real card data, visibility-scoped
+
+**opus / high, opus reviewer.** `WorkspaceRef` and
+  `GET /v1/me/workspaces` gain **`memberCount`, `ticketCount`, `blockedCount`** — computed per workspace
+  (`proj_memberships`; `proj_tickets` with `blockedCount` = tickets whose current state has `blocked:true`) and served
+  **only where the viewer is owner/member; ABSENT (not 0) for a guest.** The guest's `projects` carry a
+  name-restriction marker + a visible/ restricted count (the `restrictedCount` pattern already in `mappers.ts`), so a
+  guest sees *"N project · name restricted"* and never a name they may not see (P32/P38 surface — escalate before
+  inventing a new rule). `mapWorkspaceRefs` reads the new fields. Cases 13.366–13.372, mutation-witnessed: a guest's
+  response carries no count and no restricted name (mutate the gate to permit → RED, alone); a member's counts equal
+  the DB aggregation; `blockedCount` counts blocked-state tickets and nothing else.
+### Task 17: Pending invitations + Decline
+
+**opus / high, opus reviewer.** Server: a read surfacing invitations
+  addressed to the signed-in user's VERIFIED email that are still valid (not expired/accepted/declined), from
+  `proj_invites`; a **Decline** mutation (a real state change — the audit noted Decline exists nowhere); *"Open the
+  invitation"* links to the existing accept flow. Client: the *"One invitation is waiting"* banner with the inviter,
+  workspace, role and expiry. Cases 13.373–13.379: only genuine pending invites surface; a declined/expired invite
+  vanishes; Decline is witnessed as a state change; an invite for another email never appears (mutate the email scope
+  → RED). **Decline is destructive-adjacent — the banner asks nothing clever but the mutation is real; recorded as an
+  owner-approved feature.**
+### Task 18: The neo workspace card + nav additions
+
+**sonnet, sonnet reviewer (haiku ok for the pure-CSS card).** The card to
+  the reference through the style axis: initials tile (deterministic colour from workspace id, the `Avatar` primitive),
+  *"N members · N projects"*, the tickets/blocked chips (`Chip` tones already exist), the role label, the project
+  subtitle, the guest *"name restricted"* line, the chevron→board affordance. Nav gains a **Help** link and the
+  *"No workspace selected — pick one to reach its board, members and settings."* subtitle when none is selected, plus
+  the avatar. **The Account nav link WAITS for Task 12** (`/account` does not exist yet) — add it in Task 12's PR, not
+  here. Cases 13.380–13.385: the card renders every element from real data; counts/chips absent on a guest card; the
+  accessible-name floor rises by the new controls and never falls; both viewport suites; the roster does not grow.
+
+**Sequence:** 2d (sign-in, in flight) → **16 → 17 → 18** → owner look at `/workspaces` → **12** (passkeys; also lands
+the Account nav link) → 3a/3b → 5a/5b → 9 → 6a/6b → 7a/7b → 8a/8b → 10 → 11. Tasks 16 and 17 are opus (relaunch the
+executor on `--model opus` for each); 18 is sonnet.
+
 
 ## Execution order and merge cadence
 
