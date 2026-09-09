@@ -20,7 +20,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~09:4x IST. **ROUND 2d IN FLIGHT. READ THIS BLOCK FIRST.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~11:1x IST. **ROUND 2d COMPLETE, ABOUT TO FREEZE AND PUSH.**
 >
 > **This block lives only on branch `exec/147-2d-signin-neo-feedback` until its PR merges** — read it
 > via `git show exec/147-2d-signin-neo-feedback:docs/lanes/executor-state.md` if `main`'s copy looks
@@ -49,30 +49,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > necessary to satisfy the dispatch's OWN "every CONTRAST_PAIRS row passes" requirement, not scope
 > creep. Full reasoning in the implementer dispatch prompt if this needs re-deriving after a restart.
 >
-> ## IN FLIGHT — one sonnet implementer subagent, dispatched, not yet returned
+> ## WHAT HAPPENED — implementer → my own re-verification → reviewer → one follow-up fix, all done
 >
-> Scope: tokens.ts (new `brand`/`textAccent` roles, retire `blue600`/`blue300` hex to the new accent,
-> derive `textAccent`'s primitives via script against every surface/raised background, verify
-> `accentText`-on-`accent` still ≥4.5), `ui.css` (`.gn-page-header__icon` → brand + textInverted,
-> `.gn-button--ghost` → textAccent, an audit of other accent-as-text call sites, `.gn-sign-in__mark`
-> geometry if it belongs here), `globals.css` (`a{color}`, `.gn-sign-in__mark`, footer link hover/focus
-> underline — the export has none but WCAG "more than colour" requires one), `sign-in/page.tsx` (email
-> placeholder only), `Features.md` + `test-cases/13` (cases 13.358–13.365, pointer → 13.366), a witness
-> test for the derived segmented control under `phone:true`. Told: commit only, no push, no PR — review
-> the diff first. HARD CAP 6 subagents for this task; this is implementer #1 of a planned ≤3.
+> **Implementer (sonnet, subagent #1 of 2 used, cap is 6)** delivered everything in the scope above in
+> two commits. **I did not just trust its summary** — read every line of `git diff caba1f6a HEAD` myself
+> across all 12 files, independently re-derived the `textAccent` contrast math in a standalone node
+> script (matched the implementer's claimed ratios to 3 decimal places, including the two binding
+> constraints: light `#325d97` on the `.gn-button--ghost` fillTertiary composite at 4.540, dark
+> `#8bb1e6` on `neoNavySunken` at 4.503 — genuinely tight but real), and ran `pnpm --filter
+> @gisik-nokma/ui exec vitest run test/tokens.test.ts` myself (203/203) before trusting anything further.
 >
-> ## STILL OUTSTANDING AFTER THAT SUBAGENT RETURNS
+> **Dispatched a reviewer (sonnet, subagent #2)**, read-only, told explicitly to re-derive rather than
+> trust: it built an isolated copy of `packages/ui` and ACTUALLY RAN the two claimed mutations
+> (`brandOrange`→wrong hex, `textAccentLight`→the rejected intermediate value) rather than reading the
+> docblocks, and got the exact same "200/203, these three cases" both times. It also personally
+> classified every remaining `var(--gn-accent)` site in `ui.css`/`globals.css` (22 occurrences) rather
+> than trusting the implementer's audit, and matched it exactly. **One Minor finding** (13.362's
+> `selectedTabShadow.split(',').length >= 2` doesn't actually test layer count — `rgba()` colour values
+> contain commas, so a single hig-layer shadow would also pass; the sibling `toContain('16px')` check
+> was doing the real discrimination, so this never produced a false green, just an inert assertion) and
+> **one Trivial gap** (dispatch item 4 — card/field/button geometry — had no case citation despite being
+> independently confirmed already-conformant from Task 14/15). Both closed myself directly (no third
+> subagent needed for a Minor+Trivial pair): replaced the inert assertion with two geometry checks
+> against `SHADOWS.neo.light.raised` in `tokens.ts`, and added the missing sentence to case 13.361.
 >
-> * Review its diff personally (don't just trust the summary — this file's own standing rule).
-> * Dispatch a sonnet reviewer subagent (opus only if something touches visibility/refusal semantics,
->   which nothing here should). Fix round only if Important-or-worse.
-> * Run the full gate myself at the final head; rebuild the dev stack with `--env-file
->   /Users/kiro/my_projects/gisik-nokma/.env` (NOT the plain command — Task 14's rebuild dropped Google
->   auth, this is the fix); verify `curl localhost:3000/v1/auth/methods` says `"google":true`.
-> * Freeze head, re-verify `origin/main` unchanged, push, open ONE PR. Report per the dispatch's own
->   required format: accent/textAccent values with ratios, screenshot path if taken.
-> * Report to the controller only when the PR is open (or if a genuine ruling-level ambiguity surfaces —
->   none has so far; the finding above was resolved in-task, not escalated).
+> **One real environment incident, not a code regression — recorded because it will recur.** The final
+> gate run FAILED with 17 server-test failures, all `ECONNREFUSED` on the standalone Postgres
+> (port 54329) — NOT a regression from this branch (only `apps/web`/`test-cases` files were touched in
+> the fix commit). Root cause: `/var/lib` inside the Docker VM was at **100%** (`docker run --rm
+> --privileged --pid=host alpine nsenter -t 1 -m -- df -h /var/lib`, the standing method this file
+> already recorded — `docker system df` does NOT show this number), from the day's accumulated build
+> cache (11.89GB, fully reclaimable) and images. `docker builder prune -f` alone freed enough (100%→80%,
+> 11.2GB free) to bring the standalone `docker-compose.yml` postgres back up cleanly and re-run the gate
+> green. **If a gate run fails with ECONNREFUSED to a local Postgres and nothing you changed touches the
+> server, check VM disk space via `nsenter` before assuming a real regression** — `docker system df`
+> alone will look fine (it reports host-visible reclaimable space, not the VM's own disk pressure).
+>
+> **Final gate, at the head about to be pushed:** `pnpm turbo run build test typecheck --force`,
+> **33/33, 0 cached, 1475 passed | 5 skipped**, Node confirmed v22.22.2 (`which node` checked, not
+> assumed). Dev stack rebuilt with `--env-file /Users/kiro/my_projects/gisik-nokma/.env`;
+> `curl localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}`, confirmed
+> myself, not taken from the implementer. `pnpm test:e2e:stack` 6/6 (reproduced myself).
+> `pnpm --filter @gisik-nokma/web run test:e2e:viewport` (NOT `pnpm test:e2e:viewport` — no such root
+> script; this repo's root only proxies `test:e2e:stack`) — 31 passed, 2 skipped, including 13.362,
+> reproduced myself both before and after the shadow-assertion fix. No accessible-name baseline or
+> non-text-contrast roster file moved (`git status`/`git diff --stat` empty on both).
+>
+> **textAccent, the numbers to quote if asked:** light `#325d97` (from `#3A6DB0`, binding constraint
+> `.gn-button--ghost`'s fillTertiary composite at 4.540/4.539); dark `#8bb1e6` (from `#7FA9E4`, binding
+> constraint `neoNavySunken` at 4.503) — no per-style override needed, one hex covers hig/minimal/neo in
+> each theme. `brand` = `#ee7733` (the export's one fixed hue, no light/dark split), exempted from a
+> `CONTRAST_PAIRS` row with the shortfall (2.87 light, `textInverted` on `brand`) recorded rather than
+> hidden — a purely decorative `aria-hidden="true"` glyph, same trade-off the export itself ships.
+>
+> ## STILL OUTSTANDING
+>
+> * Freeze this head (3 commits: implementer's 2 + my follow-up fix), re-verify `origin/main` hasn't
+>   moved since `caba1f6a` (it moved once already, by two unrelated docs-only commits from a DIFFERENT
+>   dispatch — Tasks 16-19 workspaces — zero file overlap with this branch, confirmed via `git show
+>   --stat` on both; no rebase needed, just re-check immediately before push), push, open ONE PR.
+> * PR body: the accent/textAccent values above with ratios (no screenshot taken — CSS source-scan +
+>   live-DOM-measured e2e assertions substituted, per this round's own test discipline).
+> * Report to the controller once the PR is open (authorized reason #3). Nothing else is outstanding —
+>   no ruling-level ambiguity surfaced; the accent/textAccent scope question was resolved in-task.
 
 > # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~06:1x IST. **HISTORY — superseded by the block above.**
 >
