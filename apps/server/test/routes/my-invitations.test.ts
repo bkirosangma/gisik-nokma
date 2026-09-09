@@ -372,6 +372,50 @@ describe('Decline — the state change the product could not express', () => {
     });
     expect(again.statusCode).toBe(404);
     expect(await inviteEventTypes(inviteId)).toEqual(['invite.sent', 'invite.declined']);
+
+    // ── THE OTHER SIDE OF THE SAME CLAIM ────────────────────────────────────
+    // "Declining is recorded by the server for the person the invitation
+    // names" is one rule with two halves, and a case measuring only the first
+    // leaves the dangerous half untested. A FRESH invitation is declined
+    // through the CLIENT door by the workspace OWNER — the role that reaches
+    // the check with every earlier guard already passed, and the role the
+    // escalation belongs to: an inviteId is readable by every member, so
+    // without this refusal any admin could destroy any pending invitation
+    // *under the invited person's name*, which is strictly worse than the
+    // revocation they are already entitled to make.
+    const second = await invite(admin, workspaceId, me.email);
+    const forged = await app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: admin.headers,
+      payload: {
+        events: [
+          {
+            id: newUlid(),
+            workspaceId,
+            entity: { kind: 'invite', id: second.inviteId },
+            type: 'invite.declined',
+            version: 1,
+            payload: { inviteId: second.inviteId },
+            actorId: admin.userId,
+            origin: 'web',
+            clientTime: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+    expect(forged.statusCode).toBe(200);
+    const [refusal] = (forged.json() as { results: Array<{ status: string; reason?: string }> })
+      .results;
+    expect(refusal?.status).toBe('refused');
+    expect(refusal?.reason).toBe(
+      'Declining is recorded by the server for the person the invitation names.',
+    );
+    // Nothing landed, and the invitation is still the invited person's to act
+    // on — the refusal protected it rather than half-consuming it.
+    expect(await statusOf(second.inviteId)).toBe('pending');
+    expect(await inviteEventTypes(second.inviteId)).toEqual(['invite.sent']);
+    expect((await myInvitations(me)).map((row) => row.inviteId)).toEqual([second.inviteId]);
   });
 
 });
@@ -422,5 +466,44 @@ describe('Accept — from the banner, on the same semantics as the link', () => 
     expect(await myInvitations(me)).toEqual([]);
     const afterLink = await app.inject({ method: 'GET', url: `/v1/invites/${token}` });
     expect(afterLink.statusCode).toBe(404);
+
+    // ── THE HALF NO SEQUENTIAL ASSERTION CAN SEE ────────────────────────────
+    // Everything above passes with the token spend DELETED from both
+    // caller-scoped handlers, and that was measured rather than guessed:
+    // `openableInvite` refuses on `status` before it reaches the credential, so
+    // a link stops opening the moment the projection moves whether or not the
+    // row was spent. The spend's real job is the CONCURRENT window, and the
+    // only instrument that can see it is a race — the same shape case 6.129
+    // needed when three parallel acceptances of one token all committed in 24
+    // of 25 trials.
+    //
+    // Each trial fires the two doors at one invitation AT ONCE: an acceptance
+    // by link and a decline from the banner. Exactly one may win, because both
+    // spend the same row in one conditional DELETE and one statement is one
+    // transaction. Without the spend both read a pending invitation, both
+    // append, and the ledger holds an invitation that was accepted AND
+    // declined — a membership granted to somebody who refused it.
+    for (let trial = 0; trial < 12; trial += 1) {
+      const racer = await signedIn();
+      const raced = await invite(admin, workspaceId, racer.email);
+      const [accepted, declined] = await Promise.all([
+        app.inject({
+          method: 'POST',
+          url: `/v1/invites/${raced.token}/accept`,
+          headers: racer.headers,
+        }),
+        app.inject({
+          method: 'POST',
+          url: `/v1/me/invitations/${raced.inviteId}/decline`,
+          headers: racer.headers,
+        }),
+      ]);
+      const won = [accepted?.statusCode === 200, declined?.statusCode === 204].filter(Boolean);
+      expect(won, `trial ${trial}: accept=${accepted?.statusCode} decline=${declined?.statusCode}`)
+        .toHaveLength(1);
+      // And the ledger agrees with the HTTP answers: one terminal event, not two.
+      const types = await inviteEventTypes(raced.inviteId);
+      expect(types.filter((type) => type !== 'invite.sent'), `trial ${trial}`).toHaveLength(1);
+    }
   });
 });
