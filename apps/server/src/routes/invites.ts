@@ -1,13 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import {
-  membershipId,
-  newUlid,
-  type IngestResult,
-  type SubmittedEvent,
-} from '@gisik-nokma/domain';
+import { newUlid, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
+import { appendAcceptance } from '../invites/acceptance.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 
@@ -160,7 +156,7 @@ type InviteRow = {
   invite_id: string;
   workspace_id: string;
   role: 'admin' | 'member' | 'guest';
-  status: 'pending' | 'accepted' | 'revoked';
+  status: 'pending' | 'accepted' | 'revoked' | 'declined';
   project_ids: string[];
 };
 
@@ -420,97 +416,16 @@ export function registerInviteRoutes(
         return reply.code(404).send(INVITE_NOT_OPENABLE_BODY);
       }
 
-      const userId = request.currentUserId;
-      const { workspace_id: workspaceId } = invite;
-      const clientTime = new Date().toISOString();
-      const serverEvent = (
-        entity: SubmittedEvent['entity'],
-        type: string,
-        payload: unknown,
-      ): SubmittedEvent => ({
-        id: newUlid(),
-        workspaceId,
-        entity,
-        type,
-        version: 1,
-        payload,
-        // The ACTOR is the accepting person: accepting is their act. The
-        // AUTHORIZATION traces through `inviteId` to the admin's attributed
-        // `invite.sent`, which is what a history view shows when the grant
-        // unfolds. Envelope-origin is `'server'` because the server is what
-        // recorded it — the two fields answer different questions and this is
-        // the one place in the product where they visibly diverge.
-        actorId: userId,
-        origin: 'server',
-        clientTime,
-      });
-
-      // Membership read through `resolveEffectiveRole` and nothing else: a
-      // project-scope row in `proj_memberships` survives `membership.revoked` by
-      // design, so a direct query would report a stranger as a member.
-      const existing = await resolveEffectiveRole(deps.pool, userId, workspaceId);
-
-      const sequence: SubmittedEvent[] = [
-        serverEvent({ kind: 'invite', id: invite.invite_id }, 'invite.accepted', {
-          inviteId: invite.invite_id,
-          userId,
-        }),
-      ];
-      if (existing.workspaceRole === null) {
-        sequence.push(
-          serverEvent(
-            { kind: 'membership', id: membershipId(workspaceId, userId) },
-            'membership.granted',
-            { userId, role: invite.role },
-          ),
-        );
-      }
-      // The projects the invitation promised — appended for a newcomer and for
-      // an existing NON-GUEST member, because an admin authored that promise
-      // and putting a member on a project is coherent with any role they hold.
-      //
-      // **Withheld from someone who is a GUEST and stays one**, and that is the
-      // hole this guard closes rather than a nicety. `inviteSentPayload` refuses
-      // `projectIds` on a guest INVITATION — "a guest reaches work through
-      // visibility.set explicit lists, so a project association would promise
-      // something membership no longer means" — but that refusal keys on the
-      // invitation's role, not on the acceptor's. MEASURED before this line
-      // existed: an existing guest accepting a perfectly legal MEMBER invitation
-      // carrying a project kept their guest role (the rule above) and got the
-      // project row anyway, so the 2026-08-27 collapse's inert association grew
-      // back through the accept door with no event looking wrong.
-      //
-      // Written against the role the person will actually HOLD, not against the
-      // invitation's — the invitation's role is the field that was already
-      // checked and already insufficient.
-      const resultingRole = existing.workspaceRole ?? invite.role;
-      const projectIds = resultingRole === 'guest' ? [] : invite.project_ids;
-      for (const projectId of projectIds) {
-        sequence.push(
-          serverEvent({ kind: 'project', id: projectId }, 'project.member_added', {
-            userId,
-            projectAdmin: false,
-          }),
-        );
-      }
-
-      const results = await deps.serverAppend(sequence);
-      // Length first, then each result: a short array would make the per-result
-      // loop pass over exactly the events it never saw.
-      if (results.length !== sequence.length) {
-        throw new Error(
-          `invite acceptance appended ${sequence.length} events for invite ${invite.invite_id} ` +
-            `and got ${results.length} results back`,
-        );
-      }
-      results.forEach((result, index) => {
-        if (result.status !== 'committed') {
-          throw new Error(
-            `invite acceptance for ${invite.invite_id} failed at event ${index} ` +
-              `(${sequence[index]?.type ?? 'unknown'}): ${JSON.stringify(result)}`,
-          );
-        }
-      });
+      // The acceptance semantics live in ONE place — `../invites/acceptance.ts`
+      // — because Task 17 added a second door that needs exactly them: the
+      // `/workspaces` banner, which cannot call THIS route because the raw token
+      // is unrecoverable (hashed at rest, one copy, gone at mint). Everything
+      // that used to be spelled out here is there verbatim, with its reasoning:
+      // the actor/origin split, the membership read through
+      // `resolveEffectiveRole`, and the guest-stays-guest projectIds guard that
+      // closes a measured hole. This handler keeps what is ITS OWN — the proof
+      // it demands (possession of the link) and the refusal that follows.
+      const workspaceId = await appendAcceptance(deps, invite, request.currentUserId);
 
       // No deletion here any more: the token row went at the consume, before a
       // single event was appended. A second DELETE would be a no-op that read

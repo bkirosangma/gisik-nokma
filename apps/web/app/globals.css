@@ -107,6 +107,38 @@ button { font: inherit; }
 }
 .gn-founding__heading { margin: 0; }
 
+/* Task 17 — the invitations banner. Same surface treatment as `.gn-founding`
+   directly above it, and for the same reason stated there: it sits BESIDE the
+   list rather than inside a card, so it carries its own surface, and fill plus
+   spacing separate it rather than a border (R1(c)). Every value is a token role
+   or a rem — `--gn-radius-card` and `--gn-shadow-raised` are the SAME roles
+   `.gn-card` uses, so under `neo` this panel reads as a raised surface exactly
+   like the cards beside it instead of a flatter outlier. The one thing it does
+   NOT share with `.gn-founding` is the accent edge: an invitation is the only
+   thing on this page addressed to the person personally, and the edge is what
+   says so without a second heading level. */
+.gn-invitations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+  padding: 1rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+  border-inline-start: 0.25rem solid var(--gn-text-accent);
+}
+.gn-invitations__heading { margin: 0; }
+.gn-invitations__list { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.gn-invitations__item { display: flex; flex-direction: column; gap: 0.35rem; }
+.gn-invitations__offer { margin: 0; }
+.gn-invitations__when { margin: 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+.gn-invitations__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.15rem; }
+/* The failed-read line, which is NOT a refusal panel: this read is a small
+   extra on a page whose main job is the list and the founding form, so its
+   failure must not look like the page refusing. Muted, one line, no surface. */
+.gn-invitations__failure { margin: 1.1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+
 .gn-invite__dead { color: var(--gn-text-muted); }
 
 /* 2.75rem = 44px, the floor this product already uses for standalone controls

@@ -20,7 +20,132 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~12:0x IST. **TASK 16 — WORK COMPLETE, FREEZING.**
+> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~13:2x IST. **TASK 17 — WORK COMPLETE, FREEZING.**
+>
+> **This block is written BEFORE the freeze, so its last line is a claim about the future and the one to
+> distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open` before
+> acting — a restart surface fails in the conservative direction and that is the direction nobody audits.
+>
+> **Anchors, verified rather than remembered.** Branch `exec/17-invitations`, **REBASED onto `e4091b1c`**
+> (the controller's owner-ruling + Task 18 plan merge, which landed mid-task). Head `37e40b9d`, THIRTEEN
+> commits, ahead 13 / **behind 0** — re-check `git rev-parse origin/main` before doing anything with this
+> branch. `git branch --contains` on all thirteen returns this branch (not empty), so none is orphaned;
+> the pre-rebase shas in any earlier narrative are ORPHANED by that rebase and will still `cat-file`
+> clean. Zero file overlap with the two commits main gained, so the rebase was clean.
+>
+> **What Task 17 is.** The invite surface was admin-and-token shaped: no caller-scoped read, and
+> **Decline existed nowhere in the product** — the only exits from `pending` were an acceptance or an
+> admin's revocation. Now `GET /v1/me/invitations` (scoped to the caller's VERIFIED email, from their own
+> `"user"` row, never a parameter), `POST /v1/me/invitations/:inviteId/{accept,decline}`, a new
+> `invite.declined` event + a migration widening `proj_invites.status`'s CHECK, and the *"One invitation
+> is waiting"* banner on `/workspaces`. Cases **13.373–13.378** (six; the ledger row grants seven, I used
+> six, matching the plan and the §13 block).
+>
+> ## THE ONE DELIBERATE DEVIATION — the controller should read this before merging
+>
+> The dispatch said Accept must reuse `/v1/invites/:token/accept` and NOT be reimplemented. **It cannot
+> be called from a banner**, and the reason is measured, not an oversight: `invite_tokens` holds
+> `sha256(token)` and the raw token exists in one place for one moment — the 201 that minted it. A
+> caller-scoped list has no token to serve. So the flow is **shared, not reimplemented**:
+> `apps/server/src/invites/acceptance.ts` holds the sequence once (moved verbatim with its reasoning) and
+> the two doors differ only in the proof they demand — link possession, or a verified email equal to the
+> address the invitation names. The second is **strictly narrower ON WHO MAY ACCEPT** (a forward admits a
+> non-addressee; a verified address cannot) and **wider on WHAT IS DISCLOSED**, which is now stated as a
+> scoped claim rather than an unqualified one. All three doors spend the SAME credential row through the
+> same conditional DELETE, so the three outcomes are mutually exclusive by construction.
+>
+> ## WHAT WAS MEASURED, and the four checks that could not fail
+>
+> **ELEVEN mutations, tree verified clean after every restore.** Four of them exposed checks passing for
+> a reason unrelated to their name, and every one was found by RUNNING the mutation rather than reading:
+>
+> 1. **`emailVerified` was unconstrained.** Deleting it left all five cases green — 13.375's empty answer
+>    came from the ADDRESS filter, because the phone account's synthetic
+>    `@phone.gisik-nokma.invalid` matched no invitation. The fixture now addresses an invitation to that
+>    account's OWN address, separating the two predicates.
+> 2. **A whole test half was never in the file.** 13.376's negative half (the owner's forged
+>    client-submitted decline) was inserted by a `str.replace` whose anchor no longer matched; replace
+>    returned the string unchanged and the script printed success. That is why deleting the
+>    `invite.declined` refusal branch survived. **Every insertion now asserts its own result.**
+> 3. **The race had to be THREE-way.** Deleting the token spend from either caller-scoped handler survived
+>    every sequential check — `openableInvite` refuses on `status` before it consults the credential — and
+>    a race pairing link-accept with banner-decline never runs the banner ACCEPT handler, so that mutation
+>    survived the pair too. 13.377 now fires all three doors at once, twelve trials.
+> 4. **The TZ window closed before the date was formatted.** The banner renders twice and produces dates
+>    on the microtask after the read resolves, so a zone set around `render()` was already back to IST.
+>    `process.env.TZ` does reach `toLocaleDateString`; the window was wrong. It spans the awaits now.
+>
+> **A fifth was found on the DEV STACK, not in review:** the banner rendered *" invited you to Convenience
+> Corner as a member."* — better-auth's `"user"."name"` is `NOT NULL` with **no non-blank constraint** and
+> the dev owner carries `''`, which `?? 'Someone'` does not catch.
+>
+> **And I destroyed an uncommitted fix with `git checkout HEAD --` while mutating around it**, with the
+> memory about that exact failure loaded. Re-applied and committed BEFORE re-running the mutation. The
+> rule is not "commit before mutating most things".
+>
+> ## THE OPUS REVIEW — one Important, seven Minor, all closed
+>
+> **Important:** 13.376 listed "drop the token spend from the decline handler" among the mutations it
+> reddens, and the catalogue repeated it EIGHT LINES from 13.377's measurement of the opposite. The case is
+> insensitive to that spend. Corrected in both places, and the replacement is **hedged**: the race covers
+> it only when the decline's read lands before the winner's projection write — likely over twelve trials,
+> not guaranteed. Minors closed: the user-visible acceptance refusal still said *"when the invited person
+> opens their link"* (now proof-neutral; nothing asserted the literal, case 6.34 pins the constant); the
+> read served `invitedBy`, a raw user ULID with no reader, to a non-member (removed); "strictly narrower"
+> scoped to its axis; "all three invite types" → four; `InviteRow.status` did not admit `declined`; the
+> 13.378 date parenthetical named two zones that AGREE (UTC and Niue) and so described a fixture measuring
+> nothing; "exactly one live region" where the case asserts zero. **Plus a coverage gap closed:**
+> `proj_invites` now has the REVERSE one-way door, an acceptance arriving after a decline — the worse
+> direction, because the guard failing there grants a membership to somebody who refused it alongside a
+> `membership.granted` that really is in the ledger.
+>
+> ## GATE AND LIVE VERIFICATION
+>
+> Gate: `pnpm turbo run build test typecheck --force`, Node **v22.22.2** (`which node` checked, not
+> assumed). **GREEN AT THE FROZEN, REBASED HEAD `37e40b9d`: 33/33 tasks, 0 cached, exit 0, 1m12s** —
+> **4,161 passed | 5 skipped across 327 files** (server 1492+5skipped, app-core 1158, web 184, domain 464,
+> rule-engine 282, ui 235, editor 178, sync-client 90, mcp-server 43, mobile 27, desktop 8). Zero
+> `Unsupported engine`. Zero orphaned vitest workers (`ppid=1` sweep). **The earlier green at `bad3d834`
+> is NOT the line to quote — real source changed after it.**
+>
+> **Dev stack, real data, real doors** — rebuilt with
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml up -d --build --wait server web`;
+> `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}`. Migration
+> applied to the real dev database (`pgmigrations` row present; the CHECK now reads
+> `pending|accepted|revoked|declined`). Probed with three short-lived `session` rows, ALL DELETED
+> afterwards (re-probe → 401):
+> * owner mints an invitation to a real verified address → the TARGET's list carries it; the workspace's
+>   GUEST sees `[]`; the OWNER who SENT it sees `[]`.
+> * the guest declining it → **404, still `pending`**.
+> * the target declining it → **204**; ledger `invite.sent/<owner>/web` then
+>   `invite.declined/<target>/server`; projection `declined`; list empty; the LINK 404s; **roster
+>   unchanged** (a decline grants nothing).
+>
+> ## RECORDED, NOT FIXED — owners named
+>
+> * **`docs/lanes/task-ledger.tsv` rows 18 and 19 OVERLAP** — row 18 says cases `13.380–13.385`, row 19
+>   says `13.384–13.389`, so `13.384`/`13.385` are claimed twice. The §13 block and the plan say 18 =
+>   `13.379–13.383`, 19 = `13.384–13.389`. Row 17 also says `13.373–13.379` where the plan says
+>   `13.373–13.378` (I used six, the narrower). **The ledger is controller-owned and I did not touch it.**
+>   *Owner: the controller, before dispatching Task 18.*
+> * The two pre-existing non-gated smoke failures Task 16 recorded (sign-in asserts Google is absent while
+>   the dev stack configures it; the board case cannot find its rollup line) are **untouched and still
+>   owned** by whoever next takes those surfaces. Neither is reachable from this task.
+> * **Neither e2e suite was RUN** — both need a served app and a stack, which is the orchestrator's job.
+>   Stubs for the new `/v1/me/invitations` read were ADDED to `e2e/smoke.spec.ts` and to both
+>   `/workspaces` blocks in `e2e-viewport/responsive.spec.ts`, because that file's own comment records
+>   that an unstubbed read proxies to whatever compose stack is running — which is how a live Google
+>   credential reached the accessible-names baseline on 2026-09-08.
+>
+> ## NEXT
+>
+> **Task 18** — the neo workspace card + nav. **It is NOT blocked any more**: the owner ruled
+> **option 2** on the restricted-project count (*"go with 2: Count only projects the guest already has
+> sight into"*), which landed on main as `b00e21ca`, and **Task 18 is now opus** because it amends the
+> `mapWorkspaceRefs` docblock's recorded privacy rationale. Then 19 → owner look → 12. Any sentence
+> anywhere saying Task 18 waits for an owner ruling is STALE as of 2026-09-09 ~12:2x.
+
+> # ▣ HISTORY — WEDNESDAY 2026-09-09 ~12:0x IST. **TASK 16 — MERGED as `d878c45` (PR #396); superseded by the block above.**
 >
 > **This block is written BEFORE the freeze, so its last line is a claim about the future and the one
 > to distrust after a restart.** If it says a PR is open, settle it with `gh pr list --state open`

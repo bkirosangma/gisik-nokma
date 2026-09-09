@@ -2335,8 +2335,12 @@ amendment (controller, 2026-09-09): `13.366`–`13.372` minted by Task 16 (this 
 reserved for Task 17, `13.379`–`13.383` for Task 18, `13.384`–`13.389` for Task 19. The next free BLOCK
 is `13.390`, controller-allocated ON REQUEST ONLY** — recount the maximum in use against `origin/main`
 before trusting this pointer, same caveat as every prior one in this paragraph. **Recounted at
-`1417580` for this PR: the maximum id in use was `13.365`, and `13.366` appeared only in the pointer
-prose above.** Both documented traps were reproduced rather than avoided by memory — a bare
+`1417580` for Task 16's PR: the maximum id in use was `13.365`, and `13.366` appeared only in the pointer
+prose above. Recounted again at `02641cb` for TASK 17's PR: the maximum in use was `13.372`, and every id
+from `13.373` to `13.389` occurred ONLY in reservation prose — this file's paragraph here, the plan's Task
+17 line, and the two lane state files — file-by-file, four hits for `13.373` and four for `13.378`, none of
+them a case. Both documented traps reproduced again: the ordinal sweep still reports `13.3333` as its
+maximum, and it also surfaces `13.9999` and a `13.632866`-shaped hit, none of which are case ids.** Both documented traps were reproduced rather than avoided by memory — a bare
 `13\.[0-9]+` sweep still reports `13.3333` (the user-agent font size cases 13.266–13.267 are about) as
 its maximum under an ordinal sort, and a float sort still puts `13.99` above `13.365`.
 
@@ -2648,3 +2652,137 @@ closed by the fixture rather than by an argument:
 > absence blocks nothing in this PR; the question, with three options and the asymmetry that decides them,
 > is at `docs/lanes/owner-question-restricted-project-count.md`. **Task 18's card string has no data source
 > until it is answered.**
+
+
+## Task 17 of the neomorphism amendment (2026-09-09) — caller-scoped invitations, and Decline
+
+Block `13.373`–`13.378`. The invite surface Plan 4 Task 14 shipped is **admin-and-token shaped**, measured
+before a line was written: an admin mints, an admin lists their own workspace's pending ones, and anybody
+holding a link can read it and accept it. Two things were therefore missing and this task builds both — a
+**caller-scoped read**, so a person who lost the email can still discover they were invited, and **Decline**,
+which existed nowhere in the product: the only exits from `pending` were an acceptance or an admin's
+revocation, so saying no was not expressible.
+
+**The dispatch said Accept must reuse `/v1/invites/:token/accept` and not be reimplemented. It cannot be
+called from a banner, and the reason is a measured property of the design rather than an oversight:**
+`invite_tokens` stores `sha256(token)` and the raw token exists in exactly one place for exactly one moment
+— the body of the 201 that minted it. A caller-scoped list has no token to serve and could not be given one
+without changing how invitations are stored. So the flow is not reimplemented, it is SHARED:
+`apps/server/src/invites/acceptance.ts` holds the whole acceptance sequence once, moved verbatim with its
+reasoning, and the two doors differ only in the proof they demand — **possession of the link**, or **a
+verified email equal to the address the invitation names**. The second is strictly the NARROWER (a forwarded
+link admits somebody the invitation never named; a verified address cannot), which is why adding it widens
+nothing. `INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON` is untouched and stays exactly as strong: it refuses
+CLIENT-SUBMITTED `invite.accepted`, and both doors append through the server's internal door.
+
+**Four ways these checks could have passed for the wrong reason, each closed by a fixture rather than an
+argument:**
+
+1. *An empty invitations list is what BOTH "correctly scoped" and "this caller has no verified address" look
+   like from outside.* Every caller here signs in through `signInWithEmail`, a new helper that follows a real
+   magic link and **asserts `emailVerified` on the session it returns** — `signInWithPhone` cannot produce a
+   verified address at all, because better-auth's phone plugin mints a synthetic
+   `@phone.gisik-nokma.invalid` and never sets the flag. Without that assertion a library change would turn
+   every case in the block green for the wrong reason at once.
+2. *A scope filter and no filter agree when only one invitation exists.* 13.373 mints two from ONE workspace
+   to TWO addresses, so the rows differ in exactly the field under test and in nothing else.
+3. *`status = 'pending'` alone is not "still live".* The claim is in the projection and the clock is in the
+   credential store, and they disagree: 13.374 checks all four dead shapes — accepted, declined, revoked,
+   and **lapsed-but-still-pending** — each against a live invitation in the same response.
+4. *A table holding no row of the new shape diffs clean for the same reason an empty one does.* This is Task
+   16's `proj_projects` trap in its own house. `proj_invites`' verify case held only `pending` and
+   `accepted` rows, so it was extended with a DECLINED one: without it the rebuild's fold of
+   `invite.declined` is never exercised, and — because `verify-projections` builds its shadow tables with
+   `LIKE public.<table> INCLUDING ALL` — the widened `status` CHECK is never asked to admit `'declined'` in
+   the shadow schema. A migration that widened only the live table would throw there and nowhere else.
+
+**Named absences, recorded rather than papered over** (`apps/server/src/routes/my-invitations.ts` carries
+them in full): phone-channel invitations do not surface here, because this read is email-scoped by the
+task's own words; a phone-only account has no verified address and is answered an empty list, which is the
+truth about it and not a failure; and `"user"."email"` is UNIQUE **case-sensitively**, so two accounts
+differing only in case are constructible and would both match one invitation under the case-insensitive
+comparison this uses — closing that means a citext or a normalising constraint on better-auth's own schema.
+*Owner for the first: whoever next takes the invitations surface. For the third: whoever next touches the
+auth tables.*
+
+- **13.373** ✅ Only the invitations addressed to the CALLER surface, matched case-insensitively — two
+  invitations from one workspace to two addresses, each caller served exactly their own, and the mixed-case
+  address proves the comparison rather than assuming it (`seed/users.ts` already matches addresses that
+  way). The ACTIONS carry the same scope as the list, asserted in the same case: a decline of somebody
+  else's invitation is 404 with the frozen body and leaves it `pending` — an inviteId is a ULID any member
+  can read out of their own workspace's history, so a list-only assertion would leave that open.
+  **Mutation, and what it actually did:** dropping the address predicate reddens this case — and four
+  others in the same file, because the suite shares one database per file and an unscoped read then
+  serves every caller every invitation any case ever minted. Reported as measured rather than as the
+  "reddens alone" this entry first claimed: the mutation is specific enough to identify its site (the
+  message names the address scope) but it is not isolated, and saying otherwise would misdescribe what a
+  future reader will see.
+  — (`apps/server/test/routes/my-invitations.test.ts`)
+- **13.374** ✅ An accepted, declined, revoked or lapsed invitation does not surface, while a fifth to the
+  same address still does. All five are asserted LIVE first, so the final `[live]` is a filter working
+  rather than a route that never served anything. The lapsed one is aged by moving
+  `invite_tokens.expires_at` into the past — the only hand-written row in the file, written to the
+  CREDENTIAL store because `expires_at` genuinely lives there (a projection reads no clock), and its
+  projection row is asserted still `pending` so the case cannot be satisfied by the status check alone.
+  — (`apps/server/test/routes/my-invitations.test.ts`)
+- **13.375** ✅ A caller with no VERIFIED address is answered an empty list, while the very same invitation
+  reaches a caller who has verified that address. The two responses differ in exactly one property, so a
+  read that dropped `"emailVerified"` from its `WHERE` reddens this and nothing else — the escalation that
+  guards against is that anyone may sign up claiming an address and only its holder can prove it. The
+  phone account's synthetic `@phone.gisik-nokma.invalid` address and its `false` flag are READ from the
+  table rather than assumed, because the case's whole claim is about that column.
+  — (`apps/server/test/routes/my-invitations.test.ts`)
+- **13.376** ✅ Declining is a real, attributed, terminal claim made by the server for the person the
+  invitation names **and by nobody else** — one rule, measured on both sides in one case. The positive half
+  asserts four things, because a decline doing only three would be a different feature: the EVENT is in the
+  ledger under the decliner's name (not the admin's) with envelope-origin `server`, the PROJECTION moved to
+  `declined`, the invitation left the caller's list, and the emailed LINK stops opening — without that last
+  one a person could decline and still be admitted by the link they already had. The negative half submits
+  the same claim through the client door as the workspace OWNER, the role that reaches the check with every
+  earlier guard passed, and nothing lands. Mutations it reddens: make the decline a no-op; delete the
+  `invite.declined` branch from `checkRolePermission`.
+  **What it does NOT detect, corrected after a reviewer found this entry claiming otherwise eight lines
+  from 13.377's measurement of the opposite:** dropping the token spend from the decline handler. Every
+  assertion here survives it — `openableInvite` refuses on `status` before it consults the credential, so
+  the link 404s once the projection reads `declined` whether or not the row was spent, and `pendingFor`'s
+  own status filter answers the rest. That property belongs to 13.377's race, and even there it reddens
+  probabilistically rather than certainly.
+  — (`apps/server/test/routes/my-invitations.test.ts`)
+- **13.377** ✅ Accepting from the caller-scoped door joins the workspace at the invited role, read back
+  through `GET /v1/me/workspaces` rather than out of the table, and **spends the link with it**. Then a
+  RACE, twelve trials, firing all three doors at one invitation at once — accept by link, accept from the
+  banner, decline from the banner — asserting exactly one wins and that the ledger holds one terminal
+  event rather than two.
+  **The race is here because the sequential assertions could not see what the spend does.** Deleting the
+  spend from either caller-scoped handler left every sequential check green, measured: `openableInvite`
+  refuses on `status` before it reaches the credential, so the link stops opening the moment the
+  projection moves whether or not the row was spent. The spend guards the CONCURRENT window and only a
+  race can see it — the same reason case 6.129 needed one, after three parallel acceptances of one token
+  committed in 24 of 25 trials. **And the race had to be three-way**: a pair of link-accept and
+  banner-decline never runs the banner ACCEPT handler, so deleting THAT spend survived the pair.
+  — (`apps/server/test/routes/my-invitations.test.ts`)
+- **13.378** ✅ The banner renders the offer as a sentence with the role as a sentence too (never the raw
+  enum), the dates in the PRODUCT's timezone, and Accept/Decline whose accessible names carry the workspace
+  — TWO invitations in the fixture, four buttons, four different accessible names, and the PLURAL heading a
+  singular fixture never reached. The second invitation carries the two names the server can honestly not
+  supply, and one of them is not hypothetical: **`invitedByName: ''`**, because better-auth's
+  `"user"."name"` is `NOT NULL` with no non-blank constraint and the dev workspace's own owner carries the
+  empty string. Found by probing the real stack, where the banner rendered *" invited you to Convenience
+  Corner as a member."* — `?? 'Someone'` does not catch a value that is neither null nor a name. Mutation:
+  drop the blank guard from `named()` and this reddens. It renders **nothing at all** when none is
+  waiting, which is the same claim from the side that
+  matters: a banner rendering its heading unconditionally would pass every assertion about the full case.
+  The expiry fixture is deliberately on the far side of the date line (`19:30Z` on the 20th renders *20
+  Sept* in the `Pacific/Niue` the case renders under and *21 Sept* in the product's `Asia/Kolkata`), so a component formatting in
+  the machine's zone reddens this; a same-day instant could never do that, and neither could an unvaried
+  render on a gate machine that is already `Asia/Kolkata`. **The zone has to span the AWAITS and not just
+  the `render()` call** — the banner renders twice, formats no date on the first pass, and produces the
+  dates on the microtask after the read resolves, so a zone restored at the end of `render()` is already
+  back to IST by then and the mutation survives. Measured, both ways round. Accept navigates into the workspace; Decline is witnessed as a
+  RE-READ (the stub answers differently the second time and the call count is asserted), because a page that
+  edited its own copy would be asserting an outcome instead of reading one. A failed invitations read leaves
+  the founding form standing and says so in one muted line — not a `<ShellRefusal>`, and carrying no
+  `role="status"`: in that scenario the workspace read SUCCEEDED, so the page's only live region
+  (`ShellRefusal`'s) never rendered and the case asserts **zero**. The assertion's point is that this line
+  does not add a SECOND one over the top of the page's own refusal when both reads fail.
+  — (`apps/web/test/workspaces-invitation-banner.test.tsx`)

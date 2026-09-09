@@ -162,6 +162,14 @@ async function stubApi(page: Page): Promise<void> {
   // The values are an ADMIN's, matching `role` below: an admin is served every
   // count. A guest is served this object with the three count keys ABSENT,
   // which is what `WorkspaceRef`'s `number | null` means (cases 13.366, 13.372).
+  // GET /v1/me/invitations — apps/server/src/routes/my-invitations.ts (Task
+  // 17). The `/workspaces` banner reads it, so leaving it unstubbed would let
+  // this spec measure whichever stack happens to be up. `{invitations: []}` is
+  // the case whose layout the smoke is about: the banner renders nothing.
+  await page.route('**/v1/me/invitations', (route) =>
+    route.fulfill({ json: { invitations: [] } }),
+  );
+
   await page.route('**/v1/me/workspaces', (route) =>
     route.fulfill({
       json: {

@@ -27,6 +27,7 @@ import { visibilitySetPayload } from './events/visibility.js';
 import { workspaceSettingsSetPayloadSchema } from './events/workspace-settings.js';
 import {
   inviteAcceptedPayload,
+  inviteDeclinedPayload,
   inviteRevokedPayload,
   inviteSentPayload,
 } from './events/invites.js';
@@ -281,21 +282,28 @@ domainRegistry.register({
 });
 
 /**
- * The invitation vocabulary (Plan 4 Task 14). Three types, all version 1, all
- * filed against `entityKind: 'invite'` — the member `envelope.ts` reserved for
- * exactly this and left INERT until now, because no registration declared it.
- * This is the declaration that wakes it.
+ * The invitation vocabulary (Plan 4 Task 14; a FOURTH type added by Task 17).
+ * All version 1, all filed against `entityKind: 'invite'` — the member
+ * `envelope.ts` reserved for exactly this and left INERT until Task 14, because
+ * no registration declared it. This is the declaration that wakes it.
  *
  * The entity id is the `inviteId`, and `parse-event.ts` refuses any of the
- * three whose `entity.id` and `payload.inviteId` disagree — the same coherence
- * rule the membership types get, for the same reason: three events about one
+ * four whose `entity.id` and `payload.inviteId` disagree — the same coherence
+ * rule the membership types get, for the same reason: every event about one
  * invitation must land on one stream, or a revoke and an accept can each start
  * their own history of the same invitation and neither knows about the other.
+ * That guard keys on `entity.kind === 'invite'` and not on a list of types, so
+ * `invite.declined` inherits it by being filed at the invite entity rather than
+ * by being added anywhere — which is why nothing in `parse-event.ts` changed
+ * when it was registered. The same is true of `visible-events-for.ts`, which
+ * withholds an invitation's address from non-admins on sync-down by entity
+ * KIND: a new invite type is withheld the day it exists.
  *
- * `invite.accepted` is registered like any other type, and being registered is
- * NOT the same as being submittable: `checkRolePermission` refuses it from every
- * client envelope-origin. Registration is what lets the SERVER append it, and
- * what lets every replica parse one when it arrives.
+ * `invite.accepted` and `invite.declined` are registered like any other type,
+ * and being registered is NOT the same as being submittable:
+ * `checkRolePermission` refuses BOTH from every client envelope-origin.
+ * Registration is what lets the SERVER append them, and what lets every replica
+ * parse one when it arrives.
  */
 domainRegistry.register({
   type: 'invite.sent',
@@ -316,6 +324,13 @@ domainRegistry.register({
   version: 1,
   entityKind: 'invite',
   payloadSchema: inviteRevokedPayload,
+});
+
+domainRegistry.register({
+  type: 'invite.declined',
+  version: 1,
+  entityKind: 'invite',
+  payloadSchema: inviteDeclinedPayload,
 });
 
 /**

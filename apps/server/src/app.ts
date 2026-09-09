@@ -28,6 +28,7 @@ import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
@@ -826,6 +827,22 @@ export function buildApp(
   registerInviteRoutes(
     app,
     { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
+    requireSession,
+  );
+  // The CALLER-scoped half of that surface (Task 17): the invitations addressed
+  // to the signed-in person's verified email, plus Accept and Decline for them.
+  // A separate module rather than four more handlers in `routes/invites.ts`,
+  // because the question it answers is a different one — that file is
+  // admin-and-token shaped and keys on a workspace or a link, this one keys on
+  // WHO IS ASKING and on nothing the caller sends, which is the family
+  // `/v1/me/work` and `/v1/me/notifications` belong to.
+  //
+  // It takes `serverAppend` and NOT `ingest`: both of its mutations append
+  // `invite.accepted` / `invite.declined`, and both are refused at every client
+  // door by design, so there is no gated path either could travel.
+  registerMyInvitationRoutes(
+    app,
+    { pool: deps.pool, serverAppend: deps.serverAppend },
     requireSession,
   );
   // The project board (Plan 5 Task 8) — one column per state of every workflow

@@ -19,6 +19,19 @@ export type TestApp = {
   app: FastifyInstance;
   /** The OTP sender THIS app issues codes through — `signInWithPhone` reads it. */
   otp: LogOtpSender;
+  /**
+   * The magic-link sender THIS app delivers through — `signInWithEmail` reads
+   * it. Returned for the same reason `otp` is: it belongs to the app instance
+   * that sent the link, and a shared one would hand a test a link a different
+   * server minted.
+   *
+   * It is the ONLY way to get a caller with a VERIFIED email in a test, which
+   * Task 17's caller-scoped invitations read requires. `signInWithPhone` cannot
+   * produce one: better-auth's phone plugin mints a synthetic address at
+   * `phone.gisik-nokma.invalid` and never touches `emailVerified`, while the
+   * magic-link plugin creates its user with `emailVerified: true`.
+   */
+  magic: LogMagicLinkSender;
   /** The full, UNGATED ingest service, for tests that need the internal door. */
   ingest: IngestService;
 };
@@ -136,10 +149,11 @@ export function buildTestApp(
   overrides: BuildTestAppOverrides = {},
 ): TestApp {
   const otp = new LogOtpSender(() => {});
+  const magic = new LogMagicLinkSender(() => {});
   const auth = createAuth({
     pool: db.pool,
     otpSender: otp,
-    magicLinkSender: new LogMagicLinkSender(() => {}),
+    magicLinkSender: magic,
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
     // The browser's origin, so better-auth trusts the product's own client.
@@ -174,5 +188,5 @@ export function buildTestApp(
       ? { security: overrides.security }
       : { logLevel: 'info', logStream: overrides.logStream, security: overrides.security },
   );
-  return { app, otp, ingest };
+  return { app, otp, magic, ingest };
 }

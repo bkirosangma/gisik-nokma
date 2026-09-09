@@ -14,11 +14,13 @@ import {
   createHttpFoundingGateway,
   createHttpInviteAdminGateway,
   createHttpInviteGateway,
+  createHttpMyInvitationsGateway,
   createHttpNotificationsGateway,
   createOnlineDataSource,
   type FoundingGateway,
   type InviteAdminGateway,
   type InviteGateway,
+  type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
@@ -28,13 +30,17 @@ import { createHttpTicketLocator, type TicketLocator } from './ticket-location.j
  * The shell's whole world, in one object.
  *
  * `dataSource` is amendment 10's seam and carries the thirteen read/write methods
- * a replica must also implement. The four GATEWAYS beside it are deliberately
- * not part of it.
+ * a replica must also implement. The GATEWAYS beside it are deliberately not
+ * part of it.
  *
- * For the three onboarding ones — founding a workspace, minting an invitation
- * and accepting one — these are one-shot actions no replica ever serves offline,
+ * For the onboarding ones — founding a workspace, minting an invitation,
+ * accepting one, and (Task 17) reading the invitations addressed to the
+ * signed-in person — these are one-shot actions no replica ever serves offline,
  * and putting them in `DataSource` would oblige Plan 10's replica to implement
- * something it can only refuse. Each gateway module carries the argument in full.
+ * something it can only refuse. `myInvitations` is the sharpest of the four on
+ * that point: whether an invitation is still pending depends on a credential row
+ * and a clock that exist only on the server, so a replica could not answer it
+ * even in principle. Each gateway module carries the argument in full.
  *
  * `authoring` (Plan 8 Task 13) joins them on the SAME argument, and this
  * docblock was corrected rather than left saying "three": four of that
@@ -57,6 +63,8 @@ export type AppServices = {
   cache: ClientStateCache;
   invites: InviteGateway;
   invitesAdmin: InviteAdminGateway;
+  /** Task 17. The invitations addressed to the signed-in person, and Accept/Decline for them. */
+  myInvitations: MyInvitationsGateway;
   founding: FoundingGateway;
   authoring: WorkflowAuthoringGateway;
   notifications: NotificationsGateway;
@@ -88,8 +96,8 @@ export function Providers({
     // the other the day someone reached for it.
     if (services !== undefined) return null;
     const cache = createClientStateCache();
-    // ONE transport for the FOUR gateways below — the three onboarding ones and
-    // the authoring adapter — same-origin, so they carry the same session cookie
+    // ONE transport for the gateways below — the four onboarding ones and the
+    // authoring adapter — same-origin, so they carry the same session cookie
     // through the same Next rewrites the DataSource uses. A second client here
     // would be a second idea of where the server is.
     const http = createHttpClient('', (input, init) => fetch(input, init));
@@ -109,6 +117,10 @@ export function Providers({
       cache,
       invites: createHttpInviteGateway(http),
       invitesAdmin: createHttpInviteAdminGateway(http),
+      // The SAME `http` again: this one speaks to `/v1/me/invitations*` through
+      // the same same-origin rewrites carrying the same session cookie, and the
+      // session is the whole scope of what it can read.
+      myInvitations: createHttpMyInvitationsGateway(http),
       founding: createHttpFoundingGateway(http),
       // The SAME `dataSource` the pages read through and the SAME `http` the
       // three gateways above use — the adapter serves THREE of its eight
