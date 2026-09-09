@@ -311,6 +311,44 @@ describe('13.368 ticketCount counts what THIS caller may see, never what the tab
     expect(ownerProject['ticketCount']).toBe(raw);
   });
 
+  it("does not count another workspace's ticket that carries this project's id", async () => {
+    // THE CASE THE TENANCY CLAUSE DID NOT HAVE. A reviewer mutated
+    // `v.workspace_id = $n` away and all nine cases stayed green: the route only
+    // reads `counts.get()` for ids `visibleProjects` returned, and `project_id`
+    // is a global primary key, so no client-door world can tell the difference.
+    //
+    // The world that CAN is the one the internal door allows. No existence check
+    // runs there (`verify-projections.test.ts` seeds tickets naming a project
+    // with no row for exactly that reason), so a ticket committed under
+    // workspace B can carry workspace A's `project_id` — and without the
+    // tenancy clause, A's owner counts it. `visible-where.ts` says a tenancy
+    // note deserves "a case that dies if this one stops being true"; this is it.
+    const owner = await signedIn();
+    const workspaceA = await found(owner.headers, 'Workspace A');
+    const projectId = newUlid();
+    await seedProject(db.pool, workspaceA, projectId, 'Shop operations');
+    const mine = newUlid();
+    await seedTicket(db.pool, { workspaceId: workspaceA, projectId, ticketId: mine });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceA, mine, 'workspace')]);
+
+    const stranger = await signedIn();
+    const workspaceB = await found(stranger.headers, 'Workspace B');
+    const theirs = newUlid();
+    // Workspace B's ticket, wearing workspace A's project id. `seedTicket`
+    // writes the `proj_tickets` and `proj_visibility` rows with
+    // `workspace_id = B` and `project_id = A's`, which is precisely the shape
+    // the internal door cannot refuse.
+    await seedTicket(db.pool, { workspaceId: workspaceB, projectId, ticketId: theirs });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceB, theirs, 'workspace')]);
+
+    // The raw table holds TWO rows for this project id; A's owner must count
+    // one. Asserted with the raw count in the same case so the `1` cannot be
+    // read as "the fixture only made one".
+    expect(await rawTicketCount(projectId)).toBe(2);
+    const project = projectOf(await entryFor(owner.headers, workspaceA), projectId);
+    expect(project['ticketCount']).toBe(1);
+  });
+
   it('serves an explicit 0 for a project the caller can name but has no visible work in', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner.headers);
@@ -387,7 +425,11 @@ describe('13.370 archived is a folded event pair, and only an owner or admin may
     // never having run. A plain member is on the project and is still refused:
     // retiring a project is the workspace's decision, not the project's.
     const refused = await submit(member.headers, { ...archive, actorId: member.userId });
+    // The RULE, not only the status: a refusal for some other reason —
+    // `project.unknown`, an actor mismatch — would satisfy `status: 'refused'`
+    // while proving nothing about the admin gate this case is named for.
     expect(refused['status']).toBe('refused');
+    expect(refused['rule']).toBe('permission.role');
     expect(await archivedFlag(projectId)).toBe(false);
     // The member is still served the project, unarchived — the refusal changed
     // nothing, which is the half a status check alone does not prove.
@@ -424,6 +466,11 @@ describe('13.370 archived is a folded event pair, and only an owner or admin may
       actorId: owner.userId,
     });
     expect(unfounded['status']).toBe('refused');
+    // Named, because "the project does not exist" is the honest reason and
+    // `permission.role` here would mean the ordering broke — the owner IS an
+    // admin, so the only way a role refusal fires is if the existence check
+    // stopped running first.
+    expect(unfounded['rule']).toBe('project.unknown');
 
     const projectId = newUlid();
     await seedProject(db.pool, workspaceId, projectId, 'Real project');
@@ -436,8 +483,14 @@ describe('13.370 archived is a folded event pair, and only an owner or admin may
       payload: { projectId: newUlid() },
       actorId: owner.userId,
     });
-    expect(named['status']).not.toBe('committed');
+    expect(named['status']).toBe('invalid');
     expect(await archivedFlag(projectId)).toBe(false);
+    // **MUTATING `.strict()` IN `packages/domain/src` PROVES NOTHING HERE.**
+    // `@gisik-nokma/domain` exports `./dist/index.js` and this package has no
+    // src alias, so the server under test loads the BUILT artifact: the edit
+    // has to land in `dist` (or the package be rebuilt) or the mutation is a
+    // null one that reports green. Measured on this very case — src edit: 9/9
+    // green; the same edit in `dist`: this case red, alone.
   });
 });
 

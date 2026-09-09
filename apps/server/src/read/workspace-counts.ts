@@ -15,8 +15,10 @@ export type ProjectCounts = { ticketCount: number; blockedCount: number };
  * ## Every number here is the CALLER'S number, never the workspace's
  *
  * The product's existing answer to "may this person be told a total" is already
- * on the tree and it is not a single answer — it is a fork, stated at
- * `routes/builder-reads.ts`'s state-occupancy door:
+ * on the tree and it is not a single answer — it is a fork, stated verbatim at
+ * `routes/builder-reads.ts`'s **`/ticket-types/:typeId/population`** door
+ * (which says it is taking state-occupancy's terms; state-occupancy's own
+ * comment two doors up words the same decision differently, so cite this one):
  *
  * > "the honest number is the whole workspace's, counted over tickets the caller
  * > may not see, **so there is no per-viewer variant to serve instead**" — and
@@ -87,6 +89,18 @@ export async function visibleProjectCounts(
   // join key is the ticket id, and `proj_visibility` holds one row per ticket
   // (its migration's PRIMARY KEY), so the INNER JOIN drops nothing — proved by
   // the owner case, whose scoped count equals a raw `proj_tickets` count.
+  //
+  // **The tenancy clause is MEASURED, not asserted** (case 13.368's third
+  // case). A reviewer found it surviving its own mutation: the route only reads
+  // `counts.get()` for the ids `visibleProjects` returned, and `project_id` is a
+  // global primary key, so a client-door world cannot tell the difference. The
+  // world that can is the one the INTERNAL door allows — no existence check
+  // runs there, so a ticket in workspace B can carry workspace A's
+  // `project_id`, and without `v.workspace_id = $n` A's owner counts B's
+  // ticket. The case seeds exactly that. This is the same discipline
+  // `read/visible-where.ts` records for its own tenancy note ("the agreement
+  // test has a case that dies if this one stops being true"); it had no such
+  // case until that review.
   const { rows } = await db.query<{ project_id: string; ticket_count: string; blocked_count: string }>(
     `WITH ${BLOCKED_STATES_CTE}
      SELECT t.project_id,
