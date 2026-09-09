@@ -1,5 +1,17 @@
 # OWNER RULING REQUEST — may a workspace card carry a COUNT of the projects the caller may not name?
 
+> ## ✅ RESOLVED 2026-09-09 — OWNER RULED **OPTION 2**: *"go with 2: Count only projects the guest already has sight into."*
+> Count only projects the caller can already derive — those in which they can see at least one ticket
+> (`visibleTicketsWhere`) but whose NAME `visibleProjects` withholds. This discloses nothing the caller does not
+> already hold (they carry the `projectId` on the ticket card), and it makes *"1 project · name restricted"* exactly
+> true. **Built in Task 18 (now opus, because it is a new derivation rule on the visibility surface):** the field is
+> added to `WorkspaceRef`/the route as a count of name-restricted-but-ticket-visible projects, and the
+> `mapWorkspaceRefs` docblock's *"there is deliberately no 'and N more'"* rationale is AMENDED in the same change set —
+> replaced with option 2's reasoning (a count of projects the caller already holds a ticket in reveals a NAME
+> restriction, not an existence, the P32 distinction). Option 3 (count ALL projects) is refused — a plain existence
+> leak. The count is NOT computed over projects the caller has no sight into at all.
+
+
 **Raised by the serial executor, 2026-09-09, during Task 16 (`/v1/me/workspaces` real counts).**
 **Status: OPEN. Nothing in Task 16's PR depends on the answer** — the field is strictly additive and is
 NOT built. **Task 18's card string *"1 project · name restricted"* has no data source until this is ruled.**

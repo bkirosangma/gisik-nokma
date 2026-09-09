@@ -1,5 +1,9 @@
 # Cross-lane controller — live state
 
+## ⚖ WEDNESDAY ~12:2x IST — **OWNER RULED OPTION 2 on the restricted-project count; Task 18 becomes opus; Task 17 (invitations) is underway on opus.** `main` is `02641cb` + this PR.
+
+Owner, verbatim: *"go with 2: Count only projects the guest already has sight into."* So the workspace card MAY carry a count of the caller's **name-restricted-but-ticket-visible** projects (those they see a ticket in but whose name is withheld), making *"1 project · name restricted"* true while disclosing nothing they do not already hold (the `projectId` is on the ticket card). Option 3 (count ALL projects) is refused — a plain existence leak the `mapWorkspaceRefs` docblock forbids. **This reverses that docblock's *"no 'and N more'"* rationale, which is why it was the owner's to rule, not the controller's.** Recorded: the owner-question file marked RESOLVED; **Task 18 is now opus** (a new derivation rule on the visibility surface) — it adds the count field to the route/`WorkspaceRef`, AMENDS the `mapWorkspaceRefs` docblock in the same change set, then renders the neo card; mutation-witnessed (count all → RED). Task 16's shipped wire is untouched (the field is additive, per the escalation's own "add it in Task 18's PR" note). Task 17 (caller-scoped invitations + Accept/Decline, opus, 13.373–13.378) started 12:1x, independent of this ruling. Sequence unchanged: 17 → 18 → 19 → owner look → 12.
+
 ## ✅ WEDNESDAY ~12:1x IST — **TASK 16 MERGED (#396 → `d878c45`): real workspace counts + archived, visibility-scoped. FORCED GATE GREEN. LEDGER 16 → done. ONE OWNER RULING OPEN (blocks only Task 18).** `main` is `d878c45` + this PR; zero open PRs; executor → Task 17 (opus).
 
 ### The merge — branch EVEN with main (cut from 1417580 = then-main), trees identical
