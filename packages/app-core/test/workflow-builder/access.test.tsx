@@ -85,6 +85,14 @@ function valueControls(): HTMLElement[] {
     ...screen.queryAllByRole('combobox'),
     ...screen.queryAllByRole('checkbox'),
     ...screen.queryAllByRole('spinbutton'),
+    // The shared Select component's trigger is a real <button> (react-aria's
+    // useSelect), not a <select>/combobox — but it is still the value-bearing
+    // control for whichever field it picks, so the enumeration has to keep
+    // catching it under its new role rather than silently losing coverage.
+    // Scoped to "Field type" by name: the only Select call site in this
+    // screen's tree at time of writing (fields-editor.tsx, Task 5 of the
+    // shared-select plan).
+    ...screen.queryAllByRole('button', { name: /Field type/ }),
   ];
 }
 
@@ -527,13 +535,15 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     return gateway;
   }
 
-  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice', async () => {
+  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice or a gated Field-type control', async () => {
     renderTypeEditor(memberSession);
     await screen.findByRole('textbox', { name: 'Type name' });
     const memberControls = valueControls();
     // Enumerated, not counted alone: 4 textboxes (Type name, two Field names —
     // a textarea reports as one too, so the select field's options box is in
-    // here) + 3 comboboxes (Workflow, two Field types) + 1 spinbutton (rank).
+    // here) + 1 combobox (Workflow) + 2 Field-type Select triggers (the shared
+    // Select's trigger is a <button>, counted by valueControls()'s dedicated
+    // query for it) + 1 spinbutton (rank).
     expect(memberControls).toHaveLength(8);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Named separately from the sweep because this is the D4 field and the
@@ -541,17 +551,20 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toBeDisabled();
 
     // The button analogue of the builder screen's `everyButtonIsAJump`: every
-    // button a member is offered here is an icon choice, and every one of them
-    // is disabled. FieldsEditor's Add/Remove and the Save button are the ones
-    // that would appear if a gate came down, and they are buttons, so a count
-    // that matches the icon group is the whole claim.
+    // button a member is offered here is either an icon choice or one of the
+    // two Field-type Select triggers — a value control already covered by the
+    // sweep above, not an authoring affordance — and every one of them is
+    // disabled. FieldsEditor's Add/Remove and the Save button are the ones
+    // that would appear if a gate came down.
     const iconGroup = screen.getByRole('group', { name: 'Icon' });
+    const fieldTypeTriggers = screen.getAllByRole('button', { name: /Field type/ });
+    expect(fieldTypeTriggers).toHaveLength(2);
     const buttons = screen.queryAllByRole('button');
     // Non-vacuity: sixteen icon choices ship at this sha, so an empty list here
     // would mean the picker never rendered rather than that nothing escaped.
     expect(buttons.length).toBeGreaterThan(8);
     for (const button of buttons) {
-      expect(iconGroup.contains(button)).toBe(true);
+      expect(iconGroup.contains(button) || fieldTypeTriggers.includes(button)).toBe(true);
       expect(button).toBeDisabled();
     }
     // The named half, whose control is the next test — without it a typo in any
