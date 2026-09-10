@@ -646,9 +646,16 @@
   box-shadow: var(--gn-shadow-raised);
 }
 [data-style="neo"] .gn-select__panel {
-  /* Same gap as .ticket-type-list__row/.fields-editor__row: neo gives
-     surface/surfaceRaised/surfaceSunken no colour of its own, so without
-     this the panel is indistinguishable from the page behind it. */
+  /* Currently redundant with the base rule above, which already carries
+     `box-shadow: var(--gn-shadow-raised)` (unlike `.ticket-type-list__row`/
+     `.fields-editor__row`, whose BASE rules have no shadow at all — there
+     the neo override is the only place the shadow exists, not the case
+     here). Kept as an explicit anchor rather than removed: neo gives
+     surface/surfaceRaised/surfaceSunken no colour of its own, so the panel's
+     entire visual separation from the page depends on this shadow value
+     staying present — a future edit to the base rule that dropped or
+     changed it would need this line to still say so, and the test above
+     pins this selector existing for that reason. */
   box-shadow: var(--gn-shadow-raised);
 }
 
