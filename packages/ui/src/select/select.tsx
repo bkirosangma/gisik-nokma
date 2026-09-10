@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useButton } from '@react-aria/button';
 import { useListBox, useOption } from '@react-aria/listbox';
 import { DismissButton, useOverlay, useOverlayPosition } from '@react-aria/overlays';
@@ -82,33 +83,25 @@ export function Select(props: SelectProps) {
   return (
     <>
       <HiddenSelect state={state} triggerRef={triggerRef} label={props['aria-label']} name={props['aria-label']} />
-      <button
-        {...buttonProps}
-        // `useSelect` always prepends the value span's id to its computed
-        // `aria-labelledby` (so a Spectrum Picker announces "<value>, <label>").
-        // `SelectProps` here only exposes `aria-label` (no visible `label`
-        // node for that pairing to make sense against), so we drop the
-        // generated `aria-labelledby` and let the plain `aria-label` name the
-        // trigger — the value stays visible in the button's text content.
-        aria-labelledby={undefined}
-        ref={triggerRef}
-        className="gn-select__trigger gn-field__input"
-      >
+      <button {...buttonProps} ref={triggerRef} className="gn-select__trigger gn-field__input">
         <span {...valueProps}>{selected ? selected.label : placeholder}</span>
       </button>
-      {state.isOpen ? (
-        <div
-          {...overlayProps}
-          {...dismissOverlayProps}
-          ref={overlayRef}
-          className="gn-select__panel"
-          data-placement={placement}
-        >
-          <DismissButton onDismiss={state.close} />
-          <SelectListBox {...menuProps} state={state} />
-          <DismissButton onDismiss={state.close} />
-        </div>
-      ) : null}
+      {state.isOpen
+        ? createPortal(
+            <div
+              {...overlayProps}
+              {...dismissOverlayProps}
+              ref={overlayRef}
+              className="gn-select__panel"
+              data-placement={placement}
+            >
+              <DismissButton onDismiss={state.close} />
+              <SelectListBox {...menuProps} state={state} />
+              <DismissButton onDismiss={state.close} />
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
