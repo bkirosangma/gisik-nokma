@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax` — settled at test/views/board.test.tsx
 // and re-corrected at canvas.test.tsx. The plan's Task 12 snippet still carries
@@ -435,7 +435,13 @@ describe('the bulk migration — the one irreversible call — is unreachable fo
     renderEditor(adminSession);
     const picker = await screen.findByRole('combobox', { name: 'Workflow' });
     expect(picker).toBeEnabled();
-    await user.selectOptions(picker, errandPublished.id);
+    // Workflow's trigger is now the shared searchable Select (Task 7 of the
+    // shared-select plan) — a real <input role="combobox">, not a native
+    // <select>, so `selectOptions` no longer applies: click to open, then
+    // pick the option from the portal-rendered listbox.
+    await user.click(picker);
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: errandPublished.name }));
     expect(await screen.findByTestId('workflow-divergence')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }),
