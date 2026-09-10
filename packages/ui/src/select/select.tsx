@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useButton } from '@react-aria/button';
 import { useComboBox } from '@react-aria/combobox';
@@ -12,7 +12,7 @@ import type { ListState } from '@react-stately/list';
 import { useSelectState } from '@react-stately/select';
 import { CheckIcon, RemoveIcon, SearchIcon } from './select-icons.js';
 
-export type SelectOption = { value: string; label: string };
+export type SelectOption = { value: string; label: string; icon?: ReactNode; description?: string };
 
 export type SelectProps =
   | {
@@ -450,7 +450,14 @@ function SelectOptionRow({
   item,
   state,
 }: {
-  item: { key: string | number; rendered: React.ReactNode };
+  // `value: SelectOption | null`, not `SelectOption` — matches `@react-stately/list`'s own
+  // `Node<T>.value: T | null` exactly (confirmed by `tsc`, not assumed: typing this as
+  // non-nullable `SelectOption` fails typecheck against the real `Node<SelectOption>` objects
+  // `[...state.collection]` yields). `buildCollection` (above) always sets a real `value: option`
+  // for every node it builds, so the `null` case is never actually reached at runtime for this
+  // component's own collections — but the type is honest about what react-aria's `Node<T>`
+  // itself promises, so `item.value?.icon`/`?.description` below, not a non-null assertion.
+  item: { key: string | number; rendered: React.ReactNode; value: SelectOption | null };
   state: SharedSelectState;
 }) {
   const ref = useRef<HTMLLIElement>(null);
@@ -462,7 +469,13 @@ function SelectOptionRow({
   const { optionProps, isFocused, isSelected } = useOption({ key: item.key }, state, ref);
   return (
     <li {...optionProps} ref={ref} className="gn-select__option" data-focused={isFocused || undefined}>
-      <span className="gn-select__option-label">{item.rendered}</span>
+      {item.value?.icon ? <span className="gn-select__option-icon">{item.value.icon}</span> : null}
+      <span className="gn-select__option-text">
+        <span className="gn-select__option-label">{item.rendered}</span>
+        {item.value?.description ? (
+          <span className="gn-select__option-description">{item.value.description}</span>
+        ) : null}
+      </span>
       {isSelected ? <CheckIcon /> : null}
     </li>
   );

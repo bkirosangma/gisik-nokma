@@ -736,6 +736,9 @@
   border-radius: var(--gn-radius-control);
   cursor: pointer;
 }
+.gn-select__option-icon { flex: none; display: flex; }
+.gn-select__option-text { display: flex; flex-direction: column; flex: 1; }
+.gn-select__option-description { font-size: 0.85em; color: var(--gn-text-muted); }
 .gn-select__option[data-focused] {
   /* Reuses the exact pattern already established at
      .icon-picker__choice:focus-visible — focusRing verified as a 2px

@@ -292,3 +292,36 @@ describe('Select — multiple', () => {
     expect(message.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
   });
 });
+
+const WITH_ICONS: SelectOption[] = [
+  { value: 'apple', label: 'Apple', icon: <span data-testid="apple-icon" />, description: 'A crisp fruit' },
+  { value: 'banana', label: 'Banana' },
+];
+
+describe('Select — option icon and description', () => {
+  // The brief's Step 1 sketch queries the trigger with an EXACT name ('Fruit'). That can never
+  // match: `useSelect`'s trigger concatenates the placeholder/selected-value text with the given
+  // `aria-label` into its accessible name (Task 3's Ruling F2 — confirmed here again directly,
+  // not just cited: the rendered button's computed name is "Select… Fruit", not "Fruit" — see
+  // this task's report), which is exactly why every OTHER test in this file that queries this
+  // same trigger button uses a regex (`/Fruit/`), never an exact string, and why Task 5's
+  // `pickFromSelect` test helper does the same for the Field-type consumer. Using `/Fruit/` here
+  // matches that established, necessary pattern rather than the brief's one-off exact string —
+  // unrelated to and unaffected by Task 9's actual scope (SelectOptionRow's icon/description
+  // rendering), which is what these tests are actually verifying.
+  it('renders an option’s icon and description when provided', async () => {
+    const user = userEvent.setup();
+    render(<Select options={WITH_ICONS} value={null} onChange={vi.fn()} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: /Fruit/ }));
+    const apple = await screen.findByRole('option', { name: /Apple/ });
+    expect(within(apple).getByTestId('apple-icon')).toBeInTheDocument();
+    expect(within(apple).getByText('A crisp fruit')).toBeInTheDocument();
+  });
+
+  it('an option with neither icon nor description renders without error', async () => {
+    const user = userEvent.setup();
+    render(<Select options={WITH_ICONS} value={null} onChange={vi.fn()} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: /Fruit/ }));
+    expect(await screen.findByRole('option', { name: 'Banana' })).toBeInTheDocument();
+  });
+});
