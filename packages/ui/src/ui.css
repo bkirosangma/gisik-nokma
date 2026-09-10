@@ -647,9 +647,13 @@
 
 /* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
    horizontally without this — the base `.gn-select__trigger` has no `flex-wrap` since the
-   single-select/non-multiple triggers only ever hold one item. Same shape as the foreign
-   `.ticket-type-list__row { flex-wrap: wrap }` fix already in this file for an analogous
-   variable-width-content overflow. */
+   single-select/non-multiple triggers only ever hold one item. Same shape as the ticket-type
+   list row's own overflow fix elsewhere in this file (also a wrapping flex row of variable-width
+   content), described here without repeating its selector-plus-braces text verbatim: doing that
+   would hand `components.test.tsx`'s `rule()` helper a second, earlier "rule" to match against
+   that selector before the real one, since `rule()` does a raw brace-matching scan with no
+   awareness of comments — the exact footgun this file's OWN nearby doc-comment on
+   `.fields-editor__options` already warns about for a different selector. */
 .gn-select__trigger--multiple { flex-wrap: wrap; }
 
 /* Resets UA button chrome so this reads as part of the trigger box rather than a separate
