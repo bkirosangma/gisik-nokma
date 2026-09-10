@@ -172,3 +172,60 @@ describe('Select — searchable', () => {
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
   });
 });
+
+describe('Select — multiple', () => {
+  it('renders selected values as chips with a remove button each', () => {
+    render(<Select multiple options={FRUIT} value={['apple', 'banana']} onChange={vi.fn()} aria-label="Fruit" />);
+    expect(screen.getByText('Apple')).toBeInTheDocument();
+    expect(screen.getByText('Banana')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Remove /ig })).toHaveLength(2);
+  });
+
+  it('clicking a chip’s × removes it from value', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select multiple options={FRUIT} value={['apple', 'banana']} onChange={onChange} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: 'Remove Apple' }));
+    expect(onChange).toHaveBeenCalledWith(['banana']);
+  });
+
+  it('Backspace removes the last chip when the filter text is empty', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select multiple searchable options={FRUIT} value={['apple', 'banana']} onChange={onChange} aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.keyboard('{Backspace}');
+    expect(onChange).toHaveBeenCalledWith(['apple']);
+  });
+
+  it('selecting an option adds it to value without removing existing selections', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select multiple options={FRUIT} value={['apple']} onChange={onChange} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: /Fruit/ }));
+    await user.click(await screen.findByRole('option', { name: 'Cherry' }));
+    expect(onChange).toHaveBeenCalledWith(['apple', 'cherry']);
+  });
+
+  it('stale values not present in options are silently dropped from the chip list', () => {
+    render(<Select multiple options={FRUIT} value={['apple', 'durian']} onChange={vi.fn()} aria-label="Fruit" />);
+    expect(screen.getByText('Apple')).toBeInTheDocument();
+    expect(screen.queryByText('durian')).not.toBeInTheDocument();
+  });
+
+  it('hitting maxSelected shows an aria-live message and further picks are no-ops, not disabled', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Select multiple options={FRUIT} value={['apple', 'banana']} onChange={onChange} maxSelected={2} aria-label="Fruit" />,
+    );
+    await user.click(screen.getByRole('button', { name: /Fruit/ }));
+    const cherry = await screen.findByRole('option', { name: 'Cherry' });
+    expect(cherry).not.toHaveAttribute('aria-disabled', 'true');
+    await user.click(cherry);
+    expect(onChange).not.toHaveBeenCalled();
+    const message = await screen.findByText('Max 2 selected');
+    expect(message.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
+  });
+});

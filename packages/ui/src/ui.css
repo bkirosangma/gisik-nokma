@@ -700,6 +700,28 @@
 }
 .gn-select__option-label { flex: 1; }
 
+.gn-select__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: var(--gn-surface);
+  font-size: 0.85em;
+}
+.gn-select__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gn-border);
+  cursor: pointer;
+}
+
 .ticket-type-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
 .ticket-type-list__header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }

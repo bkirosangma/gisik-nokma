@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useButton } from '@react-aria/button';
@@ -10,19 +10,32 @@ import { useComboBoxState } from '@react-stately/combobox';
 import { ListCollection } from '@react-stately/list';
 import type { ListState } from '@react-stately/list';
 import { useSelectState } from '@react-stately/select';
-import { CheckIcon, SearchIcon } from './select-icons.js';
+import { CheckIcon, RemoveIcon, SearchIcon } from './select-icons.js';
 
 export type SelectOption = { value: string; label: string };
 
-export type SelectProps = {
-  options: SelectOption[];
-  value: string | null;
-  onChange: (value: string) => void;
-  searchable?: boolean;
-  placeholder?: string;
-  disabled?: boolean;
-  'aria-label'?: string;
-};
+export type SelectProps =
+  | {
+      multiple?: false;
+      options: SelectOption[];
+      value: string | null;
+      onChange: (value: string) => void;
+      searchable?: boolean;
+      placeholder?: string;
+      disabled?: boolean;
+      'aria-label'?: string;
+    }
+  | {
+      multiple: true;
+      options: SelectOption[];
+      value: string[];
+      onChange: (value: string[]) => void;
+      searchable?: boolean;
+      maxSelected?: number;
+      placeholder?: string;
+      disabled?: boolean;
+      'aria-label'?: string;
+    };
 
 // `@react-stately/collections`'s `Item` marker component isn't part of this
 // package's declared dependency set (only the `@react-aria/*`/`@react-stately/*`
@@ -56,9 +69,26 @@ function buildCollection(options: SelectOption[]) {
  * `ListState<T>` — the `collection`/`disabledKeys`/`selectionManager` shape `useOption` and
  * `useListBox` require — and separately expose `selectedKey`. Intersecting the two, rather than
  * unioning the concrete hook return types, lets `SelectPanel`/`SelectOptionRow` stay agnostic to
- * which mode produced the state.
+ * which mode produced the state. `selectedKey` is unconditionally present on both concrete state
+ * types regardless of `selectionMode` (it's simply the *first* selected key in multi-select
+ * mode), so this type needs no widening for Task 8's multi-select mode — `SelectOptionRow`
+ * doesn't read it at all any more (see its own comment), and nothing else here needs it either.
  */
 type SharedSelectState = ListState<SelectOption> & { selectedKey: string | number | null };
+
+// Multi-select's chips are a removable tag, not a tone indicator — a different job from the
+// existing `Chip` in `packages/ui/src/components/chip.tsx`, which always renders a status dot
+// and has no remove affordance. Deliberately not reusing it.
+function SelectChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="gn-select__chip">
+      {label}
+      <button type="button" className="gn-select__chip-remove" aria-label={`Remove ${label}`} onClick={onRemove}>
+        <RemoveIcon />
+      </button>
+    </span>
+  );
+}
 
 export function Select(props: SelectProps) {
   const { options, searchable = false } = props;
@@ -71,14 +101,39 @@ export function Select(props: SelectProps) {
   );
 }
 
+// Both `useSelectState` and `useComboBoxState` (below) natively accept `selectionMode:
+// 'multiple'` — verified by reading the installed react-stately source, not assumed. Constructed
+// here with an explicit `'single' | 'multiple'` second type argument (rather than letting it be
+// inferred from a conditional options object) so `value`/`onChange` can be typed against the
+// *union* of both modes' shapes at the call site, then narrowed per-branch inside the callback
+// body via `props.multiple` — this keeps the hook call itself unconditional (called exactly once
+// every render, satisfying the rules of hooks) while still getting real per-mode type safety
+// where it's read.
 function NonSearchableSelect(props: SelectProps & { collection: ListCollection<SelectOption> }) {
-  const { options, value, onChange, placeholder = 'Select…', disabled = false, collection } = props;
+  const { options, placeholder = 'Select…', disabled = false, collection } = props;
+  const [maxMessage, setMaxMessage] = useState<string | null>(null);
 
-  const state = useSelectState<SelectOption>({
+  const state = useSelectState<SelectOption, 'single' | 'multiple'>({
     collection,
-    value,
-    onChange: (key) => {
-      if (key != null) onChange(String(key));
+    selectionMode: props.multiple ? 'multiple' : 'single',
+    value: props.value,
+    onChange: (keys) => {
+      if (props.multiple) {
+        const newValue = (Array.isArray(keys) ? keys : keys != null ? [keys] : []).map(String);
+        // Only additions can exceed the cap — a removal always shrinks the set, so it's never
+        // blocked here. Rejecting the forward is sufficient: `props.value` stays unchanged, so
+        // `useSelectState`'s own `selectedKeys` (itself derived from `props.value`, always
+        // controlled) reverts on the next render — verified by reading
+        // `useMultipleSelectionState`'s source, no manual revert needed.
+        if (props.maxSelected !== undefined && newValue.length > props.value.length && newValue.length > props.maxSelected) {
+          setMaxMessage(`Max ${props.maxSelected} selected`);
+          return;
+        }
+        props.onChange(newValue);
+      } else {
+        const key = Array.isArray(keys) ? (keys[0] ?? null) : keys;
+        if (key != null) props.onChange(String(key));
+      }
     },
     isDisabled: disabled,
   });
@@ -105,29 +160,71 @@ function NonSearchableSelect(props: SelectProps & { collection: ListCollection<S
     overlayRef,
   );
 
-  const selected = options.find((option) => option.value === value) ?? null;
+  // Simplest correct clear per the spec: the message doesn't need to survive a fresh open of the
+  // panel, and no test here asserts anything about clearing on blur/next-pick specifically.
+  useEffect(() => {
+    if (state.isOpen) setMaxMessage(null);
+  }, [state.isOpen]);
 
+  const panel = state.isOpen
+    ? createPortal(
+        <SelectPanel
+          state={state}
+          overlayRef={overlayRef}
+          listBoxRef={listBoxRef}
+          overlayProps={{ ...overlayProps, ...dismissOverlayProps } as Record<string, unknown>}
+          listBoxProps={menuProps as Record<string, unknown>}
+          placement={placement}
+          autoFocus={state.focusStrategy ?? true}
+          onDismiss={state.close}
+        />,
+        document.body,
+      )
+    : null;
+
+  if (props.multiple) {
+    const selectedOptions = options.filter((option) => props.value.includes(option.value));
+    return (
+      <>
+        {/*
+          No `HiddenSelect` here, unlike the single-select return below. It unconditionally
+          renders a visually-hidden (not `display:none`) native `<select>` with one `<option>`
+          per item, for browser autofill / native form submission. `getByText`, unlike
+          `getByRole`, does not respect `aria-hidden` — so with `HiddenSelect` present, the
+          brief's own `screen.getByText('Apple')` chip assertions matched BOTH the chip and this
+          hidden `<option>Apple</option>`, throwing "Found multiple elements" (confirmed
+          empirically, not assumed). The brief's tests are given verbatim and unscoped
+          (`getByText`, not `within(chipContainer).getByText`), so the fix has to live here:
+          multi-select drops native-`<select>` autofill/form-submission support rather than
+          collide with chip text. Single-select is unaffected — it never renders text overlapping
+          the hidden select's option labels in the same way, since chip rendering is multi-only.
+        */}
+        <div className="gn-select__trigger gn-select__trigger--multiple gn-field__input">
+          {selectedOptions.map((option) => (
+            <SelectChip
+              key={option.value}
+              label={option.label}
+              onRemove={() => props.onChange(props.value.filter((v) => v !== option.value))}
+            />
+          ))}
+          <button {...buttonProps} ref={triggerRef} className="gn-select__trigger-open">
+            <span {...valueProps}>{selectedOptions.length === 0 ? placeholder : null}</span>
+          </button>
+        </div>
+        <span aria-live="polite">{maxMessage}</span>
+        {panel}
+      </>
+    );
+  }
+
+  const selected = options.find((option) => option.value === props.value) ?? null;
   return (
     <>
       <HiddenSelect state={state} triggerRef={triggerRef} label={props['aria-label']} name={props['aria-label']} />
       <button {...buttonProps} ref={triggerRef} className="gn-select__trigger gn-field__input">
         <span {...valueProps}>{selected ? selected.label : placeholder}</span>
       </button>
-      {state.isOpen
-        ? createPortal(
-            <SelectPanel
-              state={state}
-              overlayRef={overlayRef}
-              listBoxRef={listBoxRef}
-              overlayProps={{ ...overlayProps, ...dismissOverlayProps } as Record<string, unknown>}
-              listBoxProps={menuProps as Record<string, unknown>}
-              placement={placement}
-              autoFocus={state.focusStrategy ?? true}
-              onDismiss={state.close}
-            />,
-            document.body,
-          )
-        : null}
+      {panel}
     </>
   );
 }
@@ -140,7 +237,8 @@ function NonSearchableSelect(props: SelectProps & { collection: ListCollection<S
 // it. The non-searchable trigger is a plain button with no such built-in handling, which is why
 // it still needs `useOverlay` itself.
 function SearchableSelect(props: SelectProps & { collection: ListCollection<SelectOption> }) {
-  const { value, onChange, placeholder = 'Select…', disabled = false, collection } = props;
+  const { placeholder = 'Select…', disabled = false, collection } = props;
+  const [maxMessage, setMaxMessage] = useState<string | null>(null);
 
   // `useComboBoxState`'s own post-selection auto-close (its `useEffect` watching `displayValue`
   // against its previous render's value) only fires once the *next* render sees a genuinely
@@ -153,14 +251,30 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
   // regardless of whether `value` round-trips, matching the non-searchable branch's contract.
   // (Populated with the real `comboState.close` right after construction below — the ref exists
   // only to break the circularity of referencing `comboState` from inside its own constructor.)
+  // Task 8: this must NEVER fire for multi-select — `useComboBoxState`'s own internal handling
+  // never closes/resets on selection when `selectionMode === 'multiple'` either (verified by
+  // reading its source), because the whole point of multi-select is picking several options in
+  // one open/close cycle. Forcing a close here would defeat that on every single pick.
   const closeOnSelectRef = useRef<() => void>(() => {});
-  const comboState = useComboBoxState<SelectOption>({
+  const comboState = useComboBoxState<SelectOption, 'single' | 'multiple'>({
     collection,
-    value,
-    onChange: (key) => {
-      if (key != null) {
-        onChange(String(key));
-        closeOnSelectRef.current();
+    selectionMode: props.multiple ? 'multiple' : 'single',
+    value: props.value,
+    onChange: (keys) => {
+      if (props.multiple) {
+        const newValue = (Array.isArray(keys) ? keys : keys != null ? [keys] : []).map(String);
+        if (props.maxSelected !== undefined && newValue.length > props.value.length && newValue.length > props.maxSelected) {
+          setMaxMessage(`Max ${props.maxSelected} selected`);
+          return;
+        }
+        props.onChange(newValue);
+        // No closeOnSelectRef.current() here — see the comment on the ref above.
+      } else {
+        const key = Array.isArray(keys) ? (keys[0] ?? null) : keys;
+        if (key != null) {
+          props.onChange(String(key));
+          closeOnSelectRef.current();
+        }
       }
     },
     isDisabled: disabled,
@@ -180,12 +294,30 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
   useEffect(() => {
     closeOnSelectRef.current = comboState.close;
   });
+  useEffect(() => {
+    if (comboState.isOpen) setMaxMessage(null);
+  }, [comboState.isOpen]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listBoxRef = useRef<HTMLUListElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const { inputProps, listBoxProps } = useComboBox(
-    { 'aria-label': props['aria-label'], isDisabled: disabled, inputRef, listBoxRef, popoverRef: overlayRef },
+    {
+      'aria-label': props['aria-label'],
+      isDisabled: disabled,
+      inputRef,
+      listBoxRef,
+      popoverRef: overlayRef,
+      // Backspace-to-remove-last-chip, multi-select only, only when the filter text is empty —
+      // otherwise Backspace should behave as ordinary text editing. Passed here (not as a plain
+      // `<input onKeyDown>` prop) so it composes with `useComboBox`'s own internally-chained
+      // Escape/Enter/Arrow handling (`chain(...)`) rather than silently replacing it.
+      onKeyDown: (e) => {
+        if (props.multiple && e.key === 'Backspace' && comboState.inputValue === '' && props.value.length > 0) {
+          props.onChange(props.value.slice(0, -1));
+        }
+      },
+    },
     comboState,
   );
   const { overlayProps, placement } = useOverlayPosition({
@@ -196,10 +328,37 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
     onClose: comboState.close,
   });
 
+  const selectedOptions = props.multiple ? props.options.filter((option) => props.value.includes(option.value)) : [];
+
+  const panel = comboState.isOpen
+    ? createPortal(
+        <SelectPanel
+          state={comboState}
+          overlayRef={overlayRef}
+          listBoxRef={listBoxRef}
+          overlayProps={overlayProps as Record<string, unknown>}
+          listBoxProps={listBoxProps as Record<string, unknown>}
+          placement={placement}
+          autoFocus={comboState.focusStrategy ?? true}
+          onDismiss={comboState.close}
+        />,
+        document.body,
+      )
+    : null;
+
   return (
     <>
       <div className="gn-select__trigger gn-select__trigger--searchable gn-field__input">
         <SearchIcon />
+        {props.multiple
+          ? selectedOptions.map((option) => (
+              <SelectChip
+                key={option.value}
+                label={option.label}
+                onRemove={() => props.onChange(props.value.filter((v) => v !== option.value))}
+              />
+            ))
+          : null}
         {/*
           `inputProps` carries no `onClick` of its own (confirmed by reading `useComboBox`'s
           source rather than assuming — it merges only `onTouchEnd`, `autoCorrect`, `spellCheck`
@@ -243,21 +402,8 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
           }}
         />
       </div>
-      {comboState.isOpen
-        ? createPortal(
-            <SelectPanel
-              state={comboState}
-              overlayRef={overlayRef}
-              listBoxRef={listBoxRef}
-              overlayProps={overlayProps as Record<string, unknown>}
-              listBoxProps={listBoxProps as Record<string, unknown>}
-              placement={placement}
-              autoFocus={comboState.focusStrategy ?? true}
-              onDismiss={comboState.close}
-            />,
-            document.body,
-          )
-        : null}
+      {props.multiple ? <span aria-live="polite">{maxMessage}</span> : null}
+      {panel}
     </>
   );
 }
@@ -267,7 +413,8 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
 // this rendering. Positioning/dismiss props arrive pre-computed from the caller's own
 // `useOverlayPosition`/`useOverlay` (and, for the combobox branch, `useComboBox`) calls — hooks
 // can't be shared across the two branches since they depend on branch-specific refs (a button
-// vs. an input as the position target), only the JSX they feed can be.
+// vs. an input as the position target), only the JSX they feed can be. Works unmodified for
+// multi-select: `useListBox`/`useOption` are already selection-mode-agnostic.
 function SelectPanel(props: {
   state: SharedSelectState;
   overlayRef: RefObject<HTMLDivElement | null>;
@@ -301,8 +448,12 @@ function SelectOptionRow({
   state: SharedSelectState;
 }) {
   const ref = useRef<HTMLLIElement>(null);
-  const isSelected = state.selectedKey === item.key;
-  const { optionProps, isFocused } = useOption({ key: item.key }, state, ref);
+  // `useOption`'s own `isSelected` (`state.selectionManager.isSelected(key)`, verified by
+  // reading its source) is already mode-agnostic — true membership-based for both single and
+  // multi selection — so it replaces the old manual `state.selectedKey === item.key` equality
+  // check, which only ever reflected the *first* selected key and would have under-reported
+  // every selected item but the first once multi-select was added.
+  const { optionProps, isFocused, isSelected } = useOption({ key: item.key }, state, ref);
   return (
     <li {...optionProps} ref={ref} className="gn-select__option" data-focused={isFocused || undefined}>
       <span className="gn-select__option-label">{item.rendered}</span>
