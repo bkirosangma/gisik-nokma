@@ -149,4 +149,26 @@ describe('Select — searchable', () => {
     await user.click(input);
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
   });
+
+  // A second, independent close path: Escape closes via `state.revert()`
+  // (commitSelection/commitCustomValue), never moving focus off the input at all — unlike the
+  // select-an-option path above, where focus visibly leaves for the clicked option and returns.
+  // If `state.isFocused` staying `true` across the close is really what defeats the next
+  // `focus` event (this file's other reopen test's inline comment infers that mechanism from
+  // the source, without measuring it directly), this is the purest reproduction of it: focus
+  // never moves at all, so the next click's `focus` event is unambiguously a no-op on the
+  // `state.isFocused` check, with nothing else (like a real blur/refocus) that could coincidentally
+  // make the fix look like it's working. A second, independently-shaped test passing here is
+  // stronger evidence the `onClick` fix is the right lever than one passing test alone.
+  it('clicking the trigger again reopens the panel after Escape closed it', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await screen.findByRole('listbox');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await user.click(input);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+  });
 });

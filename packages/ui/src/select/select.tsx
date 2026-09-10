@@ -204,19 +204,35 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
           `inputProps` carries no `onClick` of its own (confirmed by reading `useComboBox`'s
           source rather than assuming — it merges only `onTouchEnd`, `autoCorrect`, `spellCheck`
           etc. onto `useTextField`'s base props, never a click handler), so there's nothing to
-          chain here. The click handler below is what actually fixes Task 7.5's reopen bug:
-          `useComboBox`'s own `inputProps.onFocus` is `if (state.isFocused) return; ...
-          state.setFocused(true)`, and `onBlur` deliberately ignores a blur that moves focus INTO
-          the popover (`blurIntoPopover`, so clicking an option doesn't itself close the panel) —
-          which means `state.isFocused` never resets to `false` across a select-then-refocus
-          round trip, so the *next* native `focus` event on this input hits that early return and
-          never reopens anything. Verified empirically (not assumed) in this test environment: on
-          the reopen click, `comboState.isOpen` reads `false` by the time this `onClick` runs, so
-          `open()` (never `toggle()` — this must never flip an already-open panel closed) fires
-          exactly when needed. On the *first* click (nothing focused yet), focus's own
-          `setFocused(true)` already flips `isOpen` to `true` and React re-renders before `click`
-          fires, so the guard below is a no-op there — and even without the guard, `open()` is
-          idempotent when already open, so this is safe regardless of event-ordering assumptions.
+          chain here. The click handler below is what fixes Task 7.5's reopen bug: clicking this
+          trigger again after a selection (or Escape) closed the panel used to do nothing — only
+          ArrowDown/ArrowUp reopened it.
+
+          MEASURED (a debug console.log in this test environment, not inferred): on the reopen
+          click, `comboState.isOpen` already reads `false` by the time this `onClick` handler
+          runs — i.e. whatever normally opens the panel on focus hasn't fired for this click. On
+          the *first* click (nothing focused yet), by contrast, `isOpen` already reads `true` by
+          click time — focus's own open-on-focus effect fired and React re-rendered before the
+          click handler ran. Two independent close paths (select-then-reclick, and
+          Escape-then-reclick, both covered in select.test.tsx) show the same `isOpen === false`
+          pattern on the reopen click.
+
+          INFERRED (plausible from reading `useComboBox`'s source, not directly measured):
+          `inputProps.onFocus` is `if (state.isFocused) return; ...; state.setFocused(true)` — so
+          the open-on-focus path is skipped whenever `state.isFocused` is already `true`. For the
+          Escape-close case this is straightforward: Escape never blurs the input at all, so
+          `state.isFocused` stays `true` and the next focus event is trivially a no-op. For the
+          select-an-option case, a native `focus` event was observed firing again on the reopen
+          click (a real DOM focus transition), so this explanation requires `state.isFocused` to
+          have stayed `true` even though focus visibly left and returned — plausibly because
+          `onBlur` deliberately ignores a blur into the popover (`blurIntoPopover`, so clicking an
+          option doesn't itself close the panel), but this was not independently confirmed by
+          reading `state.isFocused` at each step.
+
+          Whichever of these the real mechanism is, the fix doesn't depend on it: `open()`
+          (never `toggle()` — must never flip an already-open panel closed) fires whenever
+          `isOpen` is still `false` at click time, and is idempotent when already open, so it's
+          safe regardless of exactly why the open-on-focus path didn't already fire.
         */}
         <input
           {...inputProps}
