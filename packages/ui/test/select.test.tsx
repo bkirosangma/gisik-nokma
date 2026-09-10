@@ -208,6 +208,69 @@ describe('Select — multiple', () => {
     expect(onChange).toHaveBeenCalledWith(['apple', 'cherry']);
   });
 
+  // The test above uses a bare `vi.fn()`, so `value` never round-trips — it doesn't actually
+  // exercise a real controlled consumer picking a SECOND option in the same open/close cycle,
+  // which is the defining multi-select behavior (`shouldCloseOnSelect` defaults to `false` for
+  // `selectionMode: 'multiple'`, verified by reading `useSelectState`'s source, not assumed).
+  // A genuinely controlled wrapper proves the panel really stays open across two picks and that
+  // both land in the final value, rather than merely that one `onChange` call had the right shape.
+  it('the panel stays open across multiple picks with a genuinely controlled value (non-searchable)', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string[]>(['apple']);
+      return <Select multiple options={FRUIT} value={value} onChange={setValue} aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    await user.click(screen.getByRole('button', { name: /Fruit/ }));
+    await user.click(await screen.findByRole('option', { name: 'Cherry' }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Banana' }));
+    // Not `getByText('Apple')` etc.: the panel legitimately stays open (that's what this test is
+    // proving) with all three options now shown as selected — each option row's own label text
+    // duplicates the chip's, so an unscoped text query is ambiguous by design once the panel
+    // stays open. Chip remove buttons ("Remove X") are unique to chips, so they're what actually
+    // proves three chips rendered rather than merely that the panel shows three selections.
+    expect(screen.getByRole('button', { name: 'Remove Apple' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Cherry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Banana' })).toBeInTheDocument();
+  });
+
+  // Same proof for the searchable branch, where staying open across picks depends on an extra
+  // piece of logic beyond the hook's own default: `closeOnSelectRef` (select.tsx) is gated on
+  // `!props.multiple` specifically so it never force-closes the panel after a pick. This is the
+  // more delicate of the two branches to get right — a wrong gate would force-close after every
+  // single pick, defeating multi-select entirely, and only a controlled round-trip would show it.
+  //
+  // `{ hidden: true }` on the final `getByRole` calls, not the plain form the non-searchable
+  // version above uses — a real, verified finding, not a test-scoping convenience:
+  // `useComboBox`'s own `inputProps`/popover wiring runs react-aria's `ariaHideOutside` while
+  // the panel is open, which sets `aria-hidden="true"` on anything outside the specific
+  // `[inputRef, popoverRef]` pair it was told to keep visible — including these chips, which are
+  // plain siblings of the `<input>` inside the same trigger, not wrapped by anything on that
+  // list. Confirmed by inspecting the rendered DOM directly: the chip `<span>`s carry
+  // `aria-hidden="true"` while `comboState.isOpen` is true (the `<input>` itself does not).
+  // `{ hidden: true }` tells `getByRole` to include aria-hidden elements, so this still proves
+  // the three chips rendered with the right structure/labels — but a *default* (accessibility-
+  // respecting) query would not find them right now, which is the real, current behavior for a
+  // screen-reader user while the panel is open, not an artifact of the test. See the report for
+  // why this is flagged as a finding rather than fixed in this task.
+  it('the panel stays open across multiple picks with a genuinely controlled value (searchable)', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string[]>(['apple']);
+      return <Select multiple searchable options={FRUIT} value={value} onChange={setValue} aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Cherry' }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Banana' }));
+    expect(screen.getByRole('button', { name: 'Remove Apple', hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Cherry', hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Banana', hidden: true })).toBeInTheDocument();
+  });
+
   it('stale values not present in options are silently dropped from the chip list', () => {
     render(<Select multiple options={FRUIT} value={['apple', 'durian']} onChange={vi.fn()} aria-label="Fruit" />);
     expect(screen.getByText('Apple')).toBeInTheDocument();

@@ -645,6 +645,34 @@
 }
 .gn-select__trigger--searchable input:focus { outline: none; }
 
+/* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
+   horizontally without this — the base `.gn-select__trigger` has no `flex-wrap` since the
+   single-select/non-multiple triggers only ever hold one item. Same shape as the foreign
+   `.ticket-type-list__row { flex-wrap: wrap }` fix already in this file for an analogous
+   variable-width-content overflow. */
+.gn-select__trigger--multiple { flex-wrap: wrap; }
+
+/* Resets UA button chrome so this reads as part of the trigger box rather than a separate
+   control — same reset shape already used above for `.gn-select__trigger--searchable input`
+   (border/background/font/color), applied to a `<button>` instead of an `<input>` because a
+   `<button>` can't nest inside the chip-remove `<button>`s' sibling `<input>` the searchable
+   variant uses instead. `flex: 1` lets it absorb the remaining row width after the chips (or
+   collapse to nothing when every option is already chipped and there's no placeholder to show),
+   matching the searchable input's own `flex: 1`. */
+.gn-select__trigger-open {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .gn-select__chip {
   display: inline-flex;
   align-items: center;

@@ -348,7 +348,13 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
 
   return (
     <>
-      <div className="gn-select__trigger gn-select__trigger--searchable gn-field__input">
+      <div
+        className={
+          props.multiple
+            ? 'gn-select__trigger gn-select__trigger--searchable gn-select__trigger--multiple gn-field__input'
+            : 'gn-select__trigger gn-select__trigger--searchable gn-field__input'
+        }
+      >
         <SearchIcon />
         {props.multiple
           ? selectedOptions.map((option) => (
