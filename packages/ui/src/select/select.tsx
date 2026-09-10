@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useButton } from '@react-aria/button';
@@ -172,7 +172,14 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
     // narrow" behavior the spec's "trigger itself becomes the typeable field" describes.
     menuTrigger: 'focus',
   });
-  closeOnSelectRef.current = comboState.close;
+  // Assigning during render (rather than reading `comboState.close` fresh inside the `onChange`
+  // handler, which can't see it — that handler is one of `comboState`'s own construction
+  // arguments) would run on every render, including a discarded one under concurrent rendering.
+  // The ref is only ever read from event handlers, always post-mount, so committing it in an
+  // effect is both sufficient and the safer/more idiomatic timing.
+  useEffect(() => {
+    closeOnSelectRef.current = comboState.close;
+  });
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listBoxRef = useRef<HTMLUListElement>(null);

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -106,5 +107,27 @@ describe('Select — searchable', () => {
     await user.click(await screen.findByRole('option', { name: 'Apple' }));
     expect(onChange).toHaveBeenCalledWith('apple');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  // The two tests above use a bare `vi.fn()` for `onChange`, which never feeds the selection
+  // back in as a new `value` prop — the fire-and-forget path `closeOnSelectRef` (select.tsx)
+  // exists for. A real consumer (e.g. Task 5's Field-type editor) is fully controlled: it
+  // round-trips `onChange` into a new `value` on the next render. This test covers that path,
+  // which exercises `useComboBoxState`'s OWN post-selection effect (closeMenu + resetInputValue
+  // once `displayValue` actually changes) running *alongside* `closeOnSelectRef`'s synchronous
+  // close, to confirm the two don't fight (double-close, or a spurious reopen from the
+  // `inputValue !== lastValue` open-on-change branch racing the value update).
+  it('closes and shows the new label when the caller round-trips onChange into a new value', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>(null);
+      return <Select options={FRUIT} value={value} onChange={setValue} searchable aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Apple' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveValue('Apple');
   });
 });
