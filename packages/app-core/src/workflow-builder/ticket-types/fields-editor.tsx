@@ -1,4 +1,5 @@
 import { newUlid, type CustomFieldDef } from '@gisik-nokma/domain';
+import { Select } from '@gisik-nokma/ui';
 
 const FIELD_TYPES: readonly CustomFieldDef['type'][] = ['text', 'number', 'date', 'select', 'person'];
 
@@ -38,20 +39,15 @@ export function FieldsEditor(props: {
               value={field.name}
               onChange={(changeEvent) => updateField(index, { name: changeEvent.target.value })}
             />
-            <select
-              aria-label="Field type"
-              disabled={props.disabled === true}
-              value={field.type}
-              onChange={(changeEvent) =>
-                updateField(index, { type: changeEvent.target.value as CustomFieldDef['type'] })
-              }
-            >
-              {FIELD_TYPES.map((fieldType) => (
-                <option key={fieldType} value={fieldType}>
-                  {fieldType}
-                </option>
-              ))}
-            </select>
+            <div className="fields-editor__type">
+              <Select
+                options={FIELD_TYPES.map((fieldType) => ({ value: fieldType, label: fieldType }))}
+                value={field.type}
+                onChange={(next) => updateField(index, { type: next as CustomFieldDef['type'] })}
+                disabled={props.disabled === true}
+                aria-label="Field type"
+              />
+            </div>
             {field.type === 'select' ? (
               <textarea
                 aria-label="Select options"
