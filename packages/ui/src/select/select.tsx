@@ -200,7 +200,32 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
     <>
       <div className="gn-select__trigger gn-select__trigger--searchable gn-field__input">
         <SearchIcon />
-        <input {...inputProps} ref={inputRef} placeholder={placeholder} />
+        {/*
+          `inputProps` carries no `onClick` of its own (confirmed by reading `useComboBox`'s
+          source rather than assuming — it merges only `onTouchEnd`, `autoCorrect`, `spellCheck`
+          etc. onto `useTextField`'s base props, never a click handler), so there's nothing to
+          chain here. The click handler below is what actually fixes Task 7.5's reopen bug:
+          `useComboBox`'s own `inputProps.onFocus` is `if (state.isFocused) return; ...
+          state.setFocused(true)`, and `onBlur` deliberately ignores a blur that moves focus INTO
+          the popover (`blurIntoPopover`, so clicking an option doesn't itself close the panel) —
+          which means `state.isFocused` never resets to `false` across a select-then-refocus
+          round trip, so the *next* native `focus` event on this input hits that early return and
+          never reopens anything. Verified empirically (not assumed) in this test environment: on
+          the reopen click, `comboState.isOpen` reads `false` by the time this `onClick` runs, so
+          `open()` (never `toggle()` — this must never flip an already-open panel closed) fires
+          exactly when needed. On the *first* click (nothing focused yet), focus's own
+          `setFocused(true)` already flips `isOpen` to `true` and React re-renders before `click`
+          fires, so the guard below is a no-op there — and even without the guard, `open()` is
+          idempotent when already open, so this is safe regardless of event-ordering assumptions.
+        */}
+        <input
+          {...inputProps}
+          ref={inputRef}
+          placeholder={placeholder}
+          onClick={() => {
+            if (!comboState.isOpen) comboState.open();
+          }}
+        />
       </div>
       {comboState.isOpen
         ? createPortal(

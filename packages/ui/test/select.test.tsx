@@ -130,4 +130,23 @@ describe('Select — searchable', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(input).toHaveValue('Apple');
   });
+
+  // Task 7.5: clicking the trigger while it's already focused (but its panel is closed — e.g.
+  // right after a prior selection) must reopen the panel. Root cause: `useComboBox`'s
+  // `inputProps.onFocus` early-returns when `state.isFocused` is already `true`, and a click on
+  // an element that never lost focus doesn't fire a new native `focus` event at all — so the
+  // `menuTrigger: 'focus'` open path this component otherwise relies on never re-fires on a
+  // second click. No `buttonRef` is wired into `useComboBox` either, so its `onPress`/
+  // `onPressStart` toggle handlers (meant for a separate trigger button) never reach any
+  // rendered element here.
+  it('clicking the trigger again reopens the panel after a selection closed it', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Apple' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await user.click(input);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+  });
 });
