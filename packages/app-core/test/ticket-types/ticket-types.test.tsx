@@ -29,22 +29,12 @@ async function pickFromSelect(user: ReturnType<typeof userEvent.setup>, trigger:
   await user.click(within(listbox).getByRole('option', { name: optionName }));
 }
 
-// Workflow's searchable trigger (a real <input role="combobox">, unlike Field type's
-// non-searchable <button>) only reopens its panel via a genuine DOM focus transition:
-// `useComboBox`'s inputProps.onFocus early-returns when the input is already focused
-// (`if (state.isFocused) return;`), and select.tsx wires no buttonRef into useComboBox,
-// so its onPress/onPressStart toggle handlers never reach a rendered element either. A
-// click on a trigger that never lost focus (e.g. picking a second value right after the
-// first, with no click on anything else in between) is therefore a silent no-op in the
-// real app, not just in tests — this is a genuine gap in Task 6's SearchableSelect, out
-// of this task's file scope (packages/ui/src/select/select.tsx), flagged for a follow-up
-// fix-round rather than patched here. ArrowDown works regardless of prior focus state
-// (repeatKeyboardProps.ArrowDown calls state.open('first', 'manual') unconditionally),
-// so it's used here as the reliable reopen path — this line exists BECAUSE OF that defect,
-// not as unrelated interaction styling.
+// Workflow's searchable trigger is a real <input role="combobox">, unlike Field type's
+// non-searchable <button>, but otherwise behaves the same way: click to open, click the
+// option inside the portal-rendered listbox to select. (Task 7.5 fixed the reopen-on-click
+// gap this helper used to work around with an inline `{ArrowDown}` — see select.tsx.)
 async function pickFromSearchableSelect(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, optionName: string) {
   await user.click(trigger);
-  await user.keyboard('{ArrowDown}');
   const listbox = await screen.findByRole('listbox');
   await user.click(within(listbox).getByRole('option', { name: optionName }));
 }
