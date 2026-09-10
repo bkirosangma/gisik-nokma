@@ -259,3 +259,27 @@ describe('R1(c) at the component layer', () => {
     }
   });
 });
+
+describe('Select panel/option styling', () => {
+  // NOTE: selectors below are passed RAW (unescaped), matching every other
+  // call site of `rule()` in this file (e.g. 13.339's
+  // `rule('[data-style="neo"] .gn-field__input')`) — `rule()` already
+  // regex-escapes its argument internally
+  // (`selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`), and that escape
+  // class includes the backslash character itself. Pre-escaping the
+  // selector here (`\\[`, `\\]`, `\\.`) double-escapes it into a pattern
+  // that requires a literal backslash in the stylesheet text and can never
+  // match real CSS — verified empirically (a raw string matches, a
+  // pre-escaped one does not) before writing these.
+  it('the neo panel gets shadow-only elevation, matching the row-shadow precedent', () => {
+    expect(rule('[data-style="neo"] .gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-raised\)/);
+  });
+
+  it('the active/focused option row uses a focus-ring outline, not a background-fill misuse of focusRing', () => {
+    expect(rule('.gn-select__option[data-focused]')).toMatch(/outline:\s*2px solid var\(--gn-focus-ring\)/);
+  });
+
+  it('the option row background is the shared surface token, not a bespoke color', () => {
+    expect(rule('.gn-select__panel')).toMatch(/background:\s*var\(--gn-surface(-raised)?\)/);
+  });
+});
