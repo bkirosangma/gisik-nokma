@@ -313,7 +313,18 @@ describe('Select — option icon and description', () => {
     const user = userEvent.setup();
     render(<Select options={WITH_ICONS} value={null} onChange={vi.fn()} aria-label="Fruit" />);
     await user.click(screen.getByRole('button', { name: /Fruit/ }));
-    const apple = await screen.findByRole('option', { name: /Apple/ });
+    // Exact name match, not `/Apple/` — deliberately, to prove the description does NOT get
+    // folded into the option's accessible name. `useOption` wires `aria-labelledby`/
+    // `aria-describedby` via `useSlotId()`, which resolves to a real id only if `labelProps`/
+    // `descriptionProps` are actually spread onto an element in the DOM (confirmed by reading
+    // react-aria@3.52.1's `useOption.mjs`/`useId.mjs`); without that wiring, the accessible name
+    // falls back to full text content and this exact query would see "Apple A crisp fruit"
+    // instead of "Apple" (empirically reproduced before `SelectOptionRow` spread `labelProps`/
+    // `descriptionProps` onto their spans). A regex here would pass either way and silently miss
+    // a regression — the description is supposed to be an ARIA *description*, not part of the
+    // name, per the same accessible-name contract `apps/web/e2e-stack/accessible-names-baseline
+    // .json` (Task 0's gate) exists to protect.
+    const apple = await screen.findByRole('option', { name: 'Apple' });
     expect(within(apple).getByTestId('apple-icon')).toBeInTheDocument();
     expect(within(apple).getByText('A crisp fruit')).toBeInTheDocument();
   });
