@@ -633,6 +633,18 @@
 }
 .gn-select__trigger:disabled { cursor: not-allowed; }
 
+.gn-select__trigger--searchable {
+  cursor: text;
+}
+.gn-select__trigger--searchable input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  font: inherit;
+  color: inherit;
+}
+.gn-select__trigger--searchable input:focus { outline: none; }
+
 .gn-select__panel {
   position: absolute;
   z-index: 30;

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CheckIcon, RemoveIcon, SearchIcon } from '../src/select/select-icons.js';
@@ -77,5 +77,34 @@ describe('Select — non-searchable single-select', () => {
   it('is disabled when disabled is true', () => {
     render(<Select options={FRUIT} value={null} onChange={vi.fn()} disabled aria-label="Fruit" />);
     expect(screen.getByRole('button', { name: /Fruit/ })).toBeDisabled();
+  });
+});
+
+describe('Select — searchable', () => {
+  it('renders the trigger as a combobox input showing the selected label', () => {
+    render(<Select options={FRUIT} value="banana" onChange={vi.fn()} searchable aria-label="Fruit" />);
+    expect(screen.getByRole('combobox', { name: 'Fruit' })).toHaveValue('Banana');
+  });
+
+  it('typing filters the option list', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.type(input, 'cher');
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Cherry' })).toBeInTheDocument();
+    expect(within(listbox).queryByRole('option', { name: 'Apple' })).not.toBeInTheDocument();
+  });
+
+  it('selecting an option calls onChange and closes the panel', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Apple' }));
+    expect(onChange).toHaveBeenCalledWith('apple');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });
