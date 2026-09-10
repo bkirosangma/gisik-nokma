@@ -29,6 +29,26 @@ async function pickFromSelect(user: ReturnType<typeof userEvent.setup>, trigger:
   await user.click(within(listbox).getByRole('option', { name: optionName }));
 }
 
+// Workflow's searchable trigger (a real <input role="combobox">, unlike Field type's
+// non-searchable <button>) only reopens its panel via a genuine DOM focus transition:
+// `useComboBox`'s inputProps.onFocus early-returns when the input is already focused
+// (`if (state.isFocused) return;`), and select.tsx wires no buttonRef into useComboBox,
+// so its onPress/onPressStart toggle handlers never reach a rendered element either. A
+// click on a trigger that never lost focus (e.g. picking a second value right after the
+// first, with no click on anything else in between) is therefore a silent no-op in the
+// real app, not just in tests — this is a genuine gap in Task 6's SearchableSelect, out
+// of this task's file scope (packages/ui/src/select/select.tsx), flagged for a follow-up
+// fix-round rather than patched here. ArrowDown works regardless of prior focus state
+// (repeatKeyboardProps.ArrowDown calls state.open('first', 'manual') unconditionally),
+// so it's used here as the reliable reopen path — this line exists BECAUSE OF that defect,
+// not as unrelated interaction styling.
+async function pickFromSearchableSelect(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, optionName: string) {
+  await user.click(trigger);
+  await user.keyboard('{ArrowDown}');
+  const listbox = await screen.findByRole('listbox');
+  await user.click(within(listbox).getByRole('option', { name: optionName }));
+}
+
 const adminSession: BuilderSession = { userId: newUlid(), role: 'admin' };
 const kanbanPublished = cloneTemplate(WORKFLOW_TEMPLATES[0]!);
 // A second published workflow, so the binding combobox has somewhere to move to.
@@ -161,7 +181,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     const nameField = await screen.findByRole('textbox', { name: 'Type name' });
     await user.type(nameField, 'Invoice');
     await user.click(screen.getByRole('button', { name: 'Icon: receipt' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.id);
+    await pickFromSearchableSelect(user, screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.name);
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     const row = screen.getByTestId('field-row-0');
     const fieldName = within(row).getByRole('textbox', { name: 'Field name' });
@@ -196,7 +216,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     const user = userEvent.setup();
     renderEditor(null);
     await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'Priority thing');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.id);
+    await pickFromSearchableSelect(user, screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.name);
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     const row = screen.getByTestId('field-row-0');
     await pickFromSelect(user, within(row).getByRole('button', { name: /Field type/ }), 'select');
@@ -271,7 +291,16 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'task')!);
     expect(await screen.findByRole('textbox', { name: 'Type name' })).toHaveClass('gn-field__input');
     expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toHaveClass('gn-field__input');
-    expect(screen.getByRole('combobox', { name: 'Workflow' })).toHaveClass('gn-field__input');
+    // Workflow is now the shared searchable Select (Task 7), not a bare
+    // `<select>` — `gn-field__input` moved with it, but it now lives on the
+    // trigger BOX (select.tsx:201), not on the `<input role="combobox">`
+    // inside it (ui.css:677-687 styles the input to blend into that box
+    // rather than duplicating the class onto it, which would paint a second
+    // border/fill inside the first). So the class check walks up from the
+    // accessible combobox to the box that actually carries it.
+    const workflowTriggerBox = screen.getByRole('combobox', { name: 'Workflow' }).closest('.gn-select__trigger');
+    expect(workflowTriggerBox).not.toBeNull();
+    expect(workflowTriggerBox).toHaveClass('gn-field__input');
   });
 
   /**
@@ -297,10 +326,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
   async function rebind(seed: FakeGatewaySeed = {}) {
     const user = userEvent.setup();
     const rendered = renderEditor(task, { ...bothWorkflows, ...seed });
-    await user.selectOptions(
-      await screen.findByRole('combobox', { name: 'Workflow' }),
-      errandPublished.id,
-    );
+    await pickFromSearchableSelect(user, await screen.findByRole('combobox', { name: 'Workflow' }), errandPublished.name);
     return { user, ...rendered };
   }
 
@@ -344,9 +370,9 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await screen.findByRole('combobox', { name: 'Workflow' });
     expect(screen.queryByTestId('workflow-divergence')).not.toBeInTheDocument();
     // …and it goes away again when the admin changes their mind back.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), errandPublished.id);
+    await pickFromSearchableSelect(user, screen.getByRole('combobox', { name: 'Workflow' }), errandPublished.name);
     expect(await screen.findByTestId('workflow-divergence')).toBeInTheDocument();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.id);
+    await pickFromSearchableSelect(user, screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.name);
     expect(screen.queryByTestId('workflow-divergence')).not.toBeInTheDocument();
   });
 
@@ -439,12 +465,12 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
       typePopulation: { task: { [kanbanPublished.id]: 14 } },
     });
     const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
-    await user.selectOptions(combobox, errandPublished.id);
+    await pickFromSearchableSelect(user, combobox, errandPublished.name);
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
     expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
 
     // A second re-point, with no second save behind it.
-    await user.selectOptions(combobox, approvalPublished.id);
+    await pickFromSearchableSelect(user, combobox, approvalPublished.name);
     expect((gateway.submitted[0]!.payload as TicketTypeDef).workflowId).toBe(errandPublished.id);
     expect(screen.getByRole('button', { name: `Move them to "${approvalPublished.name}"…` })).toBeDisabled();
     expect(
@@ -471,7 +497,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
       typePopulation: { task: { [kanbanPublished.id]: 14 } },
     });
     const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
-    await user.selectOptions(combobox, errandPublished.id);
+    await pickFromSearchableSelect(user, combobox, errandPublished.name);
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
     await screen.findByText('Ticket type saved.');
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
@@ -481,7 +507,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     for (const state of kanbanPublished.states) {
       await user.selectOptions(within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }), target.id);
     }
-    await user.selectOptions(combobox, approvalPublished.id);
+    await pickFromSearchableSelect(user, combobox, approvalPublished.name);
 
     expect(screen.getByRole('dialog')).toHaveAttribute(
       'aria-label',
@@ -504,7 +530,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
       typePopulation: { task: { [kanbanPublished.id]: 14 } },
     });
     const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
-    await user.selectOptions(combobox, errandPublished.id);
+    await pickFromSearchableSelect(user, combobox, errandPublished.name);
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
     await screen.findByText('Ticket type saved.');
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
@@ -519,7 +545,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
 
     // Nothing has moved since; the sentence must not follow the combobox.
-    await user.selectOptions(combobox, approvalPublished.id);
+    await pickFromSearchableSelect(user, combobox, approvalPublished.name);
     expect(screen.getByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
     expect(screen.queryByText(`14 tickets moved to "${approvalPublished.name}".`)).not.toBeInTheDocument();
   });
