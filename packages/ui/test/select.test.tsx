@@ -1,6 +1,8 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { CheckIcon, RemoveIcon, SearchIcon } from '../src/select/select-icons.js';
+import { Select, type SelectOption } from '../src/select/select.js';
 
 describe('select icon glyphs', () => {
   it('render as aria-hidden inline SVGs with at least one path or circle', () => {
@@ -11,5 +13,69 @@ describe('select icon glyphs', () => {
       expect(svg).toHaveAttribute('aria-hidden', 'true');
       expect(svg?.querySelectorAll('path, circle, line').length ?? 0).toBeGreaterThan(0);
     }
+  });
+});
+
+const FRUIT: SelectOption[] = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+];
+
+describe('Select — non-searchable single-select', () => {
+  it('shows the placeholder when value is null, opens on click, and selects on click', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Select options={FRUIT} value={null} onChange={onChange} placeholder="Pick a fruit" aria-label="Fruit" />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Fruit' });
+    expect(trigger).toHaveTextContent('Pick a fruit');
+    await user.click(trigger);
+    const option = await screen.findByRole('option', { name: 'Banana' });
+    await user.click(option);
+    expect(onChange).toHaveBeenCalledWith('banana');
+  });
+
+  it('shows the placeholder rather than throwing when value matches no option', () => {
+    render(<Select options={FRUIT} value="durian" onChange={vi.fn()} placeholder="Pick a fruit" aria-label="Fruit" />);
+    expect(screen.getByRole('button', { name: 'Fruit' })).toHaveTextContent('Pick a fruit');
+  });
+
+  it('shows a checkmark on the currently selected option when open', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value="banana" onChange={vi.fn()} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: 'Fruit' }));
+    const selected = await screen.findByRole('option', { name: 'Banana' });
+    expect(selected).toHaveAttribute('aria-selected', 'true');
+    expect(selected.querySelector('svg')).not.toBeNull();
+  });
+
+  it('opens with the keyboard (Enter), navigates with ArrowDown, and selects with Enter', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} aria-label="Fruit" />);
+    const trigger = screen.getByRole('button', { name: 'Fruit' });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('listbox');
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(onChange).toHaveBeenCalledWith('banana');
+  });
+
+  it('closes on Escape without selecting', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} aria-label="Fruit" />);
+    await user.click(screen.getByRole('button', { name: 'Fruit' }));
+    await screen.findByRole('listbox');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('is disabled when disabled is true', () => {
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} disabled aria-label="Fruit" />);
+    expect(screen.getByRole('button', { name: 'Fruit' })).toBeDisabled();
   });
 });

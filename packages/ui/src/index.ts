@@ -27,3 +27,4 @@ export { SegmentedControl } from './components/segmented-control.js';
 export type { SegmentedOption, SegmentedControlProps } from './components/segmented-control.js';
 export { Sheet, type SheetProps } from './components/sheet.js';
 export { Table, type TableColumn, type TableProps } from './components/table.js';
+export { Select, type SelectOption, type SelectProps } from './select/select.js';
