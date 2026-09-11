@@ -24,6 +24,11 @@ const FRUIT: SelectOption[] = [
 ];
 
 describe('Select — non-searchable single-select', () => {
+  /**
+   * 10.81 — the Field-type select renders as the shared neumorphic Select
+   * (button trigger, portal panel, checkmark on the current selection)
+   * instead of a native `<select>`.
+   */
   it('shows the placeholder when value is null, opens on click, and selects on click', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -82,6 +87,11 @@ describe('Select — non-searchable single-select', () => {
 });
 
 describe('Select — searchable', () => {
+  /**
+   * 10.82 — the Workflow select renders as the shared Select in searchable
+   * mode: the trigger is a typeable combobox showing the current workflow's
+   * name, and typing filters the list.
+   */
   it('renders the trigger as a combobox input showing the selected label', () => {
     render(<Select options={FRUIT} value="banana" onChange={vi.fn()} searchable aria-label="Fruit" />);
     expect(screen.getByRole('combobox', { name: 'Fruit' })).toHaveValue('Banana');
@@ -174,6 +184,12 @@ describe('Select — searchable', () => {
 });
 
 describe('Select — multiple', () => {
+  /**
+   * 10.83 — Select's multi-select mode: selected options render as
+   * removable chips, hitting `maxSelected` shows an aria-live message
+   * rather than disabling remaining options. No live call site yet; proven
+   * at the component level, per the Phase 1 spec's decomposition.
+   */
   it('renders selected values as chips with a remove button each', () => {
     render(<Select multiple options={FRUIT} value={['apple', 'banana']} onChange={vi.fn()} aria-label="Fruit" />);
     expect(screen.getByText('Apple')).toBeInTheDocument();
