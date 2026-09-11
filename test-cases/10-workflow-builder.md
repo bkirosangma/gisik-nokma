@@ -89,6 +89,11 @@ Six real, gate-covered tests over the route layer, in `apps/web/test/authoring-r
 ## Adapter seam (apps/web)
 - 10.59 ✅ getWorkflow/listTicketTypes/submit route through Plan 6's `DataSource`; listWorkflows/getStateOccupancy/getTypeWorkflowPopulation/migrateTypeToWorkflow route over the online HTTP client (no `DataSourceQuery` member exists for them); listMembers never calls `DataSourceQuery.getMembers` (`Actor[]`, wrong shape) and instead reads members over HTTP into `WorkspaceMember[]` — `apps/web/test/data-source-gateway.test.ts`
 
+## Ticket-type editor: shared Select migration (Phase 1)
+- 10.81 ✅ The Field-type select renders as the shared neumorphic Select (button trigger, portal panel, checkmark on the current selection) instead of a native `<select>` — `select.test.tsx`, `ticket-types.test.tsx`
+- 10.82 ✅ The Workflow select renders as the shared Select in searchable mode — trigger is a typeable combobox showing the current workflow's name, typing filters the list — `select.test.tsx`, `ticket-types.test.tsx`
+- 10.83 ✅ Select's multi-select mode: selected options render as removable chips, hitting `maxSelected` shows an aria-live message rather than disabling remaining options — `select.test.tsx` (no live call site yet; proven at the component level, per the Phase 1 spec's decomposition)
+
 ## Smoke (Playwright, env-gated)
 - 10.50 🧪 Template to published to listed — `workflow-builder.spec.ts`
 - 10.51 🧪 Blank author with a real drag-to-connect, published — `workflow-builder.spec.ts`
