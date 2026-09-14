@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Select } from '@gisik-nokma/ui';
 
 /**
  * The pinned count copy, and the only place it is spelled. Four shapes, and
@@ -58,23 +59,15 @@ export function StateMappingDialog(props: {
             <span className="state-mapping-dialog__count">
               {countLine(props.occupancy?.[state.id], props.occupancyFailed, loading)}
             </span>
-            <label className="state-mapping-dialog__target">
+            <div className="state-mapping-dialog__target">
               <span>Send them to</span>
-              <select
+              <Select
+                options={props.targetStates.map((target) => ({ value: target.id, label: target.name }))}
+                value={mapping[state.id] ?? null}
+                onChange={(next) => setMapping((current) => ({ ...current, [state.id]: next }))}
                 aria-label={`Send them to — ${state.name}`}
-                value={mapping[state.id] ?? ''}
-                onChange={(changeEvent) =>
-                  setMapping((current) => ({ ...current, [state.id]: changeEvent.target.value }))
-                }
-              >
-                <option value="" disabled hidden></option>
-                {props.targetStates.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
           </li>
         ))}
       </ul>
