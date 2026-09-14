@@ -182,6 +182,59 @@ describe('Select — searchable', () => {
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
   });
 
+  // A third isOpen false->true transition beyond the click/Tab-focus paths the two tests above
+  // cover, flagged in review of the I2 fix below and checked here rather than taken on trust:
+  // Escape closes without blurring (state.isFocused stays true — see the comment on the
+  // non-searchable Escape test), so the input is closed-but-focused afterward, and the very next
+  // keystroke reopens the panel via `useComboBoxState`'s OWN `open(null, 'input')` path (its main
+  // effect, `isFocused && ... && inputValue !== lastValue`). If the I2 fix below were keyed on
+  // isOpen transitioning true with no further guard, this transition would fire it too and
+  // `setInputValue('')` could eat the keystroke that caused the open. Instrumented directly
+  // (a throwaway `console.log` inside the effect, not just reasoning from source) to confirm why
+  // it doesn't: the native `keydown`/`input` DOM events a real keystroke produces are dispatched
+  // as genuinely separate React commits, so the render where `isOpen` flips `true` is never the
+  // same render that also carries the just-typed character.
+  it('typing after Escape closed the panel keeps the typed filter text', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await screen.findByRole('listbox');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await user.type(input, 'cher');
+    expect(input).toHaveValue('cher');
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).queryByRole('option', { name: 'Apple' })).not.toBeInTheDocument();
+  });
+
+  // The more spec-relevant shape of the same concern: typing immediately after a selection, never
+  // blurring in between (no reopen click, no Tab). After a selection, `resetInputValue()` puts the
+  // picked label back in the input and closes the panel, but focus never leaves — so this is the
+  // "closed but focused, box already has a real label" starting state, closer to what I2's fix is
+  // actually for than the Escape-with-nothing-selected shape above. Multi-character (not a single
+  // keystroke) and asserts the resulting filter actually narrows the list — a second-character
+  // loss, or a filter still matched against the stale "Banana" text underneath, would both be
+  // invisible to a single-character check.
+  it('typing immediately after a selection (no blur) does not lose characters, and the fresh filter narrows the list', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>(null);
+      return <Select options={FRUIT} value={value} onChange={setValue} searchable aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Banana' }));
+    expect(input).toHaveValue('Banana');
+    await user.type(input, 'app');
+    expect(input).toHaveValue('app');
+    const listbox = await screen.findByRole('listbox');
+    const options = within(listbox).getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Apple');
+  });
+
   // Real, reproduced bug (found by an external peer session, independently confirmed here):
   // pressing Enter to commit a keyboard-driven selection throws
   // `TypeError: Cannot read properties of undefined (reading 'href')` and never commits. Root
@@ -276,6 +329,109 @@ describe('Select — searchable', () => {
     const refilteredOptions = within(refiltered).getAllByRole('option');
     expect(refilteredOptions).toHaveLength(1);
     expect(refilteredOptions[0]).toHaveTextContent('Banana');
+  });
+
+  // I2 (final whole-branch review, deliberately parked at the time — the owner has since ruled
+  // "fix both now"): per the approved design spec, the searchable trigger's input should clear to
+  // an empty filter box when its panel opens, not keep showing the previously-selected label —
+  // e.g. select "Banana", close, reopen: the input should read empty and ready for a fresh
+  // filter, not still show "Banana". Single-select only — `useComboBoxState`'s `selectedKey` is
+  // always `null` in `selectionMode: 'multiple'` (confirmed by reading its source), so
+  // `resetInputValue()`'s `itemText` is already `''` there; multi-select's input is already empty
+  // except while actively typing.
+  //
+  // This test covers the reopen-VIA-CLICK path: Task 7.5/12.6's own `onClick` handler
+  // (`comboState.open(null, 'focus')`) already reopens the panel; before this fix it left the old
+  // selected label sitting in the input, which is exactly the stale text I1's own fix (Task 12.6)
+  // relied on `showAllItems` (not the input text) to work around.
+  it('reopening via click after a selection clears the input to an empty filter box', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>(null);
+      return <Select options={FRUIT} value={value} onChange={setValue} searchable aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Banana' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveValue('Banana');
+    await user.click(input);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+    expect(input).toHaveValue('');
+  });
+
+  // The OTHER path that can reopen the panel with a stale selected label still showing: focusing
+  // the trigger via Tab after it was previously blurred (panel closed, nothing clicked). Unlike
+  // the click path above, this goes entirely through `useComboBox`'s own `inputProps.onFocus` →
+  // `comboState.setFocused(true)` → the library's OWN internal `menuTrigger === 'focus'` open call
+  // (`useComboBoxState.mjs`, `setFocused`, confirmed by reading the installed source: `if
+  // (menuTrigger === 'focus' && !props.isReadOnly) open(null, 'focus')`) — none of this
+  // component's own code runs on this path at all, so a fix wired only into the `onClick` handler
+  // above would miss it entirely. A preceding button gives `user.tab()` a real place to move focus
+  // from.
+  it('reopening via Tab focus after a selection clears the input to an empty filter box', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>(null);
+      return (
+        <>
+          <button type="button">before</button>
+          <Select options={FRUIT} value={value} onChange={setValue} searchable aria-label="Fruit" />
+        </>
+      );
+    }
+    render(<Controlled />);
+    const before = screen.getByRole('button', { name: 'before' });
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.click(await screen.findByRole('option', { name: 'Banana' }));
+    expect(input).toHaveValue('Banana');
+    await user.click(before);
+    expect(input).not.toHaveFocus();
+    await user.tab();
+    expect(input).toHaveFocus();
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+    expect(input).toHaveValue('');
+  });
+
+  // Traced by reading `useComboBoxState.mjs` and `useControlledState.mjs` directly (installed
+  // react-stately@3.50.0 source, not assumed): clearing `inputValue` to `''` on open runs straight
+  // into the library's own main effect branch `if (selectionMode === 'single' && inputValue ===
+  // '' && (props.inputValue === undefined || value === undefined)) setValue(null)` (~line 198) —
+  // `props.inputValue` is always `undefined` here (this component never passes it), so the guard
+  // holds regardless of `value`. `setValue(null)` → `setControlledValue(null)` →
+  // `useControlledState`'s setter, confirmed by reading ITS source: since the combobox's `value`
+  // is controlled (this component always passes `value: props.value`), `Object.is(valueRef
+  // .current, null)` is false whenever something is actually selected, so it DOES call this
+  // component's own `onChange` wrapper with `keys: null`. But that wrapper's own `if (key !=
+  // null)` guard (select.tsx, both single-select `onChange` handlers) swallows it before it ever
+  // reaches the real consumer `onChange` prop — confirmed here empirically against a real
+  // controlled consumer, not just the source trace.
+  it('reopening a single-select panel does not call the consumer onChange during the reopen itself', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>('banana');
+      return (
+        <Select
+          options={FRUIT}
+          value={value}
+          onChange={(v) => {
+            onChange(v);
+            setValue(v);
+          }}
+          searchable
+          aria-label="Fruit"
+        />
+      );
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    expect(input).toHaveValue('Banana');
+    await user.click(input);
+    await screen.findByRole('listbox');
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
 

@@ -327,6 +327,51 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
   useEffect(() => {
     if (comboState.isOpen) setMaxMessage(null);
   }, [comboState.isOpen]);
+  // I2 (final whole-branch review, deliberately parked at the time — the owner has since ruled
+  // "fix both now"): per the approved design spec, the searchable trigger should clear to an
+  // empty filter box whenever its panel opens, rather than keep showing the previously-selected
+  // label. Keyed on `comboState.isOpen` transitioning to `true` (not wired into the `onClick`
+  // handler below) specifically because there are TWO independent paths that can open this panel
+  // with a stale label still in the input — the reopen click below, and focusing the trigger via
+  // Tab, which goes entirely through `useComboBox`'s own `inputProps.onFocus` →
+  // `comboState.setFocused(true)` → the library's internal `menuTrigger === 'focus'` open call
+  // and never runs any of this component's own code. A `useEffect` on `isOpen` is the one place
+  // that sees both. Guarded to `!props.multiple`: multi-select's input is already empty except
+  // while typing (`useComboBoxState`'s `selectedKey` is always `null` in `selectionMode:
+  // 'multiple'`, confirmed by reading its source), so there is nothing to clear there, and the
+  // spec's "searchable trigger" wording is single-select only.
+  //
+  // Checked against a THIRD isOpen transition beyond the two paths above (flagged in review of
+  // this exact fix): the library's own type-to-reopen path (`open(null, 'input')`, its main
+  // effect, fires when the box is closed-but-focused and the user starts typing — e.g. right
+  // after Escape without blurring, or right after a selection without blurring). Instrumented
+  // directly (a throwaway `console.log` inside this effect, not just reasoning from source):
+  // MEASURED, NOT EXPLAINED — the effect does fire on that transition, and at the moment it fires
+  // `comboState.inputValue` reads `''`, which does not reconcile with `useComboBoxState.mjs`'s own
+  // `open(null, 'input')` guard (~line 185) requiring `inputValue !== lastValue` — i.e. the typed
+  // character would need to already be IN `inputValue` for that branch to fire at all. The exact
+  // render ordering that produces this is unresolved; do not trust an explanation for it that
+  // isn't here, because none has been verified. What IS measured is the outcome: in both shapes
+  // tested (typing after Escape with nothing selected, typing after a selection with no blur —
+  // both multi-character, checked per keystroke and per-render), no character is ever lost or
+  // reordered. See select.test.tsx's two `does not lose`/`keeps the typed filter text` tests —
+  // they ARE the guard here, standing in for an understood mechanism rather than restating one.
+  //
+  // Separately verified (this part IS traced through source, not just measured): this fix does
+  // not defeat two further guarantees. `useComboBoxState`'s own main effect reacts to `inputValue
+  // !== lastValue` by flipping `showAllItems` back to `false` and running a `setValue(null)`
+  // branch on the very next
+  // render — but `filteredCollection` with an empty `inputValue` already equals the full
+  // collection (`''.includes()` is always true), so Task 12.6's I1 fix (which shows the full list
+  // on reopen) is unaffected either way; and `setValue(null)`'s resulting `onChange(null)` call is
+  // swallowed by this component's own `if (key != null)` guard below, so the real consumer
+  // `onChange` prop is never invoked from the reopen itself. See select.test.tsx for the permanent
+  // regression tests covering both reopen paths, the onChange-silence guarantee, the two
+  // typing-is-preserved probes, and Task 12.6's own full-list-on-reopen test (re-run and confirmed
+  // still passing after this change).
+  useEffect(() => {
+    if (comboState.isOpen && !props.multiple) comboState.setInputValue('');
+  }, [comboState.isOpen, comboState.setInputValue, props.multiple]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listBoxRef = useRef<HTMLUListElement>(null);
