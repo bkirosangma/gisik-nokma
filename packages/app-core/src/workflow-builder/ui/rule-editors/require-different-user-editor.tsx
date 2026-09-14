@@ -1,4 +1,5 @@
 import type { Rule } from '@gisik-nokma/domain';
+import { Select } from '@gisik-nokma/ui';
 import { selectInboundTargetIds } from '../../draft-store.js';
 import { useBuilderStore, useDraft, useSummaryCtx } from '../builder-context.js';
 
@@ -17,26 +18,21 @@ export function RequireDifferentUserEditor(props: {
   const known = targetIds.includes(target);
   return (
     <div className="require-different-user-editor">
-      <label>
-        <span>Earlier move</span>
-        <select
-          aria-label="Earlier move"
-          value={known ? target : ''}
-          onChange={(changeEvent) =>
-            store.actions.updateRule(props.transitionIndex, props.ruleIndex, {
-              kind: 'require-different-user',
-              thanActorOf: { to: changeEvent.target.value },
-            })
-          }
-        >
-          {known ? null : <option value="" disabled hidden></option>}
-          {targetIds.map((stateId) => (
-            <option key={stateId} value={stateId}>
-              {`the move to "${summaryCtx.stateName(stateId)}"`}
-            </option>
-          ))}
-        </select>
-      </label>
+      <span>Earlier move</span>
+      <Select
+        options={targetIds.map((stateId) => ({
+          value: stateId,
+          label: `the move to "${summaryCtx.stateName(stateId)}"`,
+        }))}
+        value={known ? target : null}
+        onChange={(next) =>
+          store.actions.updateRule(props.transitionIndex, props.ruleIndex, {
+            kind: 'require-different-user',
+            thanActorOf: { to: next },
+          })
+        }
+        aria-label="Earlier move"
+      />
       {target === draft.def.initialStateId ? (
         <p className="require-different-user-editor__start-note">
           {`A ticket born in the start state has nobody to differ from — this rule only bites once the move to "${summaryCtx.stateName(target)}" has actually been performed.`}

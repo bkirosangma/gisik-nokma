@@ -1,4 +1,5 @@
 import type { Rule } from '@gisik-nokma/domain';
+import { Select } from '@gisik-nokma/ui';
 import { fieldChoicesFor } from '../../fields.js';
 import { useBuilderEnv, useBuilderStore, useDraft } from '../builder-context.js';
 
@@ -17,26 +18,21 @@ export function RequireFieldEditor(props: { transitionIndex: number; ruleIndex: 
   const known = choices.some((choice) => choice.id === props.rule.field);
   return (
     <div className="require-field-editor">
-      <label>
-        <span>Field</span>
-        <select
-          aria-label="Field"
-          value={known ? props.rule.field : ''}
-          onChange={(changeEvent) =>
-            store.actions.updateRule(props.transitionIndex, props.ruleIndex, {
-              kind: 'require-field',
-              field: changeEvent.target.value,
-            })
-          }
-        >
-          {known ? null : <option value="" disabled hidden></option>}
-          {choices.map((choice) => (
-            <option key={choice.id} value={choice.id}>
-              {choice.source === 'Built-in' ? choice.name : `${choice.name} (${choice.source})`}
-            </option>
-          ))}
-        </select>
-      </label>
+      <span>Field</span>
+      <Select
+        options={choices.map((choice) => ({
+          value: choice.id,
+          label: choice.source === 'Built-in' ? choice.name : `${choice.name} (${choice.source})`,
+        }))}
+        value={known ? props.rule.field : null}
+        onChange={(next) =>
+          store.actions.updateRule(props.transitionIndex, props.ruleIndex, {
+            kind: 'require-field',
+            field: next,
+          })
+        }
+        aria-label="Field"
+      />
       {known ? null : (
         <p className="require-field-editor__unknown-warning">
           This field is not on any ticket type bound to this workflow.

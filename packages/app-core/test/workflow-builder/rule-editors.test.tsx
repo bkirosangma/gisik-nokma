@@ -117,8 +117,10 @@ describe('RequireFieldEditor', () => {
     store.actions.addRule(0, { kind: 'require-field', field: 'dueDate' });
     store.actions.select({ kind: 'transition', index: 0 });
     renderInspector(store);
-    const picker = screen.getByRole('combobox', { name: 'Field' });
-    const optionLabels = within(picker)
+    const picker = screen.getByRole('button', { name: /Field/ });
+    await user.click(picker);
+    const listbox = await screen.findByRole('listbox');
+    const optionLabels = within(listbox)
       .getAllByRole('option')
       .map((option) => option.textContent);
     // fields.ts's BUILTIN_FIELD_CHOICES carries four built-ins (title,
@@ -126,7 +128,7 @@ describe('RequireFieldEditor', () => {
     // but a prior fix round (dd1cdeb) added startDate to mirror domain's
     // BUILTIN_FIELD_IDS, and this test targets fieldChoicesFor's real output.
     expect(optionLabels).toEqual(['Title', 'Description', 'Due date', 'Start date', 'Counterparty (Errand)']);
-    await user.selectOptions(picker, 'counterparty');
+    await user.click(within(listbox).getByRole('option', { name: 'Counterparty (Errand)' }));
     expect(store.getState().def.transitions[0]?.rules[0]).toEqual({
       kind: 'require-field',
       field: 'counterparty',
@@ -148,11 +150,12 @@ describe('RequireFieldEditor', () => {
     expect(
       screen.getByText('This field is not on any ticket type bound to this workflow.'),
     ).toBeInTheDocument();
-    // The placeholder option is what keeps the picker from *displaying* a field
-    // the rule does not name. Without it the select falls back to its first
-    // option and shows "Title" while the rule still requires 'ghost-field' —
-    // the exact misrepresentation design decision 3 exists to prevent.
-    expect(screen.getByRole('combobox', { name: 'Field' })).toHaveValue('');
+    // The placeholder is what keeps the trigger from *displaying* a field the
+    // rule does not name. Without Select falling back to its placeholder text
+    // when `value` matches nothing, the trigger would show "Title" while the
+    // rule still requires 'ghost-field' — the exact misrepresentation design
+    // decision 3 exists to prevent.
+    expect(screen.getByRole('button', { name: /Field/ })).toHaveTextContent('Select…');
   });
 });
 
@@ -166,12 +169,14 @@ describe('RequireDifferentUserEditor', () => {
     store.actions.addRule(2, { kind: 'require-different-user', thanActorOf: { to: 'doing' } });
     store.actions.select({ kind: 'transition', index: 2 });
     renderInspector(store);
-    const picker = screen.getByRole('combobox', { name: 'Earlier move' });
-    const optionLabels = within(picker)
+    const picker = screen.getByRole('button', { name: /Earlier move/ });
+    await user.click(picker);
+    const listbox = await screen.findByRole('listbox');
+    const optionLabels = within(listbox)
       .getAllByRole('option')
       .map((option) => option.textContent);
     expect(optionLabels).toEqual(['the move to "Doing"', 'the move to "To do"', 'the move to "Done"']);
-    await user.selectOptions(picker, 'done');
+    await user.click(within(listbox).getByRole('option', { name: 'the move to "Done"' }));
     expect(store.getState().def.transitions[2]?.rules[0]).toEqual({
       kind: 'require-different-user',
       thanActorOf: { to: 'done' },
