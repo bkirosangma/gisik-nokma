@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
@@ -141,11 +141,15 @@ describe('3.129 a member sees the roster and none of the invite machinery', () =
 
 describe('3.132 the mint form honours the two refusals the door would give', () => {
   it('offers admin, member and guest — and never owner', async () => {
+    const user = userEvent.setup();
     mount({ listPending: async () => [] });
-    const role = await screen.findByLabelText('Role');
-    expect(
-      [...(role as HTMLSelectElement).options].map((option) => option.value),
-    ).toEqual(['admin', 'member', 'guest']);
+    await user.click(await screen.findByRole('button', { name: /Role/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'admin',
+      'member',
+      'guest',
+    ]);
   });
 
   /**
@@ -171,7 +175,8 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
     // Type a project id FIRST, then switch to guest — the state survives the
     // switch, so this is the shape that would leak the key.
     await user.type(screen.getByLabelText(/^Projects/), '01J9PROJECT000000000000000');
-    await user.selectOptions(screen.getByLabelText('Role'), 'guest');
+    await user.click(screen.getByRole('button', { name: /Role/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'guest' }));
     expect(screen.queryByLabelText(/^Projects/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
