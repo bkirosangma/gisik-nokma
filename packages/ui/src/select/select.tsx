@@ -59,6 +59,21 @@ function buildCollection(options: SelectOption[]) {
     rendered: option.label,
     textValue: option.label,
     index,
+    // Real, reproduced bug fix: `@react-aria/combobox`'s `useComboBox.mjs` reads
+    // `state.collection.getItem(focusedKey)?.props.href` (and `?.props.onAction`) in both its
+    // `Enter` and `Tab` keyboard-shortcut handlers, once a real item is keyboard-focused. The
+    // `?.` there only guards `collectionItem` itself being `null` — it does NOT guard `.props`
+    // being `undefined`. Every node built here previously had no `props` field at all, so
+    // `collectionItem.props` was `undefined` for any focused item, and `.href` on `undefined`
+    // threw `TypeError: Cannot read properties of undefined (reading 'href')` — unconditionally,
+    // every time an item was focused via keyboard and Enter or Tab was pressed (confirmed via a
+    // reproduced stack trace pointing at the exact `useComboBox.ts` line, before this fix
+    // existed). An empty `props: {}` object makes `collectionItem.props.href` and
+    // `collectionItem.props.onAction` both read safely as `undefined` instead of throwing, and
+    // the handler falls through to `state.commit()` as intended — these `Select` options are
+    // plain data (`SelectOption`), never links or actions, so `href`/`onAction` should always be
+    // absent for them.
+    props: {},
   }));
   return new ListCollection<SelectOption>(nodes);
 }

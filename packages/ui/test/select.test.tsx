@@ -181,6 +181,54 @@ describe('Select — searchable', () => {
     await user.click(input);
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
   });
+
+  // Real, reproduced bug (found by an external peer session, independently confirmed here):
+  // pressing Enter to commit a keyboard-driven selection throws
+  // `TypeError: Cannot read properties of undefined (reading 'href')` and never commits. Root
+  // cause, confirmed by reading the installed react-aria source
+  // (`@react-aria/combobox`'s `useComboBox.mjs`, its `Enter` shortcut handler): once a real key is
+  // focused, it reads `state.collection.getItem(focusedKey)?.props.href` — the `?.` only guards
+  // `collectionItem` itself being `null`, not `.props` being `undefined`. `buildCollection()`
+  // (this file's own workaround for the missing `Item`/`@react-stately/collections` dependency,
+  // from Task 3) builds plain nodes with no `.props` field at all, so `collectionItem.props` is
+  // `undefined` for every focused item and `.href` on `undefined` throws.
+  //
+  // `{ArrowDown}` before `{Enter}` is load-bearing: with nothing focused yet,
+  // `state.selectionManager.focusedKey != null` short-circuits before the buggy branch is ever
+  // reached, so a bare `{Enter}` alone doesn't reproduce the crash. Measured directly against
+  // unfixed code (a throwaway repro, not just the coordinator's report): a bare `{Enter}` neither
+  // throws nor logs a `console.error` — `onChange` simply stays at 0 calls, which looks like a
+  // *different*, milder bug. Only `{ArrowDown}` first sets a real focused key and reaches the
+  // `.props.href` read.
+  it('selecting an option with ArrowDown then Enter calls onChange (does not throw)', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await screen.findByRole('listbox');
+    await user.keyboard('{ArrowDown}');
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenCalledWith('apple');
+  });
+
+  // Companion coverage for the sibling `Tab` shortcut handler in the same file, which reads the
+  // identical `collectionItem?.props.href` pattern (confirmed in source) and would throw for the
+  // same reason on the same missing `.props` field. The fix is the same one-line change
+  // (`buildCollection` gaining `props: {}`), so this asserts Tab's own commit-and-close behavior
+  // rather than merely "doesn't throw" — a non-throwing Tab that still failed to commit would be
+  // a different bug wearing the same clothes.
+  it('selecting an option with ArrowDown then Tab calls onChange and closes the panel (does not throw)', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await screen.findByRole('listbox');
+    await user.keyboard('{ArrowDown}');
+    await user.keyboard('{Tab}');
+    expect(onChange).toHaveBeenCalledWith('apple');
+  });
 });
 
 describe('Select — multiple', () => {
