@@ -694,12 +694,12 @@ Becomes:
 // AFTER:
     for (const state of kanbanPublished.states) {
       await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
-      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'in-progress' }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
 ```
 
-(`new RegExp(...)` rather than a literal `/.../ ` regex here because the state name is interpolated — a literal regex can't embed a template-string variable directly. If `state.name` could ever contain regex metacharacters this would need escaping, but check the actual fixture data used in these tests — workflow state names in this test file's fixtures are plain words, so this is safe as written; note in your report if you find otherwise.)
+**Amendment (found by Task 3's implementer, same defect in this plan's own Step 2 template there, fixed before Task 4 was dispatched):** `getByRole('option', { name: ... })` matches an option's rendered *label* text, not its `value`/id — `Select`'s options render `option.label` as their accessible name (confirmed in `packages/ui/src/select/select.tsx`'s `SelectOptionRow`), never `option.value`. The original native-`<select>` `selectOptions(el, 'in-progress')` call above matches by *value*, which is why the BEFORE code correctly uses the id (`'in-progress'`) — but the AFTER code must use the state's actual display *name*. Verified directly: `packages/domain/src/workflows/errand-with-waits.ts` defines `{ id: 'in-progress', name: 'In progress', category: 'active' }` — the label is `'In progress'` (capital I, a space, lowercase p), not the id string. `new RegExp(...)` rather than a literal `/.../ ` regex here because the state name is interpolated — a literal regex can't embed a template-string variable directly. If `state.name` could ever contain regex metacharacters this would need escaping, but check the actual fixture data used in these tests — workflow state names in this test file's fixtures are plain words, so this is safe as written; note in your report if you find otherwise.
 
-Each of the 5 call sites needs this same transformation — read each one's exact loop/context first (some may pick a different target value per state, not always `'in-progress'`).
+Each of the 5 call sites needs this same transformation — read each one's exact loop/context first (some may pick a different target value/name per state, not always `'in-progress'`/`'In progress'` — confirm each site's actual target state's `name` against `packages/domain/src/workflows/errand-with-waits.ts` or `packages/domain/src/workflows/simple-kanban.ts` as appropriate, the same way this amendment did, rather than assuming every site targets the same state).
 
 - [ ] **Step 3: Run the tests and confirm they fail for the right reason**
 
