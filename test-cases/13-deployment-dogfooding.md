@@ -2251,14 +2251,20 @@ card-scale) and is recorded here only for completeness, not as a call.
   override stripping it back to a boundary. — (`packages/ui/test/components.test.tsx`)
 - **13.341** ✅ Dark theme, per style: `surface`↔`surfaceRaised`, `surface`↔`surfaceSunken` and
   `surfaceRaised`↔`surfaceSunken` each separate by fill at or above a LITERAL floor (never derived from
-  the same `colorOf` call the assertion reads). **`neo`'s `surface↔raised` floor is pinned at `1.20`, not
-  the plan's literal "at least Task 13's measured value" (`1.214`, hig/minimal's own figure) — `tokens.ts`'s
-  `neoNavyRaised` docblock records why this is a genuine collision, not an oversight: lightening `neoNavy`
-  far enough to clear 1.214 pushes `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
-  guarantees it, and the luminance window both constraints would need is empty by ~0.00002 independent of
-  hue. The achieved 1.2035 clears the pinned 1.20 floor; the 0.8% shortfall from 1.214 is recorded, not
-  hidden.** `raised↔sunken` (1.29 floor, 1.292 achieved) and `surface↔sunken` (1.55 floor, 1.555 achieved)
-  clear their own floors for `neo` with margin — only the one pair is exceptional. — (`packages/ui/test/tokens.test.ts`)
+  the same `colorOf` call the assertion reads) — for `hig`/`minimal` only. **UPDATED 2026-09-10, owner:
+  "revert to prototype's exact dark hex and fix the accent colour ratio instead" (the dark+neo input box
+  read visibly lighter/flatter than the prototype's own screenshot).** `neo` previously carried its own
+  narrower `1.20` floor here — `tokens.ts`'s `neoNavyRaised` docblock recorded a genuine collision at the
+  time: lightening `neoNavy` far enough to clear hig/minimal's `1.214` floor pushed the THEN-bare `accent`
+  role below the 4.5 `CONTRAST_PAIRS` guarantee it carried as text against `surfaceRaised`. **That
+  collision stopped binding the same day it was written**: a same-day change split `accent` into a
+  fill-only role and `textAccent` (the role actually derived to read as text), so `CONTRAST_PAIRS` no
+  longer names bare `accent` on `surfaceRaised`/`surface` at all. With `neoNavyRaised`/`neoNavySunken`
+  reverted to `neoNavy`, `neo` is now EXEMPT from this separation floor in dark, the same way it was always
+  exempt in light (`neoPaper`, one shared hex) — a new positive case in the same describe block asserts
+  `surfaceRaised`/`surfaceSunken` equal `surface` exactly for `neo`/dark. Verified empirically before the
+  revert: every `CONTRAST_PAIRS` row for `neo`/dark still passes, with MORE margin, because darker
+  backgrounds only help the light-toned foregrounds in play. — (`packages/ui/test/tokens.test.ts`)
 - **13.342** ✅ The accessible-name ratchet (13.285–13.287) does not fall on any route and rises by
   EXACTLY the `StyleToggle`'s contribution on every signed-in route: `ariaLabel` +1, `role` +4,
   `ariaSelected` +3, `ariaDescribedby` +0 (one `tablist` + three `tab`s), measured live against the
@@ -2475,10 +2481,15 @@ same way).
   why that gap matters here too). — (`apps/web/test/sign-in-neo-restyle.test.ts`)
 - **13.360** ✅ `textAccent`'s derivation and the two renamed `CONTRAST_PAIRS` rows (`accent` →
   `textAccent` on `surface`/`surfaceRaised`), plus the retired accent hex measured in both directions: it
-  no longer clears 4.5 as text on a bare light surface, and even dark — which clears the two declared
-  rows unaided — fails against `neoNavySunken` specifically (4.11), which is why `.gn-help__result-title`
-  (rendered on `surfaceSunken`) moved to `textAccent` rather than staying on `accent`. `accentText` on the
-  new `accent` still clears 4.5 in both themes, unnudged (dispatch item 10, verified rather than assumed).
+  no longer clears 4.5 as text on a bare light surface, and dark clears the two declared rows unaided.
+  **UPDATED 2026-09-10 (see 13.341's own update, same day): the third check — `accent` against
+  `neoNavySunken` specifically — used to fail at 4.11, which was WHY `.gn-help__result-title` (rendered on
+  `surfaceSunken`) moved to `textAccent` rather than staying on `accent`. Reverting `neoNavySunken` to
+  `neoNavy` flips that ONE assertion: `accent` now clears 4.5 there too (≈6.39), a changed FACT rather
+  than a claim this case still needs to hold the old way.** `accent` still carries no formal guarantee on
+  a sunken background — nothing derives it to — so `.gn-help__result-title` stays on `textAccent`
+  regardless. `accentText` on the new `accent` still clears 4.5 in both themes, unnudged (dispatch item
+  10, verified rather than assumed).
   *Mutation-witnessed: reverting `textAccentLight` to an intermediate value that clears the two declared
   rows but not the ghost-button composite reddens exactly three cases (200/203 pass) — the pinned-hex
   case, the composite/sunken case, and 13.284's own label-contrast case one describe block up, which is
@@ -2812,24 +2823,26 @@ now RESOLVED. Option 3 — count every project the caller cannot name — is ref
 leak. The `mapWorkspaceRefs` comment forbidding any such count ("the COUNT would itself be the disclosure
 the rule withholds") is AMENDED in the same change set, quoting the sentence it replaces.
 
-- **13.379** ✅ The card renders every element from data the route served, and every input to every
-  displayed number is a DIFFERENT number, so a card reading one field off another cannot pass: member
-  count 5, three projects at 9/4/7 tickets and 3/1/2 blocked, restricted count 2. The monogram carries
-  the workspace's own name as its accessible name and `CC` as its text; the chips read `14 active`
-  (`20 − 6`) and `6 blocked`; the per-project counts are asserted INSIDE their own rows, so a card
-  printing one project's number on another's reddens. **Archived is marked AND hidden**: the archived
-  project is absent until a disclosure whose accessible name carries the workspace is clicked, and it
-  then carries an `Archived` chip — marking without hiding, or hiding without marking, each fails half of
-  this. `aria-expanded` is asserted in both states. The restricted line is one text node
-  (`2 projects · name restricted`), which a three-interpolation version fails. **Three negative controls,
-  because zero is where this card lies most easily:** a card with nothing restricted renders no line at
-  all (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
-  construction), a card with nothing archived renders no toggle (a control revealing nothing lies about
-  the shape of the data), and both singulars — `1 member`, `1 project · name restricted` — are asserted
-  on cards that have one, so the plurals above are a choice rather than the only string the code can
-  produce. Mutations, each red at its own site: drop the `− blocked` subtraction from the active chip;
-  stop splitting archived out of the live list; loosen `count <= 0` to `count < 0` so the line prints at
-  zero. **And the TINT, which the rest of this case does not reach**: `getByLabelText` finds the avatar by
+- **13.379** ✅ **UPDATED same day, Round 19c** (see 13.390 below). The card renders every element from
+  data the route served, and every input to every displayed number is a DIFFERENT number, so a card
+  reading one field off another cannot pass: member count 5, three projects at 9/4/7 tickets and 3/1/2
+  blocked, restricted count 2. The monogram carries the workspace's own name as its accessible name and
+  `CC` as its text; the chips read `14 active` (`20 − 6`) and `6 blocked`; the per-project counts are
+  asserted INSIDE their own rows, so a card printing one project's number on another's reddens. **Archived
+  is a COUNT, not a disclosure** (Round 19c replaced the toggle-and-reveal pattern, since the revealed rows
+  used to carry the one nested `<button>`/project-`<a>` pair that capped the door at the card's head): the
+  archived project's own row is simply absent from the live list, and its only trace is a `1 archived`
+  chip alongside the member/active/blocked chips — asserted present here and, in the negative-control case
+  below, asserted absent at zero rather than printing `0 archived`. The restricted line is one text node
+  (`2 projects · name restricted`), which a three-interpolation version fails. **Negative controls, because
+  zero is where this card lies most easily:** a card with nothing restricted renders no line at all
+  (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
+  construction), a card with nothing archived renders no chip mentioning it, and both singulars — `1
+  member`, `1 project · name restricted` — are asserted on cards that have one, so the plurals above are a
+  choice rather than the only string the code can produce. Mutations, each red at its own site: drop the
+  `− blocked` subtraction from the active chip; stop splitting archived out of the live list; loosen
+  `count <= 0` to `count < 0` so the line prints at zero. **And the TINT, which the rest of this case does
+  not reach**: `getByLabelText` finds the avatar by
   the workspace NAME and asserts its INITIALS, both functions of the name — so keying the tint on the name
   instead of the id survives every other assertion here. Measured, not supposed: that mutation was run and
   passed 235/235 in `packages/ui` and every case in this file. Two cards with IDENTICAL names and
@@ -2984,14 +2997,21 @@ true the moment the tree changes.
   `return` where the reload is) reddens this case ALONE, 1 failed / 201 passed.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.387** ✅ The five doors out of the page resolve to routes that exist, asserted as five LITERAL
-  paths. **Four are workspace-scoped and the fifth is not**: `/mcp/tokens` is a global route that takes no
+  paths. **Three are workspace-scoped and two are not**: `/mcp/tokens` is a global route that takes no
   `workspaceId`, so a page building its hrefs from one `/w/${id}/` prefix would emit
   `/w/<id>/mcp/tokens`, which resolves to nothing — **and a test building its expectations the same way
   would agree with the bug.** That is the whole reason the paths are literals, and the negative naming the
   defect (`MCP tokens` must NOT point at a workspace-scoped MCP route) is asserted directly. The link
   count is asserted too, so a sixth link cannot appear unnamed. **Mutation measured:** building the MCP
   href as `/w/<workspaceId>/mcp/tokens` — the exact defect the case is named for — reddens this case
-  ALONE, 1 failed / 201 passed.
+  ALONE, 1 failed / 201 passed. **UPDATED same day (Round 19e, owner: "the ticket type edit is opening in
+  a separate route... repoint it"):** `Ticket types` is now the SECOND non-`/w/<id>/…` door, targeting
+  `/settings?workspaceId=<id>&tab=ticket-types` — the bare `/w/<id>/settings/ticket-types` list it used to
+  point at has no sidebar, and its own Edit button opened the ticket-type editor as a third, separate
+  route, which is the exact bug just closed on `/settings` (§10's ticket-type-editor-inlining entry). The
+  header's own `Settings` button carried the same stale href and is repointed to
+  `/settings?workspaceId=<id>` the same way. `Workflows` is unchanged — its own editor (the builder) was
+  never inlined into `/settings`, so repointing its list here would be cosmetic, not a fix.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.388** ✅ The DOOR decides, not the page — driven with no UI in the picture at all. A `member` and a
   `guest` each submit `project.created`, `project.archived` and `project.restored` at the real client door
@@ -3049,32 +3069,52 @@ the create workspace card shouldnt be that big."* The controller's reading of th
 result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every number rendered is one Task
 16/18 already served.
 
-- **13.390** ✅ The `/workspaces` card's HEAD (monogram + name) is a door to `/w/<id>` — `aria-label` set
-  to EXACTLY the workspace's name, which overrides the content-derived name a bare anchor would compute
-  from the avatar's own label, the heading and the role sentence all sitting inside it. Two elements
-  legitimately share that accessible name now (the door and the avatar), which is not an error but did
-  require three pre-existing `getByLabelText` sites to disambiguate with `{ selector: '.gn-avatar' }`.
-  Every OTHER control (project links, the archived toggle, "My Work") stays a sibling, never nested
-  inside the door — asserted by finding each at its own top-level role, which nesting would break. —
+- **13.390** ✅ **UPDATED same day, Round 19c (owner: "the entire workspace card should be clickable ...
+  everything else on the card should just be info, nothing clickable").** The `/workspaces` card's WHOLE
+  content — not just the head — is a door to `/w/<id>`: `aria-label` set to EXACTLY the workspace's name,
+  which overrides the content-derived name a bare anchor would compute from the avatar's own label, the
+  heading, the role sentence, every project name/count and the restricted line, all now sitting inside it.
+  Two elements legitimately share that accessible name (the door and the avatar), which is not an error
+  but did require three pre-existing `getByLabelText` sites to disambiguate with `{ selector: '.gn-avatar'
+  }`. The per-project link, the archived toggle and "My Work" are not merely moved inside the door —
+  they are GONE from the card (project names are plain text; archived survives as a count chip) — so this
+  case now asserts the direct, stronger shape its Round 19b version could only approximate: exactly one
+  link and zero buttons anywhere in the card (`getAllByRole('link')` length 1, `queryAllByRole('button')`
+  length 0), rather than proving absence indirectly by showing other controls still reachable at their own
+  top-level role. Nothing removed is unreachable: `/w/<id>`, one click through this same door, already
+  carries all three (Task 19, Round 19b). —
   (`workspaces-cards.test.tsx`)
 - **13.391** ✅ The nav is CONTEXTUAL, transcribing the prototype's `navItems` FILTER rather than its
-  picture: without a workspace in the route, only the four `always` items render (Workspaces, Inbox,
-  Help, Account) plus a scope note; with one, the served workspace name, My Work, Members and Settings
-  join. **Board is a second, narrower filter this product has and the prototype does not**: it renders
-  only when the route ALSO carries a project, applying the prototype's own "a link appears only when its
-  target exists" rule one level down (a workspace has no single board; a project does). The three shapes
-  are three separate `it()`s (11.185, same file) rather than one array, and the Board-only-with-a-project
-  rule is what that split exists to keep mutation-witnessable at all: widening the condition to drop the
-  project check reddens the "with a workspace, no project" arm alone, because it is the one shape whose
-  expected set has no Board entry while a workspace is present. The workspace-name item OMITS while its
-  read is pending or fails — never the raw id — because `getMyWorkspaces` is one of this product's
-  refusing reads and a name that might be wrong is worse than a name not yet shown. —
+  picture: without a workspace in the route, only the `always` items render plus a scope note; with one,
+  the served workspace name, My Work and Members join. **UPDATED same day (Round 19c, owner: "move
+  members into settings and settings should always be visible on the nav bar"): the always tier grew
+  from four items to five, and Members stayed put.** An earlier draft of this case (and the nav change
+  it covers) also dropped `Members` from the workspace-scoped group, on the theory that "into settings"
+  meant folding it there; the owner's own reference screenshots (design mockups, same feedback round)
+  keep `Members` as its own top-level link beside `Settings`, so that draft was reverted — `Members` is
+  UNCHANGED from before this round, still `!noWorkspace`-gated at `/w/<id>/members`. What DID move is
+  `Settings`: it used to join Members and My Work only when a workspace was in the route, pointed at
+  `/w/<id>/settings/ticket-types`; it now renders UNCONDITIONALLY (Workspaces, Inbox, Members,
+  **Settings**, Help, Account, with Members present only inside a workspace), pointed at a new global
+  `/settings` (`app/settings/page.tsx`) that carries the workspace forward as `?workspaceId=` rather than
+  a path segment, because this shell remembers no "current workspace" outside a route or query param for
+  an unconditional link to target — a query-carrying one still can. **Board is a second, narrower filter
+  this product has and the prototype does not**: it renders only when the route ALSO carries a project,
+  applying the prototype's own "a link appears only when its target exists" rule one level down (a
+  workspace has no single board; a project does). The three shapes are three separate `it()`s (11.185,
+  same file) rather than one array, and the Board-only-with-a-project rule is what that split exists to
+  keep mutation-witnessable at all: widening the condition to drop the project check reddens the "with a
+  workspace, no project" arm alone, because it is the one shape whose expected set has no Board entry
+  while a workspace is present. The workspace-name item OMITS while its read is pending or fails — never
+  the raw id — because `getMyWorkspaces` is one of this product's refusing reads and a name that might be
+  wrong is worse than a name not yet shown. —
   (`app-nav.test.tsx`)
 - **13.392** ✅ Every literal nav target is checked against the app directory itself, not only against
-  what the component renders: a table of nine `[href, page.tsx path]` pairs, each existence-checked with
-  `node:fs`, and the nav's own rendered href set checked both for coverage (every table entry appears)
-  and for closure (every rendered href is in the table) — so a href this table forgot would fail loudly
-  rather than silently passing because nobody asked. —
+  what the component renders: a table of `[href, page.tsx path]` pairs (nine, after Round 19c swapped
+  `/w/<id>/settings/ticket-types` for `/settings?workspaceId=<id>` and kept `/w/<id>/members`), each
+  existence-checked with `node:fs`, and the nav's own rendered href set checked both for coverage (every
+  table entry appears) and for closure (every rendered href is in the table) — so a href this table
+  forgot would fail loudly rather than silently passing because nobody asked. —
   (`app-nav.test.tsx`)
 - **13.393** ✅ The current nav item carries `aria-current="page"`, and it is asserted the ONLY one that
   does — a page with two "current" items is a page that has not said which one is true. The sign-out
