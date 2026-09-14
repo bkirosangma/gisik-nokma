@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Select } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 
 /**
@@ -45,23 +46,15 @@ export function WorkflowRebindDialog(props: {
         {props.fromWorkflow.states.map((state) => (
           <li className="workflow-rebind-dialog__row" data-testid={`rebind-row-${state.id}`} key={state.id}>
             <span className="workflow-rebind-dialog__state-name">{state.name}</span>
-            <label className="workflow-rebind-dialog__target">
+            <div className="workflow-rebind-dialog__target">
               <span>Send them to</span>
-              <select
+              <Select
+                options={props.toWorkflow.states.map((target) => ({ value: target.id, label: target.name }))}
+                value={stateMap[state.id] ?? null}
+                onChange={(next) => setStateMap((current) => ({ ...current, [state.id]: next }))}
                 aria-label={`Send them to — ${state.name}`}
-                value={stateMap[state.id] ?? ''}
-                onChange={(changeEvent) =>
-                  setStateMap((current) => ({ ...current, [state.id]: changeEvent.target.value }))
-                }
-              >
-                <option value="" disabled hidden></option>
-                {props.toWorkflow.states.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
           </li>
         ))}
       </ul>

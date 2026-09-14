@@ -414,10 +414,8 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const confirm = within(dialog).getByRole('button', { name: 'Move these tickets' });
     expect(confirm).toBeDisabled();
     for (const state of kanbanPublished.states) {
-      await user.selectOptions(
-        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
-        'in-progress',
-      );
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     expect(confirm).toBeEnabled();
     await user.click(confirm);
@@ -495,7 +493,8 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const dialog = await screen.findByRole('dialog');
     const target = errandPublished.states[0]!;
     for (const state of kanbanPublished.states) {
-      await user.selectOptions(within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }), target.id);
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: target.name }));
     }
     await pickFromSearchableSelect(user, combobox, approvalPublished.name);
 
@@ -526,10 +525,8 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.selectOptions(
-        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
-        errandPublished.states[0]!.id,
-      );
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
     expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
@@ -547,10 +544,8 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.selectOptions(
-        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
-        errandPublished.states[0]!.id,
-      );
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
     expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
@@ -577,10 +572,8 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.selectOptions(
-        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
-        'in-progress',
-      );
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
 
