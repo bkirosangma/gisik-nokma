@@ -4,7 +4,7 @@
 
 **Goal:** Migrate the 3 native `<select>` sites in `apps/web` (Invite Channel, Invite Role, Style) onto the existing shared `Select` component from `@gisik-nokma/ui`, matching Phase 1's proven pattern exactly — no changes to `Select` itself.
 
-**Architecture:** Each site swaps its `<select><option>...</option></select>` markup for `<Select options={...} value={...} onChange={...} aria-label="..." />`, paired with a plain `<span>Text</span>` sibling for the visible label text (no `label` prop on `Select` itself — see Phase 1 spec's Public API section, which specifies `aria-label` as the sole accessible-name mechanism). **Amendment (Task 1 review finding, ruling recorded in the SDD ledger):** the `<span>`/`<Select>` pair must NOT be wrapped in an enclosing `<label>` element — Phase 1's two shipped call sites use that wrapping, but it produces a real defect (an enclosing `<label>` associates with `Select`'s internally-rendered hidden native `<select>`, not the visible trigger, breaking click-on-label-text — screen-reader naming and keyboard access are unaffected). Task 1 was fixed post-review; Task 2's code below already reflects the corrected, unwrapped pattern. All 3 sites are non-searchable, fixed 3-option enums with no "unset" state (each site's local state is always a valid enum member from mount), so none of them exercise the spec's `string` → `string | null` migration note — confirmed per-site in Task 1/2 below rather than assumed.
+**Architecture:** Each site swaps its `<select><option>...</option></select>` markup for `<Select options={...} value={...} onChange={...} aria-label="..." />`, paired with a plain `<span>Text</span>` sibling for the visible label text (no `label` prop on `Select` itself — see Phase 1 spec's Public API section, which specifies `aria-label` as the sole accessible-name mechanism). **Amendment (Task 1 review finding, ruling recorded in the SDD ledger):** the `<span>`/`<Select>` pair for this wave's 3 non-searchable sites must NOT be wrapped in an enclosing `<label>` element. The mechanism: `Select`'s non-searchable branch (`NonSearchableSelect`) renders a visually-hidden native `<select>` (react-aria's `HiddenSelect`) with its own internal `<label>`, placed *before* the visible trigger button in DOM order; an enclosing `<label>` associates with that hidden element, not the visible trigger, breaking click-on-label-text (screen-reader naming and keyboard access are unaffected either way). **This is a conditional rule, not a universal one, and it does not describe anything that ships at Phase 1's two call sites — verified independently at both, by two different mechanisms, not assumed:** `fields-editor.tsx`'s `Select` has no enclosing `<label>` at all (it sits inside a plain `<div className="fields-editor__type">`), so the wrapping this amendment forbids was never present there. `ticket-type-editor-screen.tsx`'s Workflow `Select` *is* wrapped in `<label>`, but it passes `searchable`, which routes to `SearchableSelect` — a branch that renders no `HiddenSelect` at all (confirmed in `select.tsx`: the only `HiddenSelect` usage is in the non-searchable branch's return, with a comment a few lines above confirming the searchable branch deliberately has none). With nothing hidden to mis-associate with, the wrapping `<label>` there correctly targets the real combobox `<input>`, and click-on-label-text works. **The rule this wave's fix follows, stated precisely: the nested-label defect affects only non-searchable `Select` usage wrapped in `<label>`. For searchable usage, wrapping in `<label>` is safe and actively beneficial** — it preserves click-on-label-text, which this wave's non-searchable fix otherwise gives up. Task 1 was fixed post-review; Task 2's code below already reflects the corrected, unwrapped pattern. All 3 sites in this wave are non-searchable, fixed 3-option enums with no "unset" state (each site's local state is always a valid enum member from mount), so none of them exercise the spec's `string` → `string | null` migration note — confirmed per-site in Task 1/2 below rather than assumed.
 
 **Tech Stack:** React 19, `@gisik-nokma/ui`'s `Select` (already built, already exported), Vitest + Testing Library + `userEvent`.
 
@@ -449,7 +449,11 @@ Replace `apps/web/src/style-toggle.tsx` in full:
 import { useEffect, useState } from 'react';
 import { Select, type StyleName } from '@gisik-nokma/ui';
 
-const OPTIONS: ReadonlyArray<{ value: StyleName; label: string }> = [
+// Not `ReadonlyArray` (the pre-migration type): `Select`'s `options` prop is typed
+// `SelectOption[]`, a mutable array — `readonly` here fails typecheck (TS4104) since
+// `Select`'s two other call sites (`fields-editor.tsx`, `ticket-type-editor-screen.tsx`) each
+// pass a fresh `.map()` result, never hitting this. `OPTIONS` itself is still never mutated.
+const OPTIONS: Array<{ value: StyleName; label: string }> = [
   { value: 'hig', label: 'HIG' },
   { value: 'minimal', label: 'Minimal' },
   { value: 'neo', label: 'Neu' },
@@ -490,7 +494,14 @@ export function StyleToggle() {
   };
 
   return (
-    <p>
+    // `<div>`, not `<p>`: `Select`'s internal `HiddenSelect` renders a `<div>`
+    // (`hidden-select-container`), and `<p>`'s HTML content model permits only phrasing
+    // content — a block-level `<div>` descendant is invalid there and triggers React's
+    // `validateDOMNesting` warning, a live SSR hydration defect on the real `/account`
+    // route (Wave A fix round 1). `<div>` permits block content, the same way
+    // `members/page.tsx`'s `<form>` wrapper already tolerates the same internal
+    // structure at Task 1's two sites.
+    <div>
       <span>Style</span>{' '}
       <Select
         options={OPTIONS}
@@ -500,23 +511,42 @@ export function StyleToggle() {
         }}
         aria-label="Style"
       />
-    </p>
+    </div>
   );
 }
 ```
 
-**Amendment, made before this task was dispatched (ruling recorded in the SDD ledger):** the
-original draft of this step wrapped `<span>Style</span>` and `<Select>` in an enclosing
-`<label>`, matching Phase 1's own established call-site convention. Task 1's task reviewer found
-that convention produces a real defect: `Select`'s non-searchable branch renders a hidden native
-`<select>` (react-aria's `HiddenSelect`) with its own internal `<label>` *before* the visible
-trigger button in DOM order, so an enclosing `<label>` associates with the hidden select, not the
-visible one — clicking the visible label text stops opening the picker (screen-reader naming and
-keyboard Tab order are both unaffected, only this convenience is lost). The fix is to drop the
-enclosing `<label>` and use `<span>` and `<Select>` as plain siblings, relying purely on
-`aria-label` for the accessible name — exactly what Phase 1's own spec already specifies as the
-mechanism (no `label` prop on `Select` itself, "aria-label for the accessible name"). This
-amendment is reflected in the code above; do not restore the `<label>` wrapping.
+**Amendment 1 (Task 1 review finding, ruling recorded in the SDD ledger):** the original draft
+of this step wrapped `<span>Style</span>` and `<Select>` in an enclosing `<label>`. Task 1's task
+reviewer found that this produces a real defect for **non-searchable** `Select` usage
+specifically: `Select`'s non-searchable branch renders a hidden native `<select>` (react-aria's
+`HiddenSelect`) with its own internal `<label>` *before* the visible trigger button in DOM order,
+so an enclosing `<label>` associates with the hidden select, not the visible one — clicking the
+visible label text stops opening the picker (screen-reader naming and keyboard Tab order are both
+unaffected, only this convenience is lost). This is not, as an earlier draft of this plan's
+Architecture section claimed, a defect already shipping at either of Phase 1's call sites — see
+the corrected Architecture paragraph above for the verified, conditional (non-searchable-only)
+statement of the rule. The fix here is to drop the enclosing `<label>` and use `<span>` and
+`<Select>` as plain siblings, relying purely on `aria-label` for the accessible name — exactly
+what Phase 1's own spec already specifies as the mechanism (no `label` prop on `Select` itself,
+"aria-label for the accessible name"). This amendment is reflected in the code above; do not
+restore the `<label>` wrapping.
+
+**Amendment 2 (Wave A's own review, round 1 — final-review fix wave, ruling recorded in the SDD
+ledger):** the original draft of this step wrapped the migrated control in `<p>`, carried over
+unchanged from the pre-migration markup. That wrapper was wrong even before this task was first
+executed: `Select`'s internally-rendered `HiddenSelect` renders a `<div>`
+(`hidden-select-container`), and `<p>`'s HTML content model permits only phrasing content — a
+block-level `<div>` descendant inside a `<p>` is invalid there and triggers React's
+`validateDOMNesting` warning, a real SSR hydration defect on the live `/account` route. This was
+caught and fixed during Wave A's own review cycle (not by this plan text, which still showed the
+old `<p>` until this correction), and independently confirmed absent a regression test — see
+Task 2's Global Constraints and this wave's final-review fix report for the hardening added to
+close that gap. The fix is `<div>` in place of `<p>`, which — like `members/page.tsx`'s `<form>`
+wrapper at Task 1's two sites — legally tolerates the internal block-level structure `Select`
+renders. This amendment is reflected in the code above; do not restore the `<p>` wrapping, and do
+not reintroduce `ReadonlyArray` for `OPTIONS` (also corrected above — it fails typecheck against
+`Select`'s mutable `SelectOption[]` prop type, per the inline comment in the code block).
 
 - [ ] **Step 6: Run the tests and confirm they pass**
 
