@@ -1512,7 +1512,47 @@ export function createSessionsClient(currentToken: string | null): SessionsClien
 +      {sessions !== null ? <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} /> : null}
 ```
 
-- [ ] **Step 7: Full suite + typecheck**
+- [ ] **Step 7: Write and pass a page-level integration test for the wiring**
+
+The Files list for this task names `apps/web/test/account-page.test.tsx` as modified — this step is what actually earns that, matching the pattern Tasks 2–4 already established (a page-level test proves the wiring, not just the isolated section component):
+
+```tsx
+// add to apps/web/test/account-page.test.tsx
+const listSessions = vi.fn();
+const revokeSession = vi.fn();
+vi.mock('../src/auth-client.js', () => ({
+  authClient: {
+    signOut: vi.fn(),
+    useSession: () => ({ data: { user: { id: 'u1', name: 'Anjali', email: 'a@example.com' }, session: { token: 'current-token' } } }),
+    updateUser: vi.fn(),
+    listSessions: (...args: unknown[]) => listSessions(...args),
+    revokeSession: (...args: unknown[]) => revokeSession(...args),
+  },
+}));
+
+describe('AccountPage — Sessions', () => {
+  it('lists sessions and lets you revoke a non-current one', async () => {
+    listSessions.mockResolvedValue({
+      data: [
+        { token: 'current-token', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-14T00:00:00Z', userAgent: 'Mozilla/5.0 Chrome Mac' },
+        { token: 'other-token', createdAt: '2026-09-05T00:00:00Z', updatedAt: '2026-09-10T00:00:00Z', userAgent: null },
+      ],
+      error: null,
+    });
+    revokeSession.mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+    mount();
+    expect(await screen.findByText('Chrome on Mac')).toBeInTheDocument();
+    expect(screen.getByText('Unknown device')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
+  });
+});
+```
+
+Run: `pnpm --filter apps/web exec vitest run test/account-page.test.tsx` — expect FAIL first (no `Sessions` wiring exists on the page yet if this step is reached before Step 6, or PASS if Step 6 is already done; run it before Step 6's edit to see it fail, confirming the test is real, then again after to see it pass).
+
+- [ ] **Step 8: Full suite + typecheck**
 
 ```bash
 pnpm --filter @gisik-nokma/app-core exec vitest run
@@ -1522,7 +1562,7 @@ pnpm --filter apps/web typecheck
 ```
 Expected: PASS.
 
-- [ ] **Step 8: Catalogue and commit**
+- [ ] **Step 9: Catalogue and commit**
 
 Add cases to `test-cases/13-deployment-dogfooding.md`: sessions list with honest device labels (never fabricated specificity), current session has no revoke control, revoking another session removes it. Extend the `/account` Features.md bullet.
 
@@ -1750,7 +1790,61 @@ Expected: PASS.
 +      ) : null}
 ```
 
-- [ ] **Step 7: Write the failing stack-suite witness (the load-bearing test)**
+- [ ] **Step 7: Write and pass a page-level integration test for the wiring**
+
+The Files list for this task names `apps/web/test/account-page.test.tsx` as modified — matching the pattern Tasks 2–4 established:
+
+```tsx
+// add to apps/web/test/account-page.test.tsx
+const listUserPasskeys = vi.fn();
+const addPasskey = vi.fn();
+const deletePasskey = vi.fn();
+vi.mock('../src/auth-client.js', () => ({
+  authClient: {
+    signOut: vi.fn(),
+    useSession: () => ({ data: { user: { id: 'u1', name: 'Anjali', email: 'a@example.com' }, session: { token: 'current-token' } } }),
+    updateUser: vi.fn(),
+    listSessions: vi.fn().mockResolvedValue({ data: [], error: null }),
+    revokeSession: vi.fn(),
+    passkey: {
+      listUserPasskeys: (...args: unknown[]) => listUserPasskeys(...args),
+      addPasskey: (...args: unknown[]) => addPasskey(...args),
+      deletePasskey: (...args: unknown[]) => deletePasskey(...args),
+    },
+  },
+}));
+
+describe('AccountPage — Passkeys', () => {
+  it('shows the empty state, adds a passkey, and lists it after reload', async () => {
+    listUserPasskeys
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [{ id: 'p1', name: 'Work laptop' }], error: null });
+    addPasskey.mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+    mount();
+    expect(await screen.findByText('You have no passkeys yet.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Passkey name'), 'Work laptop');
+    await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
+    expect(addPasskey).toHaveBeenCalledWith({ name: 'Work laptop' });
+    expect(await screen.findByText('Work laptop')).toBeInTheDocument();
+  });
+
+  it('a refusal from the server renders verbatim', async () => {
+    listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    addPasskey.mockResolvedValue({ error: { message: 'This authenticator is already registered' } });
+    const user = userEvent.setup();
+    mount();
+    await screen.findByText('You have no passkeys yet.');
+    await user.type(screen.getByLabelText('Passkey name'), 'Work laptop');
+    await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This authenticator is already registered');
+  });
+});
+```
+
+Run: `pnpm --filter apps/web exec vitest run test/account-page.test.tsx` before Step 6's edit lands, to see it fail, then again after, to see it pass.
+
+- [ ] **Step 8: Write the failing stack-suite witness (the load-bearing test)**
 
 This is the one test that proves the whole story is real, not merely wired — Task 12's own design, carried over unchanged. Confirm this repo's existing stack-suite conventions first (`find apps/web -iname "*e2e*" -o -iname "*stack*" | grep -v node_modules | grep -v dist`, then read one existing stack-suite spec for its exact `page.route`/CDP-session setup pattern before writing this):
 
@@ -1790,7 +1884,7 @@ test('register a passkey on /account, then sign in with it on /sign-in — no ma
 
 Expected: FAIL initially (no button exists yet).
 
-- [ ] **Step 8: Add the button to `/sign-in`**
+- [ ] **Step 9: Add the button to `/sign-in`**
 
 ```diff
  // apps/web/app/sign-in/page.tsx
@@ -1808,7 +1902,7 @@ Expected: FAIL initially (no button exists yet).
 
 Delete the now-outdated docblock at lines 190–244 (`"PASSKEY: THE DEAD BUTTON IS GONE..."`) and replace it with a short note that the button is back, along with the design choice: an explicit click, not focus-triggered conditional UI, because a click is unambiguous user intent and costs nothing on an anonymous page load.
 
-- [ ] **Step 9: Update `sign-in.test.tsx`'s test `13.326`**
+- [ ] **Step 10: Update `sign-in.test.tsx`'s test `13.326`**
 
 Replace the "never fires" assertion with "fires only on click":
 
@@ -1825,7 +1919,7 @@ it('13.326 the passkey button exists and fires only on click, never on mount', a
 });
 ```
 
-- [ ] **Step 10: Write the rate-limit-neutral integration test**
+- [ ] **Step 11: Write the rate-limit-neutral integration test**
 
 There's no existing template for this exact property at the HTTP-integration level (confirmed during research — `rate-limit.test.ts` is unit-only on the pure limiter functions). Build it directly against the assembled Fastify app, following whatever pattern `apps/server/test/auth/sign-in-flows.test.ts` or `security.test.ts` use for `app.inject()` sequences (read one first):
 
@@ -1851,12 +1945,12 @@ it('an anonymous /sign-in page load, even after adding the passkey button, spend
 
 (This step's exact shape depends on confirming there is genuinely no server-side call fired by a mere page load — which there isn't, since the passkey request now lives entirely behind an onClick handler. If that's the case, the meaningful assertion collapses to: static analysis / a client-side test proving the button never fires without a click (Step 9 already covers this) plus this one server-side sanity check that the sign-in path alone still isn't over-budget. Don't force an artificial 10-probe loop against an endpoint nothing calls — write what actually needs proving once the real shape is in front of you, and say so in the commit if this step's scope narrowed from what was planned.)
 
-- [ ] **Step 11: Run the stack-suite witness and confirm it passes**
+- [ ] **Step 12: Run the stack-suite witness and confirm it passes**
 
 Run whatever command executes this repo's stack suite (check `package.json` for a `test:stack` or `e2e:stack` script).
 Expected: PASS.
 
-- [ ] **Step 12: Full suite + typecheck across every touched package**
+- [ ] **Step 13: Full suite + typecheck across every touched package**
 
 ```bash
 pnpm --filter @gisik-nokma/app-core exec vitest run
@@ -1869,7 +1963,7 @@ pnpm check:help
 ```
 Expected: PASS. `pnpm check:help` confirms `docs/manual.md`/`docs/faq.md` still agree with `content.generated.ts` — expected to pass with NO changes to either doc, since the button restores what they already (accurately) describe.
 
-- [ ] **Step 13: Catalogue and commit**
+- [ ] **Step 14: Catalogue and commit**
 
 Add cases to `test-cases/13-deployment-dogfooding.md`: passkey list/add/delete behavior (including the named empty state and verbatim refusal), the accessible-name `aria-label="Delete passkey {name}"` per row, the button's click-only firing, and the rate-limit-neutral property. Extend the `/account` Features.md bullet with a Passkeys sub-clause, and update whatever `Features.md` bullet currently describes `/sign-in`'s methods to note the passkey button is back.
 
