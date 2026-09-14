@@ -155,11 +155,15 @@ describe('read-only workflow views for non-admins', () => {
     ).not.toBeInTheDocument();
     for (const button of screen.queryAllByRole('button')) {
       // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
-      // <button> elements too, but they're disabled value-bearing controls,
-      // not a navigation jump or an authoring action — valueControls() above
-      // separately asserts every one of them is disabled. Skip them here so
-      // this loop keeps testing what it names: every button is a jump.
-      if (button.className.includes('gn-select__trigger')) continue;
+      // <button> elements too, but they're a value-bearing control, not a
+      // navigation jump or an authoring action. This test never calls
+      // valueControls(), so assert disabled right here rather than only
+      // skip — an enabled Select trigger reaching a guest would otherwise
+      // pass this loop silently.
+      if (button.className.includes('gn-select__trigger')) {
+        expect(button).toBeDisabled();
+        continue;
+      }
       expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
     }
     expect(gateway.submitted).toEqual([]);
@@ -288,8 +292,9 @@ describe('no authoring action is reachable by any path the builder screen offers
     await screen.findByText('Later'); // the canvas nodes mount a tick after the screen
     const memberControls = valueControls();
     // Enumerated, not counted alone: 1 workflow-name textbox + 5 category
-    // comboboxes + 5 blocked checkboxes, one pair per errand state. A zero here
-    // would make "every one of them is disabled" vacuously true.
+    // pickers (Select trigger buttons, since Phase 2 Wave B Task 1) + 5
+    // blocked checkboxes, one pair per errand state. A zero here would make
+    // "every one of them is disabled" vacuously true.
     expect(memberControls).toHaveLength(11);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Read-only is not hidden: nothing was omitted, only frozen. One category
@@ -335,10 +340,14 @@ describe('no authoring action is reachable by any path the builder screen offers
 
     function everyButtonIsAJump(): void {
       for (const button of screen.queryAllByRole('button')) {
-        // Same skip as the guest test above: a disabled Select trigger
-        // (Category, one per canvas node) is a value-bearing control, not a
-        // jump or an authoring action.
-        if (button.className.includes('gn-select__trigger')) continue;
+        // Same as the guest test above: a Select trigger (Category, one per
+        // canvas node) is a value-bearing control, not a jump or an
+        // authoring action — assert disabled rather than only skip, so an
+        // enabled one reaching a member doesn't pass this loop silently.
+        if (button.className.includes('gn-select__trigger')) {
+          expect(button).toBeDisabled();
+          continue;
+        }
         expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
       }
     }

@@ -81,31 +81,39 @@ describe('WorkflowCanvas', () => {
    * Canvas-embedding-specific: the Category picker lives inside a React Flow
    * node whose own onClick selects the node. `Select` has no className/onClick
    * passthrough (see state-node.tsx), so nodrag and stopPropagation both move
-   * onto a wrapping <div> instead of the interactive element itself. This
-   * asserts the click that opens the picker does not ALSO select the node.
+   * onto a wrapping <div> instead of the interactive element itself. These two
+   * tests assert the click that opens the picker, and a click on its label,
+   * do not ALSO select the node — mutation-tested (see task report) so each
+   * one is pinned to the mechanism it actually exercises, not the one its
+   * name suggests:
    *
-   * Mutation-tested (see task report): with the wrapper's onClick
-   * stopPropagation removed, this test STILL PASSES — react-aria's `useSelect`
-   * button stops propagation of the click it handles by default (its
-   * documented behavior: interaction hooks don't bubble unless the handler
-   * calls `continuePropagation()`, which `Select` doesn't), so this exact
-   * assertion doesn't witness the wrapper's onClick. That onClick remains
-   * necessary for a click landing on the "Category" <span> or wrapper
-   * whitespace instead of the button itself (plain React bubbling, no library
-   * involved there) — the same defensive shape already used by the sibling
-   * Blocked checkbox+label a few lines below — just not exercised by this
-   * test or by any test in this file.
+   * - Clicking the Select's own trigger button: STAYS GREEN with the
+   *   wrapper's onClick stopPropagation removed. react-aria's `useSelect`
+   *   button already stops propagation of the click it handles by default
+   *   (documented behavior: interaction hooks don't bubble unless the handler
+   *   calls `continuePropagation()`, which `Select` doesn't). So this case
+   *   witnesses react-aria's own isolation, not the wrapper's onClick.
+   * - Clicking the "Category" label text instead of the button: this is the
+   *   one that actually exercises the wrapper's onClick — plain React
+   *   bubbling, no library involved, and REDDENS when that handler is
+   *   removed (confirmed by mutation test). `{ selector: 'span' }` is
+   *   load-bearing: react-aria's `HiddenSelect` renders its own hidden
+   *   `<label>Category</label>` for native-select semantics, and `getByText`
+   *   (unlike `getByRole`) doesn't respect that it's inert — same collision
+   *   already documented in select.tsx's multi-select branch.
    *
-   * With `nodrag` removed instead, this test still passes too, but the
-   * REWRITTEN case above ("changes a state category through the node
-   * picker") starts failing: `findByRole('listbox')` times out — the picker
-   * never opens at all. So `nodrag`'s necessity here is proven, just not by
-   * this test: empirically by that mutation, and structurally by reading
-   * node_modules/@xyflow/system's hasSelector(), which walks the DOM ancestor
-   * chain (parentElement) checking `.matches(selector)` at each level exactly
-   * like Element.closest() — so a wrapping-element `nodrag` class is checked
-   * the same as one on the exact target. See the task report for exact
-   * source lines and full mutation-test transcript.
+   * Neither test exercises `nodrag` — jsdom does no layout, so no React Flow
+   * drag gesture is ever live here. That claim is proven separately: with
+   * `nodrag` removed, BOTH these tests still pass, but the REWRITTEN case
+   * above ("changes a state category through the node picker") starts
+   * failing — `findByRole('listbox')` times out, the picker never opens at
+   * all. So `nodrag`'s necessity is real and proven here, just not by either
+   * of these two tests: empirically by that mutation, and structurally by
+   * reading node_modules/@xyflow/system's hasSelector(), which walks the DOM
+   * ancestor chain (parentElement) checking `.matches(selector)` at each
+   * level exactly like Element.closest() — so a wrapping-element `nodrag`
+   * class is checked the same as one on the exact target. See the task
+   * report for exact source lines and the full mutation-test transcript.
    */
   it('clicking the category picker does not also select the node', async () => {
     const user = userEvent.setup();
@@ -113,6 +121,15 @@ describe('WorkflowCanvas', () => {
     renderCanvas(store);
     const node = screen.getByTestId('state-node-done');
     await user.click(within(node).getByRole('button', { name: /Category/ }));
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+  });
+
+  it('clicking the Category label does not select the node', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderCanvas(store);
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByText('Category', { selector: 'span' }));
     expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
