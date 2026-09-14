@@ -42,14 +42,21 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// MUTABLE too, same reason as `currentPath`: the signed-out mount case below
+// needs `useCurrentUser`/`useSessionStatus` to answer "nobody", and every
+// other case in this file needs the seeded Kiro session it always answered
+// before this became a variable.
+let mockSessionUser: { id: string; name: string } | null = { id: 'u_kiro', name: 'Kiro' };
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
-    useSession: () => ({ data: { user: { id: 'u_kiro', name: 'Kiro' } } }),
+    useSession: () => ({ data: mockSessionUser === null ? null : { user: mockSessionUser } }),
     signOut: async () => ({ data: {}, error: null }),
   },
 }));
 
 import { AppNav } from '../src/app-nav.js';
+import HelpPage from '../app/help/page.js';
+import AccountPage from '../app/account/page.js';
 
 /**
  * `AppNav` reads `getMyWorkspaces` for its own workspace-name item whenever a
@@ -152,7 +159,7 @@ describe('AppNav — the mounts, not the components', () => {
    * this file's own case-id line in `test-cases/11-calendar-notifications.md`.
    */
   describe('11.185 the link set is closed at each of the three nav shapes', () => {
-    it('WITHOUT a workspace: only the four ALWAYS items, no My Work/Board/Members/Settings', () => {
+    it('WITHOUT a workspace: only the five ALWAYS items, no My Work/Board', () => {
       currentPath = '/workspaces';
       render(
         <Providers services={NO_NAV_SERVICES}>
@@ -160,11 +167,11 @@ describe('AppNav — the mounts, not the components', () => {
         </Providers>,
       );
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-      expect(hrefs).toEqual(['/workspaces', '/inbox', '/help', '/account']);
+      expect(hrefs).toEqual(['/workspaces', '/inbox', '/settings', '/help', '/account']);
     });
 
-    it('WITH a workspace, no project: the served name joins, Board does not', async () => {
-      currentPath = '/w/ws_1/members';
+    it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
+      currentPath = '/w/ws_1/my-work';
       render(
         <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
           <AppNav workspaceId="ws_1" />
@@ -178,7 +185,7 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/inbox',
         '/w/ws_1/members',
-        '/w/ws_1/settings/ticket-types',
+        '/settings?workspaceId=ws_1',
         '/help',
         '/account',
       ]);
@@ -207,7 +214,7 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/inbox',
         '/w/ws_1/members',
-        '/w/ws_1/settings/ticket-types',
+        '/settings?workspaceId=ws_1',
         '/help',
         '/account',
       ]);
@@ -264,15 +271,35 @@ describe('13.391 the nav is contextual', () => {
     expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
   });
 
-  it('Settings targets the prototype\'s DEFAULT tab (ticket-types), and lights for any settings sub-route', async () => {
-    currentPath = '/w/ws_1/settings/workflows/new';
-    render(
+  /**
+   * Settings is now GLOBAL (owner feedback, 2026-09-09) — one literal route,
+   * unconditional on `workspaceId`, so it needs no "any sub-route" widening
+   * the old `/w/[id]/settings/ticket-types` target did. It still carries the
+   * workspace forward as a QUERY PARAM when one is in scope (`/settings?
+   * workspaceId=<id>`), so `/settings`'s own page can show that workspace's
+   * ticket types without the link itself being workspace-typed —
+   * `usePathname()` ignores the query string, so `aria-current` reads the
+   * same regardless of which workspace (or none) is attached.
+   */
+  it('Settings is a global link that carries the workspace as a query param, current only on /settings', async () => {
+    currentPath = '/w/ws_1/my-work';
+    const { rerender } = render(
       <Providers services={workspacesOf([workspace({ id: 'ws_1' })])}>
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    const settings = await screen.findByRole('link', { name: 'Settings' });
-    expect(settings).toHaveAttribute('href', '/w/ws_1/settings/ticket-types');
+    let settings = await screen.findByRole('link', { name: 'Settings' });
+    expect(settings).toHaveAttribute('href', '/settings?workspaceId=ws_1');
+    expect(settings).not.toHaveAttribute('aria-current');
+
+    currentPath = '/settings';
+    rerender(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    settings = screen.getByRole('link', { name: 'Settings' });
+    expect(settings).toHaveAttribute('href', '/settings');
     expect(settings).toHaveAttribute('aria-current', 'page');
   });
 });
@@ -291,7 +318,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
     ['/w/ws_1/members', 'app/w/[workspaceId]/members/page.tsx'],
-    ['/w/ws_1/settings/ticket-types', 'app/w/[workspaceId]/settings/ticket-types/page.tsx'],
+    ['/settings?workspaceId=ws_1', 'app/settings/page.tsx'],
     ['/help', 'app/help/page.tsx'],
     ['/account', 'app/account/page.tsx'],
   ];
@@ -332,15 +359,16 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
  */
 describe('13.393 exactly one nav item is current, and sign-out keeps its full name', () => {
   it('marks the current item aria-current="page" and no sibling carries it', async () => {
-    currentPath = '/w/ws_1/members';
+    currentPath = '/w/ws_1/my-work';
     render(
       <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    const members = await screen.findByRole('link', { name: 'Members' });
-    expect(members).toHaveAttribute('aria-current', 'page');
-    const others = screen.getAllByRole('link').filter((a) => a !== members);
+    await screen.findByRole('link', { name: 'Convenience Corner' });
+    const myWork = screen.getByRole('link', { name: 'My Work' });
+    expect(myWork).toHaveAttribute('aria-current', 'page');
+    const others = screen.getAllByRole('link').filter((a) => a !== myWork);
     for (const other of others) {
       expect(other, other.textContent ?? '').not.toHaveAttribute('aria-current', 'page');
     }
@@ -365,5 +393,82 @@ describe('13.393 exactly one nav item is current, and sign-out keeps its full na
     // The name did NOT stay in the visible text — only in the accessible one.
     expect(button.textContent).not.toMatch(/Kiro/);
     expect(screen.getByLabelText('Kiro', { selector: '.gn-avatar' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * THE SAME MOUNT GAP THIS FILE'S OWN HEADER WARNS ABOUT, FOUND AGAIN.
+ *
+ * `/help` and `/account` never rendered `<AppNav />` at all — not a deleted
+ * line this time, one never added. Both pages had their own tests (none, in
+ * fact — see below) and nothing that renders `AppNav` transitively asserts
+ * anything about the two files that don't render it, so the absence was
+ * invisible the same way the deleted `InboxNavLink` import was. Case IDs are
+ * NOT allocated here: `test-cases/13-deployment-dogfooding.md`'s own header
+ * requires block allocation from the controller ("next free BLOCK... ON
+ * REQUEST ONLY"), which this session has no channel to; a block should be
+ * requested and these renamed to real ids before merge.
+ */
+describe('pending-13.4xx AppNav is mounted on every page that must always show it', () => {
+  it('/help mounts AppNav — signed in, and needs no workspace to show it', async () => {
+    currentPath = '/help';
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <HelpPage />
+      </Providers>,
+    );
+    expect(await screen.findByRole('link', { name: 'Help' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+  });
+
+  /**
+   * `/help`'s own docblock says it needs "no session" — so `AppNav` had
+   * better not quietly decide otherwise. Features.md's accessible-name-ratchet
+   * bullet says "`AppNav` never renders signed-out", which reads as a claim
+   * about the component itself rather than about which routes happened to
+   * mount it; before this fix that was also the only routes-mounted-it fact
+   * available to tell the two apart. This is the direct check: a signed-out
+   * session, asserted against the component, not inferred from routes.
+   */
+  it('AppNav renders its always-items with NO session at all, not only without a workspace', () => {
+    currentPath = '/help';
+    mockSessionUser = null;
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Account' })).toBeInTheDocument();
+    // The one item that SHOULD disappear signed out — proving this case would
+    // notice the opposite defect (everything rendering regardless of session).
+    expect(screen.queryByRole('button', { name: /Sign out/ })).not.toBeInTheDocument();
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+
+  /**
+   * `/account` is a SERVER component (no `'use client'`) rendering a
+   * `'use client'` child — normal in the App Router, and worth a witness
+   * because it is the one shape in this file that differs from every other
+   * case, which all render `AppNav` itself or a client page.
+   */
+  it('/account mounts AppNav — a server component rendering it as a client child', async () => {
+    currentPath = '/account';
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AccountPage />
+      </Providers>,
+    );
+    expect(await screen.findByRole('link', { name: 'Account' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
   });
 });

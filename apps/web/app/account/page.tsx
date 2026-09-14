@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { BackButton } from '../../src/back-button.js';
+import { AppNav } from '../../src/app-nav.js';
+import { StyleToggle } from '../../src/style-toggle.js';
 
 /**
  * `/account` — the GLOBAL account screen, as a deliberate stub (Task 18).
@@ -34,16 +35,29 @@ import { BackButton } from '../../src/back-button.js';
  * act on, and "partial" is not.
  *
  * A server component: it holds no state and reads nothing.
+ *
+ * ## Style moved here from `AppNav` (owner request)
+ *
+ * `StyleToggle` no longer rides in the persistent nav on every screen — it is
+ * a settled preference, not a control a reader needs mid-glance on every
+ * page, so it belongs on the page ABOUT the reader's own settings. It is also
+ * now a `<select>` rather than `SegmentedControl`: three always-visible
+ * segments earn their footprint in a 44px-tall nav row; one row in a
+ * preferences page does not need the same always-on visibility, and a
+ * dropdown is the shape this page's own invite-form sibling
+ * (`w/[workspaceId]/members/page.tsx`) already uses for a single choice among
+ * a few named options.
  */
 export default function AccountPage() {
   return (
     <main className="gn-shell gn-account">
-      <BackButton />
+      <AppNav />
       <h1 className="gn-page-title">Account</h1>
       <p>
         Your account settings live here — the ones that follow you across every workspace, rather
         than the ones that belong to one of them.
       </p>
+      <StyleToggle />
       <p>Nothing on this page is built yet. What is missing, by name:</p>
       <ul>
         <li>Passkeys — registering one, and seeing the ones you have.</li>

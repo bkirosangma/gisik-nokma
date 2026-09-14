@@ -194,7 +194,21 @@ it stayed in `apps/web` when the gateway left.*
   project: `/w/<id>/p/<pid>` (Board) joins too, between the workspace name and My Work — nine links.
   Each arm is its own `it()`, asserted in order, so a link added to any one shape reddens that shape's
   arm by name — the same discipline the single-array version kept, extended to three shapes instead of
-  one. —
+  one. **AMENDED AGAIN, same day (Round 19c, owner: "move members into settings and settings should
+  always be visible on the nav bar"): `Settings` LEFT the workspace-scoped group; `Members` did NOT.**
+  An earlier draft of this change also dropped `Members`, on the theory that "move members into
+  settings" meant folding it under Settings' nav slot — the owner's own reference screenshots (design
+  mockups, same feedback round) contradicted that by keeping `Members` as its own top-level link
+  beside `Settings`, so it was restored, unchanged from before this round. What DID move is `Settings`:
+  it now points at a new global `/settings` (`app/settings/page.tsx`) instead of `/w/<id>/settings/
+  ticket-types`, carrying the workspace forward as `?workspaceId=` rather than a path segment when one
+  is in scope — a workspace-TYPED href cannot be unconditional, since this shell remembers no "current
+  workspace" outside a route or query param, but a query-carrying one can be. The three shapes are now:
+  without a workspace, `/workspaces`, `/inbox`, `/settings`, `/help`, `/account` — five, one more than
+  before (`Settings` joined the always tier). With one and no project: the served name, `/w/<id>/
+  my-work` and `/w/<id>/members` join after `/workspaces`, and `/settings?workspaceId=<id>` sits where
+  the old workspace-scoped `Settings` link did — eight links, same count as before this round, Board
+  absent. With one AND a project: Board joins too — nine links, same count as before.** —
   (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)

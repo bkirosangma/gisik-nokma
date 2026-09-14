@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { StyleToggle } from '../src/style-toggle.js';
@@ -10,25 +10,22 @@ beforeEach(() => {
 
 describe('StyleToggle — neo is the default, not the absence of a choice', () => {
   /**
-   * 13.344 — one control per style with an aria-label, `data-style` set on the
-   * theme element, and `aria-selected` tracking the active style. Mutation:
-   * drop the group's `aria-label` → RED.
+   * 13.344 (retitled: a `<select>`, not `SegmentedControl`, since the owner
+   * moved this control off `AppNav` onto `/account`) — one labelled dropdown
+   * with all three styles as options, and `data-style` set on the theme
+   * element when a choice is made. Mutation: drop the field's label → RED.
    */
-  it('renders one tab per style, group-labelled, sets data-style, and tracks the active one via aria-selected', async () => {
+  it('renders one labelled dropdown with all three styles, and sets data-style on change', async () => {
     const user = userEvent.setup();
     render(<StyleToggle />);
-    const list = screen.getByRole('tablist', { name: 'Style' });
-    const tabs = within(list).getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['HIG', 'Minimal', 'Neu']);
-    const [higTab, minimalTab, neoTab] = [tabs[0]!, tabs[1]!, tabs[2]!];
-    expect(neoTab).toHaveAttribute('aria-selected', 'true');
-    expect(higTab).toHaveAttribute('aria-selected', 'false');
-    expect(minimalTab).toHaveAttribute('aria-selected', 'false');
+    const select = screen.getByRole('combobox', { name: 'Style' });
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['HIG', 'Minimal', 'Neu']);
+    expect(select).toHaveValue('neo');
 
-    await user.click(higTab);
+    await user.selectOptions(select, 'HIG');
     expect(document.documentElement.dataset['style']).toBe('hig');
-    expect(higTab).toHaveAttribute('aria-selected', 'true');
-    expect(neoTab).toHaveAttribute('aria-selected', 'false');
+    expect(select).toHaveValue('hig');
   });
 
   /**
@@ -37,7 +34,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
    */
   it('defaults to neo when nothing is stored', () => {
     render(<StyleToggle />);
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('combobox', { name: 'Style' })).toHaveValue('neo');
   });
 
   /**
@@ -50,14 +47,13 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
   it('a stored choice is restored on mount', async () => {
     localStorage.setItem('gn-style', 'minimal');
     render(<StyleToggle />);
-    expect(await screen.findByRole('tab', { name: 'Minimal' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'false');
+    expect(await screen.findByRole('combobox', { name: 'Style' })).toHaveValue('minimal');
   });
 
   it('persists an explicit choice for the next mount to restore', async () => {
     const user = userEvent.setup();
     render(<StyleToggle />);
-    await user.click(screen.getByRole('tab', { name: 'Minimal' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'Minimal');
     expect(localStorage.getItem('gn-style')).toBe('minimal');
   });
 });

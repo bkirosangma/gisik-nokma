@@ -130,12 +130,16 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
 }
 
 /**
- * Scoped to `.gn-view-tabs`, not a bare `screen.findAllByRole('tab')` —
- * `AppNav`'s `StyleToggle` (Task 14) is a second, unrelated `role="tablist"`
- * on the same page (`aria-label="Style"`), and an unscoped query over ALL
- * tabs on the page would count its three alongside these four. The view-tabs
- * tablist itself carries no `aria-label` to disambiguate by name, so this
- * scopes by the DOM container instead.
+ * Scoped to `.gn-view-tabs`, not a bare `screen.findAllByRole('tab')`.
+ *
+ * STALE AS OF the owner's `StyleToggle` move (2026-09-09): the second,
+ * unrelated `role="tablist"` this scoping originally guarded against
+ * (`AppNav`'s `StyleToggle`, Task 14, `aria-label="Style"`) no longer lives
+ * on this page — it moved to `/account` and became a `<select>`. The scope
+ * is kept anyway rather than loosened back to a bare query: the view-tabs
+ * tablist itself still carries no `aria-label` to disambiguate by name if a
+ * future control ever adds a second tablist here again, and scoping by the
+ * DOM container costs nothing today.
  */
 async function viewTabs(): Promise<HTMLElement[]> {
   // BY ROLE, not by text, since Round 19b: `AppNav` now offers its own
