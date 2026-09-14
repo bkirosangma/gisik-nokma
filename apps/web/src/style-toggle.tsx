@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { StyleName } from '@gisik-nokma/ui';
+import { Select, type StyleName } from '@gisik-nokma/ui';
 
-const OPTIONS: ReadonlyArray<{ value: StyleName; label: string }> = [
+// Not `ReadonlyArray` (the pre-migration type): `Select`'s `options` prop is typed
+// `SelectOption[]`, a mutable array — `readonly` here fails typecheck (TS4104) since
+// `Select`'s two other call sites (`fields-editor.tsx`, `ticket-type-editor-screen.tsx`) each
+// pass a fresh `.map()` result, never hitting this. `OPTIONS` itself is still never mutated.
+const OPTIONS: Array<{ value: StyleName; label: string }> = [
   { value: 'hig', label: 'HIG' },
   { value: 'minimal', label: 'Minimal' },
   { value: 'neo', label: 'Neu' },
@@ -22,13 +26,12 @@ function isStyleName(value: string): value is StyleName {
  * render agrees with what already painted, the same discipline `ThemeToggle`
  * follows for its own pre-paint script.
  *
- * Moved off `AppNav` onto `/account` (owner request) and rendered as a
- * `<select>`, not `SegmentedControl` — the same `<label htmlFor>` + `<select>`
- * pair `members/page.tsx` already uses for its invite form, rather than a new
- * control convention for one field. Living on a settled preferences page
- * rather than the persistent nav is what makes a dropdown the right shape
- * here: it no longer needs to announce all three options at a glance on
- * every screen, only let a visiting reader change one.
+ * Moved off `AppNav` onto `/account` (owner request), first rendered as a
+ * plain `<select>` (the same `<label htmlFor>` + `<select>` pair
+ * `members/page.tsx` used for its invite form at the time), then migrated
+ * onto the shared `Select` component in Phase 2 Wave A alongside that same
+ * invite form — both control families now share one component rather than
+ * two independent native-`<select>` conventions.
  */
 export function StyleToggle() {
   const [style, setStyle] = useState<StyleName>('neo');
@@ -46,21 +49,15 @@ export function StyleToggle() {
 
   return (
     <p>
-      <label htmlFor="gn-style">Style</label>{' '}
-      <select
-        id="gn-style"
+      <span>Style</span>{' '}
+      <Select
+        options={OPTIONS}
         value={style}
-        onChange={(event) => {
-          const { value } = event.target;
+        onChange={(value) => {
           if (isStyleName(value)) apply(value);
         }}
-      >
-        {OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        aria-label="Style"
+      />
     </p>
   );
 }

@@ -2293,16 +2293,21 @@ card-scale) and is recorded here only for completeness, not as a call.
   updated to the freshly measured (unchanged-membership) state; no entry was invented to match the
   plan's prediction. **Owner/controller: decide whether this needs its own instrument, an explicit
   roster-exemption line, or stands as documented and sufficient.** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
-- **13.344** ✅ `StyleToggle` renders one `role=tab` per style inside a `role=tablist` named by a
-  required `aria-label`, `data-style` lands on `document.documentElement`, and `aria-selected` tracks the
-  active style. Mutation: drop the `aria-label` → RED (witnessed on the prior commit that introduced this
-  test). — (`apps/web/test/style-toggle.test.tsx`)
-- **13.345** ✅ With nothing stored, the applied `data-style` is `neo`. *Mutation-witnessed here:
+- **13.344** ✅ (retitled again, Phase 2 Wave A: the shared `Select` component, not a plain
+  `<select>` — the plain `<select>` was itself never retitled here from the original `SegmentedControl`
+  description below, a pre-existing gap this retitle also closes) `StyleToggle` renders one labelled
+  control — `Select`'s non-searchable trigger (`role="button"`, named by a required `aria-label`) opening
+  a portal-rendered `role="listbox"` of 3 `role="option"` entries, HIG/Minimal/Neu — with `data-style`
+  landing on `document.documentElement` when a choice is made. Mutation: drop the field's label → RED. —
+  (`apps/web/test/style-toggle.test.tsx`)
+- **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed on the shared `Select`
+  trigger's own visible label text (`Neu`), not a native `<select>`'s `value`. *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
   check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
 - **13.346** ✅ A stored style choice survives a reload — asserted the same way `ThemeToggle`'s
   persistence is, a fresh mount restoring from `localStorage` rather than drifting from what
-  `layout.tsx`'s pre-paint script already applied. — (`apps/web/test/style-toggle.test.tsx`)
+  `layout.tsx`'s pre-paint script already applied; witnessed via the shared `Select` trigger's own
+  visible label text (`role="button"`), not a native `<select>`'s `value`. — (`apps/web/test/style-toggle.test.tsx`)
 - **13.347** ✅ The positive control the axis needs: switching style changes a WITNESSED rendered value,
   not two numbers that merely differ in memory. `hig` and `neo`'s `raised` box-shadow both appear in
   `themeStylesheet()`'s own output under their own declaration (reusing 13.337's machinery) and the two

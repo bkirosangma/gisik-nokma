@@ -622,6 +622,27 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     // nothing). Also recorded in `Features.md`'s accessible-name-ratchet
     // bullet, because a gap that lives only in a spec comment is a gap nobody
     // reviews (this file's own `/invite/<token>` precedent, 2026-09-08).
+    //
+    // 2026-09-14 (Phase 2 Wave A): `StyleToggle` changed identity a third
+    // time, native `<select>` -> the shared `Select` component from
+    // `@gisik-nokma/ui` (same component `members/page.tsx`'s Channel/Role
+    // fields now use). The trigger's role changes from `combobox`/native-
+    // select semantics to `button` (confirmed against `Select`'s own
+    // `select.test.tsx`, e.g. `screen.getByRole('button', { name: /Fruit/ })`);
+    // clicking it opens a portal-rendered `listbox` with 3 `option` role
+    // elements, matching `Select`'s shape at every other migrated site. In
+    // this route sweep's default (closed) DOM, no `aria-selected` triad
+    // exists the way `SegmentedControl`'s three `role="tab"` siblings always
+    // did — the listbox and its options render only while open, portaled to
+    // `document.body`, so a closed-page sweep sees none of them; selection is
+    // conveyed instead by a checkmark plus the trigger's own visible label
+    // text. No live assertion in this file depended on the old `role=combobox`
+    // shape: the ratchet loop below only asserts `RATCHETED` attributes when
+    // `accessibleBaseline` is defined for a route, and every key was already
+    // deleted to `{}` above (2026-09-09 entry) — confirmed via `grep -n
+    // "combobox"` returning no matches anywhere in this file. This paragraph
+    // is therefore purely historical documentation, same as the one above it,
+    // with nothing live to update.
     const accessibleKey = route.key;
     const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
     if (accessibleBaseline === undefined) {
