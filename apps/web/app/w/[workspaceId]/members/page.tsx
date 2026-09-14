@@ -283,34 +283,30 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
         onChange={(event) => setAddress(event.target.value)}
       />
 
-      <label className="gn-invite-channel">
-        <span>Channel</span>
-        <Select
-          options={[
-            { value: 'email', label: 'email' },
-            { value: 'sms', label: 'sms' },
-            { value: 'whatsapp', label: 'whatsapp' },
-          ]}
-          value={channel}
-          onChange={setChannel}
-          aria-label="Channel"
-        />
-      </label>
+      <span>Channel</span>
+      <Select
+        options={[
+          { value: 'email', label: 'email' },
+          { value: 'sms', label: 'sms' },
+          { value: 'whatsapp', label: 'whatsapp' },
+        ]}
+        value={channel}
+        onChange={setChannel}
+        aria-label="Channel"
+      />
 
-      <label className="gn-invite-role">
-        <span>Role</span>
-        {/* No `owner`. The door refuses it and a picker offering it would lie. */}
-        <Select
-          options={[
-            { value: 'admin', label: 'admin' },
-            { value: 'member', label: 'member' },
-            { value: 'guest', label: 'guest' },
-          ]}
-          value={role}
-          onChange={setRole}
-          aria-label="Role"
-        />
-      </label>
+      <span>Role</span>
+      {/* No `owner`. The door refuses it and a picker offering it would lie. */}
+      <Select
+        options={[
+          { value: 'admin', label: 'admin' },
+          { value: 'member', label: 'member' },
+          { value: 'guest', label: 'guest' },
+        ]}
+        value={role}
+        onChange={setRole}
+        aria-label="Role"
+      />
 
       {role === 'guest' ? null : (
         <>
