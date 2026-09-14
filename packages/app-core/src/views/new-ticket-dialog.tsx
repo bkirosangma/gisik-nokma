@@ -126,12 +126,27 @@ export function NewTicketDialog({
         )}
       </label>
       {/*
-        OUTSIDE the `<label>`, and that is not cosmetic. A `<label>` is matched by
-        its TEXT, so a sentence inside this one becomes part of the control's
-        accessible name — `getByLabelText('Parent')` stops resolving, and a screen
-        reader announces the whole disclosure as the field's label every time focus
-        lands on it. Measured: putting it inside turned 12.388 red with "Unable to
-        find a label with the text of: Parent" while the field rendered fine.
+        OUTSIDE the `<label>`, and that is not cosmetic — though WHY it holds has
+        changed, and the old reason is no longer the live one.
+
+        It used to be self-enforcing. The picker was a bare `<select>` taking its
+        accessible name from this `<label>`'s TEXT, so a sentence moved inside was
+        absorbed into that name: `getByLabelText('Parent')` stopped resolving and a
+        screen reader announced the whole disclosure as the field's label. Measured
+        at the time: putting it inside turned 12.388 red with "Unable to find a
+        label with the text of: Parent" while the field rendered fine.
+
+        The shared-`Select` migration ended that mechanism. `Select` carries an
+        explicit `aria-label="Parent"`, which WINS over a wrapping label's text, so
+        the accessible name is now correct wherever this span sits — the corruption
+        is structurally impossible rather than merely avoided. Good, but it retired
+        the only thing that PROVED the placement: moved inside today, nothing about
+        the name would complain.
+
+        So 12.388 now pins this span's position directly —
+        `getByTestId('parent-narrowing').closest('label')` must be null — and THAT
+        assertion, not the accessible name, is what keeps the arrangement below
+        honest. The placement itself still costs nothing and stays.
 
         Beside the picker rather than on the page behind it, because
         `parentCandidates` is whatever the caller could see — and once the caller

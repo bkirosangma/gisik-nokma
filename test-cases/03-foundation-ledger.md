@@ -2,7 +2,7 @@
 
 Mirrors `Features.md` §3. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope.
 
-**HIGHEST ID IN USE HERE IS `3.163`. THE NEXT FREE ID IS `3.164`.** *(Recount before trusting it, and recount with a pattern that catches a RANGE: this file's entries are not one id per line — `3.149–3.151` is a single bullet covering three, and a grep requiring `**` straight after the digits reads straight past it. That is exactly how `3.149` was minted twice on 2026-09-06: the ceiling was re-measured, and the measurement was wrong in a way that looked careful. §12 carries the same line for the same reason, after the same class of collision.)*
+**HIGHEST ID IN USE HERE IS `3.165`. THE NEXT FREE ID IS `3.166`.** *(Recount before trusting it, and recount with a pattern that catches a RANGE: this file's entries are not one id per line — `3.149–3.151` is a single bullet covering three, and a grep requiring `**` straight after the digits reads straight past it. That is exactly how `3.149` was minted twice on 2026-09-06: the ceiling was re-measured, and the measurement was wrong in a way that looked careful. §12 carries the same line for the same reason, after the same class of collision.)*
 
 - **3.1** ✅ A well-formed submitted event passes envelope validation; a non-ULID id, unknown entity kind, missing actor, unreal datetime, or micro-second timestamp is refused (planted defects). — `packages/domain/test/envelope.test.ts`
 - **3.2** ✅ An event of an unregistered type is refused `unknown-event-type` with the type named (planted defect). — `packages/domain/test/parse-event.test.ts`
@@ -148,3 +148,22 @@ and no Postgres enum, verified across every migration.*
   `it.each(CLIENT_ORIGINS)` gained "still admits an ordinary mcp-origin client submission" the moment the
   member landed, and it passed without being edited — which is the point of deriving rather than
   re-spelling.*
+- **3.164–3.165** ✅ **"NONE (PROJECT ROOT)" IS A CHOICE, NOT AN EMPTY BOX.** The New-ticket dialog's
+  `parentId` is `useState('')`, and `''` there is NOT the "nothing chosen yet" sentinel it is at every
+  other picker in the shared-`Select` rollout — it is a real, permanently offered option meaning *create
+  this at project root*, and picking it back is how a ticket un-nests. **3.164**: the untouched picker
+  READS "None (project root)" rather than a placeholder, and the draft it submits carries
+  `parentId: null` — both halves asserted because they fail independently, the label being what the user
+  reads and the `''` → `null` translation at the submit boundary being what the payload carries
+  (`ticketCreatedPayload` types it as a nullable ULID, and `''` is neither). **3.165**: after a real
+  parent is picked, project root can be chosen BACK — the half a placeholder could not do at all, since a
+  placeholder is not selectable. **Why these exist:** the native `<select>` rendered
+  `<option value="">None (project root)</option>` and showed it for free, so the behaviour was real but
+  unpinned through Wave C, and every pre-existing case either picks a real parent or withholds the picker
+  entirely — none look at what the untouched picker says. (Planted defect: applying this rollout's usual
+  `value={x === '' ? null : x}` translation to Parent — correct at every OTHER site — makes `''` mean "no
+  selection", so the trigger renders the generic "Select…" placeholder and the un-nest row disappears.
+  Measured 2026-09-14, not assumed: that mutation reddens exactly these two cases — the trigger's value
+  comes back EMPTY where "None (project root)" was expected — while all four pre-existing cases in the
+  file stay GREEN, which is the gap these were written to close.) — `packages/app-core/test/views/new-ticket-dialog.test.tsx`,
+  `packages/app-core/src/views/new-ticket-dialog.tsx`

@@ -84,6 +84,20 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
     expect(screen.getByTestId('parent-narrowing')).toHaveTextContent(
       'showing only tickets in progress — a ticket outside that is not offered here',
     );
+    // The note's placement, pinned STRUCTURALLY rather than through a side effect.
+    //
+    // It used to be enforced for free: the picker was a bare `<select>` whose accessible name came
+    // from its wrapping `<label>`'s TEXT, so a sentence moved inside that label was absorbed into
+    // the name and `getByLabelText('Parent')` stopped resolving — this case went red with "Unable
+    // to find a label with the text of: Parent". The shared-Select migration ended that. `Select`
+    // carries an explicit `aria-label="Parent"`, which WINS over the wrapping label's text, so the
+    // accessible name is now correct no matter where this span sits. That is the outcome the
+    // migration wanted, but it silently retired the only thing that PROVED the placement — move
+    // the span back inside the label today and every other assertion here stays green.
+    //
+    // So the placement is asserted directly. `.closest('label')` walks up from the span and must
+    // find nothing, which is exactly the claim the component's own comment makes.
+    expect(screen.getByTestId('parent-narrowing').closest('label')).toBeNull();
     // The picker is still a picker: this is a DISCLOSURE, not the withholding that
     // `parentCandidatesUnavailable` does. Without this the case would pass against a
     // dialog that replaced the control, which is a different and wrong behaviour.
@@ -228,7 +242,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
  * Both halves are asserted because they fail independently: the LABEL is what the user reads,
  * and the `''` → `null` translation at the submit boundary is what the payload carries.
  */
-describe('the parent picker offers project root as a real, selectable option', () => {
+describe('3.164–3.165 the parent picker offers project root as a real, selectable option', () => {
   const TYPES = [{ id: 'task', name: 'Task' }];
   const CANDIDATES = [{ id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign' }];
 
@@ -246,7 +260,7 @@ describe('the parent picker offers project root as a real, selectable option', (
     return onCreate;
   };
 
-  it('reads "None (project root)" before anything is picked, and submits it as null', async () => {
+  it('3.164 reads "None (project root)" before anything is picked, and submits it as null', async () => {
     const onCreate = renderDialog();
     // The untouched picker NAMES project root rather than sitting empty or reading "Select…".
     expect(screen.getByRole('combobox', { name: 'Parent' })).toHaveValue('None (project root)');
@@ -264,7 +278,7 @@ describe('the parent picker offers project root as a real, selectable option', (
     });
   });
 
-  it('can be chosen BACK after a parent was picked, which is how a ticket un-nests', async () => {
+  it('3.165 can be chosen BACK after a parent was picked, which is how a ticket un-nests', async () => {
     // The half a placeholder cannot do. A placeholder is not selectable, so if `''` were
     // handed over as `null` there would be no row to click here and a user who picked a parent
     // by mistake could never return the ticket to project root without reopening the dialog.
