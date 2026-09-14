@@ -240,6 +240,29 @@ describe('R1(c) at the component layer', () => {
   });
 
   /**
+   * 10.80 — `neo` gives `surface`/`surfaceRaised`/`surfaceSunken` the SAME
+   * flat hex (`tokens.ts`'s `neoPaper`), so a "sunken" element with no shadow
+   * of its own is indistinguishable from the raised surface around it —
+   * exactly the gap found in `.ticket-type-list__row` and `.fields-editor__
+   * row` (owner, 2026-09-10: "the text boxes... colours seem to be too
+   * bright... the feel of the neumorphic elements is greatly diminished").
+   * Pinned the same shape 13.339 already pins for `.gn-field__input`, so a
+   * future edit that drops either override reddens here rather than only
+   * being visible by eye against the running app.
+   */
+  it('10.80 the ticket-type row and field row are pressed-in under neo, not merely coloured', () => {
+    for (const selector of ['.ticket-type-list__row', '.fields-editor__row']) {
+      const base = rule(selector);
+      const neo = rule(`[data-style="neo"] ${selector}`);
+      expect(neo, `${selector}: the neo override must be a distinct rule, not a re-match of the base`).not.toBe(
+        base,
+      );
+      expect(base, selector).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+      expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+    }
+  });
+
+  /**
    * 13.340 — ghost/secondary controls keep fill + accent label as their
    * identifying signal in EVERY style, never a style-specific override that
    * strips it back to a boundary (or to nothing). 13.289 already pins this for

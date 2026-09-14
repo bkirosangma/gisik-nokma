@@ -1,5 +1,5 @@
 import { newUlid, type CustomFieldDef } from '@gisik-nokma/domain';
-import { Select } from '@gisik-nokma/ui';
+import { Button, Select } from '@gisik-nokma/ui';
 
 const FIELD_TYPES: readonly CustomFieldDef['type'][] = ['text', 'number', 'date', 'select', 'person'];
 
@@ -34,6 +34,7 @@ export function FieldsEditor(props: {
           <li className="fields-editor__row" data-testid={`field-row-${index}`} key={field.id}>
             <input
               type="text"
+              className="gn-field__input fields-editor__name"
               aria-label="Field name"
               disabled={props.disabled === true}
               value={field.name}
@@ -50,6 +51,7 @@ export function FieldsEditor(props: {
             </div>
             {field.type === 'select' ? (
               <textarea
+                className="gn-field__input fields-editor__options"
                 aria-label="Select options"
                 placeholder="one option per line"
                 disabled={props.disabled === true}
@@ -58,27 +60,26 @@ export function FieldsEditor(props: {
               />
             ) : null}
             {props.disabled === true ? null : (
-              <button
-                type="button"
+              <Button
+                variant="danger"
                 aria-label="Remove field"
                 onClick={() => props.onChange(props.fields.filter((_field, at) => at !== index))}
               >
                 Remove field
-              </button>
+              </Button>
             )}
           </li>
         ))}
       </ul>
       {props.disabled === true ? null : (
-        <button
-          type="button"
+        <Button
           className="fields-editor__add"
           onClick={() =>
             props.onChange([...props.fields, { id: newUlid(), name: 'New field', type: 'text' }])
           }
         >
           Add field
-        </button>
+        </Button>
       )}
     </div>
   );

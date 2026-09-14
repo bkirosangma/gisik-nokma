@@ -52,6 +52,7 @@
   background: var(--gn-fill-tertiary);
   color: var(--gn-text-accent);
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
 }
 .gn-button:focus-visible {
@@ -606,6 +607,15 @@
   width: 2rem;
   height: 2rem;
   padding: 0;
+  /* A real 1.5px transparent border, not the browser's default button chrome
+     `border-color` alone would otherwise recolour: with no `border-style`/
+     `-width` declared here, `.icon-picker__choice--selected` setting only
+     `border-color` rendered the UA's own default button border (visibly
+     rectangular, off-palette) instead of a deliberate accent ring. Reserving
+     the width on every choice, selected or not, is also what keeps the
+     selected icon from growing by the border's width and shifting its
+     neighbours. */
+  border: 1.5px solid transparent;
   border-radius: 6px;
   background: var(--gn-surface);
   color: var(--gn-text-muted);
@@ -619,7 +629,38 @@
 
 .fields-editor { display: flex; flex-direction: column; gap: 0.5rem; }
 .fields-editor__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.fields-editor__row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem; }
+.fields-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-sunken);
+}
+/* Same gap as `.ticket-type-list__row` (see its own docblock): `neo` gives
+   `surfaceSunken` no colour of its own, so without this the row was
+   indistinguishable from the raised card around it. */
+[data-style="neo"] .fields-editor__row {
+  box-shadow: var(--gn-shadow-sunken);
+}
+/* Sizing only — the box itself (border, radius, fill, focus ring) is
+   `.gn-field__input`'s, shared with every other field on this screen rather
+   than re-declared per row. Each control carries BOTH classes; these two
+   are never compounded onto `.gn-field__input` in the selector itself —
+   `components.test.tsx`'s `rule()` helper finds the FIRST `{selector} {`
+   text match in this file, so a selector merely ENDING in `.gn-field__input`
+   (`input.gn-field__input`, declared above the real base rule) would shadow
+   13.291/13.339's own lookup and make them read this rule's body instead. */
+.fields-editor__name { flex: 1 1 10rem; min-width: 8rem; }
+.fields-editor__type { flex: 0 1 9rem; }
+.fields-editor__options {
+  flex: 1 1 100%;
+  min-height: 3.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  resize: vertical;
+}
 .fields-editor__add { align-self: flex-start; }
 
 .gn-select__trigger {
@@ -757,34 +798,107 @@
 }
 .gn-select__option-label { flex: 1; }
 
-.ticket-type-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-list { display: flex; flex-direction: column; gap: 0.9rem; }
 .ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
-.ticket-type-list__header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+/* `wrap`, the same measured reason `.gn-mcp-tokens__row` carries it: at 390px
+   the heading column and the New-type button do not share a line. */
+.ticket-type-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.ticket-type-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
 .ticket-type-list__title { margin: 0; font-size: 1rem; }
-.ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+.ticket-type-list__card { padding: 0.5rem; }
+.ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+/* The row IS the door now (owner: "remove [Edit] and open on just clicking
+   the entire card/row"), the same shape `.gn-workspace-card__door` already
+   established for the workspace card — one interactive element wrapping the
+   whole row rather than a trailing action button, which is also why this is
+   a real `<button>` and not a `<div onClick>`: keyboard and screen-reader
+   reachability come from the element, not from CSS. `width: 100%` and
+   `text-align: left` undo the browser's own button centring/intrinsic-width
+   defaults; `font: inherit`/`color: inherit` undo its own type styling —
+   none of that was needed on the `<li>` this replaces. */
 .ticket-type-list__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  background: var(--gn-surface);
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--gn-surface-sunken);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.ticket-type-list__row:hover { background: var(--gn-fill-tertiary); }
+.ticket-type-list__row:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* `neo` collapses `surface`/`surfaceRaised`/`surfaceSunken` to the SAME flat
+   hex (`neoPaper`, `tokens.ts`) — depth under this style comes ENTIRELY from
+   the shadow, never from a colour difference the way `hig`/`minimal`'s three
+   distinct `warm*` tones give it for free. Left at `background` alone, this
+   row was IDENTICAL to `.ticket-type-list__card` behind it under `neo` — no
+   shadow, no colour difference, so the row that is supposed to read as
+   pressed-in instead read as nothing at all (owner: "the text boxes...
+   colours seem to be too bright... the feel of the neumorphic elements is
+   greatly diminished"). Same pair `.ticket-type-list__badge` and `.gn-field__
+   input` already wire in for exactly this reason. */
+[data-style="neo"] .ticket-type-list__row {
+  box-shadow: var(--gn-shadow-sunken);
+}
+.ticket-type-list__icon { display: inline-flex; color: var(--gn-text-muted); flex: none; }
+.ticket-type-list__info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; min-width: 0; }
 .ticket-type-list__name { font-weight: 600; font-size: 0.9rem; }
+/* Right-aligned by ordinary flex flow — `.ticket-type-list__info` above is
+   `flex: 1 1 12rem` and grows to fill the row, so this, declared after it,
+   lands at the row's trailing edge with no positioning of its own (owner:
+   "put it on the right side"). */
 .ticket-type-list__badge {
   /* 0.75rem, not 0.7rem — 11.2px, under the floor. The badge is the only thing
      distinguishing one ticket type row from another at a glance. */
+  flex: none;
   font-size: 0.75rem;
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
+  background: var(--gn-fill-tertiary);
   color: var(--gn-text-muted);
 }
+/* Depressed/pressed-in look (owner: "with a depressed UI") — the same
+   neumorphic pair `[data-style="neo"] .gn-field__input` and `[data-style=
+   "neo"] .gn-nav a[aria-current='page']` already wire in rather than
+   inventing a new shadow: swap the flat fill for `--gn-surface-sunken` and
+   let `--gn-shadow-sunken` do the work. `hig`/`minimal` render that token as
+   `none` (their `SHADOWS` entries are empty), so the badge stays the flat
+   chip above under those styles without needing its own guard beyond this
+   selector already being scoped to `neo`. */
+[data-style="neo"] .ticket-type-list__badge {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
+.ticket-type-list__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
 .ticket-type-list__rank,
-.ticket-type-list__fields { font-size: 0.75rem; color: var(--gn-text-muted); }
-.ticket-type-list__fields { margin-right: auto; }
+.ticket-type-list__fields,
+.ticket-type-list__workflow,
+.ticket-type-list__meta-sep { font-size: 0.75rem; color: var(--gn-text-muted); }
 
-.ticket-type-editor { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-editor { display: flex; flex-direction: column; gap: 0.9rem; }
 .ticket-type-editor__loading { margin: 0; color: var(--gn-text-muted); }
+.ticket-type-editor__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1rem; align-items: start; }
+.ticket-type-editor__main,
+.ticket-type-editor__aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+.ticket-type-editor__card { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-editor__fields-title,
+.ticket-type-editor__aside-title { margin: 0; font-size: 0.9rem; }
+/* Stacks below the two-column canvas's own floor (`40rem` here is a page
+   breakpoint choice, not that measurement) — a fixed 18rem aside would
+   otherwise squeeze the form column on a phone. */
+@media (max-width: 40rem) {
+  .ticket-type-editor__layout { grid-template-columns: minmax(0, 1fr); }
+}
 .ticket-type-editor__name,
 .ticket-type-editor__rank,
 .ticket-type-editor__workflow { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
@@ -1624,6 +1738,17 @@
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
+}
+/* Had no rule at all before this: a disabled `.gn-field__input` (a built-in
+   ticket type's locked rank, a read-only field row) fell back to nothing but
+   the browser's own disabled treatment on top of this class's background —
+   inconsistent across browsers and never actually muted next to the plain
+   sunken/muted look every other disabled control on this product (`.gn-
+   button:disabled`) already carries. */
+.gn-field__input:disabled {
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+  cursor: not-allowed;
 }
 /* ── OWNER RULING 2026-09-09 (Task 14 AMENDMENT rule (a)): under `neo` the
    empty input takes the PURE NEO look — sunken, no border — even though the
