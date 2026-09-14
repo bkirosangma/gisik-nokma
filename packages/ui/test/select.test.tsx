@@ -403,6 +403,33 @@ describe('Select — multiple', () => {
     const message = await screen.findByText('Max 2 selected');
     expect(message.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
   });
+
+  // I3 (final whole-branch review, T1 finding): `SelectChip`'s remove button never received
+  // `props.disabled` from either enclosing scope, so a disabled multi-select's chips stayed
+  // clickable. No `disabled` test existed for `multiple` mode in any branch before this — one
+  // case per branch (non-searchable/searchable), since the chip markup and the disabled-threading
+  // call site are separate code in each.
+  it('disables chip remove buttons when the select itself is disabled (non-searchable)', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select multiple options={FRUIT} value={['apple']} onChange={onChange} disabled aria-label="Fruit" />);
+    const remove = screen.getByRole('button', { name: 'Remove Apple' });
+    expect(remove).toBeDisabled();
+    await user.click(remove);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('disables chip remove buttons when the select itself is disabled (searchable)', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Select multiple searchable options={FRUIT} value={['apple']} onChange={onChange} disabled aria-label="Fruit" />,
+    );
+    const remove = screen.getByRole('button', { name: 'Remove Apple' });
+    expect(remove).toBeDisabled();
+    await user.click(remove);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 const WITH_ICONS: SelectOption[] = [

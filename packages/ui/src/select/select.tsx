@@ -94,11 +94,25 @@ type SharedSelectState = ListState<SelectOption> & { selectedKey: string | numbe
 // Multi-select's chips are a removable tag, not a tone indicator — a different job from the
 // existing `Chip` in `packages/ui/src/components/chip.tsx`, which always renders a status dot
 // and has no remove affordance. Deliberately not reusing it.
-function SelectChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+function SelectChip({
+  label,
+  onRemove,
+  disabled,
+}: {
+  label: string;
+  onRemove: () => void;
+  disabled: boolean;
+}) {
   return (
     <span className="gn-select__chip">
       {label}
-      <button type="button" className="gn-select__chip-remove" aria-label={`Remove ${label}`} onClick={onRemove}>
+      <button
+        type="button"
+        className="gn-select__chip-remove"
+        aria-label={`Remove ${label}`}
+        onClick={onRemove}
+        disabled={disabled}
+      >
         <RemoveIcon />
       </button>
     </span>
@@ -220,6 +234,7 @@ function NonSearchableSelect(props: SelectProps & { collection: ListCollection<S
               key={option.value}
               label={option.label}
               onRemove={() => props.onChange(props.value.filter((v) => v !== option.value))}
+              disabled={disabled}
             />
           ))}
           <button {...buttonProps} ref={triggerRef} className="gn-select__trigger-open">
@@ -377,6 +392,7 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
                 key={option.value}
                 label={option.label}
                 onRemove={() => props.onChange(props.value.filter((v) => v !== option.value))}
+                disabled={disabled}
               />
             ))
           : null}
