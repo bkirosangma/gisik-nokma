@@ -89,10 +89,11 @@ function valueControls(): HTMLElement[] {
     // useSelect), not a <select>/combobox — but it is still the value-bearing
     // control for whichever field it picks, so the enumeration has to keep
     // catching it under its new role rather than silently losing coverage.
-    // Scoped to "Field type" by name: the only Select call site in this
-    // screen's tree at time of writing (fields-editor.tsx, Task 5 of the
-    // shared-select plan).
-    ...screen.queryAllByRole('button', { name: /Field type/ }),
+    // Scoped by name to the Select call sites reachable from this screen's
+    // tree: "Field type" (fields-editor.tsx, Task 5 of the shared-select
+    // plan) and "Category" (state-node.tsx's canvas picker, added by Phase 2
+    // Wave B Task 1 — one per rendered state, so 5 in the errand template).
+    ...screen.queryAllByRole('button', { name: /Field type|Category/ }),
   ];
 }
 
@@ -153,6 +154,12 @@ describe('read-only workflow views for non-admins', () => {
       screen.queryByText('Could not load workspace people and types — reload to try again.'),
     ).not.toBeInTheDocument();
     for (const button of screen.queryAllByRole('button')) {
+      // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
+      // <button> elements too, but they're disabled value-bearing controls,
+      // not a navigation jump or an authoring action — valueControls() above
+      // separately asserts every one of them is disabled. Skip them here so
+      // this loop keeps testing what it names: every button is a jump.
+      if (button.className.includes('gn-select__trigger')) continue;
       expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
     }
     expect(gateway.submitted).toEqual([]);
@@ -286,8 +293,11 @@ describe('no authoring action is reachable by any path the builder screen offers
     expect(memberControls).toHaveLength(11);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Read-only is not hidden: nothing was omitted, only frozen. One category
-    // picker per state, all five still on screen.
-    expect(screen.getAllByRole('combobox', { name: 'Category' })).toHaveLength(5);
+    // picker per state, all five still on screen. Role changed combobox->button
+    // by Phase 2 Wave B Task 1's Select migration; name is a regex because
+    // Select's trigger accessible name concatenates the current value with the
+    // aria-label (see canvas.test.tsx's equivalent queries).
+    expect(screen.getAllByRole('button', { name: /Category/ })).toHaveLength(5);
   });
 
   it('control: the admin render has the SAME controls, every one of them enabled', async () => {
@@ -325,6 +335,10 @@ describe('no authoring action is reachable by any path the builder screen offers
 
     function everyButtonIsAJump(): void {
       for (const button of screen.queryAllByRole('button')) {
+        // Same skip as the guest test above: a disabled Select trigger
+        // (Category, one per canvas node) is a value-bearing control, not a
+        // jump or an authoring action.
+        if (button.className.includes('gn-select__trigger')) continue;
         expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
       }
     }

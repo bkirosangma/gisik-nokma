@@ -70,9 +70,50 @@ describe('WorkflowCanvas', () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store);
-    const picker = within(screen.getByTestId('state-node-done')).getByRole('combobox', { name: 'Category' });
-    await user.selectOptions(picker, 'active');
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByRole('button', { name: /Category/ }));
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: 'active' }));
     expect(store.getState().def.states.find((state) => state.id === 'done')?.category).toBe('active');
+  });
+
+  /**
+   * Canvas-embedding-specific: the Category picker lives inside a React Flow
+   * node whose own onClick selects the node. `Select` has no className/onClick
+   * passthrough (see state-node.tsx), so nodrag and stopPropagation both move
+   * onto a wrapping <div> instead of the interactive element itself. This
+   * asserts the click that opens the picker does not ALSO select the node.
+   *
+   * Mutation-tested (see task report): with the wrapper's onClick
+   * stopPropagation removed, this test STILL PASSES — react-aria's `useSelect`
+   * button stops propagation of the click it handles by default (its
+   * documented behavior: interaction hooks don't bubble unless the handler
+   * calls `continuePropagation()`, which `Select` doesn't), so this exact
+   * assertion doesn't witness the wrapper's onClick. That onClick remains
+   * necessary for a click landing on the "Category" <span> or wrapper
+   * whitespace instead of the button itself (plain React bubbling, no library
+   * involved there) — the same defensive shape already used by the sibling
+   * Blocked checkbox+label a few lines below — just not exercised by this
+   * test or by any test in this file.
+   *
+   * With `nodrag` removed instead, this test still passes too, but the
+   * REWRITTEN case above ("changes a state category through the node
+   * picker") starts failing: `findByRole('listbox')` times out — the picker
+   * never opens at all. So `nodrag`'s necessity here is proven, just not by
+   * this test: empirically by that mutation, and structurally by reading
+   * node_modules/@xyflow/system's hasSelector(), which walks the DOM ancestor
+   * chain (parentElement) checking `.matches(selector)` at each level exactly
+   * like Element.closest() — so a wrapping-element `nodrag` class is checked
+   * the same as one on the exact target. See the task report for exact
+   * source lines and full mutation-test transcript.
+   */
+  it('clicking the category picker does not also select the node', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderCanvas(store);
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByRole('button', { name: /Category/ }));
+    expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
   /**
@@ -242,7 +283,7 @@ describe('WorkflowCanvas', () => {
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store, testEnv({ session: { userId: newUlid(), role: 'member' }, canAuthor: false }));
     expect(
-      within(screen.getByTestId('state-node-done')).getByRole('combobox', { name: 'Category' }),
+      within(screen.getByTestId('state-node-done')).getByRole('button', { name: /Category/ }),
     ).toBeDisabled();
     expect(
       within(screen.getByTestId('state-node-done')).getByRole('checkbox', { name: 'Blocked' }),

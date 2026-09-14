@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Select } from '@gisik-nokma/ui';
 import { useBuilderEnv, useBuilderStore } from './builder-context.js';
 import type { StateNodeData } from './flow-graph.js';
 
@@ -25,23 +26,23 @@ export function StateNode(props: NodeProps) {
         <span className="gn-state-node__name">{data.name}</span>
         {data.isInitial ? <span className="gn-state-node__initial-badge">Start</span> : null}
       </div>
-      <label className="gn-state-node__category">
-        <span className="gn-state-node__category-label">Category</span>
-        <select
-          aria-label="Category"
-          className="nodrag gn-state-node__category-picker"
-          disabled={!canAuthor}
+      <div
+        className="nodrag gn-state-node__category"
+        onClick={(mouseEvent) => mouseEvent.stopPropagation()}
+      >
+        <span>Category</span>
+        <Select
+          options={[
+            { value: 'open', label: 'open' },
+            { value: 'active', label: 'active' },
+            { value: 'terminal', label: 'terminal' },
+          ]}
           value={data.category}
-          onClick={(mouseEvent) => mouseEvent.stopPropagation()}
-          onChange={(changeEvent) =>
-            store.actions.setStateCategory(data.stateId, changeEvent.target.value as StateNodeData['category'])
-          }
-        >
-          <option value="open">open</option>
-          <option value="active">active</option>
-          <option value="terminal">terminal</option>
-        </select>
-      </label>
+          onChange={(next) => store.actions.setStateCategory(data.stateId, next as StateNodeData['category'])}
+          disabled={!canAuthor}
+          aria-label="Category"
+        />
+      </div>
       <label className="gn-state-node__blocked">
         <input
           type="checkbox"
