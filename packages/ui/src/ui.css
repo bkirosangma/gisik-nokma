@@ -1577,7 +1577,8 @@
   font-size: 1rem;                /* never below 16px: iOS zooms the page otherwise */
   color: var(--gn-text);
   background: var(--gn-surface-raised);
-  border-radius: 0.4rem;
+  border-radius: var(--gn-radius-control);
+  box-shadow: var(--gn-shadow-sunken);
 }
 .gn-help__search-input:focus-visible,
 .gn-help__tab:focus-visible,
@@ -1588,7 +1589,13 @@
   outline-offset: 2px;
 }
 
-.gn-help__results { margin-bottom: 2rem; padding: 0.9rem 1rem; border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__results {
+  margin-bottom: 2rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
 .gn-help__results-count { margin: 0 0 0.6rem; font-weight: 600; }
 .gn-help__results-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 .gn-help__result { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -1603,20 +1610,39 @@
 .gn-help__result-where { font-size: 0.9rem; color: var(--gn-text-muted); }
 .gn-help__result-excerpt { color: var(--gn-text-muted); }
 
-.gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border-left: 3px solid var(--gn-warning); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border-left: 3px solid var(--gn-warning); border-radius: var(--gn-radius-control); background: var(--gn-surface-sunken); }
 
-.gn-help__tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.gn-help__tabs {
+  display: inline-flex;
+  gap: 0.15rem;
+  margin-bottom: 1rem;
+  padding: 0.2rem;
+  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-control);
+}
 .gn-help__tab {
   min-height: 2.75rem; padding: 0 1rem; cursor: pointer;
   color: var(--gn-text); background: var(--gn-surface-raised);
   font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
+  border-radius: calc(var(--gn-radius-control) - 0.2rem);
 }
 .gn-help__tab:hover { background: var(--gn-surface-sunken); }
-/* The selected document is marked by BORDER as well as background: colour alone
-   is not an indicator, and `aria-pressed` carries it to assistive tech. */
-.gn-help__tab[aria-pressed='true'] { border-color: var(--gn-accent); background: var(--gn-surface-sunken); font-weight: 600; }
+.gn-help__tab[aria-pressed='true'] {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  font-weight: 600;
+}
 
-.gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; }
+.gn-help__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-bottom: 2rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
 /* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
    body text on a phone — and these are the only navigation links on the page. */
 /* `inline-flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. Measured at
@@ -1647,7 +1673,7 @@
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.05rem; line-height: 1.35; }
 .gn-help__p { margin: 0 0 0.75rem; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-left: 3px solid var(--gn-accent); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+.gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-left: 3px solid var(--gn-accent); border-radius: var(--gn-radius-control); background: var(--gn-surface-sunken); }
 .gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-size: 0.92em; }
 /* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
    Inline documentation link text, on the same ambient `--gn-surface` as
