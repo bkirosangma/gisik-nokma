@@ -315,7 +315,8 @@ describe('TicketSheet — the transition round-trip', () => {
     const source = renderSheet(ticketRead());
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(
       screen.getByLabelText('Comment (required by this transition)'),
       'filed at the portal',
@@ -352,7 +353,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     await waitFor(() => expect(source.ingested).toHaveLength(1));
@@ -385,7 +387,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'trying anyway');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     const serverBox = await screen.findByRole('alert');
@@ -415,7 +418,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'trying anyway');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     const serverBox = await screen.findByRole('alert');
@@ -428,7 +432,8 @@ describe('TicketSheet — the transition round-trip', () => {
     const source = renderSheet(ticketRead());
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'done and filed');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     await waitFor(() => expect(screen.queryByLabelText('Move to')).toBeNull());
@@ -465,7 +470,10 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
     // `passed` is not a promise of acceptance and says nothing on screen. What
     // it proves here is that the engine PARSED the payload: a `{toStateId}`
@@ -480,9 +488,10 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
     // doing → done declares require-comment, and the pre-check candidate carries
     // no comment, so the engine refuses by that rule.
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-comment');
     // THE KILL. With the plan's `{toStateId}` payload this same box reads

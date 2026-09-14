@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
@@ -166,7 +166,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
   it('requires a comment when the chosen transition declares require-comment', async () => {
     const user = userEvent.setup();
     const onSubmit = renderDialog();
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(screen.getByLabelText('Comment (required by this transition)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.type(
@@ -188,7 +189,10 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     // carries.
     const user = userEvent.setup();
     renderDialog();
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
     expect(screen.queryByLabelText('Comment (required by this transition)')).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
   });
@@ -202,7 +206,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Whoever moved this to Doing cannot also close it.',
       }),
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-different-user');
     expect(preview).toHaveTextContent('Whoever moved this to Doing cannot also close it.');
@@ -217,8 +222,12 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         return { kind: 'passed' };
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(asked).toEqual(['waiting', 'done']);
     // A pre-check that passed says nothing: it is not a promise of acceptance,
     // and printing "looks fine" would make it one.
@@ -233,7 +242,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const serverBox = screen.getByRole('alert');
     expect(serverBox).toHaveTextContent('Refused by the server — restrict-to');
     expect(serverBox).toHaveTextContent(
@@ -257,7 +267,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-different-user');
     expect(screen.getByRole('alert')).toHaveTextContent('restrict-to');
@@ -274,7 +285,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(
       screen.getByText(
         'This transition requires an attachment as evidence. Evidence upload is not available in this build yet.',
@@ -294,7 +306,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(screen.queryByText(/Evidence upload is not available/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.upload(
@@ -323,7 +336,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
       },
       fromStateId: 'todo',
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     expect(screen.getByLabelText('dueDate (required before this transition)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.type(
@@ -361,7 +375,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         },
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     expect(screen.queryByLabelText('dueDate (required before this transition)')).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Move' }));
@@ -384,7 +399,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(
       screen.getByText(/This transition carries restrict-to rules — the server decides/),
     ).toBeInTheDocument();
@@ -393,5 +409,10 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
   it('renders nothing at all when closed', () => {
     renderDialog({ open: false });
     expect(screen.queryByLabelText('Move to')).toBeNull();
+  });
+
+  it('shows "Choose a state" as the trigger placeholder before any state is picked', () => {
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
   });
 });

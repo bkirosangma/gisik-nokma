@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FieldClaim, WorkflowDef } from '@gisik-nokma/domain';
-import { Button, Dialog } from '@gisik-nokma/ui';
+import { Button, Dialog, Select } from '@gisik-nokma/ui';
 import type { PrecheckResult } from '../precheck.js';
 
 type TransitionRules = WorkflowDef['transitions'][number]['rules'];
@@ -180,19 +180,16 @@ export function TransitionDialog({
 
   return (
     <Dialog open={open} title="Move ticket" onClose={onClose}>
-      <label className="gn-transition__field">
-        Move to
-        <select value={toStateId} onChange={(event) => setToStateId(event.target.value)}>
-          <option value="" disabled>
-            Choose a state
-          </option>
-          {options.map((option) => (
-            <option key={option.toStateId} value={option.toStateId}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="gn-transition__field">
+        <span>Move to</span>
+        <Select
+          options={options.map((option) => ({ value: option.toStateId, label: option.name }))}
+          value={toStateId === '' ? null : toStateId}
+          onChange={setToStateId}
+          placeholder="Choose a state"
+          aria-label="Move to"
+        />
+      </div>
 
       {needsComment ? (
         <label className="gn-transition__field">
