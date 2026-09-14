@@ -135,7 +135,10 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
  * STALE AS OF the owner's `StyleToggle` move (2026-09-09): the second,
  * unrelated `role="tablist"` this scoping originally guarded against
  * (`AppNav`'s `StyleToggle`, Task 14, `aria-label="Style"`) no longer lives
- * on this page — it moved to `/account` and became a `<select>`. The scope
+ * on this page — it moved to `/account`, first becoming a plain `<select>`
+ * and then, in Phase 2 Wave A, migrating onto the shared `Select` component
+ * from `@gisik-nokma/ui` (whose trigger renders `role="button"`, not a
+ * tablist, so this remains a non-issue either way it's shaped). The scope
  * is kept anyway rather than loosened back to a bare query: the view-tabs
  * tablist itself still carries no `aria-label` to disambiguate by name if a
  * future control ever adds a second tablist here again, and scoping by the

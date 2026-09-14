@@ -40,13 +40,16 @@ import { StyleToggle } from '../../src/style-toggle.js';
  *
  * `StyleToggle` no longer rides in the persistent nav on every screen — it is
  * a settled preference, not a control a reader needs mid-glance on every
- * page, so it belongs on the page ABOUT the reader's own settings. It is also
- * now a `<select>` rather than `SegmentedControl`: three always-visible
- * segments earn their footprint in a 44px-tall nav row; one row in a
- * preferences page does not need the same always-on visibility, and a
- * dropdown is the shape this page's own invite-form sibling
- * (`w/[workspaceId]/members/page.tsx`) already uses for a single choice among
- * a few named options.
+ * page, so it belongs on the page ABOUT the reader's own settings. Its shape
+ * has changed twice since the move: first from `SegmentedControl` to a plain
+ * `<select>` (three always-visible segments earn their footprint in a
+ * 44px-tall nav row; one row in a preferences page does not need the same
+ * always-on visibility), then, in Phase 2 Wave A, from that plain `<select>`
+ * onto the shared `Select` component from `@gisik-nokma/ui`. That is the same
+ * component this page's own invite-form sibling
+ * (`w/[workspaceId]/members/page.tsx`) uses for its Channel and Role choices
+ * — both now the one shared dropdown convention rather than two independent
+ * native-`<select>` shapes.
  */
 export default function AccountPage() {
   return (
