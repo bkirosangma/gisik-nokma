@@ -189,11 +189,11 @@ describe('Select — searchable', () => {
   // keystroke reopens the panel via `useComboBoxState`'s OWN `open(null, 'input')` path (its main
   // effect, `isFocused && ... && inputValue !== lastValue`). If the I2 fix below were keyed on
   // isOpen transitioning true with no further guard, this transition would fire it too and
-  // `setInputValue('')` could eat the keystroke that caused the open. Instrumented directly
-  // (a throwaway `console.log` inside the effect, not just reasoning from source) to confirm why
-  // it doesn't: the native `keydown`/`input` DOM events a real keystroke produces are dispatched
-  // as genuinely separate React commits, so the render where `isOpen` flips `true` is never the
-  // same render that also carries the just-typed character.
+  // `setInputValue('')` could eat the keystroke that caused the open. This test proves the final
+  // typed value survives intact; see the "MEASURED, NOT EXPLAINED" comment on the I2 fix itself
+  // (`select.tsx`) for why no claim is made here about *why* — an earlier version of this comment
+  // asserted a specific render-ordering explanation for that, which did not reconcile with what
+  // was actually instrumented and has been retracted, not just from that comment but from here too.
   it('typing after Escape closed the panel keeps the typed filter text', async () => {
     const user = userEvent.setup();
     render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
@@ -205,6 +205,7 @@ describe('Select — searchable', () => {
     await user.type(input, 'cher');
     expect(input).toHaveValue('cher');
     const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Cherry' })).toBeInTheDocument();
     expect(within(listbox).queryByRole('option', { name: 'Apple' })).not.toBeInTheDocument();
   });
 

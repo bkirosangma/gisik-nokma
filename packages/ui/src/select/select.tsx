@@ -353,17 +353,20 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
   // render ordering that produces this is unresolved; do not trust an explanation for it that
   // isn't here, because none has been verified. What IS measured is the outcome: in both shapes
   // tested (typing after Escape with nothing selected, typing after a selection with no blur —
-  // both multi-character, checked per keystroke and per-render), no character is ever lost or
-  // reordered. See select.test.tsx's two `does not lose`/`keeps the typed filter text` tests —
-  // they ARE the guard here, standing in for an understood mechanism rather than restating one.
+  // both multi-character), the final settled value after a complete `user.type()` call is exactly
+  // the typed text, with no character lost or reordered. (Per-keystroke checks were used during
+  // development via a throwaway `console.log`, not preserved as intermediate test assertions —
+  // the two committed tests below assert only the final value.) See select.test.tsx's two `does
+  // not lose`/`keeps the typed filter text` tests — they ARE the guard here, standing in for an
+  // understood mechanism rather than restating one.
   //
   // Separately verified (this part IS traced through source, not just measured): this fix does
   // not defeat two further guarantees. `useComboBoxState`'s own main effect reacts to `inputValue
   // !== lastValue` by flipping `showAllItems` back to `false` and running a `setValue(null)`
-  // branch on the very next
-  // render — but `filteredCollection` with an empty `inputValue` already equals the full
-  // collection (`''.includes()` is always true), so Task 12.6's I1 fix (which shows the full list
-  // on reopen) is unaffected either way; and `setValue(null)`'s resulting `onChange(null)` call is
+  // branch on the very next render — but `filteredCollection` with an empty `inputValue` already
+  // equals the full collection (`''.includes()` is always true), so Task 12.6's I1 fix (which
+  // shows the full list on reopen) is unaffected either way; and `setValue(null)`'s resulting
+  // `onChange(null)` call is
   // swallowed by this component's own `if (key != null)` guard below, so the real consumer
   // `onChange` prop is never invoked from the reopen itself. See select.test.tsx for the permanent
   // regression tests covering both reopen paths, the onChange-silence guarantee, the two
