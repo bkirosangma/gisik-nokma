@@ -54,7 +54,7 @@ against Phase 1's old 62-call figure, which mixed in the now-migrated sites):**
 |---|---|---|
 | `apps/web/test/style-toggle.test.tsx` | 2 | Style select |
 | `apps/web/test/members-page.test.tsx` | 1 | Channel and/or Role |
-| `packages/app-core/test/ticket-types/ticket-types.test.tsx` | 5 | Workflow-rebind-dialog (exercised from ticket-type editing flows) — needs confirmation, not the already-migrated Workflow/Field-type selects |
+| `packages/app-core/test/ticket-types/ticket-types.test.tsx` | 5 | Workflow-rebind-dialog — confirmed via `grep -n selectOptions -B6`: all 5 target `getByRole('combobox', { name: `Send them to — ${state.name}` })`, workflow-rebind-dialog's own accessible-name pattern; not the already-migrated Workflow/Field-type selects |
 | `packages/app-core/test/workflow-builder/access.test.tsx` | 1 | one of the Wave B sites |
 | `packages/app-core/test/workflow-builder/publish.test.tsx` | 8 | Wave B sites (canvas/rule-editor flows) |
 | `packages/app-core/test/workflow-builder/canvas.test.tsx` | 1 | State Category |
