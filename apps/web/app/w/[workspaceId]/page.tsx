@@ -400,14 +400,33 @@ function ProjectRow({
 /**
  * The five doors out of this page.
  *
- * **Four are workspace-scoped and the fifth is NOT**, and that asymmetry is the
- * whole reason these are five literal strings rather than a mapped prefix:
- * `/mcp/tokens` is a GLOBAL route (`app/mcp/tokens/page.tsx` takes no
- * `workspaceId` and reads none), so a uniform `/w/${workspaceId}/…` builder
- * would emit `/w/<id>/mcp/tokens`, which resolves to nothing — and a test that
- * built its expectations the same way would agree with the bug. Case 13.387
- * asserts the five paths as literals for exactly that reason. TARGETS are
- * unchanged by Round 19b.
+ * **Three are workspace-scoped path segments and two are not**, and that
+ * asymmetry is the whole reason these are five literal strings rather than a
+ * mapped prefix. `/mcp/tokens` is a GLOBAL route (`app/mcp/tokens/page.tsx`
+ * takes no `workspaceId` and reads none), so a uniform `/w/${workspaceId}/…`
+ * builder would emit `/w/<id>/mcp/tokens`, which resolves to nothing — and a
+ * test that built its expectations the same way would agree with the bug.
+ * Case 13.387 asserts the five paths as literals for exactly that reason.
+ * TARGETS are unchanged by Round 19b.
+ *
+ * **Ticket types joined `/mcp/tokens` as the second non-`/w/<id>/…` door
+ * (owner feedback, 2026-09-09: "the ticket type edit is opening in a separate
+ * route... repoint it").** It used to point at
+ * `/w/<id>/settings/ticket-types` — the bare, sidebar-less list page whose own
+ * Edit button opened the ticket-type editor as a THIRD route, the exact
+ * defect fixed on `/settings` itself (`app/settings/page.tsx`'s own
+ * docblock). Fixing the editor there and leaving this link pointed at the
+ * page it bypasses would leave the identical bug reachable a second way, so
+ * it now targets `/settings?workspaceId=<id>&tab=ticket-types` — the real
+ * shell, sidebar and inlined editor included. The header's own `Settings`
+ * button (below) carried the same stale href and is repointed the same way,
+ * to `/settings?workspaceId=<id>` with no tab (the shell's own default).
+ * **Workflows is deliberately UNCHANGED** — `/w/<id>/settings/workflows`
+ * still has no sidebar, but unlike ticket types its own editor (the
+ * workflow BUILDER) was never inlined into `/settings` either, on purpose
+ * (`app/settings/page.tsx`'s own docblock), so repointing the list here
+ * would not close any editor-left-the-shell gap the way it did for ticket
+ * types — it would just be cosmetic, and was not asked for.
  *
  * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
  * transcribed, not invented, except the one place the prototype's copy
@@ -480,7 +499,7 @@ function WorkspaceLinks({
         </span>
       </Link>
       <Link
-        href={`/w/${workspaceId}/settings/ticket-types`}
+        href={`/settings?workspaceId=${workspaceId}&tab=ticket-types`}
         className="gn-workspace-home__link"
         aria-label="Ticket types"
         aria-describedby="gn-link-note-ticket-types"
@@ -572,7 +591,7 @@ function WorkspaceHome({
           <Link href={`/w/${workspace.id}/members`} className="gn-button">
             Members
           </Link>
-          <Link href={`/w/${workspace.id}/settings/ticket-types`} className="gn-button">
+          <Link href={`/settings?workspaceId=${workspace.id}`} className="gn-button">
             Settings
           </Link>
         </div>

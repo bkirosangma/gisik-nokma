@@ -405,11 +405,23 @@ describe('13.386 archive hides a project and restore returns it — read from th
 /**
  * 13.387 — the five doors out of this page resolve to the routes that exist.
  *
- * **Asserted as five LITERAL paths, and that is the whole case.** Four of the
+ * **Asserted as five LITERAL paths, and that is the whole case.** Three of the
  * five live under `app/w/[workspaceId]/`; `/mcp/tokens` does NOT — it is a
  * global route that takes no `workspaceId`. A page that built its hrefs from one
  * `/w/${id}/` prefix would emit `/w/<id>/mcp/tokens`, which resolves to nothing,
  * and a test that built its expectations the same way would agree with the bug.
+ *
+ * **Ticket types is the SECOND non-`/w/<id>/…` door, since owner feedback
+ * 2026-09-09 ("the ticket type edit is opening in a separate route... repoint
+ * it").** It targets `/settings?workspaceId=<id>&tab=ticket-types` now, not
+ * `/w/<id>/settings/ticket-types` — that bare list page's own Edit button
+ * opened the ticket-type editor as a THIRD, sidebar-less route, the exact
+ * defect `/settings` itself was just fixed to close; leaving this link
+ * pointed at the page that bypasses the fix would have kept the bug
+ * reachable a second way. Workflows is unchanged and still `/w/<id>/settings/
+ * workflows`, deliberately — its own editor (the builder) was never inlined
+ * into `/settings`, so repointing its list would be cosmetic rather than
+ * closing a gap the way it did for ticket types.
  *
  * The paths are also checked against the app directory itself, in the same run:
  * a link is only proven live by a `page.tsx` existing at the route it names.
@@ -433,7 +445,7 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
     const expected: Array<[string, string]> = [
       ['My Work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
-      ['Ticket types', `/w/${WORKSPACE}/settings/ticket-types`],
+      ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
       ['Workflows', `/w/${WORKSPACE}/settings/workflows`],
       ['MCP tokens', '/mcp/tokens'],
     ];
