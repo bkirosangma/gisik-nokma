@@ -235,34 +235,36 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
  * 13.341 — dark theme, per style: `surface`, `surfaceRaised` and
  * `surfaceSunken` separate from one another by FILL (rule (c): dark
  * separates by fill, measured; a shadow does not count toward separation
- * there). Every floor below is a LITERAL pinned from Task 13's report / the
- * neo-round ruling — never a value derived from the same `colorOf` call the
- * assertion reads, which would make the test unable to fail.
+ * there) — for `hig`/`minimal`. Every floor below is a LITERAL pinned from
+ * Task 13's report / the neo-round ruling — never a value derived from the
+ * same `colorOf` call the assertion reads, which would make the test
+ * unable to fail.
  *
- * **`neo`/dark's `surface↔raised` floor is `1.20`, not `1.214`
- * (hig/minimal's own figure, which the plan's case text says to use as "at
- * least Task 13's measured value").** `tokens.ts`'s `neoNavyRaised` docblock
- * records why: lightening `neoNavy` far enough to clear 1.214 pushes
- * `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
- * guarantees it — a genuine collision between this amendment's rule (c) and
- * the declared contrast floor, not a value somebody forgot to nudge. The
- * achieved 1.2035 clears 1.20 with margin; the 0.8% shortfall from 1.214 is
- * recorded here, not hidden. `raised↔sunken` and `surface↔sunken` both clear
- * their hig/minimal-derived floors for `neo` too — only this one pair is
- * exceptional.
+ * **`neo` is EXEMPT from rule (c) in BOTH themes now, not only light**
+ * (owner, 2026-09-10: "revert to prototype's exact dark hex"). It used to
+ * carry a narrower `1.20` floor in dark (`tokens.ts`'s `neoNavyRaised`
+ * docblock has the full history: lightening `neoNavy` far enough to clear
+ * hig/minimal's own `1.214` floor pushed the THEN-bare `accent` role below
+ * 4.5 as text against it — a real collision at the time). That collision
+ * stopped binding the same day it was written, once `accent` split into
+ * `accent` (fill-only) and `textAccent` (the actually-derived text role);
+ * with `neoNavyRaised`/`neoNavySunken` reverted to `neoNavy`, holding dark
+ * to ANY separation floor while light already gets `neoPaper` — one hex,
+ * zero separation, depth from shadow alone — was the inconsistency. `neo`'s
+ * whole visual language is shadow-only depth in both themes now.
  *
- * Mutation: set `neoNavyRaised`/`neoNavySunken` to `neoNavy` (the export's
- * own pre-derivation value) → every `neo`/dark row here collapses to 1.00
- * and reddens, naming the pair.
+ * Mutation: reintroduce `neo` into `DARK_SEPARATION_FLOORS` with any floor
+ * above `1.0` → reddens, naming the exact regression this exemption guards
+ * against (`neoNavyRaised`/`neoNavySunken` drifting away from `neoNavy`
+ * again without updating this test to match).
  */
 describe('13.341 dark-theme fill separation per style (rule (c))', () => {
-  const DARK_SEPARATION_FLOORS: Record<StyleName, { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
+  const DARK_SEPARATION_FLOORS: Record<'hig' | 'minimal', { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
     hig: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
     minimal: { surfaceRaised: 1.21, surfaceSunken: 1.45, raisedSunken: 1.2 },
-    neo: { surfaceRaised: 1.2, surfaceSunken: 1.55, raisedSunken: 1.29 },
   };
 
-  for (const style of STYLE_NAMES) {
+  for (const style of ['hig', 'minimal'] as const) {
     it(`${style}/dark: surface, raised and sunken separate by at least the recorded floor`, () => {
       const surface = colorOf('dark', 'surface', style);
       const raised = colorOf('dark', 'surfaceRaised', style);
@@ -273,6 +275,14 @@ describe('13.341 dark-theme fill separation per style (rule (c))', () => {
       expect(contrastRatio(raised, sunken), `${style} raised↔sunken`).toBeGreaterThanOrEqual(floor.raisedSunken);
     });
   }
+
+  it('neo/dark: surface, surfaceRaised and surfaceSunken are the SAME hex — depth comes from shadow, not fill, matching neo/light', () => {
+    const surface = colorOf('dark', 'surface', 'neo');
+    const raised = colorOf('dark', 'surfaceRaised', 'neo');
+    const sunken = colorOf('dark', 'surfaceSunken', 'neo');
+    expect(raised).toBe(surface);
+    expect(sunken).toBe(surface);
+  });
 });
 
 /**
@@ -418,11 +428,16 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
     expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surface'))).toBeLessThan(4.5);
     expect(contrastRatio(colorOf('dark', 'accent'), colorOf('dark', 'surface'))).toBeGreaterThanOrEqual(4.5);
     // Dark clears bare surface/raised (see `textAccentDark`'s own docblock)
-    // but NOT every sunken background — `accent` carries no guarantee there
-    // at all post-rename, which is exactly why sites that render on a sunken
-    // background (`.gn-help__result-title`) were moved to `textAccent`
-    // instead of staying on `accent`.
-    expect(contrastRatio(colorOf('dark', 'accent'), primitives.neoNavySunken)).toBeLessThan(4.5);
+    // AND, since 2026-09-10, the neo sunken surface too — `neoNavySunken`
+    // was reverted to `neoNavy` itself (the prototype's exact dark+neo hex;
+    // see `tokens.ts`'s `neoNavyRaised` docblock), and a darker background
+    // only helps a light foreground like `accent` read MORE clearly. This
+    // is a changed FACT, not a claim this test still needs to hold the old
+    // way — `accent` still carries no GUARANTEE on a sunken background in
+    // general (nothing derives it to clear one), which is why sites that
+    // render on one (`.gn-help__result-title`) stay on `textAccent` rather
+    // than reclaiming `accent` for the job.
+    expect(contrastRatio(colorOf('dark', 'accent'), primitives.neoNavySunken)).toBeGreaterThanOrEqual(4.5);
   });
 
   /**

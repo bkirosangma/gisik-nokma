@@ -151,14 +151,54 @@ export const primitives = {
   navySunken: '#2a3560',
   /** `neo` light: rule (c) (dark-only fill separation) leaves light alone — the export's neo surface, raised and sunken are one hex, relying on shadow for elevation. */
   neoPaper: '#ede4db',
-  /** `neo` dark surface — the export's own value, unlike raised/sunken below. */
+  /** `neo` dark surface — the export's own value, matching `neoPaper`'s light-mode role: ONE hex for surface/raised/sunken, depth from shadow alone. */
   neoNavy: '#1b2340',
   /**
-   * **DERIVED, not measured — ruling item 3(b).** The export's `neo` dark
-   * raised and sunken are the SAME hex as surface (separation 1.00, rule (c)
-   * fails outright). The ruling requires deriving steps giving at least
-   * `hig`/`minimal` dark's own separation (surface↔raised 1.214,
-   * surface↔sunken 1.460, measured against `#141a2e`/`#20294a`/`#2a3560`).
+   * **REVERTED to `neoNavy` (owner, 2026-09-10: "revert to prototype's
+   * exact dark hex and fix the accent colour ratio instead" — in response
+   * to the dark+neo input box reading visibly lighter/flatter than the
+   * prototype's own screenshot).** These were previously stepped lighter
+   * (see the retained derivation below) under owner ruling #386 to satisfy
+   * a "dark surfaces must separate by fill" requirement (rule (c)) while
+   * keeping the BARE `accent` role legible as TEXT against them at 4.5:1 —
+   * a real constraint at the time the derivation below was written.
+   *
+   * **That constraint stopped binding the SAME DAY it was written, before
+   * anyone next touched this file.** The Round 2d change (also
+   * 2026-09-09) split `accent` into two roles — `accent` (a fill only, no
+   * text guarantee) and `textAccent` (the role actually derived to read as
+   * text; see `textAccentDark`'s own docblock, which independently accounts
+   * for `neoNavySunken`) — so "does bare `accent` clear 4.5 as text against
+   * `surfaceRaised`" is a question `CONTRAST_PAIRS` no longer asks: it
+   * names `textAccent`, never `accent`, on `surface`/`surfaceRaised`. The
+   * derivation below solved a problem that had already stopped existing by
+   * the time this value was next revisited — it was never wrong, its
+   * premise just went stale.
+   *
+   * **Verified empirically before reverting, not assumed:** with both
+   * values set to `neoNavy`, every declared `CONTRAST_PAIRS` row for
+   * `neo`/dark still passes — with MORE margin than before, because a
+   * darker background only helps light-coloured foregrounds (`text`,
+   * `textMuted`, `textAccent`, `accentText`) read more clearly, never less.
+   * `tokens.test.ts`'s rule (c) separation test ("13.341") now exempts
+   * `neo` from the dark-separation floor entirely, the same way it always
+   * exempted `neo` in LIGHT (see `neoPaper`'s own comment above) — this
+   * style's whole visual language is shadow-only depth, and holding dark
+   * to a fill-separation floor light was never held to was the
+   * inconsistency, not a rule `neo` needed to keep.
+   *
+   * The original derivation is kept below as the historical record of a
+   * real, carefully-measured trade-off — it just no longer governs this
+   * value.
+   *
+   * ---
+   *
+   * **DERIVED, not measured — ruling item 3(b) [SUPERSEDED, see above].**
+   * The export's `neo` dark raised and sunken are the SAME hex as surface
+   * (separation 1.00, rule (c) fails outright). The ruling requires
+   * deriving steps giving at least `hig`/`minimal` dark's own separation
+   * (surface↔raised 1.214, surface↔sunken 1.460, measured against
+   * `#141a2e`/`#20294a`/`#2a3560`).
    *
    * **`surfaceRaised` falls narrowly short of that floor (1.204 vs 1.214,
    * −0.8%) and this is deliberate, not an error.** Lightening `neoNavy`
@@ -175,10 +215,12 @@ export const primitives = {
    * the harder, tested invariant across the whole project); the separation
    * shortfall is 99.2% of the target and both raised↔sunken (1.292 vs
    * 1.202) and surface↔sunken (1.555 vs 1.460) clear their floors with
-   * margin. `accent` on `neoNavyRaised` measures 4.528.
+   * margin. `accent` on `neoNavyRaised` measures 4.528. **This `accent`
+   * pairing is itself retired — see above — which is exactly what makes
+   * the collision moot rather than merely tolerated.**
    */
-  neoNavyRaised: '#29314c',
-  neoNavySunken: '#3b425b',
+  neoNavyRaised: '#1b2340',
+  neoNavySunken: '#1b2340',
 
   /**
    * The four-step FILL hierarchy R1(c) separates by. Eight-digit hex, not

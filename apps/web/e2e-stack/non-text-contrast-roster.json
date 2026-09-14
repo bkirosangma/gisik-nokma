@@ -76,14 +76,14 @@
       "selector": "[data-style=\"neo\"] .gn-field__input",
       "sanctioned": true,
       "ratioLight": 1.24,
-      "ratioDark": 1.16,
+      "ratioDark": 1.0,
       "border": "none — sunken box-shadow only, not compositable by this instrument",
       "backdrop": "surface (neo)",
       "routes": [
         "/sign-in",
         "/workspaces"
       ],
-      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Measured by Task 13 (docs/neo-token-report.md); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is Task 13's measurement, cited."
+      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavyRaised docblock), not re-measured."
     },
     {
       "selector": "[data-style=\"neo\"] .gn-select__panel",
