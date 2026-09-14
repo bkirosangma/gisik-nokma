@@ -221,7 +221,7 @@ describe('RuleEditor authoring gate', () => {
     // Absent half, probed through each editor's own affordance rather than a
     // testid: only restrict-to-editor carries one.
     expect(screen.queryByRole('checkbox', { name: 'The assignee' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Field' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Earlier move' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Field/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Earlier move/ })).not.toBeInTheDocument();
   });
 });
