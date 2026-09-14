@@ -4,7 +4,7 @@
 
 **Goal:** Migrate the 3 native `<select>` sites in `apps/web` (Invite Channel, Invite Role, Style) onto the existing shared `Select` component from `@gisik-nokma/ui`, matching Phase 1's proven pattern exactly — no changes to `Select` itself.
 
-**Architecture:** Each site swaps its `<select><option>...</option></select>` markup for `<Select options={...} value={...} onChange={...} aria-label="..." />`, wrapped in the same `<label><span>Text</span><Select .../></label>` pattern Phase 1's two call sites already established (no `label` prop on `Select` itself — see Phase 1 spec's Public API section). All 3 sites are non-searchable, fixed 3-option enums with no "unset" state (each site's local state is always a valid enum member from mount), so none of them exercise the spec's `string` → `string | null` migration note — confirmed per-site in Task 1/2 below rather than assumed.
+**Architecture:** Each site swaps its `<select><option>...</option></select>` markup for `<Select options={...} value={...} onChange={...} aria-label="..." />`, paired with a plain `<span>Text</span>` sibling for the visible label text (no `label` prop on `Select` itself — see Phase 1 spec's Public API section, which specifies `aria-label` as the sole accessible-name mechanism). **Amendment (Task 1 review finding, ruling recorded in the SDD ledger):** the `<span>`/`<Select>` pair must NOT be wrapped in an enclosing `<label>` element — Phase 1's two shipped call sites use that wrapping, but it produces a real defect (an enclosing `<label>` associates with `Select`'s internally-rendered hidden native `<select>`, not the visible trigger, breaking click-on-label-text — screen-reader naming and keyboard access are unaffected). Task 1 was fixed post-review; Task 2's code below already reflects the corrected, unwrapped pattern. All 3 sites are non-searchable, fixed 3-option enums with no "unset" state (each site's local state is always a valid enum member from mount), so none of them exercise the spec's `string` → `string | null` migration note — confirmed per-site in Task 1/2 below rather than assumed.
 
 **Tech Stack:** React 19, `@gisik-nokma/ui`'s `Select` (already built, already exported), Vitest + Testing Library + `userEvent`.
 
@@ -491,21 +491,32 @@ export function StyleToggle() {
 
   return (
     <p>
-      <label>
-        <span>Style</span>{' '}
-        <Select
-          options={OPTIONS}
-          value={style}
-          onChange={(value) => {
-            if (isStyleName(value)) apply(value);
-          }}
-          aria-label="Style"
-        />
-      </label>
+      <span>Style</span>{' '}
+      <Select
+        options={OPTIONS}
+        value={style}
+        onChange={(value) => {
+          if (isStyleName(value)) apply(value);
+        }}
+        aria-label="Style"
+      />
     </p>
   );
 }
 ```
+
+**Amendment, made before this task was dispatched (ruling recorded in the SDD ledger):** the
+original draft of this step wrapped `<span>Style</span>` and `<Select>` in an enclosing
+`<label>`, matching Phase 1's own established call-site convention. Task 1's task reviewer found
+that convention produces a real defect: `Select`'s non-searchable branch renders a hidden native
+`<select>` (react-aria's `HiddenSelect`) with its own internal `<label>` *before* the visible
+trigger button in DOM order, so an enclosing `<label>` associates with the hidden select, not the
+visible one — clicking the visible label text stops opening the picker (screen-reader naming and
+keyboard Tab order are both unaffected, only this convenience is lost). The fix is to drop the
+enclosing `<label>` and use `<span>` and `<Select>` as plain siblings, relying purely on
+`aria-label` for the accessible name — exactly what Phase 1's own spec already specifies as the
+mechanism (no `label` prop on `Select` itself, "aria-label for the accessible name"). This
+amendment is reflected in the code above; do not restore the `<label>` wrapping.
 
 - [ ] **Step 6: Run the tests and confirm they pass**
 
