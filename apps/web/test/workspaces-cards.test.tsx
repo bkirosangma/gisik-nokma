@@ -1,5 +1,4 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import WorkspacesPage from '../app/workspaces/page.js';
@@ -89,11 +88,11 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     const p1 = within(ws1).getByTestId('project-card-p1');
     const p2 = within(ws1).getByTestId('project-card-p2');
     expect(p1).not.toBe(p2);
-    expect(within(p1).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
-      'href',
-      '/w/ws1/p/p1',
-    );
-    expect(within(p2).getByRole('link', { name: 'Deliveries' })).toHaveAttribute('href', '/w/ws1/p/p2');
+    // Round 19c: plain text, not a link (the whole card is the one door now).
+    expect(within(p1).getByText('Shop operations')).toBeInTheDocument();
+    expect(within(p2).getByText('Deliveries')).toBeInTheDocument();
+    expect(within(p1).queryByRole('link')).toBeNull();
+    expect(within(p2).queryByRole('link')).toBeNull();
     // The other workspace's project never leaks into this one's scope.
     expect(within(ws1).queryByTestId('project-card-p3')).toBeNull();
   });
@@ -161,7 +160,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
 }
 
 describe('13.379 the card renders every element from data the route served', () => {
-  it('shows the monogram, the member count, both chips, the per-project count, the archived split and the restricted line', async () => {
+  it('shows the monogram, the member count, all three chips, the per-project count and the restricted line', async () => {
     mountWith([
       workspace({
         id: 'ws1',
@@ -182,8 +181,8 @@ describe('13.379 the card renders every element from data the route served', () 
     // is what makes two cards' avatars distinguishable to a screen reader —
     // the tint alone is not available to one.
     //
-    // `{ selector: '.gn-avatar' }` disambiguates from the head's own door
-    // (Round 19b): the card's head is now a `<Link aria-label={workspace.name}>`
+    // `{ selector: '.gn-avatar' }` disambiguates from the card's own door
+    // (Round 19b/19c): the whole card is now a `<Link aria-label={workspace.name}>`
     // wrapping the avatar, so TWO elements share this accessible name — the
     // door and the monogram inside it — and a bare `getByLabelText` cannot
     // tell them apart. Two elements sharing a name is not itself a defect;
@@ -206,31 +205,22 @@ describe('13.379 the card renders every element from data the route served', () 
     const p2 = within(card).getByTestId('project-card-p2');
     expect(within(p2).getByText('4 tickets')).toBeInTheDocument();
 
-    // ARCHIVED IS HIDDEN BY DEFAULT, and the toggle's accessible name carries
-    // the workspace so two cards do not present two identical buttons.
+    // Round 19c: archived is no longer a disclosure — the card renders LIVE
+    // projects only, and the sole trace of the archived one is a count chip.
     expect(within(card).queryByTestId('project-card-p3')).toBeNull();
-    const toggle = within(card).getByRole('button', {
-      name: 'Show archived projects in Convenience Corner',
-    });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(toggle);
-    const p3 = within(card).getByTestId('project-card-p3');
-    // Marked as well as hidden: revealing it is not the whole of "archived".
-    expect(within(p3).getByText('Archived')).toBeInTheDocument();
-    expect(
-      within(card).getByRole('button', { name: 'Hide archived projects in Convenience Corner' }),
-    ).toHaveAttribute('aria-expanded', 'true');
+    expect(within(card).getByText('1 archived')).toBeInTheDocument();
+    expect(within(card).queryByRole('button')).toBeNull();
 
     // ONE text node, plural. `getByText` on the whole sentence is the assertion
     // that a three-interpolation version would fail.
     expect(within(card).getByText('2 projects · name restricted')).toBeInTheDocument();
   });
 
-  it('renders no restricted line and no archive toggle when there is nothing to say', async () => {
+  it('renders no restricted line and no archived chip when there is nothing to say', async () => {
     // THE NEGATIVE CONTROL for both, and it is not decoration: `0 projects ·
     // name restricted` would appear on every owner's card, where the count is
-    // zero by construction, and a toggle revealing nothing lies about the shape
-    // of the data.
+    // zero by construction, and an "archived" chip with nothing behind it
+    // would claim a split in the data that is not there.
     mountWith([
       workspace({
         id: 'ws1',
@@ -241,7 +231,7 @@ describe('13.379 the card renders every element from data the route served', () 
     ]);
     const card = await screen.findByTestId('workspace-card-ws1');
     expect(within(card).queryByText(/name restricted/)).toBeNull();
-    expect(within(card).queryByRole('button', { name: /archived/ })).toBeNull();
+    expect(within(card).queryByText(/archived/)).toBeNull();
     // And the singular, on a card that HAS one — so the plural above is a
     // choice the code makes rather than the only string it can produce.
     expect(within(card).getByText('1 member')).toBeInTheDocument();
@@ -342,8 +332,8 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
 
     // The name is still served (rulings P32/P38 withhold names, not this one),
     // and so is the restricted line — the string the whole owner ruling exists
-    // to make renderable.
-    expect(within(card).getByRole('link', { name: 'Shared with a guest' })).toBeInTheDocument();
+    // to make renderable. Round 19c: plain text, not a link.
+    expect(within(card).getByText('Shared with a guest')).toBeInTheDocument();
     expect(within(card).getByText('1 project · name restricted')).toBeInTheDocument();
   });
 });
@@ -400,26 +390,25 @@ describe('13.381 the role sentence and every gated affordance read ONE value', (
 });
 
 /**
- * 13.390 — the card's HEAD is a door to `/w/<id>` (Round 19b, owner feedback
- * item 1: *"the workspace card should be clickable ... and on click it should
- * lead into the workspace page"*).
+ * 13.390 — the WHOLE card is a door to `/w/<id>` (Round 19c, owner feedback:
+ * *"the entire workspace card should be clickable ... everything else on the
+ * card should just be info, nothing clickable"*).
  *
  * The accessible name is asserted to be EXACTLY the workspace's name, not that
  * name padded with the role sentence or repeated — the failure a naive
- * `aria-label` built from the head's full text content would produce, since
- * the avatar carries its own `aria-label` and the role sentence sits beside
- * the heading inside the same link.
+ * `aria-label` built from the card's full text content would produce, since
+ * the avatar carries its own `aria-label` and the role sentence, every
+ * project name/count and the restricted line all sit inside the same link.
  *
- * "No nested interactive content" is asserted the only way it can be from
- * outside the DOM tree: every OTHER control on the card (the project links,
- * the archived toggle, "My Work") is still reachable as its OWN top-level
- * role, scoped to the card — which a browser could not do if any of them were
- * nested inside the door anchor (nested interactive elements are invalid HTML
- * and most browsers hoist the inner one out of the outer, breaking exactly
- * this kind of scoped lookup).
+ * Round 19b's version of this case proved "no nested interactive content"
+ * indirectly, by showing every other control was still reachable as its own
+ * top-level role — the only way to prove it when some of the card WAS meant to
+ * stay outside the door. Round 19c removed those controls instead of keeping
+ * them beside the door, so the direct proof is now the stronger one: exactly
+ * one link and zero buttons anywhere in the card.
  */
 describe('13.390 the card is a door to /w/<id>', () => {
-  it('the head is a link named by the workspace, and every other control stays reachable on its own', async () => {
+  it('the whole card is one link named by the workspace, with no nested interactive content', async () => {
     mountWith([
       workspace({
         id: 'ws1',
@@ -434,24 +423,28 @@ describe('13.390 the card is a door to /w/<id>', () => {
     ]);
     const card = await screen.findByTestId('workspace-card-ws1');
 
-    const door = within(card).getByRole('link', { name: 'Convenience Corner' });
+    // EXACTLY ONE link in the whole card, and it is the door — a project link
+    // or a "My Work" link surviving the refactor would fail this count even if
+    // every other assertion here still passed.
+    const links = within(card).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    const door = links[0];
     expect(door).toHaveAttribute('href', '/w/ws1');
-    // EXACTLY the name — not padded with the role sentence, which sits
-    // inside the same link visually but must not join its accessible name.
+    expect(door).toHaveAccessibleName('Convenience Corner');
+    // Not padded with the role sentence, which sits inside the same link
+    // visually but must not join its accessible name.
     expect(door).not.toHaveAccessibleName(/owner/i);
 
-    // Every OTHER control is still its own top-level reachable role, scoped
-    // to the card — which nesting inside `door` would have broken.
-    expect(within(card).getByRole('link', { name: 'My Work' })).toHaveAttribute(
-      'href',
-      '/w/ws1/my-work',
-    );
-    expect(within(card).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
-    const toggle = within(card).getByRole('button', {
-      name: 'Show archived projects in Convenience Corner',
-    });
-    await userEvent.click(toggle);
-    expect(within(card).getByRole('link', { name: 'Old signage' })).toBeInTheDocument();
+    // No button anywhere — the archived-disclosure toggle is gone, replaced
+    // by the plain "1 archived" chip in ChipRow.
+    expect(within(card).queryAllByRole('button')).toHaveLength(0);
+
+    // The info that used to live behind separate controls is still ON the
+    // card, just not clickable: the live project by name, and the archived
+    // one as a count rather than a revealed row.
+    expect(within(card).getByText('Shop operations')).toBeInTheDocument();
+    expect(within(card).queryByText('Old signage')).toBeNull();
+    expect(within(card).getByText('1 archived')).toBeInTheDocument();
   });
 
   it('keeps the door\'s target current when the caller belongs to more than one workspace', async () => {

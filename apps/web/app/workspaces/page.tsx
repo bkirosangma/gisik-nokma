@@ -114,11 +114,21 @@ export default function WorkspacesPage() {
  * so nobody should later wire this chip to the category and call it a fix: the
  * label would go on being the same word and start being a different claim.
  */
-function ChipRow({ workspace, viewer }: { workspace: WorkspaceRef; viewer: CardViewer }) {
+function ChipRow({
+  workspace,
+  viewer,
+  archivedCount,
+}: {
+  workspace: WorkspaceRef;
+  viewer: CardViewer;
+  archivedCount: number;
+}) {
   if (viewer.countsWithheld) {
     // ONE chip, and no number anywhere in it. Printing `0` would be the claim
     // "nothing here you can see", which is exactly what the server declined to
-    // say by omitting the key.
+    // say by omitting the key. `archivedCount` is deliberately not read on
+    // this branch either, for the same reason: a guest gets no numbers at all,
+    // not a subset of them.
     return (
       <div className="gn-workspace-card__chips">
         <Chip tone="restricted">Restricted</Chip>
@@ -139,23 +149,29 @@ function ChipRow({ workspace, viewer }: { workspace: WorkspaceRef; viewer: CardV
       ) : null}
       <Chip tone="active">{`${total - blocked} active`}</Chip>
       <Chip tone="blocked">{`${blocked} blocked`}</Chip>
+      {/* Round 19c (owner: "everything else on the card should just be info,
+          nothing clickable") replaced the disclosure toggle that used to
+          reveal the archived rows with this count — the only remaining trace
+          of "archived" on a card that no longer nests a `<button>` in it. */}
+      {archivedCount > 0 ? <Chip tone="neutral">{`${archivedCount} archived`}</Chip> : null}
     </div>
   );
 }
 
-/** One project row: its name, and the counts this caller may be told. */
-function ProjectRow({
-  workspaceId,
-  project,
-  viewer,
-}: {
-  workspaceId: string;
-  project: ProjectRef;
-  viewer: CardViewer;
-}) {
+/**
+ * One project row: its name, and the counts this caller may be told.
+ *
+ * Plain text, not a `<Link>` (Round 19c) — the whole card is one door now, and
+ * an anchor cannot nest inside another anchor. `workspaceId` is gone from the
+ * props for the same change: nothing here builds an `href` any more. Only
+ * `live` (non-archived) projects are ever passed to this component (Round
+ * 19c's `WorkspaceCard` no longer renders the archived rows at all, per the
+ * chip in `ChipRow`), so there is no `Archived` marker to draw here either.
+ */
+function ProjectRow({ project, viewer }: { project: ProjectRef; viewer: CardViewer }) {
   return (
     <li className="gn-workspace-card__project" data-testid={`project-card-${project.id}`}>
-      <Link href={`/w/${workspaceId}/p/${project.id}`}>{project.name}</Link>
+      <span>{project.name}</span>
       {/* The SAME gate as the chips above, read from the same value. A guest is
           told a project's NAME (rulings P32/P38) and no number about it. */}
       {viewer.countsWithheld || project.ticketCount === null ? null : (
@@ -163,7 +179,6 @@ function ProjectRow({
           {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
         </span>
       )}
-      {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
     </li>
   );
 }
@@ -179,40 +194,47 @@ function ProjectRow({
  * sentence, the two chip totals, and the archived split. Nothing on this card
  * is invented: every string traces to a value the route computed.
  *
- * ## Archived projects are marked AND hidden, both
+ * ## The WHOLE card is a door to `/w/<id>` (Round 19c, owner feedback: "the
+ * entire workspace card should be clickable ... everything else on the card
+ * should just be info, nothing clickable")
  *
- * A `<Chip>Archived</Chip>` on the row, and the rows themselves behind a
- * disclosure that is collapsed by default. The toggle exists only when there is
- * something behind it — a control that reveals nothing is a control that lies
- * about the shape of the data — and its accessible name carries the workspace,
- * because two cards would otherwise present two identically-named buttons.
+ * Round 19b made only the head (monogram + name) a `<Link>`, reasoning that an
+ * anchor cannot validly nest a `<button>` or another `<a>` — which the
+ * per-project links and the archived-disclosure toggle both were at the time.
+ * Round 19c removes those nested controls instead of working around them: the
+ * per-project name is now plain text (`ProjectRow` below), and the archived
+ * toggle is gone, replaced by a count chip in `ChipRow`. With no interactive
+ * descendant left, the single `<Link>` can wrap the card's entire content —
+ * head, chips, project list and restricted line — and the invalid-nesting
+ * constraint that used to cap the door at the head no longer applies.
  *
- * The restricted line sits OUTSIDE that toggle and applies to both lists: a
- * project whose NAME is withheld has no `archived` flag as far as this caller
- * is concerned (`read/visible-projects.ts` serves the flag only alongside the
- * name it rides with), so the number cannot be split by archived state without
- * disclosing more than the owner ruled.
+ * `aria-label={workspace.name}` on the `<Link>` still OVERRIDES the name a
+ * browser would otherwise compute from its content (now the avatar's own
+ * label, the heading text, the role sentence, every project name and count,
+ * and the restricted line, all at once) — so the link's accessible name stays
+ * exactly the workspace's name. The `<h2>` inside it keeps its own heading
+ * role and text (`getByRole('heading', ...)` is unaffected by an ancestor's
+ * `aria-label`), and the avatar keeps its own `aria-label` too — two elements
+ * sharing one accessible name is not an error, only something `getByLabelText`
+ * alone cannot disambiguate without its `selector` option.
  *
- * ## The head is a DOOR to `/w/<id>` (Round 19b, owner feedback item 1)
+ * ## Nothing removed is unreachable
  *
- * `aria-label={workspace.name}` on the `<Link>` OVERRIDES the name a browser
- * would otherwise compute from its content (the avatar's own label, the
- * heading text, the role sentence) — so the link's accessible name is exactly
- * the workspace's name, never that name repeated or padded with the sentence
- * beside it. The `<h2>` inside it keeps its own heading role and text
- * (`getByRole('heading', ...)` is unaffected by an ancestor's `aria-label`),
- * and the avatar keeps its own `aria-label` too — two elements sharing one
- * accessible name is not an error, only something `getByLabelText` alone
- * cannot disambiguate without its `selector` option, which is why the tint
- * assertions in `workspaces-cards.test.tsx` now pass one.
+ * `/w/<id>` — one click through the door — already carries a "My Work" link,
+ * every project as its own "Open board" link, and its own admin archive/
+ * restore controls (`app/w/[workspaceId]/page.tsx`, Task 19 / Round 19b).
+ * Stripping this card down to the door plus plain info is not a loss of
+ * function, only of a second, redundant place to reach the same controls.
  *
- * The per-project links, the archived toggle and "My Work" stay OUTSIDE this
- * link, as separate controls — an anchor wrapping a button is invalid HTML and
- * reads to assistive tech as one control, so only the head (monogram + name)
- * is the door; the rest of the card is not nested inside it.
+ * ## Archived is a COUNT here, not a disclosure
+ *
+ * The toggle that used to reveal archived rows inline is gone along with the
+ * rows themselves — this card renders `live` projects only. `archived.length`
+ * survives as one more `Chip` in `ChipRow`, gated the same way the member and
+ * ticket counts are (`viewer.countsWithheld`), so a guest sees no archived
+ * count either, consistent with getting no numbers at all.
  */
 function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
-  const [showArchived, setShowArchived] = useState(false);
   const viewer = viewerOf(workspace.role);
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
@@ -224,64 +246,35 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
         <Link
           href={`/w/${workspace.id}`}
           aria-label={workspace.name}
-          className="gn-workspace-card__head"
+          className="gn-workspace-card__door"
         >
-          {/* The tint key is the workspace ID, not its name: two workspaces
-              called the same thing must still be told apart, and a rename must
-              not change a colour a person has learned. */}
-          <Avatar name={workspace.name} tint={workspace.id} />
-          <div className="gn-workspace-card__titles">
-            <h2>{workspace.name}</h2>
-            {/* 13.357's role label, now a SENTENCE. The raw enum was a database
-                value on a card; `viewerOf` is the one place it becomes English,
-                and the same object gates every number below. */}
-            <p className="gn-workspace-list__role">{viewer.sentence}</p>
+          <div className="gn-workspace-card__head">
+            {/* The tint key is the workspace ID, not its name: two workspaces
+                called the same thing must still be told apart, and a rename
+                must not change a colour a person has learned. */}
+            <Avatar name={workspace.name} tint={workspace.id} />
+            <div className="gn-workspace-card__titles">
+              <h2>{workspace.name}</h2>
+              {/* 13.357's role label, now a SENTENCE. The raw enum was a
+                  database value on a card; `viewerOf` is the one place it
+                  becomes English, and the same object gates every number
+                  below. */}
+              <p className="gn-workspace-list__role">{viewer.sentence}</p>
+            </div>
           </div>
+
+          <ChipRow workspace={workspace} viewer={viewer} archivedCount={archived.length} />
+
+          <ul className="gn-workspace-card__projects">
+            {live.map((project) => (
+              <ProjectRow key={project.id} project={project} viewer={viewer} />
+            ))}
+          </ul>
+
+          {restricted !== null ? (
+            <p className="gn-workspace-card__restricted">{restricted}</p>
+          ) : null}
         </Link>
-
-        <ChipRow workspace={workspace} viewer={viewer} />
-
-        <ul className="gn-workspace-card__projects">
-          {live.map((project) => (
-            <ProjectRow
-              key={project.id}
-              workspaceId={workspace.id}
-              project={project}
-              viewer={viewer}
-            />
-          ))}
-        </ul>
-
-        {archived.length > 0 ? (
-          <>
-            <Button
-              type="button"
-              aria-expanded={showArchived}
-              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
-              onClick={() => setShowArchived((open) => !open)}
-            >
-              {`${showArchived ? 'Hide' : 'Show'} ${archived.length} archived`}
-            </Button>
-            {showArchived ? (
-              <ul className="gn-workspace-card__projects gn-workspace-card__projects--archived">
-                {archived.map((project) => (
-                  <ProjectRow
-                    key={project.id}
-                    workspaceId={workspace.id}
-                    project={project}
-                    viewer={viewer}
-                  />
-                ))}
-              </ul>
-            ) : null}
-          </>
-        ) : null}
-
-        {restricted !== null ? (
-          <p className="gn-workspace-card__restricted">{restricted}</p>
-        ) : null}
-
-        <Link href={`/w/${workspace.id}/my-work`}>My Work</Link>
       </Card>
     </li>
   );

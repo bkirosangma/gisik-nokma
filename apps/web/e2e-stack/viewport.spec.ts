@@ -253,9 +253,8 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * must be a LOUD failure here, never a quiet green.
    */
   /**
-   * The project links are on `/workspaces` — the SAME page the workspace id
-   * came from (`app/workspaces/page.tsx:67` renders
-   * `/w/<workspaceId>/p/<projectId>` per project).
+   * The project links were on `/workspaces` — the SAME page the workspace id
+   * came from — until Round 19c moved them.
    *
    * Recorded because two other readings of this looked equally reasonable and
    * both cost a run: `/my-work` lists the tickets assigned to the signed-in
@@ -271,15 +270,29 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * rather than deleted because its reasoning is what makes the new route worth
    * adding: a sweep of a 404 and a sweep of a real page are indistinguishable
    * from the numbers alone, which is why the new route carries `MUST_NAME`
-   * probes that fail if the page did not actually render its controls. The
-   * project links are still read from `/workspaces`, unchanged.
+   * probes that fail if the page did not actually render its controls.
+   *
+   * **MOVED AGAIN, same day (Round 19c, owner: "the entire workspace card
+   * should be clickable ... everything else on the card should just be info,
+   * nothing clickable")**: the workspace card on `/workspaces` is now one
+   * `<Link>` to `/w/<id>` and nothing else inside it is a link, so
+   * `app/workspaces/page.tsx` no longer renders a `/w/<id>/p/<projectId>` href
+   * at all. `app/w/[workspaceId]/page.tsx` still renders exactly that shape,
+   * one per LIVE project ("Open board", `app/w/[workspaceId]/page.tsx:377`),
+   * so the read moved one hop later — through the door this test already
+   * followed to get `workspaceId` — rather than disappearing. NOT re-run
+   * against the real stack after this edit: e2e-stack needs the owner's own
+   * `:3001`, which was not taken over for this change (see the accessible-
+   * names ratchet note a few hundred lines below for the same caveat on the
+   * same day's edits).
    */
+  await page.goto(`/w/${workspaceId}`, { waitUntil: 'networkidle' });
   const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
   await projectLink.waitFor({ timeout: 15_000 });
   const projectHref = await projectLink.getAttribute('href');
   expect(
     projectHref,
-    'no project link reachable from /my-work — the seed or the session is wrong, and sweeping ' +
+    'no project link reachable from /w/<id> — the seed or the session is wrong, and sweeping ' +
       'without the board would report coverage of the page the finding was actually about',
   ).not.toBeNull();
 
@@ -576,6 +589,39 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     // `aria-label` pinning each door's name to its label and
     // `aria-describedby` linking the note as a description instead; this
     // route's baseline stayed exact and green on re-measure.
+    //
+    // 2026-09-09 (owner request): `StyleToggle` moved OFF `AppNav` onto
+    // `/account`, and changed from `SegmentedControl` to a `<select>`. This is
+    // a genuine FALL, the one direction this ratchet cannot absorb by itself:
+    // every route below lost `SegmentedControl`'s `role="tablist"` + three
+    // `role="tab"` (role -4), its `aria-label="Style"` (ariaLabel -1), and the
+    // three tabs' `aria-selected` (ariaSelected -3) — confirmed from the
+    // baseline file itself before this edit, since `ariaSelected` read exactly
+    // `3` on every recorded route except `/p/:projectId` (`7` — the extra 4
+    // are `.gn-view-tabs`' own Board/List/Calendar/Timeline tabs, unaffected).
+    //
+    // ALL SEVEN recorded keys are affected (13.342's own comment above names
+    // every one of them as StyleToggle's contribution), so rather than guess
+    // seven new numbers by hand — which is exactly the failure this file's
+    // `recordAccessibleBaseline` refuses to allow ("writes ABSENT keys only")
+    // — `e2e-stack/accessible-names-baseline.json` was reset to `{}`. Every
+    // key is deleted, not lowered: the ratchet records-but-does-not-assert on
+    // its next run (the `undefined` branch below) instead of asserting stale
+    // numbers against a page that no longer matches them.
+    //
+    // **This is not a free pass — name what still has teeth.** Only
+    // `stack-phone-390|/w/:workspaceId` keeps a real assertion through the
+    // gap, via its `MUST_NAME` entry above. The other six
+    // (`/my-work`, `/p/:projectId`, `/members`, `/settings/ticket-types`,
+    // `/settings/workflows`, `/workspaces`) have no `MUST_NAME` probes and are
+    // NAKED until re-recorded — a real regression on any of them would pass
+    // silently. Owner: whoever next has a stack window should run this spec
+    // once with `UPDATE_ACCESSIBLE_BASELINE=1` to write fresh values, THEN
+    // re-run without it to prove the fresh baseline actually asserts (an
+    // unread write is indistinguishable from a ratchet that still does
+    // nothing). Also recorded in `Features.md`'s accessible-name-ratchet
+    // bullet, because a gap that lives only in a spec comment is a gap nobody
+    // reviews (this file's own `/invite/<token>` precedent, 2026-09-08).
     const accessibleKey = route.key;
     const accessibleBaseline = readAccessibleBaseline(STACK_ACCESSIBLE_BASELINE_PATH)[accessibleKey];
     if (accessibleBaseline === undefined) {
@@ -785,6 +831,11 @@ test('records non-text contrast across the signed-in surface, with a positive co
   const workspaceId = /^\/w\/([^/]+)/.exec(workspaceHref ?? '')?.[1];
   expect(workspaceId, `could not read a workspace id out of ${workspaceHref}`).toBeDefined();
 
+  // Round 19c moved the project links off `/workspaces` (its card is now one
+  // door-link and nothing else) onto `/w/<id>`'s own "Open board" rows — see
+  // the longer version of this note on the accessible-name sweep above. NOT
+  // re-run against the real stack after this edit; same caveat as there.
+  await page.goto(`/w/${workspaceId}`, { waitUntil: 'networkidle' });
   const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
   await projectLink.waitFor({ timeout: 15_000 });
   const projectHref = await projectLink.getAttribute('href');
@@ -824,15 +875,25 @@ test('records non-text contrast across the signed-in surface, with a positive co
       selector: '[data-style="neo"] .gn-field__input',
       sanctioned: true as const,
       ratioLight: 1.24,
-      ratioDark: 1.16,
+      // UPDATED 2026-09-10: `neoNavySunken` was reverted to `neoNavy` itself
+      // (owner: "revert to prototype's exact dark hex"), so `surface` and
+      // `surfaceSunken` are now the IDENTICAL hex in neo/dark — the field's
+      // boundary is 100% the shadow, zero colour delta, which is exactly
+      // 1.00 by definition rather than Task 13's pre-revert 1.16. Not
+      // re-measured by this suite either (still light-theme-only, per the
+      // docblock above) — this is the arithmetic consequence of the token
+      // change, cited the same way 1.16 was.
+      ratioDark: 1.0,
       border: 'none — sunken box-shadow only, not compositable by this instrument',
       backdrop: 'surface (neo)',
       routes: ['/sign-in', '/workspaces'],
       citation:
         'Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo ' +
-        'look (sunken, no border) even below 3:1. Measured by Task 13 (docs/neo-token-report.md); ' +
-        'quoted in packages/ui/src/ui.css\'s [data-style="neo"] .gn-field__input docblock and case ' +
-        '13.339. Light confirmed by this run\'s own DOM check; dark is Task 13\'s measurement, cited.',
+        'look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) ' +
+        'at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in ' +
+        'packages/ui/src/ui.css\'s [data-style="neo"] .gn-field__input docblock and case 13.339. ' +
+        'Light confirmed by this run\'s own DOM check; dark is arithmetic (surface === surfaceSunken ' +
+        'post-revert, tokens.ts\'s neoNavyRaised docblock), not re-measured.',
     },
   ];
 
