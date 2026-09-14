@@ -161,14 +161,24 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     expect(dialog).toHaveTextContent('Registrations is Done.');
     expect(dialog).toHaveTextContent(`Refused by the server — hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`);
 
-    // The picker offers only structurally reachable non-terminal states.
-    const picker = screen.getByLabelText('Reopen to');
-    const optionValues = [...picker.querySelectorAll('option')].map((option) =>
-      option.getAttribute('value'),
-    );
+    // The picker offers only structurally reachable non-terminal states. Read from
+    // the shared Select's HiddenSelect mirror rather than `getByLabelText('Reopen
+    // to')`: post-migration that name resolves to BOTH the visible trigger button
+    // and HiddenSelect's own hidden native <select> (they share the accessible
+    // name), so an unscoped getByLabelText throws "Found multiple elements"
+    // (confirmed empirically). HiddenSelect is fed from the same buildCollection
+    // source as the visible panel (confirmed in select.tsx), so this stays a
+    // genuine, non-vacuous check of the same options. Its blank placeholder
+    // option (value="") is filtered out, matching the established pattern at
+    // workflow-builder/publish.test.tsx:411-413.
+    const picker = within(dialog).getByTestId('hidden-select-container');
+    const optionValues = [...picker.querySelectorAll('option')]
+      .map((option) => option.getAttribute('value'))
+      .filter((value) => value !== '');
     expect(optionValues.sort()).toEqual(['doing', 'todo']);
 
-    await user.selectOptions(picker, 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(3));
@@ -198,7 +208,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const onCreated = renderFlow(source);
     await createTicketUnderParent(user);
     await screen.findByRole('dialog', { name: 'Reopen parent?' });
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -224,7 +235,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const onCreated = renderFlow(source);
     await createTicketUnderParent(user);
     await screen.findByRole('dialog', { name: 'Reopen parent?' });
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     const alertBox = await screen.findByRole('alert');
@@ -304,7 +316,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // Accepting it submits the parent first and then the child, exactly as the
     // server-refused path does — the instant route is a shortcut to the offer,
     // never a shortcut past the two claims.
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');

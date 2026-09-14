@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Dialog } from '@gisik-nokma/ui';
+import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
 /** Which authority produced the refusal being shown. They are never the same thing. */
 export type RefusalOrigin = 'instant' | 'server';
@@ -82,16 +82,15 @@ export function ReopenDialog({
           workflow offers no reopen.
         </p>
       ) : (
-        <label className="gn-reopen__picker">
-          Reopen to
-          <select value={toStateId} onChange={(event) => setToStateId(event.target.value)}>
-            {reopenStates.map((state) => (
-              <option key={state.id} value={state.id}>
-                {state.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="gn-reopen__picker">
+          <span>Reopen to</span>
+          <Select
+            options={reopenStates.map((state) => ({ value: state.id, label: state.name }))}
+            value={toStateId}
+            onChange={setToStateId}
+            aria-label="Reopen to"
+          />
+        </div>
       )}
       {parentRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
