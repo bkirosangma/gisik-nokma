@@ -229,6 +229,54 @@ describe('Select — searchable', () => {
     await user.keyboard('{Tab}');
     expect(onChange).toHaveBeenCalledWith('apple');
   });
+
+  // Real, reproduced bug (found by the final whole-branch review, independently confirmed here):
+  // after typing a filter, selecting an option, and reopening the panel, the listbox showed only
+  // the filtered subset from the earlier search, not the full option list — until the user
+  // manually cleared the input text. Root cause, confirmed by reading the installed
+  // `useComboBoxState.mjs`: `open(focusStrategy, trigger)` computes `displayAllItems = trigger
+  // === 'manual' || (trigger === 'focus' && menuTrigger === 'focus')`. The reopen-click handler
+  // below (Task 7.5's fix) called `comboState.open()` with no `trigger` argument, so
+  // `displayAllItems` stayed `false` and the reopened panel kept rendering the stale filtered
+  // collection — even though the input still displays the selected option's full label (from
+  // `resetInputValue()`), which is exactly the text that was still filtering the list.
+  //
+  // Reuses the `Controlled` wrapper pattern from the round-trip test above, since the stale
+  // label only persists once `onChange` is actually round-tripped back in as a new `value` — a
+  // bare `vi.fn()` never updates the input's displayed text, so it wouldn't reproduce this at
+  // all.
+  it('reopening after a filtered selection shows the full option list, not the stale filtered one', async () => {
+    const user = userEvent.setup();
+    function Controlled() {
+      const [value, setValue] = useState<string | null>(null);
+      return <Select options={FRUIT} value={value} onChange={setValue} searchable aria-label="Fruit" />;
+    }
+    render(<Controlled />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    await user.click(input);
+    await user.type(input, 'cher');
+    await user.click(await screen.findByRole('option', { name: 'Cherry' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await user.click(input);
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Apple' })).toBeInTheDocument();
+    expect(within(listbox).getByRole('option', { name: 'Banana' })).toBeInTheDocument();
+    expect(within(listbox).getByRole('option', { name: 'Cherry' })).toBeInTheDocument();
+
+    // The fix's mechanism (`open(null, 'focus')`) sets `useComboBoxState`'s internal
+    // `showAllItems` flag to `true`, which is a different thing from the assertion above — this
+    // checks that flag doesn't get stuck on and defeat a *fresh* filter typed into the reopened
+    // panel. Confirmed by reading the same source: its main effect resets `setShowAllItems(false)`
+    // whenever `inputValue !== lastValue`, i.e. on the very next keystroke — independently
+    // verified here with a throwaway repro before adding this as a permanent assertion, not just
+    // inferred from the source.
+    await user.clear(input);
+    await user.type(input, 'ban');
+    const refiltered = await screen.findByRole('listbox');
+    const refilteredOptions = within(refiltered).getAllByRole('option');
+    expect(refilteredOptions).toHaveLength(1);
+    expect(refilteredOptions[0]).toHaveTextContent('Banana');
+  });
 });
 
 describe('Select — multiple', () => {

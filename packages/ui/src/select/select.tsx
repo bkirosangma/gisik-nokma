@@ -419,7 +419,19 @@ function SearchableSelect(props: SelectProps & { collection: ListCollection<Sele
           ref={inputRef}
           placeholder={placeholder}
           onClick={() => {
-            if (!comboState.isOpen) comboState.open();
+            // `open(focusStrategy, trigger)`'s own `displayAllItems` is computed purely from
+            // `trigger` (`trigger === 'manual' || (trigger === 'focus' && menuTrigger ===
+            // 'focus')`, confirmed by reading `useComboBoxState.mjs`) — not from anything about
+            // *why* the panel was closed. Calling `open()` with no `trigger` argument leaves
+            // `displayAllItems` `false`, so a reopen after a filtered selection kept rendering
+            // the stale filtered collection instead of the full one, even though the input still
+            // displays the selected option's full label (from `resetInputValue()`) rather than an
+            // empty filter box — that stale label text is what was still filtering the list.
+            // Passing `'focus'` here matches `menuTrigger: 'focus'` (already hardcoded below) and
+            // is exactly the call shape `useComboBoxState`'s own internal focus-open path already
+            // uses (`open(null, 'focus')`, confirmed in the same source), so this reopen now goes
+            // through the same `displayAllItems: true` branch a normal focus-open would.
+            if (!comboState.isOpen) comboState.open(null, 'focus');
           }}
         />
       </div>
