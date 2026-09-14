@@ -66,13 +66,19 @@ describe('the list’s preference controls follow whether a write would actually
     // A promise that never settles is the window itself: `usePreferences` has
     // asked and has no document, which is exactly `canSetPrefs === false`.
     await renderListTab(() => new Promise<never>(() => undefined));
-    const groupBy = await screen.findByLabelText('Group by');
+    // Not `findByLabelText('Group by')`: the shared Select's visible trigger
+    // button and its `HiddenSelect` mirror's own hidden native `<select>` share
+    // the same accessible name post-migration, so an unscoped label-text query
+    // throws "Found multiple elements" (confirmed empirically) — the same
+    // gotcha Task 2's reopen-dialog migration hit and documented at its own call
+    // site.
+    const groupBy = await screen.findByRole('button', { name: /Group by/ });
     expect(groupBy).toBeDisabled();
   });
 
   it('are ENABLED once it has, because a write then has a document to merge into', async () => {
     await renderListTab(async () => EMPTY_PREFERENCES);
-    const groupBy = await screen.findByLabelText('Group by');
+    const groupBy = await screen.findByRole('button', { name: /Group by/ });
     await waitFor(() => expect(groupBy).toBeEnabled());
   });
 });

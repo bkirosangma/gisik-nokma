@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Avatar, Chip, Table, type TableColumn } from '@gisik-nokma/ui';
+import { Avatar, Chip, Select, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import {
@@ -183,25 +183,21 @@ export function TicketList({
             narrowed to {narrowing} — not the whole project
           </span>
         )}
-        <label className="gn-list__control">
-          Group by
-          <select
+        <div className="gn-list__control">
+          <span>Group by</span>
+          <Select
+            options={GROUPING_OPTIONS.map((option) => ({ value: option, label: option }))}
             value={grouping}
             disabled={!prefsEditable}
-            onChange={(event) =>
+            onChange={(next) =>
               onPrefsChange({
                 ...prefs,
-                grouping: { origin: 'stored', value: event.target.value as Grouping },
+                grouping: { origin: 'stored', value: next as Grouping },
               })
             }
-          >
-            {GROUPING_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+            aria-label="Group by"
+          />
+        </div>
         <details className="gn-list__columns-picker">
           <summary>Columns</summary>
           {AVAILABLE_COLUMNS.map((id) => (

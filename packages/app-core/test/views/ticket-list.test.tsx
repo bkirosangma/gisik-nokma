@@ -185,8 +185,9 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     const baseline = summary();
     expect(baseline).toBe('4 tickets · 1 done');
     for (const grouping of ALL_GROUPINGS) {
-      await user.selectOptions(screen.getByLabelText('Group by'), grouping);
-      expect(screen.getByLabelText('Group by')).toHaveValue(grouping);
+      await user.click(screen.getByRole('button', { name: /Group by/ }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: grouping }));
+      expect(screen.getByRole('button', { name: /Group by/ })).toHaveTextContent(grouping);
       expect(summary(), `grouping=${grouping}`).toBe(baseline);
     }
   });
@@ -205,7 +206,8 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     const view = render(<ControlledList />);
     const expected = ROWS.map((row) => row.title).sort();
     for (const grouping of ALL_GROUPINGS) {
-      await user.selectOptions(screen.getByLabelText('Group by'), grouping);
+      await user.click(screen.getByRole('button', { name: /Group by/ }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: grouping }));
       const titles = [...view.container.querySelectorAll('.gn-list__section .gn-list__open')]
         .map((node) => node.textContent ?? '')
         .sort();
@@ -242,7 +244,8 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ControlledList onChange={onChange} />);
-    await user.selectOptions(screen.getByLabelText('Group by'), 'status');
+    await user.click(screen.getByRole('button', { name: /Group by/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'status' }));
     expect(onChange).toHaveBeenCalledWith({
       ...DEFAULT_VIEW_PREFS,
       grouping: { origin: 'stored', value: 'status' },
@@ -444,7 +447,8 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ControlledList initial={DEFAULT_VIEW_PREFS} onChange={onChange} />);
-    await user.selectOptions(screen.getByLabelText('Group by'), 'status');
+    await user.click(screen.getByRole('button', { name: /Group by/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'status' }));
     expect(onChange).toHaveBeenCalledWith({
       columns: { origin: 'default' },
       grouping: { origin: 'stored', value: 'status' },
@@ -453,13 +457,19 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
 
   it('PLANTED DEFECT: the controls are DISABLED, not merely inert, before the document loads', () => {
     render(<ControlledList prefsEditable={false} />);
-    expect(screen.getByLabelText('Group by')).toBeDisabled();
+    // Not `getByLabelText('Group by')`: post-migration that name resolves to BOTH
+    // the shared Select's visible trigger button and its `HiddenSelect` mirror's
+    // own hidden native `<select>` (they share the accessible name via `label`/
+    // `name`), so an unscoped label-text query throws "Found multiple elements"
+    // (confirmed empirically) — the same gotcha Task 2's reopen-dialog migration
+    // hit and documented at its own call site.
+    expect(screen.getByRole('button', { name: /Group by/ })).toBeDisabled();
     expect(screen.getByLabelText('Status')).toBeDisabled();
   });
 
   it('and enabled once it has — which is the component’s own default, not the harness’s', () => {
     render(<ControlledList />);
-    expect(screen.getByLabelText('Group by')).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Group by/ })).toBeEnabled();
     expect(screen.getByLabelText('Status')).toBeEnabled();
   });
 });
