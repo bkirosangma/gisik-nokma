@@ -48,7 +48,14 @@ export function StyleToggle() {
   };
 
   return (
-    <p>
+    // `<div>`, not `<p>`: `Select`'s internal `HiddenSelect` renders a `<div>`
+    // (`hidden-select-container`), and `<p>`'s HTML content model permits only phrasing
+    // content — a block-level `<div>` descendant is invalid there and triggers React's
+    // `validateDOMNesting` warning, a live SSR hydration defect on the real `/account`
+    // route (Wave A fix round 1). `<div>` permits block content, the same way
+    // `members/page.tsx`'s `<form>` wrapper already tolerates the same internal
+    // structure at Task 1's two sites.
+    <div>
       <span>Style</span>{' '}
       <Select
         options={OPTIONS}
@@ -58,6 +65,6 @@ export function StyleToggle() {
         }}
         aria-label="Style"
       />
-    </p>
+    </div>
   );
 }
