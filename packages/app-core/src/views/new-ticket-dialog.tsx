@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Dialog } from '@gisik-nokma/ui';
+import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
 export type NewTicketDraft = { title: string; typeId: string; parentId: string | null };
 
@@ -76,25 +76,48 @@ export function NewTicketDialog({
       </label>
       <label className="gn-new-ticket__field">
         Type
-        <select value={typeId} onChange={(event) => setTypeId(event.target.value)}>
-          {typeOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          options={typeOptions.map((option) => ({ value: option.id, label: option.name }))}
+          value={typeId === '' ? null : typeId}
+          onChange={setTypeId}
+          searchable
+          aria-label="Type"
+        />
       </label>
       <label className="gn-new-ticket__field">
         Parent
         {parentCandidatesUnavailable === undefined ? (
-          <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
-            <option value="">None (project root)</option>
-            {parentCandidates.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.title}
-              </option>
-            ))}
-          </select>
+          /*
+            `''` is passed through as a REAL option, never as `Select`'s
+            "nothing chosen" sentinel — the one place in this rollout where the
+            usual `value={x === '' ? null : x}` translation would be wrong.
+            "None (project root)" is a permanently offered CHOICE, not the
+            absence of one: it is what this picker shows before anything is
+            touched, and picking it back is how a user un-nests a ticket. Handing
+            `null` here instead would render the generic "Select…" placeholder
+            and silently delete that sentence from the screen.
+
+            `Select` carries `''` as an ordinary key end to end — MEASURED against
+            the real component, not inferred: the trigger displays
+            "None (project root)" with `value=""`, and choosing that row fires
+            `onChange('')` (its `if (key != null)` guard admits `''`). The `''` →
+            `null` translation stays exactly where this component's docblock
+            already puts it, at the SUBMIT boundary below, where the option value
+            stops being a DOM detail and becomes a nullable ULID.
+          */
+          <Select
+            options={[
+              { value: '', label: 'None (project root)' },
+              ...parentCandidates.map((candidate) => ({
+                value: candidate.id,
+                label: candidate.title,
+              })),
+            ]}
+            value={parentId}
+            onChange={setParentId}
+            searchable
+            aria-label="Parent"
+          />
         ) : (
           <p role="status" className="gn-new-ticket__parent-unavailable">
             This ticket will be created at project root: the list of tickets that could be a

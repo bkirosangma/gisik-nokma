@@ -121,7 +121,16 @@ function flowSource(
 async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'New ticket' }));
   await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
-  await user.selectOptions(screen.getByLabelText('Parent'), PARENT);
+  // The Parent picker is the shared searchable `Select` now, so it is opened and clicked rather
+  // than `selectOptions`'d: its trigger is an `<input role="combobox">` with no `<option>`
+  // children, and the options are portal-rendered into a `listbox` on `document.body` only while
+  // the panel is open. Matched BY TITLE, not by `PARENT` (the id) — `selectOptions` matched on an
+  // option's VALUE, a click matches on what the row actually reads. The title is the one
+  // `renderFlow` below supplies for `PARENT` in this file's own `parentCandidates` fixture.
+  await user.click(screen.getByLabelText('Parent'));
+  await user.click(
+    within(await screen.findByRole('listbox')).getByRole('option', { name: 'Registrations' }),
+  );
   await user.click(screen.getByRole('button', { name: 'Create' }));
 }
 
