@@ -230,15 +230,44 @@ input, textarea, select { font-family: inherit; }
    header meta line (`app/w/[workspaceId]/page.tsx:588`, inside
    `.gn-workspace-home__header-titles`, whose own `gap: 0.15rem` already owned
    the spacing there — unaffected by the margin change, but still grows from
-   0.8rem to 0.9375rem type). Flagged, not fixed here, same pattern
-   `.gn-workspace-card__project-count` carries elsewhere in this file for the
-   identical reason: this task is the card head, not those two screens, and no
-   test in this repo guards either one's spacing. */
+   0.8rem to 0.9375rem type). Flagged, not fixed here: this task is the card
+   head, not those two screens, and no test in this repo guarded either one's
+   spacing.
+
+   Task 7 PINS both borrowers back to the pre-Task-6 size (see
+   `.gn-page-title + .gn-workspace-list__role` a few lines down): the two
+   pages beyond `/workspaces` are outside this plan's remit and must not
+   silently gain the card head's larger type just because they share a class
+   with it. */
 .gn-workspace-list__role {
   margin: 0;                /* the flex column owns the spacing now */
   font-size: 0.9375rem;
   line-height: 1.25rem;
   color: var(--gn-text-muted);
+}
+
+/* ROUTED 3 (Task 7 review, routed from Task 6) — the two BORROWERS of the
+   rule above, pinned at the size they carried before Task 6's resize:
+   `0.8rem`, and no explicit `line-height` at all (the pre-Task-6 rule set
+   none, so it inherited `body`'s unitless `line-height: 1.45`, recomputed at
+   THIS element's own font-size — `line-height: inherit` below restores
+   exactly that, rather than hand-picking a value the rule never declared).
+   Without this override Task 6's `1.25rem` line box would reach these two at
+   0.8rem type — 1.56x taller than either page has ever carried — which is
+   the regression this rule exists to prevent.
+
+   Selector chosen by inspecting the actual markup, not guessed: at BOTH
+   borrowing call sites — `/settings` (`app/settings/page.tsx:147-148`) and
+   the workspace home header (`app/w/[workspaceId]/page.tsx:587-588`) —
+   `.gn-workspace-list__role` is the IMMEDIATE next sibling of a
+   `.gn-page-title`. The namesake `/workspaces` card's role sentence is not:
+   it sits several levels below that page's own `<h1>`, inside the card's
+   door. `(0,2,0)` beats the bare-class rule above regardless of source
+   order, so this stays here beside its base rule rather than at the file's
+   end. */
+.gn-page-title + .gn-workspace-list__role {
+  font-size: 0.8rem;
+  line-height: inherit;
 }
 
 /* ── Task 18: the workspace card. ───────────────────────────────────────────
@@ -306,7 +335,14 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
-  min-width: 0;             /* lets a long name ellipsise instead of pushing the monogram */
+  /* ROUTED 4(i) (Task 7 review) — this does NOT ellipsise anything; the rule
+     that wraps a long name is `overflow-wrap: anywhere` on the `h2` below.
+     A flex item's default `min-width` is `auto` (its content's intrinsic
+     width), which would keep this column exactly as wide as the longest
+     unbreakable run of the name and push the monogram regardless of the
+     wrap rule. `min-width: 0` is what lets the column shrink below that, so
+     `overflow-wrap: anywhere` has room to actually wrap the name instead. */
+  min-width: 0;
 }
 
 .gn-workspace-card__titles h2 {
@@ -332,22 +368,42 @@ input, textarea, select { font-family: inherit; }
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-/* `margin: 0`, not a deleted declaration: the door's flex `gap` now owns the
-   top offset, but `<ul>`'s UA-default `margin-block: 1em` has nothing else in
-   this file resetting it, and would otherwise reappear on top of the gap
-   rather than being replaced by it. */
-.gn-workspace-card__projects { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
-.gn-workspace-card__project { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
-.gn-workspace-card__project-count { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Task 7 — the prototype's single joined project line
+   (`desktop.dc.html:206`), replacing the per-project `<ul>`/`ProjectRow`
+   rows this block used to style (`.gn-workspace-card__project`,
+   `__project-count` — both deleted with `ProjectRow`, nothing else in the
+   app renders them). `margin: 0` resets `<p>`'s UA-default `margin-block:
+   1em`, which would otherwise reappear on top of the door's flex `gap:
+   0.75rem` rather than being replaced by it — same reasoning `.gn-workspace-
+   card__chips` above relies on for its own reset. */
+.gn-workspace-card__projects { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+/* The chevron takes its colour from `currentColor`'s dimmer sibling and
+   never shrinks — `flex: none` keeps a long project line from squeezing it
+   into a sliver. */
+.gn-workspace-card__projects svg { flex: none; color: var(--gn-text-subtle); }
 /* Same `margin: 0` reasoning as `__projects` above (`<p>`'s UA default is
    `margin-block: 1em`). This class is ALSO rendered at `/w/[workspaceId]`
-   (`app/w/[workspaceId]/page.tsx:666`), outside any flex-gap door — that
-   usage loses its former 0.55rem top offset with this change, and no test in
-   this repo guards its spacing. Flagged, not fixed here: splitting that
-   usage onto its own class is a page-content change, out of this task's
-   scope (grid/container geometry only) — left for whichever of Task 6/7
-   next touches `__restricted`. */
-.gn-workspace-card__restricted { margin: 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+   (`app/w/[workspaceId]/page.tsx:666`), outside any flex-gap door — Task 6
+   flagged that call site loses its former 0.55rem top offset with the shared
+   `margin: 0` and left it for "whichever of Task 6/7 next touches
+   `__restricted`". ROUTED 2 (Task 7 review) is that fix: see
+   `.gn-workspace-home__restricted` immediately below, and why it MUST stay
+   textually after this rule. */
+.gn-workspace-card__restricted { margin: 0; font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+/* ROUTED 2 (Task 7 review, routed from Task 5) — `gn-workspace-home__restricted`
+   is a SECOND class Task 7 adds on top of `gn-workspace-card__restricted` at
+   the ONE call site outside the `/workspaces` door
+   (`app/w/[workspaceId]/page.tsx`), so this rule can target it alone rather
+   than guessing at a sibling selector — the element that precedes the
+   restricted line there varies (the live list, the archived list, or the
+   empty-state paragraph), so no stable sibling combinator exists, and a
+   dedicated class is the reliable scope. Both this selector and the shared
+   one above are a single class — equal (0,1,0) specificity — so on a tie the
+   LATER rule in source order wins for any property both declare; this MUST
+   stay textually after the shared rule, or its own `margin: 0` would win the
+   tie and silently re-zero this override. `margin-top` only (not the
+   shorthand `margin`), so the other three sides stay at the shared rule's 0. */
+.gn-workspace-home__restricted { margin-top: 0.55rem; }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen

@@ -662,8 +662,12 @@ function WorkspaceHome({
           </ul>
         ) : null}
 
+        {/* `gn-workspace-home__restricted` (Task 7 review, ROUTED 2): this call
+            site sits outside the /workspaces card's flex-gap door, so it needs
+            its own scoped top offset — see that class's rule in globals.css
+            for why a dedicated class rather than a sibling selector. */}
         {restricted !== null ? (
-          <p className="gn-workspace-card__restricted">{restricted}</p>
+          <p className="gn-workspace-card__restricted gn-workspace-home__restricted">{restricted}</p>
         ) : null}
       </Card>
 

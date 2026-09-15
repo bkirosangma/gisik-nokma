@@ -6,12 +6,18 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import { FoundingError, InvitationActionError, type PendingInvitation } from '@gisik-nokma/app-core/online';
-import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
-import { projectCountLine, restrictedLine, viewerOf, type CardViewer } from '../../src/workspace-viewer.js';
+import {
+  projectCountLine,
+  projectLine,
+  restrictedLine,
+  viewerOf,
+  type CardViewer,
+} from '../../src/workspace-viewer.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -180,31 +186,6 @@ function ChipRow({
 }
 
 /**
- * One project row: its name, and the counts this caller may be told.
- *
- * Plain text, not a `<Link>` (Round 19c) — the whole card is one door now, and
- * an anchor cannot nest inside another anchor. `workspaceId` is gone from the
- * props for the same change: nothing here builds an `href` any more. Only
- * `live` (non-archived) projects are ever passed to this component (Round
- * 19c's `WorkspaceCard` no longer renders the archived rows at all, per the
- * chip in `ChipRow`), so there is no `Archived` marker to draw here either.
- */
-function ProjectRow({ project, viewer }: { project: ProjectRef; viewer: CardViewer }) {
-  return (
-    <li className="gn-workspace-card__project" data-testid={`project-card-${project.id}`}>
-      <span>{project.name}</span>
-      {/* The SAME gate as the chips above, read from the same value. A guest is
-          told a project's NAME (rulings P32/P38) and no number about it. */}
-      {viewer.countsWithheld || project.ticketCount === null ? null : (
-        <span className="gn-workspace-card__project-count">
-          {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
-        </span>
-      )}
-    </li>
-  );
-}
-
-/**
  * One workspace, as the owner's `/workspaces` reference draws it (Task 18).
  *
  * ## What is derived and what is served
@@ -223,16 +204,20 @@ function ProjectRow({ project, viewer }: { project: ProjectRef; viewer: CardView
  * anchor cannot validly nest a `<button>` or another `<a>` — which the
  * per-project links and the archived-disclosure toggle both were at the time.
  * Round 19c removes those nested controls instead of working around them: the
- * per-project name is now plain text (`ProjectRow` below), and the archived
- * toggle is gone, replaced by a count chip in `ChipRow`. With no interactive
- * descendant left, the single `<Link>` can wrap the card's entire content —
- * head, chips, project list and restricted line — and the invalid-nesting
- * constraint that used to cap the door at the head no longer applies.
+ * per-project name became plain text (a `ProjectRow` per live project), and the
+ * archived toggle is gone, replaced by a count chip in `ChipRow`. With no
+ * interactive descendant left, the single `<Link>` can wrap the card's entire
+ * content — head, chips, project list and restricted line — and the
+ * invalid-nesting constraint that used to cap the door at the head no longer
+ * applies. **Task 7** goes one step further and removes `ProjectRow` itself:
+ * the per-project rows become the prototype's one joined, truncated line
+ * (`projectLine`, `src/workspace-viewer.ts`) — still plain text inside the
+ * same door, so nothing here about nesting changes again.
  *
  * `aria-label={workspace.name}` on the `<Link>` still OVERRIDES the name a
  * browser would otherwise compute from its content (now the avatar's own
- * label, the heading text, the role sentence, every project name and count,
- * and the restricted line, all at once) — so the link's accessible name stays
+ * label, the heading text, the role sentence, the joined project line, and
+ * the restricted line, all at once) — so the link's accessible name stays
  * exactly the workspace's name. The `<h2>` inside it keeps its own heading
  * role and text (`getByRole('heading', ...)` is unaffected by an ancestor's
  * `aria-label`), and the avatar keeps its own `aria-label` too — two elements
@@ -263,6 +248,9 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
   // Bound once: read in both the render condition below and the body, and a
   // bare double call would be flagged.
   const meta = projectCountLine(live.length);
+  // Same reason as `meta` above: `projects` is read in both the render
+  // condition and the body below.
+  const projects = projectLine(live.map((p) => p.name), viewer.countsWithheld);
 
   return (
     <li data-testid={`workspace-card-${workspace.id}`}>
@@ -298,11 +286,28 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
               English, and the same object gates every number above. */}
           <p className="gn-workspace-list__role">{viewer.sentence}</p>
 
-          <ul className="gn-workspace-card__projects">
-            {live.map((project) => (
-              <ProjectRow key={project.id} project={project} viewer={viewer} />
-            ))}
-          </ul>
+          {/* The prototype's single project line (`desktop.dc.html:206`), replacing
+              the per-project rows. The chevron is decorative — the whole card is
+              already one link named by the workspace, so the arrow names nothing a
+              screen reader has not already been told. */}
+          {projects !== null ? (
+            <p className="gn-workspace-card__projects">
+              {projects}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </p>
+          ) : null}
 
           {restricted !== null ? (
             <p className="gn-workspace-card__restricted">{restricted}</p>

@@ -6,12 +6,20 @@ import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * 3.153/3.154 — the two `data-testid` hooks Plan 11 T13's E2E needs to
- * address one specific workspace or project card among structurally
- * identical siblings (house style `mapping-row-${state.id}` /
- * `state-node-${data.stateId}`): the id goes on the entity's own container,
- * disambiguation only — every interaction here still goes through the
- * accessible `name`/role, never the testid itself.
+ * 3.153 — the `data-testid` hook Plan 11 T13's E2E needs to address one
+ * specific workspace card among structurally identical siblings (house style
+ * `mapping-row-${state.id}` / `state-node-${data.stateId}`): the id goes on
+ * the entity's own container, disambiguation only — every interaction here
+ * still goes through the accessible `name`/role, never the testid itself.
+ *
+ * 3.154 (the sibling per-project hook) drove this page until the 2026-09-15
+ * prototype port (Task 7) replaced the per-project `<ul>` rows with one
+ * joined project line — the `project-card-<id>` testid it asserted no longer
+ * exists anywhere in the app (the workspace-home project rows use their own,
+ * unrelated `project-row-<id>` testid). Its assertions are removed here per
+ * that task's brief rather than repointed at a subject that no longer
+ * exists; the case NUMBER is left unused, not reassigned. A later task owns
+ * marking it 🚫 in `test-cases/` and `Features.md` — out of scope here.
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -97,21 +105,6 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     expect(within(ws2).getByRole('heading', { name: 'Second Workspace' })).toBeInTheDocument();
   });
 
-  it('3.154 keys each project card by its own projectId, scoped inside its own workspace card', async () => {
-    mount();
-    const ws1 = await screen.findByTestId('workspace-card-ws1');
-    const p1 = within(ws1).getByTestId('project-card-p1');
-    const p2 = within(ws1).getByTestId('project-card-p2');
-    expect(p1).not.toBe(p2);
-    // Round 19c: plain text, not a link (the whole card is the one door now).
-    expect(within(p1).getByText('Shop operations')).toBeInTheDocument();
-    expect(within(p2).getByText('Deliveries')).toBeInTheDocument();
-    expect(within(p1).queryByRole('link')).toBeNull();
-    expect(within(p2).queryByRole('link')).toBeNull();
-    // The other workspace's project never leaks into this one's scope.
-    expect(within(ws1).queryByTestId('project-card-p3')).toBeNull();
-  });
-
   /**
    * 13.357 — the role label, the one owner-approved invented row on this
    * screen: real backing data (`GET /v1/me/workspaces` has disclosed `role`
@@ -140,6 +133,21 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     // sentence beside it.
     expect(within(ws1).queryByText('owner')).toBeNull();
     expect(within(ws2).queryByText('member')).toBeNull();
+
+    // ROUTED 4(ii) (Task 7 review): everything above asserts the sentence's
+    // TEXT, so none of it would fail if Task 6's relocation of this sentence
+    // — from the card head, under the name, to below the chip row — were
+    // ever reverted; the sentence reads the same either way. This is a
+    // DOM-POSITION assertion instead: the chip row must PRECEDE the role
+    // sentence in document order, which is true only at the current
+    // position.
+    const chips = within(ws1).getByText('3 members').closest('.gn-workspace-card__chips');
+    expect(chips, 'no .gn-workspace-card__chips ancestor found for the "3 members" chip').not.toBeNull();
+    const role = within(ws1).getByText("You're an owner here.");
+    expect(
+      chips!.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the role sentence no longer follows the chip row in document order',
+    ).toBeTruthy();
   });
 });
 
@@ -219,12 +227,12 @@ describe('13.379 the card renders every element from data the route served', () 
     expect(within(card).getByText('14 active')).toBeInTheDocument();
     expect(within(card).getByText('6 blocked')).toBeInTheDocument();
 
-    // Per-project counts, scoped to their own row so a card that printed one
-    // project's number on another's row reddens.
-    const p1 = within(card).getByTestId('project-card-p1');
-    expect(within(p1).getByText('9 tickets')).toBeInTheDocument();
-    const p2 = within(card).getByTestId('project-card-p2');
-    expect(within(p2).getByText('4 tickets')).toBeInTheDocument();
+    // Task 7: the two live projects, joined into ONE line. `getByText` on the
+    // whole sentence is the assertion a multi-interpolation version fails.
+    expect(within(card).getByText('Shop operations · Deliveries')).toBeInTheDocument();
+    // The archived project is named nowhere — its only trace is the chip.
+    expect(within(card).queryByText(/Last winter/)).toBeNull();
+    expect(within(card).queryByTestId('project-card-p1')).toBeNull();
 
     // Round 19c: archived is no longer a disclosure — the card renders LIVE
     // projects only, and the sole trace of the archived one is a count chip.
@@ -235,6 +243,28 @@ describe('13.379 the card renders every element from data the route served', () 
     // ONE text node, plural. `getByText` on the whole sentence is the assertion
     // that a three-interpolation version would fail.
     expect(within(card).getByText('2 projects · name restricted')).toBeInTheDocument();
+  });
+
+  // Task 7: a truncation case at the card level, so `projectLine`'s own rule
+  // (`PROJECT_LINE_CAP`, `src/workspace-viewer.ts`) is pinned where it
+  // actually renders too, not only inside the helper's own unit tests.
+  it('names three projects and counts the rest, so a wide workspace does not grow the card', async () => {
+    mountWith([
+      workspace({
+        id: 'ws1',
+        memberCount: 3,
+        projects: ['Delivery', 'Site readiness', 'Winter stock', 'Payroll'].map((name, i) =>
+          project({ id: `p${i}`, name, ticketCount: 1, blockedCount: 0 }),
+        ),
+      }),
+    ]);
+    const card = await screen.findByTestId('workspace-card-ws1');
+    expect(
+      within(card).getByText('Delivery · Site readiness · Winter stock · +1 more'),
+    ).toBeInTheDocument();
+    // The meta line still counts ALL four, so the truncation never becomes
+    // the card's answer to "how many projects are in here".
+    expect(within(card).getByText('4 projects')).toBeInTheDocument();
   });
 
   it('renders no restricted line and no archived chip when there is nothing to say', async () => {
@@ -332,8 +362,19 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
         // this fixture is the client half of it.
         memberCount: null,
         nameRestrictedProjectCount: 1,
+        // ROUTED 1 (Task 7 review): FOUR live projects — one past
+        // `PROJECT_LINE_CAP` (3) — so the truncation branch actually runs
+        // for a guest. With only a single project (the original fixture)
+        // `projectLine`'s `hidden` count is negative and no suffix ever
+        // renders, regardless of which branch a bug takes; the mutation
+        // proof below would have been a silent no-op against that fixture.
+        // Every name here is deliberately digit-free, so the scan below
+        // cannot pass by accident.
         projects: [
           project({ id: 'p1', name: 'Shared with a guest', ticketCount: null, blockedCount: null }),
+          project({ id: 'p2', name: 'Second guest errand', ticketCount: null, blockedCount: null }),
+          project({ id: 'p3', name: 'Third guest errand', ticketCount: null, blockedCount: null }),
+          project({ id: 'p4', name: 'Fourth guest errand', ticketCount: null, blockedCount: null }),
         ],
       }),
     ]);
@@ -353,11 +394,34 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
     // 13.380's own name is "no number anywhere", and the meta line is a number.
     expect(within(card).queryByText(/\d+ projects?$/)).toBeNull();
 
-    // The name is still served (rulings P32/P38 withhold names, not this one),
-    // and so is the restricted line — the string the whole owner ruling exists
-    // to make renderable. Round 19c: plain text, not a link.
-    expect(within(card).getByText('Shared with a guest')).toBeInTheDocument();
+    // The names are still served (rulings P32/P38 withhold names, not this
+    // one) — all four, joined and truncated to the SAFE "and more" form, not
+    // the numeric "+1 more" a non-withheld viewer would get.
+    expect(
+      within(card).getByText(
+        'Shared with a guest · Second guest errand · Third guest errand · and more',
+      ),
+    ).toBeInTheDocument();
     expect(within(card).getByText('1 project · name restricted')).toBeInTheDocument();
+
+    // ROUTED 1 (Task 7 review, load-bearing): none of the shape-specific
+    // regexes above matches "+1 more" — the exact suffix `projectLine` would
+    // print if it ever ignored `countsWithheld` — so a leaked truncation
+    // count would have sailed through every check above and left this case
+    // green. This is a card-wide digit scan instead of one more shape: ANY
+    // digit anywhere on the card fails it, minus the one digit this card IS
+    // allowed to show — the restricted count above, never withheld (see
+    // `restrictedLine`'s own docblock) — which is stripped out by its exact
+    // text rather than excluded by yet another pattern.
+    const restrictedSentence = '1 project · name restricted';
+    const fullText = card.textContent ?? '';
+    const withoutRestrictedSentence = fullText.replace(restrictedSentence, '');
+    // Proves the strip actually fired, rather than silently no-op-ing if the
+    // sentence text ever drifted from what is asserted two lines above.
+    expect(withoutRestrictedSentence, 'the restricted sentence text was not found to strip').not.toBe(
+      fullText,
+    );
+    expect(withoutRestrictedSentence).not.toMatch(/\d/);
   });
 });
 
