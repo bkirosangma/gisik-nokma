@@ -262,6 +262,18 @@ pinned this contract's producer end while stating that its consumer was out of r
 - **11.194** ✅ `markRead` actually marks it: the count the client re-reads moves, and a second mark is still idempotent — (`notifications-consumer-roundtrip.test.ts`)
 - **11.195** ✅ `markRead` THROWS on another user's row, and that row is still unread when measured at the store — (`notifications-consumer-roundtrip.test.ts`)
 
+## Notification preferences — global, per-kind mute list (`apps/server`, `packages/domain`)
+
+*Account/help-screens plan, Task 5. A `mutedKinds` list, global (no `workspaceId` — the Inbox itself is a
+global route) and stored in a NEW table (`user_notification_preferences`), never as a fourth key on
+`PreferencesDoc`/`user_preferences` — see `packages/domain/src/notification-preferences.ts` for why that
+table's `(user_id, workspace_id)` key and its 30-day sweep-on-revocation make it the wrong home. Muting
+hides a kind from what is READ; it never stops the row from being WRITTEN.*
+- **11.197** ✅ `notificationPreferencesSchema` accepts the empty (everything-on) default and any real subset of the five kinds, refuses an unknown kind, and refuses an unknown top-level key (`.strict()`) — `EMPTY_NOTIFICATION_PREFERENCES` is exactly the empty-list answer — (`packages/domain/test/notification-preferences.test.ts`)
+- **11.198** ✅ The store answers the empty default for a user with no row, round-trips a written preference, upsert-REPLACES rather than merges on a second write, keeps two users' rows independent, and the database's own `CHECK` refuses a kind outside the five (positive control: a valid kind inserts fine) — (`apps/server/test/notification-preferences/store.test.ts`)
+- **11.199** ✅ `GET`/`PUT /v1/me/notification-preferences`: 401 with no session on both verbs and nothing stored; `GET` answers the empty default for a fresh user; `PUT` then `GET` round-trips and the `PUT` answers what it stored; an unknown kind and an unknown top-level key are both refused `400 {error:'invalid_notification_preferences'}` with nothing partial landed; and one user's write never touches another's row (positive control: the writer's own row did move) — (`apps/server/test/routes/notification-preferences.test.ts`)
+- **11.200** ✅ The read-side filter: `unreadNotificationCount` and `listNotifications` both exclude a muted kind's rows entirely — not merely marking them read — while an unmuted kind's row in the SAME fixture stays visible (the positive control against a query that silently returned nothing at all); an empty muted list changes nothing, the default; and `/v1/me/notifications` and its `/unread-count` sibling actually look the caller's stored preference up and pass it through — the wiring witness that `notifications.test.ts`'s own docblock says a route-registration test alone cannot give, since a store-level pass here is silent about whether the ROUTE ever calls `getNotificationPreferences` at all — (`apps/server/test/notifications/store.test.ts`, `apps/server/test/routes/notifications.test.ts`)
+
 ## Permanently unused id ranges
 
 Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
@@ -278,9 +290,10 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.197.**  
-*(11.196 is IN USE, at the entry directly above. This pointer means the NEXT FREE id — that is the
-convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188). #293 set it
-equal to the highest id instead of one past it, and #304 then minted exactly the id the pointer named;
-no duplicate resulted only because #304 advanced the pointer to its own new maximum, carrying the
-fault forward. Restored to max+1 here. Nothing validates this line, so it is checked by reading.)*
+**New cases continue from 11.201.**  
+*(11.200 is IN USE, at the Notification preferences section above (account/help-screens plan, Task 5,
+11.197–11.200). This pointer means the NEXT FREE id — that is the convention this file was created
+with (`e09666c`: pointer 11.189, highest entry 11.188). #293 set it equal to the highest id instead of
+one past it, and #304 then minted exactly the id the pointer named; no duplicate resulted only because
+#304 advanced the pointer to its own new maximum, carrying the fault forward. Restored to max+1 there,
+and kept at max+1 here. Nothing validates this line, so it is checked by reading.)*

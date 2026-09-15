@@ -1,5 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Queryable } from '../db/queryable.js';
+import { getNotificationPreferences } from '../notification-preferences/store.js';
 import { listNotifications, markNotificationRead, unreadNotificationCount } from '../notifications/store.js';
 
 /**
@@ -72,7 +73,8 @@ export function registerNotificationRoutes(
         }
       }
 
-      return listNotifications(deps.pool, request.currentUserId, { cursor, limit, workspaceId });
+      const { mutedKinds } = await getNotificationPreferences(deps.pool, request.currentUserId);
+      return listNotifications(deps.pool, request.currentUserId, { cursor, limit, workspaceId, mutedKinds });
     },
   );
 
@@ -80,7 +82,8 @@ export function registerNotificationRoutes(
     '/v1/me/notifications/unread-count',
     { preHandler: requireSession },
     async (request) => {
-      return { unread: await unreadNotificationCount(deps.pool, request.currentUserId) };
+      const { mutedKinds } = await getNotificationPreferences(deps.pool, request.currentUserId);
+      return { unread: await unreadNotificationCount(deps.pool, request.currentUserId, mutedKinds) };
     },
   );
 

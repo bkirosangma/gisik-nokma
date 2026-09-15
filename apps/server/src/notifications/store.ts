@@ -66,7 +66,21 @@ export type NotificationPage = { notifications: Notification[]; nextCursor: stri
 export async function listNotifications(
   db: Queryable,
   userId: string,
-  opts: { cursor?: string | null; limit?: number; workspaceId?: string | null },
+  opts: {
+    cursor?: string | null;
+    limit?: number;
+    workspaceId?: string | null;
+    /**
+     * Kinds this caller has muted (`getNotificationPreferences`) — rows of
+     * these kinds never reach the page at all, the same exclusion
+     * `unreadNotificationCount` applies to its count. Defaults to `[]`,
+     * matching that function's default: `kind = ANY('{}'::text[])` is
+     * `false` for every row (measured, not merely reasoned — an empty
+     * Postgres array is never NULL here), so `NOT (...)` is `true` for
+     * every row and an empty list excludes nothing.
+     */
+    mutedKinds?: readonly string[];
+  },
 ): Promise<NotificationPage> {
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
   const params: unknown[] = [userId];
@@ -79,6 +93,8 @@ export async function listNotifications(
     params.push(opts.workspaceId);
     where += ` AND workspace_id = $${params.length}`;
   }
+  params.push(opts.mutedKinds ?? []);
+  where += ` AND NOT (kind = ANY($${params.length}::text[]))`;
   params.push(limit + 1); // fetch one extra to learn whether a next page exists
   const result = await db.query(
     `SELECT id, user_id, workspace_id, kind, dedupe_key, payload, read, created_at
@@ -102,9 +118,23 @@ export async function markNotificationRead(db: Queryable, userId: string, id: st
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function unreadNotificationCount(db: Queryable, userId: string): Promise<number> {
-  const result = await db.query('SELECT count(*)::int AS unread FROM notifications WHERE user_id = $1 AND read = false', [
-    userId,
-  ]);
+/**
+ * `mutedKinds` (account/help-screens plan, Task 5) defaults to `[]`, so
+ * every existing caller keeps compiling and reading the same count as
+ * before — the exclusion is opt-in per call, not a behaviour change nobody
+ * asked for. `NOT (kind = ANY($2::text[]))` over an empty array is `true`
+ * for every row (measured against the real Postgres in this repo's test
+ * database, not merely reasoned from the docs), which is what makes the
+ * default a true no-op rather than an accidental empty count.
+ */
+export async function unreadNotificationCount(
+  db: Queryable,
+  userId: string,
+  mutedKinds: readonly string[] = [],
+): Promise<number> {
+  const result = await db.query(
+    'SELECT count(*)::int AS unread FROM notifications WHERE user_id = $1 AND read = false AND NOT (kind = ANY($2::text[]))',
+    [userId, mutedKinds],
+  );
   return (result.rows[0] as { unread: number }).unread;
 }
