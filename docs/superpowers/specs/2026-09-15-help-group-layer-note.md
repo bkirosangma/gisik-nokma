@@ -166,6 +166,19 @@ simply than this note expected:
   *(The prototype groups ACROSS both documents and filters to the open tab; that
   only works because its FAQ has five sections. Over 13 already-topical ones it
   would file each FAQ topic under a manual chapter's heading.)*
+  **Still open, and the owner's call:** `docs/faq.md:8` opens with its own
+  `**Jump to:** …` line naming all 13 sections. It renders above the body,
+  beside a sidebar listing the same 13 — so on the FAQ tab there are still TWO
+  indexes, which is precisely the condition that justified removing
+  `.gn-help__toc`. It is shipped prose in a source document, so the copy rule
+  keeps the words and this pass left them alone; removing it means editing
+  `docs/faq.md`. The manual has no equivalent line.
+- **Whether a sticky sidebar collides with the web shell's nav.** Checked rather
+  than assumed: `.gn-nav` is in normal document flow, and says so in its own
+  comment (`globals.css:786`) — *"not `position: sticky`/`fixed`"*. Measured at
+  `scrollY: 3000`: the sidebar pins at `top: 0`, the nav is off-screen at
+  `-3000`, and `elementFromPoint` over the first group toggle returns the toggle
+  itself, so nothing overlays it.
 - **Responsive behaviour.** Settled with an explicit breakpoint rather than left
   to `flex-wrap`: below 48rem the sidebar goes full width, drops `position:
   sticky` and moves its hairline from the right edge to the bottom. Measured at
