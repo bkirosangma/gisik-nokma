@@ -463,8 +463,19 @@ export const primitives = {
    * follow that."* Ruled PRODUCT-WIDE, not page-scoped (`apps/desktop/src/main.tsx`
    * imports this same stylesheet, so both shells move together). `ink`
    * (`#000000`) and `white` (`#ffffff`) are the WCAG MAXIMUM-contrast case;
-   * the prototype never uses either for text — see
+   * within the CSS custom-property token block cited below, the prototype
+   * never uses either for text —
    * `design-system/interactive/desktop.dc.html:12-48`.
+   *
+   * **Scoped precisely (coordinator review F3, 2026-09-16): this claim covers
+   * that token block only, not the whole prototype file.** `#fff` IS used for
+   * text elsewhere, inline, outside the token system: `color:#fff` on the
+   * workspace/avatar monogram style strings at `desktop.dc.html:2461`, `:2547`
+   * and `:3323`. Those paint over a per-workspace/per-avatar background colour
+   * chosen from a fixed palette, not one of THIS file's surface roles, so
+   * they are not themselves evidence against this change — but the sentence
+   * above is false if read as a claim about the whole file, so it says
+   * "within the token block" rather than "the prototype", full stop.
    *
    * ADDED rather than mutating `ink`/`white` in place: other roles may still
    * reference those two primitives for non-text purposes, and editing a
@@ -835,8 +846,19 @@ export function fontVariableName(role: FontRole): string {
  * has camelCase members). A camelCase role here would emit
  * `--gn-shadow-sunkenCompact`, which `tokens.test.ts`'s own var-harvesting
  * regex (`/var\((--gn-[a-z0-9-]*)\)/g`) cannot match — the check would pass
- * by finding nothing, while the chip's `box-shadow` silently resolved to
- * nothing in the browser.
+ * by finding nothing, since there is no REVERSE assertion that every
+ * declared var is actually referenced (only a `>10` count and one spot-check).
+ *
+ * **Precisely stated (coordinator review F6, 2026-09-16): this alone does
+ * NOT break the browser.** A camelCase CSS custom-property name is valid and
+ * renders correctly — `themeStylesheet()` would emit `--gn-shadow-
+ * sunkenCompact` and, had `ui.css` referenced that exact spelling, it would
+ * have worked. The real failure needs a SECOND condition: `ui.css` spelling
+ * the reference in kebab-case (as every other `--gn-*` var in that file is,
+ * by convention) while the emitter spells it camelCase — a mismatch the
+ * scanner's regex then hides rather than catches. It is that combination,
+ * not the hyphen's absence alone, that would have left the chip's
+ * `box-shadow` resolving to nothing.
  */
 export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact';
 
@@ -1101,7 +1123,26 @@ export function cssVariableName(role: TokenRole): string {
 }
 
 const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
-const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
+/**
+ * EXPORTED (round 3 fix round 1, 2026-09-16) so `tokens.test.ts` can build its
+ * own "every var(--gn-…) names a declared role" check directly from THIS
+ * array, rather than keeping a second, hand-maintained copy in the test file.
+ * Before this export, `SHADOW_ROLE_NAMES` (`tokens.test.ts`) and this array
+ * were two unlinked lists with no test cross-checking them against each
+ * other. The dangerous direction is specifically forgetting a role HERE
+ * (this emission list) while still adding it everywhere else — `ShadowRole`,
+ * `SHADOWS`, a real `ui.css` rule, AND the test file's own (then-separate)
+ * `SHADOW_ROLE_NAMES`: `themeStylesheet()` would stop emitting the role's
+ * declaration, but the test's "declared" set — built from ITS OWN list,
+ * which still names the role — would still consider `ui.css`'s reference
+ * legitimate. 13.337 (colours only) and 13.347 (pins `raised` alone) neither
+ * one would notice either. Every existing check stays green while the var
+ * resolves to nothing in the browser — the opposite direction (a role added
+ * here and forgotten in the test's list) instead reds the "declared role"
+ * check loudly, which is safe, just noisy. See case 13.411, which closes
+ * this gap directly by asserting the stylesheet's actual emitted content.
+ */
+export const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {

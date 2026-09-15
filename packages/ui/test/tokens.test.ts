@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import {
   CONTRAST_PAIRS,
+  SHADOW_ROLES,
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
@@ -16,14 +17,22 @@ import {
   themeStylesheet,
   themes,
   type FontRole,
-  type ShadowRole,
   type StyleName,
   type ThemeName,
 } from '../src/tokens.js';
 
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
 const STYLE_NAMES: StyleName[] = ['hig', 'minimal', 'neo'];
-const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
+/**
+ * Round 3 fix round 1 (2026-09-16, case 13.411): this used to be a SECOND,
+ * hand-maintained `ShadowRole[]` literal, unlinked from `tokens.ts`'s own
+ * `SHADOW_ROLES` — a role added to one and forgotten in the other would stay
+ * invisible to every test in this file (F5 of the coordinator review). Now a
+ * direct re-export of the source array, so the two literally cannot diverge:
+ * the "declared" set below is built from the same array `themeStylesheet()`
+ * emits from.
+ */
+const SHADOW_ROLE_NAMES = SHADOW_ROLES;
 const FONT_ROLE_NAMES: FontRole[] = ['sans', 'mono'];
 
 /** `hig` needs no `[data-style]` predicate — it is the unmarked base, reached through bare `:root`/`[data-theme]`. */
@@ -295,6 +304,67 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
       expect(neoValue, `${theme}: hig and neo must not render the same "raised" box-shadow`).not.toBe(higValue);
       expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${higValue};`);
       expect(stylesheet).toContain(`${shadowVariableName('raised')}: ${neoValue};`);
+    }
+  });
+
+  /**
+   * 13.411 — closes the gap the coordinator review's F5 named: `SHADOW_ROLES`
+   * (`tokens.ts`, the array `declarationsFor` actually emits from) and the
+   * test file's own role list were two independent arrays with NOTHING
+   * cross-checking them. 13.337 iterates `TOKEN_ROLES` only (colours, no
+   * shadows) and 13.347 pins `raised` alone — so had `sunken-compact` been
+   * left out of `SHADOW_ROLES` (the emission list) while still present in
+   * `ShadowRole`/`SHADOWS`/the test file's own role list, every existing case
+   * would have stayed green while `--gn-shadow-sunken-compact` never reached
+   * the stylesheet and the chip/badge's `box-shadow` resolved to nothing in
+   * the browser.
+   *
+   * DELIBERATELY NOT built from `SHADOW_ROLE_NAMES`/`SHADOW_ROLES` — now that
+   * `SHADOW_ROLE_NAMES` above is a direct re-export of `tokens.ts`'s own
+   * array (good for the "declared" set above, which should track it), a test
+   * that iterated the SAME reference could never observe a role vanishing
+   * from it: the loop would just silently shrink with the array and pass.
+   * This hardcodes the expected role list as its own literal instead, so a
+   * role dropped from `SHADOW_ROLES` is still EXPECTED here and the mismatch
+   * is what fails.
+   *
+   * Mutation, performed and reverted live to capture the failure text below
+   * verbatim (not invented): dropping `'sunken-compact'` from `SHADOW_ROLES`
+   * in `tokens.ts` and running `vitest run -t 13.411` failed exactly 1 test
+   * (the loop's `toContain` throws on the FIRST missing declaration and stops
+   * there — it does not continue on to fail once per style×theme):
+   *
+   *   FAIL  test/tokens.test.ts > the style axis (Task 14, 2026-09-09) >
+   *   13.411 every declared shadow role reaches the emitted stylesheet
+   *   AssertionError: hig/light/sunken-compact — expected declaration
+   *   "--gn-shadow-sunken-compact: none;" in themeStylesheet()'s output:
+   *   expected ':root { --gn-font-sans: -apple-system…' to contain
+   *   '--gn-shadow-sunken-compact: none;'
+   *   Tests  1 failed | 304 skipped (305)
+   *
+   * `hig`/`light` is first in loop order, which is why the FIRST missing
+   * declaration named is `none` rather than the neo inset geometry — every
+   * style×theme's `sunken-compact` line was in fact absent from the emitted
+   * stylesheet, confirmed by reading the "Received" stylesheet dump in the
+   * same failure: it lists `--gn-shadow-raised`/`--gn-shadow-sunken`/
+   * `--gn-shadow-overlay` for every block and `--gn-shadow-sunken-compact`
+   * nowhere. Reverted immediately after capture (`SHADOW_ROLES` restored from
+   * a pre-mutation copy, then `packages/ui`'s full suite re-run green).
+   */
+  it('13.411 every declared shadow role reaches the emitted stylesheet', () => {
+    // A literal, not an import — see the docblock above for why.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact'] as const;
+    const stylesheet = themeStylesheet();
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        for (const role of EXPECTED_SHADOW_ROLES) {
+          const declaration = `${shadowVariableName(role)}: ${shadowValueOf(style, theme, role)};`;
+          expect(
+            stylesheet,
+            `${style}/${theme}/${role} — expected declaration "${declaration}" in themeStylesheet()'s output`,
+          ).toContain(declaration);
+        }
+      }
     }
   });
 });
@@ -682,12 +752,32 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * 4.5 in both themes (the dispatch's own item 10, "verify"). No nudge was
    * needed; this pins that finding so a future accent change that DOES need
    * one is caught here rather than assumed away.
+   *
+   * **CORRECTED, round 3 fix round 1 (2026-09-16, coordinator review F4).**
+   * The last two assertions used to be `expect(primitives.white).toBe(
+   * '#ffffff')` / `expect(primitives.navy900).toBe('#101625')` — pinning
+   * *the values `accentText` resolved to* at the time, which is what
+   * "unnudged" meant: the role kept its ORIGINAL primitive rather than being
+   * stepped to a different one. Owner round 4 (`b05e723f`) re-pointed
+   * `accentText` to `onColorWarmLight`/`onColorWarmDark` — the prototype's
+   * off-white/off-black, not pure white/navy — and these two lines were left
+   * behind, still passing, but no longer pinning anything `accentText`
+   * actually touches: `white`/`navy900` are referenced by no role after that
+   * change, so the case could no longer fail for the reason it exists (a
+   * future re-nudge of `accentText` would sail through it). Re-pointed below
+   * at what the role resolves to NOW, both the primitive NAME (so a future
+   * change that points `accentText` at a third primitive reds here) and its
+   * HEX (so a change to the primitive's own value reds here too) — the same
+   * two-level pin `themes.light.accentText`'s sibling assertions elsewhere in
+   * this file already use (e.g. 13.358's `brand`/`brandOrange` pair).
    */
   it('13.360 accentText on the new accent still clears 4.5 in both themes, unnudged', () => {
     expect(contrastRatio(colorOf('light', 'accentText'), colorOf('light', 'accent'))).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(colorOf('dark', 'accentText'), colorOf('dark', 'accent'))).toBeGreaterThanOrEqual(4.5);
-    expect(primitives.white).toBe('#ffffff');
-    expect(primitives.navy900).toBe('#101625');
+    expect(themes.light.accentText).toBe('onColorWarmLight');
+    expect(primitives.onColorWarmLight).toBe('#fbf7f3');
+    expect(themes.dark.accentText).toBe('onColorWarmDark');
+    expect(primitives.onColorWarmDark).toBe('#141a2e');
   });
 });
 
@@ -743,11 +833,14 @@ describe('brand — Round 2d (2026-09-09)', () => {
     const light = contrastRatio(colorOf('light', 'textInverted'), colorOf('light', 'brand'));
     const dark = contrastRatio(colorOf('dark', 'textInverted'), colorOf('dark', 'brand'));
     expect(light).toBeLessThan(3);
-    // Owner round 4 (2026-09-16): `textInverted` moved off pure `white`/`ink`
-    // to the prototype's `onColorWarmLight`/`onColorWarmDark`
-    // (`#fbf7f3`/`#141a2e`) — light's number moved with it (2.87 → 2.69, both
-    // still well below the 3:1 this pair is exempted from). Re-measured, not
-    // assumed.
+    // Owner round 4 (2026-09-16, coordinator review F7 fixed the wording
+    // below — "both" previously read as "both themes", which is false: dark
+    // is 6.017, nowhere near the 3:1 floor): `textInverted` moved off pure
+    // `white`/`ink` to the prototype's `onColorWarmLight`/`onColorWarmDark`
+    // (`#fbf7f3`/`#141a2e`) — light's number moved with it, 2.87 → 2.69,
+    // both of those (before and after) still well below the 3:1 this pair is
+    // exempted from. Dark is unaffected by this comment and clears 4.5 on its
+    // own assertion below. Re-measured, not assumed.
     expect(light).toBeCloseTo(2.69, 1);
     expect(dark).toBeGreaterThanOrEqual(4.5);
     // And no CONTRAST_PAIRS row was added to paper over it — the exemption is

@@ -956,16 +956,24 @@
   color: var(--gn-text-muted);
 }
 /* Depressed/pressed-in look (owner: "with a depressed UI") — the same
-   neumorphic pair `[data-style="neo"] .gn-field__input` and `[data-style=
-   "neo"] .gn-nav a[aria-current='page']` already wire in rather than
-   inventing a new shadow: swap the flat fill for `--gn-surface-sunken` and
-   let `--gn-shadow-sunken` do the work. `hig`/`minimal` render that token as
-   `none` (their `SHADOWS` entries are empty), so the badge stays the flat
-   chip above under those styles without needing its own guard beyond this
-   selector already being scoped to `neo`. */
+   neumorphic idiom `[data-style="neo"] .gn-field__input` and `[data-style=
+   "neo"] .gn-nav a[aria-current='page']` already wire in: swap the flat fill
+   for `--gn-surface-sunken` and let a sunken shadow do the work. `hig`/
+   `minimal` render `--gn-shadow-sunken-compact` as `none` (their `SHADOWS`
+   entries are empty), so the badge stays the flat chip above under those
+   styles without needing its own guard beyond this selector already being
+   scoped to `neo`.
+
+   Owner round 3 correction (2026-09-16, "the shadows of the sunken badges…
+   too much shadow for a small badge"): this WAS `--gn-shadow-sunken`, the
+   same 4px/4px/9px treatment `.gn-field__input`/`.ticket-type-list__row`
+   use — too heavy for an 0.75rem-text, 0.1rem/0.5rem-pad badge. This is
+   literally the `.gn-chip` fix (`ui.css:133-150`) applied to the second
+   element the owner's plural "badges" named; see `tokens.ts`'s
+   `sunken-compact` docblock for the primitive-reuse accounting. */
 [data-style="neo"] .ticket-type-list__badge {
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact);
 }
 .ticket-type-list__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
 .ticket-type-list__rank,

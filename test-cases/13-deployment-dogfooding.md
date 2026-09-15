@@ -2215,7 +2215,9 @@ nobody ships and then defend it.
 ## Task 14 of the neomorphism amendment (2026-09-09) — the style axis, the toggle, and the shared pieces
 
 Block `13.337`–`13.347`. `packages/ui/src/tokens.ts` gains a `StyleName` axis (`hig`|`minimal`|`neo`)
-beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay`);
+beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay` —
+**a fourth shadow role, `sunken-compact`, joined 2026-09-16; see block `13.411` below rather than treating
+this historical sentence as the current roster**);
 `StyleToggle` (`apps/web/src/style-toggle.tsx`) ships beside `ThemeToggle`, neo default. That half
 committed separately (`8e6c6d31`); this section is the CSS restyle of the nine shared class families
 (`.gn-segmented*`, `.gn-field*`, `.gn-button*`, `.gn-refusal*`, `.gn-page-header*`, `.gn-card`,
@@ -2400,7 +2402,15 @@ uncased composite-contrast blocks in `packages/ui/test/tokens.test.ts`, the `pro
 tests, the summary-line refusal/empty-read cases, the rendered project-line truncation case, and three
 whole new test files (`workspace-restricted-spacing.test.ts`, `workspace-list-role-pin.test.ts`, and the
 Task 8 fix-round-1 block in `workspaces-invitation-banner.test.tsx`) — see each entry below for the exact
-mapping. **The next free BLOCK is `13.411`.**
+mapping.
+
+**CORRECTED 2026-09-16 — recounted before minting, per this paragraph's own ritual.** A coordinator
+review of the `sunken-compact` shadow-role fix (owner round 3) stated the next free id as `13.412`; a
+repo-wide grep for every `13.4\d\d` occurrence at this branch's HEAD found the true maximum IN USE was
+still `13.410` (the `13.411` hit was this pointer's own prose, reproducing the exact trap this file's
+"CORRECTED 2026-09-15" paragraph above already documented once). **`13.411` is minted below** for the
+`sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **The next free BLOCK is
+now `13.412`.**
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -3592,3 +3602,45 @@ Task 4, Task 7 ×3, Task 8). Block `13.403`–`13.410`, minted per the corrected
   against the real source (planting `box-shadow` back into the rule reddens exactly the box-shadow case;
   removing `aria-hidden` from the JSX reddens exactly the render-level case), each reverted immediately
   after capture. — (`apps/web/test/workspaces-invitation-banner.test.tsx`)
+
+## Owner round 3 fix round 1 (2026-09-16) — the fourth shadow role, `sunken-compact`
+
+Block `13.411`, minted per this file's own recount ritual (see the "CORRECTED 2026-09-16" note above
+`13.400`'s block) — the true maximum id in use at HEAD was `13.410`, not `13.411` as a coordinator review
+first stated.
+
+- **13.411** ✅ **A fourth `ShadowRole`, `sunken-compact`, and every place it had to reach** — owner round
+  3: "check the prototype for the shadows of the sunken badges. looks like too much shadow for a small
+  badge." `[data-style="neo"] .gn-chip` and `[data-style="neo"] .ticket-type-list__badge` were both carved
+  with `--gn-shadow-sunken` (`inset 4px 4px 9px`, the SAME treatment `.gn-field__input`/
+  `.ticket-type-list__row` correctly use) where the prototype's own `--chipShadow`
+  (`design-system/interactive/desktop.dc.html:59` light, `:71` dark) defines a smaller `inset 2px 2px 4px`
+  step reserved for badge/chip-scale elements; `--fieldShadow`/`--trayShadow` (`:61`/`:62`) stay the 4px/9px
+  step. Three of the four prototype layer colours are byte-identical to existing primitives
+  (`shadowNeoRaisedDarkLight`, `shadowNeoHighlightLight`, `shadowNeoSunkenHighlightDark` — verified by
+  converting each `rgba()` to this file's 8-digit-hex convention and diffing, not assumed); the dark
+  theme's first layer needed one new primitive, `shadowNeoSunkenCompactDarkDark` (`rgba(0,0,0,0.55)` →
+  `#0000008c`, distinct from `sunken`'s own `rgba(0,0,0,0.6)`). `hig`/`minimal` are `[]` for the new role in
+  both themes, matching the prototype's `--chipShadow:none`. Pinned assertions: `shadowValueOf`'s exact
+  return string for `neo`/light and `neo`/dark (not merely that it contains `inset` or differs from
+  `sunken` — a same-shape-wrong-colour regression would survive a looser check); `hig`'s value is `'none'`.
+  A SEPARATE case (this same block) closes the emission gap the coordinator review's F5 named:
+  `SHADOW_ROLES` (`tokens.ts`, the array `themeStylesheet()` actually emits from) and this file's own
+  `SHADOW_ROLE_NAMES` used to be two hand-maintained, unlinked arrays — a role dropped from the emission
+  array alone would leave every prior case green while the var vanished from the browser. `SHADOW_ROLES` is
+  now exported and `SHADOW_ROLE_NAMES` re-exports it directly (cannot diverge at the source), AND a new
+  case asserts, against a deliberately-hardcoded literal role list (NOT derived from either array, so it
+  cannot silently shrink with a regression), that every declared shadow role's exact declaration string
+  reaches `themeStylesheet()`'s output for every style×theme. Mutation performed and reverted live, not
+  merely claimed: temporarily dropping `'sunken-compact'` from `SHADOW_ROLES` reddened this case
+  (`AssertionError: hig/light/sunken-compact — expected declaration "--gn-shadow-sunken-compact: none;" in
+  themeStylesheet()'s output`), confirming it actually catches the regression it exists for. Every other
+  remaining `--gn-shadow-sunken` call site in `ui.css` (`.fields-editor__row`, `.ticket-type-list__row`,
+  `.gn-help__search-input`, `.gn-help__results`, `.gn-help__none`, `.gn-help__toggle:hover`,
+  `.gn-help__quote`, `.gn-field__input`) was individually reviewed and confirmed field/tray-scale, correctly
+  left on `sunken` — enumerated one by one, not summarised as a group, since a group summary
+  ("fields, trays, rows") is what let `.ticket-type-list__badge` go unnoticed in the first pass.
+  `[data-style="neo"] .gn-segmented__item--on` (`ui.css:2474`) is flagged as needing its OWN, third
+  geometry (the prototype's `--segOnShadow`, `inset 3px 3px 6px`) rather than either existing step, and is
+  deliberately left untouched — a separate scope decision for the owner, out of this block. —
+  (`packages/ui/test/tokens.test.ts`)
