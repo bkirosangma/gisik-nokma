@@ -19,6 +19,15 @@
   font: inherit;
   border-radius: var(--gn-radius-control);
   padding: 0 1.125rem;
+  /* OPEN DECISION (whole-branch review, Important 4): the prototype's `.btn`
+     also carries the raised neumorphic `--ctlShadow` under `neo`
+     (`desktop.dc.html:62`, `:214-215`, `:227`). The spec named it for this
+     rule; the plan dropped it with no recorded reason, and this fix wave
+     deliberately does NOT add it — applying a raised control shadow to every
+     button in the product and in `apps/desktop` is a product-wide visual
+     decision for the repo owner to make, not something a fix wave should
+     decide on the review's behalf. Either implement it or record the
+     refusal; nothing has done either yet. */
   /* R1(c): no boundary. The affordance is fill + an accent-coloured semibold
      label — three signals replacing one hairline, and it is what the design
      specifies (`.btn { border:none; background: fill3; color: accent;
@@ -76,8 +85,8 @@
    every chip on every card invisible under hig — a real defect, found while
    porting the workspace card. `fill-tertiary` fixes hig (and is minimal's
    base too, overridden to `transparent` below). Metrics follow the
-   prototype (`desktop.dc.html:203`): 13px/18px, 9px dot, and hig's 4px/10px
-   pad.
+   prototype (`desktop.dc.html:362` for 13px/18px and the 9px dot; `:24` for
+   hig's 4px/10px pad).
 
    Fix round 1 (task-3-report.md, findings 1-2): the brief ported only the
    PROTOTYPE'S PADDING per style and missed that `--chipBg` is ALSO
@@ -165,16 +174,31 @@
    declared after it. */
 .gn-avatar--large { width: 3.5rem; height: 3.5rem; font-size: 1.4rem; border-radius: 0.875rem; }
 /* The workspace card's monogram: 44px, rounded square, per the prototype
-   (`desktop.dc.html:190`). `--large` (3.5rem, 0.875rem radius) is the
+   (`desktop.dc.html:2547`). `--large` (3.5rem, 0.875rem radius) is the
    precedent that a non-circular avatar already belongs in this set, so this
    adds a size rather than an exception. The prototype's per-workspace brand
    hexes are deliberately NOT adopted — a monogram is read text and owes
-   4.5:1, which is what the four contrast-paired tints guarantee. */
+   4.5:1, which is what the four contrast-paired tints guarantee.
+
+   `flex: none` is in the prototype's own `avatarStyle` string
+   (`desktop.dc.html:2547`) and was dropped in the port (whole-branch review,
+   Important 3). Without it: this element is a flex item of
+   `.gn-workspace-card__head` (`flex-wrap: nowrap`, `apps/web/app/globals.css`),
+   and a flex item with a definite `width` gets an automatic minimum size of
+   `min(width, content min-width)` — here `min(44px, ~22px of two glyphs at
+   17px)`. `.gn-workspace-card__titles` beside it declares `min-width: 0`
+   specifically so it can shrink first, but the titles column's BASE size is
+   still the name's max-content width, so a long enough name pulls space from
+   every flex sibling in proportion to base size — including this one — and
+   the 44px rounded square compresses toward ~22px wide while staying 44px
+   tall: a rectangle where the prototype draws a square. `flex: none` removes
+   this element from that negotiation entirely, matching the prototype. */
 .gn-avatar--workspace {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.6875rem;
   font-size: 1.0625rem;
+  flex: none;
 }
 /* The four tints. Each is a fill/text PAIR `CONTRAST_PAIRS` already holds to
    4.5:1 in every theme and style, because a monogram is read text and not a
@@ -2466,7 +2490,7 @@
   color: var(--gn-text-muted);
 }
 /* Metrics (padding, font-size) follow the prototype
-   (`desktop.dc.html:227-228`), same task-3 port as `.gn-chip`/`.gn-button`
+   (`desktop.dc.html:223`/`:225`), same task-3 port as `.gn-chip`/`.gn-button`
    above. `border: 1px solid var(--gn-border)` is DELIBERATELY UNCHANGED,
    despite the port brief calling for `border: none` here: 13.291/13.339
    (components.test.tsx) pin the base rule keeping its border — an

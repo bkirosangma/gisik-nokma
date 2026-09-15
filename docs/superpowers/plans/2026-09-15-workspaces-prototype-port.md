@@ -447,7 +447,7 @@ Beside the other `.gn-avatar--*` rules:
 
 ```css
 /* The workspace card's monogram: 44px, rounded square, per the prototype
-   (`desktop.dc.html:190`). `--large` (3.5rem, 0.875rem radius) is the
+   (`desktop.dc.html:2547`). `--large` (3.5rem, 0.875rem radius) is the
    precedent that a non-circular avatar already belongs in this set, so this
    adds a size rather than an exception. The prototype's per-workspace brand
    hexes are deliberately NOT adopted — a monogram is read text and owes
@@ -469,7 +469,8 @@ Replace the `.gn-chip` and `.gn-chip__dot` rules at `ui.css:75-89`:
    role as the card it sits on, which made every chip on every card
    invisible — a real defect, found while porting the workspace card, and
    fixed here rather than overridden per page. Metrics follow the prototype
-   (`desktop.dc.html:203`): 13px/18px, 9px dot, and hig's 4px/10px pad. */
+   (`desktop.dc.html:362` for 13px/18px and the 9px dot; `:24` for hig's
+   4px/10px pad). */
 .gn-chip {
   display: inline-flex;
   align-items: center;
@@ -525,7 +526,7 @@ The tone modifiers at `ui.css:91-97` are left exactly as they are — they colou
 }
 
 /* The field's own column spacing and label size, also from the prototype
-   (`desktop.dc.html:227-228`). These live HERE, in the shared stylesheet,
+   (`desktop.dc.html:223`/`:225`). These live HERE, in the shared stylesheet,
    because `.gn-field` and `.gn-field__label` are declared here at :2408-2416
    — never in a page stylesheet, where a duplicate would win by load order
    and silently diverge from the shared rule. */
@@ -616,7 +617,7 @@ Expected: FAIL on the second case — no summary element exists yet. The first c
 In `apps/web/app/globals.css`:
 
 ```css
-/* The prototype caps this screen at 1180px (`desktop.dc.html:177`), not at
+/* The prototype caps this screen at 1180px (`desktop.dc.html:178`), not at
    `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
    workspace home uses 1100px — so it lives here rather than widening or
    narrowing every route that shares the shell. `.gn-workspace-founding`
@@ -719,7 +720,7 @@ git commit -m "The page title had no font-size, and the summary must not count a
 /* `auto-fit`, not `auto-fill`: `auto-fill` keeps empty tracks, so three
    workspaces render at their 280px minimum with dead space to the right of
    them. `auto-fit` collapses the empty tracks and lets the real cards
-   stretch. Prototype: `desktop.dc.html:185`. */
+   stretch. Prototype: `desktop.dc.html:184`. */
 .gn-workspace-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));

@@ -2900,7 +2900,7 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   asserted; that would pin the hash rather than the property. Positive control: both avatars carry a tint
   class at all, so the inequality cannot pass on two undefineds.
   — (`apps/web/test/workspaces-cards.test.tsx`)
-- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number anywhere. The point of the case is
+- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project · name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
   the absence, not the presence: a card printing the chip AND a zero passes *"'Restricted' is present"*
   and fails this. `0` is a claim — *"no work you can see"* — and it is exactly the claim the server
   declined to make by omitting the key (`13.366` on the route side). The numbers are queried away
@@ -3155,7 +3155,13 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   workspace, no project" arm alone, because it is the one shape whose expected set has no Board entry
   while a workspace is present. The workspace-name item OMITS while its read is pending or fails — never
   the raw id — because `getMyWorkspaces` is one of this product's refusing reads and a name that might be
-  wrong is worse than a name not yet shown. —
+  wrong is worse than a name not yet shown. **KNOWN FAILURE (whole-branch review, deferred item 11,
+  recorded 2026-09-16): this case is currently RED at `app-nav.test.tsx:238` (the "no workspace selected"
+  scope-note assertion). It predates the workspaces-prototype-port branch — the last commit to touch nav
+  behaviour is the owner's own `d904efab` — and is deliberately NOT fixed here: repointing a nav
+  scope-note assertion is scope creep inside a `/workspaces` styling fix wave, and the spec already pushed
+  this to a separate pass. Recorded so the ✅ above is not read as "passing" — it means "covered," and one
+  uniformly-ignored red is how a whole gate becomes background noise.** —
   (`app-nav.test.tsx`)
 - **13.392** ✅ Every literal nav target is checked against the app directory itself, not only against
   what the component renders: a table of `[href, page.tsx path]` pairs (nine, after Round 19c swapped

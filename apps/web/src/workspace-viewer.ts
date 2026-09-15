@@ -134,8 +134,9 @@ export function projectCountLine(liveCount: number): string | null {
  *
  * A COUNT, deliberately, and not a CSS line-clamp. A clamp truncates whatever
  * overflows — including the "+N more" suffix itself, which would hide the very
- * number the suffix exists to give. Three names is what the prototype's
- * ~280px card fits on two lines at 15px.
+ * number the suffix exists to give. Three names is CHOSEN as what should fit
+ * the prototype's ~280px card on two lines at 15px — not measured against a
+ * render.
  */
 export const PROJECT_LINE_CAP = 3;
 
@@ -151,7 +152,11 @@ export const PROJECT_LINE_CAP = 3;
  * ## The suffix has two forms, and the reason is a test's name
  *
  * `test/workspaces-cards.test.tsx`'s 13.380 is *"a guest card shows one
- * 'Restricted' chip and **no number anywhere**"*. A guest still sees the
+ * 'Restricted' chip and **no number outside the owner-ruled restricted
+ * sentence**"* (retitled, whole-branch review Minor 2 — the card's own "1
+ * project · name restricted" is a number, so the original "no number
+ * anywhere" title was false; the test strips that exact sentence before its
+ * digit scan). A guest still sees the
  * project names — their set is exactly the errands handed to them by name —
  * so the line renders; but "+1 more" is a number, so a withheld viewer gets
  * "and more" instead. Both forms read `countsWithheld`, which the caller took

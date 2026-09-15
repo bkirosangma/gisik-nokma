@@ -104,10 +104,11 @@ input, textarea, select { font-family: inherit; }
   .gn-shell { padding: 0 0.75rem 2rem; }
 }
 /* The font-size change below is GLOBAL and meant to be: this rule declared no
-   font-size at all and fell through to the UA's `2em` on all thirteen pages
-   that use it (`/account`, `/inbox`, `/settings`, `/invite/[token]`,
-   `/mcp/authorize`, `/workspaces`, and every `/w/*` screen), and 34px is the
-   prototype's page-title size across screens. The existing `margin` stays
+   font-size at all and fell through to the UA's `2em` on every page that uses
+   it (`/account`, `/inbox`, `/settings`, `/invite/[token]`, `/mcp/authorize`,
+   `/mcp/tokens`, `/workspaces`, and every `/w/*` screen that owns one), and
+   34px is the prototype's page-title size across screens. The existing
+   `margin` stays
    exactly as it was — see `.gn-workspaces__head .gn-page-title` below for the
    one page that resets it, scoped rather than here.
 
@@ -148,7 +149,7 @@ input, textarea, select { font-family: inherit; }
 /* `auto-fit`, not `auto-fill`: `auto-fill` keeps empty tracks, so three
    workspaces render at their 280px minimum with dead space to the right of
    them. `auto-fit` collapses the empty tracks and lets the real cards
-   stretch. Prototype: `desktop.dc.html:185`. */
+   stretch. Prototype: `desktop.dc.html:184`. */
 .gn-workspace-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));
@@ -158,7 +159,7 @@ input, textarea, select { font-family: inherit; }
   list-style: none;
 }
 
-/* The prototype caps this screen at 1180px (`desktop.dc.html:177`), not at
+/* The prototype caps this screen at 1180px (`desktop.dc.html:178`), not at
    `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
    workspace home uses 1100px — so it lives here rather than widening or
    narrowing every route that shares the shell. `.gn-workspace-founding`
@@ -189,10 +190,12 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
-/* The margin reset is SCOPED, because `.gn-page-title` is shared by thirteen
-   pages (`/account`, `/inbox`, `/settings`, `/invite/[token]`, every `/w/*`
-   screen…) and zeroing it globally would collapse the heading spacing on all
-   of them. Only this page hands its spacing to a flex column. */
+/* The margin reset is SCOPED, because `.gn-page-title` is shared by every
+   page that carries the class (`/account`, `/inbox`, `/settings`,
+   `/invite/[token]`, `/mcp/authorize`, `/mcp/tokens`, every `/w/*` screen
+   that owns one…) and zeroing it globally would collapse the heading
+   spacing on all of them. Only this page hands its spacing to a flex
+   column. */
 .gn-workspaces__head .gn-page-title {
   margin: 0;
 }
@@ -222,7 +225,7 @@ input, textarea, select { font-family: inherit; }
    settle. These two surfaces now simply render `.gn-card`'s own radius, at
    whatever the active style says: 16px (hig/minimal) or 20px (neo). */
 /* Task 6 resized this for the card head's role SENTENCE, now living below the
-   chips at the prototype's 15px/20px meta type (`desktop.dc.html:205`). The
+   chips at the prototype's 15px/20px meta type (`desktop.dc.html:199`). The
    class is shared by two callers this task does not otherwise touch:
    `/settings` (`app/settings/page.tsx:148`, the workspace-name line under the
    page title — its 0.15rem top offset is gone, so the gap above it is now
@@ -271,8 +274,28 @@ input, textarea, select { font-family: inherit; }
    around it: the pin now applies because the element carries the class, full
    stop, with no structural precondition to silently stop matching. Consistent
    with ROUTED 2's `.gn-workspace-home__restricted`, which took the same
-   dedicated-class approach from the start. */
-.gn-workspace-list__role--pinned { font-size: 0.8rem; line-height: inherit; }
+   dedicated-class approach from the start.
+
+   Whole-branch review, Minor 6: this pin restored `font-size`/`line-height`
+   but not `margin` — the shared rule above went `margin: 0.15rem 0 0` (its
+   pre-Task-6 value) to `margin: 0`. Restored here for byte-parity with the
+   pre-Task-6 rule, but MEASURED rather than assumed to matter: at
+   `/settings` (`app/settings/page.tsx`), the `<h1 className="gn-page-title">`
+   and this subtitle are adjacent BLOCK siblings inside `.gn-shell` — not a
+   flex container — so their margins COLLAPSE to the larger of the two.
+   `.gn-page-title`'s own `0.4rem` bottom margin already exceeds this rule's
+   `0.15rem`, on either side of this fix, so the visible gap is 0.4rem
+   (measured: 6.4px) whether this rule's `margin-top` is `0` or `0.15rem` —
+   this is what the pre-existing comment above already meant by "the gap
+   above it is now `.gn-page-title`'s own 0.4rem bottom margin alone". The
+   workspace-home header's meta line is the opposite case, and IS visibly
+   affected: its parent, `.gn-workspace-home__header-titles`, is a FLEX
+   column with its own `0.15rem` `gap`, and flex layout does not collapse a
+   child's margin into that gap — restoring this rule's margin there would
+   ADD to the flex gap (measured: 4.8px) rather than match the pre-Task-6
+   spacing, so it is zeroed specifically at that call site below (measured
+   with the override: 2.4px, the correct pre-Task-6-equivalent total). */
+.gn-workspace-list__role--pinned { margin: 0.15rem 0 0; font-size: 0.8rem; line-height: inherit; }
 
 /* ── Task 18: the workspace card. ───────────────────────────────────────────
    Every colour is a token role. The card's own surface, radius and shadow are
@@ -379,7 +402,7 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
 }
 /* Task 7 — the prototype's single joined project line
-   (`desktop.dc.html:206`), replacing the per-project `<ul>`/`ProjectRow`
+   (`desktop.dc.html:200`), replacing the per-project `<ul>`/`ProjectRow`
    rows this block used to style (`.gn-workspace-card__project`,
    `__project-count` — both deleted with `ProjectRow`, nothing else in the
    app renders them). `margin: 0` resets `<p>`'s UA-default `margin-block:
@@ -406,7 +429,7 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-card__projects svg { flex: none; color: var(--gn-text-subtle); }
 /* Same `margin: 0` reasoning as `__projects` above (`<p>`'s UA default is
    `margin-block: 1em`). This class is ALSO rendered at `/w/[workspaceId]`
-   (`app/w/[workspaceId]/page.tsx:666`), outside any flex-gap door — Task 6
+   (`app/w/[workspaceId]/page.tsx:673`), outside any flex-gap door — Task 6
    flagged that call site loses its former 0.55rem top offset with the shared
    `margin: 0` and left it for "whichever of Task 6/7 next touches
    `__restricted`". ROUTED 2 (Task 7 review) is that fix: see
@@ -839,6 +862,15 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-workspace-home__header-titles { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
 .gn-workspace-home__header-titles .gn-page-title { margin: 0; }
+/* `.gn-workspace-list__role--pinned`'s own `margin: 0.15rem 0 0` (restored,
+   whole-branch review Minor 6) must NOT apply here: this column's flex
+   `gap: 0.15rem` above already supplies the identical offset between the
+   title and this subtitle, and flex layout does not collapse a child's own
+   margin into the container's `gap` — unlike `/settings` (see that rule's
+   own comment), where the two ARE adjacent block siblings and DO collapse.
+   Letting both stack here would double the gap to 0.3rem (measured: 4.8px)
+   instead of matching the pre-Task-6 2.4px — zeroed rather than restored. */
+.gn-workspace-home__header-titles .gn-workspace-list__role--pinned { margin-top: 0; }
 .gn-workspace-home__header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 0.6rem 0 1.1rem; }
 .gn-workspace-home__link {
@@ -1014,11 +1046,31 @@ input, textarea, select { font-family: inherit; }
 .gn-invitations__list { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
 .gn-invitations__item { display: flex; flex-direction: column; gap: 0.35rem; }
 
-.gn-invitations__offer,
-.gn-invitations__when {
+/* `.gn-invitations__offer` is the prototype's one real body line
+   (`desktop.dc.html:212`, `--label2` at 15px/20px) — unchanged here. */
+.gn-invitations__offer {
   margin: 0;
   font-size: 0.9375rem;
   line-height: 1.25rem;
+  color: var(--gn-text-muted);
+}
+/* `.gn-invitations__when` (the "Invited … · lapses …" line) has NO prototype
+   counterpart — the reference banner has exactly one body line — so Task 8
+   merged it into `.gn-invitations__offer`'s own rule, which lost its
+   pre-existing subordinate rank: it used to be `font-size: 0.8rem` against
+   `__offer`'s unstyled (larger, non-muted) default, and the merge left both
+   lines identical (whole-branch review, Minor 5). Restored as its own rule,
+   smaller than `__offer` and still muted, at the size this same branch
+   already uses for secondary/meta text beside a primary line — 13px/18px,
+   the workspace card's own member/project meta line — rather than inventing
+   a number with nothing in the design system behind it. `0.8125rem` (13px)
+   also lands within 0.2px of the pre-Task-8 `0.8rem` (12.8px) this rule
+   carried, so this reads as a restoration to the branch's own established
+   scale rather than a new number picked to look plausible. */
+.gn-invitations__when {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
   color: var(--gn-text-muted);
 }
 

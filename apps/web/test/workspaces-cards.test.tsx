@@ -364,7 +364,7 @@ describe('13.379 the card renders every element from data the route served', () 
   });
 });
 
-describe('13.380 a guest card shows one "Restricted" chip and no number anywhere', () => {
+describe('13.380 a guest card shows one "Restricted" chip and no number outside the owner-ruled restricted sentence', () => {
   it('prints no count, and prints "Restricted" instead — while still naming the project and its restricted total', async () => {
     mountWith([
       workspace({

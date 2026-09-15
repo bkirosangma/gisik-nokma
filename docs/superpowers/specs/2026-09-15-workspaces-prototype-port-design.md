@@ -95,7 +95,7 @@ workspace home uses 1100px), and `.gn-shell` serves every route.
 `.gn-workspace-founding` already existing separately from `.gn-project-founding`
 is the precedent that page-local is an accepted answer here.
 
-**Header** (`desktop.dc.html:180-183`)
+**Header** (`desktop.dc.html:179-182`)
 | Element | Prototype | Built | Target |
 |---|---|---|---|
 | `h1` | 34px / 41px / 700 / -0.4px | **no font-size declared** (UA `2em`) | `2.125rem` / `2.5625rem` / `-0.025em` |
@@ -106,7 +106,7 @@ The summary `<p>` renders **only when `workspaces !== null`**. On a failed read
 it would otherwise print "0 workspaces you belong to." — a number nobody
 counted, which this codebase refuses everywhere else.
 
-**Grid** (`desktop.dc.html:185`)
+**Grid** (`desktop.dc.html:184`)
 | Property | Prototype | Built | Target |
 |---|---|---|---|
 | tracks | `repeat(auto-fit, minmax(280px, 1fr))` | `repeat(auto-fill, minmax(18rem, 1fr))` | `repeat(auto-fit, minmax(17.5rem, 1fr))` |
@@ -117,7 +117,7 @@ counted, which this codebase refuses everywhere else.
 space to the right; `auto-fit` stretches them to fill the row. One word, visible
 effect.
 
-**Card** (`desktop.dc.html:187`)
+**Card** (`desktop.dc.html:186`)
 | Property | Prototype | Built | Target |
 |---|---|---|---|
 | padding | 20px | `.gn-card` 0.75rem | `1.25rem` |
@@ -139,7 +139,7 @@ Converting to a flex column removes three per-child margin rules
    not return, so the padding routes through the door or a `Card` modifier —
    never that selector.
 
-**Card head** (`desktop.dc.html:188-194`)
+**Card head** (`desktop.dc.html:187-193`)
 | Element | Prototype | Built | Target |
 |---|---|---|---|
 | head | gap 14px, `align-items: center`, `nowrap` | gap 0.6rem, `flex-start` | `0.875rem`, `center`, `nowrap` |
@@ -148,7 +148,7 @@ Converting to a flex column removes three per-child margin rules
 | name | 20px / 25px / 600 | 1.05rem | `1.25rem` / `1.5625rem` / 600 |
 | meta | 13px / 18px, `--label2` | — | `0.8125rem` / `1.125rem`, muted |
 
-**Card body** (`desktop.dc.html:202-207`)
+**Card body** (`desktop.dc.html:194-202`)
 | Element | Prototype | Built | Target |
 |---|---|---|---|
 | chips row | gap 8px, wrap | gap 0.35rem | `0.5rem`, wrap |
@@ -176,7 +176,7 @@ Behaviour is untouched: `aria-labelledby`, the `null` render on an empty list,
 the `"Accept the invitation to {workspace}"` labels, and the deliberately muted
 one-line failure that is **not** a `ShellRefusal`.
 
-**Founding form** (`desktop.dc.html:226-229`)
+**Founding form** (`desktop.dc.html:221-228`)
 | Property | Prototype | Built | Target |
 |---|---|---|---|
 | margin-top | 34px | 1.1rem | `2.125rem` |
