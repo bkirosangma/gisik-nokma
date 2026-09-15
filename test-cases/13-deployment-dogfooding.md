@@ -3216,7 +3216,63 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   assumed `listSessions()` answers `createdAt`/`updatedAt` as strings; the installed
   `better-auth@1.7.2` client types them `Date` (its fetch client revives ISO strings back into `Date`
   instances on the way in), so the adapter converts explicitly rather than passing either straight
-  through as a `string`. **Not yet ID-allocated**: this file's own header requires the next free block
+  through as a `string`. **Task 8 adds nine more cases to this same pending block**, the Passkeys half
+  of the same Sign-in and devices section plus the `/sign-in` entry point it makes honest:
+  (a) `PasskeysSection` shows the named empty state ("You have no passkeys yet.") with nothing
+  registered, and no `role="alert"` at all when there is no refusal — the negative half, without which
+  the refusal case is satisfied by a component that renders an empty alert unconditionally;
+  (b) each listed credential carries a delete control whose ACCESSIBLE name is its own
+  (`Delete passkey {name}`), driven with TWO rows and the SECOND clicked, because a single-row fixture
+  passes against a component wired to `passkeys[0]`;
+  (c) adding submits the typed name and then CLEARS the field, so a second click cannot silently
+  re-submit the first name;
+  (d) at the page level, the empty state → add → the row appearing comes from a RE-READ that answers
+  differently the second time (`listUserPasskeys` called twice), which is what distinguishes the
+  server confirming the credential from the page appending the name it was given;
+  (e) deleting calls `authClient.passkey.deletePasskey({ id })` with the clicked row's own id and
+  re-reads, the row leaving and its sibling staying;
+  (f) a refused add renders better-auth's message verbatim in a `role="alert"` AND does not re-read
+  (the call count discriminates the refusal branch from the success branch), and a refusal carrying NO
+  message still surfaces rather than reading as success — `error?.message ?? null` would collapse a
+  message-less refusal to "no error", and a silent no-op after a WebAuthn ceremony is
+  indistinguishable from the passkey having been saved;
+  (g) an ANONYMOUS `/account` load makes NO passkey request at all — the rate-limit gate, since
+  `GET /passkey/list-user-passkeys` is charged to the shared `auth:` bucket and sits behind session
+  middleware (measured as a real 401 in `apps/server/test/auth/sign-in-flows.test.ts`, not asserted in
+  prose), so an anonymous read would spend everyone's sign-in budget on a request that cannot succeed.
+  **Mutation-checked:** deleting the `user !== null` guard reddens this case and only this case;
+  (h) the SERVER half of both paths, from the other side of a seam neither web suite can cross:
+  `GET /api/auth/passkey/list-user-passkeys` answers `200 []` for a signed-in caller and `401` for an
+  anonymous one, and `POST /api/auth/passkey/delete-passkey` reaches better-auth's handler —
+  **asserted by BODY (`code: 'PASSKEY_NOT_FOUND'`), not by status, and the first version of that
+  assertion was WRONG and went red: `not.toBe(404)` cannot work, because 404 is ALSO better-auth's own
+  answer for an id the caller does not own, so a missing route and a working handler are identical in
+  status and opposite in meaning** (the same discipline 13.273 uses to tell two limiters apart);
+  (i) `/sign-in`'s restored "Sign in with a passkey" button — present under every social answer
+  including the dev stack's neither-provider one (it needs no provider, so it is NOT gated on
+  `GET /v1/auth/methods`, and it lives outside `.gn-sign-in__marks`), never called on mount, and called
+  exactly once with `{ autoFill: false }` on click. The argument is asserted rather than the call,
+  because `{ autoFill: true }` would satisfy "was called" while being precisely the
+  conditional-mediation request that must not ship.
+  The SERVER-side companion to (i) lives in this file's own "One limiter on `/api/auth/*`" family
+  rather than here: ten `GET /api/auth/passkey/generate-authenticate-options` probes exhaust
+  production's real `RATE_LIMIT_AUTH_MAX` of 10 and the eleventh genuine `POST /sign-in/magic-link` is
+  refused **by our limiter, identified by body**, against a zero-probe control through the identical
+  pipeline that must NOT be refused; a third case pins that the probe charges the general `auth:`
+  bucket and never the tighter `signin:` one (`/passkey/*` is absent from `SIGN_IN_PREFIXES`), and a
+  fourth that one deliberate click costs one unit and leaves the magic link available.
+  **Both directions mutation-checked:** adding `/passkey` to `SIGN_IN_PREFIXES` reddens the bucket
+  case alone; pointing the probe at a non-auth path reddens the exhaustion case alone.
+  **NOT WITNESSED END TO END, and named rather than left to be discovered:**
+  `apps/web/e2e-stack/passkey-registration.spec.ts` (register a credential over a CDP virtual
+  authenticator on `/account`, sign out, then sign in with it on `/sign-in`, no magic link in the
+  second half) is written and typechecked — `tsconfig.e2e.json` includes `e2e-stack/**`, so it cannot
+  rot silently — but was **never executed**: the stack port was held by a developer's own `next dev`,
+  and `playwright.stack.config.ts` refuses (correctly) to adopt a stray server. Its first green is owed
+  to CI's `gate` job. So the WebAuthn ceremony itself, and the runtime URL better-auth's generated
+  client builds for `listUserPasskeys`/`deletePasskey`, are the two things no test in this change set
+  observes; the member NAMES are settled by `typecheck` (with a negative control) and the PATHS by (h).
+  **Not yet ID-allocated**: this file's own header requires the next free block
   (after 13.399) to be requested from the controller before minting, and this task has no channel to
   request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block
   already carries for its three cases (`/help` and `/account` mounting `AppNav`), unresolved before
@@ -3226,4 +3282,10 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`,
   `apps/web/src/account/workspaces-section.tsx`, `apps/web/src/account/account-clients.ts`,
   `packages/app-core/src/account/sessions-section.tsx`,
-  `packages/app-core/test/account/sessions-section.test.tsx`)
+  `packages/app-core/test/account/sessions-section.test.tsx`,
+  `packages/app-core/src/account/passkeys-section.tsx`,
+  `packages/app-core/test/account/passkeys-section.test.tsx`,
+  `apps/web/test/sign-in.test.tsx`, `apps/web/app/sign-in/page.tsx`,
+  `apps/server/test/auth/sign-in-flows.test.ts`,
+  `apps/server/test/http/security-middleware.test.ts`,
+  `apps/web/e2e-stack/passkey-registration.spec.ts`)

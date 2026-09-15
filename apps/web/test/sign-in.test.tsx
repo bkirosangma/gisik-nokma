@@ -223,8 +223,15 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
       await screen.findByRole('button', { name: onName });
       // Same settled DOM, and the whole property: the gate DISCRIMINATES.
       expect(screen.queryByRole('button', { name: offName })).toBeNull();
-      // The old dead control is gone rather than hidden, in every answer.
-      expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull();
+      // UPDATED, Task 8: this line used to assert the passkey button was
+      // ABSENT. It is back — registration now exists on `/account`, so the
+      // offer has a population it can serve. What the line is FOR here is
+      // unchanged and is why it was not simply deleted: the passkey button
+      // must NOT be gated on the social answer, because a passkey needs no
+      // provider. It is present under BOTH asymmetric answers.
+      expect(
+        screen.getByRole('button', { name: 'Sign in with a passkey' }),
+      ).toBeInTheDocument();
     },
   );
 
@@ -258,7 +265,12 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
 
     expect(screen.queryByRole('button', { name: 'Continue with Google' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Continue with Apple' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Sign in with a passkey' })).toBeNull();
+    // UPDATED, Task 8, and this is the sharpest place the change is visible:
+    // the dev stack's real answer offers NEITHER provider, and the passkey
+    // button is still here. It lives in its own `.gn-sign-in__alternatives`
+    // block rather than inside the social row, which is what keeps the
+    // `.gn-sign-in__marks` assertion below true and meaningful.
+    expect(screen.getByRole('button', { name: 'Sign in with a passkey' })).toBeInTheDocument();
     expect(container.querySelector('.gn-sign-in__marks')).toBeNull();
   });
 
@@ -289,52 +301,59 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   });
 
   /**
-   * 13.326 — passkey is offered through WebAuthn conditional mediation, not a
-   * button. `autoFill: true` is the whole point: it asks the browser to surface a
-   * REGISTERED passkey through the email field's autofill and to show nothing at
-   * all when the user has none.
+   * 13.326, REWRITTEN for Task 8 — the passkey button is BACK, and the property
+   * this case pins is no longer "no request" but **"no request until a click"**.
    *
-   * Asserting the call is made is not enough on its own — `signIn.passkey()`
-   * with no argument would also be "called" — so the ARGUMENT is asserted. That
-   * is the difference between conditional UI and the dead modal-triggering call
-   * this replaces.
-   */
-  /**
-   * 13.326 — the passkey BUTTON is gone and NO passkey request is made, and the
-   * second half is the one that took a demonstration to earn.
+   * ## Why the button returned
    *
-   * The dispatch's replacement for the dead button was
-   * `signIn.passkey({ autoFill: true })`. `signInPasskey` issues
-   * `GET /passkey/generate-authenticate-options` as its FIRST statement, which
-   * lands under `/api/auth/*` and is charged against the shared `auth:` bucket
-   * — `RATE_LIMIT_AUTH_MAX` is 10 per 60s in production. Review drove ten such
-   * probes through the assembled app and the eleventh real
+   * It was removed because it could not work for anybody: there was no passkey
+   * registration flow in app code, so no user could hold a credential to sign
+   * in with. Task 8 builds registration on `/account`, so the offer now has a
+   * population it can serve — and `docs/manual.md`/`docs/faq.md` have described
+   * this exact button, in these exact words, the whole time.
+   *
+   * ## Why NOT conditional mediation, which is what the original instruction
+   * ## asked for — the constraint this case exists to defend
+   *
+   * `signInPasskey` in `@better-auth/passkey@1.7.2` issues
+   * `GET /passkey/generate-authenticate-options` as its FIRST statement (re-read
+   * in the installed `dist/client.mjs` for this change, not inherited). That
+   * path lands under `/api/auth/*` and is charged against the shared `auth:`
+   * bucket — `RATE_LIMIT_AUTH_MAX` is 10 per 60s in production. Review drove ten
+   * such probes through the assembled app and the eleventh real
    * `POST /sign-in/magic-link` answered 429, against a zero-probe control that
-   * answered 500 and not 429. And `http/rate-limit.ts` records as measured that
+   * answered 500 and not 429; and `http/rate-limit.ts` records as measured that
    * a web container proxies every browser into ONE client key, so that budget is
-   * shared across users.
+   * shared across people. `autoFill: true` on mount would therefore let an
+   * anonymous visitor who merely OPENS this page refuse somebody else's magic
+   * link.
    *
-   * A request that spends a shared sign-in budget on a flow with zero possible
-   * successes — nobody can register a passkey — is the same defect this task
-   * removes, one layer down. So it is deferred to Task 12, which builds
-   * registration in the same change set.
+   * That server-side witness now lives in the suite, at
+   * `apps/server/test/http/security-middleware.test.ts` — it is not restated
+   * here, because this file cannot see a request at all (see the mock's own
+   * docblock above: `../src/auth-client.js` is replaced wholesale, so an
+   * assertion here about `/api/auth/*` traffic would be vacuous by
+   * construction). What this file CAN witness, and does, is the one fact that
+   * makes the server-side charge zero: the page does not call the client on
+   * mount.
    *
-   * **The field keeps `autocomplete="username webauthn"`**, asserted here,
-   * because that half costs nothing and must already be in place when Task 12
-   * switches mediation on. Asserting only "no button" would let the request come
-   * back silently; asserting only "no request" would let the token be dropped
-   * and Task 12 start from a worse place.
+   * ## Both halves, because either alone is satisfiable by the wrong page
+   *
+   * "Not called on mount" alone is satisfied by a page with no button at all —
+   * which is what shipped before this task and is the regression to guard
+   * against in the other direction. "Called on click" alone is satisfied by a
+   * page that ALSO fires on mount. And the ARGUMENT is asserted, not merely the
+   * call: a bare `passkey()` or a `passkey({ autoFill: true })` would both count
+   * as "called", and the second is precisely the thing that must not ship.
    */
-  it('13.326 makes no passkey request, and keeps the field ready for Task 12', async () => {
+  it('13.326 the passkey button exists and fires ONLY on click, never on mount', async () => {
     const user = userEvent.setup();
     render(<SignInPage />);
 
-    expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
+    const button = await screen.findByRole('button', { name: 'Sign in with a passkey' });
 
-    // No tab to click: with no SMS channel there is no control, and Email link
-    // is the method the page opens on.
     // The field IS present and carries the token — so the absence below is a
-    // fact about the request, never about a missing field.
+    // fact about the request, never about a page that failed to render.
     expect(document.querySelector('input[autocomplete~="webauthn"]')).not.toBeNull();
 
     // Give any mount- or tab-triggered effect a chance to fire before concluding
@@ -344,8 +363,21 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(passkey).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /passkey/i })).toBeNull();
+    expect(
+      passkey,
+      'the passkey client was called before any click. That is the ' +
+        'conditional-mediation request this page must never make: it is charged to the shared ' +
+        '`auth:` bucket, and an anonymous page load spending it can refuse somebody else\'s ' +
+        'magic link.',
+    ).not.toHaveBeenCalled();
+
+    await user.click(button);
+    // `autoFill: false` EXPLICITLY, not merely "called". The library's default
+    // reaches the same behaviour, but an omitted argument is not a decision a
+    // future reader can see — and `{ autoFill: true }` would satisfy a bare
+    // "was called" assertion while being the exact thing that must not ship.
+    expect(passkey).toHaveBeenCalledWith({ autoFill: false });
+    expect(passkey).toHaveBeenCalledTimes(1);
   });
 
   it('phone flow: request the code, then verify it', async () => {
@@ -444,13 +476,19 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
    * rather than an inbox — and it now needs the server to say Google is
    * available before the button it clicks exists at all.
    *
-   * The passkey half moved OUT of this case. It used to click
-   * `Sign in with a passkey` and assert `passkey` was called with no argument,
-   * which is exactly the call that shipped a dead control: it opens a modal
-   * asking for a credential no user in this product can hold. 13.326 asserts the
-   * replacement — `{ autoFill: true }`, conditional mediation — and asserts the
-   * argument rather than the call, because a bare `passkey()` would satisfy
-   * "was called" while being the thing that was wrong.
+   * The passkey half moved OUT of this case and has stayed out. It used to
+   * click `Sign in with a passkey` here and assert `passkey` was called with no
+   * argument — which is exactly the call that shipped a dead control, opening a
+   * modal for a credential no user could hold. 13.326 owns the passkey button
+   * now, and asserts the ARGUMENT rather than the call (`{ autoFill: false }`,
+   * a click and not conditional mediation), because a bare `passkey()` would
+   * satisfy "was called" while being the thing that was wrong.
+   *
+   * There is no passkey `callbackURL` to assert alongside the Google one below:
+   * `signIn.passkey` takes no callback at all — the ceremony finishes in the
+   * browser and this page routes with `router.push(next)` through the same
+   * `samePathOnly` guard the phone flow uses, so the hostile-`?next=` cases
+   * above already cover that surface for it.
    */
   it('13.271 the Google button carries the absolute web-origin callback', async () => {
     serverOffers({ google: true, apple: false });

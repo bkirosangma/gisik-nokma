@@ -188,59 +188,81 @@ function SignInForm() {
   const fail = (message: string | undefined) => setError(message ?? 'Sign-in failed. Try again.');
 
   /**
-   * PASSKEY: THE DEAD BUTTON IS GONE. THE REQUEST THAT WOULD HAVE REPLACED IT
-   * IS DEFERRED TO TASK 12, WITH REGISTRATION — and the deferral is the finding.
+   * PASSKEY: THE BUTTON IS BACK, BECAUSE REGISTRATION NOW EXISTS — AND IT IS A
+   * CLICK, NEVER CONDITIONAL MEDIATION. The measurement that removed it is the
+   * measurement that shapes it, so it is kept in full below.
    *
-   * ## What was here, and why it is not
+   * ## Why it was gone, and what changed
    *
-   * There was a `Sign in with a passkey` button, and it could not work for ANY
-   * user ANYWHERE: **there is no passkey registration flow anywhere in app
-   * code**, so nobody can hold a passkey to sign in with. `rpID` is correct
-   * (`auth.ts`, `new URL(baseUrl).hostname`) and WebAuthn is wired; the
-   * credential simply cannot exist. The button is removed, which is the honest
-   * half and the half the owner asked for.
+   * There was a `Sign in with a passkey` button and it could not work for ANY
+   * user ANYWHERE: **there was no passkey registration flow anywhere in app
+   * code**, so nobody could hold a passkey to sign in with. `rpID` was already
+   * correct (`auth.ts`, `new URL(baseUrl).hostname`) and WebAuthn already
+   * wired; the credential simply could not exist. The button was removed, and
+   * the offer was owed back to the day a person could actually register one.
    *
-   * The dispatch's replacement was `signIn.passkey({ autoFill: true })` —
-   * WebAuthn conditional mediation — issued on this page. **Review demonstrated
-   * that it cannot ship yet, with production's own numbers.**
+   * That day is this change. `/account`'s Passkeys section
+   * (`packages/app-core/src/account/passkeys-section.tsx`, wired through
+   * `apps/web/src/account/account-clients.ts`) registers credentials through
+   * `authClient.passkey.addPasskey`, so the offer below now has a population it
+   * can serve. `docs/manual.md` and `docs/faq.md` have described this button in
+   * these exact words the whole time; they become accurate again here rather
+   * than being edited.
    *
-   * ## The measurement, because this reverses an instruction and must earn it
+   * ## AN EXPLICIT CLICK, NOT `autoFill: true` — and this is the security
+   * ## property of the change, not a styling preference
+   *
+   * The instruction this restores asked for WebAuthn conditional mediation:
+   * `signIn.passkey({ autoFill: true })` issued on page load, surfacing a
+   * credential through the email field's autofill. **That cannot ship, and the
+   * numbers are production's own.**
    *
    * `signInPasskey` in `@better-auth/passkey@1.7.2` issues
    * `GET /passkey/generate-authenticate-options` as its FIRST statement, before
-   * any capability check. That path is under `/api/auth/*`, which `app.ts`
-   * charges against the shared `auth:` bucket — `RATE_LIMIT_AUTH_MAX` is **10**
-   * per 60s in `deploy/do/app.yaml`. A reviewer drove ten such probes through
-   * the assembled app and the eleventh real `POST /sign-in/magic-link` answered
-   * **429**, with a control run at zero probes answering 500 (offline DB) and
-   * not 429 — so the refusal was attributable to the probes and nothing else.
+   * any capability check — re-read in the installed `dist/client.mjs` for this
+   * change, not taken on trust from the earlier note. That path is under
+   * `/api/auth/*`, which `app.ts` charges against the shared `auth:` bucket —
+   * `RATE_LIMIT_AUTH_MAX` is **10** per 60s in `deploy/do/app.yaml`. A reviewer
+   * drove ten such probes through the assembled app and the eleventh real
+   * `POST /sign-in/magic-link` answered **429**, with a control run at zero
+   * probes answering 500 (offline DB) and not 429 — so the refusal was
+   * attributable to the probes and nothing else. That witness now lives in the
+   * suite rather than in a review comment:
+   * `apps/server/test/http/security-middleware.test.ts`, the
+   * "anonymous /sign-in page load" cases.
    *
-   * And the budget is very likely SHARED. `http/rate-limit.ts` records as
-   * measured that the dev stack raised `AUTH_MAX` to 60 "because its web
-   * container proxies every browser into a single client key". Production has
-   * the same topology. So the cost is not one user's own budget; it is
-   * everyone's.
+   * And the budget is SHARED. `http/rate-limit.ts` records as measured that the
+   * dev stack raised `AUTH_MAX` to 60 "because its web container proxies every
+   * browser into a single client key". Production has the same topology. So the
+   * cost of a mount-time request is not one user's own budget; it is everyone's
+   * — an anonymous visitor who merely OPENS this page could refuse somebody
+   * else's magic link.
    *
-   * **A request that spends a shared sign-in budget on a flow with zero possible
-   * successes is the same defect this whole task removes, one layer down.** The
-   * page would have stopped showing a control that cannot work and started
-   * making a request that cannot work — and this one can refuse somebody else's
-   * magic link.
+   * **So the rule this page must keep is: an anonymous `/sign-in` load charges
+   * the `auth:` bucket ZERO times.** A click-triggered call satisfies it
+   * trivially and unarguably — `signIn.passkey` is reachable from exactly one
+   * place, the `onClick` below. It is in no effect, no `useMemo`, no render
+   * path, and `autoFill` is passed **`false`** explicitly rather than omitted,
+   * so a future reader cannot mistake the default for a decision. Case 13.326
+   * in `test/sign-in.test.tsx` asserts both halves: not called on mount, called
+   * once with `{ autoFill: false }` on click.
    *
-   * *(One limb of that finding was refuted and is recorded so nobody builds
-   * against it: the challenge rows are NOT unbounded. `findVerificationValue`
-   * sweeps expired rows globally on every call and `disableCleanup` is unset,
-   * and phone-OTP verification calls it — so they are reclaimed opportunistically
-   * rather than never. No cleanup job is owed.)*
+   * A click is also the honest interaction here. Conditional mediation is a
+   * silent offer that appears only if the browser happens to hold a credential;
+   * a button is a control whose presence is a promise the product can keep for
+   * everybody, including the person who has not registered one yet and needs to
+   * be told so (the refusal renders below, verbatim).
    *
-   * ## What ships instead, and what is owed
+   * *(One limb of the original finding was refuted and is recorded so nobody
+   * builds against it: the challenge rows are NOT unbounded.
+   * `findVerificationValue` sweeps expired rows globally on every call and
+   * `disableCleanup` is unset, and phone-OTP verification calls it — so they
+   * are reclaimed opportunistically rather than never. No cleanup job is owed.)*
    *
    * The email input keeps `autocomplete="username webauthn"`. It costs nothing,
-   * it is correct, and it is the half that must already be in place when
-   * conditional mediation is switched on. **Task 12 owns turning it on, in the
-   * same change set that builds registration** — which is the right pairing:
-   * until a user can register a passkey, an offer to use one has no population
-   * it can serve.
+   * it is correct, and it is the half that must already be in place if
+   * conditional mediation is ever switched on deliberately — which would need
+   * the rate-limit question answered first, not inherited from this change.
    */
 
   return (
@@ -370,6 +392,43 @@ function SignInForm() {
             )}
           </div>
         )}
+
+        {/* THE PASSKEY ENTRY POINT. Deliberately OUTSIDE the social row below:
+            that row is gated on `GET /v1/auth/methods` answering that a
+            provider is configured, and a passkey needs no provider and no
+            server capability check at all — gating it on the social answer
+            would make it vanish on the dev stack, which is the exact shape of
+            "a control that exists only where it was not needed".
+
+            Its own `.gn-sign-in__alternatives` block, not the social one's:
+            reusing that element would put this button inside the container
+            case 13.326 asserts is absent when neither provider is available.
+
+            No `disabled` state and no capability probe: `signIn.passkey`'s
+            own refusal path is what tells a person without a credential, and
+            it renders in the shared `role="alert"` at the foot of this card.
+            Asking the browser whether a passkey exists is precisely the
+            conditional-mediation request the docblock above refuses. */}
+        <div className="gn-sign-in__alternatives">
+          <Button
+            onClick={() =>
+              void authClient.signIn
+                // `autoFill: false` EXPLICITLY. Omitting it would reach the
+                // same behaviour through a library default, and this argument
+                // is the one thing standing between a click and the
+                // mount-time conditional-mediation request that spends a
+                // shared sign-in budget for every anonymous page load.
+                .passkey({ autoFill: false })
+                .then(({ error: passkeyError }) =>
+                  passkeyError
+                    ? fail(passkeyError.message ?? 'That passkey was not accepted.')
+                    : router.push(next),
+                )
+            }
+          >
+            Sign in with a passkey
+          </Button>
+        </div>
 
         {/* Rendered only for providers this server will actually accept, and
             only once it has said so. `social === null` is both "still asking"

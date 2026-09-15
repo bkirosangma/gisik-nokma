@@ -288,4 +288,15 @@ export {
   SessionsSection,
   type SessionsSectionProps,
 } from './account/sessions-section.js';
+// Account/help-screens plan, Task 8 — the Passkeys half of `/account`'s
+// "Sign-in and devices" section (the half Task 7's own note deferred) and the
+// abstract half of its client. The concrete `authClient`-backed adapter
+// (`createPasskeyClient`) is an `apps/web`-local export, exactly as
+// `createSessionsClient` above is, and for the same reason: it speaks
+// `@better-auth/passkey`, which this package must not.
+export type { PasskeyClient, PasskeySummary } from './account/passkey-client.js';
+export {
+  PasskeysSection,
+  type PasskeysSectionProps,
+} from './account/passkeys-section.js';
 export * from './help/index.js';

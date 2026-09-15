@@ -1,11 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { NotificationsSection, SessionsSection, type SessionSummary, type WorkspaceRef } from '@gisik-nokma/app-core';
+import {
+  NotificationsSection,
+  PasskeysSection,
+  SessionsSection,
+  type PasskeySummary,
+  type SessionSummary,
+  type WorkspaceRef,
+} from '@gisik-nokma/app-core';
 import type { NotificationKind, NotificationPreferences } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { AppearanceSection } from '../../src/account/appearance-section.js';
-import { createSessionsClient } from '../../src/account/account-clients.js';
+import { createPasskeyClient, createSessionsClient } from '../../src/account/account-clients.js';
 import { ProfileSection } from '../../src/account/profile-section.js';
 import { WorkspacesSection } from '../../src/account/workspaces-section.js';
 import { authClient } from '../../src/auth-client.js';
@@ -26,6 +33,9 @@ export default function AccountPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const passkeyClient = useMemo(() => createPasskeyClient(), []);
   const sessionsClient = useMemo(
     // `?.session?.token`, not `?.session.token` — `session.data`'s own type
     // (`getSession`'s declared return, `{ session, user } | null`) always
@@ -93,6 +103,78 @@ export default function AccountPage() {
     [sessionsClient],
   );
 
+  /**
+   * THE PASSKEY LIST IS THE ONLY MOUNT-TIME READ ON THIS PAGE THAT IS GATED,
+   * and the gate is a rate-limit decision, not a tidy-up.
+   *
+   * `GET /passkey/list-user-passkeys` lands under `/api/auth/*`, which
+   * `apps/server/src/app.ts` charges against the shared `auth:` bucket —
+   * `RATE_LIMIT_AUTH_MAX` is 10 per 60s in `deploy/do/app.yaml`, and
+   * `http/rate-limit.ts` records as MEASURED that a web container proxies
+   * every browser into ONE client key, so that budget is shared across
+   * people. An `/account` load already spends two units of it (`/get-session`
+   * behind `useSession`, and `/list-sessions` behind the effect above); this
+   * task adds a third, which is named here and in the task report rather than
+   * slipped in under a change whose whole headline is auth-bucket hygiene.
+   *
+   * Gating on `user !== null` is what keeps the third charge from being spent
+   * on a request that CANNOT succeed: the endpoint sits behind better-auth's
+   * `sessionMiddleware`, so an anonymous `/account` load would buy a 401 with
+   * a unit of everyone's sign-in budget. That is the same "a control that can
+   * never succeed" defect `app/sign-in/page.tsx`'s own docblock removes, one
+   * layer down — and it is why this effect is gated while the three above,
+   * which read product routes on their own budgets, are not.
+   *
+   * `signedIn` (a boolean) rather than `user` is the dependency on purpose:
+   * `useSession()` hands back a fresh object every render, so depending on
+   * `user` would re-fire this read on every re-render of the page.
+   *
+   * None of this weakens `/sign-in`'s own guarantee, which is the property
+   * this task exists to protect: `/passkey/*` is absent from
+   * `SIGN_IN_PREFIXES`, so nothing here touches the tighter `signin:` bucket,
+   * and an ANONYMOUS visitor now reaches neither this effect nor any passkey
+   * request at all.
+   */
+  const signedIn = user !== null;
+
+  const reloadPasskeys = useCallback(() => {
+    if (!signedIn) return;
+    // Same silent-omission treatment the three effects above give a failed
+    // read, and the same reason — except for one difference worth naming: a
+    // refused ADD or REMOVE below is NOT silent, because the person just
+    // performed a WebAuthn ceremony and a no-op after touching a fingerprint
+    // sensor is indistinguishable from success. Only the passive LIST read
+    // collapses to `[]`.
+    passkeyClient.list().then(setPasskeys, () => setPasskeys([]));
+  }, [passkeyClient, signedIn]);
+
+  useEffect(() => {
+    reloadPasskeys();
+  }, [reloadPasskeys]);
+
+  const addPasskey = useCallback(
+    async (name: string) => {
+      const result = await passkeyClient.add(name);
+      setPasskeyError(result.error);
+      // Re-list rather than push the new row locally: the credential's stored
+      // label is the SERVER's answer (an empty name is resolved from the
+      // authenticator's AAGUID), so a locally-invented row would show a name
+      // the account does not actually carry. Same distrust `revokeSession`
+      // above has for a state this component did not itself confirm.
+      if (result.error === null) reloadPasskeys();
+    },
+    [passkeyClient, reloadPasskeys],
+  );
+
+  const removePasskey = useCallback(
+    async (id: string) => {
+      const result = await passkeyClient.remove(id);
+      setPasskeyError(result.error);
+      if (result.error === null) reloadPasskeys();
+    },
+    [passkeyClient, reloadPasskeys],
+  );
+
   const saveName = useCallback(async (name: string) => {
     const result = await authClient.updateUser({ name });
     return { error: result.error?.message ?? null };
@@ -131,6 +213,14 @@ export default function AccountPage() {
       ) : null}
       {sessions !== null ? (
         <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
+      ) : null}
+      {passkeys !== null ? (
+        <PasskeysSection
+          passkeys={passkeys}
+          onAdd={(name) => void addPasskey(name)}
+          onRemove={(id) => void removePasskey(id)}
+          error={passkeyError}
+        />
       ) : null}
     </main>
   );

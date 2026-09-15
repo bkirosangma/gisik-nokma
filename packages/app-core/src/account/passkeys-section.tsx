@@ -1,0 +1,114 @@
+import { useState } from 'react';
+import { Button } from '@gisik-nokma/ui';
+import type { PasskeySummary } from './passkey-client.js';
+
+export type PasskeysSectionProps = {
+  passkeys: PasskeySummary[];
+  onAdd: (name: string) => void;
+  onRemove: (id: string) => void;
+  error?: string | null;
+};
+
+/**
+ * The `/account` "Sign-in and devices" section, Passkeys half — the sibling
+ * `SessionsSection`'s own docblock has been promising since Task 7.
+ * Framework-free beyond React itself, matching every other view in this
+ * package: it never touches `authClient`, never calls WebAuthn, and never
+ * knows a passkey ceremony happens at all. It renders what it is handed and
+ * calls `onAdd`/`onRemove` with a value, the same "hand the caller a value,
+ * let it own the mutation" shape `SessionsSection`'s `onRevoke`,
+ * `NotificationsSection`'s `onToggle` and `ProfileSection`'s `onSave` use.
+ *
+ * ## The per-row accessible name is load-bearing, not decoration
+ *
+ * Every delete control is `aria-label={`Delete passkey ${name}`}` rather than
+ * a bare "Delete". Three rows of a control named only "Delete" are three
+ * controls a screen reader announces identically, on a screen whose whole job
+ * is telling one credential from another — and it is the one shape a test can
+ * address unambiguously, which is why `passkeys-section.test.tsx` drives TWO
+ * rows and clicks the second by name. The visible text stays "Delete" because
+ * a row that reads "Delete passkey MacBook Touch ID" beside the words "MacBook
+ * Touch ID" says the name twice.
+ *
+ * ## The refusal uses `.gn-shell__refusal`, an EXISTING rule
+ *
+ * `apps/web/app/globals.css:669` — the same class `sign-in/page.tsx:426` and
+ * `src/account/profile-section.tsx` already use for their own refusal alerts.
+ * Not an invented `gn-account__error`: a class that looks real and matches no
+ * rule renders an unstyled paragraph that reads as ordinary copy rather than
+ * as a refusal.
+ *
+ * Otherwise unstyled by the same DISCLOSED convention `ProfileSection`,
+ * `WorkspacesSection` and `SessionsSection` already establish on this page:
+ * `gn-account__section`, `gn-account__section-title` and
+ * `gn-account__passkey-row` carry no CSS rule in `globals.css` today.
+ * `gn-account__passkey-list` is the one exception, for the same reason
+ * `gn-account__session-list` is — it is a `<ul>`, so the page-wide
+ * `.gn-account ul` descendant rule (`globals.css:157`, list spacing) applies.
+ * The field uses `gn-field`/`gn-field__label`/`gn-field__input`, which ARE
+ * real rules and are exactly what `ProfileSection`'s Name field uses.
+ *
+ * ## An empty name is allowed through rather than blocked here
+ *
+ * The Add control is never disabled on an empty field. That is deliberate and
+ * it is the server's own contract, not a shrug: `@better-auth/passkey`'s
+ * registration options document that "a non-empty client-supplied name always
+ * takes precedence over the returned `name`; whitespace-only input is treated
+ * as absent", and the plugin then labels the credential from its AAGUID. So an
+ * empty field means "let the server name it", which is a better answer than a
+ * disabled button that gives no reason.
+ */
+export function PasskeysSection({ passkeys, onAdd, onRemove, error = null }: PasskeysSectionProps) {
+  const [name, setName] = useState('');
+
+  return (
+    <section className="gn-account__section gn-account__passkeys">
+      <h2 className="gn-account__section-title">Passkeys</h2>
+      {error !== null ? (
+        <p role="alert" className="gn-shell__refusal">
+          {error}
+        </p>
+      ) : null}
+      {passkeys.length === 0 ? (
+        <p>You have no passkeys yet.</p>
+      ) : (
+        <ul className="gn-account__passkey-list">
+          {passkeys.map((passkey) => (
+            <li key={passkey.id} className="gn-account__passkey-row">
+              <span>{passkey.name}</span>
+              <Button
+                variant="danger"
+                aria-label={`Delete passkey ${passkey.name}`}
+                onClick={() => onRemove(passkey.id)}
+              >
+                Delete
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className="gn-field">
+        <span className="gn-field__label">Passkey name</span>
+        <input
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="gn-field__input"
+        />
+      </label>
+      <Button
+        variant="primary"
+        onClick={() => {
+          onAdd(name);
+          // Cleared BEFORE the ceremony resolves, on purpose: `onAdd` is a
+          // fire-and-forget hand-off (the caller owns the promise), and a
+          // field still holding the submitted name is a field a second click
+          // would re-submit under the same label.
+          setName('');
+        }}
+      >
+        Add a passkey
+      </Button>
+    </section>
+  );
+}

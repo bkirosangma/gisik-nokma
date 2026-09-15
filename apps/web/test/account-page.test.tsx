@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 
 vi.mock('next/navigation', () => ({
@@ -13,40 +13,91 @@ vi.mock('next/navigation', () => ({
  * declared below it throws `ReferenceError: Cannot access 'updateUser' before
  * initialization` at import time (documented precedent: `test/sign-in.test.tsx`'s
  * own docblock on this exact mistake). `listSessions`/`revokeSession` (Task 7)
- * join the SAME `vi.hoisted` call rather than a second one — there is exactly
- * one `vi.mock('../src/auth-client.js', ...)` call in this file, extended
- * here, not duplicated — and are referenced directly as the mock's members
- * below, no wrapper closure needed.
+ * and `listUserPasskeys`/`addPasskey`/`deletePasskey` (Task 8) join the SAME
+ * `vi.hoisted` call rather than a second one — there is exactly one
+ * `vi.mock('../src/auth-client.js', ...)` call in this file, extended here,
+ * not duplicated — and are referenced directly as the mock's members below,
+ * no wrapper closure needed.
+ *
+ * The three Task 8 names are the REAL generated-client members, confirmed by
+ * typechecking a probe against the installed `@better-auth/passkey@1.7.2`
+ * (with a negative control proving the surface is not `any`) — see
+ * `apps/web/src/account/account-clients.ts`'s own docblock. A mock is free to
+ * spell a member however it likes and still pass, so the spelling is settled
+ * by the compiler, never by this file.
  */
-const { updateUser, listSessions, revokeSession } = vi.hoisted(() => ({
-  updateUser: vi.fn(),
-  listSessions: vi.fn(),
-  revokeSession: vi.fn(),
-}));
+const {
+  updateUser,
+  listSessions,
+  revokeSession,
+  listUserPasskeys,
+  addPasskey,
+  deletePasskey,
+  sessionAnswer,
+} = vi.hoisted(() => {
+  /**
+   * Task 8 made `useSession`'s answer MUTABLE. It was a fixed literal, which
+   * meant there was no way to mount this page as an ANONYMOUS visitor — and
+   * that is the state the Passkeys gate exists for (`page.tsx`: the passkey
+   * list is the one mount-time read gated on `user !== null`, because the
+   * endpoint sits behind `sessionMiddleware` and an anonymous read would buy
+   * a 401 with a unit of the shared `auth:` budget). Every existing case is
+   * unaffected: `beforeEach` restores `initial` before each test, so the
+   * default answer is byte-identical to the literal this replaces.
+   */
+  const initial = {
+    user: { id: 'u1', name: 'Anjali Kharkongor', email: 'anjali@example.com' },
+    // Task 7: the current session's own token, read by the page as
+    // `session.data?.session.token` to build `createSessionsClient`.
+    session: { token: 'current-token' },
+  };
+  return {
+    updateUser: vi.fn(),
+    listSessions: vi.fn(),
+    revokeSession: vi.fn(),
+    listUserPasskeys: vi.fn(),
+    addPasskey: vi.fn(),
+    deletePasskey: vi.fn(),
+    sessionAnswer: { current: initial as typeof initial | null, initial },
+  };
+});
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
     signOut: vi.fn(),
-    useSession: () => ({
-      data: {
-        user: { id: 'u1', name: 'Anjali Kharkongor', email: 'anjali@example.com' },
-        // Task 7: the current session's own token, read by the page as
-        // `session.data?.session.token` to build `createSessionsClient`.
-        // Added to the ONE existing `useSession` mock rather than a second
-        // one — every describe block in this file shares this return value,
-        // and none of the pre-Task-7 assertions read `.session`, so this is
-        // additive.
-        session: { token: 'current-token' },
-      },
-    }),
+    useSession: () => ({ data: sessionAnswer.current }),
     updateUser,
     listSessions,
     revokeSession,
+    // Task 8. Nested under `passkey` because that is where better-auth's
+    // generated client puts them: each server endpoint path
+    // (`/passkey/list-user-passkeys`, `/passkey/delete-passkey`) becomes a
+    // camelCase member of a `passkey` namespace.
+    passkey: { listUserPasskeys, addPasskey, deletePasskey },
   },
 }));
 
 import AccountPage from '../app/account/page.js';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
+
+/**
+ * Task 8. Only the three passkey mocks and the session answer are touched:
+ * every pre-Task-8 case sets its own `updateUser`/`listSessions` expectation
+ * inside the test body, so those are deliberately left alone.
+ *
+ * `listUserPasskeys` gets a benign default because the page now reads it on
+ * EVERY mount — without one, each of the ten older cases would drive the
+ * adapter against `undefined` and reach the list's `() => setPasskeys([])`
+ * rejection branch, which renders the same empty state a real empty answer
+ * does. That is a passing test for the wrong reason in ten places at once.
+ */
+beforeEach(() => {
+  sessionAnswer.current = sessionAnswer.initial;
+  listUserPasskeys.mockReset();
+  listUserPasskeys.mockResolvedValue({ data: [], error: null });
+  addPasskey.mockReset();
+  deletePasskey.mockReset();
+});
 
 function mount() {
   render(
@@ -271,5 +322,131 @@ describe('AccountPage — Sessions', () => {
     mount();
     expect(await screen.findByText('Last active 10 Sep 2026, 05:30 IST')).toBeInTheDocument();
     expect(screen.queryByText(/2026-09-10/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Task 8 — the Passkeys half of the same section, at the PAGE level: the
+ * `authClient.passkey.*` adapter, the shell's own state, and `PasskeysSection`
+ * driven together. The component's own behaviour is proven directly in
+ * `packages/app-core/test/account/passkeys-section.test.tsx`; what these cases
+ * add is the wiring between the two, which is the seam neither end can witness
+ * alone.
+ *
+ * **Named vacuity, said before the assertions**, matching this file's own
+ * precedent and `sign-in.test.tsx`'s: `../src/auth-client.js` is replaced
+ * wholesale, so nothing here can fail because better-auth spells a member
+ * differently. That axis is checked by `typecheck`, which resolves
+ * `@better-auth/passkey` for real — and, for this task specifically, by a
+ * throwaway probe module typechecked WITH a negative control (see
+ * `src/account/account-clients.ts`'s docblock). What these cases do prove is
+ * that the page calls the right member with the right argument, reads the
+ * answer the right way, and re-lists rather than inventing a row.
+ */
+describe('AccountPage — Passkeys', () => {
+  it('shows the empty state, adds a passkey, and lists it after re-reading the server', async () => {
+    listUserPasskeys
+      .mockResolvedValueOnce({ data: [], error: null })
+      // The SECOND read answers differently, which is what makes the row's
+      // appearance a fact about the re-list rather than about an optimistic
+      // local push: a page that appended the typed name itself would show
+      // "Work laptop" without ever asking again.
+      .mockResolvedValueOnce({ data: [{ id: 'p1', name: 'Work laptop' }], error: null });
+    addPasskey.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    expect(await screen.findByText('You have no passkeys yet.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Passkey name'), 'Work laptop');
+    await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
+    expect(addPasskey).toHaveBeenCalledWith({ name: 'Work laptop' });
+    expect(await screen.findByText('Work laptop')).toBeInTheDocument();
+    expect(listUserPasskeys).toHaveBeenCalledTimes(2);
+  });
+
+  it('deleting a listed passkey calls deletePasskey with that row\'s id and re-reads', async () => {
+    listUserPasskeys
+      .mockResolvedValueOnce({
+        data: [
+          { id: 'p1', name: 'MacBook Touch ID' },
+          { id: 'p2', name: 'YubiKey' },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: [{ id: 'p1', name: 'MacBook Touch ID' }], error: null });
+    deletePasskey.mockResolvedValue({ data: { status: true }, error: null });
+    const user = userEvent.setup();
+    mount();
+    // TWO rows, and the second is the one clicked — a single-row fixture would
+    // pass against a page wired to `passkeys[0]`.
+    await screen.findByText('YubiKey');
+    await user.click(screen.getByRole('button', { name: 'Delete passkey YubiKey' }));
+    expect(deletePasskey).toHaveBeenCalledWith({ id: 'p2' });
+    await waitFor(() => expect(screen.queryByText('YubiKey')).toBeNull());
+    expect(screen.getByText('MacBook Touch ID')).toBeInTheDocument();
+  });
+
+  it('a refusal from the server renders verbatim, and the list is NOT re-read', async () => {
+    listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    addPasskey.mockResolvedValue({
+      data: null,
+      error: { message: 'This authenticator is already registered' },
+    });
+    const user = userEvent.setup();
+    mount();
+    await screen.findByText('You have no passkeys yet.');
+    await user.type(screen.getByLabelText('Passkey name'), 'Work laptop');
+    await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This authenticator is already registered',
+    );
+    // Exactly the mount read: a refused add re-lists nothing, so the count
+    // discriminates the refusal branch from the success branch above rather
+    // than merely observing that some text appeared.
+    expect(listUserPasskeys).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refusal with NO message still surfaces, rather than reading as success', async () => {
+    // `addPasskey`'s error branch types `message` as `string | undefined`, and
+    // an aborted WebAuthn ceremony is a routine outcome. The `?? null`
+    // spelling used elsewhere on this page would collapse this to "no error"
+    // and show nothing at all — after the person just touched a fingerprint
+    // sensor. `refusalOf` in `account-clients.ts` is what this case pins.
+    listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    addPasskey.mockResolvedValue({ data: null, error: { status: 400, statusText: 'BAD_REQUEST' } });
+    const user = userEvent.setup();
+    mount();
+    await screen.findByText('You have no passkeys yet.');
+    await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('That did not work. Try again.');
+  });
+
+  it('an ANONYMOUS /account load makes no passkey request at all — the auth-bucket gate', async () => {
+    /**
+     * The rate-limit half of this task, on the `/account` side.
+     *
+     * `GET /passkey/list-user-passkeys` is charged to the shared `auth:`
+     * bucket (`apps/server/src/app.ts`; `RATE_LIMIT_AUTH_MAX` is 10 per 60s,
+     * on a key a web container shares across every browser behind it), and it
+     * sits behind better-auth's `sessionMiddleware` — so for a signed-OUT
+     * visitor it is a request that CANNOT succeed, spending everyone's
+     * sign-in budget on a 401. `page.tsx` gates the effect on
+     * `user !== null` for exactly that reason, and this is the case that
+     * would go red if the gate were removed.
+     *
+     * The positive control is the four cases above: with a user, the same
+     * page reads the list on mount every time. So a zero here is a fact about
+     * the GATE, not about a page that never reads passkeys at all.
+     */
+    sessionAnswer.current = null;
+    mount();
+    // Anchor on something the anonymous page DOES render, so the zero below is
+    // read from a settled DOM rather than from the first tick of a page that
+    // has not mounted yet. `<h1>Account</h1>` and Appearance render for
+    // everyone; Profile and Passkeys do not.
+    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument();
+    await waitFor(() => expect(listSessions).toHaveBeenCalled());
+    expect(listUserPasskeys).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Passkey name')).toBeNull();
+    expect(screen.queryByText('You have no passkeys yet.')).toBeNull();
   });
 });
