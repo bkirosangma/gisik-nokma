@@ -181,6 +181,24 @@ export function HelpBrowser() {
 
   return (
     <div className="gn-help">
+      {/*
+        THE PAGE'S OWN `h1`, and it is an ADDITION rather than a restyle.
+        Before this, `/help` had no `h1` at all — measured in a real browser,
+        not inferred — so the first heading on the page was an `h2` from the
+        document body, and the heading hierarchy started at level 2.
+
+        It lives here and not in `apps/web/app/help/page.tsx` for the reason
+        this component exists at all (see the docblock above): web and desktop
+        both render it, and a title owned by one shell is a title the other
+        silently lacks.
+
+        The desktop prototype opens its Help screen the same way. Adopting it
+        is what the standing copy rule asks for — "reject anything that loses
+        information or an aria-label; keep shipped wording where it's merely
+        different; adopt the additions" (owner, 2026-09-08) — since there is no
+        shipped wording here to replace.
+      */}
+      <h1 className="gn-help__title">Help</h1>
       <label className="gn-help__search" htmlFor="gn-help-search">
         <span className="gn-help__search-label">Search the manual and FAQ</span>
         <input

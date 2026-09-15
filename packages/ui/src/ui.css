@@ -1568,6 +1568,27 @@
 
 .gn-help { max-width: 72ch; margin: 0 auto; padding: 1.5rem 0 4rem; }
 
+/* The page title, added 2026-09-15 — `/help` previously rendered no `h1` at
+   all. The prototype's own values: 34px/41px, 700, −0.4px tracking, and 14px
+   to the search label below it (the reference groups the two with `gap:14px`).
+   In rem because this file is rem-based throughout.
+
+   THE TRACKING IS DERIVED, NOT GUESSED, and the first cut of this rule got it
+   wrong: −0.025em measured −0.85px live, over twice the reference's −0.4px.
+   −0.4px ÷ 34px = −0.0118em, which is the value below — em rather than px so
+   it scales if the root size changes. `.gn-page-header__title` nearby uses
+   −0.02em at the same visual size; that is the house's own rounder number,
+   and it is NOT adopted here only because matching the reference is this
+   change's whole purpose. The difference is about 1px across the word
+   "Help". */
+.gn-help__title {
+  margin: 0 0 0.875rem;
+  font-size: 2.125rem;
+  line-height: 2.5625rem;
+  font-weight: 700;
+  letter-spacing: -0.0118em;
+}
+
 .gn-help__search { display: block; margin-bottom: 1.5rem; }
 .gn-help__search-label { display: block; margin-bottom: 0.35rem; font-weight: 600; }
 .gn-help__search-input {
@@ -1655,15 +1676,25 @@
   font-weight: 600;
 }
 
+/* FLATTENED to the prototype's own treatment (2026-09-15): a wrapped row of
+   links on the page ground, `gap: 7px 20px`, with no card behind it. It shipped
+   as a raised card (`surfaceRaised` + `shadowRaised` + card radius) in this
+   rule's first commit, and — unlike almost every other rule in this file —
+   carried no comment saying why, so there was no stated reason to weigh
+   against the reference.
+
+   Removing the card also makes the comment on `.gn-help__toc-link` below TRUE
+   for the first time: it reasons that the link renders "on the ambient
+   `body { background: var(--gn-surface) }`", which was wrong while this rule
+   painted `surfaceRaised` directly behind it. That was never an accessibility
+   hole — `textAccent` is declared against BOTH `surface` and `surfaceRaised`
+   in `CONTRAST_PAIRS` (`tokens.ts:788-789`), so the link was gated either way
+   — only a justification that named the wrong ground. */
 .gn-help__toc {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1rem;
+  gap: 0.4375rem 1.25rem;
   margin-bottom: 2rem;
-  padding: 0.9rem 1rem;
-  border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
 }
 /* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
    body text on a phone — and these are the only navigation links on the page. */

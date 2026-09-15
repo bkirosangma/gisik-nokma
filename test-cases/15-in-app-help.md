@@ -45,7 +45,7 @@ anything: a parser reporting "224 entries" tells you it ran, not that it was rig
 
 ## The three surfaces
 
-- **15.14** ❌ Web `/help` renders the browser and its search — *no test yet; the shared model and search are covered above, and the DOM rendering is not.*
+- **15.14** ❌ Web `/help` renders the browser and its search — *no test yet; the shared model and search are covered above, and the DOM rendering is not. NARROWED 2026-09-15: the HEADING-STRUCTURE half of the DOM render is now covered by 15.18; what remains uncovered here is the search box and results rendering.*
 - **15.15** ❌ Desktop reaches the same component, including from the signed-out branch.
 - **15.16** ❌ Mobile's React Native screen renders the same parsed content.
 - **15.17** ✅ **The desktop window DEFINES the design tokens it draws with, rather than only referencing
@@ -63,5 +63,26 @@ anything: a parser reporting "224 entries" tells you it ran, not that it was rig
   *Mutation: drop one role from what `installTheme` installs (`--gn-surface-sunken`) → red, and the
   failure names its own site — `expected [ 'surfaceSunken' ] to deeply equal []`. Restored and verified
   by SHA-256 against `HEAD`, not by a shell `diff`.*
+
+- **15.18** ✅ **`/help` renders exactly one level-1 heading, so the hierarchy does not start at `h2`.**
+  Before 2026-09-15 the page rendered NO `h1` at all — measured live in a real browser — so its first
+  heading was an `h2` from the document body. `packages/app-core/test/help/help-browser.test.tsx` is the
+  FIRST render test for this component; until it existed this directory held only `search.test.ts`, which
+  drives `searchHelp` as a pure function, so nothing in the tree asserted anything about what the
+  component puts on the page and the missing `h1` went unnoticed through the whole Help restyle.
+  Asserted at `level: 1` and not by text alone, because the defect it guards is a heading at the WRONG
+  LEVEL, which a text-only query cannot see; a second case asserts the document body still contributes
+  `level: 2` headings, as the positive control that "the hierarchy started at level 2" was a statement
+  about this page rather than about an empty render.
+  *Mutation-witnessed: rendering the title as an `h2` reddens it, and the failure names its own site —
+  `Unable to find an accessible element with the role "heading" and name "Help"` at `EXIT=1`. Restored
+  via an editor round-trip, never `git checkout`.*
+  *Deliberately narrow — it pins heading STRUCTURE, not content: the manual and FAQ are generated from
+  `docs/manual.md` / `docs/faq.md`, and a test asserting their prose would fight every edit to those
+  documents, which is the coupling the generator exists to avoid.*
+  *NOT covered by any test, and named rather than implied: the `h1`'s own type (34px/700/−0.4px) and
+  the flattened `.gn-help__toc`. Both are CSS, both were verified by live measurement and screenshot
+  against the reference, and neither has an assertion — the same honest gap 15.14–15.16 record.* —
+  (`packages/app-core/test/help/help-browser.test.tsx`)
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
