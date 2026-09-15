@@ -212,9 +212,23 @@ describe('AccountPage — Sessions', () => {
     // in; see `apps/web/src/account/account-clients.ts`'s docblock). A string
     // literal here would let the adapter's `.toISOString()` conversion go
     // completely unexercised while still typechecking and still passing.
+    //
+    // The `userAgent` below is a REAL, full Chrome-on-Mac string, not the
+    // hand-abbreviated `'Mozilla/5.0 Chrome Mac'` this fixture originally
+    // carried — that abbreviation put the browser token BEFORE the OS token,
+    // which is backwards from every real UA string, and is exactly what let
+    // `deviceLabelOf`'s original ordered-regex bug ship undetected (see
+    // `account-clients.ts`'s docblock and `test/account-clients.test.ts`,
+    // which drives that function directly against 9 real UA strings).
     listSessions.mockResolvedValue({
       data: [
-        { token: 'current-token', createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-14T00:00:00Z'), userAgent: 'Mozilla/5.0 Chrome Mac' },
+        {
+          token: 'current-token',
+          createdAt: new Date('2026-09-01T00:00:00Z'),
+          updatedAt: new Date('2026-09-14T00:00:00Z'),
+          userAgent:
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
         { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
       ],
       error: null,
@@ -226,5 +240,36 @@ describe('AccountPage — Sessions', () => {
     expect(screen.getByText('Unknown device')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
+  });
+
+  it('renders "Last active" through the FULL pipeline — mocked Date, adapter\'s toISOString, then formatDateTime', async () => {
+    // Round 1 fixed the adapter's Date→string conversion; round 2 added a
+    // formatDateTime assertion, but only by feeding SessionsSection a
+    // hand-written string directly (packages/app-core/test/account/
+    // sessions-section.test.tsx), which never runs through this adapter's
+    // own `.toISOString()` call. Neither round on its own would catch a
+    // mutation IN THE ADAPTER — `.toISOString()` swapped for `String(value)`
+    // or `.toDateString()` — because nothing downstream of the mocked `Date`
+    // here read what the adapter actually produced. This case does: a real
+    // `Date` goes in, and the exact `formatDateTime` string comes out the
+    // other end of the real, un-mocked `account-clients.ts` and
+    // `SessionsSection`. Expected string confirmed by running
+    // `formatDateTime('2026-09-10T00:00:00.000Z')` directly, not computed by
+    // hand (same value `sessions-section.test.tsx`'s own case pins, for the
+    // same source instant, converted through `.toISOString()` first here).
+    listSessions.mockResolvedValue({
+      data: [
+        {
+          token: 'other-token',
+          createdAt: new Date('2026-09-05T00:00:00Z'),
+          updatedAt: new Date('2026-09-10T00:00:00Z'),
+          userAgent: null,
+        },
+      ],
+      error: null,
+    });
+    mount();
+    expect(await screen.findByText('Last active 10 Sep 2026, 05:30 IST')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-09-10/)).not.toBeInTheDocument();
   });
 });

@@ -39,28 +39,55 @@ import { authClient } from '../auth-client.js';
  */
 
 /**
- * Device labels never fabricate specificity: a short, explicit substring
- * match against `userAgent`, producing e.g. "Chrome on Mac". Anything that
- * doesn't match — including a missing `userAgent`, which better-auth's own
- * type allows (`ipAddress?`/`userAgent?: string | null | undefined`) —
+ * Device labels never fabricate specificity: two INDEPENDENT lookups (OS,
+ * then browser), never one ordered regex per combination. **A real defect,
+ * found and fixed after this file shipped:** the first version matched
+ * `/Chrome.*Mac/i` — browser token BEFORE the OS token — which is backwards
+ * from every real user-agent string, where the OS/device segment comes
+ * first and the browser tokens come last (`Mozilla/5.0 (Macintosh; Intel
+ * Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0
+ * Safari/537.36`). The only reason any test passed was a hand-abbreviated
+ * fixture (`'Mozilla/5.0 Chrome Mac'`) with the tokens in the wrong-but-
+ * matching order; against 8 realistic real-world UA strings (real Chrome/
+ * Safari/Firefox × Mac/Windows/Android/iPhone/iPad) the old code answered
+ * "Unknown device" for all eight — the feature did not do the one thing it
+ * exists to do. `apps/web/test/account-clients.test.ts` now drives this
+ * function with full, realistic UA strings rather than abbreviated ones, so
+ * a token-order regression like this one fails a test again.
+ *
+ * `browserOf` checks Edge and Safari-without-Chrome LAST-to-first in the
+ * sense that both Edge and ordinary Chrome-on-desktop Safari UAs also carry
+ * a `Safari/` token (inherited WebKit boilerplate), so a bare `Safari/` test
+ * would misname a Chrome or Edge session; Edge is checked before Chrome for
+ * the same reason (an Edge UA also carries `Chrome/`). Anything neither
+ * lookup can name — including a missing `userAgent`, which better-auth's
+ * own type allows (`ipAddress?`/`userAgent?: string | null | undefined`) —
  * falls back to "Unknown device" rather than inventing a browser or OS this
  * adapter cannot actually name.
  */
-const DEVICE_PATTERNS: Array<{ match: RegExp; label: string }> = [
-  { match: /Chrome.*Mac/i, label: 'Chrome on Mac' },
-  { match: /Chrome.*Windows/i, label: 'Chrome on Windows' },
-  { match: /Chrome.*Android/i, label: 'Chrome on Android' },
-  { match: /Safari.*iPhone/i, label: 'Safari on iPhone' },
-  { match: /Safari.*iPad/i, label: 'Safari on iPad' },
-  { match: /Safari.*Mac/i, label: 'Safari on Mac' },
-  { match: /Firefox.*Mac/i, label: 'Firefox on Mac' },
-  { match: /Firefox.*Windows/i, label: 'Firefox on Windows' },
-];
+function osOf(userAgent: string): string | null {
+  if (/iPhone/.test(userAgent)) return 'iPhone';
+  if (/iPad/.test(userAgent)) return 'iPad';
+  if (/Android/.test(userAgent)) return 'Android';
+  if (/Mac OS X|Macintosh/.test(userAgent)) return 'Mac';
+  if (/Windows/.test(userAgent)) return 'Windows';
+  return null;
+}
+
+function browserOf(userAgent: string): string | null {
+  if (/Edg\//.test(userAgent)) return 'Edge';
+  if (/Chrome\//.test(userAgent)) return 'Chrome';
+  if (/Firefox\//.test(userAgent)) return 'Firefox';
+  if (/Safari\//.test(userAgent) && !/Chrome/.test(userAgent)) return 'Safari';
+  return null;
+}
 
 function deviceLabelOf(userAgent: string | null | undefined): string {
   if (userAgent === null || userAgent === undefined) return 'Unknown device';
-  const found = DEVICE_PATTERNS.find((pattern) => pattern.match.test(userAgent));
-  return found?.label ?? 'Unknown device';
+  const os = osOf(userAgent);
+  const browser = browserOf(userAgent);
+  if (os === null || browser === null) return 'Unknown device';
+  return `${browser} on ${os}`;
 }
 
 export function createSessionsClient(currentToken: string | null): SessionsClient {
