@@ -11,7 +11,7 @@ import { AppNav } from '../../src/app-nav.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
-import { restrictedLine, viewerOf, type CardViewer } from '../../src/workspace-viewer.js';
+import { projectCountLine, restrictedLine, viewerOf, type CardViewer } from '../../src/workspace-viewer.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -260,6 +260,9 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
+  // Bound once: read in both the render condition below and the body, and a
+  // bare double call would be flagged.
+  const meta = projectCountLine(live.length);
 
   return (
     <li data-testid={`workspace-card-${workspace.id}`}>
@@ -273,18 +276,27 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
             {/* The tint key is the workspace ID, not its name: two workspaces
                 called the same thing must still be told apart, and a rename
                 must not change a colour a person has learned. */}
-            <Avatar name={workspace.name} tint={workspace.id} />
+            <Avatar name={workspace.name} tint={workspace.id} size="workspace" />
             <div className="gn-workspace-card__titles">
               <h2>{workspace.name}</h2>
-              {/* 13.357's role label, now a SENTENCE. The raw enum was a
-                  database value on a card; `viewerOf` is the one place it
-                  becomes English, and the same object gates every number
-                  below. */}
-              <p className="gn-workspace-list__role">{viewer.sentence}</p>
+              {/* The prototype's meta line. It carries the PROJECT count only:
+                  the members chip below already says the member count, and the
+                  prototype's "5 members · 2 projects" would say it twice on one
+                  card. Gated on `countsWithheld` because 13.380 is named "no
+                  number anywhere" — a guest sees names, never counts. */}
+              {!viewer.countsWithheld && meta !== null ? (
+                <p className="gn-workspace-card__meta">{meta}</p>
+              ) : null}
             </div>
           </div>
 
           <ChipRow workspace={workspace} viewer={viewer} archivedCount={archived.length} />
+
+          {/* 13.357's role label, now a SENTENCE and now BELOW the chips, which is
+              where the prototype puts it (`desktop.dc.html:205`). The raw enum was a
+              database value on a card; `viewerOf` is the one place it becomes
+              English, and the same object gates every number above. */}
+          <p className="gn-workspace-list__role">{viewer.sentence}</p>
 
           <ul className="gn-workspace-card__projects">
             {live.map((project) => (

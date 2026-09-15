@@ -221,7 +221,25 @@ input, textarea, select { font-family: inherit; }
    only one rule left in the cascade, there is no tie for import order to
    settle. These two surfaces now simply render `.gn-card`'s own radius, at
    whatever the active style says: 16px (hig/minimal) or 20px (neo). */
-.gn-workspace-list__role { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Task 6 resized this for the card head's role SENTENCE, now living below the
+   chips at the prototype's 15px/20px meta type (`desktop.dc.html:205`). The
+   class is shared by two callers this task does not otherwise touch:
+   `/settings` (`app/settings/page.tsx:148`, the workspace-name line under the
+   page title — its 0.15rem top offset is gone, so the gap above it is now
+   `.gn-page-title`'s own 0.4rem bottom margin alone) and the workspace home
+   header meta line (`app/w/[workspaceId]/page.tsx:588`, inside
+   `.gn-workspace-home__header-titles`, whose own `gap: 0.15rem` already owned
+   the spacing there — unaffected by the margin change, but still grows from
+   0.8rem to 0.9375rem type). Flagged, not fixed here, same pattern
+   `.gn-workspace-card__project-count` carries elsewhere in this file for the
+   identical reason: this task is the card head, not those two screens, and no
+   test in this repo guards either one's spacing. */
+.gn-workspace-list__role {
+  margin: 0;                /* the flex column owns the spacing now */
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  color: var(--gn-text-muted);
+}
 
 /* ── Task 18: the workspace card. ───────────────────────────────────────────
    Every colour is a token role. The card's own surface, radius and shadow are
@@ -277,10 +295,43 @@ input, textarea, select { font-family: inherit; }
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
-.gn-workspace-card__head { display: flex; align-items: flex-start; gap: 0.6rem; }
-.gn-workspace-card__titles { display: flex; flex-direction: column; min-width: 0; }
-.gn-workspace-card__titles h2 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
-.gn-workspace-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.gn-workspace-card__head {
+  display: flex;
+  align-items: center;      /* was flex-start — the prototype centres on the 44px monogram */
+  gap: 0.875rem;
+  flex-wrap: nowrap;
+}
+
+.gn-workspace-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;             /* lets a long name ellipsise instead of pushing the monogram */
+}
+
+.gn-workspace-card__titles h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.5625rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The card head's project-count meta line (Task 6). `live.length` alone —
+   `workspace-viewer.ts`'s `projectCountLine` carries the full reasoning for
+   why this is never summed with `nameRestrictedProjectCount`. */
+.gn-workspace-card__meta {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-workspace-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 /* `margin: 0`, not a deleted declaration: the door's flex `gap` now owns the
    top offset, but `<ul>`'s UA-default `margin-block: 1em` has nothing else in
    this file resetting it, and would otherwise reappear on top of the gap

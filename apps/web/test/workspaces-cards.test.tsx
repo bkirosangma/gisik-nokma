@@ -206,6 +206,12 @@ describe('13.379 the card renders every element from data the route served', () 
       within(card).getByLabelText('Convenience Corner', { selector: '.gn-avatar' }),
     ).toHaveTextContent('CC');
 
+    // The meta line: `live.length` alone. Two live projects here (p3 is
+    // archived), so a sum that folded in `nameRestrictedProjectCount` (2) would
+    // print "4 projects" and redden.
+    expect(within(card).getByText('2 projects')).toBeInTheDocument();
+
+    // The chip set is UNCHANGED by the prototype port — the built labels stay.
     expect(within(card).getByText('5 members')).toBeInTheDocument();
     // THE TWO CHIP NUMBERS, and every input to them is a different number so
     // neither can be the other by accident: 9+4+7 tickets, 3+1+2 blocked, over
@@ -344,6 +350,8 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
     expect(within(card).queryByText(/active/)).toBeNull();
     expect(within(card).queryByText(/blocked/)).toBeNull();
     expect(within(card).queryByText(/tickets?$/)).toBeNull();
+    // 13.380's own name is "no number anywhere", and the meta line is a number.
+    expect(within(card).queryByText(/\d+ projects?$/)).toBeNull();
 
     // The name is still served (rulings P32/P38 withhold names, not this one),
     // and so is the restricted line — the string the whole owner ruling exists
