@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
+ * Case 13.409 (test-cases/13-deployment-dogfooding.md) — minted by the
+ * workspaces-prototype-port plan's Task 10, catalogue consolidation. This
+ * whole file was new with Task 7 and left uncased at the time.
+ *
  * ROUTED 3 — a cross-page leak Task 7's review routed from Task 6.
  *
  * `.gn-workspace-list__role` has THREE call sites: `/settings`

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { PROJECT_LINE_CAP, projectCountLine, projectLine } from '../src/workspace-viewer.js';
 
+// Case 13.405 (test-cases/13-deployment-dogfooding.md) — projectLine's
+// truncation boundary (at the cap, over the cap, the withheld suffix) and
+// projectCountLine's singular/plural/zero rule. Minted by the
+// workspaces-prototype-port plan's Task 10, catalogue consolidation.
+
 describe('projectCountLine — the card meta line', () => {
   it('says "1 project" in the singular, which a plural-only implementation cannot', () => {
     expect(projectCountLine(1)).toBe('1 project');

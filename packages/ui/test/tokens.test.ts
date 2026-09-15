@@ -449,7 +449,10 @@ describe('a control without a boundary — which signal identifies it', () => {
 });
 
 /**
- * `tintWarning` — the invitation banner's wash (2026-09-15).
+ * `tintWarning` — the invitation banner's wash (2026-09-15). Case 13.403
+ * (test-cases/13-deployment-dogfooding.md), minted by the workspaces-
+ * prototype-port plan's Task 10 — left uncased when this block was written,
+ * since Task 1 had no visibility into numbers concurrent work might claim.
  *
  * It is ALPHA, so no `CONTRAST_PAIRS` row may name it (`tokens.ts:228`):
  * `relativeLuminance` ignores alpha, and a declared pair would measure the
@@ -498,8 +501,12 @@ describe('tintWarning composites legibly on every surface it can reach', () => {
 });
 
 /**
- * `.gn-chip` (hig/minimal) — `text` on `fillTertiary`, composited. Task 3
- * fix round 1 (task-3-report.md, finding 3): the existing fillTertiary
+ * `.gn-chip` (hig/minimal) — `text` on `fillTertiary`, composited. Case
+ * 13.404 (test-cases/13-deployment-dogfooding.md), minted by the
+ * workspaces-prototype-port plan's Task 10 — left uncased when this block
+ * was written, since the highest number this block's author could confirm
+ * taken was 13.399, with no visibility into concurrent work's claims above
+ * it. Task 3 fix round 1 (task-3-report.md, finding 3): the existing fillTertiary
  * checks in this file (13.360's ghost-button case, and the ratio above it)
  * both measure `textAccent`, which is a DIFFERENT foreground from the chip's
  * own `color: var(--gn-text)`, and both composite `fillTertiary` over

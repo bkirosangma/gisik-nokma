@@ -2389,6 +2389,19 @@ trusting this pointer, same caveat as every prior one in this paragraph. **Recou
 (this branch's own merge-base) before minting: the maximum id in use was `13.389`; `13.390` occurred
 only in this pointer's own prose, reproducing the documented trap once more.**
 
+**CORRECTED 2026-09-15 — the pointer above was already stale.** `13.400`–`13.402` were minted the same
+day as owner-direct commits on `owner/workspace-edits` (the segmented-control sunken-selection restyle,
+13.400–13.401, and the floating app bar, 13.402) without going through this paragraph's own
+controller-allocation ritual — an owner editing the primary checkout does not queue behind it. Recounted
+at HEAD (`d904efab`, this branch's own tip before Task 10) before minting: the maximum id in use was
+`13.402`. **The workspaces-prototype-port plan's Task 10 (catalogue consolidation, 2026-09-15) mints
+`13.403`–`13.410`** for the eight test-cases debts its own task brief names by description — two
+uncased composite-contrast blocks in `packages/ui/test/tokens.test.ts`, the `projectLine` boundary unit
+tests, the summary-line refusal/empty-read cases, the rendered project-line truncation case, and three
+whole new test files (`workspace-restricted-spacing.test.ts`, `workspace-list-role-pin.test.ts`, and the
+Task 8 fix-round-1 block in `workspaces-invitation-banner.test.tsx`) — see each entry below for the exact
+mapping. **The next free BLOCK is `13.411`.**
+
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
 the toggle's default — so `/sign-in`, `/workspaces` and `/invite/<token>` already rendered in neo the
@@ -2463,7 +2476,10 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   avatars, chips, the invitation banner, Help/Account nav) stay unbuilt because no data exists for them.
   *Mutation-witnessed live against the real file: removing the rendered `<p className="gn-workspace-list__role">`
   line reddens exactly the 13.357 assertion in `workspaces-cards.test.tsx`, leaving 3.153/3.154 green;
-  restored via `git checkout HEAD --`, re-verified 3/3 green.* A second refusal at the mapper level pins
+  restored via `git checkout HEAD --`, re-verified 3/3 green.* *(Historical: 3.154 was later removed —
+  see `test-cases/03-foundation-ledger.md`'s 🚫 entry, workspaces-prototype-port Task 10, 2026-09-15 —
+  because the per-project rows its testid keyed no longer render. This mutation record is unaffected;
+  it reports what the tree looked like at the time.)* A second refusal at the mapper level pins
   the same property one layer down: a body with no `role` key throws `MappingError` rather than
   defaulting one. — (`apps/web/test/workspaces-cards.test.tsx`,
   `packages/app-core/test/online/mappers.test.ts`)
@@ -3486,3 +3502,87 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   at 25/23/25, 3 failed / 28 passed unchanged. Verified by direct measurement in the running dev
   server — bar pinned at `top: 0` while scrolled 1400px, sidebar at 93.6px, anchors at 86px.* —
   (no test; owner: whoever next asserts computed style on the shell)
+
+## The workspaces-prototype-port plan — Task 10, catalogue consolidation (2026-09-15)
+
+Nine tasks (1–9) ported the owner's `desktop.dc.html` prototype onto `/workspaces`: tokens, shared
+`ui.css` metrics, page shell/title/summary, grid and card geometry, card head/meta line, the project
+line's truncation, the invitation banner, and the founding form. Two of those tasks left tests
+deliberately uncased — Task 1's and Task 3's own reports name the reason: an implementer mid-plan has no
+visibility into numbers concurrent work may claim, so minting was deferred to this consolidation task.
+Five more new test files/cases were built and flagged as owed here by the tasks that wrote them (Task 2,
+Task 4, Task 7 ×3, Task 8). Block `13.403`–`13.410`, minted per the corrected pointer above.
+
+- **13.403** ✅ **`tintWarning` composites legibly on every surface it can reach** — the invitation
+  banner's alpha wash cannot carry a `CONTRAST_PAIRS` row (`tokens.ts:228` forbids naming an alpha
+  primitive there, since `relativeLuminance` ignores alpha and such a row would measure the tint's own
+  colour rather than what it blends into), so the obligation is measured against the COMPOSITE instead,
+  the same shape the pre-existing `fillTertiary` check uses. All twelve numbers (3 styles × 2 themes × 2
+  foregrounds, `text` and `textMuted`) clear 4.5 with margin, tightest at neo/light's `textMuted`, 7.434 —
+  65% above the floor. Carries the anti-vacuous control (`expect(washed).not.toBe(surface)`) so a
+  fully-transparent tint cannot pass by degenerating to text-on-bare-surface. — (`packages/ui/test/tokens.test.ts`)
+- **13.404** ✅ **The chip label composites legibly on `fillTertiary`, over every ground it can reach** —
+  closes a gap the two pre-existing `fillTertiary` checks left open: both measure `textAccent`, not the
+  chip's own `color: var(--gn-text)`, and both composite over `surface`, not `surfaceRaised` — the chip's
+  actual ground, since it sits on `.gn-card`. All six style/theme combinations clear 4.5 with wide margin
+  (minimum 10.49), checked over both `surfaceRaised` and `surface`. Same anti-vacuous-control shape as
+  13.403. — (`packages/ui/test/tokens.test.ts`)
+- **13.405** ✅ **`projectLine`'s truncation boundary: at the cap, over the cap, and the withheld
+  suffix** — joined names exactly at `PROJECT_LINE_CAP` (3) take no suffix at all, the boundary a
+  cap-off-by-one implementation gets wrong; one name past it truncates and COUNTS the remainder
+  (`· +1 more`); and when `countsWithheld` is true the suffix drops the number (`· and more`) rather than
+  leaking one to a guest — 13.380's own property ("no number anywhere") applied to a second surface. Six
+  cases total (`projectLine`), plus three for the sibling `projectCountLine` (singular, plural, and
+  renders nothing at zero, the same withholding rule `restrictedLine` keeps). —
+  (`apps/web/test/workspace-viewer.test.ts`)
+- **13.406** ✅ **The `/workspaces` page-head summary is gated on `workspaces !== null &&
+  workspaces.length > 0`, both halves independently proven** — a REFUSED read is `null` exactly like an
+  in-flight one, so `!== null` must be checked and must short-circuit BEFORE `.length`, or a refusal
+  prints "0 workspaces you belong to." (a count of a list nobody managed to read); fix round 1 added the
+  `length > 0` half, since a SUCCESSFUL empty read is a real counted zero and the summary would sit
+  redundantly atop the page's own "No workspaces yet…" sentence. Both halves mutation-witnessed live: an
+  ungated summary reddens the refusal case alone (`PASS 14 FAIL 1`) and, after the `length > 0` term was
+  added, reddens BOTH the refusal and the empty-read case together (`PASS 14 FAIL 2`) — confirming
+  neither term is redundant with the other. — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.407** ✅ **The card itself truncates a wide workspace's project line, not only `projectLine`'s own
+  unit tests** — "names three projects and counts the rest, so a wide workspace does not grow the card,"
+  pinning `PROJECT_LINE_CAP` where it actually renders. The fixture was extended past the brief's own
+  version (one project, which never reaches the truncating branch: `hidden = 1 − 3 = −2`, an unobservable
+  no-op) to four, so `hidden = 1` and the branch genuinely matters; mutation-witnessed live (`projectLine`
+  forced to always take the numeric branch, ignoring `countsWithheld`) reddens this case alone, caught
+  first by the positive safe-string assertion and independently, with that assertion disabled, by a
+  card-wide digit scan that strips the one digit-bearing string the card IS allowed to show and asserts no
+  digit survives the strip. — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.408** ✅ **The cross-page spacing pin for `.gn-workspace-card__restricted`, at its two call
+  sites** — `/workspaces` (inside the door's flex column, where `gap` supplies the offset and the shared
+  rule correctly carries `margin: 0`) and the workspace-home header (a direct `<Card>` child outside any
+  flex-gap container, needing its own `margin-top: 0.55rem` via a second class,
+  `.gn-workspace-home__restricted`, since no stable sibling exists there to hang a combinator off). Four
+  source-scan cases: the shared rule still declares `margin: 0`; the override declares
+  `margin-top: 0.55rem`; the override's line index sits textually AFTER the shared rule's (the tie-break
+  both equal-specificity rules rely on); and a mutation witness that swaps the two rules' lines in a copy
+  of the source and re-runs the same ordering computation, confirming it flips to `false` on the swapped
+  text rather than merely being trusted to. — (`apps/web/test/workspace-restricted-spacing.test.ts`)
+- **13.409** ✅ **`.gn-workspace-list__role`'s two cross-page borrowers are pinned back to their
+  pre-port size** — Task 6 resized the shared rule (`0.8rem` → `0.9375rem`, plus a new `line-height`) for
+  the `/workspaces` card's own sake, which silently also grew the class's two OTHER call sites: `/settings`'s
+  workspace-name subtitle and the workspace-home header's meta line. Both are pinned back via a dedicated
+  `.gn-workspace-list__role--pinned` modifier class (`font-size: 0.8rem; line-height: inherit` — `inherit`
+  reproduces the pre-Task-6 rule's own unset `line-height`, verified via `git show` rather than guessed)
+  added directly in JSX at both call sites. Three source-scan cases (the pin rule exists and declares
+  `0.8rem`; the namesake bare-class rule is untouched at `0.9375rem`; a mutation witness deleting the pin
+  rule's text confirms the scan then finds nothing), plus rendered-DOM assertions confirming the modifier
+  class actually reaches the element at both call sites — mutation-witnessed live: removing the class from
+  either JSX call site reddens exactly that page's own case. — (`apps/web/test/workspace-list-role-pin.test.ts`,
+  `apps/web/test/workspace-home.test.tsx`, `apps/web/test/settings-page.test.tsx`)
+- **13.410** ✅ **The invitation banner's restyle is pinned at both the CSS and the rendered-DOM level,
+  not only its behaviour** — the four pre-existing cases in this file are behaviour-only (heading text,
+  per-invitation sentences, accept/decline, the one-line failure message), and none pinned the tint
+  background, the absent shadow/edge, or the icon's `aria-hidden` state, so the whole Task 8 restyle could
+  be reverted with the suite staying green. Four new cases: `.gn-invitations` fills with
+  `var(--gn-tint-warning)`; carries no `box-shadow` (the raised-card treatment is gone); carries no
+  `border-inline-start` (the accent edge is gone); and the rendered banner root carries the class with its
+  icon `aria-hidden`. Both the CSS-level and render-level halves are separately mutation-witnessed live
+  against the real source (planting `box-shadow` back into the rule reddens exactly the box-shadow case;
+  removing `aria-hidden` from the JSX reddens exactly the render-level case), each reverted immediately
+  after capture. — (`apps/web/test/workspaces-invitation-banner.test.tsx`)

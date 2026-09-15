@@ -354,6 +354,8 @@ function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
   return lines.slice(startIndex, closeIndex + 1).join('\n');
 }
 
+// Case 13.410 (test-cases/13-deployment-dogfooding.md) — minted by the
+// workspaces-prototype-port plan's Task 10, catalogue consolidation.
 describe('Task 8 fix round 1 — the restyle is pinned, not just the banner\'s behaviour', () => {
   describe('CSS level — apps/web/app/globals.css', () => {
     const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');

@@ -257,6 +257,8 @@ describe('13.379 the card renders every element from data the route served', () 
     expect(within(card).getByText('2 projects · name restricted')).toBeInTheDocument();
   });
 
+  // Case 13.407 (test-cases/13-deployment-dogfooding.md) — minted by the
+  // workspaces-prototype-port plan's Task 10, catalogue consolidation.
   // Task 7: a truncation case at the card level, so `projectLine`'s own rule
   // (`PROJECT_LINE_CAP`, `src/workspace-viewer.ts`) is pinned where it
   // actually renders too, not only inside the helper's own unit tests.
@@ -565,6 +567,9 @@ describe('13.390 the card is a door to /w/<id>', () => {
 });
 
 /**
+ * Case 13.406 (test-cases/13-deployment-dogfooding.md) — minted by the
+ * workspaces-prototype-port plan's Task 10, catalogue consolidation.
+ *
  * Task 4 — the page head's one-line summary, gated on `workspaces !== null &&
  * workspaces.length > 0`. The `!== null` term is the withholding half: a
  * REFUSED read is `null` at this point in the component exactly like an
