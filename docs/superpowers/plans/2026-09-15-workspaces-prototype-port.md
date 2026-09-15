@@ -46,7 +46,7 @@
 The viewport sweep is **already red** on the tap-target ratchet from the `/help` work (3 failed / 28 passed). Without a recorded baseline, a new `/workspaces` offender gets filed under "the known `/help` failures" and never surfaces. This task produces the file every later verification compares against.
 
 **Files:**
-- Create: `/tmp/workspaces-port-baseline.log`
+- Create: `.superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log`
 
 **Interfaces:**
 - Produces: a baseline log naming each currently-failing spec and its offending selector. Task 10 diffs against it.
@@ -55,7 +55,7 @@ The viewport sweep is **already red** on the tap-target ratchet from the `/help`
 
 ```bash
 cd /Users/kiro/my_projects/gisik-nokma/apps/web
-pnpm exec playwright test e2e-stack/viewport.spec.ts > /tmp/workspaces-port-baseline.log 2>&1; echo "EXIT=$?"
+pnpm exec playwright test e2e-stack/viewport.spec.ts > .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log 2>&1; echo "EXIT=$?"
 ```
 
 Note the `; echo "EXIT=$?"` — a count or a tail can look identical whether the run failed or errored out before starting. The exit status is the thing that distinguishes them.
@@ -63,8 +63,8 @@ Note the `; echo "EXIT=$?"` — a count or a tail can look identical whether the
 - [ ] **Step 2: Read the baseline and write down the offenders**
 
 ```bash
-tail -60 /tmp/workspaces-port-baseline.log
-grep -c "✘\|failed" /tmp/workspaces-port-baseline.log
+tail -60 .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log
+grep -c "✘\|failed" .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log
 ```
 
 Expected: failures confined to `/help`. **If any current failure names `/workspaces`, stop and report it** — it changes what "no regression" means for this plan.
@@ -469,13 +469,13 @@ Replace the `.gn-chip` and `.gn-chip__dot` rules at `ui.css:75-89`:
    role as the card it sits on, which made every chip on every card
    invisible — a real defect, found while porting the workspace card, and
    fixed here rather than overridden per page. Metrics follow the prototype
-   (`desktop.dc.html:203`): 13px/18px, 9px dot, and a style-specific pad. */
+   (`desktop.dc.html:203`): 13px/18px, 9px dot, and hig's 4px/10px pad. */
 .gn-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   border-radius: 999px;
-  padding: var(--gn-chip-pad, 0.25rem 0.625rem);
+  padding: 0.25rem 0.625rem;
   font-size: 0.8125rem;
   line-height: 1.125rem;
   background: var(--gn-fill-tertiary);
@@ -488,13 +488,16 @@ Replace the `.gn-chip` and `.gn-chip__dot` rules at `ui.css:75-89`:
   border-radius: 50%;
   background: var(--gn-text-muted);
 }
-```
 
-`--gn-chip-pad` is a plain CSS custom property with a fallback, not a token role — it carries spacing, not colour, so `token-discipline.test.ts` does not police it and `TOKEN_ROLES` does not need it. Set the per-style values beside the existing `[data-style]` blocks:
-
-```css
-[data-style='minimal'] { --gn-chip-pad: 0.25rem 0; }
-[data-style='neo'] { --gn-chip-pad: 0.3125rem 0.75rem; }
+/* The prototype gives the chip a different pad per style
+   (`desktop.dc.html:50` minimal, `:58` neo). Written as style-scoped rules
+   rather than a custom property: `tokens.test.ts:119` requires every
+   `var(--gn-…)` in this file to name a declared role, and while its regex
+   happens not to match the fallback form `var(--gn-chip-pad, …)`, passing a
+   check by a regex subtlety is not passing it. Direct rules are also how
+   this file already does per-style overrides. */
+[data-style='minimal'] .gn-chip { padding: 0.25rem 0; }
+[data-style='neo'] .gn-chip { padding: 0.3125rem 0.75rem; }
 ```
 
 The tone modifiers at `ui.css:91-97` are left exactly as they are — they colour only the dot, and ruling 1(a) keeps the chips untinted.
@@ -519,6 +522,23 @@ The tone modifiers at `ui.css:91-97` are left exactly as they are — they colou
 .gn-button {
   /* …existing declarations unchanged… */
   padding: 0 1.125rem;
+}
+
+/* The field's own column spacing and label size, also from the prototype
+   (`desktop.dc.html:227-228`). These live HERE, in the shared stylesheet,
+   because `.gn-field` and `.gn-field__label` are declared here at :2408-2416
+   — never in a page stylesheet, where a duplicate would win by load order
+   and silently diverge from the shared rule. */
+.gn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+}
+
+.gn-field__label {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
 }
 ```
 
@@ -614,13 +634,23 @@ In `apps/web/app/globals.css`:
   color: var(--gn-text-muted);
 }
 
+/* The font-size change is GLOBAL and meant to be: this rule declared no
+   font-size at all and fell through to the UA's `2em` on all thirteen pages
+   that use it, and 34px is the prototype's page-title size across screens.
+   Keep its EXISTING `margin` declaration exactly as it is. */
 .gn-page-title {
-  /* It declared no font-size at all and fell through to the UA's `2em`. */
-  margin: 0;
   font-size: 2.125rem;
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.025em;
+}
+
+/* The margin reset is SCOPED, because `.gn-page-title` is shared by thirteen
+   pages (`/account`, `/inbox`, `/settings`, `/invite/[token]`, every `/w/*`
+   screen…) and zeroing it globally would collapse the heading spacing on all
+   of them. Only this page hands its spacing to a flex column. */
+.gn-workspaces__head .gn-page-title {
+  margin: 0;
 }
 
 .gn-workspaces__head {
@@ -719,6 +749,16 @@ git commit -m "The page title had no font-size, and the summary must not count a
   margin: -0.75rem;
   padding: 1.25rem;
 }
+
+/* PRESERVED VERBATIM from the rule this replaces (`globals.css:183-184`).
+   The block above rewrites `.gn-workspace-card__door`, and dropping these
+   two would cost the card its hover affordance and — far worse — its
+   visible focus ring, which no styling ratchet in this repo would catch. */
+.gn-workspace-card__door:hover { background: var(--gn-surface-sunken); }
+.gn-workspace-card__door:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
 ```
 
 - [ ] **Step 2: Delete the three superseded margin rules**
@@ -816,8 +856,8 @@ Expected: FAIL — no element carries "2 projects".
         prototype's "5 members · 2 projects" would say it twice on one
         card. Gated on `countsWithheld` because 13.380 is named "no
         number anywhere" — a guest sees names, never counts. */}
-    {!viewer.countsWithheld && projectCountLine(live.length) !== null ? (
-      <p className="gn-workspace-card__meta">{projectCountLine(live.length)}</p>
+    {!viewer.countsWithheld && meta !== null ? (
+      <p className="gn-workspace-card__meta">{meta}</p>
     ) : null}
   </div>
 </div>
@@ -835,7 +875,11 @@ Move the role sentence out of `__titles` to sit directly after `<ChipRow …/>`:
 <p className="gn-workspace-list__role">{viewer.sentence}</p>
 ```
 
-Import `projectCountLine` alongside the existing `restrictedLine` import.
+Import `projectCountLine` alongside the existing `restrictedLine` import, and bind the sentence once beside the other derived values at the top of `WorkspaceCard` (it is called in both the condition and the body, so a bare double call would be flagged):
+
+```tsx
+const meta = projectCountLine(live.length);
+```
 
 - [ ] **Step 4: Add the head and type rules**
 
@@ -971,9 +1015,9 @@ Delete the `ProjectRow` function and its docblock. Replace the `<ul>` block with
     the per-project rows. The chevron is decorative — the whole card is
     already one link named by the workspace, so the arrow names nothing a
     screen reader has not already been told. */}
-{projectLine(live.map((p) => p.name), viewer.countsWithheld) !== null ? (
+{projects !== null ? (
   <p className="gn-workspace-card__projects">
-    {projectLine(live.map((p) => p.name), viewer.countsWithheld)}
+    {projects}
     <svg
       width="14"
       height="14"
@@ -991,7 +1035,13 @@ Delete the `ProjectRow` function and its docblock. Replace the `<ul>` block with
 ) : null}
 ```
 
-Import `projectLine`. Remove the now-unused `ProjectRef` import if nothing else in the file uses it.
+Import `projectLine`, and bind the sentence once beside `meta` at the top of `WorkspaceCard` — it is called in both the condition and the body:
+
+```tsx
+const projects = projectLine(live.map((p) => p.name), viewer.countsWithheld);
+```
+
+Remove the now-unused `ProjectRef` import if nothing else in the file uses it.
 
 - [ ] **Step 4: Style the line**
 
@@ -1177,19 +1227,9 @@ Only two numbers differ; the width cap and the column gap already match the prot
   line-height: 1.5625rem;
   font-weight: 600;
 }
-
-.gn-field__label {
-  font-size: 0.8125rem;
-  line-height: 1.125rem;
-  color: var(--gn-text-muted);
-}
-
-.gn-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4375rem;
-}
 ```
+
+`.gn-field` and `.gn-field__label` are **not** touched here — they are declared in the shared `packages/ui/src/ui.css:2408-2416` and Task 3 already updates them there. Re-declaring them in this page stylesheet would create a duplicate that wins by load order and then silently drifts from the shared rule.
 
 The form stays a bare column with no surface and no shadow — `test/founding.test.tsx:85` (13.394) asserts exactly that, and the prototype agrees.
 
@@ -1242,7 +1282,7 @@ Expected: PASS. If turbo replays a cached result, force the run — a cache scop
 ```bash
 cd /Users/kiro/my_projects/gisik-nokma/apps/web
 pnpm exec playwright test e2e-stack/viewport.spec.ts > /tmp/workspaces-port-after.log 2>&1; echo "EXIT=$?"
-diff <(grep -o "✘.*" /tmp/workspaces-port-baseline.log | sort) \
+diff <(grep -o "✘.*" .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log | sort) \
      <(grep -o "✘.*" /tmp/workspaces-port-after.log | sort)
 ```
 
