@@ -346,15 +346,21 @@ input, textarea, select { font-family: inherit; }
 
    The door's `margin` is the exact negative of `.gn-card`'s own 0.75rem
    (`packages/ui/src/ui.css`): pulling the anchor out to the card's edges and
-   re-applying padding inside it means the door's box — and its hover/focus
-   affordance — covers the full card with no visible seam. Task 5 sets that
-   inner padding to 1.25rem (the prototype's 20px) rather than 0.75rem, so
-   every descendant now sits at the prototype's own inset rather than the
-   card's borrowed one — see `.gn-workspace-card__door`'s own comment below
-   for the asymmetry. The focus ring is `.gn-button`'s own `--gn-focus-ring`
-   pair. (Hover used to be `--gn-surface-sunken`, the same role
-   `.gn-table__row--clickable` uses for exactly this — round 2 replaced it
-   with a brightness filter; see the comment on that rule below for why.) */
+   re-applying padding inside it means the door's box — the click target,
+   the focus ring, and (round 2) the region that has to be hovered for
+   `.gn-card:has(> .gn-workspace-card__door:hover)` to match below — covers
+   the full card with no visible seam, rather than a box inset within it.
+   Task 5 sets that inner padding to 1.25rem (the prototype's 20px) rather
+   than 0.75rem, so every descendant now sits at the prototype's own inset
+   rather than the card's borrowed one — see `.gn-workspace-card__door`'s
+   own comment below for the asymmetry. The focus ring is `.gn-button`'s own
+   `--gn-focus-ring` pair. (Hover used to be `--gn-surface-sunken`, painted
+   directly on this box — the same role `.gn-table__row--clickable` uses for
+   exactly this. Round 2 replaced it with a brightness filter painted on
+   `.gn-card` itself, not this element; see the comment on that rule below
+   for why. The door's full-card box still matters for hover — not because
+   it paints anything now, but because `.gn-card`'s `:has()` selector only
+   fires while the pointer is somewhere inside THIS box.) */
 .gn-workspace-card__door {
   display: flex;
   flex-direction: column;
@@ -364,9 +370,13 @@ input, textarea, select { font-family: inherit; }
   border-radius: var(--gn-radius-card);
   /* `margin: -0.75rem` is the exact negative of `.gn-card`'s own `0.75rem`
      padding (packages/ui/src/ui.css:140). It pulls the door out to the
-     card's edge so the hover fill and the focus ring cover the whole card
-     rather than a box inset within it. THAT pairing is coupled: if
-     `.gn-card`'s padding ever changes, this margin must change with it.
+     card's edge so the click target and the focus ring cover the whole
+     card rather than a box inset within it — and (round 2) so the whole
+     card counts as hovered: `.gn-card:has(> .gn-workspace-card__door:hover)`
+     below only matches while the pointer is inside THIS box, which is why
+     it still has to reach the card's edges even though it no longer paints
+     a hover fill of its own. THAT pairing is coupled: if `.gn-card`'s
+     padding ever changes, this margin must change with it.
 
      The door's own `padding: 1.25rem` is NOT part of that pairing. It is
      the prototype's 20px card padding, which the door supplies precisely
