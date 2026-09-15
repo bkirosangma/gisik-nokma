@@ -452,12 +452,18 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
   });
 
   /**
-   * `/account` is a SERVER component (no `'use client'`) rendering a
-   * `'use client'` child — normal in the App Router, and worth a witness
-   * because it is the one shape in this file that differs from every other
-   * case, which all render `AppNav` itself or a client page.
+   * `/account` mounts `AppNav` — the same mount-gap witness this file's
+   * header describes, applied to this route. **As of the account/help
+   * screens plan's Task 2, `/account` is a CLIENT component itself**
+   * (`'use client'`), not a server component wrapping a client child as it
+   * was before that task — the shape that used to make this case worth
+   * calling out on its own is gone, but the witness still earns its keep:
+   * nothing else in this file renders `AccountPage` directly, so this stays
+   * the only guard here against `AppNav` going missing from this route.
+   * `account-page.test.tsx` (added by the same task) covers `AccountPage`'s
+   * own content, not this mount.
    */
-  it('/account mounts AppNav — a server component rendering it as a client child', async () => {
+  it('/account mounts AppNav', async () => {
     currentPath = '/account';
     mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
     render(

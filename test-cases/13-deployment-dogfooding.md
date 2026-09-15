@@ -3188,3 +3188,13 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   (`archived = f`, read back from the database); the guest's restricted view and the non-admin refusal
   note both verified live. —
   (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)
+- **pending-13.4xx** ✅ `/account`'s page shell (account/help screens plan, Task 2) — `AccountPage`
+  became a `'use client'` shell composing `AppNav` and the page's `<h1>Account</h1>` title, and gained
+  its first real content section, Appearance, wrapping the already-tested `StyleToggle`/`ThemeToggle`
+  pair (`ThemeToggle` moved off `AppNav` into this new section in the same task). **Not yet
+  ID-allocated**: this file's own header requires the next free block (after 13.399) to be requested
+  from the controller before minting, and this task has no channel to request one — the same gap
+  `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block already carries for its three
+  cases (`/help` and `/account` mounting `AppNav`), unresolved before this task and still unresolved
+  after it. Rename to a real case id once a block is requested. —
+  (`apps/web/test/account-page.test.tsx`)
