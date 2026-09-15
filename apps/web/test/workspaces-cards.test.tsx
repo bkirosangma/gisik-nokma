@@ -144,10 +144,22 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     const chips = within(ws1).getByText('3 members').closest('.gn-workspace-card__chips');
     expect(chips, 'no .gn-workspace-card__chips ancestor found for the "3 members" chip').not.toBeNull();
     const role = within(ws1).getByText("You're an owner here.");
+    const position = chips!.compareDocumentPosition(role);
+    // m2 (Task 7 fix round 1): `& FOLLOWING` alone also passes if `role` sat
+    // INSIDE `chips` — `compareDocumentPosition` sets both FOLLOWING and
+    // CONTAINED_BY on a descendant, so a version of this test that only
+    // checked FOLLOWING would not catch the sentence being nested inside the
+    // chip row, only moved before it. Masking out CONTAINED_BY makes the
+    // assertion test what its own name claims: a SIBLING that comes after,
+    // not a descendant.
     expect(
-      chips!.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING,
+      position & Node.DOCUMENT_POSITION_FOLLOWING,
       'the role sentence no longer follows the chip row in document order',
     ).toBeTruthy();
+    expect(
+      position & Node.DOCUMENT_POSITION_CONTAINED_BY,
+      'the role sentence is nested INSIDE the chip row, not merely following it',
+    ).toBe(0);
   });
 });
 

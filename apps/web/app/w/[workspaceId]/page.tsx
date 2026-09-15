@@ -585,7 +585,10 @@ function WorkspaceHome({
         <Avatar size="large" name={workspace.name} tint={workspace.id} />
         <div className="gn-workspace-home__header-titles">
           <h1 className="gn-page-title">{workspace.name}</h1>
-          <p className="gn-workspace-list__role">{meta}</p>
+          {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
+              a dedicated class, not a structural selector — see that class's
+              rule in globals.css for why. */}
+          <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{meta}</p>
         </div>
         <div className="gn-workspace-home__header-actions">
           <Link href={`/w/${workspace.id}/members`} className="gn-button">

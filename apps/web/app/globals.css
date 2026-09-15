@@ -235,10 +235,9 @@ input, textarea, select { font-family: inherit; }
    spacing.
 
    Task 7 PINS both borrowers back to the pre-Task-6 size (see
-   `.gn-page-title + .gn-workspace-list__role` a few lines down): the two
-   pages beyond `/workspaces` are outside this plan's remit and must not
-   silently gain the card head's larger type just because they share a class
-   with it. */
+   `.gn-workspace-list__role--pinned` a few lines down): the two pages beyond
+   `/workspaces` are outside this plan's remit and must not silently gain the
+   card head's larger type just because they share a class with it. */
 .gn-workspace-list__role {
   margin: 0;                /* the flex column owns the spacing now */
   font-size: 0.9375rem;
@@ -256,18 +255,24 @@ input, textarea, select { font-family: inherit; }
    0.8rem type — 1.56x taller than either page has ever carried — which is
    the regression this rule exists to prevent.
 
-   Selector chosen by inspecting the actual markup, not guessed: at BOTH
-   borrowing call sites — `/settings` (`app/settings/page.tsx:147-148`) and
-   the workspace home header (`app/w/[workspaceId]/page.tsx:587-588`) —
-   `.gn-workspace-list__role` is the IMMEDIATE next sibling of a
-   `.gn-page-title`. The namesake `/workspaces` card's role sentence is not:
-   it sits several levels below that page's own `<h1>`, inside the card's
-   door. `(0,2,0)` beats the bare-class rule above regardless of source
-   order, so this stays here beside its base rule rather than at the file's
-   end. Written SINGLE-LINE, like every rule `workspace-restricted-spacing
-   .test.ts` scans, so the same one-rule-per-line scan convention could check
-   this one too if a later task wants that guarded as well as commented. */
-.gn-page-title + .gn-workspace-list__role { font-size: 0.8rem; line-height: inherit; }
+   Fix round 1 (IMPORTANT 3, reviewer-caught): this used to be the sibling
+   combinator `.gn-page-title + .gn-workspace-list__role`, chosen because it
+   was verified against the real markup at both borrowing call sites rather
+   than guessed. The defect the reviewer found is that the verification was
+   only ever a SNAPSHOT of the markup, and the selector itself does not keep
+   it true — insert any element between the `<h1 className="gn-page-title">`
+   and the role/meta `<p>` at either call site (a wrapper `<div>`, a banner, a
+   loading state) and the pin silently stops applying, with every test in
+   this repo still green, because nothing asserted the ADJACENCY itself, only
+   the rule's own existence.
+   `.gn-workspace-list__role--pinned` — a DEDICATED class, added directly to
+   the element at both call sites (`app/settings/page.tsx`,
+   `app/w/[workspaceId]/page.tsx`) — removes the fragility instead of testing
+   around it: the pin now applies because the element carries the class, full
+   stop, with no structural precondition to silently stop matching. Consistent
+   with ROUTED 2's `.gn-workspace-home__restricted`, which took the same
+   dedicated-class approach from the start. */
+.gn-workspace-list__role--pinned { font-size: 0.8rem; line-height: inherit; }
 
 /* ── Task 18: the workspace card. ───────────────────────────────────────────
    Every colour is a token role. The card's own surface, radius and shadow are
@@ -334,13 +339,19 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
-  /* ROUTED 4(i) (Task 7 review) — this does NOT ellipsise anything; the rule
-     that wraps a long name is `overflow-wrap: anywhere` on the `h2` below.
-     A flex item's default `min-width` is `auto` (its content's intrinsic
-     width), which would keep this column exactly as wide as the longest
-     unbreakable run of the name and push the monogram regardless of the
-     wrap rule. `min-width: 0` is what lets the column shrink below that, so
-     `overflow-wrap: anywhere` has room to actually wrap the name instead. */
+  /* ROUTED 4(i) (Task 7 review), corrected again in fix round 1 (m3) — this
+     does NOT ellipsise anything, and the FIRST correction's claim that this
+     rule earns its place against the `h2` was also wrong: `overflow-wrap:
+     anywhere` on the `h2` below is itself accounted for in min-content
+     sizing (unlike `overflow-wrap: break-word`, which is not), so the name
+     already shrinks on its own — this column's `min-width: 0` is not what
+     lets IT wrap.
+     The sibling that actually needs it is `.gn-workspace-card__meta` below
+     (the "N projects" line) — it carries no `overflow-wrap` override, so its
+     min-content floor is the ordinary one (the width of its longest
+     unbreakable run), and without `min-width: 0` here that floor would set
+     this flex column's own minimum width and push the monogram, regardless
+     of how small the `h2` has already shrunk. */
   min-width: 0;
 }
 
@@ -375,7 +386,20 @@ input, textarea, select { font-family: inherit; }
    1em`, which would otherwise reappear on top of the door's flex `gap:
    0.75rem` rather than being replaced by it — same reasoning `.gn-workspace-
    card__chips` above relies on for its own reset. */
-.gn-workspace-card__projects { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+/* (m4, fix round 1) `overflow-wrap: anywhere` — the joined line's text is a
+   bare string, so it becomes an ANONYMOUS flex item nothing here can select
+   directly; its default `min-width: auto` resolves to its min-content size,
+   and for ordinary text that is the width of the longest unbreakable run.
+   The `<ul>` this replaced could wrap between whole project names
+   (`flex-wrap: wrap` on the list, one `<li>` per name); this single `<p>`
+   cannot — a project named with one long unbroken word would otherwise force
+   this box wider than the card, past the SVG's `flex: none` floor, and
+   overflow it horizontally. `overflow-wrap: anywhere` is specifically
+   accounted for in min-content sizing (unlike `overflow-wrap: break-word`,
+   which is not), so it is what actually shrinks the floor rather than merely
+   permitting a wrap that never gets asked for — same mechanism
+   `.gn-workspace-card__titles h2` already relies on. */
+.gn-workspace-card__projects { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); overflow-wrap: anywhere; }
 /* The chevron takes its colour from `currentColor`'s dimmer sibling and
    never shrinks — `flex: none` keeps a long project line from squeezing it
    into a sliver. */
@@ -401,8 +425,19 @@ input, textarea, select { font-family: inherit; }
    LATER rule in source order wins for any property both declare; this MUST
    stay textually after the shared rule, or its own `margin: 0` would win the
    tie and silently re-zero this override. `margin-top` only (not the
-   shorthand `margin`), so the other three sides stay at the shared rule's 0. */
-.gn-workspace-home__restricted { margin-top: 0.55rem; }
+   shorthand `margin`), so the other three sides stay at the shared rule's 0.
+
+   Fix round 1 (IMPORTANT 1, reviewer-caught): the shared rule's `font-size`
+   went from `0.8rem` to `0.9375rem` with a new `1.25rem` line box in the same
+   change that introduced this override — a THIRD instance of the identical
+   leak this rule already exists to fix, this time in font size rather than
+   margin. Pinned here, on the class this call site already carries, rather
+   than adding yet another selector. Previous values verified from git, not
+   from a comment: `git show main:apps/web/app/globals.css` shows the
+   pre-Task-7 rule as `margin: 0.55rem 0 0; font-size: 0.8rem;` with no
+   `line-height` at all — `inherit` reproduces that (see the `.gn-page-title +
+   .gn-workspace-list__role` rule above for the identical reasoning). */
+.gn-workspace-home__restricted { margin-top: 0.55rem; font-size: 0.8rem; line-height: inherit; }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen

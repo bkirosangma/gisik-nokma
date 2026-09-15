@@ -145,7 +145,12 @@ function SettingsContent() {
     <main className="gn-shell">
       <AppNav workspaceId={workspaceId ?? undefined} />
       <h1 className="gn-page-title">Settings</h1>
-      {workspaceName !== null ? <p className="gn-workspace-list__role">{workspaceName}</p> : null}
+      {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3): a
+          dedicated class, not a structural selector — see that class's rule
+          in globals.css for why. */}
+      {workspaceName !== null ? (
+        <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{workspaceName}</p>
+      ) : null}
       <div className="gn-settings">
         <nav className="gn-settings__sidebar" aria-label="Settings sections">
           {workspaceId !== null ? (

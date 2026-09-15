@@ -221,3 +221,53 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(screen.queryByRole('textbox', { name: 'Type name' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * IMPORTANT 3 (Task 7 fix round 1) — same gap as the workspace-home case:
+ * the CSS-scan tests for `.gn-workspace-list__role--pinned` only prove the
+ * RULE exists, never that THIS page's workspace-name subtitle carries it.
+ * `getMyWorkspaces` is left un-stubbed by every other case in this file
+ * (`useWorkspaceName` then fails silently and the subtitle never renders at
+ * all), so this is the one case in the file that has to stub it.
+ */
+describe('the workspace-name subtitle keeps its pinned size (ROUTED 3)', () => {
+  it('carries both the base role class and the pinned-size modifier', async () => {
+    setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types' });
+    render(
+      <Providers
+        services={stubServices(
+          {
+            getMyWorkspaces: async () => [
+              {
+                id: WORKSPACE,
+                name: 'Garo Hills Logistics',
+                role: 'admin',
+                memberCount: 1,
+                nameRestrictedProjectCount: 0,
+                projects: [],
+              },
+            ],
+          },
+          {
+            authoring: {
+              listMembers: async () => rosterWhereIAm('admin'),
+              listTicketTypes: async () => TYPES,
+              listWorkflows: async () => WORKFLOWS,
+            },
+          },
+        )}
+      >
+        <SettingsPage />
+      </Providers>,
+    );
+
+    // `{ selector: '.gn-workspace-list__role' }` disambiguates from `AppNav`'s
+    // OWN workspace-name nav link — it reads the same `useWorkspaceName` hook
+    // and renders the identical text as an `<a>`, so a bare `getByText` here
+    // matches two elements once the fixture actually resolves a name.
+    const subtitle = await screen.findByText('Garo Hills Logistics', {
+      selector: '.gn-workspace-list__role',
+    });
+    expect(subtitle).toHaveClass('gn-workspace-list__role', 'gn-workspace-list__role--pinned');
+  });
+});

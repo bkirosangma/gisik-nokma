@@ -195,7 +195,15 @@ describe('13.384 the workspace home lists projects with the caller’s own count
 
     // The restricted line, one text node — a three-interpolation version is
     // split across nodes and fails this.
-    expect(screen.getByText('2 projects · name restricted')).toBeInTheDocument();
+    const restrictedLine = screen.getByText('2 projects · name restricted');
+    expect(restrictedLine).toBeInTheDocument();
+    // IMPORTANT 2 (Task 7 fix round 1): the CSS-scan tests in
+    // `workspace-restricted-spacing.test.ts` only prove the STYLESHEET rule
+    // exists for `.gn-workspace-home__restricted`; nothing anywhere proved
+    // this element actually CARRIES the class the rule targets. A JSX edit
+    // that dropped it — silently losing the 0.55rem offset again — would
+    // have left every one of those four scan tests green.
+    expect(restrictedLine).toHaveClass('gn-workspace-card__restricted', 'gn-workspace-home__restricted');
   });
 
   it('renders NO number at all for a guest, and still names every project', async () => {
@@ -514,6 +522,21 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
     const avatar = await screen.findByLabelText('Convenience Corner', { selector: '.gn-avatar' });
     expect(avatar).toHaveClass(`gn-avatar--tint-${byId}`);
     expect(avatar).not.toHaveClass(`gn-avatar--tint-${byName}`);
+  });
+
+  /**
+   * IMPORTANT 3 (Task 7 fix round 1) — the CSS-scan tests for
+   * `.gn-workspace-list__role--pinned` (`workspace-list-role-pin.test.ts`)
+   * only ever proved the RULE exists in `globals.css`; nothing anywhere
+   * proved this page's header meta line actually CARRIES the class. A JSX
+   * edit that dropped the modifier — restoring the card head's 0.9375rem
+   * type here by accident — would have left every existing test in this file
+   * green, because none of them reads `className`.
+   */
+  it('the header meta line carries the pinned-size modifier class, not just the base role class', async () => {
+    mount([[workspaceAs('member', { id: WORKSPACE, name: 'Convenience Corner' })]]);
+    const meta = await screen.findByText(/active project/);
+    expect(meta).toHaveClass('gn-workspace-list__role', 'gn-workspace-list__role--pinned');
   });
 
   it('carries no member number for a guest, and the role clause matches the /workspaces card\'s own source', async () => {
