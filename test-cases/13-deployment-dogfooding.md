@@ -3760,8 +3760,8 @@ the obvious way to "move it back" is to restore the old target along with the ol
 
 ### Round 22 — five more owner corrections to the workspace home
 
-**No new ids: the next free BLOCK is still `13.416`.** Four of the five corrections landed; one is held
-for an owner decision (below). Only 13.387 changed, and only in its expected set — the other three
+**No new ids: the next free BLOCK is still `13.416`.** Four of the five corrections landed; the fifth
+was put to the owner and DECLINED (below), so nothing shipped for it. Only 13.387 changed, and only in its expected set — the other three
 shipped items are CSS-only and mint nothing, the same treatment Round 21's four CSS-only items got.
 
 - **13.387** ✅ **REVISED AGAIN — Workflows joined Ticket types as a query-scoped door**
@@ -3783,8 +3783,16 @@ caught by something other than the literal expected in the case itself, which wa
 the four targets happen to coincide with routes 13.392 does check, so the real gap is narrow — but the
 claim was wrong about this case, and a wrong claim about coverage is worse than no claim.
 
-**HELD, pending an owner decision — "once inside a workspace, the board nav bar item should be always
-visible."** Board renders today only when the route carries a project, because the only board route in
+**RULED AND CLOSED, 2026-09-16 — "once inside a workspace, the board nav bar item should be always
+visible" is NOT adopted; Board stays conditional on a project being in the route.** The owner was given
+the three options below and chose to leave the behaviour as it is, so `app-nav.tsx` is unchanged by this
+round and the prototype's `navDef` divergence on Board is now a DECIDED difference rather than an
+untranscribed one. Anyone reading that docblock's "a workspace with no project in scope has no true
+Board target" should treat it as standing product policy, re-affirmed here, not as a gap awaiting work.
+The reasoning that made the question worth asking is kept below, because it is what rules out the
+implementation somebody will otherwise reach for next time.
+
+Board renders only when the route carries a project, because the only board route in
 the product is `/w/<id>/p/<pid>`: there is one board per PROJECT, not one per workspace. Making the item
 unconditional therefore needs a target, and the obvious one — the workspace's first served project — was
 REJECTED rather than shipped. It would send two people with the same workspace to different boards
@@ -3793,6 +3801,9 @@ manufacture the "current project" `app-nav.tsx`'s own docblock records this shel
 remember outside the URL. It would also still need a fallback when a workspace has no projects, so the
 item would remain conditional and the instruction would go unmet anyway. The prototype's `navDef` is not
 evidence for it either: its `go("board")` works because its state holds one implicit current project,
-which is a state model this product does not have. **The two real options are a `/w/<id>/board` route
-that renders a picker, or pointing Board at `/w/<id>` when no project is in scope (which puts two nav
-items on one target). Owner: to be asked in this round's report.**
+which is a state model this product does not have. The two alternatives put to the owner were a
+`/w/<id>/board` route rendering a picker, and pointing Board at `/w/<id>` when no project is in scope
+(which would put two nav items on one target while you are on that page — the two-doors-to-one-target
+shape this repo has ruled against twice). **Both were declined in favour of the current behaviour: the
+nav does not offer a link that cannot resolve, which is the prototype's own stated filter rule, and
+that rule wins over its Board row's particular placement.**
