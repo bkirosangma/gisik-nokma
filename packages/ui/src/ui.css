@@ -1626,7 +1626,8 @@
   font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
   border-radius: calc(var(--gn-radius-control) - 0.2rem);
 }
-.gn-help__tab:hover { background: var(--gn-surface-sunken); }
+.gn-help__tab:hover { background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-sunken); }
+/* The selected document is marked by a raised SHADOW as well as background: colour alone is not an indicator, and `aria-pressed` carries it to assistive tech. */
 .gn-help__tab[aria-pressed='true'] {
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
