@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { fontStackOf } from '@gisik-nokma/ui/tokens';
 import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
 import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
 import {
@@ -972,6 +973,31 @@ for (const route of UNAUTHED_ROUTES) {
           `Offending: ${JSON.stringify(typeScale.uaFont)}`,
       )
       .toEqual([]);
+
+    /* Case 15.31 — and `body` itself is painting in the ORIGIN's stack.
+       The check above is an EQUALITY against `body`, so it says nothing about
+       what `body` resolved to. Since the 2026-09-15 font port that value is
+       `var(--gn-font-sans)`: if the variable ever stops being emitted or is
+       renamed, the declaration is invalid at computed-value time, `body` drops
+       to the UA serif, every inheriting element drops with it, and `uaFont`
+       goes EMPTY — green, with the product's typeface gone everywhere. This is
+       the assertion that can tell those two apart.
+
+       It compares against `fontStackOf('sans')`'s FIRST family rather than the
+       whole string: the expectation comes from the one origin in `tokens.ts`
+       and not a literal copy, while staying immune to the quote and whitespace
+       normalisation `getComputedStyle` applies to a stack. `-apple-system` is
+       in no browser default, so a fallback cannot satisfy it by accident. */
+    const expectedFirstFamily = fontStackOf('sans').split(',')[0]?.trim() ?? '';
+    expect
+      .soft(
+        typeScale.bodyFamily,
+        `body on ${route.path} at ${name} is not painting in the product's stack — it computed to ` +
+          `"${typeScale.bodyFamily}", which does not begin with "${expectedFirstFamily}". ` +
+          `The likeliest cause is that \`--gn-font-sans\` did not resolve, which ALSO empties the ` +
+          `uaFont list above and would otherwise read as a pass.`,
+      )
+      .toContain(expectedFirstFamily);
 
     const typeKey = `${name}|${route.path}`;
     const typeBaseline = readTypeScaleBaseline();

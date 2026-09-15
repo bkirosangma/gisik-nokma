@@ -7,12 +7,15 @@ import {
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
+  fontStackOf,
+  fontVariableName,
   primitives,
   radiusVariableName,
   shadowValueOf,
   shadowVariableName,
   themeStylesheet,
   themes,
+  type FontRole,
   type ShadowRole,
   type StyleName,
   type ThemeName,
@@ -21,6 +24,7 @@ import {
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
 const STYLE_NAMES: StyleName[] = ['hig', 'minimal', 'neo'];
 const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay'];
+const FONT_ROLE_NAMES: FontRole[] = ['sans', 'mono'];
 
 /** `hig` needs no `[data-style]` predicate — it is the unmarked base, reached through bare `:root`/`[data-theme]`. */
 function styleSelectorPredicate(style: StyleName): string {
@@ -120,6 +124,7 @@ describe('CSS variable emission', () => {
       radiusVariableName('card'),
       radiusVariableName('control'),
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
+      ...FONT_ROLE_NAMES.map(fontVariableName),
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
@@ -129,6 +134,45 @@ describe('CSS variable emission', () => {
     // merely declared in TypeScript.
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
+  });
+
+  /**
+   * 15.28 — the typefaces are emitted, and emitted ONCE. Before this the
+   * product named a font in exactly one place (`apps/web/app/globals.css`), so
+   * `apps/desktop`, which loads `ui.css` alone, painted in the browser's
+   * default serif. `installTheme` already carries this output into that window,
+   * which is why the cure is an emission and not a second stylesheet.
+   *
+   * The count assertion is the load-bearing half: fonts are invariant across
+   * both axes and live OUTSIDE `declarationsFor` for that reason. Moving them
+   * inside it would still satisfy a `toContain`, and would silently produce six
+   * copies free to diverge one edit later. Mutation: emit them from
+   * `declarationsFor` → this reds on the count, naming the actual mistake.
+   */
+  it('15.28 emits each font stack exactly once, under the bare :root', () => {
+    const stylesheet = themeStylesheet();
+    for (const role of FONT_ROLE_NAMES) {
+      const declaration = `${fontVariableName(role)}: ${fontStackOf(role)};`;
+      expect(stylesheet).toContain(declaration);
+      expect(stylesheet.split(declaration).length - 1, `${role} should be declared once, not per style×theme`).toBe(1);
+    }
+    // Reached from the bare `:root`, so it applies with neither axis marked —
+    // the state the desktop shell is in, having no style or theme toggle.
+    expect(stylesheet.startsWith(':root { --gn-font-')).toBe(true);
+  });
+
+  /**
+   * 15.29 — the mono stack is actually REFERENCED. `--gn-font-sans` is reached
+   * from each app's own base rule (outside this package), but the mono face has
+   * exactly one consumer and it is in this file's own stylesheet; without this,
+   * deleting `font-family` from `.gn-help__code` would leave inline code back
+   * on the UA's default monospace with every test still green.
+   */
+  it('15.29 ui.css sets inline code in the mono stack', () => {
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const rule = css.match(/\.gn-help__code \{[^}]*\}/)?.[0] ?? '';
+    expect(rule).not.toBe('');
+    expect(rule).toContain(`font-family: ${`var(${fontVariableName('mono')})`}`);
   });
 });
 
@@ -529,11 +573,20 @@ describe('brand — Round 2d (2026-09-09)', () => {
    */
   it('13.358 themeStylesheet() emits the literal brand hex under both :root and [data-theme="dark"]', () => {
     const stylesheet = themeStylesheet();
-    const rootLine = stylesheet.split('\n').find((line) => line.startsWith(':root {'));
+    /* EVERY bare-`:root` block, not the first one. There are two since the
+       2026-09-15 font port — the typefaces are emitted under their own `:root`
+       ahead of the colours, being invariant across both axes — and `find`
+       silently returned that one, reporting the brand hex missing when it was
+       one line further down. A filter states what the case actually means:
+       somewhere under an unmarked `:root`, brand is this literal. */
+    const rootBlocks = stylesheet
+      .split('\n')
+      .filter((line) => line.startsWith(':root {'))
+      .join('\n');
     const darkLine = stylesheet.split('\n').find((line) => line.startsWith('[data-theme="dark"] {'));
-    expect(rootLine, ':root block').toBeDefined();
+    expect(rootBlocks, ':root block').not.toBe('');
     expect(darkLine, '[data-theme="dark"] block').toBeDefined();
-    expect(rootLine).toContain('--gn-brand: #ee7733;');
+    expect(rootBlocks).toContain('--gn-brand: #ee7733;');
     expect(darkLine).toContain('--gn-brand: #ee7733;');
   });
 

@@ -690,6 +690,47 @@ export function radiusVariableName(role: RadiusRole): string {
   return `--gn-radius-${role}`;
 }
 
+/** `font.sans` / `font.mono` → `--gn-font-sans` / `--gn-font-mono`. Not a colour, so plain CSS font-stack strings, no primitive/discipline concerns — the same standing radii and shadows have in this file. */
+export type FontRole = 'sans' | 'mono';
+
+/**
+ * The typefaces, transcribed from the desktop prototype's own `body` rule
+ * (`-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif`)
+ * and from the `font-family:ui-monospace,Menlo,monospace` it writes inline
+ * wherever it sets code.
+ *
+ * WHY THEY LIVE HERE AND NOT IN A STYLESHEET. Before this, `apps/web` named a
+ * stack in `globals.css` and nothing else in the product named one at all:
+ * `ui.css` carried zero `font-family` declarations, so `apps/desktop` — which
+ * loads `ui.css` and nothing else — painted every glyph in the browser's
+ * default serif. That is the SAME defect class as the undefined-tokens one
+ * `apps/desktop/src/theme.ts` documents, and it has the same cure: one origin,
+ * emitted as custom properties, installed by whatever each shell already
+ * installs. A second copy of the stack in a second stylesheet would be a
+ * literal free to drift, which is the thing this file exists to prevent.
+ *
+ * INVARIANT ACROSS BOTH AXES, deliberately. Style (`hig`/`minimal`/`neo`) and
+ * theme (`light`/`dark`) change colour, elevation and corner radius; none of
+ * the three prototypes sets a different typeface, so a per-style font map
+ * would be three identical rows inviting an accidental divergence. If a style
+ * ever earns its own face, this becomes `Record<StyleName, …>` and
+ * `declarationsFor` is where it goes — see `themeStylesheet` for why it is
+ * emitted apart from that function today.
+ */
+export const fontStacks: Record<FontRole, string> = {
+  sans: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif',
+  mono: 'ui-monospace, Menlo, monospace',
+};
+
+export function fontStackOf(role: FontRole): string {
+  return fontStacks[role];
+}
+
+/** `sans` → `--gn-font-sans`. */
+export function fontVariableName(role: FontRole): string {
+  return `--gn-font-${role}`;
+}
+
 export type ShadowRole = 'raised' | 'sunken' | 'overlay';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
@@ -931,6 +972,7 @@ export function cssVariableName(role: TokenRole): string {
 
 const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
 const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay'];
+const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {
   const colours = TOKEN_ROLES.map((role) => `${cssVariableName(role)}: ${colorOf(theme, role, style)};`);
@@ -959,6 +1001,15 @@ function declarationsFor(style: StyleName, theme: ThemeName): string {
  */
 export function themeStylesheet(): string {
   const blocks: string[] = [
+    /* The typefaces, emitted ONCE and outside `declarationsFor`. They are the
+       only design values in this file that vary with neither axis, so writing
+       them into the per-style×theme function would repeat two identical
+       declarations across all six blocks and quietly invite one of the six to
+       drift. Emitted FIRST so that a future per-style face — added inside
+       `declarationsFor`, where it would belong — lands later in source order
+       and wins the tie against this base at equal specificity, which is the
+       direction an override has to resolve. */
+    `:root { ${FONT_ROLES.map((role) => `${fontVariableName(role)}: ${fontStackOf(role)};`).join(' ')} }`,
     `:root { ${declarationsFor('hig', 'light')} }`,
     `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('hig', 'dark')} } }`,

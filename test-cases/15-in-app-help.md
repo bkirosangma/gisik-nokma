@@ -235,6 +235,77 @@ written to make it work.*
   `var(--gn-radius-card)` instead, because a length literal would desync these two boxes from ruling
   #386's radius scale under `neo` (14px/20px) to buy 2px and 4px — recorded as a deviation rather than
   taken silently.* — (no test; owner: whoever next touches the help surfaces, with 15.14–15.16)
+- **15.28** ✅ **The typefaces are emitted, and emitted ONCE** — `themeStylesheet()` carries
+  `--gn-font-sans` and `--gn-font-mono` under a bare `:root`, so they apply with neither the style nor
+  the theme axis marked — the state the desktop shell is permanently in, having no toggle for either.
+  *The COUNT is the load-bearing half and the reason this is not a plain `toContain`: fonts vary with
+  neither axis, which is exactly why they live outside `declarationsFor`. Moving them inside it would
+  satisfy a containment check perfectly while emitting six copies, one edit away from diverging.
+  Mutation-witnessed: emitting them per style×theme reddens this on the count, naming the mistake
+  rather than "something changed".* — (`packages/ui/test/tokens.test.ts`)
+- **15.29** ✅ **Inline code in the shared stylesheet is set in the mono stack** — `.gn-help__code`
+  reads `var(--gn-font-mono)`. *Asserted because `--gn-font-mono` has exactly ONE consumer and it is
+  in `ui.css`: `--gn-font-sans` is reached from each app's own base rule and would fail loudly
+  elsewhere, but deleting `font-family` from this one rule would silently return inline code to
+  whatever monospace the browser defaults to, with every other test green. Before this it HAD no
+  family — the same "no rule set a font" defect as the body stack, one element down.* —
+  (`packages/ui/test/tokens.test.ts`)
+- **15.30** ✅ **The desktop window renders in the product's typeface** — `installTheme` appends a
+  second `<style data-gn-base>` setting `body { font-family: var(--gn-font-sans); -webkit-font-smoothing: antialiased }`.
+  *It did not, and this is the identical defect to 15.17 one property along: `ui.css` declares no
+  `font-family` and `index.html` no `<style>`, so the only stack the product named lived in
+  `apps/web/app/globals.css`, which this app never loads — every glyph in the window was the browser's
+  default SERIF while `apps/web` rendered the same `HelpBrowser` in the system sans. The case asserts
+  BOTH halves — that the rule REFERENCES the variable and that the same install DEFINES it — because
+  either alone cannot fail usefully: a `body` rule pointing at an undefined custom property is invalid
+  at computed-value time and drops straight back to the serif, which is the failure that looks most
+  like success. A second element rather than appending to `data-gn-tokens`, so that element stays
+  `themeStylesheet()` verbatim and 15.17's equality assertion keeps meaning what it says.* —
+  (`apps/desktop/src/theme.test.ts`)
+- **15.31** ✅ **`body` is painting in the ORIGIN's stack, not merely in the same font as itself** —
+  the viewport sweep carries `body`'s computed `font-family` out and the spec checks it begins with
+  `fontStackOf('sans')`'s first family.
+  *This closes a FALSE-GREEN in the `uaFont` check beside it (13.266), which is an EQUALITY against
+  `body` and therefore says nothing about what `body` resolved to. Since the font port that value is
+  `var(--gn-font-sans)`: if the variable stops being emitted or is renamed, the declaration is invalid
+  at computed-value time, `body` falls to the UA serif, every inheriting element falls with it, and
+  `uaFont` goes EMPTY — green, with the product's typeface gone from every screen. The expectation is
+  derived from `tokens.ts` rather than copied as a literal, and compares the FIRST family only, which
+  is immune to the quote and whitespace normalisation `getComputedStyle` applies to a stack;
+  `-apple-system` appears in no browser default, so no fallback satisfies it by accident.*
+  *DELIBERATELY NOT PORTED, recorded here so the decision is visible rather than lost: the prototype's
+  `font-size:17px; line-height:22px` on that same `body` rule. `rem` resolves against `html`, so
+  adopting it would rescale only text that inherits a size and leave every `rem`-sized rule anchored at
+  16 — a type scale split down the middle, across screens the request never named. Same reasoning
+  limits `input, textarea, select` to `font-family: inherit` where the prototype writes the `font`
+  shorthand: the family is the font port and moves no box; the shorthand carries SIZE and would shift
+  text under two ratcheted baselines. If the owner wants the 17px scale, it is a deliberate change to
+  the root and belongs in its own pass with the baselines re-measured.* —
+  (`apps/web/e2e-viewport/responsive.spec.ts`)
+- **15.32** ❌ **The desktop window sets its own `background` and `color` on `body`** — it does not.
+  `apps/web/app/globals.css` gives web `background: var(--gn-surface); color: var(--gn-text)`; the
+  desktop shell has no counterpart, so `body` there is the browser's white-and-black beneath whatever
+  the components paint. *Found while fixing the typeface half of the same absence (15.30) and left
+  undone deliberately: it is a colour question with a contrast argument attached, and that change was
+  about fonts. Named rather than quietly folded in.* — (no test; owner: whoever next touches
+  `apps/desktop/src/theme.ts`)
+- **15.33** ✅ **The phone's inline code renders in the design's monospace face** — `monoFamilyFor`
+  returns `Menlo` on iOS and the generic `monospace` elsewhere, and the screen sets
+  `fontFamily: monoFamilyFor(Platform.OS)`.
+  *React Native takes one family name, not a CSS stack, so the prototype's `ui-monospace, Menlo,
+  monospace` becomes a branch — and the branch lives in the sibling `.ts` because `Platform.select`
+  would drag `react-native` into a node runner, which is the rule `vitest.config.ts` states and what
+  12.394's own docblock records. It replaces `'Courier'`, which was neither of the prototype's
+  families: a narrow typewriter face iOS ships for compatibility that no part of this design asked for.
+  The second assertion reads the `.tsx` as TEXT — the wiring, not a rendered glyph — because
+  `monoFamilyFor` could otherwise be correct and unused with both value cases green. That is the same
+  honest limit 12.396 states for `userInterfaceStyle`.*
+  *WHY THERE IS NO SANS CASE: the prototype's body stack begins `-apple-system`, a CSS keyword with no
+  meaning inside a `StyleSheet`. React Native already paints unstyled text in the platform's system
+  font — San Francisco on iOS, which is what that keyword resolves to. Writing the stack into a style
+  object would name six families the platform cannot find and fall back silently, so the port is the
+  ABSENCE of a declaration, and it is recorded so it does not read as an omission.* —
+  (`apps/mobile/src/screens/help-theme.test.ts`)
 
 *NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
 sticky behaviour, the stacking breakpoint below 48rem, the active row's VISUAL treatment (15.25 asserts

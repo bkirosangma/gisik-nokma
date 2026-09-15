@@ -4,10 +4,29 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* `font-family` is a token now, for the same reason `background` and `color`
+   are: it had been a literal here and NOWHERE ELSE, so `apps/desktop` — which
+   loads `ui.css` alone and never this file — rendered in the browser's default
+   serif. The stack itself is the prototype's own and lives in
+   `packages/ui/src/tokens.ts`; see its `fontStacks` docblock.
+
+   `-webkit-font-smoothing: antialiased` is the prototype's, and is font
+   RENDERING rather than font metrics — it thins the stroke and moves no box,
+   so it is safe beside the ratcheted type-scale and tap-target baselines in a
+   way a `font-size` change would not be.
+
+   WHAT WAS DELIBERATELY NOT PORTED: the prototype's `font-size:17px;
+   line-height:22px` on this same `body` rule. `rem` resolves against `html`,
+   not `body`, so setting 17px here would rescale only the text that INHERITS a
+   size and would leave every `rem`-sized rule in the product anchored to 16 —
+   a type scale split down the middle, silently, on screens nobody asked about.
+   `/help` already carries the reference's 17/22 per element, where it was
+   measured. `line-height: 1.45` below is this product's own and stays. */
 body {
   background: var(--gn-surface);
   color: var(--gn-text);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--gn-font-sans);
+  -webkit-font-smoothing: antialiased;
   line-height: 1.45;
 }
 /* `--gn-text-accent`, not `--gn-accent` — Round 2d (2026-09-09). This is the
@@ -58,6 +77,18 @@ a { color: var(--gn-text-accent); }
    than calling it partial: 26 measured signed-in, 2 measured signed-out, an
    unmeasured tail of the same class. */
 button { font: inherit; }
+
+/* The other three form elements the UA also paints in its own typeface. The
+   prototype writes `input,textarea,select,button{font:inherit}` as one rule;
+   this takes only the FAMILY for the three, and deliberately not the shorthand.
+   `font: inherit` carries SIZE, and these three currently render at the UA's
+   ~13.3333px on every screen in the product — adopting the shorthand here would
+   be a type-scale change dressed as a font change, moving text the owner asked
+   nothing about and shifting boxes under two ratcheted baselines. Family alone
+   is what "use the prototype's fonts" actually asks for, and it moves no box.
+   The size question is recorded in `test-cases/15-in-app-help.md` (15.31),
+   unmade rather than silently decided. */
+input, textarea, select { font-family: inherit; }
 
 .gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 1.25rem 3rem; }
 .gn-shell__main { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
