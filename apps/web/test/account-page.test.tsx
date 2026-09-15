@@ -12,16 +12,35 @@ vi.mock('next/navigation', () => ({
  * statement in this file, so a factory closing over a module-level binding
  * declared below it throws `ReferenceError: Cannot access 'updateUser' before
  * initialization` at import time (documented precedent: `test/sign-in.test.tsx`'s
- * own docblock on this exact mistake).
+ * own docblock on this exact mistake). `listSessions`/`revokeSession` (Task 7)
+ * join the SAME `vi.hoisted` call rather than a second one — there is exactly
+ * one `vi.mock('../src/auth-client.js', ...)` call in this file, extended
+ * here, not duplicated — and are referenced directly as the mock's members
+ * below, no wrapper closure needed.
  */
-const { updateUser } = vi.hoisted(() => ({ updateUser: vi.fn() }));
+const { updateUser, listSessions, revokeSession } = vi.hoisted(() => ({
+  updateUser: vi.fn(),
+  listSessions: vi.fn(),
+  revokeSession: vi.fn(),
+}));
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
     signOut: vi.fn(),
     useSession: () => ({
-      data: { user: { id: 'u1', name: 'Anjali Kharkongor', email: 'anjali@example.com' } },
+      data: {
+        user: { id: 'u1', name: 'Anjali Kharkongor', email: 'anjali@example.com' },
+        // Task 7: the current session's own token, read by the page as
+        // `session.data?.session.token` to build `createSessionsClient`.
+        // Added to the ONE existing `useSession` mock rather than a second
+        // one — every describe block in this file shares this return value,
+        // and none of the pre-Task-7 assertions read `.session`, so this is
+        // additive.
+        session: { token: 'current-token' },
+      },
     }),
     updateUser,
+    listSessions,
+    revokeSession,
   },
 }));
 
@@ -182,5 +201,30 @@ describe('AccountPage — Your workspaces', () => {
     expect(screen.getByText('Field Support')).toBeInTheDocument();
     expect(screen.getByText('member')).toBeInTheDocument();
     expect(screen.getByText('0 projects')).toBeInTheDocument();
+  });
+});
+
+describe('AccountPage — Sessions', () => {
+  it('lists sessions and lets you revoke a non-current one', async () => {
+    // `createdAt`/`updatedAt` as plain ISO strings here — this mock does not
+    // reproduce the real `authClient`'s date-revival behaviour (real
+    // `listSessions()` resolves these as `Date` instances; see
+    // `apps/web/src/account/account-clients.ts`'s docblock), which is exactly
+    // why that adapter's `toIsoString` accepts `Date | string` rather than
+    // `Date` alone.
+    listSessions.mockResolvedValue({
+      data: [
+        { token: 'current-token', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-14T00:00:00Z', userAgent: 'Mozilla/5.0 Chrome Mac' },
+        { token: 'other-token', createdAt: '2026-09-05T00:00:00Z', updatedAt: '2026-09-10T00:00:00Z', userAgent: null },
+      ],
+      error: null,
+    });
+    revokeSession.mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+    mount();
+    expect(await screen.findByText('Chrome on Mac')).toBeInTheDocument();
+    expect(screen.getByText('Unknown device')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
   });
 });

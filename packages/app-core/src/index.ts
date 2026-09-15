@@ -277,4 +277,15 @@ export {
   NotificationsSection,
   type NotificationsSectionProps,
 } from './account/notifications-section.js';
+// Account/help-screens plan, Task 7 — the Sessions half of `/account`'s
+// "Sign-in and devices" section (Passkeys is a later task) and the abstract
+// half of its client. The concrete `authClient`-backed adapter
+// (`createSessionsClient`) is an `apps/web`-local export, matching how
+// `NotificationPreferencesGateway` above is named here while its own HTTP
+// implementation lives at the package root's `./online` instead.
+export type { SessionsClient, SessionSummary } from './account/sessions-client.js';
+export {
+  SessionsSection,
+  type SessionsSectionProps,
+} from './account/sessions-section.js';
 export * from './help/index.js';

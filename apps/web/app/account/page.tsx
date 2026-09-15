@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { NotificationsSection, type WorkspaceRef } from '@gisik-nokma/app-core';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NotificationsSection, SessionsSection, type SessionSummary, type WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NotificationKind, NotificationPreferences } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { AppearanceSection } from '../../src/account/appearance-section.js';
+import { createSessionsClient } from '../../src/account/account-clients.js';
 import { ProfileSection } from '../../src/account/profile-section.js';
 import { WorkspacesSection } from '../../src/account/workspaces-section.js';
 import { authClient } from '../../src/auth-client.js';
@@ -24,6 +25,21 @@ export default function AccountPage() {
   const { dataSource, notificationPreferences } = useAppServices();
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const sessionsClient = useMemo(
+    // `?.session?.token`, not `?.session.token` — `session.data`'s own type
+    // (`getSession`'s declared return, `{ session, user } | null`) always
+    // carries `.session` when `.data` is non-null, but `app-nav.test.tsx`'s
+    // OWN `auth-client.js` mock (a second, independent mock of this module,
+    // separate from `account-page.test.tsx`'s) mounts this same page with
+    // `data: { user }` and no `session` key at all — a shape only a test
+    // double can produce, and one this page must not crash its ENTIRE render
+    // over just to build the Sessions section's client. The extra `?.` costs
+    // nothing against the real client and keeps a missing `session` on the
+    // same silent-omission footing every other section's failed read gets.
+    () => createSessionsClient(session.data?.session?.token ?? null),
+    [session.data?.session?.token],
+  );
 
   useEffect(() => {
     // A failed read collapses to the SAME `[]` an honestly-empty answer would
@@ -53,6 +69,29 @@ export default function AccountPage() {
     // without asserting that fact about the account.
     notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }));
   }, [notificationPreferences]);
+
+  useEffect(() => {
+    // Same silent-omission treatment the two effects above give a failed
+    // read, and the same reason: Sign-in and devices is a convenience
+    // section, not `/account`'s primary content. `sessionsClient` is
+    // recreated whenever the current session's own token changes (sign-in,
+    // sign-out, a refreshed session), so this effect re-lists against the
+    // right adapter rather than a stale one closing over an old token.
+    sessionsClient.list().then(setSessions, () => setSessions([]));
+  }, [sessionsClient]);
+
+  const revokeSession = useCallback(
+    async (token: string) => {
+      // No optimistic removal: unlike `toggleKind`'s flip above, there is no
+      // local edit to make that would be honest to show before the server
+      // confirms it — re-listing is what proves a session is actually gone,
+      // the same distrust `toggleKind`'s own `.catch()` has for a state this
+      // component did not itself confirm.
+      await sessionsClient.revoke(token);
+      sessionsClient.list().then(setSessions);
+    },
+    [sessionsClient],
+  );
 
   const saveName = useCallback(async (name: string) => {
     const result = await authClient.updateUser({ name });
@@ -89,6 +128,9 @@ export default function AccountPage() {
       {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
       {prefs !== null ? (
         <NotificationsSection mutedKinds={prefs.mutedKinds} onToggle={toggleKind} />
+      ) : null}
+      {sessions !== null ? (
+        <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
       ) : null}
     </main>
   );

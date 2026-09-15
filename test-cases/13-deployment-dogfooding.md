@@ -3202,11 +3202,28 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   invented fields; two workspaces with different roles and project counts (one with a project, one
   without) render correctly and independently in the same list. A failed read is out of scope for this
   case — it collapses to the same empty render an honestly-empty answer produces (disclosed in
-  `Features.md`'s bullet, not asserted here). **Not yet ID-allocated**: this file's own header requires
-  the next free block (after 13.399) to be requested from the controller before minting, and this task
-  has no channel to request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx`
-  describe block already carries for its three cases (`/help` and `/account` mounting `AppNav`),
-  unresolved before Task 2, unresolved after Task 2, unresolved after Task 3, and still unresolved
-  after Task 4. Rename every case in this block to real case ids, in order, once a block is requested. —
+  `Features.md`'s bullet, not asserted here). **Task 7 adds three more cases to this same pending
+  block:** the Sessions half of the new Sign-in and devices section lists every session
+  `authClient.listSessions()` answers with an HONEST device label — a short, explicit substring match
+  against `userAgent` (`Chrome`/`Safari`/`Firefox` × `Mac`/`Windows`/`iPhone`/`iPad`/`Android`) producing
+  e.g. "Chrome on Mac", never a fabricated specific like "iPhone · Shillong", and falling back to
+  "Unknown device" for anything that doesn't match or for a `null`/absent `userAgent`; the current
+  session (matched by token against `authClient.useSession()`'s own `session.token`) renders no revoke
+  control at all, while every other listed session gets one; and clicking that control's "Sign out"
+  calls `authClient.revokeSession({ token })` with the clicked row's own token and re-lists afterward,
+  proven at the page level with two sessions (one current, one not) and a real revoke click. **A real
+  shape mismatch was found and fixed, not merely assumed away:** the plan's own verification step
+  assumed `listSessions()` answers `createdAt`/`updatedAt` as strings; the installed
+  `better-auth@1.7.2` client types them `Date` (its fetch client revives ISO strings back into `Date`
+  instances on the way in), so the adapter converts explicitly rather than passing either straight
+  through as a `string`. **Not yet ID-allocated**: this file's own header requires the next free block
+  (after 13.399) to be requested from the controller before minting, and this task has no channel to
+  request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block
+  already carries for its three cases (`/help` and `/account` mounting `AppNav`), unresolved before
+  Task 2, unresolved after Task 2, unresolved after Task 3, unresolved after Task 4, and still
+  unresolved after Task 7. Rename every case in this block to real case ids, in order, once a block is
+  requested. —
   (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`,
-  `apps/web/src/account/workspaces-section.tsx`)
+  `apps/web/src/account/workspaces-section.tsx`, `apps/web/src/account/account-clients.ts`,
+  `packages/app-core/src/account/sessions-section.tsx`,
+  `packages/app-core/test/account/sessions-section.test.tsx`)
