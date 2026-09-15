@@ -266,4 +266,15 @@ export { ContestBanner } from './contests/contest-banner.js';
 export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
 export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
 export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
+// Account/help-screens plan, Task 6 — the Notifications section of
+// `/account` and the abstract half of its gateway. The concrete HTTP
+// adapter (`createHttpNotificationPreferencesGateway`) is a `./online`
+// export beside its sibling `createHttpNotificationsGateway`, matching how
+// `PreferencesGateway` above is named here while nothing implements it at
+// the package root either.
+export type { NotificationPreferencesGateway } from './account/notification-preferences-gateway.js';
+export {
+  NotificationsSection,
+  type NotificationsSectionProps,
+} from './account/notifications-section.js';
 export * from './help/index.js';

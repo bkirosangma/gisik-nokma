@@ -274,6 +274,18 @@ hides a kind from what is READ; it never stops the row from being WRITTEN.*
 - **11.199** ✅ `GET`/`PUT /v1/me/notification-preferences`: 401 with no session on both verbs and nothing stored; `GET` answers the empty default for a fresh user; `PUT` then `GET` round-trips and the `PUT` answers what it stored; an unknown kind and an unknown top-level key are both refused `400 {error:'invalid_notification_preferences'}` with nothing partial landed; and one user's write never touches another's row (positive control: the writer's own row did move) — (`apps/server/test/routes/notification-preferences.test.ts`)
 - **11.200** ✅ The read-side filter: `unreadNotificationCount` and `listNotifications` both exclude a muted kind's rows entirely — not merely marking them read — while an unmuted kind's row in the SAME fixture stays visible (the positive control against a query that silently returned nothing at all); an empty muted list changes nothing, the default; and `/v1/me/notifications` and its `/unread-count` sibling actually look the caller's stored preference up and pass it through — the wiring witness that `notifications.test.ts`'s own docblock says a route-registration test alone cannot give, since a store-level pass here is silent about whether the ROUTE ever calls `getNotificationPreferences` at all — (`apps/server/test/notifications/store.test.ts`, `apps/server/test/routes/notifications.test.ts`)
 
+*Task 6, same plan — the client half: the HTTP gateway over the route above, and the `/account`
+Notifications section it feeds. Driven against the REAL `createHttpClient` over a scripted `fetch`,
+matching `notifications.test.ts`'s own argument against a hand-written `HttpClient` stub.*
+- **11.201** ✅ `createHttpNotificationPreferencesGateway`'s `load()` GETs `/v1/me/notification-preferences` with no query string and parses the result through the domain's own schema — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.202** ✅ `save()` PUTs the whole document to the same path — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.203** ✅ `load()` refuses a body naming a kind outside the five, rather than handing it to the view — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.204** ✅ `load()` names the door on a 404 rather than handing zod a bare `null` to parse — this route is session-gated and answers 401 to a stranger, never 404, so a 404 here means the request never reached the route at all — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.205** ✅ `NotificationsSection` renders one checked-by-default row per real kind, five rows — no invented "email" column, no "weekly digest" row, since neither exists server-side — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.206** ✅ A muted kind renders unchecked, and only that one — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.207** ✅ Clicking a row calls `onToggle` with that kind and does not flip local state itself — the component is controlled, owning no state of its own — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.208** ✅ The wiring witness: `/account` reads real preferences through `useAppServices().notificationPreferences` and renders the muted row unchecked — proof the seam carries a real answer through, which the page's own un-stubbed-rejects-to-all-on fallback (every other case in this file) cannot show — (`apps/web/test/account-page.test.tsx`)
+
 ## Permanently unused id ranges
 
 Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
@@ -290,10 +302,11 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.201.**  
-*(11.200 is IN USE, at the Notification preferences section above (account/help-screens plan, Task 5,
-11.197–11.200). This pointer means the NEXT FREE id — that is the convention this file was created
-with (`e09666c`: pointer 11.189, highest entry 11.188). #293 set it equal to the highest id instead of
-one past it, and #304 then minted exactly the id the pointer named; no duplicate resulted only because
-#304 advanced the pointer to its own new maximum, carrying the fault forward. Restored to max+1 there,
-and kept at max+1 here. Nothing validates this line, so it is checked by reading.)*
+**New cases continue from 11.209.**  
+*(11.208 is IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
+server half 11.197–11.200, Task 6's client half 11.201–11.208). This pointer means the NEXT FREE id —
+that is the convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188).
+#293 set it equal to the highest id instead of one past it, and #304 then minted exactly the id the
+pointer named; no duplicate resulted only because #304 advanced the pointer to its own new maximum,
+carrying the fault forward. Restored to max+1 there, and kept at max+1 here. Nothing validates this
+line, so it is checked by reading.)*

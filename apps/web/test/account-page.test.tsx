@@ -81,6 +81,27 @@ function workspace(over: Partial<WorkspaceRef> = {}): WorkspaceRef {
   };
 }
 
+describe('AccountPage — Notifications', () => {
+  it('11.208 loads real preferences through useAppServices and renders a muted kind unchecked — the page→gateway→section wiring', async () => {
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          { notificationPreferences: { load: async () => ({ mutedKinds: ['mention'] }) } },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    // The un-stubbed default (every other case in this file) rejects by
+    // name and the page falls back to the all-on `{ mutedKinds: [] }`, which
+    // never proves this seam actually carries a REAL answer through — only a
+    // load that resolves to something OTHER than the fallback default can.
+    expect(await screen.findByLabelText(/mentioned/i)).not.toBeChecked();
+    expect(screen.getByLabelText(/assigned/i)).toBeChecked();
+  });
+});
+
 describe('AccountPage — Your workspaces', () => {
   it('lists each workspace with its real role and project count', async () => {
     render(

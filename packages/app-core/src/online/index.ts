@@ -70,6 +70,14 @@ export {
  * produced contract rather than a one-shot action.
  */
 export { createHttpNotificationsGateway } from './notifications.js';
+/**
+ * Task 6 (account/help-screens plan). The HTTP adapter for the global,
+ * per-kind mute list Task 5 shipped — same argument as the inbox adapter
+ * above: it takes an `HttpClient` and lives here beside its siblings, not in
+ * `apps/web`, so `no-http-in-views.test.ts` still has exactly one directory
+ * to fence off.
+ */
+export { createHttpNotificationPreferencesGateway } from './notification-preferences.js';
 export {
   MappingError,
   LIST_PAGE_CAP,

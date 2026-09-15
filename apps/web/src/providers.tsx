@@ -6,6 +6,7 @@ import {
   withCacheFeed,
   type ClientStateCache,
   type DataSource,
+  type NotificationPreferencesGateway,
   type NotificationsGateway,
   type WorkflowAuthoringGateway,
 } from '@gisik-nokma/app-core';
@@ -15,6 +16,7 @@ import {
   createHttpInviteAdminGateway,
   createHttpInviteGateway,
   createHttpMyInvitationsGateway,
+  createHttpNotificationPreferencesGateway,
   createHttpNotificationsGateway,
   createOnlineDataSource,
   type FoundingGateway,
@@ -68,6 +70,8 @@ export type AppServices = {
   founding: FoundingGateway;
   authoring: WorkflowAuthoringGateway;
   notifications: NotificationsGateway;
+  /** Task 6 (account/help-screens plan). The `/account` mute-list gateway — global, no `workspaceId`. */
+  notificationPreferences: NotificationPreferencesGateway;
   ticketLocation: TicketLocator;
 };
 
@@ -132,6 +136,9 @@ export function Providers({
       // `/v1/me/notifications*` and `/v1/workspaces/:ws/tickets/:id` through the
       // same same-origin rewrites carrying the same session cookie.
       notifications: createHttpNotificationsGateway(http),
+      // The SAME `http` again: `/v1/me/notification-preferences` is the same
+      // same-origin, same-session-cookie transport every gateway here uses.
+      notificationPreferences: createHttpNotificationPreferencesGateway(http),
       ticketLocation: createHttpTicketLocator(http),
     };
   }, [services]);
