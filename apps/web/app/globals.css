@@ -822,15 +822,75 @@ input, textarea, select { font-family: inherit; }
    horizontal padding (same 80rem/1.25rem/0.75rem-below-60rem numbers), so the
    bar's clickable content still lines up with the page content beneath it —
    only the bar's background and shadow reach the physical screen edges. */
-.gn-nav { margin-inline: calc(50% - 50vw); box-shadow: var(--gn-shadow-raised); }
+.gn-nav {
+  margin-inline: calc(50% - 50vw);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--gn-surface);
+  box-shadow: var(--gn-shadow-raised);
+}
 /* Raised off the page, on request — same `--gn-shadow-raised` role as
    `.gn-theme-toggle` and `.gn-card` above, reused rather than a bespoke
    bottom-only value: `hig` renders it as a soft 1px drop shadow (mostly below
    the bar, since its one layer's own offset is `0 1px 3px`), `minimal` as
-   `none` (flat by design), `neo` as the two-layer lift. The bar sits in
-   normal document flow (not `position: sticky`/`fixed`), so this reads as
-   "raised above the row beneath it" rather than a floating app bar with
-   something scrolling under it. */
+   `none` (flat by design), `neo` as the two-layer lift.
+
+   ── IT NOW FLOATS, 2026-09-15 (owner: "make the top nav bar always be floating
+   on the top"). This paragraph used to end by saying the bar sat in normal
+   document flow, "NOT `position: sticky`/`fixed`", so the shadow read as
+   "raised above the row beneath it" rather than as a floating app bar with
+   something scrolling under it. That is the decision being reversed; the
+   sentence is rewritten rather than left to contradict the rule above it.
+
+   `sticky`, NOT `fixed`. Sticky keeps the bar in flow, so it still occupies
+   its own height at the top of the document and nothing below it has to be
+   pushed down by a compensating margin — a `fixed` bar would need one, and
+   that margin would then be a second copy of the bar's height to keep in sync.
+
+   `background` is now DECLARED, and it is the half that is easy to miss: the
+   rule had none, so the bar was transparent and merely looked solid because
+   `body` paints the same `--gn-surface` behind it. The moment content scrolls
+   underneath, transparent means the text shows through the bar. `--gn-surface`
+   keeps the bar's resting appearance byte-identical to what it was.
+
+   `z-index: 20` sits deliberately BELOW the two values already in the tree:
+   `.gn-select__panel` and `.mention-popup` at 30, and `.gn-dialog__scrim` /
+   `.gn-sheet__scrim` at 40. A dropdown opening near the top of the page must
+   render OVER the bar, and a modal scrim must cover it entirely; a bar that
+   outranked either would clip the menu it belongs to. */
+
+/* The bar's own height, published for the things that must sit clear of it
+   once it stops scrolling away. Measured on the live page, identical at 768px
+   and 1512px — the whole range in which anything else here is sticky — and it
+   is not a magic number: `.gn-nav__links` is a 2.75rem control row and
+   `.gn-nav__inner` adds 0.8rem of padding twice, so 2.75 + 1.6 = 4.35rem
+   (69.6px, which is what the browser reports).
+
+   WHERE IT IS AN UNDERSTATEMENT, said plainly rather than left as a surprise:
+   `.gn-nav__links` wraps, so the bar grows on narrow viewports — measured at
+   190px on a signed-in workspace route at 500px wide, where the destination
+   links, the scope note and sign-out take three rows. One number cannot cover
+   that, because the height depends on how many links the ROUTE contributes and
+   on the signed-in name's width, neither of which CSS can see; a media query
+   would only trade one wrong value for another. The consequences are bounded
+   and both were checked: `.gn-help__sidebar` is `position: static` below 48rem
+   so it cannot collide at all, and the `scroll-margin-top` consumers land a
+   fragment ~86px down, which is correct at every width where the bar does not
+   wrap and short of it on a wrapped phone bar — the heading is then reachable
+   by a short scroll rather than lost. Making this exact needs the bar's height
+   measured at runtime into the variable, which is a script, and this is a
+   stylesheet.
+
+   DELIBERATELY NOT A `--gn-` TOKEN. `packages/ui/test/tokens.test.ts` asserts
+   that every `var(--gn-…)` written in `ui.css` names a role declared in
+   `tokens.ts`, so borrowing the prefix would mean inventing a design-token
+   role for what is not a design value at all — it is one shell's layout fact,
+   true of `apps/web` and false of `apps/desktop`, which renders no nav. The
+   unprefixed name keeps it out of that contract, and consumers read it with a
+   `0px` fallback so the no-nav shell is unaffected without knowing anything
+   about this file. */
+:root { --app-nav-offset: 4.35rem; }
 .gn-nav__inner {
   display: flex;
   align-items: flex-start;

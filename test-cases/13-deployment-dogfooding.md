@@ -3432,3 +3432,57 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   a thing that stopped existing. It reads `--gn-surface-sunken` now (what the pressed segment actually
   composes against) and adds a direct reading of the track's own computed `backgroundColor`, which is
   `rgba(0, 0, 0, 0)`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)
+
+- **13.402** ❌ **The app bar floats, and everything that must clear it does** — `.gn-nav` is
+  `position: sticky; top: 0; z-index: 20` with a declared `background`. Owner, 2026-09-15: *"make the
+  top nav bar always be floating on the top."* It reverses this rule's own recorded decision — the
+  comment used to end "the bar sits in normal document flow (not `position: sticky`/`fixed`)" — which
+  is rewritten rather than left contradicting the CSS under it.
+  *`sticky`, NOT `fixed`: sticky stays in flow, so the bar still occupies its own height and nothing
+  below needs a compensating top margin — and that margin would have been a second copy of the bar's
+  height to keep in sync with it.*
+  *TWO CONSEQUENCES THE REQUEST DOES NOT NAME, both found by looking rather than by reasoning.*
+  *(1) THE BAR HAD NO BACKGROUND. It only ever looked solid because `body` paints the same
+  `--gn-surface` behind it; measured as `rgba(0, 0, 0, 0)`. Transparent is invisible until something
+  scrolls under it, and then the page's text runs straight through the bar. Declared now at
+  `var(--gn-surface)`, which keeps the resting appearance byte-identical.*
+  *(2) EVERY ANCHOR LANDED BEHIND IT. A fragment navigation scrolls its target to the top of the
+  viewport, which is now under a 69.6px bar. Measured before the fix: clicking "§4 — Getting your
+  people in" put its heading at `top: 0.04px` with `scroll-margin-top: 0px` — the heading you asked
+  for was the only thing you could not see, on every topic link and every search result in `/help`.
+  `.gn-help__section`/`.gn-help__entry` now carry `scroll-margin-top`; re-measured at 86px against a
+  70px bar, clear with 16px of air.*
+  *`--app-nav-offset: 4.35rem` is not a magic number: `.gn-nav__links` is a 2.75rem control row and
+  `.gn-nav__inner` adds 0.8rem of padding twice, which is the 69.6px the browser reports, identical at
+  768px and 1512px — the whole range in which anything else here is sticky. It is DELIBERATELY not a
+  `--gn-` token: `tokens.test.ts` requires every `var(--gn-…)` in `ui.css` to name a declared role, and
+  this is one shell's layout fact rather than a design value. `apps/desktop` renders no nav, resolves
+  the `0px` fallback, and reproduces its previous behaviour exactly.*
+  *WHERE THE NUMBER IS AN UNDERSTATEMENT, recorded rather than left to be discovered: `.gn-nav__links`
+  wraps, so the bar grows on narrow viewports — **measured at 190px on a signed-in workspace route at
+  500px wide**, three rows of links. No single value can cover that, because the height depends on how
+  many links the ROUTE contributes and on the signed-in name's width, neither of which CSS can see, so
+  a media query would only trade one wrong value for another. Both consequences are bounded and both
+  were checked: `.gn-help__sidebar` is `position: static` below 48rem and cannot collide at all, and a
+  fragment lands ~86px down, correct wherever the bar does not wrap and merely short of it on a
+  wrapped phone bar — the heading is then a short scroll away rather than lost. Exactness here needs
+  the bar measured at runtime into the variable, which is a script, not a stylesheet.*
+  *The one property a spec DOES assert about this element was re-checked directly, since it covers
+  signed-in routes the viewport suite never visits: `e2e-stack/viewport.spec.ts` measures `.gn-nav`
+  for horizontal overflow (item 7's own defect — it escaped the viewport by 10px at 390px). Measured
+  live on a signed-in `/members` at the narrowest width this browser allows: **0 escaping elements,
+  `scrollWidth === clientWidth`**, bar sticky and wrapped to 190px. `position: sticky` does not alter
+  horizontal layout, so this was expected — but it is the assertion that exists, so it was read rather
+  than reasoned about.*
+  *`z-index: 20` is chosen against what is already in the tree, not picked: `.gn-select__panel` and
+  `.mention-popup` are 30, `.gn-dialog__scrim`/`.gn-sheet__scrim` are 40. A dropdown opening near the
+  top must render OVER the bar and a modal scrim must cover it; a bar outranking either would clip the
+  menu it belongs to.*
+  *Unasserted — this is CSS positioning, and nothing in the suite reads a computed style on the shell.
+  **Stated carefully this time:** 13.400's first draft made the same claim about the segmented control
+  and was WRONG (13.362 reads that one), so this was checked rather than assumed — no spec in
+  `e2e-viewport` or `e2e-stack` queries `.gn-nav`'s position, background or z-index. What the suite
+  DOES cover is that nothing regressed: overflow 0 at all three viewports, tap-target counts unmoved
+  at 25/23/25, 3 failed / 28 passed unchanged. Verified by direct measurement in the running dev
+  server — bar pinned at `top: 0` while scrolled 1400px, sidebar at 93.6px, anchors at 86px.* —
+  (no test; owner: whoever next asserts computed style on the shell)

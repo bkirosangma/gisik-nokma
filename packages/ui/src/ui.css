@@ -1919,9 +1919,18 @@
   /* Inset rather than flush (owner, 2026-09-15). `top: 0` pinned the pane
      against the viewport edge the moment it stuck; the 1.5rem leaves air, and
      `max-height` gives the same 1.5rem back at the bottom so a long topic list
-     still scrolls inside its own box rather than past the fold. */
-  top: 1.5rem;
-  max-height: calc(100vh - 3rem);
+     still scrolls inside its own box rather than past the fold.
+
+     `--app-nav-offset` clears the app bar, which became sticky later the same
+     day. Without it this pane sticks 1.5rem from the VIEWPORT top and spends
+     the rest of the page underneath a 4.35rem bar — its first topic group
+     permanently hidden. The variable is deliberately not a `--gn-` token: it
+     is one shell's layout fact, published by `apps/web/app/globals.css`, and
+     `apps/desktop` renders no nav at all. Hence the `0px` fallback, which is
+     what that app resolves and which reproduces this rule's previous
+     behaviour there exactly. */
+  top: calc(var(--app-nav-offset, 0px) + 1.5rem);
+  max-height: calc(100vh - var(--app-nav-offset, 0px) - 3rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -2148,6 +2157,23 @@
   .gn-help__column { padding-top: 1.25rem; }
 }
 
+/* ── EVERY ANCHOR IN THIS DOCUMENT LANDS CLEAR OF THE APP BAR.
+   Both of these carry the ids the sidebar's topic links and the search
+   results point at (`${document.id}-${entry.id}`), so a fragment navigation
+   scrolls one of them to the top of the viewport — which, since the bar became
+   sticky, is UNDERNEATH it. Measured before this rule existed: clicking
+   "§4 — Getting your people in" put its heading at `top: 0.04px` against a
+   69.6px bar, i.e. the heading you asked for was the one thing you could not
+   see. `scroll-margin-top` moves the scroll's resting place, not the element,
+   so nothing about the layout shifts.
+
+   Same `--app-nav-offset` with the same `0px` fallback as the sidebar above:
+   in `apps/desktop`, which has no bar, this resolves to a 1rem breathing gap,
+   which is an improvement there rather than a no-op. */
+.gn-help__section,
+.gn-help__entry {
+  scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
+}
 .gn-help__section { margin-bottom: 2.5rem; }
 /* The section eyebrow — `MANUAL · GETTING STARTED`. 13px/18px/600 with 0.4px
    tracking (0.4 ÷ 13 = 0.0308em) and 6px to the `h2`, all from the reference.
