@@ -103,7 +103,20 @@ input, textarea, select { font-family: inherit; }
 @media (max-width: 60rem) {
   .gn-shell { padding: 0 0.75rem 2rem; }
 }
-.gn-page-title { margin: 1.2rem 0 0.4rem; }
+/* The font-size change below is GLOBAL and meant to be: this rule declared no
+   font-size at all and fell through to the UA's `2em` on all thirteen pages
+   that use it (`/account`, `/inbox`, `/settings`, `/invite/[token]`,
+   `/mcp/authorize`, `/workspaces`, and every `/w/*` screen), and 34px is the
+   prototype's page-title size across screens. The existing `margin` stays
+   exactly as it was — see `.gn-workspaces__head .gn-page-title` below for the
+   one page that resets it, scoped rather than here. */
+.gn-page-title {
+  margin: 1.2rem 0 0.4rem;
+  font-size: 2.125rem;
+  line-height: 2.5625rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
 
 /* A one-line "back to the list" link above a detail page's own title — the
    ticket-type editor's `<Link>Ticket types</Link>`, and any later editor
@@ -125,6 +138,38 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-type-editor-header .gn-page-title { margin: 0; }
 .gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
+
+/* The prototype caps this screen at 1180px (`desktop.dc.html:177`), not at
+   `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
+   workspace home uses 1100px — so it lives here rather than widening or
+   narrowing every route that shares the shell. `.gn-workspace-founding`
+   existing apart from `.gn-project-founding` is the same precedent. */
+.gn-workspaces {
+  max-width: 73.75rem;
+  margin: 0 auto;
+  padding: 1.625rem 1.5rem 2.5rem;
+}
+
+.gn-workspaces__summary {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  color: var(--gn-text-muted);
+}
+
+/* The margin reset is SCOPED, because `.gn-page-title` is shared by thirteen
+   pages (`/account`, `/inbox`, `/settings`, `/invite/[token]`, every `/w/*`
+   screen…) and zeroing it globally would collapse the heading spacing on all
+   of them. Only this page hands its spacing to a flex column. */
+.gn-workspaces__head .gn-page-title {
+  margin: 0;
+}
+
+.gn-workspaces__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
    Both page-specific radius bumps below (`.gn-workspace-list .gn-card`,

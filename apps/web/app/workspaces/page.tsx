@@ -40,51 +40,65 @@ export default function WorkspacesPage() {
   return (
     <main className="gn-shell">
       <AppNav />
-      <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
-      {/* Error before data, everywhere in this shell. `getMyWorkspaces` is one
-          of the refusing reads (four of them since ruling P25 clause 1; this is
-          still one), so `workspaces === null` is its NORMAL
-          resting state against the shipped server and a bare "Loading…" here
-          would be a spinner that never stops. */}
-      {expired ? (
-        <ExpiredSessionNotice />
-      ) : error !== null ? (
-        <ShellRefusal what="Your workspaces" message={error} />
-      ) : workspaces === null ? (
-        <p>Loading…</p>
-      ) : workspaces.length === 0 ? (
-        // The second sentence this always needed (Plan 6 Task 15b, item 1). A
-        // person with a session and no workspace used to be told only to wait
-        // for somebody else, which was the last hole in the founding path.
-        <p>No workspaces yet. Ask an admin for an invite link — or create your own.</p>
-      ) : (
-        <ul className="gn-workspace-list">
-          {workspaces.map((workspace) => (
-            <WorkspaceCard key={workspace.id} workspace={workspace} />
-          ))}
-        </ul>
-      )}
+      <div className="gn-workspaces">
+        <div className="gn-workspaces__head">
+          <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
+          {/* Gated on `workspaces !== null`, not on `.length`: a REFUSED read is
+              also `null` here, and a summary rendered through it would print "0
+              workspaces you belong to." — a number nobody counted, about a list
+              nobody managed to read. ONE interpolation, so the sentence is one
+              text node. */}
+          {workspaces !== null ? (
+            <p className="gn-workspaces__summary">
+              {`${workspaces.length} ${workspaces.length === 1 ? 'workspace' : 'workspaces'} you belong to`}
+            </p>
+          ) : null}
+        </div>
+        {/* Error before data, everywhere in this shell. `getMyWorkspaces` is one
+            of the refusing reads (four of them since ruling P25 clause 1; this is
+            still one), so `workspaces === null` is its NORMAL
+            resting state against the shipped server and a bare "Loading…" here
+            would be a spinner that never stops. */}
+        {expired ? (
+          <ExpiredSessionNotice />
+        ) : error !== null ? (
+          <ShellRefusal what="Your workspaces" message={error} />
+        ) : workspaces === null ? (
+          <p>Loading…</p>
+        ) : workspaces.length === 0 ? (
+          // The second sentence this always needed (Plan 6 Task 15b, item 1). A
+          // person with a session and no workspace used to be told only to wait
+          // for somebody else, which was the last hole in the founding path.
+          <p>No workspaces yet. Ask an admin for an invite link — or create your own.</p>
+        ) : (
+          <ul className="gn-workspace-list">
+            {workspaces.map((workspace) => (
+              <WorkspaceCard key={workspace.id} workspace={workspace} />
+            ))}
+          </ul>
+        )}
 
-      {/*
-        OUTSIDE the list's three branches, and deliberately so. `getMyWorkspaces`
-        is one of the refusing reads — four of them since ruling P25
-        clause 1, and this is still one — so `error` is its NORMAL resting state
-        against the shipped server — and a founding form nested inside the
-        `workspaces.length === 0` arm would be a form nobody could ever reach.
-        A person who cannot be told which workspaces they are in can still found
-        one, and that is exactly the person who most needs to.
-      */}
-      {/*
-        OUTSIDE the list's five branches too, and beside the founding form for
-        the SAME reason it is: `getMyWorkspaces` refusing is this page's normal
-        resting state, and a person with a pending invitation and no workspace
-        yet is precisely the one the banner exists for — nesting it in the
-        `length === 0` arm would hide it from everyone whose list failed to
-        load, and nesting it inside the list would hide it from the person who
-        has no list.
-      */}
-      <InvitationBanner />
-      <FoundingForm />
+        {/*
+          OUTSIDE the list's three branches, and deliberately so. `getMyWorkspaces`
+          is one of the refusing reads — four of them since ruling P25
+          clause 1, and this is still one — so `error` is its NORMAL resting state
+          against the shipped server — and a founding form nested inside the
+          `workspaces.length === 0` arm would be a form nobody could ever reach.
+          A person who cannot be told which workspaces they are in can still found
+          one, and that is exactly the person who most needs to.
+        */}
+        {/*
+          OUTSIDE the list's five branches too, and beside the founding form for
+          the SAME reason it is: `getMyWorkspaces` refusing is this page's normal
+          resting state, and a person with a pending invitation and no workspace
+          yet is precisely the one the banner exists for — nesting it in the
+          `length === 0` arm would hide it from everyone whose list failed to
+          load, and nesting it inside the list would hide it from the person who
+          has no list.
+        */}
+        <InvitationBanner />
+        <FoundingForm />
+      </div>
     </main>
   );
 }

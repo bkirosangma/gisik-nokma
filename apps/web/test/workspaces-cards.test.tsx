@@ -72,6 +72,21 @@ function mount() {
   mountWith(WORKSPACES);
 }
 
+/**
+ * Task 4's refusal fixture, built the same way `page-refusals.test.tsx`
+ * builds one for this same page (`getMyWorkspaces` rejecting), rather than
+ * inventing a second helper for one branch this file already knows how to
+ * reach: `ShellRefusal` renders whatever `Error#message` the read rejects
+ * with, unparaphrased.
+ */
+function mountRefusing(message: string) {
+  render(
+    <Providers services={stubServices({ getMyWorkspaces: () => Promise.reject(new Error(message)) })}>
+      <WorkspacesPage />
+    </Providers>,
+  );
+}
+
 describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () => {
   it('3.153 keys each workspace card by its own workspaceId, distinguishing two siblings', async () => {
     mount();
@@ -462,5 +477,26 @@ describe('13.390 the card is a door to /w/<id>', () => {
       'href',
       '/w/ws2',
     );
+  });
+});
+
+/**
+ * Task 4 — the page head's one-line summary, gated on `workspaces !== null`
+ * rather than on `.length`. A REFUSED read is `null` at this point in the
+ * component exactly like an in-flight one is, so the interesting case is not
+ * that the summary renders once there is a list — it is that it stays absent
+ * on a refusal, where a naive `workspaces.length` gate would print "0
+ * workspaces you belong to.": a count of a list nobody managed to read.
+ */
+describe('Task 4 — the workspaces summary line', () => {
+  it('prints no summary when the workspaces read refused — a count of nothing counted', async () => {
+    mountRefusing('The ledger is unavailable.');
+    await screen.findByText(/ledger is unavailable/i);
+    expect(screen.queryByText(/workspaces? you belong to/i)).toBeNull();
+  });
+
+  it('summarises the list once it has one', async () => {
+    mountWith([workspace({ id: 'ws1', memberCount: 1 }), workspace({ id: 'ws2', memberCount: 1 })]);
+    expect(await screen.findByText('2 workspaces you belong to')).toBeInTheDocument();
   });
 });
