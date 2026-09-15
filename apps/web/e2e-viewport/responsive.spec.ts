@@ -993,7 +993,7 @@ for (const route of UNAUTHED_ROUTES) {
       .soft(
         typeScale.bodyFamily,
         `body on ${route.path} at ${name} is not painting in the product's stack — it computed to ` +
-          `"${typeScale.bodyFamily}", which does not begin with "${expectedFirstFamily}". ` +
+          `"${typeScale.bodyFamily}", which does not name "${expectedFirstFamily}". ` +
           `The likeliest cause is that \`--gn-font-sans\` did not resolve, which ALSO empties the ` +
           `uaFont list above and would otherwise read as a pass.`,
       )

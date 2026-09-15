@@ -289,23 +289,24 @@ written to make it work.*
   undone deliberately: it is a colour question with a contrast argument attached, and that change was
   about fonts. Named rather than quietly folded in.* — (no test; owner: whoever next touches
   `apps/desktop/src/theme.ts`)
-- **15.33** ✅ **The phone's inline code renders in the design's monospace face** — `monoFamilyFor`
-  returns `Menlo` on iOS and the generic `monospace` elsewhere, and the screen sets
-  `fontFamily: monoFamilyFor(Platform.OS)`.
-  *React Native takes one family name, not a CSS stack, so the prototype's `ui-monospace, Menlo,
-  monospace` becomes a branch — and the branch lives in the sibling `.ts` because `Platform.select`
-  would drag `react-native` into a node runner, which is the rule `vitest.config.ts` states and what
-  12.394's own docblock records. It replaces `'Courier'`, which was neither of the prototype's
-  families: a narrow typewriter face iOS ships for compatibility that no part of this design asked for.
-  The second assertion reads the `.tsx` as TEXT — the wiring, not a rendered glyph — because
-  `monoFamilyFor` could otherwise be correct and unused with both value cases green. That is the same
-  honest limit 12.396 states for `userInterfaceStyle`.*
-  *WHY THERE IS NO SANS CASE: the prototype's body stack begins `-apple-system`, a CSS keyword with no
-  meaning inside a `StyleSheet`. React Native already paints unstyled text in the platform's system
-  font — San Francisco on iOS, which is what that keyword resolves to. Writing the stack into a style
-  object would name six families the platform cannot find and fall back silently, so the port is the
-  ABSENCE of a declaration, and it is recorded so it does not read as an omission.* —
-  (`apps/mobile/src/screens/help-theme.test.ts`)
+- **15.33** ❌ **The ticket editor's `<code>` and `<pre>` render in the product's monospace** — they do
+  not, and this is where "everywhere" stops. StarterKit is configured with only `document`, `link` and
+  `underline` switched off, so the `code` mark and the `codeBlock` node are both live (that file's own
+  census counts their input and paste rules), while `packages/editor/src/styles/editor.css` declares
+  no `font-family` at all — every code span and code block in a ticket is on whatever monospace the
+  browser picked.
+  *NOT fixed here, and the reason is structural rather than an oversight. That stylesheet's header
+  states the boundary: `packages/editor` must not depend on `packages/ui`, so it draws every edge with
+  `currentColor` rather than a token. There is no `currentColor` for a typeface. And `editor.css` is
+  imported by exactly ONE module — `src/webview/entry.tsx`, the React Native WebView entry — which
+  installs no token stylesheet, so a `var(--gn-font-mono)` written there would resolve to nothing
+  today: with a `monospace` fallback it is a no-op that contradicts the file's own header, and without
+  one it is WORSE than the status quo, because a custom property that fails to resolve makes
+  `font-family` invalid at computed-value time and the code would inherit the SANS from its ancestor
+  instead of the UA's monospace. Fixing it properly means deciding how that webview gets the design
+  tokens at all — the same question `apps/desktop` answered with `installTheme` (15.17, 15.30) — and
+  that is a larger change than a font port.* — (no test; owner: whoever next gives the editor webview
+  its tokens)
 
 *NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
 sticky behaviour, the stacking breakpoint below 48rem, the active row's VISUAL treatment (15.25 asserts

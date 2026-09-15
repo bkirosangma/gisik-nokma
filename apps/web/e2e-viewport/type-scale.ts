@@ -172,12 +172,15 @@ export type TypeScale = {
    *
    * Safe as an equality because this product has exactly one SANS stack, and
    * the loop above skips `code`/`kbd`/`pre` descendants before reaching here.
-   * The declarations are `body`'s own `var(--gn-font-sans)`, three `inherit`s
-   * (`button`, and `input, textarea, select`), and — the second typeface, added
-   * 2026-09-15 with the prototype's fonts — `.gn-help__code`'s
-   * `var(--gn-font-mono)` in `ui.css`, which this sweep never examines. A
-   * second typeface in a LABEL position would still need this widened to a set,
-   * and would still fail loudly here first.
+   * The declarations are `body`'s own `var(--gn-font-sans)`; four `inherit`s
+   * (`button`, the `input, textarea, select` rule, and
+   * `.gn-mcp-authorize__input`'s own); and — the second typeface, added
+   * 2026-09-15 with the prototype's fonts — two MONO rules, `.gn-help__code` in
+   * `ui.css` and `.gn-invite-mint__url` in `globals.css`. Neither mono site is
+   * examined here: `code` is skipped by the `closest()` guard above, and
+   * `editor.css` is loaded only inside the RN webview this suite never opens. A
+   * second SANS typeface in a LABEL position would still need this widened to a
+   * set, and would still fail loudly here first.
    *
    * ITS FALSE-GREEN MODE, AND WHY `bodyFamily` IS REPORTED BELOW. This compares
    * each element to `body` and never to the product. Since 2026-09-15 `body`'s

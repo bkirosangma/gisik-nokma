@@ -90,6 +90,14 @@ button { font: inherit; }
    unmade rather than silently decided. */
 input, textarea, select { font-family: inherit; }
 
+/* The minted invite URL is a `<code>` with no rule of its own, so it had been
+   rendering in whatever monospace the browser defaulted to — the same absence
+   `.gn-help__code` had, and the reason a grep for `font-family` could not find
+   either: neither DECLARED a wrong font, both relied on the UA for the right
+   one. This is the product's mono now. It is a URL read off the screen and
+   typed or copied by hand, which is what the `<code>` tag was chosen for. */
+.gn-invite-mint__url { font-family: var(--gn-font-mono); }
+
 .gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 1.25rem 3rem; }
 .gn-shell__main { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
 @media (max-width: 60rem) {

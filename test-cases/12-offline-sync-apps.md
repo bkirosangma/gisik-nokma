@@ -2736,6 +2736,24 @@ the native app learns the OS preference". The answer is `useColorScheme()` plus 
   dark — which reads exactly like a themed screen that works. —
   (`apps/mobile/src/screens/help-theme.test.ts`)
   *Mutation: remove the declaration → fails.*
+- **12.397** ✅ **The phone's inline code renders in the design's monospace face** — `monoFamilyFor`
+  returns `Menlo` on iOS and the generic `monospace` elsewhere, and the screen sets
+  `fontFamily: monoFamilyFor(Platform.OS)`. Added 2026-09-15 with the port of the desktop prototype's
+  typefaces across all three clients (`/help`'s side of that change is 15.28–15.33).
+  *React Native takes ONE family name, not a CSS stack, so the prototype's `ui-monospace, Menlo,
+  monospace` has to become a branch — and the branch lives in the sibling `.ts` because
+  `Platform.select` would drag `react-native` into this node runner, which is the rule
+  `vitest.config.ts` states and 12.394's docblock already records. It replaces `'Courier'`, which was
+  neither of the prototype's families: a narrow typewriter face iOS ships for compatibility that no
+  part of this design asked for. The second assertion reads the `.tsx` as TEXT — the wiring, not a
+  rendered glyph — because `monoFamilyFor` could otherwise be correct and UNUSED with both value
+  cases green. Same honest limit 12.396 states for `userInterfaceStyle`.*
+  *WHY THERE IS NO SANS CASE, recorded so an absence does not read as an omission: the prototype's
+  body stack begins `-apple-system`, a CSS keyword with no meaning inside a `StyleSheet`. React Native
+  ALREADY paints unstyled text in the platform's system font — San Francisco on iOS, which is exactly
+  what that keyword resolves to. Writing the stack into a style object would not port it; it would
+  name six families the platform cannot find and fall back silently. The port is the ABSENCE of a
+  declaration.* — (`apps/mobile/src/screens/help-theme.test.ts`)
 
 > ### The deferral reason was not true, and nobody had re-checked it
 >

@@ -68,7 +68,10 @@ describe('12.396 the native shell is told to follow the system', () => {
 });
 
 /**
- * 15.33 — the phone's inline code renders in the design's monospace face.
+ * 12.397 — the phone's inline code renders in the design's monospace face.
+ * Numbered in THIS file's own series and not with the `/help` font cases it
+ * landed beside: `test-cases/` mirrors the feature sections, and the mobile
+ * help screen's cases are 12.394–12.396 here.
  *
  * The screen imports this rather than calling `Platform.select` inline so the
  * branch is reachable from a node runner at all; asserting `Platform.OS`
@@ -77,7 +80,7 @@ describe('12.396 the native shell is told to follow the system', () => {
  * (`fontFamily: monoFamilyFor(Platform.OS)`) is asserted against the source
  * below, not against a rendered glyph.
  */
-describe('15.33 the mobile monospace face', () => {
+describe('12.397 the mobile monospace face', () => {
   it('is Menlo on iOS and the generic monospace elsewhere, never Courier', () => {
     expect(monoFamilyFor('ios')).toBe('Menlo');
     expect(monoFamilyFor('android')).toBe('monospace');
