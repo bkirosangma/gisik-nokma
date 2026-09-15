@@ -192,6 +192,38 @@ written to make it work.*
   would point nowhere, and a missing one mid-document would strand a reader.
   *Mutation-witnessed: suppressing the pager reddens it at `EXIT=1`.* —
   (`packages/app-core/test/help/help-browser.test.tsx`)
+- **15.26** ✅ **The third dim text role clears 4.5:1 on every surface, in every style AND theme** —
+  `textSubtle`, added 2026-09-15 so `/help`'s furniture (eyebrows, group counts, the caret, the pager
+  label) can sit a step below `textMuted` the way the owner's prototype's `--label3` does. Covered by
+  the existing `'declared contrast pairs meet their minimums'` loop, which is why THREE rows were
+  declared (`surface`, `surfaceRaised`, `surfaceSunken`) and not the one `/help` uses: the loop only
+  checks what the array declares, so an undeclared co-occurring pair is unchecked by construction.
+  *The reference's own `--label3` is NOT what shipped, and the numbers are why: composited over the
+  four light surfaces it measures **3.00 / 3.10 / 2.87 / 2.96** — under 4.5 everywhere and under even
+  3.0 on two, so no honest `minimum` existed to declare for it. The shipped values are derived at this
+  palette's own (higher) baseline — `#5e5e62` light / `#a0a0a5` dark, binding constraint `surfaceSunken`
+  at **4.61** and **4.54**, with one step dimmer failing outright (`#606064` → 4.47, `#9e9ea3` → 4.43).
+  `grayAccessible` was unusable for the same reason its own docblock already gave: it is the status-dot
+  grey and fails text at **3.73** on `warmSunken`.* — (`packages/ui/test/tokens.test.ts`)
+- **15.27** ❌ **The Help screen's surfaces, type scale and geometry match the prototype** — the
+  search field and the results tray are RECESSED, not raised; the blockquote and the empty state are
+  the same tray card; body copy is 17px/22px; the reading column runs on one 20px rhythm. Unasserted
+  for the reason 15.14–15.16 already record: this is CSS, and nothing in the suite reads a computed
+  style on this screen.
+  *Measured live rather than left unstated. The two surface INVERSIONS this closed were real defects,
+  not restyles: `.gn-help__search-input` drew on `--gn-surface-raised` `#fbf7f3`, which is LIGHTER than
+  the `#efe7df` page behind it, while wearing a sunken shadow that said the opposite; `.gn-help__results`
+  sat on raised + a real `0 1px 3px` drop shadow. Both now read as wells. It matters most under
+  `minimal`, where BOTH shadow roles resolve to `none` and the hex was the only cue left — pointing the
+  wrong way; under `neo` light all three surface roles collapse to one hex, so the old rule was merely
+  invisible there rather than wrong. Type: body/list/quote/table 17px/22px set PER ELEMENT and not on a
+  container — this file is rem-based and `rem` is root-relative, so a `font-size` on `.gn-help__column`
+  would rescale nothing inside it. The two search-result lines are deliberately SMALLER (13px where,
+  15px snippet), which is the reference's own value and not an oversight. TWO LITERALS WERE DECLINED in
+  favour of the token: the field's `10px` and the quote's `12px` radii read `var(--gn-radius-control)` /
+  `var(--gn-radius-card)` instead, because a length literal would desync these two boxes from ruling
+  #386's radius scale under `neo` (14px/20px) to buy 2px and 4px — recorded as a deviation rather than
+  taken silently.* — (no test; owner: whoever next touches the help surfaces, with 15.14–15.16)
 
 *NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
 sticky behaviour, the stacking breakpoint below 48rem, the active row's VISUAL treatment (15.25 asserts

@@ -634,18 +634,32 @@ export function HelpBrowser() {
             different; adopt the additions" (owner, 2026-09-08) — since there is no
             shipped wording here to replace.
           */}
-          <h1 className="gn-help__title">Help</h1>
-          <label className="gn-help__search" htmlFor="gn-help-search">
-            <span className="gn-help__search-label">Search the manual and FAQ</span>
-            <input
-              id="gn-help-search"
-              className="gn-help__search-input"
-              type="search"
-              value={query}
-              placeholder="due date, passkey, offline…"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          {/*
+            The title and the search box are wrapped as one group because the
+            reference sets them closer to each other (14px) than to anything
+            around them (20px), and `.gn-help__column` is a flex container as
+            of the same change — so the distance has to be a `gap` on a
+            wrapper rather than a margin on the `h1`, which would add to the
+            column's gap instead of replacing it.
+
+            A presentational element with no semantics, deliberately: it sits
+            between the column and an `h1`/`label` that both keep their own
+            roles, so nothing an assistive technology reads changes.
+          */}
+          <div className="gn-help__intro">
+            <h1 className="gn-help__title">Help</h1>
+            <label className="gn-help__search" htmlFor="gn-help-search">
+              <span className="gn-help__search-label">Search the manual and FAQ</span>
+              <input
+                id="gn-help-search"
+                className="gn-help__search-input"
+                type="search"
+                value={query}
+                placeholder="due date, passkey, offline…"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+          </div>
 
           {/*
             The three states are drawn separately and named, rather than collapsing

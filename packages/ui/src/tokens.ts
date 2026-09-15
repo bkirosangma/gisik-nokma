@@ -367,6 +367,59 @@ export const primitives = {
    * further step was needed once `neoNavySunken` was satisfied.
    */
   textAccentDark: '#8bb1e6',
+
+  /**
+   * ## The THIRD dim step — `textSubtle` (2026-09-15, the Help restyle)
+   *
+   * **DERIVED, not the export's own value**, the same way `textAccentLight`
+   * is. The owner's Help prototype runs a three-level text hierarchy where
+   * this repo had two: `--label` (full), `--label2` (78% alpha) and
+   * `--label3` (52% alpha). `--label3` carries the eyebrows, the group
+   * counts and the pager's label — small uppercase text, which is the
+   * hardest kind to read dim.
+   *
+   * **The export's own `--label3` cannot be adopted literally, and the
+   * reason is arithmetic rather than preference.** Composited over the four
+   * light surfaces this product ships it measures **3.00** (`warmPaper`),
+   * **3.10** (`warmRaised`), **2.87** (`warmSunken`) and **2.96**
+   * (`neoPaper`) — not merely under the 4.5 read text owes, but under the
+   * 3.0 a purely decorative non-text mark would owe, on two of the four. A
+   * `CONTRAST_PAIRS` row at `minimum: 3` would have been red the moment it
+   * was written; there is no honest minimum to declare for that value.
+   *
+   * **What IS ported is the STEP, not the hex** — and the step is what the
+   * design actually encodes. This palette sits higher than the export's
+   * throughout: `textMuted` (`inkMuted`) measures **8.94** on `surface`
+   * where the export's `--label2` composite measures 6.13. A third level
+   * derived at the export's own ratio would land below AA; a third level
+   * derived at this palette's baseline keeps the reference's *proportional*
+   * two-step hierarchy (full → muted → subtle) and stays readable.
+   *
+   * These are the DIMMEST greys on Apple's own neutral hue (R=G, B=R+4
+   * light / R+5 dark, matching `grayAccessible`'s family) that clear 4.5 on
+   * every surface in their theme. The binding constraint — the number a
+   * future palette edit will break first — is `surfaceSunken` in both:
+   *
+   *   light  `#5e5e62`  surface 5.28 · raised 6.06 · **sunken 4.61** · neo 5.14
+   *   dark   `#a0a0a5`  surface 6.63 · raised 5.46 · **sunken 4.54** · neo 5.93
+   *
+   * One step dimmer fails outright in each (`#606064` → 4.47, `#9e9ea3` →
+   * 4.43), so there is no margin to give back here.
+   *
+   * **`grayAccessible` is NOT the ready-made answer**, and its own docblock
+   * above says why before this role existed: it is the status-DOT grey,
+   * split out of `inkMuted` precisely because it fails text at 4.16 on
+   * `surfaceSunken` (measured again here: 4.27 / 4.90 / **3.73** / 4.16).
+   * Reaching for it would have reintroduced the exact collision that split
+   * created.
+   *
+   * No `STYLE_COLOR_OVERRIDES` entry is needed: `neo` varies only surfaces
+   * and the fill ladder, never a text role, so all three styles resolve
+   * this through `themes` — which is why `neoPaper`/`neoNavy` are measured
+   * above rather than assumed.
+   */
+  textSubtleLight: '#5e5e62',
+  textSubtleDark: '#a0a0a5',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -378,6 +431,16 @@ export const TOKEN_ROLES = [
   'surfaceOverlay',
   'text',
   'textMuted',
+  /**
+   * The third dim step, below `textMuted`. Eyebrows, group counts, the
+   * pager's `Next` label — the text that says where you are rather than
+   * what is there. See `primitives.textSubtleLight` for the derivation and
+   * for why the reference's own alpha could not be taken literally.
+   *
+   * It is a TEXT role and carries the full 4.5 guarantee on all three
+   * surfaces; "subtle" names the visual weight, not a relaxed minimum.
+   */
+  'textSubtle',
   'textInverted',
   /**
    * ## `textAccent` vs `accentText` — Round 2d (2026-09-09), and the two names
@@ -515,6 +578,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceOverlay: 'overlayWarmHig',
     text: 'ink',
     textMuted: 'inkMuted',
+    textSubtle: 'textSubtleLight',
     textInverted: 'white',
     textAccent: 'textAccentLight',
     border: 'grayAccessible',
@@ -550,6 +614,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceOverlay: 'overlayNavyHig',
     text: 'fog',
     textMuted: 'fogMuted',
+    textSubtle: 'textSubtleDark',
     textInverted: 'ink',
     textAccent: 'textAccentDark',
     border: 'grayAccessibleDark',
@@ -787,6 +852,23 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'textMuted', bg: 'surfaceSunken', minimum: 4.5 },
   { fg: 'textAccent', bg: 'surface', minimum: 4.5 },
   { fg: 'textAccent', bg: 'surfaceRaised', minimum: 4.5 },
+  /**
+   * Added 2026-09-15 with `textSubtle`, and all THREE rows rather than the
+   * one `/help` currently needs. On that screen the role only ever lands on
+   * the ambient `surface` (eyebrows, group counts, the pager label) — but
+   * the role is global the moment it exists, and this array's own "GAP THIS
+   * BLOCK CLOSES" note is explicit that the undeclared co-occurring pair is
+   * the one a future edit breaks in silence. The derivation clears all
+   * three by construction (see `primitives.textSubtleLight`), so stating
+   * them costs nothing and the two unstated ones would have been free
+   * exposure.
+   *
+   * 4.5 and not 3: this is read text, not a decorative mark. Smallest
+   * margin in the set is `surfaceSunken` — 4.61 light, 4.54 dark.
+   */
+  { fg: 'textSubtle', bg: 'surface', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceRaised', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceSunken', minimum: 4.5 },
   { fg: 'categoryOpen', bg: 'surface', minimum: 3 },
   { fg: 'categoryActive', bg: 'surface', minimum: 3 },
   { fg: 'categoryTerminal', bg: 'surface', minimum: 3 },
