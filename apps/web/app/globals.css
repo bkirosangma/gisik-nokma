@@ -258,10 +258,17 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text);
   text-decoration: none;
   border-radius: var(--gn-radius-card);
-  /* The negative margin and the padding are EXACT NEGATIVES of `.gn-card`'s
-     own 0.75rem, so the hover fill reaches the card's edge. The prototype's
-     card padding is 20px; the door absorbs the extra 0.5rem. Change one of
-     these numbers without the other and a seam opens at the card edge. */
+  /* `margin: -0.75rem` is the exact negative of `.gn-card`'s own `0.75rem`
+     padding (packages/ui/src/ui.css:140). It pulls the door out to the
+     card's edge so the hover fill and the focus ring cover the whole card
+     rather than a box inset within it. THAT pairing is coupled: if
+     `.gn-card`'s padding ever changes, this margin must change with it.
+
+     The door's own `padding: 1.25rem` is NOT part of that pairing. It is
+     the prototype's 20px card padding, which the door supplies precisely
+     BECAUSE the line above has just cancelled the card's own. Do not
+     "correct" the margin to `-1.25rem` to match it — that would inset the
+     card twice. */
   margin: -0.75rem;
   padding: 1.25rem;
 }
