@@ -1944,38 +1944,46 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // docblock names.
   //
   // ═══════════════════════════════════════════════════════════════════════
-  // THE GEOMETRY IS `sunken`, NOT `raised` — OWNER, 2026-09-15
+  // OWNER ROUND 5 (2026-09-16, case 13.412) — A DEDICATED `selected` ROLE,
+  // NOT `sunken` BORROWED FROM ANOTHER COMPONENT
   // ═══════════════════════════════════════════════════════════════════════
   //
-  // "the active one had a sunken style, and the inactive one was normal / in
-  // the prototype it was sunken style. i want it to follow that." The
-  // reference gives this control FIVE `--segOnShadow` values split on the
-  // style axis (`design-system/interactive/desktop.dc.html`): a drop shadow
-  // under `hig`, `none` under `minimal`, and `inset` pairs under `neo`. Only
-  // the `neo` arm was wrong, and `neo` is the shipped default — so this
-  // assertion had been pinning the one arm everybody actually saw, backwards.
+  // The history: owner, 2026-09-15, "the active one had a sunken style... i
+  // want it to follow that" — approximated at the time by pointing `neo` at
+  // the existing `sunken` role (`inset 4px 4px 9px`), which is what this
+  // test used to pin. The reference gives this control FIVE `--segOnShadow`
+  // values split on the style axis (`design-system/interactive/desktop.dc.html`):
+  // a drop shadow under `hig`, `none` under `minimal`, and `inset` pairs
+  // under `neo` — and `neo`'s own geometry is `inset 3px 3px 6px`, which
+  // `sunken`'s `4px 4px 9px` never actually matched. Owner round 5 replaced
+  // the two-role approximation with a dedicated fifth `ShadowRole`,
+  // `selected` (`tokens.ts`'s `SHADOWS` table), so the pinned offsets below
+  // moved from `sunken`'s geometry to `selected`'s own.
   //
-  // THIS CASE IS THE REASON THAT WAS CAUGHT AT ALL. The change was committed
-  // (810d8470) with a note claiming nothing in the suite read a computed
-  // style on this component; this test does, and reddened on all three
-  // viewports. The claim was wrong and the run said so before anything
-  // shipped further — which is the whole argument for witnessing a rendered
-  // value rather than trusting the source.
+  // THIS CASE IS THE REASON THE ORIGINAL MISMATCH WAS CAUGHT AT ALL. The
+  // 2026-09-15 change was committed (810d8470) with a note claiming nothing
+  // in the suite read a computed style on this component; this test does,
+  // and reddened on all three viewports. The claim was wrong and the run
+  // said so before anything shipped further — which is the whole argument
+  // for witnessing a rendered value rather than trusting the source.
   //
-  // Still discriminating by SHAPE rather than by mere non-'none'-ness, and
-  // MORE sharply than before: `hig`'s and `minimal`'s `sunken` both resolve
-  // to `none` (`tokens.ts`'s `SHADOWS` table), so the `inset` keyword plus
-  // these offsets can only appear under `neo`. `.split(',').length >= 2` was
-  // tried in an earlier revision and is WRONG for the same reason it always
-  // was: `getComputedStyle` renders each layer's colour as `rgba(r, g, b, a)`,
-  // which itself contains commas, so counting commas proves nothing about
-  // layer count. The offsets come from `SHADOWS.neo.<theme>.sunken`:
-  // `inset 4px 4px 9px` + `inset -4px -4px 9px`, identical in both themes.
+  // Still discriminating by SHAPE rather than by mere non-'none'-ness:
+  // `hig`'s and `minimal`'s `selected` both resolve to values with no
+  // `inset` / to `'none'` (`tokens.ts`'s `SHADOWS` table), so the `inset`
+  // keyword plus these offsets can only appear under `neo`.
+  // `.split(',').length >= 2` was tried in an earlier revision and is WRONG
+  // for the same reason it always was: `getComputedStyle` renders each
+  // layer's colour as `rgba(r, g, b, a)`, which itself contains commas, so
+  // counting commas proves nothing about layer count. The offsets come from
+  // `SHADOWS.neo.<theme>.selected`: `inset 3px 3px 6px` +
+  // `inset -3px -3px 6px`, identical in both themes.
   const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('inset');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('4px 4px 9px');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-4px -4px 9px');
-  // The old raised geometry must be GONE, not merely joined by the new one —
-  // without this, a rule that emitted both would satisfy every line above.
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('3px 3px 6px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-3px -3px 6px');
+  // The old raised geometry, AND the old (approximated) sunken geometry this
+  // case used to pin, must both be GONE — without these, a rule emitting any
+  // of them alongside the real one would satisfy the lines above.
   expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('7px 7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('4px 4px 9px');
 });

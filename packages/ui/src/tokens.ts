@@ -74,7 +74,6 @@ export type StyleName = 'hig' | 'minimal' | 'neo';
  */
 export const primitives = {
   white: '#ffffff',
-  ink: '#000000',
   inkMuted: '#3c3c43',
   /** Untouched — the border story is atomic and lands with its sweep. */
   line: '#d9d6cf',
@@ -110,7 +109,6 @@ export const primitives = {
   violet300: '#da8fff',
   magenta600: '#d30f45',
   magenta300: '#ff6482',
-  fog: '#ffffff',
   fogMuted: '#ebebf5',
   /** Untouched — see `line`. */
   seam: '#3a3833',
@@ -480,11 +478,27 @@ export const primitives = {
    * ADDED rather than mutating `ink`/`white` in place: other roles may still
    * reference those two primitives for non-text purposes, and editing a
    * primitive in place makes that blast radius invisible. After this change,
-   * `ink`, `white`, `fog` and `navy900` are referenced by NO role in `themes`
+   * `ink`, `white`, `fog` and `navy900` were referenced by NO role in `themes`
    * or `STYLE_COLOR_OVERRIDES` (verified: `themes.light`/`themes.dark` were
    * their only referents, and every one of those nine lines is repointed
-   * below). They are kept rather than deleted — see the owner round-4 report
-   * for the standing question of whether to remove them.
+   * below). All four were kept rather than deleted at the time, pending an
+   * owner decision on whether they still earned their place.
+   *
+   * **That decision arrived, owner round 5 (2026-09-16): "delete `ink` and
+   * `fog`."** Checked before deleting, not assumed: neither has a referent
+   * anywhere in `packages/ui/src`, `packages/ui/test`, `apps/`, or elsewhere
+   * in the repo, so both were removed from `primitives` outright.
+   *
+   * `white` and `navy900` were kept, per the instruction — but a repo-wide
+   * check found **no live referent for them either.** The two lines
+   * sometimes cited as pinning them (`packages/ui/test/tokens.test.ts`
+   * `:757`–`:758`) are inside a comment describing what an assertion USED TO
+   * read before it was corrected (see that file's `'13.360 accentText…'`
+   * case) — the live assertions there pin `onColorWarmLight`/`onColorWarmDark`
+   * now, not `white`/`navy900`. So as of this change `white` and `navy900`
+   * are in the same referent-free state `ink`/`fog` were in — they are kept
+   * anyway because deleting them was not asked for here, not because a
+   * referent was found. See the owner round-5 report.
    *
    * `labelWarmLight`/`labelWarmDark` are the export's `--label`
    * (`desktop.dc.html:16` light, `:36` dark) — the `text` role in both
@@ -548,9 +562,12 @@ export const TOKEN_ROLES = [
    * itself accent-coloured.
    *
    * They cannot share a value. `accent` (`blue600`/`blue300`) is legible
-   * enough as a FILL — `accentText` (`white`/`navy900`) only has to clear 4.5
-   * against that one saturated colour, and it clears by a wide margin (5.26
-   * light / 7.48 dark, measured against the Round 2d hexes). `accent` as
+   * enough as a FILL — `accentText` (`onColorWarmLight`/`onColorWarmDark` as
+   * of owner round 4, 2026-09-16; originally `white`/`navy900`) only has to
+   * clear 4.5 against that one saturated colour, and it clears with margin
+   * (4.93 light / 7.15 dark, re-measured against the round-4 hexes — down
+   * from 5.26/7.48 against the original `white`/`navy900` pair, still well
+   * clear). `accent` as
    * TEXT is a different, harder problem: it has to clear 4.5 against every
    * *neutral* surface/raised background the product ships (`warmPaper`,
    * `warmRaised`, `neoPaper` in light; `navyBase`, `navyRaised`, `neoNavy`,
@@ -604,10 +621,13 @@ export const TOKEN_ROLES = [
    * recorded here rather than discovered by a reviewer.** The obvious pair —
    * `{ fg: 'textInverted', bg: 'brand', minimum: 3 }`, matching the tile's
    * actual composition (`.gn-page-header__icon`'s glyph stroke on its own
-   * fill) — MEASURES **2.87 in light theme** (`white` on `#EE7733`), below
-   * even the 3:1 a non-text UI component owes under WCAG 1.4.11. Dark
-   * clears easily (`ink` on `#EE7733` = 7.32); light does not, and no
-   * same-hue nudge fixes it without abandoning the owner's exact orange.
+   * fill) — MEASURES **2.69 in light theme** (`onColorWarmLight` on
+   * `#EE7733`, as of owner round 4, 2026-09-16 — originally `white` at 2.87
+   * before `textInverted` moved off the pure primitive), below even the 3:1 a
+   * non-text UI component owes under WCAG 1.4.11. Dark clears easily
+   * (`onColorWarmDark` on `#EE7733` = 6.02; originally `ink` at 7.32); light
+   * does not, and no same-hue nudge fixes it without abandoning the owner's
+   * exact orange.
    *
    * The tile is exempt rather than failing, for the same reason WCAG 1.4.11
    * itself carves out: the icon is `aria-hidden="true"` (`sign-in/page.tsx`)
@@ -859,8 +879,61 @@ export function fontVariableName(role: FontRole): string {
  * scanner's regex then hides rather than catches. It is that combination,
  * not the hyphen's absence alone, that would have left the chip's
  * `box-shadow` resolving to nothing.
+ *
+ * ## `selected` — added owner round 5 (2026-09-16)
+ *
+ * The gap `sunken-compact`'s own docblock (and `SHADOW_ROLES`' emission-list
+ * docblock below) flagged and deliberately left alone:
+ * `[data-style="neo"] .gn-segmented__item--on` was approximated with the
+ * existing `sunken` role (`inset 4px 4px 9px`), but the prototype's own
+ * `--segOnShadow` (`design-system/interactive/desktop.dc.html:29` hig light,
+ * `:43` hig dark, `:51` minimal, `:65` neo light, `:77` neo dark) is not
+ * another step on the sunken scale at all — verified by reading each line
+ * individually rather than assumed from the neo arm alone:
+ *
+ *   hig light   `0 3px 8px rgba(39,58,99,.16), 0 3px 1px rgba(39,58,99,.06)` — RAISED (drop), two layers
+ *   hig dark    `0 3px 8px rgba(6,10,22,.66)` — RAISED, ONE layer only (no second layer in the export)
+ *   minimal     `none`
+ *   neo light   `inset 3px 3px 6px rgba(176,152,132,.55), inset -3px -3px 6px rgba(255,255,255,.95)` — INSET
+ *   neo dark    `inset 3px 3px 6px rgba(0,0,0,.55), inset -3px -3px 6px rgba(255,255,255,.05)` — INSET
+ *
+ * Raised under one style, absent under another, inset under a third — a name
+ * like `sunken-something` would be actively wrong. Named instead for the
+ * STATE it expresses (the chosen item in a group), not the component
+ * (`segmented`) and not a scale position (`sunken`/`raised`), the same
+ * naming discipline `sunken-compact` already established: `selected` reads
+ * naturally as a role any future single-choice control (tabs, a radio-styled
+ * list row) could reuse, where `segmentedOn` or `segOn` would not.
+ *
+ * Every one of the six layer colours across these five style×theme
+ * combinations turned out to be byte-identical to a primitive this file
+ * already had (verified by rgba→hex arithmetic — alpha byte =
+ * round(alpha × 255) — not eyeballed): `shadowHigLight`/`shadowHigDark`
+ * (hig's own two shadow primitives), `shadowNeoRaisedDarkLight`/
+ * `shadowNeoHighlightLight` (neo light, the same pair `raised` and
+ * `sunken-compact` already use), and `shadowNeoSunkenCompactDarkDark`/
+ * `shadowNeoSunkenHighlightDark` (neo dark, the same pair `sunken-compact`
+ * already uses). No new primitive was needed for this role.
+ *
+ * **One reused primitive crosses categories, and that is worth flagging
+ * explicitly.** hig light's second layer (`rgba(39,58,99,0.06)`,
+ * alpha byte round(0.06×255)=15=`0x0f`) is byte-identical to
+ * `fillWarmHig4` (`#273a630f`) — a FILL primitive, not one of the
+ * `shadowHig*`/`shadowNeo*` family every other shadow layer in this file
+ * draws from. Reused rather than duplicated under a new name, per this
+ * file's own anti-duplication precedent (`sunken-compact`'s docblock:
+ * "reused... rather than duplicated under a new name"), but note for a
+ * future reader: (1) `fillWarmHig4` is also `hig`/`minimal` light's
+ * `fillQuaternary` — a future *fill*-side accessibility nudge to that role
+ * (the same kind `fillNavyHig3`/`fillNavyNeo3` already received) would
+ * silently move this shadow layer's colour too, since both read the same
+ * primitive; (2) case 13.338 (`packages/ui/test/tokens.test.ts`) enumerates
+ * shadow layer colours by `name.startsWith('shadow')`, so this one layer's
+ * colour falls outside that sweep — harmless today (no `CONTRAST_PAIRS` row
+ * names `fillQuaternary`, so 13.338's actual guarantee is unaffected), but
+ * the sweep no longer covers every shadow layer by construction.
  */
-export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact';
+export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact' | 'selected';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
@@ -884,6 +957,13 @@ type ShadowLayer = {
  * by fill/label instead). `hig` and `minimal` are both `[]` for
  * `sunken-compact`, exactly as they are for `sunken` — the prototype's `hig`
  * (`minimal` inherits) gives `--chipShadow:none` (`desktop.dc.html:24`).
+ *
+ * `selected` (owner round 5, 2026-09-16) is transcribed from the export's
+ * `--segOnShadow` — see `ShadowRole`'s own docblock above for the per-line
+ * citations and the primitive-reuse arithmetic. Unlike every other role
+ * here, `hig`'s two themes are NOT symmetric: light carries two layers,
+ * dark only one — the export's dark block simply never declares a second
+ * `--segOnShadow` layer, so this is not an omission.
  */
 const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
   hig: {
@@ -892,17 +972,24 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
       'sunken-compact': [],
+      /** `--segOnShadow` hig light (`desktop.dc.html:29`) — both layers reused, see `ShadowRole`'s docblock. */
+      selected: [
+        { x: 0, y: 3, blur: 8, colour: 'shadowHigLight' },
+        { x: 0, y: 3, blur: 1, colour: 'fillWarmHig4' },
+      ],
     },
     dark: {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
       'sunken-compact': [],
+      /** `--segOnShadow` hig dark (`desktop.dc.html:43`) — ONE layer only, not two; see the docblock above. */
+      selected: [{ x: 0, y: 3, blur: 8, colour: 'shadowHigDark' }],
     },
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [] },
-    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [] },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
   },
   neo: {
     light: {
@@ -922,6 +1009,17 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       'sunken-compact': [
         { x: 2, y: 2, blur: 4, colour: 'shadowNeoRaisedDarkLight', inset: true },
         { x: -2, y: -2, blur: 4, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      /**
+       * `--segOnShadow` neo light (`desktop.dc.html:65`) — same colour pair as
+       * `raised`/`sunken-compact` (`shadowNeoRaisedDarkLight`/
+       * `shadowNeoHighlightLight`), a THIRD geometry (3px/3px/6px, inset) —
+       * see `ShadowRole`'s own docblock for why no existing role could be
+       * reused for this one.
+       */
+      selected: [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
       ],
     },
     dark: {
@@ -947,6 +1045,16 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       'sunken-compact': [
         { x: 2, y: 2, blur: 4, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
         { x: -2, y: -2, blur: 4, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      /**
+       * `--segOnShadow` neo dark (`desktop.dc.html:77`) — same colour pair as
+       * `sunken-compact` (`shadowNeoSunkenCompactDarkDark`/
+       * `shadowNeoSunkenHighlightDark`), the 3px/3px/6px geometry instead of
+       * `sunken-compact`'s 2px/2px/4px.
+       */
+      selected: [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
       ],
     },
   },
@@ -1141,8 +1249,19 @@ const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
  * here and forgotten in the test's list) instead reds the "declared role"
  * check loudly, which is safe, just noisy. See case 13.411, which closes
  * this gap directly by asserting the stylesheet's actual emitted content.
+ *
+ * **`selected` added, owner round 5 (2026-09-16) — and 13.411 itself needed a
+ * manual addition to keep covering it.** 13.411's own `EXPECTED_SHADOW_ROLES`
+ * is a SEPARATE hardcoded literal in the test file, deliberately not derived
+ * from this array (see that case's docblock) so it can detect a role
+ * vanishing from here. The consequence, confirmed rather than assumed: as
+ * originally written, 13.411 did NOT cover a newly added role — its literal
+ * simply did not know `'selected'` existed, so a `'selected'` missing from
+ * this array would have passed 13.411 silently. `EXPECTED_SHADOW_ROLES` was
+ * updated to add `'selected'` in the same change that added it here, which
+ * is what makes 13.411's coverage of this role real rather than assumed.
  */
-export const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
+export const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {

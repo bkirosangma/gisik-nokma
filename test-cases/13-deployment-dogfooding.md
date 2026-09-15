@@ -2216,7 +2216,8 @@ nobody ships and then defend it.
 
 Block `13.337`–`13.347`. `packages/ui/src/tokens.ts` gains a `StyleName` axis (`hig`|`minimal`|`neo`)
 beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay` —
-**a fourth shadow role, `sunken-compact`, joined 2026-09-16; see block `13.411` below rather than treating
+**a fourth shadow role, `sunken-compact`, joined 2026-09-16 (block `13.411`), and a fifth, `selected`,
+joined the same day (block `13.412`); see those blocks below rather than treating
 this historical sentence as the current roster**);
 `StyleToggle` (`apps/web/src/style-toggle.tsx`) ships beside `ThemeToggle`, neo default. That half
 committed separately (`8e6c6d31`); this section is the CSS restyle of the nine shared class families
@@ -2409,8 +2410,8 @@ review of the `sunken-compact` shadow-role fix (owner round 3) stated the next f
 repo-wide grep for every `13.4\d\d` occurrence at this branch's HEAD found the true maximum IN USE was
 still `13.410` (the `13.411` hit was this pointer's own prose, reproducing the exact trap this file's
 "CORRECTED 2026-09-15" paragraph above already documented once). **`13.411` is minted below** for the
-`sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **The next free BLOCK is
-now `13.412`.**
+`sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **`13.412` is minted below**
+for the `selected` shadow role. **The next free BLOCK is now `13.413`.**
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -3448,6 +3449,13 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   last line a rule emitting both would satisfy the others. The discrimination is sharper than the
   version it replaced: `hig` and `minimal` both resolve `sunken` to `none`, so these offsets can only
   appear under `neo`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)
+  ***SUPERSEDED, owner round 5 (2026-09-16, case 13.412).** The two-role approximation this entry
+  documents (`raised` for `hig`, `sunken` for `neo`) is replaced by a dedicated fifth `ShadowRole`,
+  `selected`, that reproduces all five prototype values exactly — including `neo`'s own 3px/3px/6px
+  geometry, which `sunken`'s 4px/4px/9px never matched precisely. `13.362`'s pinned offsets moved with
+  it (`4px 4px 9px` → `3px 3px 6px`); see 13.412 for the new arithmetic and mutation evidence. The
+  background half of this entry is UNCHANGED — `background: var(--gn-surface-sunken)` still stands,
+  since a shadow role carries no background of its own.*
 
 - **13.401** ✅ **The segmented track paints no background of its own** — `.gn-segmented` dropped
   `background: var(--gn-fill-tertiary)`. Owner, 2026-09-15: *"the background also needs to be removed

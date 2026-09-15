@@ -353,7 +353,11 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
    */
   it('13.411 every declared shadow role reaches the emitted stylesheet', () => {
     // A literal, not an import — see the docblock above for why.
-    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact'] as const;
+    // `'selected'` added owner round 5 (2026-09-16, case 13.412) — this
+    // literal does NOT track `SHADOW_ROLES` automatically (that is the whole
+    // point, see the docblock above), so a role added to `SHADOWS`/`ShadowRole`
+    // without a matching addition HERE stays uncovered by this case, silently.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'] as const;
     const stylesheet = themeStylesheet();
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
@@ -366,6 +370,57 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
         }
       }
     }
+  });
+
+  /**
+   * 13.412 — owner round 5 (2026-09-16), the `selected` shadow role: the
+   * prototype's `--segOnShadow`, RAISED under `hig`, `none` under `minimal`,
+   * INSET under `neo` — see `ShadowRole`'s own docblock in `tokens.ts` for
+   * the per-line citations. Pinned as exact strings, not just shape, for the
+   * same reason 13.411's own sibling case in `tokens.ts` gives:
+   * `toContain('inset')` alone would stay green even if a future edit swapped
+   * in a wrong-but-still-inset primitive.
+   *
+   * `hig`'s two themes are asserted to be ASYMMETRIC on purpose — light has
+   * two layers, dark has one — matching the export exactly rather than
+   * assuming symmetry every other role in this table happens to have.
+   *
+   * Mutation, performed and reverted live: temporarily dropping `'selected'`
+   * from `SHADOW_ROLES` in `tokens.ts` (leaving `ShadowRole`/`SHADOWS`
+   * untouched) reddened this exact case with
+   * `AssertionError: hig/light/selected — expected declaration
+   * "--gn-shadow-selected: 0px 3px 8px #273a6329, 0px 3px 1px #273a630f;" in
+   * themeStylesheet()'s output`, confirming 13.411 (with `'selected'` added
+   * to its own hardcoded `EXPECTED_SHADOW_ROLES`) actually catches a missed
+   * emission for this role rather than merely being extended to look like it
+   * does. `SHADOW_ROLES` restored immediately after capture, full suite
+   * re-run green before this case was written down.
+   */
+  it('13.412 selected is pinned to the prototype\'s --segOnShadow, exactly, per style×theme', () => {
+    expect(shadowValueOf('hig', 'light', 'selected')).toBe('0px 3px 8px #273a6329, 0px 3px 1px #273a630f');
+    expect(shadowValueOf('hig', 'dark', 'selected')).toBe('0px 3px 8px #060a16a8');
+    expect(shadowValueOf('minimal', 'light', 'selected')).toBe('none');
+    expect(shadowValueOf('minimal', 'dark', 'selected')).toBe('none');
+    expect(shadowValueOf('neo', 'light', 'selected')).toBe(
+      'inset 3px 3px 6px #b098848c, inset -3px -3px 6px #fffffff2',
+    );
+    expect(shadowValueOf('neo', 'dark', 'selected')).toBe(
+      'inset 3px 3px 6px #0000008c, inset -3px -3px 6px #ffffff0d',
+    );
+    // Discriminating checks beyond the exact strings above: `hig` is a real
+    // (non-'none') drop shadow with no `inset`, `neo` is `inset` and a
+    // DIFFERENT geometry than both `sunken` (4px/4px/9px) and
+    // `sunken-compact` (2px/2px/4px) — the whole reason this role exists
+    // rather than reusing either.
+    expect(shadowValueOf('hig', 'light', 'selected')).not.toContain('inset');
+    expect(shadowValueOf('hig', 'light', 'selected')).not.toBe('none');
+    expect(shadowValueOf('neo', 'light', 'selected')).toContain('inset');
+    expect(shadowValueOf('neo', 'light', 'selected')).toContain('3px 3px 6px');
+    expect(shadowValueOf('neo', 'light', 'selected')).not.toContain('4px 4px 9px');
+    expect(shadowValueOf('neo', 'light', 'selected')).not.toContain('2px 2px 4px');
+    expect(shadowValueOf('neo', 'dark', 'selected')).toContain('3px 3px 6px');
+    expect(shadowValueOf('neo', 'dark', 'selected')).not.toContain('4px 4px 9px');
+    expect(shadowValueOf('neo', 'dark', 'selected')).not.toContain('2px 2px 4px');
   });
 });
 

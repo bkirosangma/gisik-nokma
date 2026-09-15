@@ -2446,7 +2446,7 @@
 .gn-segmented__item--on {
   background: var(--gn-surface-raised);
   font-weight: 600;
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-selected);
 }
 /* ── OWNER, 2026-09-15: "in the prototype it was sunken style. i want it to
    follow that." Under `neo` the SELECTED segment is PRESSED, not lifted.
@@ -2461,19 +2461,19 @@
      neo light  inset 3px 3px 6px rgba(176,152,132,.55), inset -3px -3px 6px rgba(255,255,255,.95)
      neo dark   inset 3px 3px 6px rgba(0,0,0,.55),       inset -3px -3px 6px rgba(255,255,255,.05)
 
-   So the base rule above is already right for `hig` (raised) and `minimal`
-   (`--gn-shadow-raised` resolves to `none` there); only `neo` was wrong, and
-   `neo` is the shipped default — which is why this read as simply backwards.
-   One `[data-style]` override reproduces all five from the two existing
-   tokens, with no new shadow role and no literal.
-
-   WHY THE BACKGROUND STAYS `--gn-surface-raised`: under `neo` every surface
-   role collapses to one hex, so this resolves to the page's own ground while
-   the track around it is a `fill-tertiary` tint. The inset shadow then reads
-   as a well pressed INTO the control rather than a panel floating on it,
-   which is the effect the reference's own neo values produce. `hig` and
-   `minimal` are untouched here, exactly as `.gn-field__input`'s neo rule
-   above leaves them.
+   OWNER ROUND 5 (2026-09-16): a dedicated `selected` shadow role now carries
+   all five values directly (`packages/ui/src/tokens.ts`'s `SHADOWS` table),
+   which is why the base rule above reads `var(--gn-shadow-selected)` rather
+   than `var(--gn-shadow-raised)` and no `[data-style="neo"]` override for
+   `box-shadow` exists below any more. The two-role approximation this
+   replaced (`raised` for `hig`/`minimal`, `sunken` for `neo`) happened to
+   read right for `hig`/`minimal` — `raised` resolves to `none` under
+   `minimal`, matching the reference exactly — but `neo`'s own geometry
+   (3px/3px/6px) never matched `sunken`'s (4px/4px/9px); a dedicated role was
+   the honest fix rather than a third borrowed scale position. See
+   `ShadowRole`'s own docblock in `tokens.ts` for why `selected` is named for
+   the STATE (the chosen item in a group) and not for a scale position or for
+   this component.
 
    This is the SHARED control, so it moves everywhere `SegmentedControl` is
    used — the sign-in method picker, `/account`'s appearance rows, `/help`'s
@@ -2488,9 +2488,23 @@
      `surfaceRaised` differs from it in LIGHT (`#fbf7f3`), so keeping it would
      have left the pressed segment sitting a shade too high in exactly the
      theme this suite runs in. Same pairing `.gn-field__input` and
-     `.gn-help__search-input` take under `neo`: sunken ground, sunken shadow. */
+     `.gn-help__search-input` take under `neo`: sunken ground, sunken shadow.
+
+     NO `box-shadow` OVERRIDE HERE as of owner round 5 (2026-09-16): the base
+     rule's `var(--gn-shadow-selected)` already resolves to `neo`'s own inset
+     geometry directly (see the block comment above `.gn-segmented__item--on`),
+     so the `box-shadow: var(--gn-shadow-sunken)` line this override used to
+     carry became redundant and was removed. `background` stays overridden —
+     a shadow role carries no background of its own, so nothing about the new
+     role makes this line redundant too. (Note, not a further change: under
+     `neo` today `surfaceRaised` and `surfaceSunken` are themselves
+     byte-identical in both themes — `neoPaper` light, `neoNavy` dark — so
+     this override currently repaints the same colour the base rule would
+     have anyway. Kept rather than removed: that identity is an artifact of
+     `neo`'s current palette, not a guarantee `STYLE_COLOR_OVERRIDES` states,
+     and this line is what stays correct if a future palette edit separates
+     them again.) */
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
