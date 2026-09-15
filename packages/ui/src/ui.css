@@ -94,10 +94,18 @@
    minimal shipped a visible pill with no horizontal padding (glyphs against
    the edge), and neo shipped flat instead of carved-in. Under `neo`,
    sharing `surface-raised` with the card is CORRECT, not the same defect as
-   hig: neo's boundary comes from the inset `shadow-sunken`, never from a
-   colour difference (see `.ticket-type-list__row`'s own docblock for the
-   same "neo has one flat hex per surface role, depth is shadow-only" fact),
-   so the flat-fill instinct that fixes hig is exactly wrong for neo. */
+   hig: neo's boundary comes from an inset shadow, never from a colour
+   difference (see `.ticket-type-list__row`'s own docblock for the same "neo
+   has one flat hex per surface role, depth is shadow-only" fact), so the
+   flat-fill instinct that fixes hig is exactly wrong for neo.
+
+   Owner round 3 (2026-09-16): that inset shadow was `shadow-sunken` — the
+   SAME 4px/4px/9px treatment `.gn-field__input`/`.ticket-type-list__row` use
+   — and it read as too much shadow for a badge-sized element ("too much
+   shadow for a small badge"). The prototype agrees: `--chipShadow`
+   (`desktop.dc.html:59` light, `:71` dark) is its own smaller 2px/2px/4px
+   step, never the 4px/9px `--fieldShadow`/`--trayShadow` use. Now carved with
+   `shadow-sunken-compact` instead — see that role's docblock in `tokens.ts`. */
 .gn-chip {
   display: inline-flex;
   align-items: center;
@@ -127,12 +135,18 @@
    `:71` dark): `--chipBg` equals `--cardBg` there, plus an inset
    `--chipShadow` — no fill contrast at all, boundary carved by the shadow.
    `surface-raised` matches the card's own background exactly (`.gn-card`
-   above), and `--gn-shadow-sunken` is non-empty under neo (unlike
-   hig/minimal, whose sunken role is `[]` in `tokens.ts` — the reason THOSE
-   two styles need a fill instead). */
+   above), and `--gn-shadow-sunken-compact` is non-empty under neo (unlike
+   hig/minimal, whose sunken-compact role is `[]` in `tokens.ts` — the reason
+   THOSE two styles need a fill instead).
+
+   Owner round 3 (2026-09-16): this was `--gn-shadow-sunken` (the
+   4px/4px/9px field/tray treatment) — too much shadow for a badge this
+   small. `--gn-shadow-sunken-compact` is the prototype's own smaller
+   2px/2px/4px `--chipShadow` step; see `tokens.ts`'s `sunken-compact`
+   docblock for the primitive-reuse accounting. */
 [data-style="neo"] .gn-chip {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact);
   padding: 0.3125rem 0.75rem;
 }
 .gn-chip--open .gn-chip__dot { background: var(--gn-category-open); }

@@ -313,6 +313,24 @@ export const primitives = {
   shadowNeoRaisedHighlightDark: '#f2e9e112',
   shadowNeoSunkenDarkDark: '#00000099',
   shadowNeoSunkenHighlightDark: '#ffffff0d',
+  /**
+   * The ONE new primitive the `sunken-compact` shadow role needed (owner
+   * round-3 correction, 2026-09-16: "too much shadow for a small badge").
+   * `--chipShadow` (`design-system/interactive/desktop.dc.html:59` light,
+   * `:71` dark) is the prototype's own smaller/2px-4px inset step, distinct
+   * from `--fieldShadow`/`--trayShadow`'s 4px/9px. Three of its four layer
+   * colours are BYTE-IDENTICAL to primitives this file already has —
+   * `shadowNeoRaisedDarkLight` (`rgba(176,152,132,0.55)`, light layer 1),
+   * `shadowNeoHighlightLight` (`rgba(255,255,255,0.95)`, light layer 2) and
+   * `shadowNeoSunkenHighlightDark` (`rgba(255,255,255,0.05)`, dark layer 2)
+   * — verified arithmetically, not eyeballed, so those three are reused as
+   * `SHADOWS.neo.*.'sunken-compact'` entries below rather than duplicated
+   * under a new name. Only the dark theme's FIRST layer has no match:
+   * `rgba(0,0,0,0.55)` is a different alpha than `shadowNeoSunkenDarkDark`'s
+   * `rgba(0,0,0,0.6)` (the field/tray dark shadow), so it needed its own
+   * primitive. `0.55 × 255 = 140.25` → round `140` = `0x8c`.
+   */
+  shadowNeoSunkenCompactDarkDark: '#0000008c',
 
   /**
    * ## Round 2d additions (2026-09-09) — the sign-in neo alignment
@@ -757,7 +775,25 @@ export function fontVariableName(role: FontRole): string {
   return `--gn-font-${role}`;
 }
 
-export type ShadowRole = 'raised' | 'sunken' | 'overlay';
+/**
+ * `sunken-compact` — added owner round 3 (2026-09-16), a SMALLER inset step
+ * alongside `sunken`, not a replacement for it. Named for what it IS (a
+ * compact-geometry sunken shadow — 2px/2px/4px vs `sunken`'s 4px/4px/9px),
+ * not for the one component (`.gn-chip`) that consumes it today — a role
+ * named `chip` would already be wrong the moment a second small element
+ * needed the same treatment. See `shadowNeoSunkenCompactDarkDark`'s docblock
+ * in `primitives` for which layer colours are reused vs new.
+ *
+ * The hyphen is deliberate, not stylistic: `shadowVariableName` interpolates
+ * a `ShadowRole` directly into `--gn-shadow-${role}` with no camelCase→kebab
+ * conversion (unlike `cssVariableName`, which TOKEN_ROLES needs because it
+ * has camelCase members). A camelCase role here would emit
+ * `--gn-shadow-sunkenCompact`, which `tokens.test.ts`'s own var-harvesting
+ * regex (`/var\((--gn-[a-z0-9-]*)\)/g`) cannot match — the check would pass
+ * by finding nothing, while the chip's `box-shadow` silently resolved to
+ * nothing in the browser.
+ */
+export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
@@ -769,13 +805,18 @@ type ShadowLayer = {
 };
 
 /**
- * Every style×theme's raised/sunken elevation, transcribed from the export
- * (`design-system/neo-tokens.json`). `overlay` is DERIVED, not measured —
- * ruling item 6: neither exported file defines a dedicated overlay shadow,
- * so it reuses that style×theme's `raised` treatment (a sheet or modal
- * floating above the scrim reads as "raised" the same way a card does).
- * `minimal` has no shadow in either theme — its cards/fields are flat by
- * design (rule (b) keeps its controls identifiable by fill/label instead).
+ * Every style×theme's raised/sunken/sunken-compact elevation, transcribed
+ * from the export (`design-system/neo-tokens.json` for raised/sunken,
+ * `design-system/interactive/desktop.dc.html`'s `--chipShadow` for
+ * sunken-compact — see that role's own docblock above). `overlay` is
+ * DERIVED, not measured — ruling item 6: neither exported file defines a
+ * dedicated overlay shadow, so it reuses that style×theme's `raised`
+ * treatment (a sheet or modal floating above the scrim reads as "raised" the
+ * same way a card does). `minimal` has no shadow in either theme — its
+ * cards/fields are flat by design (rule (b) keeps its controls identifiable
+ * by fill/label instead). `hig` and `minimal` are both `[]` for
+ * `sunken-compact`, exactly as they are for `sunken` — the prototype's `hig`
+ * (`minimal` inherits) gives `--chipShadow:none` (`desktop.dc.html:24`).
  */
 const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
   hig: {
@@ -783,16 +824,18 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
+      'sunken-compact': [],
     },
     dark: {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
+      'sunken-compact': [],
     },
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [] },
-    dark: { raised: [], sunken: [], overlay: [] },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [] },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [] },
   },
   neo: {
     light: {
@@ -808,6 +851,11 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
         { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
       ],
+      /** `--chipShadow` light (`desktop.dc.html:59`) — both layers reused, see docblock above. */
+      'sunken-compact': [
+        { x: 2, y: 2, blur: 4, colour: 'shadowNeoRaisedDarkLight', inset: true },
+        { x: -2, y: -2, blur: 4, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
     },
     dark: {
       raised: [
@@ -821,6 +869,17 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       overlay: [
         { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
         { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /**
+       * `--chipShadow` dark (`desktop.dc.html:71`) — layer 2 reused
+       * (`shadowNeoSunkenHighlightDark`, byte-identical to `--chipShadow`'s
+       * `rgba(255,255,255,0.05)`); layer 1 is the one genuinely new colour
+       * (`shadowNeoSunkenCompactDarkDark`, `rgba(0,0,0,0.55)` — different
+       * alpha than `sunken`'s own dark layer 1, `rgba(0,0,0,0.6)`).
+       */
+      'sunken-compact': [
+        { x: 2, y: 2, blur: 4, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
+        { x: -2, y: -2, blur: 4, colour: 'shadowNeoSunkenHighlightDark', inset: true },
       ],
     },
   },
@@ -997,7 +1056,7 @@ export function cssVariableName(role: TokenRole): string {
 }
 
 const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
-const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay'];
+const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {

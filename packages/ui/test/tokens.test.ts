@@ -23,7 +23,7 @@ import {
 
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
 const STYLE_NAMES: StyleName[] = ['hig', 'minimal', 'neo'];
-const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay'];
+const SHADOW_ROLE_NAMES: ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact'];
 const FONT_ROLE_NAMES: FontRole[] = ['sans', 'mono'];
 
 /** `hig` needs no `[data-style]` predicate — it is the unmarked base, reached through bare `:root`/`[data-theme]`. */
@@ -248,6 +248,16 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     expect(shadowValueOf('hig', 'light', 'sunken')).toBe('none');
     expect(shadowValueOf('hig', 'light', 'raised')).not.toBe('none');
     expect(shadowValueOf('neo', 'light', 'sunken')).toContain('inset');
+    // `sunken-compact` — owner round 3 (2026-09-16): `hig`/`minimal` stay `[]`
+    // (the prototype's `--chipShadow:none`), `neo` is a real inset pair, and
+    // it must be a SMALLER box-shadow than `sunken`, not just a different one
+    // — the whole point of the correction was the geometry, not the colour.
+    expect(shadowValueOf('hig', 'light', 'sunken-compact')).toBe('none');
+    expect(shadowValueOf('neo', 'light', 'sunken-compact')).toContain('inset');
+    expect(shadowValueOf('neo', 'light', 'sunken-compact')).toContain('2px 2px 4px');
+    expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toContain('2px 2px 4px');
+    expect(shadowValueOf('neo', 'light', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'light', 'sunken'));
+    expect(shadowValueOf('neo', 'dark', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'dark', 'sunken'));
   });
 
   /**
