@@ -257,7 +257,14 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
 
   return (
     <li data-testid={`workspace-card-${workspace.id}`}>
-      <Card>
+      {/* `gn-workspace-card` (Round 22) exists only to carry `height: 100%`, so
+          every card in a row is the tallest one's height — the owner asked for
+          the same rule the project grid got. A DEDICATED class rather than a
+          `.gn-workspace-list .gn-card` descendant rule: that exact selector is
+          the one `neo-card-radius.test.ts` (case 13.355) asserts does not
+          exist, because page-scoped overrides of the shared card class are what
+          inverted a radius bump into a shrink once the radius became a token. */}
+      <Card className="gn-workspace-card">
         <Link
           href={`/w/${workspace.id}`}
           aria-label={workspace.name}

@@ -417,12 +417,12 @@ describe('13.386 archive hides a project and restore returns it — read from th
 /**
  * 13.387 — the four doors out of this page resolve to the routes that exist.
  *
- * **Asserted as four LITERAL paths, and that is the whole case.** Three of the
- * four live under `app/w/[workspaceId]/`; Ticket types does NOT — it carries its
- * workspace as a QUERY PARAM on the global `/settings` route. A page that built
- * its hrefs from one `/w/${id}/` prefix would emit `/w/<id>/settings?…`, which
- * resolves to nothing, and a test that built its expectations the same way would
- * agree with the bug.
+ * **Asserted as four LITERAL paths, and that is the whole case.** Two of the
+ * four live under `app/w/[workspaceId]/`; Ticket types and Workflows do NOT —
+ * both carry their workspace as a QUERY PARAM on the global `/settings` route. A
+ * page that built its hrefs from one `/w/${id}/` prefix would emit
+ * `/w/<id>/settings?…`, which resolves to nothing, and a test that built its
+ * expectations the same way would agree with the bug.
  *
  * **Five until Round 21 (owner: "move MCP tokens to the account page. as this
  * should not be scoped to a workspace").** `/mcp/tokens` used to be the obvious
@@ -439,13 +439,30 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * opened the ticket-type editor as a THIRD, sidebar-less route, the exact
  * defect `/settings` itself was just fixed to close; leaving this link
  * pointed at the page that bypasses the fix would have kept the bug
- * reachable a second way. Workflows is unchanged and still `/w/<id>/settings/
- * workflows`, deliberately — its own editor (the builder) was never inlined
- * into `/settings`, so repointing its list would be cosmetic rather than
- * closing a gap the way it did for ticket types.
+ * reachable a second way.
  *
- * The paths are also checked against the app directory itself, in the same run:
- * a link is only proven live by a `page.tsx` existing at the route it names.
+ * **Workflows joined it in Round 22** (owner: "clicking workflows from the
+ * project screen opens up a separate page. it should open up the workflows tab
+ * in the settings page"). Round 19e had left it pointed at
+ * `/w/<id>/settings/workflows` on the reasoning that repointing it closed no
+ * equivalent defect — the workflow BUILDER was never inlined into `/settings`
+ * either, so the move would be cosmetic. The owner asked for it on its own
+ * merits: the bare page has no sidebar, so following this card dropped you out
+ * of the settings shell with no way back to the other sections. The bare route
+ * still resolves and `authoring-routes.test.tsx` still drives it.
+ *
+ * **These paths are NOT checked against the app directory, and this docblock
+ * used to claim they were** ("in the same run: a link is only proven live by a
+ * `page.tsx` existing at the route it names") — corrected in Round 22 after a
+ * grep for `existsSync` found the only such check in the repo is 13.392's, in
+ * `app-nav.test.tsx`, over the NAV's targets. These four doors are not nav
+ * targets and no filesystem assertion has ever covered them. The sentence read
+ * as measured and was not, which is worse than its absence: it invited a reader
+ * to trust that a typo'd href here would be caught, when what actually catches
+ * one is the literal expected in this case and nothing else. Three of the four
+ * targets happen to coincide with routes 13.392 does check (`/w/<id>/my-work`,
+ * `/w/<id>/members`, `/settings`), so the gap is narrow — but it is a gap, and
+ * naming it is what stops the next reader inheriting the wrong confidence.
  *
  * **Names are EXACT, unchanged by Round 19b's notes.** The first draft folded
  * each note into its link's content and let the accessible name become the
@@ -460,14 +477,14 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.387 the workspace-section links resolve to the real routes', () => {
-  it('carries four links, three workspace-scoped and one query-scoped', async () => {
+  it('carries four links, two workspace-scoped and two query-scoped', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     const expected: Array<[string, string]> = [
       ['My Work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
       ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
-      ['Workflows', `/w/${WORKSPACE}/settings/workflows`],
+      ['Workflows', `/settings?workspaceId=${WORKSPACE}&tab=workflows`],
     ];
     for (const [name, href] of expected) {
       expect(within(nav).getByRole('link', { name }), name).toHaveAttribute('href', href);

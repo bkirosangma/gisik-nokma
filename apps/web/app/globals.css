@@ -362,6 +362,15 @@ input, textarea, select { font-family: inherit; }
    for why. The door's full-card box still matters for hover — not because
    it paints anything now, but because `.gn-card`'s `:has()` selector only
    fires while the pointer is somewhere inside THIS box.) */
+/* Round 22 (owner: "it should be same for the workspace card in the
+   /workspaces page"): every card in a row takes the tallest one's height. The
+   grid already stretches the `<li>` — `.gn-workspace-list` declares no
+   `align-items`, so the default `stretch` applies — and this is the missing
+   half, the card filling the `<li>` it sits in rather than keeping its own
+   content height. Declares NOTHING else, and in particular no `border-radius`:
+   this class exists beside `.gn-card` on the same element, which is precisely
+   the position case 13.355 was written about. */
+.gn-workspace-card { height: 100%; }
 .gn-workspace-card__door {
   display: flex;
   flex-direction: column;
@@ -974,7 +983,17 @@ input, textarea, select { font-family: inherit; }
    same reason every other nav/list row in this file carries it, and the layout
    is unaffected by the removal: `.gn-workspace-home__header-titles` already
    carries `flex: 1`, so it absorbed the freed space instead of re-centring. */
-.gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+/* `margin-top` (Round 22, owner: "the workspace home header is too close to the
+   nav bar. maintain some margin on the top"). `.gn-shell` declares
+   `padding: 0 1.25rem 3rem` — no TOP padding at all — so this header was the
+   shell's first child sitting flush against the sticky bar above it. Fixed
+   here rather than by giving `.gn-shell` a top padding, which would move the
+   first element of every route that uses it (`/account`, `/inbox`,
+   `/settings`, `/workspaces`, `/help`, every `/w/*` screen) for a complaint
+   about one. `1.25rem` matches `.gn-shell__main`'s own `margin-top`, the
+   spacing this shell already uses between the bar and the content beneath it,
+   rather than a new number measured for this one header. */
+.gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; }
 .gn-workspace-home__header-titles { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
 .gn-workspace-home__header-titles .gn-page-title { margin: 0; }
 /* `.gn-workspace-list__role--pinned`'s own `margin: 0.15rem 0 0` (restored,
@@ -1047,9 +1066,15 @@ input, textarea, select { font-family: inherit; }
    without ever overflowing it — the same reasoning `.gn-workspace-list`'s own
    comment records, and the reason the tracks are not `1fr`.
 
-   `align-items: start` so a card with one chip does not stretch to the height
-   of a card with two — the reference carries it for the same reason. */
-.gn-workspace-home__projects { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+   **No `align-items` (Round 22, owner: "card height should be the same for all
+   in the same row, dictated by the tallest card").** Round 21 carried
+   `align-items: start`, transcribed from the reference, which is exactly what
+   let a card with a blocked chip stand taller than one without. The grid's own
+   default is `stretch`, so removing the declaration — rather than writing
+   `stretch` over it — is what restores equal heights; `.gn-project-card`'s
+   `height: 100%` is the other half, since the `<li>` is the grid item and the
+   card is inside it. */
+.gn-workspace-home__projects { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 @media (max-width: 60rem) {
   .gn-workspace-home__projects { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1061,7 +1086,15 @@ input, textarea, select { font-family: inherit; }
    deliberately — case 13.355 (`neo-card-radius.test.ts`) exists because
    page-scoped literals on a `.gn-card` sibling class inverted into shrinks the
    moment the radius became a token, and this class would be the next one. */
-.gn-project-card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; }
+/* `position: relative` is the anchor for the door's stretched `::after` below,
+   and `height: 100%` is what makes every card in a row the height of the
+   tallest (Round 22, owner: "card height should be the same for all in the same
+   row"). The grid's own default `align-items: stretch` stretches the `<li>`;
+   without this the `.gn-card` inside it keeps its content height and a card with
+   a blocked chip stands taller than one without. Round 21's `align-items: start`
+   on the grid — which pinned every card to its own content height — was removed
+   in the same change. */
+.gn-project-card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; position: relative; height: 100%; }
 /* Dimmed IN PLACE rather than moved to a list of its own — the reference's
    0.72. Round 21 sorts archived cards to the END of the grid (owner ruling),
    so the dimming is no longer what marks them out of sequence; it is what
@@ -1077,20 +1110,63 @@ input, textarea, select { font-family: inherit; }
    control at full strength, so its hover reads identically on a live and an
    archived card — which is exactly what the owner's bullet asked for. */
 .gn-project-card--archived .gn-project-card__door { opacity: 0.72; }
-/* The card's BODY is the door (Round 20, owner ruling). Unlike
-   `.gn-workspace-card__door` this one does NOT full-bleed itself with a
-   negative margin, because it is not the whole card: Archive/Restore is its
-   sibling below, so the anchor covers exactly the region that navigates and
-   the actions strip is deliberately outside it. That is why there is no
-   `margin: -0.75rem`/`padding: 1.25rem` pairing to keep in step with
-   `.gn-card` here — the padding lives on `.gn-project-card` above, once, for
-   both regions. */
-.gn-project-card__door { display: flex; flex-direction: column; gap: 0.375rem; color: var(--gn-text); text-decoration: none; border-radius: var(--gn-radius-control); }
-.gn-project-card__door:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+/* THE WHOLE CARD IS THE DOOR (Round 22, owner: "the project card door covers
+   only the top half. it should be like in the workspaces page. the full card
+   should be the door"), via a STRETCHED LINK rather than the full-bleed
+   negative margin `.gn-workspace-card__door` uses.
+
+   The negative-margin trick cannot work here and that is not a style
+   preference: `/workspaces`' card holds no controls, so its door may safely
+   cover the card edge to edge. This card holds Archive/Restore, and an anchor
+   stretched over it would sit ON TOP of that button and swallow its clicks —
+   the control would still be drawn, still be focusable by keyboard, and be dead
+   to the pointer. Nesting the button inside the anchor is not the escape
+   either: `<a>` may not contain `<button>`.
+
+   So the anchor keeps its own small box in the flow — which is what carries the
+   name and the counts, and what assistive tech reads — and projects a
+   transparent `::after` over the whole card for the pointer. The actions strip
+   is then raised above that layer with its own stacking context, so the button
+   stays clickable while everything else on the card navigates.
+
+   **Three behaviours follow from hit-testing, and all three are wanted.** The
+   pointer over the card body hits the `::after`, which belongs to the anchor,
+   so `.gn-project-card__door:hover` matches and the card lights. The pointer
+   over the button hits the BUTTON, whose ancestor chain does not include the
+   anchor, so the card does NOT light and only the button does — preserving
+   Round 21's rule exactly. And a click anywhere that is not the button
+   navigates, including the card's padding.
+
+   `inset: 0` covers the card's padding box; `border-radius: inherit` keeps the
+   focus ring below tracing the card's own corner rather than a square. */
+.gn-project-card__door { display: flex; flex-direction: column; gap: 0.375rem; color: var(--gn-text); text-decoration: none; }
+.gn-project-card__door::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+/* The focus ring goes on the STRETCHED layer, not the anchor's own box: the
+   card is the door now, so a ring around the top third alone would describe a
+   click target that is no longer the real one. `outline-offset: -2px` draws it
+   just inside the card's edge, where a `2px` positive offset would be clipped
+   by the grid gap. The anchor's own outline is suppressed so the two do not
+   both paint. */
+.gn-project-card__door:focus-visible { outline: none; }
+.gn-project-card__door:focus-visible::after {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: -2px;
+}
 .gn-project-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .gn-project-card__name { font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .gn-project-card__chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
-.gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+/* `position: relative` + `z-index` lift this strip above the door's stretched
+   `::after` — without it the transparent overlay would cover Archive/Restore
+   and eat the click. `margin-top: auto` pins it to the card's bottom now that
+   every card in a row is the tallest one's height (Round 22): equal-height
+   cards with buttons floating at different heights is the complaint the height
+   change would otherwise have traded for, so the two belong together. */
+.gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; position: relative; z-index: 1; margin-top: auto; }
 /* Archive/Restore lights up UNDER THE POINTER, and the card body does not
    (Round 21, owner: "on hover over the archive button, light up the button and
    the card body stays normal").

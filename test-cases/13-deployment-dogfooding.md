@@ -3757,3 +3757,42 @@ again. The assertion was not touched. Its sibling case in the same describe was 
 now asserted as workspace-conditional, and it pins the href that must NOT come back with the revert
 (`/w/<id>/settings/ticket-types`, the sidebar-less page whose Edit button opened a third route), because
 the obvious way to "move it back" is to restore the old target along with the old condition.
+
+### Round 22 — five more owner corrections to the workspace home
+
+**No new ids: the next free BLOCK is still `13.416`.** Four of the five corrections landed; one is held
+for an owner decision (below). Only 13.387 changed, and only in its expected set — the other three
+shipped items are CSS-only and mint nothing, the same treatment Round 21's four CSS-only items got.
+
+- **13.387** ✅ **REVISED AGAIN — Workflows joined Ticket types as a query-scoped door**
+  (`/settings?workspaceId=<id>&tab=workflows`), so the split is now two path-segment doors and two
+  query-scoped ones rather than three and one. Owner: "clicking workflows from the project screen opens
+  up a separate page. it should open up the workflows tab in the settings page." Round 19e had left it
+  pointed at the bare route, reasoning the move closed no defect the way ticket types' did; the merit it
+  missed is that the bare page has NO SIDEBAR, so following the card dropped you out of the settings
+  shell with no way back. The case's argument is untouched and now has two doors supporting it instead
+  of one. — (`workspace-home.test.tsx`)
+
+**A false claim was removed from 13.387's docblock in the same edit, and it is worth recording because
+it is the kind that reads as measured.** The docblock asserted "The paths are also checked against the
+app directory itself, in the same run: a link is only proven live by a `page.tsx` existing at the route
+it names." A grep for `existsSync` across `apps/web/test` finds exactly one such check — 13.392's, in
+`app-nav.test.tsx`, over the NAV's targets. These four doors are not nav targets and no filesystem
+assertion has ever covered them. The sentence invited a reader to trust that a typo'd href here would be
+caught by something other than the literal expected in the case itself, which was never true. Three of
+the four targets happen to coincide with routes 13.392 does check, so the real gap is narrow — but the
+claim was wrong about this case, and a wrong claim about coverage is worse than no claim.
+
+**HELD, pending an owner decision — "once inside a workspace, the board nav bar item should be always
+visible."** Board renders today only when the route carries a project, because the only board route in
+the product is `/w/<id>/p/<pid>`: there is one board per PROJECT, not one per workspace. Making the item
+unconditional therefore needs a target, and the obvious one — the workspace's first served project — was
+REJECTED rather than shipped. It would send two people with the same workspace to different boards
+depending on server ordering, move under one person when a project is founded or archived, and
+manufacture the "current project" `app-nav.tsx`'s own docblock records this shell as refusing to
+remember outside the URL. It would also still need a fallback when a workspace has no projects, so the
+item would remain conditional and the instruction would go unmet anyway. The prototype's `navDef` is not
+evidence for it either: its `go("board")` works because its state holds one implicit current project,
+which is a state model this product does not have. **The two real options are a `/w/<id>/board` route
+that renders a picker, or pointing Board at `/w/<id>` when no project is in scope (which puts two nav
+items on one target). Owner: to be asked in this round's report.**

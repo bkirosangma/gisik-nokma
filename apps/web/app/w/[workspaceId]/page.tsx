@@ -433,17 +433,19 @@ function ProjectCard({
  * The four doors out of this page — five until Round 21 moved MCP tokens to
  * `/account` (owner: "this should not be scoped to a workspace").
  *
- * **Three are workspace-scoped path segments and one is not**, and that
+ * **Two are workspace-scoped path segments and two are not**, and that
  * asymmetry is the whole reason these are four literal strings rather than a
- * mapped prefix: Ticket types targets `/settings?workspaceId=<id>&tab=…`,
- * where the workspace rides as a QUERY PARAM, so a uniform `/w/${workspaceId}/…`
- * builder would emit `/w/<id>/settings?…`, which resolves to nothing — and a
- * test that built its expectations the same way would agree with the bug.
- * Case 13.387 asserts the four paths as literals for exactly that reason.
- * **The asymmetry SURVIVED the removal of `/mcp/tokens`**, which is why the
- * literals stay: the departing link was the most obvious non-`/w/` door, and
- * replacing these with a builder now would break Ticket types instead — the
- * same defect, one door over.
+ * mapped prefix: Ticket types and Workflows both target
+ * `/settings?workspaceId=<id>&tab=…`, where the workspace rides as a QUERY
+ * PARAM, so a uniform `/w/${workspaceId}/…` builder would emit
+ * `/w/<id>/settings?…`, which resolves to nothing — and a test that built its
+ * expectations the same way would agree with the bug. Case 13.387 asserts the
+ * four paths as literals for exactly that reason.
+ *
+ * **The asymmetry has now survived two rounds of churn in both directions** —
+ * Round 21 removed `/mcp/tokens`, the most obvious non-`/w/` door, and Round 22
+ * made Workflows a second one — which is why the literals stay rather than
+ * being folded into a builder each time the set looks briefly uniform.
  *
  * **Ticket types became a non-`/w/<id>/…` door in Round 19b** (owner feedback,
  * 2026-09-09: "the ticket type edit is opening in a separate route... repoint
@@ -459,12 +461,25 @@ function ProjectCard({
  * `Settings` button with the same stale href, repointed in the same round;
  * Round 21 removed that button outright — see the header's own comment — so
  * this link is now the only Ticket-types door on the page.)
- * **Workflows is deliberately UNCHANGED** — `/w/<id>/settings/workflows`
- * still has no sidebar, but unlike ticket types its own editor (the
- * workflow BUILDER) was never inlined into `/settings` either, on purpose
- * (`app/settings/page.tsx`'s own docblock), so repointing the list here
- * would not close any editor-left-the-shell gap the way it did for ticket
- * types — it would just be cosmetic, and was not asked for.
+ * **Workflows was repointed the same way in Round 22** (owner: "clicking
+ * workflows from the project screen opens up a separate page. it should open
+ * up the workflows tab in the settings page"), so all three workspace-scoped
+ * sections now open inside a shell rather than on a bare page.
+ *
+ * Round 19e had left it alone on the reasoning that repointing it "would just
+ * be cosmetic, and was not asked for": unlike ticket types, whose bare list
+ * page's Edit button opened the EDITOR as a third route, Workflows' own editor
+ * (the BUILDER) was never inlined into `/settings` either, so moving the list
+ * closed no editor-left-the-shell gap. **That reasoning was about which DEFECT
+ * the move fixed, and the owner has now asked for the move on its own merits —
+ * the bare `/w/<id>/settings/workflows` page has no sidebar, so following this
+ * card dropped you out of the settings shell and left you with no way back to
+ * Ticket types except the browser's Back button.** The asymmetry it described
+ * is unchanged and still stands: the builder still opens as its own full-width
+ * route from inside the tab, which is what the prototype does too.
+ *
+ * The bare route still resolves, and `authoring-routes.test.tsx` (10.65–10.70)
+ * still drives it — nothing that already linked there breaks.
  *
  * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
  * transcribed, not invented, except the one place the prototype's copy
@@ -548,7 +563,7 @@ function WorkspaceLinks({
         </span>
       </Link>
       <Link
-        href={`/w/${workspaceId}/settings/workflows`}
+        href={`/settings?workspaceId=${workspaceId}&tab=workflows`}
         className="gn-workspace-home__link"
         aria-label="Workflows"
         aria-describedby="gn-link-note-workflows"
