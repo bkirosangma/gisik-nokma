@@ -170,9 +170,10 @@ input, textarea, select { font-family: inherit; }
    40rem)` (640px) is this file's other existing breakpoint (see the
    `.gn-notfound`/`.gn-legal` rules below). 3 columns down to 2 at 60rem, 2
    down to 1 at 40rem — chosen, not merely reused, because 390px (the e2e
-   sideways-scroll ratchet's phone width) sits well inside the ≤40rem single
-   column arm, so three fixed 17.5rem-minimum columns can never be asked to
-   fit a 390px viewport. */
+   sideways-scroll ratchet's phone width) sits well inside the ≤40rem
+   single-column arm, where the one remaining track is `minmax(0, 1fr)` —
+   a ZERO floor, not a fixed minimum — so it shrinks to fit any container
+   width and can never be asked to overflow a 390px viewport. */
 .gn-workspace-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
