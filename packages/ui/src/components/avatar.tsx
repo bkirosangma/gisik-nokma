@@ -6,7 +6,12 @@
  * avatar shipped with — the tint is opt-in, so nothing that already renders an
  * avatar changes colour.
  */
-export type AvatarProps = { name: string; size?: 'small' | 'medium' | 'large'; tint?: string };
+export type AvatarProps = {
+  name: string;
+  /** `workspace` is the 44px rounded SQUARE the workspace card uses — see `.gn-avatar--workspace` in `ui.css` for why a non-circular avatar already belongs in this set. */
+  size?: 'small' | 'medium' | 'large' | 'workspace';
+  tint?: string;
+};
 
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
