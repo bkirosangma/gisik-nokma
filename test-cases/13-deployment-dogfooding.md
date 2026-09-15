@@ -3377,3 +3377,28 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   `apps/web/app/globals.css`, `packages/ui/test/token-discipline.test.ts`,
   `apps/web/app/account/page.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
   `design-system/interactive/desktop.dc.html`)
+
+- **13.400** ❌ **The selected segment is PRESSED under `neo`, lifted under `hig`, flat under `minimal`**
+  — `[data-style="neo"] .gn-segmented__item--on` overrides the base rule's `var(--gn-shadow-raised)`
+  with `var(--gn-shadow-sunken)`. Owner, 2026-09-15: *"in the prototype it was sunken style. i want it
+  to follow that."*
+  *THE REFERENCE HAS FIVE VALUES FOR THIS CONTROL, NOT ONE, and they split on the style axis. Read off
+  `--segOnShadow` in `design-system/interactive/desktop.dc.html` rather than eyeballed from a
+  screenshot: `0 3px 8px rgba(39,58,99,.16), 0 3px 1px rgba(39,58,99,.06)` (hig light),
+  `0 3px 8px rgba(6,10,22,.66)` (hig dark), `none` (minimal), and two `inset 3px 3px 6px … , inset
+  -3px -3px 6px …` pairs (neo light, neo dark). So the base rule was ALREADY right for two styles of
+  three — `--gn-shadow-raised` resolves to `none` under `minimal` — and only `neo` was inverted. That
+  is why it read as simply backwards rather than as a per-style nuance: `neo` is the shipped default,
+  so the one wrong arm was the one everybody saw. One `[data-style]` override reproduces all five from
+  the two existing shadow roles; no new role, no literal, and `hig`/`minimal` untouched — the same
+  shape as 13.339's `[data-style="neo"] .gn-field__input` rule directly above it in `ui.css`.*
+  *The background deliberately stays `var(--gn-surface-raised)`: under `neo` every surface role
+  collapses to one hex, so it resolves to the page's own ground while the track around it is a
+  `fill-tertiary` tint — which is what makes the inset read as a well pressed INTO the control rather
+  than a panel sitting on it, and is the composition the reference's own neo values produce.*
+  *Unasserted, for the reason 13.339 already records for its sibling: this is a `box-shadow` under one
+  `[data-style]` arm, and nothing in the suite reads a computed style on this component. It moves no
+  box — `box-shadow` is outside layout — so neither the tap-target nor the type-scale ratchet can see
+  it either way, which is also why neither could regress from it. Verified by eye in the running dev
+  server at 1512px, `neo`/dark, on `/help`'s Manual/FAQ switch.* — (no test; owner: whoever next
+  asserts computed style on the shared controls, with 13.339)
