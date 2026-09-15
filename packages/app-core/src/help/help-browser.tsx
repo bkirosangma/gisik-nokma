@@ -1,3 +1,4 @@
+import { SegmentedControl } from '@gisik-nokma/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { HELP_CONTENT } from './content.generated.js';
 import {
@@ -360,30 +361,44 @@ function TopicSidebar({
   return (
     <aside className="gn-help__sidebar">
       {/*
-        The document tabs, MOVED here from above the search box — the one
-        structural move the newer prototype asks for that costs nothing.
+        The document switch, MOVED here from above the search box and REBUILT
+        on the shared `SegmentedControl` (2026-09-15).
 
-        They keep `aria-pressed` and their shipped labels, which are the
-        documents' own titles ("Gisik Nokma — instruction manual"). The
-        prototype's are shorter; the copy rule keeps shipped wording where the
-        prototype's is merely different, so the LAYOUT adapts to the copy rather
-        than the other way round — hence a stacked column of full-width
-        segments here instead of the prototype's side-by-side pair, which
-        thirty-one characters would not fit inside 274px.
+        It was two bordered buttons carrying the documents' full titles, stacked
+        into a column because "Gisik Nokma — instruction manual" is 31
+        characters and will not sit beside its sibling in 274px. The owner
+        lifted the copy ruling that forced that — "forget the ruling on the
+        information losing. make the manual/faq switch like in the attached
+        file" — so the labels are the reference's own `Manual`/`FAQ` (its
+        source: `helpTabs: [{ k: "manual", l: "Manual" }, { k: "faq", l: "FAQ"
+        }]`), and with two short words the reference's side-by-side pair fits.
+
+        `SegmentedControl` rather than a local rule, because the reference's
+        treatment IS this component's: a 2px tray, `flex: 1` segments, and the
+        selected one lifted onto `surfaceRaised` + `shadowRaised`. Measured
+        against the prototype's inline styles, the only deliberate divergence
+        is the segment height — 44px here against its 36px — and that number is
+        load-bearing: `ui.css` records that 40px reddened the tap-target
+        ratchet on `/sign-in` the moment anything first rendered the component.
+
+        It also retires a whole local identity. `/account`'s Style and Theme
+        controls are already `SegmentedControl`; a fifth hand-rolled segmented
+        row on this screen was the thing to avoid.
+
+        `aria-label` carries the same string the `<nav>` wrapper used to, so no
+        accessible name is lost. The wrapper itself is gone deliberately: a
+        `tablist` is a control, not a navigation landmark, and wrapping one in
+        `<nav>` announced a region that was never navigation.
       */}
-      <nav className="gn-help__tabs" aria-label="Help documents">
-        {HELP_CONTENT.map((doc) => (
-          <button
-            key={doc.id}
-            type="button"
-            className="gn-help__tab"
-            aria-pressed={doc.id === documentId}
-            onClick={() => onDocument(doc.id)}
-          >
-            {doc.title}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl
+        options={HELP_CONTENT.map((doc) => ({
+          value: doc.id,
+          label: HELP_DOCUMENT_LABELS[doc.id],
+        }))}
+        value={documentId}
+        onChange={onDocument}
+        aria-label="Help documents"
+      />
 
       {/*
         `aria-labelledby` on the landmark rather than an `aria-label` that

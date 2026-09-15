@@ -195,11 +195,25 @@ simply than this note expected:
 
 Anything about Help's prose, section names or the search placeholder. Those are
 settled by the copy rule above and were deliberately left untouched by the
-2026-09-15 pass — including the shipped document titles, which is why the
-sidebar's tabs are a STACKED column of full-width segments rather than the
-reference's side-by-side pair: "Gisik Nokma — instruction manual" is 31
+2026-09-15 pass.
+
+**The document switch is the ONE exception, and by owner ruling rather than by
+this note's reasoning.** The switch first shipped as a stacked column of
+full-width segments rather than the reference's side-by-side pair, because the
+copy rule kept the shipped labels — "Gisik Nokma — instruction manual" is 31
 characters and does not fit beside its sibling in 274px, so the layout gave way
-instead of the words.
+instead of the words. The owner then lifted the ruling for this control in as
+many words:
+
+> forget the ruling on the information losing. make the manual/faq switch like
+> in the attached file
+> — owner, 2026-09-15
+
+So the labels are the reference's `Manual`/`FAQ` and the switch is the shared
+`SegmentedControl`. **The lift is scoped to that control**, which is what the
+instruction names; the search placeholder and the section names are untouched,
+and one-section-at-a-time stays declined for the reasons above. If the owner
+meant the lift more broadly, those are the next two things it would reach.
 
 ## Corrections
 

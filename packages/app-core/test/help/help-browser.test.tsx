@@ -104,18 +104,43 @@ describe('15.22 HelpBrowser — the topic sidebar', () => {
   });
 
   /**
-   * The document tabs moved INTO the sidebar, and they still carry the shipped
-   * document titles rather than the prototype's shorter pair — the copy rule
-   * keeps shipped wording where the prototype's is merely different. Pinned
-   * inside the sidebar, since the assertion that would have passed before this
-   * change is the same one run against the whole page.
+   * The document switch: the shared `SegmentedControl`, in the sidebar, under
+   * the reference's own short labels.
+   *
+   * This case REPLACES one asserting the opposite — that the tabs carried the
+   * documents' full titles ("Gisik Nokma — instruction manual"), which the copy
+   * rule required while it applied. The owner lifted that ruling for this
+   * control on 2026-09-15, so the assertion is inverted on purpose rather than
+   * relaxed: the long titles must be ABSENT from the switch, because a test
+   * that only checked for "Manual" would pass against a control showing both.
+   *
+   * Asserted through `role: 'tab'` inside `role: 'tablist'`, which is what
+   * `SegmentedControl` renders — so this also pins that the switch is the
+   * shared component and not a fifth hand-rolled segmented row.
    */
-  it('15.22 the document tabs live in the sidebar, under their shipped titles', () => {
+  it('15.22 the document switch is a segmented control labelled Manual and FAQ', () => {
     render(<HelpBrowser />);
-    const sidebar = screen.getByRole('navigation', { name: 'Help documents' });
+    const tablist = screen.getByRole('tablist', { name: 'Help documents' });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Manual', 'FAQ']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
     for (const doc of HELP_CONTENT) {
-      expect(within(sidebar).getByRole('button', { name: doc.title })).toBeInTheDocument();
+      expect(within(tablist).queryByText(doc.title)).toBeNull();
     }
+  });
+
+  /**
+   * One tab per document, derived from `HELP_CONTENT` rather than hardcoded, so
+   * a third document would appear in the switch instead of being unreachable.
+   * Separate from the case above because that one pins the LABELS and this one
+   * pins the COUNT — and a control with the right two labels and a missing
+   * third is exactly the defect the labels case cannot see.
+   */
+  it('15.22 renders one tab per document in HELP_CONTENT', () => {
+    render(<HelpBrowser />);
+    const tablist = screen.getByRole('tablist', { name: 'Help documents' });
+    expect(within(tablist).getAllByRole('tab')).toHaveLength(HELP_CONTENT.length);
   });
 
   /**
@@ -130,7 +155,7 @@ describe('15.22 HelpBrowser — the topic sidebar', () => {
     const faq = HELP_CONTENT.find((doc) => doc.id === 'faq');
     expect(faq).toBeDefined();
     return user
-      .click(screen.getByRole('button', { name: faq?.title ?? '' }))
+      .click(screen.getByRole('tab', { name: 'FAQ' }))
       .then(() => {
         expect(within(topics()).queryAllByRole('button')).toHaveLength(0);
         expect(within(topics()).getByRole('link', { name: 'Privacy' })).toBeInTheDocument();
@@ -162,7 +187,7 @@ describe('15.23 HelpBrowser — the section eyebrow', () => {
     const user = userEvent.setup();
     const { container } = render(<HelpBrowser />);
     const faq = HELP_CONTENT.find((doc) => doc.id === 'faq');
-    return user.click(screen.getByRole('button', { name: faq?.title ?? '' })).then(() => {
+    return user.click(screen.getByRole('tab', { name: 'FAQ' })).then(() => {
       const section = container.querySelector('#faq-privacy');
       expect(section).not.toBeNull();
       expect(within(section as HTMLElement).getByText('FAQ')).toBeInTheDocument();

@@ -216,7 +216,8 @@ there are two thresholds, and the three viewports discriminate all three states:
 
 | measured property | 390 | 768 | 1512 |
 |---|---|---|---|
-| `.gn-help__tabs` / `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
+| `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
+| `.gn-help__h2` font-size (40rem = 640px) | 18.4px | 22px | 22px |
 | `.gn-shell` padding-left (60rem = 960px) | 12px | 12px | 20px |
 
 ### Item 6 — the text palette is sound; the NON-TEXT palette is not, and nothing was watching either

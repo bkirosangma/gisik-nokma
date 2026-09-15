@@ -1351,6 +1351,10 @@ maximum of `13.3333` — the id pattern collides with the pixel value this very 
   failed** — `/sign-in` AND `/help` at all three widths, each naming its own selectors. Restored with
   `git checkout --` from a commit made BEFORE the mutation (never from an uncommitted tree) and re-run
   green: 19 passed, EXIT 0.*
+  *SELECTOR RENAMED 2026-09-15, finding unchanged: `.gn-help__tab` no longer exists — `/help`'s
+  document switch became the shared `SegmentedControl`, and the class's one remaining user,
+  `apps/desktop`'s help toggle, is now `.gn-help__toggle`. The record below is kept verbatim because it
+  documents how the defect was FOUND; only the name it was found under has moved. See 15.22.*
   *THE MUTATION FOUND A SITE NO SIZE INSTRUMENT COULD HAVE: `button.gn-help__tab` was rendering at
   **16px in Arial**. `ui.css:1321` sets `font-size: 1rem` and no `font-family`, so its SIZE was already
   correct and the defect was invisible to the 12px floor, to the size histogram, and to the raised-floor

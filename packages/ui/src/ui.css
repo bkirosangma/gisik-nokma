@@ -1635,7 +1635,7 @@
   box-shadow: var(--gn-shadow-sunken);
 }
 .gn-help__search-input:focus-visible,
-.gn-help__tab:focus-visible,
+.gn-help__toggle:focus-visible,
 .gn-help__group-toggle:focus-visible,
 .gn-help__nav-link:focus-visible,
 .gn-help__pager-link:focus-visible,
@@ -1677,57 +1677,58 @@
    not fit side by side in 274px, so the layout gives way instead of the words.
    `text-align: left` for the same reason — a centred three-line label reads as
    a paragraph, not a control. */
-.gn-help__tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  padding: 0.125rem;
-  background: var(--gn-surface-sunken);
-  border-radius: var(--gn-radius-control);
-}
-/* `border: none` is a FIX, not a restyle, and it was already missing: measured
-   live, `.gn-help__tab` rendered `2px outset rgb(0, 0, 0)` — the UA button
-   default — because this rule never reset it and nothing in either stylesheet
-   resets `button` globally (`globals.css:60` sets only `font: inherit`). Every
-   other control in this file says `border: none` explicitly; this one did not,
-   and under `neo` dark a black border on a near-black ground is exactly the
-   kind of defect that survives being looked at. */
-.gn-help__tab {
+/* ── `.gn-help__tabs` / `.gn-help__tab` ARE GONE, and this note is here because
+   two `test-cases/` records and `docs/pre-launch-checklist.md` still name them.
+
+   The document switch is now the shared `SegmentedControl` (`.gn-segmented`,
+   below in this file), on the owner's 2026-09-15 instruction to build it like
+   the reference — which retires the local pair entirely. `.gn-segmented` is the
+   reference's own treatment measured against its inline styles: a 2px tray,
+   `flex: 1` segments, the selected one on `surfaceRaised` + `shadowRaised`.
+
+   What was lost with them, weighed rather than waved past. Both deleted rules
+   were deliberate I2 fixes, for a defect that DOES NOT TRANSFER: `:hover` used
+   `--gn-fill-secondary` and `[aria-pressed='true']` added `--gn-text-accent`,
+   both because under `minimal` BOTH shadow roles resolve to `none`, so a
+   shadow-only cue marked nothing in 4 of 6 style×theme combinations.
+   `.gn-segmented__item--on` marks selection with `surfaceRaised` — a real
+   background change in every style, not a shadow — so the hole those fixes
+   filled is not open here. It has no `:hover` rule at all, which is a genuine
+   difference and the reference's own behaviour.
+
+   `.gn-help__toggle` below is the ONE surviving user, and it was never a tab.
+   RENAMED rather than left alone: `apps/desktop/src/app.tsx` borrowed
+   `.gn-help__tab` for its "Manual & FAQ" / "Back" button, and a class named
+   for document tabs that styles only a desktop toggle is the drift this file's
+   comments exist to prevent. */
+
+/* `border: none` is a FIX carried over from the class this was renamed out of,
+   and it was already missing: measured live, the button rendered `2px outset
+   rgb(0, 0, 0)` — the UA default — because the rule never reset it and nothing
+   in either stylesheet resets `button` globally (`globals.css:60` sets only
+   `font: inherit`). Every other control in this file says `border: none`
+   explicitly; this one did not, and under `neo` dark a black border on a
+   near-black ground is exactly the kind of defect that survives being looked
+   at. `text-align: left` is dropped with the rename — it existed to keep a
+   31-character wrapped tab label readable, and this button's label is two
+   words. */
+.gn-help__toggle {
   min-height: 2.75rem; padding: 0.5rem 0.75rem; cursor: pointer;
   border: none;
   color: var(--gn-text); background: var(--gn-surface-raised);
-  font-size: 1rem; line-height: 1.3; text-align: left;
-  transition: background-color 200ms ease, border-color 200ms ease;
-  border-radius: calc(var(--gn-radius-control) - 0.125rem);
+  font-size: 1rem; line-height: 1.3;
+  transition: background-color 200ms ease;
+  border-radius: var(--gn-radius-control);
 }
-/* Final whole-branch review (I2): under `hig` and `minimal`, `--gn-shadow-sunken`
-   resolves to `none` (`tokens.ts`'s `SHADOWS` table — only `neo` has a real
-   sunken shadow), so a hover cue that was ONLY a shadow was a no-op in 4 of 6
-   style×theme combinations, and the background value below used to equal the
-   resting tab's own background, compounding it. `--gn-fill-secondary` is a
-   real, distinct token in every style (a translucent fill over the surface,
-   never `none` — the same token `.gn-refusal` uses), so this is a genuine
-   background-colour change everywhere; the sunken shadow layers on top as a
-   bonus cue where the style has a real one (neo). */
-.gn-help__tab:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
-/* Final whole-branch review (I2): the selected tab used to be marked by a
-   raised shadow plus a background identical to the RESTING tab's own
-   `--gn-surface-raised` — under `minimal`, `--gn-shadow-raised` is ALSO
-   `none` (both shadow roles are `none` under `minimal` by design), so nothing
-   but `font-weight` distinguished selected from resting, and nothing but
-   `font-weight` distinguished selected from hovered either. `--gn-text-accent`
-   is a real, distinct colour token in every style×theme (the same accent-hued
-   text role `.gn-help__result-title`/`.gn-help__toc-link` already use on a
-   neutral surface), so colour + weight now carry the distinction under EVERY
-   combination; the raised shadow layers on top where the style has a real one
-   (hig, neo). `aria-pressed` still carries the same fact to assistive tech
-   regardless of what renders. */
-.gn-help__tab[aria-pressed='true'] {
-  background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
-  color: var(--gn-text-accent);
-  font-weight: 600;
-}
+/* Kept from the old `.gn-help__tab:hover` and for its original reason: under
+   `hig` and `minimal`, `--gn-shadow-sunken` resolves to `none` (`tokens.ts`'s
+   `SHADOWS` table — only `neo` has a real sunken shadow), so a hover cue that
+   was ONLY a shadow was a no-op in 4 of 6 style×theme combinations.
+   `--gn-fill-secondary` is a real, distinct token in every style (a translucent
+   fill over the surface, never `none` — the same token `.gn-refusal` uses), so
+   this is a genuine background change everywhere; the sunken shadow layers on
+   top where the style has a real one (neo). */
+.gn-help__toggle:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
 
 /* ── The topic sidebar ────────────────────────────────────────────────────────
    REPLACES `.gn-help__toc`, a wrapped row of every section link that stood
@@ -1968,12 +1969,19 @@
 .gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
 .gn-help__table th { background: var(--gn-surface-sunken); }
 
+/* `.gn-help__h2` is the LAST rule in this query, and it is now load-bearing for
+   more than itself. `.gn-help__tabs { flex-direction: column }` stood beside it
+   and was one of the two discriminators `apps/web/e2e-viewport/responsive.spec.ts`
+   reads to prove the 40rem breakpoint fired at all. That selector is gone, and
+   the spec guards its assertion with `if (… !== null)` — so leaving it pointed
+   at a deleted class would have turned a passing check into a SKIPPED one, with
+   nothing red to say so. The spec now reads this font-size instead; if you
+   remove this line, replace the discriminator in the same change. */
 @media (max-width: 40rem) {
-  .gn-help__tabs { flex-direction: column; }
   .gn-help__h2 { font-size: 1.15rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gn-help__tab { transition: none; }
+  .gn-help__toggle { transition: none; }
 }
 
 /* ── Segmented control (HIG method/view picker). Fill track, raised segment.

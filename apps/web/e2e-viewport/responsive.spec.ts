@@ -145,7 +145,7 @@ type Signature = {
   shellPaddingLeft: number | null;
   shellContentWidth: number | null;
   titleFontSize: number | null;
-  helpTabsDirection: string | null;
+  helpH2FontSize: number | null;
   notFoundActionsDirection: string | null;
   proseBlockWidth: number | null;
 };
@@ -170,9 +170,19 @@ type Signature = {
  *     row    — apps/web/app/globals.css:116-121
  *     column — apps/web/app/globals.css:221, under (max-width: 40rem)
  *
- *   `.gn-help__tabs` flex-direction
- *     row    — packages/ui/src/ui.css:1277
- *     column — packages/ui/src/ui.css:1311-1312, under (max-width: 40rem)
+ *   `.gn-help__h2` font-size
+ *     22px   (`1.375rem`) — packages/ui/src/ui.css, `.gn-help__h2`
+ *     18.4px (`1.15rem`)  — packages/ui/src/ui.css, under (max-width: 40rem)
+ *
+ *     REPLACES `.gn-help__tabs` flex-direction (row/column at the same
+ *     breakpoint), which was this route's discriminator until 2026-09-15.
+ *     `.gn-help__tabs` no longer exists — the document switch became the
+ *     shared `SegmentedControl` — and because `read()` returns `null` for an
+ *     absent selector and the assertion below is guarded by `!== null`,
+ *     leaving the old selector here would have turned a firing check into a
+ *     silently SKIPPED one. That is the failure this file is least able to
+ *     notice, so the discriminator moved to the OTHER declaration already in
+ *     the same `(max-width: 40rem)` block.
  *
  * `null` means the selector is absent on this route, which is expected and
  * fine — `/sign-in` has no title and no tabs. What is NOT fine is every field
@@ -190,7 +200,7 @@ async function measureSignature(page: Page): Promise<Signature> {
       shellPaddingLeft: read('.gn-shell', (_el, cs) => px(cs.paddingLeft)),
       shellContentWidth: read('.gn-shell', (el) => Math.round(el.getBoundingClientRect().width)),
       titleFontSize: read('.gn-legal__title, .gn-notfound__title', (_el, cs) => px(cs.fontSize)),
-      helpTabsDirection: read('.gn-help__tabs', (_el, cs) => cs.flexDirection),
+      helpH2FontSize: read('.gn-help__h2', (_el, cs) => px(cs.fontSize)),
       notFoundActionsDirection: read('.gn-notfound__actions', (_el, cs) => cs.flexDirection),
       proseBlockWidth: read('.gn-legal__section, .gn-help__doc, .gn-notfound__lead', (el) =>
         Math.round(el.getBoundingClientRect().width),
@@ -761,11 +771,15 @@ for (const route of UNAUTHED_ROUTES) {
         )
         .toBeCloseTo(spec.narrow40rem ? 21.6 : 25.6, 1);
     }
-    if (sig.helpTabsDirection !== null) {
-      // ui.css:1277 (row) vs ui.css:1311-1312 (column)
+    if (sig.helpH2FontSize !== null) {
+      // ui.css `.gn-help__h2` (1.375rem) vs its (max-width: 40rem) override (1.15rem)
       expect
-        .soft(sig.helpTabsDirection, `.gn-help__tabs flex-direction (ui.css:1277 / :1311-1312)`)
-        .toBe(spec.narrow40rem ? 'column' : 'row');
+        .soft(
+          sig.helpH2FontSize,
+          `.gn-help__h2 font-size at ${spec.width}px: (max-width:40rem)=${String(spec.narrow40rem)} ` +
+            `implies ${spec.narrow40rem ? 18.4 : 22}px (ui.css .gn-help__h2 / its 40rem override)`,
+        )
+        .toBeCloseTo(spec.narrow40rem ? 18.4 : 22, 1);
     }
     if (sig.notFoundActionsDirection !== null) {
       // globals.css:116-121 (row) vs globals.css:221 (column)

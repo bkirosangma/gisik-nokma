@@ -129,16 +129,31 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
 };
 
 /**
- * A short name for each document, for the section eyebrow (`MANUAL · GETTING
- * STARTED`) and nothing else.
+ * A short name for each document. Two callers: the section eyebrow (`MANUAL ·
+ * GETTING STARTED`) and the document switch in the sidebar.
  *
- * The documents' own titles — "Gisik Nokma — instruction manual", "Gisik Nokma
- * — frequently asked questions" — are what the tabs render, and they stay
- * there: the copy rule keeps shipped wording where the prototype's is *merely
- * different*. But an eyebrow is an ADDITION with no shipped wording to keep, and
- * it needs two words rather than thirty-one characters. These two are not
- * invented either — "the manual and FAQ" is the shipped search label's own
- * phrasing (`help-browser.tsx`).
+ * ## The switch used to render the documents' full titles, on a rule the owner
+ * has since lifted
+ *
+ * Until 2026-09-15 the tabs read "Gisik Nokma — instruction manual" and "Gisik
+ * Nokma — frequently asked questions", because the copy rule keeps shipped
+ * wording where the prototype's is *merely different* and the prototype's
+ * `Manual`/`FAQ` were shorter. **The owner lifted that ruling for this control
+ * in as many words** — *"forget the ruling on the information losing. make the
+ * manual/faq switch like in the attached file"* — so the switch is now the
+ * reference's own: two short segments side by side.
+ *
+ * The words are the reference's, and they were not arbitrary there either:
+ * `helpTabs: [{ k: "manual", l: "Manual" }, { k: "faq", l: "FAQ" }]` in the
+ * prototype's own source. They also match the shipped search label's phrasing,
+ * *"Search the manual and FAQ"*, so the two controls now say the same thing.
+ *
+ * ONE CONSEQUENCE, named rather than left to be noticed: the documents' full
+ * titles no longer appear anywhere on the screen. They are still on the
+ * `HelpDocument`, so anything that wants them has them.
+ *
+ * Keyed by `HelpDocument['id']` rather than positionally, so a third document
+ * would fail to compile here instead of rendering an `undefined` segment.
  */
 export const HELP_DOCUMENT_LABELS: Readonly<Record<HelpDocument['id'], string>> = {
   manual: 'Manual',

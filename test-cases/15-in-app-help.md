@@ -134,9 +134,24 @@ written to make it work.*
   count, and groups start OPEN.** Both halves of the collapse are asserted: a test of the click alone
   would pass against a sidebar that started collapsed, which is the state this deliberately does not
   have — every section behind a click would make it a worse index than the flat row of links it
-  replaced. Also pinned: the document tabs moved INTO the sidebar and still carry the shipped document
-  titles, and the FAQ tab shows a flat list with no toggles at all (asserted by the absence of buttons
-  AND the presence of its 13 links, since absence alone is also satisfied by an empty sidebar).
+  replaced. Also pinned: the FAQ tab shows a flat list with no toggles at all (asserted by the absence
+  of buttons AND the presence of its 13 links, since absence alone is also satisfied by an empty
+  sidebar).
+  **The document SWITCH is pinned by two further cases, and one of them replaces an assertion that
+  said the opposite.** It is now the shared `SegmentedControl` in the sidebar, labelled `Manual` and
+  `FAQ` — the reference's own words (`helpTabs: [{ k: "manual", l: "Manual" }, { k: "faq", l: "FAQ" }]`
+  in its source). Until 2026-09-15 a case asserted the tabs carried the documents' FULL titles, because
+  the copy rule keeps shipped wording where the prototype's is merely different; **the owner lifted that
+  ruling for this control in as many words** — *"forget the ruling on the information losing. make the
+  manual/faq switch like in the attached file"* — so the assertion is INVERTED rather than relaxed: the
+  long titles must be ABSENT from the switch, since a test that merely looked for "Manual" would pass
+  against a control showing both. Queried through `role: 'tab'` inside `role: 'tablist'`, which is what
+  `SegmentedControl` renders, so the case also pins that this is the shared component and not a fifth
+  hand-rolled segmented row. A second case pins the COUNT against `HELP_CONTENT.length` — a switch with
+  the right two labels and a missing third document is the defect the labels case cannot see.
+  *Mutation-witnessed: restoring `label: doc.title` reddens three cases at `EXIT=1` — the labels case,
+  and the two that reach the FAQ by clicking a tab named `FAQ`. Source restored and verified by
+  SHA-256.*
   *Every query is scoped through `getByRole('navigation', { name: 'Topics' })`, and that is not
   tidiness: each section's `Next` pager carries the NEXT SECTION'S OWN TITLE, so an unscoped
   `getByRole('link', { name: '§1 — Signing in' })` matches two elements, and a test that resolved the
@@ -159,10 +174,24 @@ written to make it work.*
 
 *NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
 sticky behaviour, the stacking breakpoint below 48rem, the active row's `aria-current='location'`
-treatment, and the eyebrow/pager type. All were verified by live measurement in a real browser across
-both apps and all six style×theme combinations (the active row's worst contrast is 4.54:1 under
-hig/minimal light, against a 4.5 floor), and none has an assertion — the same honest gap 15.14–15.16
-record. `/help` is in none of the e2e-stack ratchet baselines, so nothing there could have caught a
-regression either.*
+treatment, the eyebrow/pager type, and the switch's geometry. All were verified by live measurement in
+a real browser across both apps and all six style×theme combinations, and none has an assertion — the
+same honest gap 15.14–15.16 record. `/help` is in none of the e2e-stack ratchet baselines, so nothing
+there could have caught a regression either.*
+*Measured values, so a later reader can tell a regression from a redesign. Active row contrast: worst
+4.54:1 under hig/minimal light, against a 4.5 floor. The switch against the reference's own inline
+styles: tray `padding: 2px` / `gap: 2px` exact, segments `flex: 1` at 118px in a 242px tray, 15.2px
+against its 15px, weights 600 selected / 500 unselected exact, side by side. ONE deliberate divergence
+— segment height 44px against the reference's 36px, because `ui.css` records that 40px reddened the
+tap-target ratchet on `/sign-in` the moment anything first rendered `SegmentedControl`. Switch text
+contrast is 12.87:1 at worst across all six combinations.*
+*Two classes were RETIRED with this change and are named because other records still mention them:
+`.gn-help__tabs` no longer exists, and `.gn-help__tab` was renamed `.gn-help__toggle` — it had one
+remaining user, `apps/desktop/src/app.tsx`'s "Manual & FAQ" / "Back" button, which was never a tab.
+`.gn-help__tabs` was also one of two discriminators `apps/web/e2e-viewport/responsive.spec.ts` reads to
+prove the 40rem breakpoint fired; that spec guards its assertion with `if (… !== null)`, so leaving it
+aimed at a deleted selector would have turned a firing check into a silently SKIPPED one. The
+discriminator moved to `.gn-help__h2`'s font-size, the other declaration already in the same media
+query. Cases 13.266–13.267 and the mutation record at 13.x name the old class as history.*
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
