@@ -3191,10 +3191,15 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
 - **pending-13.4xx** ✅ `/account`'s page shell (account/help screens plan, Task 2) — `AccountPage`
   became a `'use client'` shell composing `AppNav` and the page's `<h1>Account</h1>` title, and gained
   its first real content section, Appearance, wrapping the already-tested `StyleToggle`/`ThemeToggle`
-  pair (`ThemeToggle` moved off `AppNav` into this new section in the same task). **Not yet
-  ID-allocated**: this file's own header requires the next free block (after 13.399) to be requested
-  from the controller before minting, and this task has no channel to request one — the same gap
-  `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block already carries for its three
-  cases (`/help` and `/account` mounting `AppNav`), unresolved before this task and still unresolved
-  after it. Rename to a real case id once a block is requested. —
-  (`apps/web/test/account-page.test.tsx`)
+  pair (`ThemeToggle` moved off `AppNav` into this new section in the same task). **Task 3 adds two
+  more cases to this same pending block:** the Profile section shows the signed-in caller's current
+  `name` and `email`, edits and saves the name through `authClient.updateUser({ name })` (verified
+  against the installed `better-auth@1.7.2` client's generated types, not assumed), and a save that
+  comes back with an `error` renders that door's `message` verbatim in a `role="alert"` rather than a
+  paraphrase. **Not yet ID-allocated**: this file's own header requires the next free block (after
+  13.399) to be requested from the controller before minting, and this task has no channel to request
+  one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block already
+  carries for its three cases (`/help` and `/account` mounting `AppNav`), unresolved before Task 2,
+  unresolved after Task 2, and still unresolved after Task 3. Rename every case in this block to real
+  case ids, in order, once a block is requested. —
+  (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`)

@@ -1,12 +1,27 @@
 import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/account',
   useRouter: () => ({ push: vi.fn() }),
 }));
+/**
+ * `vi.hoisted`, not a bare `const` — `vi.mock` is hoisted above every
+ * statement in this file, so a factory closing over a module-level binding
+ * declared below it throws `ReferenceError: Cannot access 'updateUser' before
+ * initialization` at import time (documented precedent: `test/sign-in.test.tsx`'s
+ * own docblock on this exact mistake).
+ */
+const { updateUser } = vi.hoisted(() => ({ updateUser: vi.fn() }));
 vi.mock('../src/auth-client.js', () => ({
-  authClient: { signOut: vi.fn(), useSession: () => ({ data: null }) },
+  authClient: {
+    signOut: vi.fn(),
+    useSession: () => ({
+      data: { user: { id: 'u1', name: 'Anjali Kharkongor', email: 'anjali@example.com' } },
+    }),
+    updateUser,
+  },
 }));
 
 import AccountPage from '../app/account/page.js';
@@ -31,5 +46,28 @@ describe('AccountPage — the global settings shell', () => {
     mount();
     expect(await screen.findByRole('button', { name: /Style/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Theme:/ })).toBeInTheDocument();
+  });
+});
+
+describe('AccountPage — Profile', () => {
+  it('shows the current name and email, and saves an edited name', async () => {
+    updateUser.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    const nameInput = await screen.findByLabelText('Name');
+    expect(nameInput).toHaveValue('Anjali Kharkongor');
+    expect(screen.getByText('anjali@example.com')).toBeInTheDocument();
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Anjali K.');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(updateUser).toHaveBeenCalledWith({ name: 'Anjali K.' });
+  });
+
+  it('shows a refusal verbatim if the save fails', async () => {
+    updateUser.mockResolvedValue({ data: null, error: { message: 'Name cannot be empty' } });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Name cannot be empty');
   });
 });
