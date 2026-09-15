@@ -481,12 +481,16 @@ describe('13.390 the card is a door to /w/<id>', () => {
 });
 
 /**
- * Task 4 — the page head's one-line summary, gated on `workspaces !== null`
- * rather than on `.length`. A REFUSED read is `null` at this point in the
- * component exactly like an in-flight one is, so the interesting case is not
- * that the summary renders once there is a list — it is that it stays absent
- * on a refusal, where a naive `workspaces.length` gate would print "0
- * workspaces you belong to.": a count of a list nobody managed to read.
+ * Task 4 — the page head's one-line summary, gated on `workspaces !== null &&
+ * workspaces.length > 0`. The `!== null` term is the withholding half: a
+ * REFUSED read is `null` at this point in the component exactly like an
+ * in-flight one is, so a naive `workspaces.length` gate would print "0
+ * workspaces you belong to." — a count of a list nobody managed to read — and
+ * it stays FIRST so it short-circuits before `.length` is ever read on a
+ * refusal. The `length > 0` term (fix round 1) is a copy judgement, not a
+ * withholding one: a SUCCESSFUL empty read is a real, counted zero, and the
+ * summary would sit redundantly on top of the page's own "No workspaces
+ * yet…" sentence, which already says it better.
  */
 describe('Task 4 — the workspaces summary line', () => {
   it('prints no summary when the workspaces read refused — a count of nothing counted', async () => {
@@ -498,5 +502,22 @@ describe('Task 4 — the workspaces summary line', () => {
   it('summarises the list once it has one', async () => {
     mountWith([workspace({ id: 'ws1', memberCount: 1 }), workspace({ id: 'ws2', memberCount: 1 })]);
     expect(await screen.findByText('2 workspaces you belong to')).toBeInTheDocument();
+  });
+
+  /**
+   * Fix round 1 — the case the coordinator's ruling 3 requires: a
+   * SUCCESSFUL read that answers `[]` is `!== null`, so without the
+   * `length > 0` term this would print "0 workspaces you belong to."
+   * directly above the empty-state sentence. Both halves are asserted: the
+   * summary is absent, AND the page's own empty-state copy is what actually
+   * renders instead — a presence-only check on the empty-state sentence
+   * would pass even if the summary also leaked through above it.
+   */
+  it('prints no summary — and the empty-state sentence instead — when the read succeeds with zero workspaces', async () => {
+    mountWith([]);
+    expect(
+      await screen.findByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/workspaces? you belong to/i)).toBeNull();
   });
 });

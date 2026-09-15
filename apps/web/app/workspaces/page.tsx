@@ -43,12 +43,19 @@ export default function WorkspacesPage() {
       <div className="gn-workspaces">
         <div className="gn-workspaces__head">
           <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
-          {/* Gated on `workspaces !== null`, not on `.length`: a REFUSED read is
-              also `null` here, and a summary rendered through it would print "0
-              workspaces you belong to." — a number nobody counted, about a list
-              nobody managed to read. ONE interpolation, so the sentence is one
-              text node. */}
-          {workspaces !== null ? (
+          {/* `workspaces !== null` FIRST, and it stays load-bearing: a REFUSED
+              read is also `null` here, and short-circuiting on this term before
+              `.length` is what keeps a refusal from throwing instead of merely
+              changing copy — a summary rendered through a refusal would print
+              "0 workspaces you belong to.", a number nobody counted, about a
+              list nobody managed to read.
+              `&& workspaces.length > 0` is a copy judgement, not a withholding
+              one: a SUCCESSFUL empty read is a real, counted zero, and "0
+              workspaces you belong to." sitting on top of the empty-state
+              sentence below ("No workspaces yet. Ask an admin…") was
+              redundant — that sentence already says it better.
+              ONE interpolation, so the sentence is one text node. */}
+          {workspaces !== null && workspaces.length > 0 ? (
             <p className="gn-workspaces__summary">
               {`${workspaces.length} ${workspaces.length === 1 ? 'workspace' : 'workspaces'} you belong to`}
             </p>

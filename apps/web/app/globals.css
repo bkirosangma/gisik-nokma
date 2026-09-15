@@ -111,24 +111,19 @@ input, textarea, select { font-family: inherit; }
    exactly as it was — see `.gn-workspaces__head .gn-page-title` below for the
    one page that resets it, scoped rather than here.
 
-   UNRESOLVED, flagged rather than silently fixed: `-0.025em` is Task 4's
-   brief's verbatim value, used as instructed. Two sibling rules for this
-   same 34px/700 title — `.gn-account .gn-page-title` (this file, below) and
-   `.gn-help__title` (`packages/ui/src/ui.css:1697`) — both carry `-0.0118em`
-   instead, each with a note dated 2026-09-15 recording that `-0.025em`
-   measured −0.85px live against the prototype's −0.4px tracking, and that
-   −0.4px ÷ 34px = −0.0118em. Neither of those two pages is affected by this
-   rule's value (both override it at higher specificity), but the other
-   eleven pages that read this base rule with no override of their own are.
-   Whether this base rule should carry the corrected tracking is a call for
-   whoever reconciles Task 4 against those two same-day corrections, not
-   made here. */
+   `letter-spacing: -0.0118em`, not the naive −0.4px ÷ 16px root that gives
+   −0.025em: `em` in `letter-spacing` resolves against the ELEMENT's own
+   font-size (34px here), not the root's, so −0.4px ÷ 34px = −0.0118em is the
+   correct conversion. Already measured and corrected twice in this repo for
+   the same 34px/700 title — see `.gn-account .gn-page-title` below and
+   `.gn-help__title` (`packages/ui/src/ui.css:1697`) for the live-rendered
+   −0.85px-vs−0.4px measurement this value avoids. */
 .gn-page-title {
   margin: 1.2rem 0 0.4rem;
   font-size: 2.125rem;
   line-height: 2.5625rem;
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.0118em;
 }
 
 /* A one-line "back to the list" link above a detail page's own title — the
@@ -158,14 +153,22 @@ input, textarea, select { font-family: inherit; }
    narrowing every route that shares the shell. `.gn-workspace-founding`
    existing apart from `.gn-project-founding` is the same precedent.
 
-   The padding below is the brief's verbatim value and STACKS with
-   `.gn-shell`'s own `padding: 0 1.25rem 3rem`, because Task 4 was told not
-   to touch `.gn-shell` — the rendered gutter is therefore 2.75rem
-   horizontal / 5.5rem bottom, not the prototype's 24px/40px alone. */
+   `.gn-workspaces` keeps ONLY what `.gn-shell` does not already provide, and
+   that is deliberate rather than an oversight: `.gn-shell` is not a spare
+   box to cap here, because `<AppNav />` renders INSIDE it, and capping the
+   shell to 1180px would shrink the floating nav on this page alone — a worse
+   inconsistency than the one this cap exists to fix. So no horizontal
+   padding and no bottom padding below: `.gn-shell`'s own gutter
+   (`padding: 0 1.25rem 3rem`, 1.25rem/0.75rem responsive at the ≤60rem
+   breakpoint it already carries) stands as-is and this rule adds only the
+   top spacing the prototype wants above the title. That accepts 20px vs the
+   prototype's 24px side gutter and 48px vs its 40px bottom — both invisible
+   in practice, and one gutter system with an existing, working mobile
+   breakpoint beats two that would need to be kept in sync by hand. */
 .gn-workspaces {
   max-width: 73.75rem;
   margin: 0 auto;
-  padding: 1.625rem 1.5rem 2.5rem;
+  padding-top: 1.625rem;
 }
 
 .gn-workspaces__summary {
