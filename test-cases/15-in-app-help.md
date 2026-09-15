@@ -204,7 +204,18 @@ written to make it work.*
   palette's own (higher) baseline — `#5e5e62` light / `#a0a0a5` dark, binding constraint `surfaceSunken`
   at **4.61** and **4.54**, with one step dimmer failing outright (`#606064` → 4.47, `#9e9ea3` → 4.43).
   `grayAccessible` was unusable for the same reason its own docblock already gave: it is the status-dot
-  grey and fails text at **3.73** on `warmSunken`.* — (`packages/ui/test/tokens.test.ts`)
+  grey and fails text at **3.73** on `warmSunken`.*
+  *ONE SITE NO `CONTRAST_PAIRS` ROW CAN REACH, measured separately rather than assumed: the group
+  count is 12px text inside `.gn-help__group-toggle`, which on `:hover` lays `--gn-fill-quaternary`
+  over the surface — and the fills are ALPHA, which that array forbids naming (a row would compute the
+  fill's own colour against a ground it is blended INTO). Composited by hand across all six
+  style×theme combinations, `textSubtle` on the hover ground measures **4.80 / 5.31 (hig, minimal) and
+  4.78 / 5.05 (neo)** — worst **4.78**, still clear of 4.5 and still above the 4.61 `surfaceSunken`
+  figure that binds the derivation, so no site moves back to `textMuted`. The same composite confirms
+  the premise the search-field fix rests on: in LIGHT theme `fillQuaternary` is a DARK tint
+  (`#efe7df` → `#e3ddd8`), so the field reads as a well under `hig`/`minimal` — the combination where
+  both shadow roles are `none` and the hex is the only cue.*
+  — (`packages/ui/test/tokens.test.ts`)
 - **15.27** ❌ **The Help screen's surfaces, type scale and geometry match the prototype** — the
   search field and the results tray are RECESSED, not raised; the blockquote and the empty state are
   the same tray card; body copy is 17px/22px; the reading column runs on one 20px rhythm. Unasserted
