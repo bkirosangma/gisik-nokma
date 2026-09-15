@@ -205,16 +205,23 @@ written to make it work.*
   at **4.61** and **4.54**, with one step dimmer failing outright (`#606064` → 4.47, `#9e9ea3` → 4.43).
   `grayAccessible` was unusable for the same reason its own docblock already gave: it is the status-dot
   grey and fails text at **3.73** on `warmSunken`.*
-  *ONE SITE NO `CONTRAST_PAIRS` ROW CAN REACH, measured separately rather than assumed: the group
-  count is 12px text inside `.gn-help__group-toggle`, which on `:hover` lays `--gn-fill-quaternary`
+  *ONE SITE NO `CONTRAST_PAIRS` ROW COULD REACH, measured separately rather than assumed: the group
+  count was 12px text inside `.gn-help__group-toggle`, which on `:hover` laid `--gn-fill-quaternary`
   over the surface — and the fills are ALPHA, which that array forbids naming (a row would compute the
   fill's own colour against a ground it is blended INTO). Composited by hand across all six
-  style×theme combinations, `textSubtle` on the hover ground measures **4.80 / 5.31 (hig, minimal) and
-  4.78 / 5.05 (neo)** — worst **4.78**, still clear of 4.5 and still above the 4.61 `surfaceSunken`
-  figure that binds the derivation, so no site moves back to `textMuted`. The same composite confirms
-  the premise the search-field fix rests on: in LIGHT theme `fillQuaternary` is a DARK tint
-  (`#efe7df` → `#e3ddd8`), so the field reads as a well under `hig`/`minimal` — the combination where
-  both shadow roles are `none` and the hex is the only cue.*
+  style×theme combinations, `textSubtle` on the hover ground measured **4.80 / 5.31 (hig, minimal) and
+  4.78 / 5.05 (neo)** — worst **4.78**, clear of 4.5.*
+  ***SUPERSEDED the same day, and in the direction that costs this case nothing: the sidebar's hover
+  ground is `--gn-surface-sunken` now, and the ink over it `--gn-text-muted`** (owner: "lets move the
+  styling towards the guide"). Both are solid, so the composite that needed a hand measurement is a
+  DECLARED row — `{ fg: 'textMuted', bg: 'surfaceSunken', minimum: 4.5 }` (`tokens.ts:893`) — verified
+  by the loop above in both themes. The hand figures are kept rather than deleted because they are
+  what licensed the alpha hover while it shipped, and because `textSubtle` still holds two sites in
+  the document column that this move did not touch.*
+  *The old composite's OTHER finding still stands and is still load-bearing elsewhere: in LIGHT theme
+  `fillQuaternary` is a DARK tint (`#efe7df` → `#e3ddd8`), which is the premise the search-field fix
+  rests on — that field reads as a well under `hig`/`minimal`, the combination where both shadow roles
+  are `none` and the hex is the only cue.*
   — (`packages/ui/test/tokens.test.ts`)
 - **15.27** ❌ **The Help screen's surfaces, type scale and geometry match the prototype** — the
   search field and the results tray are RECESSED, not raised; the blockquote and the empty state are
@@ -308,9 +315,10 @@ written to make it work.*
   that is a larger change than a font port.* — (no test; owner: whoever next gives the editor webview
   its tokens)
 
-*NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
-sticky behaviour, the stacking breakpoint below 48rem, the active row's VISUAL treatment (15.25 asserts
-the `aria-current` attribute; nothing asserts the fill, the weight or the depressed shadow), the
+*NOT covered by any test, and named rather than implied: the sidebar's CSS — its width, the
+sticky behaviour (now inset 1.5rem from the viewport top rather than flush), the stacking breakpoint
+below 48rem, the active row's VISUAL treatment (15.25 asserts the `aria-current` attribute; nothing
+asserts the fill or the weight), the
 eyebrow/pager type, and the switch's geometry. All were verified by live measurement in a real browser
 across both apps and all six style×theme combinations, and none has an assertion — the same honest gap
 15.14–15.16 record. `/help` is in none of the e2e-stack ratchet baselines, so nothing there could have
@@ -318,10 +326,16 @@ caught a regression either.*
 *Measured values, so a later reader can tell a regression from a redesign. Active row: `--gn-accent` +
 `--gn-accent-text` at 600, contrast **5.26:1 light / 7.48:1 dark** against a 4.5 floor — up from the
 4.54:1 the earlier `--gn-text-accent`-on-`--gn-fill-tertiary` wash gave. Inactive rows
-`--gn-text-muted` at 15px/400, 8.71:1 at worst. Rows 34px tall (WCAG 2.5.8 floor is 24px), 15px text
-(this repo's enforced floor is 12px). `--gn-shadow-sunken` on the active row verified PRESENT under
-`neo` both themes and `none` under `hig`/`minimal` — the depressed reading the owner asked for, in the
-only style that has a real inset shadow. Scroll spy measured at five positions: exactly one row marked
+`--gn-text` at 15px/400 — **15.43:1 at worst idle and 11.82:1 over the `--gn-surface-sunken` hover**,
+re-measured across all six style×theme combinations after the 2026-09-15 move toward the guide (it was
+`--gn-text-muted` at 8.71:1). Sidebar furniture — eyebrow, group counts, caret — is `--gn-text-muted`
+now rather than `--gn-text-subtle`, **7.81:1 at worst** (`hig`/light on `surfaceSunken`). Rows ~33px
+tall from `0.4rem` padding on a 1.35 line box, replacing a 34px `min-height` (WCAG 2.5.8's floor is
+24px), 15px text (this repo's enforced floor is 12px). `--gn-shadow-sunken` on the active row was
+verified PRESENT under `neo` both themes and `none` under `hig`/`minimal` — **that declaration is
+GONE** with the same move, so the active row is now fill plus 600 weight in all three styles; the
+reading is kept because it is what the depressed look cost and what removing it gave back.
+Scroll spy measured at five positions: exactly one row marked
 at every one, the first section at the top of the document, and the first section again on return.
 The switch against the reference's own inline
 styles: tray `padding: 2px` / `gap: 2px` exact, segments `flex: 1` at 118px in a 242px tray, 15.2px
