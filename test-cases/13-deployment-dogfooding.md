@@ -3392,13 +3392,43 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   so the one wrong arm was the one everybody saw. One `[data-style]` override reproduces all five from
   the two existing shadow roles; no new role, no literal, and `hig`/`minimal` untouched — the same
   shape as 13.339's `[data-style="neo"] .gn-field__input` rule directly above it in `ui.css`.*
-  *The background deliberately stays `var(--gn-surface-raised)`: under `neo` every surface role
-  collapses to one hex, so it resolves to the page's own ground while the track around it is a
-  `fill-tertiary` tint — which is what makes the inset read as a well pressed INTO the control rather
-  than a panel sitting on it, and is the composition the reference's own neo values produce.*
-  *Unasserted, for the reason 13.339 already records for its sibling: this is a `box-shadow` under one
-  `[data-style]` arm, and nothing in the suite reads a computed style on this component. It moves no
-  box — `box-shadow` is outside layout — so neither the tap-target nor the type-scale ratchet can see
-  it either way, which is also why neither could regress from it. Verified by eye in the running dev
-  server at 1512px, `neo`/dark, on `/help`'s Manual/FAQ switch.* — (no test; owner: whoever next
-  asserts computed style on the shared controls, with 13.339)
+  *THE BACKGROUND MOVED TOO, and only because a failing assertion forced the value to be looked up
+  rather than assumed. The first draft kept the base rule's `var(--gn-surface-raised)`, reasoning that
+  `neo` collapses its surfaces anyway. It does not collapse them in LIGHT: `surfaceRaised` is `#fbf7f3`
+  there against `surfaceSunken`'s `#ede4db`, so the pressed segment sat a shade too high in exactly the
+  theme this suite runs in. The reference settles it — its own `--segOnBg` under `neo` is `#EDE4DB`
+  light and `#1B2340` dark, which are byte-for-byte
+  `colorOf('light'|'dark', 'surfaceSunken', 'neo')`. So the neo override carries
+  `background: var(--gn-surface-sunken)` as well as the shadow: sunken ground, sunken shadow, the same
+  pairing `.gn-field__input` (13.339) and `.gn-help__search-input` (15.34) take under `neo`.*
+  ***CORRECTION, and it is the useful part of this entry.** The first version of this case said the
+  change was "unasserted — nothing in the suite reads a computed style on this component," and the
+  commit (810d8470) repeated it as "no gate can move on this and none did." **Both were false.**
+  `13.362` reads the selected tab's rendered `box-shadow` in a real Chromium page and pins its
+  geometry; it reddened on all three viewports on the very next run — 3 failed became 6. The reasoning
+  behind the wrong claim was sound as far as it went (`box-shadow` is outside layout, so no ratchet
+  could move) and it was still wrong, because it answered "which RATCHETS can see this" when the
+  question was "what asserts this". A ratchet is not the only kind of gate. The suite caught it before
+  anything shipped further, which is exactly what 13.362's docblock argues for witnessing a rendered
+  value instead of trusting the source.*
+  *So this case IS covered: `13.362` now asserts the `inset` keyword and both `4px 4px 9px` /
+  `-4px -4px 9px` offsets, and asserts the old `7px 7px 16px` raised geometry is GONE — without that
+  last line a rule emitting both would satisfy the others. The discrimination is sharper than the
+  version it replaced: `hig` and `minimal` both resolve `sunken` to `none`, so these offsets can only
+  appear under `neo`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)
+
+- **13.401** ✅ **The segmented track paints no background of its own** — `.gn-segmented` dropped
+  `background: var(--gn-fill-tertiary)`. Owner, 2026-09-15: *"the background also needs to be removed
+  from the tablist."*
+  *It follows from 13.400 rather than being a separate taste call: once the selected segment is a WELL
+  pressed into the page, a tint behind the whole control gives the well a second ground to compose
+  against, and the reference's own neo values compose against the page. The unselected segment is now
+  bare page with no fill of its own — the "normal" half of the owner's description. Geometry
+  (`gap`/`padding`/`--gn-radius-control`) is kept deliberately: with no fill, spacing is the only
+  thing left holding the two segments apart.*
+  *Asserted, and the assertion had to MOVE to stay honest: 13.362 used to read `--gn-fill-tertiary`
+  off the root as its declared-value control, naming it "the segmented track background". That would
+  have gone on passing forever while describing a property this component no longer has — green about
+  a thing that stopped existing. It reads `--gn-surface-sunken` now (what the pressed segment actually
+  composes against) and adds a direct reading of the track's own computed `backgroundColor`, which is
+  `rgba(0, 0, 0, 0)`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)

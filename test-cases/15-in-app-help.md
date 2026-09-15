@@ -296,6 +296,26 @@ written to make it work.*
   undone deliberately: it is a colour question with a contrast argument attached, and that change was
   about fonts. Named rather than quietly folded in.* — (no test; owner: whoever next touches
   `apps/desktop/src/theme.ts`)
+- **15.34** ❌ **The Help search field shows no border of the browser's own** — `.gn-help__search-input`
+  never declared `border`, so an `<input>` kept Chrome's UA default and rendered with
+  `2px inset rgb(118, 118, 118)`, measured on the live page. An `inset` border paints its right and
+  bottom edges LIGHT and its top and left DARK, which is the asymmetric rim the owner saw and reported
+  as *"a border on the right and bottom sides. i want it to be like the rest of the input boxes."*
+  *THE DEFECT WAS A MISSING DECLARATION, which is why nothing found it earlier and why no grep could
+  have: there was no wrong value written anywhere to match. It is the same UA-default trap
+  `.gn-help__group-toggle` already carries a note about one control away (`border: none` there, against
+  the UA's `2px outset` on a `<button>`), and the same shape as the font absences 15.28–15.33 recorded —
+  an element relying on a browser default that nobody chose. The colour was not even a token: `rgb(118,
+  118, 118)` appears nowhere in `tokens.ts`.*
+  *The fix is `.gn-field__input`'s treatment verbatim, which is what "like the rest of the input boxes"
+  names — `1px solid var(--gn-border)` on `hig`/`minimal`, and `border: none` with
+  `background: var(--gn-surface-sunken)` + `box-shadow: var(--gn-shadow-sunken)` under `neo` (13.339's
+  owner ruling). Only width, the 44px floor, padding and the reference's 17px type stay local. Note the
+  background moved too: it was `--gn-fill-quaternary` in every style, and is now the field's own split.*
+  *Unasserted for the reason 15.14–15.16 and 15.27 already record — nothing in the suite reads a
+  computed style on this screen. Verified in the running dev server at 1512px, `neo`/dark, by reading
+  the computed `border` before and after.* — (no test; owner: whoever next touches the help surfaces,
+  with 15.27)
 - **15.33** ❌ **The ticket editor's `<code>` and `<pre>` render in the product's monospace** — they do
   not, and this is where "everywhere" stops. StarterKit is configured with only `document`, `link` and
   `underline` switched off, so the `code` mark and the `codeBlock` node are both live (that file's own

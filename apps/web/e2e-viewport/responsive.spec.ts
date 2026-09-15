@@ -1904,32 +1904,78 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   await expect(phoneTab).toHaveAttribute('aria-selected', 'true');
   await expect(emailTab).toHaveAttribute('aria-selected', 'false');
 
-  // ── DECLARED value: the token pipeline resolved neo's own fillTertiary for
-  // `.gn-segmented`'s track background, not hig/minimal's. Read from the
-  // root custom property, the same technique `assertViewportTookEffect`
-  // already uses for `--gn-surface`.
-  const fillTertiary = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--gn-fill-tertiary').trim(),
+  // ── DECLARED value: the token pipeline resolved NEO's own values, not
+  // hig/minimal's. Read from a root custom property, the same technique
+  // `assertViewportTookEffect` already uses for `--gn-surface`.
+  //
+  // This reads `--gn-surface-sunken` and NOT `--gn-fill-tertiary` as of
+  // 2026-09-15. `fillTertiary` was the segmented TRACK's background and the
+  // owner has removed it ("the background also needs to be removed from the
+  // tablist"), so asserting it here would have gone on passing while naming a
+  // property this component no longer has — a check still green about a thing
+  // that stopped existing. `surfaceSunken` is what the pressed segment's own
+  // shadow composes against, so it is the token this control actually depends
+  // on now.
+  // The LIGHT arm's value: this project sets no `colorScheme`, so the run is
+  // light and `#ede4db` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
+  // as the literal the way the `fillTertiary` assertion it replaces was — and
+  // worth naming, because the first draft asserted the DARK hex (`#141a2e`)
+  // from memory and reddened on all three viewports. It is also exactly the
+  // reference's own `--segOnBg` for neo light, which is the cross-check that
+  // this is the right token rather than merely a passing one.
+  const surfaceSunken = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-sunken').trim(),
   );
   expect(
-    fillTertiary,
-    'the segmented track background should be neo\'s fillTertiary, not hig/minimal\'s',
-  ).toBe('#b0988429');
+    surfaceSunken,
+    'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
+  ).toBe('#ede4db');
+
+  // ── And the track really carries no fill of its own, which is the owner's
+  // change rather than an absence that was always there.
+  const trackBackground = await tablist.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(
+    trackBackground,
+    `the tablist track should paint no background of its own; got ${trackBackground}`,
+  ).toBe('rgba(0, 0, 0, 0)');
 
   // ── RENDERED value, on the actual selected tab element, not just the root
   // custom property — the same "declared vs. witnessed" gap 13.347's own
-  // docblock names. Distinguishing neo from hig by SHAPE (two shadow layers,
-  // a 16px blur) rather than mere non-'none'-ness: hig's own `raised` shadow
-  // is ALSO non-'none' (a single, tighter layer), so "has a shadow" alone
-  // would not tell the two styles apart.
-  // `.split(',').length >= 2` was tried first and is WRONG: `getComputedStyle`
-  // renders each layer's colour as `rgba(r, g, b, a)`, which itself contains
-  // commas, so a SINGLE hig-style layer already splits into 4+ pieces — the
-  // assertion would pass for hig too and prove nothing about layer count.
-  // Checking both layers' own offset/blur geometry (`tokens.ts`'s `neo`/
-  // `light`/`raised`: `7px 7px 16px` + `-7px -7px 16px`, `SHADOWS.neo.light.raised`)
-  // is what actually distinguishes neo's two-layer shadow from hig's one.
+  // docblock names.
+  //
+  // ═══════════════════════════════════════════════════════════════════════
+  // THE GEOMETRY IS `sunken`, NOT `raised` — OWNER, 2026-09-15
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // "the active one had a sunken style, and the inactive one was normal / in
+  // the prototype it was sunken style. i want it to follow that." The
+  // reference gives this control FIVE `--segOnShadow` values split on the
+  // style axis (`design-system/interactive/desktop.dc.html`): a drop shadow
+  // under `hig`, `none` under `minimal`, and `inset` pairs under `neo`. Only
+  // the `neo` arm was wrong, and `neo` is the shipped default — so this
+  // assertion had been pinning the one arm everybody actually saw, backwards.
+  //
+  // THIS CASE IS THE REASON THAT WAS CAUGHT AT ALL. The change was committed
+  // (810d8470) with a note claiming nothing in the suite read a computed
+  // style on this component; this test does, and reddened on all three
+  // viewports. The claim was wrong and the run said so before anything
+  // shipped further — which is the whole argument for witnessing a rendered
+  // value rather than trusting the source.
+  //
+  // Still discriminating by SHAPE rather than by mere non-'none'-ness, and
+  // MORE sharply than before: `hig`'s and `minimal`'s `sunken` both resolve
+  // to `none` (`tokens.ts`'s `SHADOWS` table), so the `inset` keyword plus
+  // these offsets can only appear under `neo`. `.split(',').length >= 2` was
+  // tried in an earlier revision and is WRONG for the same reason it always
+  // was: `getComputedStyle` renders each layer's colour as `rgba(r, g, b, a)`,
+  // which itself contains commas, so counting commas proves nothing about
+  // layer count. The offsets come from `SHADOWS.neo.<theme>.sunken`:
+  // `inset 4px 4px 9px` + `inset -4px -4px 9px`, identical in both themes.
   const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('7px 7px 16px');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-7px -7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('inset');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('4px 4px 9px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-4px -4px 9px');
+  // The old raised geometry must be GONE, not merely joined by the new one —
+  // without this, a rule that emitted both would satisfy every line above.
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('7px 7px 16px');
 });

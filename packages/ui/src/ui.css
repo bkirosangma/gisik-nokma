@@ -1712,14 +1712,37 @@
    literal `10px` — 8px here, 14px under `neo` — because a length literal
    would desync this one field from every other control in ruling #386's
    radius scale to buy 2px. */
+/* ── THE UA's OWN BORDER WAS SHOWING, 2026-09-15 (owner: "the gn-help-search
+   has a border on the right and bottom sides. i want it to be like the rest of
+   the input boxes").
+
+   This rule never declared `border`, so an `<input>` kept Chrome's default
+   `2px inset` — measured on the live page as `2px inset rgb(118, 118, 118)`.
+   An `inset` border style paints its right and bottom edges LIGHT and its top
+   and left DARK, which is the asymmetric rim that was visible, and it is not a
+   colour any token chose. Exactly the trap `.gn-help__group-toggle` already
+   carries a note about one control over ("the UA's `2px outset` otherwise
+   draws a box round it"): the defect is a MISSING declaration, so no grep for
+   a wrong value could ever have found it.
+
+   The treatment is now `.gn-field__input`'s, verbatim, which is what "like the
+   rest of the input boxes" names — bordered on `hig`/`minimal`, and the pure
+   neumorphic well under `neo` (13.339's owner ruling, and the `[data-style]`
+   rule below). Only size, padding and the reference's 17px type stay local to
+   this field. */
 .gn-help__search-input {
   width: 100%;
   min-height: 2.75rem;            /* 44px — the minimum touch target */
   padding: 0 0.875rem;
   font-size: 1.0625rem;
   color: var(--gn-text);
+  border: 1px solid var(--gn-border);
   background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-control);
+}
+[data-style="neo"] .gn-help__search-input {
+  border: none;
+  background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }
 .gn-help__search-input:focus-visible,
@@ -2258,14 +2281,23 @@
   .gn-help { animation: none; }
 }
 
-/* ── Segmented control (HIG method/view picker). Fill track, raised segment.
-   Replaces `.gn-view-tabs`. No border anywhere (R1(c)). ───────────────── */
+/* ── Segmented control (HIG method/view picker). Replaces `.gn-view-tabs`.
+   No border anywhere (R1(c)).
+
+   NO TRACK FILL as of 2026-09-15 (owner: "the background also needs to be
+   removed from the tablist"). It was `var(--gn-fill-tertiary)`. With the
+   selected segment now PRESSED under `neo` (below), the track had become the
+   second of two competing grounds — the well is read against the page itself,
+   not against a tint laid over it, which is what the reference's own neo
+   values compose against. The unselected segment is therefore bare page and
+   carries no fill of its own, which is the "normal" half of the owner's
+   description. Geometry (`gap`/`padding`/radius) stays: it is what keeps the
+   two segments apart now that no fill does. */
 .gn-segmented {
   display: flex;
   gap: 2px;
   padding: 2px;
   border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
 }
 /* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
    the 44px floor this repo's own tap-target ratchet enforces (WCAG 2.5.5, and
@@ -2326,6 +2358,16 @@
    Manual/FAQ switch and the ticket-type editor — which is the point: the
    reference defines the component once. */
 [data-style="neo"] .gn-segmented__item--on {
+  /* `surfaceSunken`, not the base rule's `surfaceRaised` — CONFIRMED against
+     the reference rather than reasoned from the word "sunken". Its own
+     `--segOnBg` under `neo` is `#EDE4DB` light and `#1B2340` dark, and those
+     are byte-for-byte this product's `surfaceSunken` in the same two arms
+     (`colorOf('light'|'dark', 'surfaceSunken', 'neo')`). The base rule's
+     `surfaceRaised` differs from it in LIGHT (`#fbf7f3`), so keeping it would
+     have left the pressed segment sitting a shade too high in exactly the
+     theme this suite runs in. Same pairing `.gn-field__input` and
+     `.gn-help__search-input` take under `neo`: sunken ground, sunken shadow. */
+  background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }
 .gn-segmented__item:focus-visible {
