@@ -449,6 +449,55 @@ describe('a control without a boundary — which signal identifies it', () => {
 });
 
 /**
+ * `tintWarning` — the invitation banner's wash (2026-09-15).
+ *
+ * It is ALPHA, so no `CONTRAST_PAIRS` row may name it (`tokens.ts:228`):
+ * `relativeLuminance` ignores alpha, and a declared pair would measure the
+ * tint's own colour against a background it is actually blended INTO. The
+ * obligation is against the COMPOSITE, which is what this block measures —
+ * the same shape as the `fillTertiary` accent-on-filled check above.
+ *
+ * The banner sits at page level, so its ground is `surface` and only
+ * `surface`. If it is ever nested inside a card, this check is measuring the
+ * wrong ground and must gain the `surfaceRaised` composite too.
+ */
+describe('tintWarning composites legibly on every surface it can reach', () => {
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number =>
+      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  for (const style of STYLE_NAMES) {
+    for (const theme of THEME_NAMES) {
+      it(`${style}/${theme}: the banner's heading and body clear 4.5 on the composite`, () => {
+        const surface = colorOf(theme, 'surface', style);
+        const washed = over(colorOf(theme, 'tintWarning', style), surface);
+
+        // THE ANTI-VACUOUS CONTROL, and it is not decoration: a fully
+        // transparent tint composites to `surface` itself, and both
+        // assertions below would then pass by measuring text on a bare
+        // surface — which already passes. Without this line the check
+        // cannot fail for the reason it exists.
+        expect(washed, `${style}/${theme}: the tint composites to nothing`).not.toBe(surface);
+
+        expect(
+          contrastRatio(colorOf(theme, 'text', style), washed),
+          `${style}/${theme}: the banner heading no longer clears 4.5 on the wash`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(colorOf(theme, 'textMuted', style), washed),
+          `${style}/${theme}: the banner body no longer clears 4.5 on the wash`,
+        ).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+/**
  * Round 2d (2026-09-09) — the sign-in neo alignment's token-level changes:
  * the retired accent hex, the new `textAccent` role that replaces it as a
  * text-contrast guarantee, and the new pairless `brand` role.

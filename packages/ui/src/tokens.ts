@@ -266,6 +266,23 @@ export const primitives = {
   fillNavyHig4: '#d8ccc11a',
   /** `neo` dark fill4 — the export's own value, a different hue than hig/minimal's (surface-toned, not warm-white). No gate composites fill4, so it is untouched. */
   fillNavyNeo4: '#b098841a',
+
+  /**
+   * The invitation banner's warning wash — the prototype's `--tintWarning`
+   * (`desktop.dc.html:20` light, `:40` dark). Eight-digit hex, not `rgba()`,
+   * because `primitives` is asserted hex-only.
+   *
+   * **ALPHA, so no `CONTRAST_PAIRS` row may name it** — see the fill
+   * hierarchy's docblock above for why that would be a false green. It is
+   * measured where it is real, composited over `surface`, in
+   * `test/tokens.test.ts`.
+   *
+   * All three styles share one value per theme: the prototype's `neo` block
+   * (`desktop.dc.html:53-67`) overrides many tokens and this is not one of them.
+   */
+  tintWarmWarning: '#f07c3433',
+  tintNavyWarning: '#f7a96124',
+
   /**
    * **NUDGED — the same regression as `fillNavyHig3`, worse here** because
    * `neo`'s dark surface (`#1b2340`) is lighter still: the export's own value
@@ -489,6 +506,13 @@ export const TOKEN_ROLES = [
   'fillSecondary',
   'fillTertiary',
   'fillQuaternary',
+  /**
+   * A tinted WASH, not a fill step: the invitation banner's ground. It is
+   * translucent so it reads as a coloured veil over whatever surface it sits
+   * on, which is exactly why its contrast obligation is against the
+   * composite rather than against itself.
+   */
+  'tintWarning',
   'focusRing',
   'shadow',
   /**
@@ -587,6 +611,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     fillSecondary: 'fillWarmShared2',
     fillTertiary: 'fillWarmHig3',
     fillQuaternary: 'fillWarmHig4',
+    tintWarning: 'tintWarmWarning',
     focusRing: 'blue600',
     shadow: 'scrimLight',
     brand: 'brandOrange',
@@ -623,6 +648,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     fillSecondary: 'fillNavyShared2',
     fillTertiary: 'fillNavyHig3',
     fillQuaternary: 'fillNavyHig4',
+    tintWarning: 'tintNavyWarning',
     focusRing: 'blue300',
     shadow: 'scrimDark',
     brand: 'brandOrange',
