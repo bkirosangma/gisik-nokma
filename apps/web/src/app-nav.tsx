@@ -6,7 +6,6 @@ import { Avatar, Button } from "@gisik-nokma/ui";
 import { authClient } from "./auth-client.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
-import { ThemeToggle } from "./theme-toggle.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
 
 /**
@@ -72,9 +71,9 @@ export function AppNav({
           still lines up with the page content beneath it. */}
       <div className="gn-nav__inner">
       {/* Everything that may need a second (or third) line at a narrow
-          viewport — the destination links, the scope note, the two toggles.
-          Sign-out is deliberately OUTSIDE this div: see `.gn-nav__signout`'s
-          own docblock in globals.css for why it is pinned instead of sharing
+          viewport — the destination links and the scope note. Sign-out is
+          deliberately OUTSIDE this div: see `.gn-nav__signout`'s own
+          docblock in globals.css for why it is pinned instead of sharing
           this group's wrap. */}
       <div className="gn-nav__links">
         <Link href="/workspaces" aria-current={current("/workspaces")}>
@@ -109,11 +108,11 @@ export function AppNav({
           </Link>
         ) : null}
         {/* Beside the view links and BEFORE the spacer, because it is a
-            destination like Workspaces and My Work rather than a control like the
-            theme toggle. Unconditional on `workspaceId`: the inbox is a global
-            route (`app/inbox/page.tsx`) and a reader can be told about a ticket in
-            a workspace they are not currently looking at. The badge's own read is
-            gated on a session inside `InboxNavLink`. */}
+            destination like Workspaces and My Work. Unconditional on
+            `workspaceId`: the inbox is a global route (`app/inbox/page.tsx`)
+            and a reader can be told about a ticket in a workspace they are
+            not currently looking at. The badge's own read is gated on a
+            session inside `InboxNavLink`. */}
         <InboxNavLink active={pathname === "/inbox"} />
         {!noWorkspace ? (
           <Link
@@ -160,7 +159,6 @@ export function AppNav({
           </span>
         ) : null} */}
         <span className="gn-nav__spacer" />
-        <ThemeToggle />
       </div>
       {user !== null ? (
         // The visible label shrinks to "Sign out"; the monogram beside it is
