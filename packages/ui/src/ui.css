@@ -1566,7 +1566,40 @@
    stylesheet both of those apps already load, rather than in either app. Two
    copies of this block would be two help screens that drift apart. */
 
-.gn-help { max-width: 72ch; margin: 0 auto; padding: 1.5rem 0 4rem; }
+/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the 72ch reading
+   column; it is now the two-column shell, and `.gn-help__column` inside it
+   carries the 72ch. Recorded because the old name did not change: a reader of
+   a diff elsewhere in the tree would otherwise assume it still centres text.
+
+   The reference's own shape (`Gisik Nokma Desktop`, the Help screen): an
+   `aside` of 274px, then `flex:1` remaining space with the reading column
+   CENTRED inside it — hence three elements rather than two, since a column
+   with `max-width` in a flex row sits against the sidebar instead of centring.
+
+   `padding: 0 0 4rem` and not the old `1.5rem 0 4rem`: the top inset now
+   belongs to the two columns separately (the sidebar's own 1.75rem, the
+   column's 1.75rem), because they no longer start at the same line — the
+   sidebar's tabs sit level with the `h1`.
+
+   BOTH APPS GET THIS. `apps/desktop` mounts the same component
+   (`apps/desktop/src/app.tsx:100,108`) and loads only this stylesheet, so a
+   rule here is the desktop layout too. There, `.gn-help` is a child of an
+   unstyled `.app-shell` — `app-shell` has no CSS anywhere in the repo — so the
+   shell spans the whole window, which is what the reference draws. The
+   sidebar's own horizontal padding is what keeps it off the window edge; the
+   web shell's `.gn-shell` padding adds to it there. */
+.gn-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;   /* load-bearing: `stretch` would defeat the sticky sidebar */
+  gap: 0 1.5rem;
+  padding: 0 0 4rem;
+}
+/* Mirrors the reference's `flex:1; display:flex; justify-content:center`. The
+   `min-width: 0` is what lets a wide table inside `.gn-help__table-scroll`
+   scroll in its own box instead of stretching this column past the viewport. */
+.gn-help__main { flex: 1 1 24rem; min-width: 0; display: flex; justify-content: center; }
+.gn-help__column { width: 100%; max-width: 72ch; padding-top: 1.75rem; }
 
 /* The page title, added 2026-09-15 — `/help` previously rendered no `h1` at
    all. The prototype's own values: 34px/41px, 700, −0.4px tracking, and 14px
@@ -1603,7 +1636,9 @@
 }
 .gn-help__search-input:focus-visible,
 .gn-help__tab:focus-visible,
-.gn-help__toc-link:focus-visible,
+.gn-help__group-toggle:focus-visible,
+.gn-help__nav-link:focus-visible,
+.gn-help__pager-link:focus-visible,
 .gn-help__result-title:focus-visible,
 .gn-help__link:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -1633,19 +1668,37 @@
 
 .gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border-left: 3px solid var(--gn-warning); border-radius: var(--gn-radius-control); background: var(--gn-surface-sunken); }
 
+/* The document tabs, now the first thing in the sidebar rather than a row above
+   the search box. STACKED, which the reference does not do — its two segments
+   sit side by side — and the reason is the copy rule, not taste: the shipped
+   labels are the documents' own titles ("Gisik Nokma — instruction manual", 31
+   characters), the reference's are two words, and "keep shipped wording where
+   it's merely different" settles which one moves. Two 31-character labels do
+   not fit side by side in 274px, so the layout gives way instead of the words.
+   `text-align: left` for the same reason — a centred three-line label reads as
+   a paragraph, not a control. */
 .gn-help__tabs {
-  display: inline-flex;
-  gap: 0.15rem;
-  margin-bottom: 1rem;
-  padding: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.125rem;
   background: var(--gn-surface-sunken);
   border-radius: var(--gn-radius-control);
 }
+/* `border: none` is a FIX, not a restyle, and it was already missing: measured
+   live, `.gn-help__tab` rendered `2px outset rgb(0, 0, 0)` — the UA button
+   default — because this rule never reset it and nothing in either stylesheet
+   resets `button` globally (`globals.css:60` sets only `font: inherit`). Every
+   other control in this file says `border: none` explicitly; this one did not,
+   and under `neo` dark a black border on a near-black ground is exactly the
+   kind of defect that survives being looked at. */
 .gn-help__tab {
-  min-height: 2.75rem; padding: 0 1rem; cursor: pointer;
+  min-height: 2.75rem; padding: 0.5rem 0.75rem; cursor: pointer;
+  border: none;
   color: var(--gn-text); background: var(--gn-surface-raised);
-  font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
-  border-radius: calc(var(--gn-radius-control) - 0.2rem);
+  font-size: 1rem; line-height: 1.3; text-align: left;
+  transition: background-color 200ms ease, border-color 200ms ease;
+  border-radius: calc(var(--gn-radius-control) - 0.125rem);
 }
 /* Final whole-branch review (I2): under `hig` and `minimal`, `--gn-shadow-sunken`
    resolves to `none` (`tokens.ts`'s `SHADOWS` table — only `neo` has a real
@@ -1676,52 +1729,199 @@
   font-weight: 600;
 }
 
-/* FLATTENED to the prototype's own treatment (2026-09-15): a wrapped row of
-   links on the page ground, `gap: 7px 20px`, with no card behind it. It shipped
-   as a raised card (`surfaceRaised` + `shadowRaised` + card radius) in this
-   rule's first commit, and — unlike almost every other rule in this file —
-   carried no comment saying why, so there was no stated reason to weigh
-   against the reference.
+/* ── The topic sidebar ────────────────────────────────────────────────────────
+   REPLACES `.gn-help__toc`, a wrapped row of every section link that stood
+   above the document. That rule was flattened onto the older reference's own
+   treatment two commits ago; the sidebar SUPERSEDES both the card it started as
+   and the flat row it became, and the earlier reasoning is not wrong so much as
+   moot — this is the same index, grouped, always visible, and it marks where
+   the reader is. Two indexes on one page would be one too many.
 
-   Removing the card also makes the comment on `.gn-help__toc-link` below TRUE
-   for the first time: it reasons that the link renders "on the ambient
-   `body { background: var(--gn-surface) }`", which was wrong while this rule
-   painted `surfaceRaised` directly behind it. That was never an accessibility
-   hole — `textAccent` is declared against BOTH `surface` and `surfaceRaised`
-   in `CONTRAST_PAIRS` (`tokens.ts:788-789`), so the link was gated either way
-   — only a justification that named the wrong ground. */
-.gn-help__toc {
+   `position: sticky` is the whole point of the change. The reference is a
+   fixed-height desktop canvas whose `aside` scrolls independently; a web page
+   scrolls as one document, and sticky is that behaviour's translation — the nav
+   stays put while 224 entries go past it. It needs `align-items: flex-start` on
+   `.gn-help` (stated there) and a `max-height` here, since five open groups are
+   taller than a short viewport.
+
+   Geometry from the reference: 274px wide, `gap: 18px`, and an inset right-edge
+   hairline in its `fill4` role. The padding is the one adaptation — the
+   reference's `28px 16px 32px 32px` assumes a full-window canvas with no outer
+   inset, and this component renders inside `.gn-shell`'s 1.25rem on web and
+   against the bare window on desktop. 1rem on both sides is the value that is
+   defensible in both rather than correct in one. */
+.gn-help__sidebar {
+  flex: 0 0 17.125rem;
+  /* MEASURED, not precautionary: this rendered 306px wide in `apps/desktop`
+     and 274px in `apps/web`, because `flex-basis` is a CONTENT width under
+     `content-box` and the 1rem side padding is then added to it. The web app
+     has a `box-sizing: border-box` reset in its own `globals.css`; THIS
+     stylesheet has none, and desktop loads only this one — so a rule here
+     means two different widths in the two apps that share it unless it says
+     which. Every other new rule in this block was checked the same way; this
+     is the one that differed. */
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4375rem 1.25rem;
-  margin-bottom: 2rem;
+  flex-direction: column;
+  gap: 1.125rem;
+  padding: 1.75rem 1rem 2rem;
+  box-shadow: inset -1px 0 0 var(--gn-fill-quaternary);
+}
+.gn-help__nav { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* The `TOPICS` label. Uppercased in CSS, not in the markup, so the accessible
+   name a screen reader announces is the sentence-case word — and so the string
+   `aria-labelledby` points at stays readable in the DOM.
+   13px/18px/600 with 0.5px tracking, from the reference; 0.5 ÷ 13 = 0.0385em. */
+.gn-help__eyebrow {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.0385em;
+  text-transform: uppercase;
+  color: var(--gn-text-muted);
+}
+
+.gn-help__groups { display: flex; flex-direction: column; gap: 0.375rem; }
+.gn-help__group { display: flex; flex-direction: column; gap: 0.125rem; }
+
+/* The group disclosure. 36px from the reference — above WCAG 2.5.8's 24px floor
+   for an in-list control, below the 44px this file gives STANDALONE controls,
+   which is the same split `.gn-help__nav-link` below inherits from the TOC rule
+   this replaces.
+
+   1rem and not the reference's 15px: the links UNDER this button are 1rem for a
+   recorded reason (carried down from the old `.gn-help__toc-link` — they are the
+   only navigation links on the page), and a parent label smaller than its own
+   children reads as a mistake. Hierarchy comes from `font-weight` and the caret
+   instead of from size. */
+.gn-help__group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0 0.625rem;
+  cursor: pointer;
+  border: none;                    /* the UA's `2px outset` otherwise draws a box round it */
+  background: transparent;
+  color: var(--gn-text);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  border-radius: var(--gn-radius-control);
+}
+.gn-help__group-toggle:hover { background: var(--gn-fill-quaternary); }
+.gn-help__group-title { flex: 1; }
+/* 12px — the bottom rung of this product's own type scale, and exactly the
+   floor `apps/web/e2e-viewport/type-scale.ts` derives from it, so this sits ON
+   the floor rather than under it. */
+.gn-help__group-count {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  color: var(--gn-text-muted);
+}
+/* The caret rotates rather than swapping glyph, so one chevron serves both
+   states and there is nothing to keep in sync. Guarded, like every other
+   transition in this file, for readers who asked for less motion. */
+.gn-help__caret { display: flex; flex: none; color: var(--gn-text-muted); transition: transform 150ms ease; }
+.gn-help__group-toggle[aria-expanded='true'] .gn-help__caret { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .gn-help__caret { transition: none; }
+}
+
+/* `padding-left: 19px` from the reference — it lines the child links up under
+   the group title rather than under its caret. */
+.gn-help__group-items {
+  margin: 0;
+  padding: 0 0 0 1.1875rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 /* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
-   body text on a phone — and these are the only navigation links on the page. */
-/* `inline-flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. Measured at
-   390px before this: `179x23` — wide, and missing the floor by ONE pixel, which
-   is what ten of this page's tap-target offenders were. An inline `<a>` ignores
-   `min-height` entirely, so the display change is the load-bearing half.
-
-   24px and not 44px, deliberately: the TOC is a dense wrapped list, and 2.5.5's
-   enhanced floor would make nineteen entries 836px tall on a phone. Standalone
-   controls (`.gn-view-tabs button`, the 404's recovery links, the MCP code
-   input) use 44px; in-list links use 24px. */
+   body text on a phone — and these are the only navigation links on the page.
+   (Carried verbatim from `.gn-help__toc-link`, which this replaces; the reading
+   and the reason both still hold, and the reference's own 15px is a computed
+   binding this repo cannot read, so there is nothing to weigh it against.) */
+/* `flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. 24px and not 44px,
+   deliberately: this is a dense list, and 2.5.5's enhanced floor would make
+   twenty-one rows 924px tall on a phone. Standalone controls
+   (`.gn-view-tabs button`, the 404's recovery links, the MCP code input) use
+   44px; in-list links use 24px. */
 /* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
-   `.gn-help` (the ancestor) sets no background of its own, so this renders on
-   the ambient `body { background: var(--gn-surface) }`. */
-.gn-help__toc-link {
-  display: inline-flex;
+   Neither `.gn-help` nor `.gn-help__sidebar` paints a background, so this
+   renders on the ambient `body { background: var(--gn-surface) }`. */
+.gn-help__nav-link {
+  display: flex;
   align-items: center;
   min-height: 1.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--gn-radius-control);
   color: var(--gn-text-accent);
   text-decoration: none;
   font-size: 1rem;
 }
-.gn-help__toc-link:hover { text-decoration: underline; }
+.gn-help__nav-link:hover { text-decoration: underline; }
+/* The active row. Three declarations copied deliberately from
+   `.gn-settings__sidebar a[aria-current='page']` in `apps/web/app/globals.css`
+   — the product's only other sidebar — rather than invented here, so there is
+   one treatment for "the thing you are looking at" and not two.
+
+   The SELECTOR differs: `location`, not `page`. The settings sidebar links real
+   routes; these link places inside this page, which is the distinction ARIA
+   draws between the two values, and using `page` here would tell a screen
+   reader the reader had navigated away. */
+.gn-help__nav-link[aria-current='location'] {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font-weight: 700;
+}
+
+/* Stacked below ~768px. Stated as a rule rather than left to `flex-wrap`: with
+   only the wrap, a 274px sidebar on a 390px phone keeps its width and leaves a
+   dead 76px column beside it, and `/help` is reachable signed out, so a phone
+   is a real entry point here and not an edge case. The hairline moves from the
+   right edge to the bottom one because it is now a divider between rows, and
+   the sticky behaviour is dropped: a full-width sticky block would cover the
+   document it is meant to navigate. */
+@media (max-width: 47.9375rem) {
+  .gn-help__sidebar {
+    flex-basis: 100%;
+    position: static;
+    max-height: none;
+    padding: 1.75rem 0 1.25rem;
+    box-shadow: inset 0 -1px 0 var(--gn-fill-quaternary);
+  }
+  .gn-help__main { flex-basis: 100%; }
+  .gn-help__column { padding-top: 1.25rem; }
+}
 
 .gn-help__section { margin-bottom: 2.5rem; }
-.gn-help__h2 { margin: 0 0 0.75rem; font-size: 1.3rem; line-height: 1.3; }
+/* The section eyebrow — `MANUAL · GETTING STARTED`. 13px/18px/600 with 0.4px
+   tracking (0.4 ÷ 13 = 0.0308em) and 6px to the `h2`, all from the reference.
+   Uppercased in CSS for the same reason as `.gn-help__eyebrow`: the DOM keeps
+   the readable string. */
+.gn-help__section-eyebrow {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.0308em;
+  text-transform: uppercase;
+  color: var(--gn-text-muted);
+}
+/* 22px/28px/600, from the reference. It was 1.3rem (20.8px) with an inherited
+   700 from the UA; the eyebrow above and this heading are one unit there, so
+   they are measured off the same block. */
+.gn-help__h2 { margin: 0 0 0.75rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; }
 .gn-help__entry { margin-bottom: 1.75rem; }
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.05rem; line-height: 1.35; }
 .gn-help__p { margin: 0 0 0.75rem; }
@@ -1732,6 +1932,35 @@
    Inline documentation link text, on the same ambient `--gn-surface` as
    `.gn-help__toc-link` above. */
 .gn-help__link { color: var(--gn-text-accent); }
+
+/* The `Next` pager at the foot of each section. The reference puts a hairline
+   above it and pays for the space with `padding-top` on the children (4px on
+   the row, 16px on each child); one 1.25rem on the row is the same 20px with
+   one declaration instead of three. `box-shadow: inset` and not `border-top`
+   because a border would change the box's own height, and because the
+   hairline's colour is the same `fill4` role the sidebar's divider uses. */
+.gn-help__pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0;
+  padding-top: 1.25rem;
+  box-shadow: inset 0 1px 0 var(--gn-fill-quaternary);
+}
+.gn-help__pager-label { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+/* `min-height: 1.5rem` for WCAG 2.5.8's 24px floor, as with the sidebar links —
+   one standalone-looking link per section, but it sits in running text rather
+   than on its own, so the 24px in-list floor is the applicable one. */
+.gn-help__pager-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  color: var(--gn-text-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gn-help__pager-link:hover { text-decoration: underline; }
 
 /* Wide content scrolls INSIDE its own box; the page never scrolls sideways. */
 .gn-help__table-scroll { overflow-x: auto; margin: 0 0 1rem; }

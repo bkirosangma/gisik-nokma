@@ -80,9 +80,89 @@ anything: a parser reporting "224 entries" tells you it ran, not that it was rig
   *Deliberately narrow — it pins heading STRUCTURE, not content: the manual and FAQ are generated from
   `docs/manual.md` / `docs/faq.md`, and a test asserting their prose would fight every edit to those
   documents, which is the coupling the generator exists to avoid.*
-  *NOT covered by any test, and named rather than implied: the `h1`'s own type (34px/700/−0.4px) and
-  the flattened `.gn-help__toc`. Both are CSS, both were verified by live measurement and screenshot
-  against the reference, and neither has an assertion — the same honest gap 15.14–15.16 record.* —
+  *NOT covered by any test, and named rather than implied: the `h1`'s own type (34px/700/−0.4px). It is
+  CSS, it was verified by live measurement and screenshot against the reference, and it has no
+  assertion — the same honest gap 15.14–15.16 record.*
+  *Superseded detail: this case originally also named the flattened `.gn-help__toc` as an untested CSS
+  change. `.gn-help__toc` no longer exists — the topic sidebar replaced it later the same day, and every
+  anchor it pointed at is still rendered and still reachable. See 15.22.* —
   (`packages/app-core/test/help/help-browser.test.tsx`)
+
+## The topic sidebar (`packages/app-core`)
+
+*Added 2026-09-15 with the newer desktop prototype's Help design. The shipped content model is
+`document → section → entry` with no group layer, so the sidebar's five manual groups are DECLARED in
+`packages/app-core/src/help/groups.ts` — a hand-maintained map, whose only real failure mode is drifting
+from documents somebody else edits. These cases are what makes the drift loud. They run against the REAL
+generated content for the reason 15.1–15.5 give: a fixture would prove the code works on a document
+written to make it work.*
+
+- **15.19** ✅ **The manual's groups partition its sections in the document's own order, exactly.**
+  ONE assertion — concatenate every group's `sectionIds` and compare to `document.sections` as a
+  SEQUENCE — because that catches four defects a count or a set comparison would each miss part of: a
+  section named in no group, one named in two, a stray id left behind by a renamed heading, and a group
+  whose sections are not neighbours in the document.
+  *The ordering half is not theoretical: the first draft of the map filed `§10 — Who can see what` with
+  "Workspaces and people", four chapters from its place in the document, and this case reddened on
+  exactly that. A set-partition check would have passed it. It matters because the sidebar reads the
+  group order and the `Next` pager reads the document's, so a non-contiguous group makes a reader
+  following the sidebar and a reader following `Next` visit the same sections in different sequences.*
+  *A positive control runs THROUGH THE SAME COMPARISON, not a hand-rolled substitute — this repo's
+  recorded failure shape is a control that does not traverse the measurement's own path — mutating the
+  real group list three ways (drop, duplicate, reverse) and asserting each is rejected.*
+  *A third case pins that the FAQ declares NO groups, so that decision has to be made again on purpose:
+  its 13 sections are already topic names, and a group layer over them would restate the first index.* —
+  (`packages/app-core/test/help/groups.test.ts`)
+- **15.20** ✅ **Every section is reachable from the sidebar, grouped or not — structurally, not because
+  a test passes.** `helpNav` appends any section no group claims as a trailing unnamed run, so a section
+  that falls out of the map renders untidily at the foot of the sidebar instead of vanishing from the
+  navigation while still existing in the document. That is the plan's own binding rule in navigation
+  form — *"keep and restyle, never delete"*. 15.19 then asserts the run is empty, which makes the
+  untidiness loud in CI rather than only visible to whoever scrolls.
+  *Three cases: a grouped document covered exactly once per section; a document declaring no groups
+  becoming one flat run through the SAME code path (which is why the sidebar needs no FAQ special case);
+  and a synthetic stray section, because an untested safety net is a claim rather than a net.*
+  *Mutation-witnessed: making `helpNav` filter strays away instead of appending them reddens two of the
+  three at `EXIT=1`. Sources restored and verified by SHA-256, never `git checkout`.* —
+  (`packages/app-core/test/help/groups.test.ts`)
+- **15.21** ✅ The eyebrow and pager helpers read the document rather than a second hand-kept list:
+  `helpGroupTitle` names the owning group and returns `null` where none is declared, and
+  `helpNextSection` follows `document.sections` and stops at the last one — so the pager keeps working
+  for an ungrouped document and for a drifted section, and is never drawn pointing nowhere. —
+  (`packages/app-core/test/help/groups.test.ts`)
+- **15.22** ✅ **The sidebar renders one collapsible group per declared group, each naming its own
+  count, and groups start OPEN.** Both halves of the collapse are asserted: a test of the click alone
+  would pass against a sidebar that started collapsed, which is the state this deliberately does not
+  have — every section behind a click would make it a worse index than the flat row of links it
+  replaced. Also pinned: the document tabs moved INTO the sidebar and still carry the shipped document
+  titles, and the FAQ tab shows a flat list with no toggles at all (asserted by the absence of buttons
+  AND the presence of its 13 links, since absence alone is also satisfied by an empty sidebar).
+  *Every query is scoped through `getByRole('navigation', { name: 'Topics' })`, and that is not
+  tidiness: each section's `Next` pager carries the NEXT SECTION'S OWN TITLE, so an unscoped
+  `getByRole('link', { name: '§1 — Signing in' })` matches two elements, and a test that resolved the
+  ambiguity by taking the first match would pass with the sidebar deleted.*
+  *Mutation-witnessed: defaulting groups to closed reddens three of the four at `EXIT=1`.* —
+  (`packages/app-core/test/help/help-browser.test.tsx`)
+- **15.23** ✅ Each section carries an eyebrow naming its document and group (`MANUAL · GETTING
+  STARTED`), and a document with no groups shows the label alone rather than a dangling separator —
+  which is what a naive template renders and what a test asserting only "contains FAQ" would let
+  through. Queried by the sentence-case text because the uppercasing is `text-transform` in CSS, which
+  is the point of doing it there: the DOM keeps a string a screen reader reads as a word.
+  *Mutation-witnessed: emptying the eyebrow reddens both cases at `EXIT=1`.* —
+  (`packages/app-core/test/help/help-browser.test.tsx`)
+- **15.24** ✅ One `Next` pager per section EXCEPT THE LAST, pointing at the next section's anchor and
+  named with its title. Asserted as a COUNT against the real document rather than by finding one pager
+  and calling it proved, because the off-by-one is the whole defect class: a pager on the last section
+  would point nowhere, and a missing one mid-document would strand a reader.
+  *Mutation-witnessed: suppressing the pager reddens it at `EXIT=1`.* —
+  (`packages/app-core/test/help/help-browser.test.tsx`)
+
+*NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
+sticky behaviour, the stacking breakpoint below 48rem, the active row's `aria-current='location'`
+treatment, and the eyebrow/pager type. All were verified by live measurement in a real browser across
+both apps and all six style×theme combinations (the active row's worst contrast is 4.54:1 under
+hig/minimal light, against a 4.5 floor), and none has an assertion — the same honest gap 15.14–15.16
+record. `/help` is in none of the e2e-stack ratchet baselines, so nothing there could have caught a
+regression either.*
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
