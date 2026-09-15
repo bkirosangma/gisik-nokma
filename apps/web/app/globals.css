@@ -996,10 +996,13 @@ input, textarea, select { font-family: inherit; }
 
 /* `color`, not `background` — this is the icon's STROKE (the svg carries
    `stroke="currentColor"`), a saturated hue meant for a 22px glyph, not a
-   surface fill. */
+   surface fill. `margin-top: 0.0625rem` (1px) is the prototype's own optical
+   nudge (`desktop.dc.html:209`), dropped from the original brief and added
+   back on fix-round-1 review. */
 .gn-invitations__icon {
   flex: none;
   color: var(--gn-warning);
+  margin-top: 0.0625rem;
 }
 
 .gn-invitations__heading {

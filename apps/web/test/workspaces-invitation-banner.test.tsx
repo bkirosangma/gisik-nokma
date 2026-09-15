@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -306,5 +309,80 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     // NOT a refusal panel: this page's `<ShellRefusal>` is reserved for the read
     // the page exists to serve, and there is exactly one live region here.
     expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+/**
+ * Fix round 1 (2026-09-15 review) — the Task 8 restyle itself was untested.
+ * Every case above is behaviour-only (heading text, dates, button labels,
+ * empty-render, failure copy); the whole visual change — the flat
+ * `--gn-tint-warning` wash replacing the raised-card surface, the removed
+ * shadow and accent edge, the decorative icon — could be reverted and every
+ * one of them would stay green.
+ *
+ * Two levels, deliberately, not one. A SOURCE scan alone (the CSS describe
+ * below) pins the RULE but not whether the rule ever reaches the element —
+ * this plan already produced a guard that could not fail that way: a
+ * CSS-text-only test asserted a rule existed while the element had stopped
+ * carrying the class. The RENDER describe below reads the actual DOM
+ * `InvitationBanner` produces, which is the half a source scan cannot see.
+ *
+ * Exact rem values (padding/gap/etc.) are deliberately NOT pinned here —
+ * that would make this a copy of the stylesheet, fighting every future
+ * tweak. What regresses if this restyle is reverted is the TOKEN, the
+ * ABSENT shadow/edge, and the icon's ARIA state — those are what is pinned.
+ */
+const CSS_TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const GLOBALS_CSS_PATH = resolve(CSS_TEST_DIR, '../app/globals.css');
+
+/**
+ * Full rule body, selector line through its matching closing brace — the
+ * same shape `sign-in-neo-restyle.test.ts`'s `ruleFor` uses (duplicated
+ * here rather than imported: no shared CSS-scan helper exists in
+ * `test/helpers/` yet). `neo-card-radius.test.ts`'s single-line version
+ * would truncate `.gn-invitations`, whose declarations each sit on their
+ * own line.
+ */
+function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
+  const lines = css.split('\n');
+  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
+  if (startIndex === -1) return undefined;
+  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
+  if (openIndex === -1) return undefined;
+  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
+  if (closeIndex === -1) return undefined;
+  return lines.slice(startIndex, closeIndex + 1).join('\n');
+}
+
+describe('Task 8 fix round 1 — the restyle is pinned, not just the banner\'s behaviour', () => {
+  describe('CSS level — apps/web/app/globals.css', () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
+    const rule = ruleFor(css, /^\.gn-invitations\s*\{/);
+
+    it('.gn-invitations rule exists and fills with the tint token', () => {
+      expect(rule, `.gn-invitations rule: ${String(rule)}`).toBeDefined();
+      expect(rule).toContain('var(--gn-tint-warning)');
+    });
+
+    // The negatives are the point: these are exactly what reverting to the
+    // old raised-card treatment would restore.
+    it('.gn-invitations carries no box-shadow (the raised-card treatment is gone)', () => {
+      expect(rule?.includes('box-shadow'), rule).toBe(false);
+    });
+
+    it('.gn-invitations carries no border-inline-start (the accent edge is gone)', () => {
+      expect(rule?.includes('border-inline-start'), rule).toBe(false);
+    });
+  });
+
+  describe('render level — the actual DOM InvitationBanner produces', () => {
+    it('the banner root carries gn-invitations, and its icon is aria-hidden', async () => {
+      mount([WAITING]);
+      const banner = await screen.findByRole('region', { name: 'One invitation is waiting' });
+      expect(banner).toHaveClass('gn-invitations');
+      const icon = banner.querySelector('svg.gn-invitations__icon');
+      expect(icon, 'no svg.gn-invitations__icon found inside the banner').not.toBeNull();
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    });
   });
 });
