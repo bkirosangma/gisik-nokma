@@ -48,8 +48,18 @@ export type NotificationPreferences = z.infer<typeof notificationPreferencesSche
  * A frozen module-level constant, the same reasoning `EMPTY_PREFERENCES`
  * states: nothing mutates a preferences document in place (a PUT replaces it
  * whole), so one shared instance is safe, and `Object.freeze` is what keeps
- * a future caller from turning "safe" into "assumed."
+ * a future caller from turning "safe" into "assumed." `Object.freeze` is
+ * SHALLOW, so `mutedKinds` is frozen explicitly too — a caller that pushed
+ * into `EMPTY_NOTIFICATION_PREFERENCES.mutedKinds` would otherwise be
+ * editing every future "this person has muted nothing" answer at once.
+ * Built through a function with a typed local, not a cast on a frozen
+ * literal, because `Object.freeze([])` is `readonly never[]`, which is NOT
+ * assignable to `NotificationKind[]`.
  */
-export const EMPTY_NOTIFICATION_PREFERENCES: NotificationPreferences = Object.freeze({
-  mutedKinds: [],
-});
+function emptyNotificationPreferences(): NotificationPreferences {
+  const doc: NotificationPreferences = { mutedKinds: [] };
+  Object.freeze(doc.mutedKinds);
+  return Object.freeze(doc);
+}
+
+export const EMPTY_NOTIFICATION_PREFERENCES: NotificationPreferences = emptyNotificationPreferences();

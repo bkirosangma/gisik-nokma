@@ -6,6 +6,11 @@ describe('notificationPreferencesSchema', () => {
   it('accepts an empty muted list — the default, everything on', () => {
     expect(notificationPreferencesSchema.parse({ mutedKinds: [] })).toEqual({ mutedKinds: [] });
     expect(EMPTY_NOTIFICATION_PREFERENCES).toEqual({ mutedKinds: [] });
+    // Object.freeze is shallow: the document AND its array are both frozen,
+    // so a caller cannot push into the shared instance and corrupt every
+    // future "this person has muted nothing" answer.
+    expect(Object.isFrozen(EMPTY_NOTIFICATION_PREFERENCES)).toBe(true);
+    expect(Object.isFrozen(EMPTY_NOTIFICATION_PREFERENCES.mutedKinds)).toBe(true);
   });
 
   it('accepts any subset of real kinds', () => {
