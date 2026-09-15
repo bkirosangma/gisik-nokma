@@ -1,4 +1,5 @@
 import { Button } from '@gisik-nokma/ui';
+import { formatDateTime } from '../provenance.js';
 import type { SessionSummary } from './sessions-client.js';
 
 export type SessionsSectionProps = {
@@ -19,6 +20,15 @@ export type SessionsSectionProps = {
  * one — because there is nothing a disabled control would honestly be
  * offering to do here.
  *
+ * "Last active" goes through `formatDateTime` (this package's own
+ * `provenance.ts`, already used by `HistoryList`/`VisibilityEditor` for the
+ * same "who did what and when" shape) rather than the raw ISO string —
+ * Features.md's own clock rule ("every date goes through the domain's one
+ * `formatIstInstant`... an ISO slice... would disagree with every other date
+ * on the sheet") applies here exactly as it does everywhere else this client
+ * shows a moment.
+ *
+
  * Unstyled by the same disclosed convention `ProfileSection`/
  * `WorkspacesSection` already establish on this page: `gn-account__section`,
  * `gn-account__section-title`, `gn-account__session-row` carry no CSS rule
@@ -41,7 +51,7 @@ export function SessionsSection({ sessions, onRevoke }: SessionsSectionProps) {
         {sessions.map((session) => (
           <li key={session.token} className="gn-account__session-row">
             <span>{session.deviceLabel}</span>
-            <span>{session.isCurrent ? 'This device' : `Last active ${session.updatedAt}`}</span>
+            <span>{session.isCurrent ? 'This device' : `Last active ${formatDateTime(session.updatedAt)}`}</span>
             {!session.isCurrent ? (
               <Button variant="danger" onClick={() => onRevoke(session.token)}>
                 Sign out

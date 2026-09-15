@@ -206,16 +206,16 @@ describe('AccountPage — Your workspaces', () => {
 
 describe('AccountPage — Sessions', () => {
   it('lists sessions and lets you revoke a non-current one', async () => {
-    // `createdAt`/`updatedAt` as plain ISO strings here — this mock does not
-    // reproduce the real `authClient`'s date-revival behaviour (real
-    // `listSessions()` resolves these as `Date` instances; see
-    // `apps/web/src/account/account-clients.ts`'s docblock), which is exactly
-    // why that adapter's `toIsoString` accepts `Date | string` rather than
-    // `Date` alone.
+    // `createdAt`/`updatedAt` as real `Date` instances, not string literals —
+    // matching what the real `authClient.listSessions()` actually resolves
+    // (its fetch client revives ISO date strings back into `Date` on the way
+    // in; see `apps/web/src/account/account-clients.ts`'s docblock). A string
+    // literal here would let the adapter's `.toISOString()` conversion go
+    // completely unexercised while still typechecking and still passing.
     listSessions.mockResolvedValue({
       data: [
-        { token: 'current-token', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-14T00:00:00Z', userAgent: 'Mozilla/5.0 Chrome Mac' },
-        { token: 'other-token', createdAt: '2026-09-05T00:00:00Z', updatedAt: '2026-09-10T00:00:00Z', userAgent: null },
+        { token: 'current-token', createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-14T00:00:00Z'), userAgent: 'Mozilla/5.0 Chrome Mac' },
+        { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
       ],
       error: null,
     });

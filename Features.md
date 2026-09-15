@@ -115,9 +115,13 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
   `authClient.useSession()`'s own `session.token`), a "Sign out" control that calls
   `authClient.revokeSession({ token })` and re-lists afterward. No optimistic removal — unlike
   Notifications' toggle, there is no local edit that would be honest to show before the server confirms
-  a session is actually gone. **Named absence, on the same silent-omission footing as Your workspaces
-  and Notifications above:** a failed `list()` collapses to the same empty render an honestly-empty
-  answer produces. `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
+  a session is actually gone. "Last active" goes through the domain's one `formatIstInstant` (via this
+  package's `formatDateTime`), the same clock rule every other date on this shell follows, never a raw
+  ISO slice. **Named absence, on the same silent-omission footing as Your workspaces and Notifications
+  above:** a failed `list()` collapses to the same empty render an honestly-empty answer produces.
+  **A second named absence:** a refused revoke's `error` is read and discarded — unlike Profile's save
+  refusal, no `role="alert"` (or any other signal) tells a caller "Sign out" was refused; the session
+  simply fails to leave the list. `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
   `apps/web/src/account/workspaces-section.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
   `packages/app-core/src/account/notification-preferences-gateway.ts`,
   `packages/app-core/src/online/notification-preferences.ts`, `apps/web/src/providers.tsx`,

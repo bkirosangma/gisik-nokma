@@ -23,14 +23,13 @@ import { authClient } from '../auth-client.js';
  *    `Date` instances on the way in (`dist/client/parser.mjs`,
  *    `parseDates: true` by default). `SessionSummary.createdAt`/`updatedAt`
  *    are `string` (this package's own abstract type, matching what
- *    `SessionsSection` renders directly into text), so `toIsoString` below
- *    converts. It accepts `Date | string` rather than `Date` alone because
- *    `apps/web/test/account-page.test.tsx`'s mock of this module — a
- *    wholesale replacement, like every other `authClient` mock in that file
- *    — supplies plain ISO strings for these fields (test doubles are not
- *    obligated to reproduce a real client's date-revival behaviour), so a
- *    `Date`-only conversion would work against the real client and throw
- *    against the test double.
+ *    `SessionsSection` hands to `formatDateTime` for display), so `list()`
+ *    below calls `.toISOString()` on each. `apps/web/test/account-page.test.tsx`'s
+ *    mock of this module constructs real `Date` instances for these fields
+ *    for exactly this reason — a mock built from a STRING literal would stop
+ *    this conversion from ever running against the shape it actually exists
+ *    to convert, the same gap a `Date | string`-accepting version of this
+ *    conversion would have left standing on the untested branch.
  * 2. The current session's own token is `authClient.useSession().data
  *    .session.token` (verified against `getSession`'s declared return type,
  *    `{ session: Session, user: User } | null`) — passed into
@@ -38,9 +37,6 @@ import { authClient } from '../auth-client.js';
  *    rather than read in here, so this module stays about the two session
  *    routes only.
  */
-function toIsoString(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value;
-}
 
 /**
  * Device labels never fabricate specificity: a short, explicit substring
@@ -73,13 +69,20 @@ export function createSessionsClient(currentToken: string | null): SessionsClien
       const result = await authClient.listSessions();
       return (result.data ?? []).map((session) => ({
         token: session.token,
-        createdAt: toIsoString(session.createdAt),
-        updatedAt: toIsoString(session.updatedAt),
+        createdAt: session.createdAt.toISOString(),
+        updatedAt: session.updatedAt.toISOString(),
         deviceLabel: deviceLabelOf(session.userAgent),
         isCurrent: session.token === currentToken,
       }));
     },
     async revoke(token: string) {
+      // A refused revoke's `error` is read here and discarded by the caller
+      // (`apps/web/app/account/page.tsx`'s `revokeSession`) — unlike
+      // `ProfileSection`'s save refusal, nothing on screen tells a caller a
+      // "Sign out" click was refused; the list simply fails to shrink.
+      // Disclosed as a named absence in `Features.md`'s bullet rather than
+      // silently decided; a `role="alert"` treatment matching Profile's own
+      // is a small addition if a reviewer wants it.
       const result = await authClient.revokeSession({ token });
       return { error: result.error?.message ?? null };
     },
