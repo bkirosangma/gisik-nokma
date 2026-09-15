@@ -29,37 +29,73 @@ export type SessionsSectionProps = {
  * shows a moment.
  *
 
- * Unstyled by the same disclosed convention `ProfileSection`/
- * `WorkspacesSection` already establish on this page: `gn-account__section`,
- * `gn-account__section-title`, `gn-account__session-row` carry no CSS rule
- * in `globals.css` today. `gn-account__session-list` is the one exception —
- * it is a `<ul>`, so the page-wide `.gn-account ul` descendant rule (list
- * spacing) applies to it the same way it already does to
- * `gn-account__workspace-list`. `/mcp/tokens`'s `.gn-mcp-tokens__row` was
- * considered as a reusable row treatment (same shape: a row, a revoke
- * button) and rejected — it is that route's own namespaced class, not a
- * shared utility, and borrowing it here would be the same mistake as
- * inventing a class, just in the other direction. The revoke button uses
- * the shared `Button` component (`variant="danger"`) rather than a bare
- * `<button>`, matching `ProfileSection`'s own use of `Button` on this page.
+ * STYLED as of the Account styling port — this docblock previously disclosed
+ * the opposite ("carry no CSS rule in `globals.css` today") and that is no
+ * longer true. `globals.css`'s `/account` block styles
+ * `gn-account__section`, `__section-title`, `__session-list` and
+ * `__session-row`; the list is named explicitly out of the page-wide
+ * `.gn-account ul` bullet rule there, since it is a row list now.
+ *
+ * The note below about `/mcp/tokens` is worth keeping and updating rather
+ * than deleting. `.gn-mcp-tokens__row` was rejected as a class to BORROW —
+ * it is that route's own namespaced class, not a shared utility — and that
+ * still holds: nothing here references it. What the `/account` block does
+ * instead is reuse its VALUES (sunken background, wrap, the
+ * primary/secondary text split) under `/account`'s own class names, which is
+ * the copy that costs nothing and keeps both routes independently editable.
+ *
+ * The revoke button uses the shared `Button` component (`variant="danger"`)
+ * rather than a bare `<button>`, matching `ProfileSection`'s own use of
+ * `Button` on this page.
  */
 export function SessionsSection({ sessions, onRevoke }: SessionsSectionProps) {
   return (
     <section className="gn-account__section gn-account__sessions">
       <h2 className="gn-account__section-title">Sign-in and devices</h2>
-      <ul className="gn-account__session-list">
-        {sessions.map((session) => (
-          <li key={session.token} className="gn-account__session-row">
-            <span>{session.deviceLabel}</span>
-            <span>{session.isCurrent ? 'This device' : `Last active ${formatDateTime(session.updatedAt)}`}</span>
-            {!session.isCurrent ? (
-              <Button variant="danger" onClick={() => onRevoke(session.token)}>
-                Sign out
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      {sessions.length === 0 ? (
+        // THE WORDING HEDGES ON PURPOSE. `/account`'s own effect collapses a
+        // FAILED read to `[]` (its docblock discloses this), so an empty list
+        // here is either "no sessions" or "the read did not answer" and this
+        // component cannot tell which. "to show" is therefore the honest
+        // claim; "You have no other devices" would assert a fact about the
+        // account that an empty array does not establish. The prototype has
+        // no empty state to port — its rows are always seeded.
+        <p className="gn-account__note">No signed-in devices to show.</p>
+      ) : (
+        <ul className="gn-account__session-list">
+          {sessions.map((session) => (
+            <li key={session.token} className="gn-account__session-row">
+              <span className="gn-account__row-text">
+                <span>{session.deviceLabel}</span>
+                <span className="gn-account__row-meta">
+                  {session.isCurrent
+                    ? 'This device'
+                    : `Last active ${formatDateTime(session.updatedAt)}`}
+                </span>
+              </span>
+              {!session.isCurrent ? (
+                // SOLID, though the prototype draws this control TINTED. The
+                // tint was built and then removed on a measurement: `danger`
+                // text on `surfaceSunken` is 3.84:1 and on `surfaceRaised`
+                // 4.29:1, both under the 4.5 this 0.9375rem label owes, while
+                // the solid variant's `dangerText on danger` is 5.38:1 and is
+                // the only one of the three `CONTRAST_PAIRS` actually gates.
+                // The full table is on the `/account` block in `globals.css`.
+                <Button variant="danger" onClick={() => onRevoke(session.token)}>
+                  Sign out
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* Prototype copy, kept because it is TRUE of this product: history is
+          append-only, so revoking a session does not retract what it
+          recorded. */}
+      <p className="gn-account__note">
+        Signing a device out does not remove what it recorded — those claims stay, attributed to
+        it.
+      </p>
     </section>
   );
 }

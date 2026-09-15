@@ -233,26 +233,51 @@ export default function AccountPage() {
   return (
     <main className="gn-shell gn-account">
       <AppNav />
-      <h1 className="gn-page-title">Account</h1>
-      <AppearanceSection />
-      {user !== null ? (
-        <ProfileSection name={user.name} email={user.email} onSave={saveName} />
-      ) : null}
-      {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
-      {prefs !== null ? (
-        <NotificationsSection mutedKinds={prefs.mutedKinds} onToggle={toggleKind} />
-      ) : null}
-      {sessions !== null ? (
-        <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
-      ) : null}
-      {passkeys !== null ? (
-        <PasskeysSection
-          passkeys={passkeys}
-          onAdd={(name) => void addPasskey(name)}
-          onRemove={(id) => void removePasskey(id)}
-          error={passkeyError}
-        />
-      ) : null}
+      {/* `AppNav` stays OUTSIDE the column on purpose: the prototype centres a
+          680px column of cards inside the content area, but the nav is a
+          full-width bar with its own inner max-width (`.gn-nav__inner`), so
+          narrowing it would be a second, unasked-for change to app chrome. */}
+      <div className="gn-account__column">
+        <div className="gn-account__intro">
+          <h1 className="gn-page-title">Your account</h1>
+          <p className="gn-account__lead">
+            This is you, across every workspace. Roles, projects and invitations belong to each
+            workspace separately.
+          </p>
+        </div>
+        {/* CARD ORDER IS THE SPEC'S, WHICH IS THE PROTOTYPE'S. The desktop
+            reference's `isAccount` screen runs Profile → Notifications → Your
+            workspaces → Sign-in and devices, and the spec's own section
+            numbering (§3 Profile, §4 Appearance, §5 Notifications, §6 Your
+            workspaces, §7 Sign-in & devices) is that same order with
+            Appearance inserted after Profile — so the two agree and this is
+            what they agree on. It replaces the order the sections happened to
+            land in as Tasks 2-8 each appended its own.
+
+            Passkeys sits last because it is not a section of its own in the
+            spec: §7 covers Sessions AND Passkeys as one "Sign-in & devices"
+            concern, so the two stay adjacent. Rendering them as one card
+            rather than two is a further change this reorder does not make. */}
+        {user !== null ? (
+          <ProfileSection name={user.name} email={user.email} onSave={saveName} />
+        ) : null}
+        <AppearanceSection />
+        {prefs !== null ? (
+          <NotificationsSection mutedKinds={prefs.mutedKinds} onToggle={toggleKind} />
+        ) : null}
+        {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
+        {sessions !== null ? (
+          <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
+        ) : null}
+        {passkeys !== null ? (
+          <PasskeysSection
+            passkeys={passkeys}
+            onAdd={(name) => void addPasskey(name)}
+            onRemove={(id) => void removePasskey(id)}
+            error={passkeyError}
+          />
+        ) : null}
+      </div>
     </main>
   );
 }

@@ -2306,21 +2306,31 @@ card-scale) and is recorded here only for completeness, not as a call.
   updated to the freshly measured (unchanged-membership) state; no entry was invented to match the
   plan's prediction. **Owner/controller: decide whether this needs its own instrument, an explicit
   roster-exemption line, or stands as documented and sufficient.** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
-- **13.344** ✅ (retitled again, Phase 2 Wave A: the shared `Select` component, not a plain
-  `<select>` — the plain `<select>` was itself never retitled here from the original `SegmentedControl`
-  description below, a pre-existing gap this retitle also closes) `StyleToggle` renders one labelled
-  control — `Select`'s non-searchable trigger (`role="button"`, named by a required `aria-label`) opening
-  a portal-rendered `role="listbox"` of 3 `role="option"` entries, HIG/Minimal/Neu — with `data-style`
-  landing on `document.documentElement` when a choice is made. Mutation: drop the field's label → RED. —
+- **13.344** ✅ (retitled a FOURTH time, 2026-09-15: back to `SegmentedControl`, on an owner
+  reference image for the Appearance card. The full identity chain is `SegmentedControl` → plain
+  `<select>` → shared `Select` → `SegmentedControl`; Phase 2 Wave A's invariant that no native
+  `<select>` remains in scope is untouched, since a segmented picker is not a native select — this
+  control simply stopped being a `Select` call site.) `StyleToggle` renders one labelled control —
+  a `role="tablist"` named `Style` holding 3 `role="tab"` entries, **`Apple HIG`/`Minimal`/
+  `Neomorphic`** (the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
+  `data-style` landing on `document.documentElement` when a choice is made, and a line beneath the
+  control naming the selected style. That description line has its own case: it must TRACK the
+  selection, asserted by switching and reading again, because fixed copy would satisfy any
+  single-state assertion. Mutation: drop the control's `aria-label` → RED (the lookup is by that
+  name); hard-code the description → RED on the second read. —
   (`apps/web/test/style-toggle.test.tsx`)
-- **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed on the shared `Select`
-  trigger's own visible label text (`Neu`), not a native `<select>`'s `value`. *Mutation-witnessed here:
+- **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed as
+  `aria-selected="true"` on the `Neomorphic` tab (retitled 2026-09-15 with the return to
+  `SegmentedControl`; previously the `Select` trigger's own visible label text, and before that a
+  native `<select>`'s `value`). *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
   check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
 - **13.346** ✅ A stored style choice survives a reload — asserted the same way `ThemeToggle`'s
   persistence is, a fresh mount restoring from `localStorage` rather than drifting from what
-  `layout.tsx`'s pre-paint script already applied; witnessed via the shared `Select` trigger's own
-  visible label text (`role="button"`), not a native `<select>`'s `value`. — (`apps/web/test/style-toggle.test.tsx`)
+  `layout.tsx`'s pre-paint script already applied; witnessed via the selected `role="tab"`
+  (retitled 2026-09-15 with the return to `SegmentedControl`; previously the shared `Select`
+  trigger's own visible label text, and before that a native `<select>`'s `value`). —
+  (`apps/web/test/style-toggle.test.tsx`)
 - **13.347** ✅ The positive control the axis needs: switching style changes a WITNESSED rendered value,
   not two numbers that merely differ in memory. `hig` and `neo`'s `raised` box-shadow both appear in
   `themeStylesheet()`'s own output under their own declaration (reusing 13.337's machinery) and the two
@@ -3285,6 +3295,64 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   to CI's `gate` job. So the WebAuthn ceremony itself, and the runtime URL better-auth's generated
   client builds for `listUserPasskeys`/`deletePasskey`, are the two things no test in this change set
   observes; the member NAMES are settled by `typecheck` (with a negative control) and the PATHS by (h).
+  **The Account STYLING port adds four more cases to this same pending block** (owner, 2026-09-15:
+  "take the styling of the account page and fix the styling in the code", then "it still doesn't match
+  the Style"). **THE REFERENCE IS THE DESKTOP PROTOTYPE'S `isAccount` SCREEN**
+  (`design-system/interactive/desktop.dc.html:1471-1529`), the file this plan's own spec names; the
+  first cut styled against the MOBILE canvas's "Account" screen, which is the phone's More TAB, and
+  that is what "doesn't match" meant. (a) `/account` renders as a centred 680px column of cards with
+  `<h1>Your account</h1>` and a lead sentence, cards at 20px padding, headings at 20px/25px/600, and
+  **transparent** rows separated by the card gap — measured live at 680px, not asserted. The cards
+  run in the SPEC'S ORDER, which is the prototype's — Profile, Appearance, Notifications, Your
+  workspaces, Sign-in and devices, Passkeys — replacing the order they happened to land in as Tasks
+  2-8 each appended its own; §2's "composed in the prototype's order" had not actually been met.
+  Passkeys stays adjacent to Sessions because §7 covers both as one concern; rendering them as ONE
+  card is the remaining divergence from §7 and is not done here. **(f) The APPEARANCE card is rebuilt
+  to its own owner reference image** (2026-09-15) — the one card with no prototype counterpart, since
+  it is this page's own section per spec §4 — as two labelled `SegmentedControl`s in place of a
+  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neomorphic`) with a
+  description line that must TRACK the selection, Theme (`System`/`Light`/`Dark`), and a closing
+  footnote. Cases 13.344-13.346 and 3.83 are retitled for the new control shapes rather than
+  renumbered, and both component suites were rewritten to assert the SAME properties through the new
+  shape. **`system` is kept as a third Theme segment against the reference image's two, pinned by its
+  own case** — it is the default state and the only route back to the device preference. The
+  accessible-name ratchet was CHECKED, not assumed: the signed-out baseline holds no `/account` entry,
+  the stack baseline is `{}`, and the assertion is a `toBeGreaterThanOrEqual` floor that this change
+  raises (`role`, `ariaSelected`) while holding `ariaLabel` level at two. (b)
+  Notifications rows carry a switch built by restyling the real `<input type="checkbox">`, so
+  `getByLabelText(...).not.toBeChecked()` still drives it — the control is unchanged, only its paint
+  is. (c) Each workspace row is a real `<a href="/w/{id}">` named `Open <name>` exactly once, the one
+  piece of new BEHAVIOUR in the port; asserted as a LINK WITH AN HREF rather than as a click, because
+  a `<div onClick>` that passed a click test would still be the defect this shape exists to prevent,
+  and the accessible name is pinned because `Avatar` labels itself with the same workspace name. (d)
+  Sign-in and devices renders a HEDGED empty state ("No signed-in devices to show.") instead of the
+  bare heading it showed before — the wording is the assertion, since the page collapses a failed read
+  to `[]` and a message claiming "you have no other devices" would assert what an empty array does not
+  establish. A fifth case pins the append-only footnote.
+  **(e) The per-device Sign out button stays SOLID, refusing the prototype's tint on a MEASUREMENT.**
+  Measured in a real browser across all six theme x style combinations: `danger` on `surfaceSunken`
+  is 3.84:1 and `danger` on `surfaceRaised` is 4.29:1 (light/`neo`), both under the 4.5 a 0.9375rem
+  label owes, against `dangerText on danger` at 5.38:1 — the only one of the three `CONTRAST_PAIRS`
+  declares and gates. A tinted class was written and then DELETED on that reading, which is the case
+  worth recording: the prototype is the reference for shape, not an override on accessibility. The
+  same sweep found TWO PRE-EXISTING failures outside this change set and left them alone —
+  `.ticket-type-editor__issues` at the same 3.84 and `.gn-contest-banner__action--discard` at 4.29
+  under light/`neo`, both product-wide palette decisions.
+  **WHAT IS AND IS NOT OBSERVED BY A TEST, stated because a styling change invites the assumption that
+  green means it looks right:** (c) and (d) and the footnote ARE covered —
+  `apps/web/test/account-page.test.tsx` (16) and `packages/app-core/test/account/*` (14) are green,
+  and the two new `SessionsSection` cases plus the new workspace-door case are what took app-core
+  1181→1183 and web 262→263. `packages/ui/test/token-discipline.test.ts` proves the block writes no
+  colour literal, and that instrument was POSITIVE-CONTROLLED for this change rather than trusted — a
+  planted `#ff0000` took it red naming `apps/web/app/globals.css` and the exact line. NOTHING asserts
+  the RENDERED geometry of (a) or the switch paint of (b): no unit test reads these rules, and
+  `apps/web/e2e-stack/helpers/non-text-contrast.ts` does not sweep `/account`. Both were instead
+  verified by SCREENSHOT against a static render of the prototype's own markup and tokens, in light/
+  `hig` and dark/`neo`, which is how the `neo` row-invisibility defect in the intermediate cut was
+  caught at all. A rendered sweep of `/account` is the test these two still want. ❌ — **and that ❌
+  sits inside this block's ✅ deliberately, not by oversight:** the behavioural half of this port is
+  test-observed, the geometric half is screenshot-observed only, and flipping the block either way
+  would misreport one of them. The mixed marker is the honest reading until a rendered sweep exists.
   **Not yet ID-allocated**: this file's own header requires the next free block
   (after 13.399) to be requested from the controller before minting, and this task has no channel to
   request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block
@@ -3301,4 +3369,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   `apps/web/test/sign-in.test.tsx`, `apps/web/app/sign-in/page.tsx`,
   `apps/server/test/auth/sign-in-flows.test.ts`,
   `apps/server/test/http/security-middleware.test.ts`,
-  `apps/web/e2e-stack/passkey-registration.spec.ts`)
+  `apps/web/e2e-stack/passkey-registration.spec.ts`,
+  `apps/web/app/globals.css`, `packages/ui/test/token-discipline.test.ts`,
+  `apps/web/app/account/page.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
+  `design-system/interactive/desktop.dc.html`)

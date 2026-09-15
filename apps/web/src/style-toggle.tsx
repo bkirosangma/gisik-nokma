@@ -1,21 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Select, type StyleName } from '@gisik-nokma/ui';
+import { SegmentedControl, type StyleName } from '@gisik-nokma/ui';
 
-// Not `ReadonlyArray` (the pre-migration type): `Select`'s `options` prop is typed
-// `SelectOption[]`, a mutable array — `readonly` here fails typecheck (TS4104) since
-// `Select`'s two other call sites (`fields-editor.tsx`, `ticket-type-editor-screen.tsx`) each
-// pass a fresh `.map()` result, never hitting this. `OPTIONS` itself is still never mutated.
-const OPTIONS: Array<{ value: StyleName; label: string }> = [
-  { value: 'hig', label: 'HIG' },
+/**
+ * `ReadonlyArray` is fine here, unlike the `Select` version this replaced:
+ * `SegmentedControl`'s `options` prop is already `ReadonlyArray<…>`, so the
+ * TS4104 workaround that forced a mutable array is gone with it.
+ */
+const OPTIONS: ReadonlyArray<{ value: StyleName; label: string }> = [
+  { value: 'hig', label: 'Apple HIG' },
   { value: 'minimal', label: 'Minimal' },
-  { value: 'neo', label: 'Neu' },
+  { value: 'neo', label: 'Neomorphic' },
 ];
 
-function isStyleName(value: string): value is StyleName {
-  return value === 'hig' || value === 'minimal' || value === 'neo';
-}
+/**
+ * One line per style, describing what the style actually DOES rather than
+ * selling it. Checked against `tokens.ts` rather than written from
+ * impression: `minimal` "has no shadow in either theme — its cards/fields are
+ * flat" (its own docblock) and shares `hig`'s colour mapping outright
+ * ("`minimal` needs no entry: its colours are" the same), so the honest
+ * difference between those two is shadow alone. `neo`'s line is the owner's
+ * own wording from the reference.
+ */
+const NOTES: Record<StyleName, string> = {
+  hig: 'Apple HIG: the same palette as Minimal, with a light shadow lifting cards and fields off the page.',
+  minimal:
+    'Minimal: the same colours, no shadows at all — cards and fields are flat, and spacing does the separating.',
+  neo: 'Neomorphic: soft raised surfaces, no borders. Heavier on the eye, lighter on lines.',
+};
 
 /**
  * Style is a runtime axis parallel to theme, but with no "system" state:
@@ -26,12 +39,20 @@ function isStyleName(value: string): value is StyleName {
  * render agrees with what already painted, the same discipline `ThemeToggle`
  * follows for its own pre-paint script.
  *
- * Moved off `AppNav` onto `/account` (owner request), first rendered as a
- * plain `<select>` (the same `<label htmlFor>` + `<select>` pair
- * `members/page.tsx` used for its invite form at the time), then migrated
- * onto the shared `Select` component in Phase 2 Wave A alongside that same
- * invite form — both control families now share one component rather than
- * two independent native-`<select>` conventions.
+ * ## CONTROL HISTORY, because this is the third shape this picker has had
+ *
+ * `SegmentedControl` → plain `<select>` → shared `Select` → `SegmentedControl`
+ * again (owner, 2026-09-15, with a reference image: all three styles visible
+ * at once, the chosen one raised, and a line under them describing the
+ * choice). **This deliberately takes this ONE control back off the shared
+ * `Select` that Phase 2 Wave A migrated it onto.** That rollout's point was
+ * that no native `<select>` remained, and that still holds — this is a
+ * segmented picker, not a native select — but the Select-rollout notes in
+ * `Features.md` name this site, so they are corrected in the same change set.
+ *
+ * Three options shown at once is also the reason the label is a plain
+ * `<span>` and not a `<label>`: there is no single form control to point at,
+ * and `SegmentedControl` carries its own required `aria-label`.
  */
 export function StyleToggle() {
   const [style, setStyle] = useState<StyleName>('neo');
@@ -48,23 +69,10 @@ export function StyleToggle() {
   };
 
   return (
-    // `<div>`, not `<p>`: `Select`'s internal `HiddenSelect` renders a `<div>`
-    // (`hidden-select-container`), and `<p>`'s HTML content model permits only phrasing
-    // content — a block-level `<div>` descendant is invalid there and triggers React's
-    // `validateDOMNesting` warning, a live SSR hydration defect on the real `/account`
-    // route (Wave A fix round 1). `<div>` permits block content, the same way
-    // `members/page.tsx`'s `<form>` wrapper already tolerates the same internal
-    // structure at Task 1's two sites.
-    <div>
-      <span>Style</span>{' '}
-      <Select
-        options={OPTIONS}
-        value={style}
-        onChange={(value) => {
-          if (isStyleName(value)) apply(value);
-        }}
-        aria-label="Style"
-      />
+    <div className="gn-account__appearance-group">
+      <span className="gn-account__appearance-label">Style</span>
+      <SegmentedControl options={OPTIONS} value={style} onChange={apply} aria-label="Style" />
+      <p className="gn-account__appearance-note">{NOTES[style]}</p>
     </div>
   );
 }

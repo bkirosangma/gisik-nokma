@@ -47,9 +47,22 @@ export function NotificationsSection({ mutedKinds, onToggle }: NotificationsSect
             checked={!mutedKinds.includes(kind)}
             onChange={() => onToggle(kind)}
           />
-          {LABELS[kind]}
+          <span className="gn-account__row-text">{LABELS[kind]}</span>
         </label>
       ))}
+      {/* Prototype copy, kept because it is TRUE: preferences live on the
+          caller's own server-owned `UserPreferences` row, so they are global
+          and no workspace can override them for one person.
+
+          What is NOT ported is the prototype's per-row note — "Email and
+          in-app", "One email on Monday" — and its Weekly digest row. No email
+          delivery exists for notifications (only magic-link SMTP does), so
+          those lines would be a promise the product cannot keep. That is the
+          same invented-data trap the governing spec designs around, and it is
+          why these rows carry a label and a switch but no second line. */}
+      <p className="gn-account__note">
+        These apply everywhere. A workspace cannot override them for you.
+      </p>
     </section>
   );
 }

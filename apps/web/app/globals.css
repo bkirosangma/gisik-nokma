@@ -155,6 +155,385 @@ button { font: inherit; }
 .gn-workspace-card__project-count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-card__restricted { margin: 0.55rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+/* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen
+   (`design-system/interactive/desktop.dc.html:1471-1529`). ─────────────────
+   THE REFERENCE, because the first cut of this block used the wrong one. The
+   spec that governs this screen names `Gisik Nokma - Desktop.dc.html`
+   (`docs/superpowers/specs/2026-09-14-account-help-screens-design.md:8`), and
+   that screen is a centred column of setting CARDS. The MOBILE canvas has a
+   screen labelled "Account" too, but it is the phone's More TAB — an identity
+   header over three groups of navigation links — and styling against it is
+   what made this page not match. Measured against the real reference, not
+   eyeballed: card padding 20px, column 680px, `h2` 20px/25px, rows
+   transparent.
+
+   Until this block existed every class below carried NO rule, and three
+   component docblocks DISCLOSED that in prose; they are retracted in the same
+   change set rather than left to contradict this file.
+
+   TRANSLATED, NOT TRANSCRIBED: the prototype's px become rem and its token
+   names become `--gn-*` roles (`--cardBg`→`surfaceRaised`,
+   `--cardShadow`→`shadowRaised`, `--cardR`→`radiusCard`,
+   `--fieldBg`→`fillQuaternary`, `--label2`→`textMuted`). This file is inside
+   `packages/ui`'s token-discipline scan, so a colour literal here reddens that
+   suite — every departure from the prototype's own values is named on the rule
+   that makes it. */
+
+/* The prototype centres a 680px column inside the content area rather than
+   filling it. `.gn-shell`'s own 80rem stays on the `<main>` so `AppNav`
+   (rendered inside it) keeps its full-width bar; the column is a wrapper
+   around the title and cards only. */
+.gn-account__column {
+  max-width: 42.5rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-top: 1.625rem;
+}
+
+.gn-account__intro { display: flex; flex-direction: column; gap: 0.25rem; }
+
+/* 34px/700 with the prototype's own negative tracking, overriding
+   `.gn-page-title`'s margin — the column's `gap` owns the spacing here.
+
+   CORRECTED 2026-09-15: this shipped as −0.025em, which measures −0.85px at
+   34px — over twice the reference's −0.4px. −0.4px ÷ 34px = −0.0118em. Found
+   while adding `/help`'s own title, where the same mistake was made and
+   measured live rather than assumed; `.gn-help__title` in `ui.css` carries the
+   fuller note. */
+.gn-account .gn-page-title {
+  margin: 0;
+  font-size: 2.125rem;
+  line-height: 2.5625rem;
+  letter-spacing: -0.0118em;
+}
+
+.gn-account__lead {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 1.0625rem;
+  text-wrap: pretty;
+}
+
+/* One card per section, the prototype's own: raised surface, card radius,
+   raised shadow — the same three tokens `.gn-settings__sidebar` already uses.
+   `align-items: flex-start` so a `Button` inside a card keeps its own width
+   instead of stretching the full 680px; rows and lists opt back in to full
+   width below. No `margin-top`: the column's `gap` is the only thing that
+   spaces cards, so the two can never disagree. */
+.gn-account__section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
+
+/* The Profile card is the one the prototype gives a wider inner gap (14px vs
+   12px), because its two stacked fields need more air than a list of rows. */
+.gn-account__profile { gap: 0.875rem; }
+
+/* 20px/25px/600 — the prototype's own. An earlier cut of this block shrank
+   these to 1.05rem on a type-scale argument aimed at the MOBILE canvas's 13px
+   uppercase eyebrow; the desktop reference's heading is LARGER than the house
+   default, so that argument never applied here. */
+.gn-account__section-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.5625rem;
+  font-weight: 600;
+}
+
+/* The three row lists stop being bullet lists. The compound `ul.` form is
+   deliberate: `.gn-account ul` above is specificity 0,1,1 and would otherwise
+   out-specify a lone class, keeping a bullet indent on rows that are no longer
+   bullets. That rule stays for any genuine prose list on this page. */
+.gn-account ul.gn-account__session-list,
+.gn-account ul.gn-account__workspace-list,
+.gn-account ul.gn-account__passkey-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ROWS ARE TRANSPARENT, which is the prototype's own answer and it settles a
+   question an earlier cut of this block got wrong in both directions. That cut
+   debated the mobile canvas's alternating `fill4` zebra against a
+   `surfaceSunken` row and shipped the latter; the desktop reference paints no
+   row background at all, separating rows by the card's `gap` and their own
+   min-height. Transparent also removes a `neo` defect the sunken version
+   carried: `tokens.ts` collapses surface/raised/sunken to ONE hex under that
+   style, so a sunken row with no shadow reads as flatly bright as the card
+   behind it — the same bug `Features.md` already records for
+   `.ticket-type-list__row`. Confirmed in a rendered screenshot, not assumed.
+
+   `wrap` for the measured reason `.gn-mcp-tokens__row` carries it: at narrow
+   widths a date and a 44px button do not fit on one line, and without it the
+   button leaves the viewport rather than the row growing. */
+.gn-account__session-row,
+.gn-account__workspace-row,
+.gn-account__passkey-row,
+.gn-account__notification-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  background: transparent;
+  color: var(--gn-text);
+}
+
+/* The workspace row is the prototype's taller one (48px), because it carries
+   an avatar rather than one line of text. */
+.gn-account__workspace-row { min-height: 3rem; }
+
+/* A footnote under a card's rows — the prototype's own 12px muted line. */
+.gn-account__note {
+  width: 100%;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-muted);
+  text-wrap: pretty;
+}
+
+/* The two-line left block every row uses: the thing being named over its
+   secondary fact. Same primary/secondary split `.gn-mcp-tokens__when`/`__used`
+   draw, and it takes the row's free space so the trailing control sits at the
+   edge. `overflow-wrap` for the reason `.gn-workspace-card__titles h2` carries
+   it — a device label or workspace name is arbitrary text that must not push
+   the row sideways. */
+.gn-account__row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.gn-account__row-meta {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-muted);
+}
+
+/* ── Notifications — the switch. ───────────────────────────────────────────
+   The prototype draws a 51x31 track with a 27px knob. This keeps the real
+   `<input type="checkbox">` underneath and restyles it, rather than building a
+   `role="switch"` div: the checkbox already carries the label association,
+   keyboard behaviour and checked state that `notifications-section.test.tsx`
+   asserts through `getByLabelText(...).not.toBeChecked()`, and none of that
+   should be re-implemented for a visual.
+
+   `order: 2` puts the switch at the row's trailing edge without reordering the
+   JSX, so the label text still precedes its own control in the DOM. */
+.gn-account__notification-row { justify-content: space-between; cursor: pointer; }
+
+.gn-account__notification-row input[type='checkbox'] {
+  order: 2;
+  flex: none;
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 3.1875rem;
+  height: 1.9375rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-fill-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+/* THE KNOB IS A TOKEN, WHICH IS THE ONE PLACE THIS SWITCH CANNOT COPY THE
+   PROTOTYPE. The prototype hard-codes `#fff` in both themes; a literal here
+   reddens the token-discipline suite, and there is deliberately no
+   always-white role in `tokens.ts` (the palette is theme-aware by design). So
+   the knob is `surfaceRaised` plus a `borderStrong` ring: the ring is what
+   guarantees a visible edge in BOTH states and BOTH themes, where a bare
+   raised fill would vanish against the unchecked track. A knob is a non-text
+   UI part, so WCAG 1.4.11's 3:1 is what it owes, and the ring is what pays
+   it. */
+.gn-account__notification-row input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.6875rem;
+  height: 1.6875rem;
+  border-radius: 999px;
+  border: 1px solid var(--gn-border-strong);
+  background: var(--gn-surface-raised);
+  transition: transform 0.15s ease;
+}
+
+.gn-account__notification-row input[type='checkbox']:checked { background: var(--gn-accent); }
+
+/* 51 − 27 − (2 x 2) = 20px of travel. */
+.gn-account__notification-row input[type='checkbox']:checked::after { transform: translateX(1.25rem); }
+
+.gn-account__notification-row input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-account__notification-row input[type='checkbox'],
+  .gn-account__notification-row input[type='checkbox']::after { transition: none; }
+}
+
+/* ── Your workspaces — the row is a door. ──────────────────────────────────
+   The prototype's row is a control that opens the workspace, with an accent
+   "Open" at its trailing edge. Rendered as a real `<a>` filling the row, the
+   same shape `.gn-workspace-card__door` already established, so keyboard and
+   screen-reader reachability come from the element rather than from CSS. */
+.gn-account__workspace-door {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  border-radius: var(--gn-radius-control);
+  color: var(--gn-text);
+  text-decoration: none;
+}
+.gn-account__workspace-door:hover { background: var(--gn-fill-quaternary); }
+.gn-account__workspace-door:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+.gn-account__workspace-name { font-size: 1.0625rem; font-weight: 500; }
+
+/* Role and project count share the prototype's one muted secondary line. They
+   stay SEPARATE elements rather than one joined string because each is its own
+   fact — and `account-page.test.tsx` reads them that way (`getByText('admin')`,
+   `getByText('1 project')`). */
+.gn-account__workspace-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-muted);
+}
+
+/* Not a `.gn-button`: the prototype draws this as accent text at the row's
+   edge, and the whole row is already the control. `textAccent` rather than
+   `accent` — `accent` stopped carrying a text-contrast guarantee in Round 2d,
+   and `textAccent on surfaceRaised` is a declared `CONTRAST_PAIRS` row. */
+.gn-account__workspace-open {
+  flex: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gn-text-accent);
+}
+
+/* ── Sign-in and devices: THE ONE PROTOTYPE DETAIL THIS PORT REFUSES. ──────
+   The prototype's per-device control is TINTED — a pale danger background
+   with `danger`-coloured text — and that cannot be built at accessible
+   contrast from this palette. The shared SOLID `Button variant="danger"` is
+   kept instead, and there is deliberately NO class here.
+
+   MEASURED in a real browser across all six theme x style combinations,
+   because the first two attempts at the tint both looked fine and both
+   failed:
+
+   | foreground on background         | min ratio | verdict               |
+   |----------------------------------|-----------|-----------------------|
+   | `danger` on `surfaceSunken`      | 3.84      | fails 4.5 (light/hig) |
+   | `danger` on `surfaceRaised`      | 4.29      | fails 4.5 (light/neo) |
+   | `dangerText` on `danger` (solid) | 5.38      | passes everywhere     |
+
+   The button's label is 0.9375rem — under the 18.66px "large text" cutoff —
+   so 4.5 is the floor it owes, not 3. Only the solid variant clears it, and
+   it is also the only one of the three that `CONTRAST_PAIRS` declares and
+   gates (`dangerText on danger`); `danger`-as-TEXT is declared nowhere.
+
+   TWO PRE-EXISTING FINDINGS this measurement turned up, recorded so they are
+   named rather than rediscovered, and NOT fixed here because both are
+   product-wide palette decisions: `.ticket-type-editor__issues` (`ui.css`,
+   `danger` on `surfaceSunken`) measures the same 3.84, and
+   `.gn-contest-banner__action--discard` (`danger` on `surfaceRaised`)
+   measures 4.29 under light/`neo`. `neo` is the aggravating factor in the
+   second — that style collapses `surfaceRaised` onto the same near-white
+   paper as `surfaceSunken`, so a pairing clearing 5.05 in `hig` drops to
+   4.29 there.
+
+   An alpha fill was the first thing tried and is the worst option of the
+   three, for a structural reason as well as a numeric one: `CONTRAST_PAIRS`'
+   own rule forbids naming the fills, because `relativeLuminance` ignores
+   alpha — so a fill background makes a pairing permanently undeclarable. An
+   earlier draft of this comment cited `.gn-mcp-tokens__refusal` and
+   `.gn-account__error` as precedent for it; both citations were FALSE — the
+   former is `text` on `surfaceSunken`, and the latter has no rule anywhere,
+   being named in a docblock precisely as a class NOT invented. */
+
+/* ── Profile and Passkeys fields ───────────────────────────────────────────
+   `.gn-field` is `display:flex;flex-direction:column` with no width of its own
+   (`ui.css`), so under the card's `align-items:flex-start` it would collapse
+   to its label's width and leave a 2.75rem input the size of the word "Name".
+   The prototype's fields fill the card, so these do too. */
+.gn-account__section .gn-field { width: 100%; }
+
+/* The email row is a `<p class="gn-field gn-account__readonly">` — a field in
+   shape but plain text in substance (`ProfileSection`'s docblock explains why
+   it is deliberately not a disabled input). It needs the paragraph margin
+   reset the field shape does not expect to be carrying. */
+.gn-account__readonly { margin: 0; }
+
+/* ── Appearance ────────────────────────────────────────────────────────────
+   Built to the owner's reference image rather than to the prototype, which
+   has no Appearance card at all — it is this page's own section (spec §4).
+   Each axis is a labelled `SegmentedControl` stacked over its options, with
+   Style carrying a description line for the current choice.
+
+   `align-items: stretch` overrides `.gn-account__section`'s `flex-start`
+   here: a segmented control is a track that should span the card, not a
+   button that should hug its label. */
+.gn-account__appearance { align-items: stretch; gap: 1rem; }
+
+.gn-account__appearance-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* The axis name ("Style", "Theme"). A plain `<span>`, not a `<label>`: a
+   segmented control is three buttons, so there is no single control for a
+   label to point at, and `SegmentedControl` requires its own `aria-label`
+   instead. Sized to match `.gn-field__label`, the product's own field label,
+   so the two read as the same kind of thing. */
+.gn-account__appearance-label {
+  font-size: 0.8rem;
+  color: var(--gn-text-muted);
+}
+
+/* The line under Style describing the chosen style. Same 0.75rem muted
+   treatment as `.gn-account__note`, but its own class because it belongs to
+   the control above it rather than closing the card. */
+.gn-account__appearance-note {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-muted);
+  text-wrap: pretty;
+}
 /* ── Task 19: the workspace home (`/w/[workspaceId]`). ──────────────────────
    Spacing and one muted text role, exactly like the Task 18 block above, and
    for the same reason: the pieces this page lays out (`.gn-card`, `.gn-chip`,

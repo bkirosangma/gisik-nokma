@@ -49,13 +49,26 @@ export type PasskeysSectionProps = {
  * that looks real and matches no rule renders an unstyled paragraph that
  * reads as ordinary copy rather than as a refusal.
  *
- * Otherwise unstyled by the same DISCLOSED convention `ProfileSection`,
- * `WorkspacesSection` and `SessionsSection` already establish on this page:
- * `gn-account__section`, `gn-account__section-title` and
- * `gn-account__passkey-row` carry no CSS rule in `globals.css` today.
- * `gn-account__passkey-list` is the one exception, for the same reason
- * `gn-account__session-list` is — it is a `<ul>`, so the page-wide
- * `.gn-account ul` descendant rule (`globals.css:157`, list spacing) applies.
+ * STYLED as of the Account styling port — this docblock previously disclosed
+ * the opposite ("carry no CSS rule in `globals.css` today") and that is no
+ * longer true. `globals.css`'s `/account` block styles
+ * `gn-account__section`, `__section-title`, `__passkey-list` and
+ * `__passkey-row`; the list is named explicitly out of the page-wide
+ * `.gn-account ul` bullet rule there, since it is a row list now.
+ *
+ * ONE SCOPE LIMIT, NAMED HERE BECAUSE THIS FILE IS WHERE IT BITES: those
+ * rules live in `apps/web/app/globals.css`, and as the `gn-refusal` note
+ * above already establishes, `apps/desktop` never loads that file —
+ * `apps/desktop/src/main.tsx:6` imports `@gisik-nokma/ui/ui.css` and nothing
+ * else, and `grep -rn "gn-account" apps/desktop apps/mobile` is empty, so
+ * there is no competing rule either, only an absent one. So this section
+ * renders styled in web and still-unstyled in desktop. That is
+ * unchanged from before (it was unstyled in BOTH), not a regression, and the
+ * rules were put there rather than in `packages/ui/src/ui.css` because every
+ * other route's CSS lives in `globals.css` (`.gn-mcp-tokens__*`,
+ * `.gn-settings__*`, `.gn-workspace-*`). Giving desktop the same treatment
+ * means promoting the `/account` block to `ui.css`, which is a deliberate
+ * cross-app decision and not something to slip in under a styling pass.
  * The field uses `gn-field`/`gn-field__label`/`gn-field__input`, which ARE
  * real rules and are exactly what `ProfileSection`'s Name field uses.
  *
@@ -86,7 +99,7 @@ export function PasskeysSection({ passkeys, onAdd, onRemove, error = null }: Pas
         <ul className="gn-account__passkey-list">
           {passkeys.map((passkey) => (
             <li key={passkey.id} className="gn-account__passkey-row">
-              <span>{passkey.name}</span>
+              <span className="gn-account__row-text">{passkey.name}</span>
               <Button
                 variant="danger"
                 aria-label={`Delete passkey ${passkey.name}`}

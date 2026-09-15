@@ -110,13 +110,21 @@ function mount() {
 describe('AccountPage — the global settings shell', () => {
   it('renders AppNav and a page title', async () => {
     mount();
-    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument();
   });
 
+  /**
+   * Both Appearance controls became labelled SEGMENTED controls with the
+   * owner's 2026-09-15 reference (a `tablist`, not a single button), so these
+   * queries moved with them. Still asserted at the PAGE level rather than
+   * only in the two component suites, because the thing this case is about is
+   * that `/account` composes both axes — a component suite passing proves
+   * neither is mounted here.
+   */
   it('renders the Appearance section with both the Style and Theme controls', async () => {
     mount();
-    expect(await screen.findByRole('button', { name: /Style/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Theme:/ })).toBeInTheDocument();
+    expect(await screen.findByRole('tablist', { name: 'Style' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Theme' })).toBeInTheDocument();
   });
 });
 
@@ -252,6 +260,31 @@ describe('AccountPage — Your workspaces', () => {
     expect(screen.getByText('Field Support')).toBeInTheDocument();
     expect(screen.getByText('member')).toBeInTheDocument();
     expect(screen.getByText('0 projects')).toBeInTheDocument();
+  });
+
+  /**
+   * Added with the Account styling port, and the one piece of NEW BEHAVIOUR
+   * in it: the desktop prototype's row is a control that opens the workspace,
+   * where this list was previously inert text.
+   *
+   * Asserted as a LINK with an href, not as a clickable element: the whole
+   * point of `.gn-workspace-card__door`'s own precedent is that reachability
+   * comes from the element rather than from a handler, so a `<div onClick>`
+   * that passed a click test would still be the defect. The accessible name
+   * is pinned too, because `Avatar` labels ITSELF with the workspace name —
+   * without the row's own `aria-label` the link would announce the name
+   * twice before its role and count.
+   */
+  it('each workspace row is a real link to that workspace, named once', async () => {
+    render(
+      <Providers services={stubServices({
+        getMyWorkspaces: async () => [workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin' })],
+      }, {})}>
+        <AccountPage />
+      </Providers>,
+    );
+    const door = await screen.findByRole('link', { name: 'Open Meghalaya Rollout' });
+    expect(door).toHaveAttribute('href', '/w/w1');
   });
 });
 
@@ -441,9 +474,9 @@ describe('AccountPage — Passkeys', () => {
     mount();
     // Anchor on something the anonymous page DOES render, so the zero below is
     // read from a settled DOM rather than from the first tick of a page that
-    // has not mounted yet. `<h1>Account</h1>` and Appearance render for
+    // has not mounted yet. `<h1>Your account</h1>` and Appearance render for
     // everyone; Profile and Passkeys do not.
-    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument();
     await waitFor(() => expect(listSessions).toHaveBeenCalled());
     expect(listUserPasskeys).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Passkey name')).toBeNull();

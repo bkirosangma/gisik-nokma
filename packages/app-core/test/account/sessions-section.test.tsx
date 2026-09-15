@@ -27,6 +27,37 @@ describe('SessionsSection', () => {
     expect(screen.getAllByRole('button', { name: /sign out/i })).toHaveLength(1);
   });
 
+  /**
+   * Added with the Account styling port. Before it, an empty list rendered a
+   * heading with NOTHING under it — measured in a real browser on `/account`,
+   * where the section was a bare card.
+   *
+   * The assertion pins the HEDGED wording, not just the presence of some text:
+   * `/account`'s own effect collapses a FAILED read to `[]`, so this component
+   * cannot distinguish "no devices" from "the read did not answer". A message
+   * asserting the former ("You have no other devices") would be a claim about
+   * the account that an empty array does not establish, and that distinction
+   * is the whole reason this case exists rather than a looser
+   * `toBeInTheDocument` on any paragraph.
+   */
+  it('renders a hedged empty state rather than a bare heading when no sessions are listed', () => {
+    render(<SessionsSection sessions={[]} onRevoke={vi.fn()} />);
+    expect(screen.getByText('No signed-in devices to show.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull();
+  });
+
+  /**
+   * The footnote is prototype copy kept because it is TRUE of this product —
+   * history is append-only, so revoking a session cannot retract what it
+   * recorded. Pinned because a future tidy-up that drops it would quietly
+   * remove the one sentence telling a person that signing a device out is
+   * not destructive.
+   */
+  it('states that signing a device out does not remove what it recorded', () => {
+    render(<SessionsSection sessions={SESSIONS} onRevoke={vi.fn()} />);
+    expect(screen.getByText(/does not remove what it recorded/)).toBeInTheDocument();
+  });
+
   it("clicking Sign out calls onRevoke with that session's token", async () => {
     const onRevoke = vi.fn();
     const user = userEvent.setup();
