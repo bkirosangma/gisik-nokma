@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { HELP_CONTENT } from '../../src/help/content.generated.js';
@@ -161,6 +161,132 @@ describe('15.22 HelpBrowser — the topic sidebar', () => {
         expect(within(topics()).getByRole('link', { name: 'Privacy' })).toBeInTheDocument();
         expect(within(topics()).getAllByRole('link')).toHaveLength(faq?.sections.length ?? 0);
       });
+  });
+});
+
+/**
+ * The active-row highlight, added 2026-09-15 on the owner's instruction: "since
+ * it's a single page document, highlight the section that is currently
+ * displayed in the reading pane on the content section."
+ *
+ * Two mechanisms answer that, and both are covered here:
+ *
+ * - a scroll spy over the rendered sections, which is the real answer; and
+ * - the URL fragment, which covers the frame before the spy's first callback
+ *   and any environment with no `IntersectionObserver`.
+ *
+ * jsdom is the second of those environments, so the fragment half runs as
+ * itself. The spy half runs against a STUBBED observer — which is not a
+ * compromise: what could be wrong in that code is the SELECTION RULE (which
+ * section wins when two share the band), and a stub drives that rule directly.
+ * The `rootMargin` geometry cannot be tested here and is not claimed to be; it
+ * was verified by scrolling a real browser.
+ */
+describe('15.25 HelpBrowser — the active row follows the reader', () => {
+  /**
+   * `aria-current='location'`, not `'page'`: the target is a place within this
+   * page. Asserted on the ATTRIBUTE rather than a class, because the attribute
+   * is the half a screen reader gets.
+   */
+  it('15.25 marks the fragment’s own section when no scroll spy is available', () => {
+    window.location.hash = '#manual-3-workspaces-and-the-project-problem';
+    render(<HelpBrowser />);
+    const topics = screen.getByRole('navigation', { name: 'Topics' });
+    const marked = within(topics)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'location');
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toHaveAccessibleName('§3 — Workspaces, and the project problem');
+    window.location.hash = '';
+  });
+
+  /**
+   * A search result links to an ENTRY, not a section. Without resolving entry →
+   * owning section, using the search would leave the sidebar marking nothing
+   * while the reader sat in the middle of a section it could have named — so
+   * this is the case that makes the search and the sidebar agree.
+   */
+  it('15.25 resolves an entry fragment to the section that owns it', () => {
+    const manual = HELP_CONTENT.find((doc) => doc.id === 'manual');
+    const section = manual?.sections.find((s) => s.entries.length > 0);
+    const entry = section?.entries[0];
+    expect(entry).toBeDefined();
+    window.location.hash = `#manual-${entry?.id ?? ''}`;
+    render(<HelpBrowser />);
+    const topics = screen.getByRole('navigation', { name: 'Topics' });
+    const marked = within(topics)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'location');
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toHaveAccessibleName(section?.title ?? '');
+    window.location.hash = '';
+  });
+
+  /**
+   * The spy's selection rule, driven through a stubbed `IntersectionObserver`.
+   *
+   * Two assertions, and the second is the one worth having: when two sections
+   * share the detection band the EARLIEST in document order wins, so the
+   * highlight advances only once the outgoing section's tail has left the band.
+   * A rule that picked the last would flicker back and forth across every
+   * boundary, and both rules look identical in a single-section test.
+   */
+  it('15.25 highlights the section in the reading pane, earliest wins when two overlap', () => {
+    const fired: ((entries: { isIntersecting: boolean; target: { id: string } }[]) => void)[] = [];
+    const observed: string[] = [];
+    class StubObserver {
+      constructor(callback: (entries: { isIntersecting: boolean; target: { id: string } }[]) => void) {
+        fired.push(callback);
+      }
+      observe(element: Element) {
+        observed.push(element.id);
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+    const original = (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
+    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = StubObserver;
+    try {
+      render(<HelpBrowser />);
+      // The positive control: it observed the real sections, so an empty
+      // highlight below would mean the RULE said nothing, not that the wiring
+      // never ran.
+      expect(observed).toContain('manual-1-signing-in');
+      expect(fired).toHaveLength(1);
+      const notify = fired[0];
+      expect(notify).toBeDefined();
+
+      const current = () => {
+        const topics = screen.getByRole('navigation', { name: 'Topics' });
+        return within(topics)
+          .getAllByRole('link')
+          .filter((link) => link.getAttribute('aria-current') === 'location')
+          .map((link) => link.textContent);
+      };
+
+      act(() => {
+        notify?.([{ isIntersecting: true, target: { id: 'manual-6-jobs-inside-jobs' } }]);
+      });
+      expect(current()).toEqual(['§6 — Jobs inside jobs']);
+
+      // §5 joins the band while §6 is still in it — the earlier one takes over.
+      act(() => {
+        notify?.([
+          { isIntersecting: true, target: { id: 'manual-5-adding-a-job-and-what-you-can-change-about-it' } },
+        ]);
+      });
+      expect(current()).toEqual(['§5 — Adding a job, and what you can change about it']);
+
+      // §5 leaves; §6 is alone in the band again.
+      act(() => {
+        notify?.([
+          { isIntersecting: false, target: { id: 'manual-5-adding-a-job-and-what-you-can-change-about-it' } },
+        ]);
+      });
+      expect(current()).toEqual(['§6 — Jobs inside jobs']);
+    } finally {
+      (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = original;
+    }
   });
 });
 

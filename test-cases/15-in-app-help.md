@@ -165,6 +165,27 @@ written to make it work.*
   is the point of doing it there: the DOM keeps a string a screen reader reads as a word.
   *Mutation-witnessed: emptying the eyebrow reddens both cases at `EXIT=1`.* —
   (`packages/app-core/test/help/help-browser.test.tsx`)
+- **15.25** ✅ **The active row follows the READER, not the last thing clicked.** Two mechanisms, both
+  covered: a scroll spy over the rendered sections (the real answer to the owner's *"since it's a single
+  page document, highlight the section that is currently displayed in the reading pane"*), and the URL
+  fragment, which covers the frame before the spy's first callback and any environment without
+  `IntersectionObserver`.
+  *The fragment half runs as itself in jsdom, including the case that makes the search and the sidebar
+  agree: a search result links to an ENTRY, so the marker resolves entry → owning section, or the
+  sidebar would mark nothing while the reader sat in a section it could have named.*
+  *The spy half runs against a STUBBED observer, which is not a compromise — what could be wrong there
+  is the SELECTION RULE, and a stub drives it directly. Three drives: §6 alone in the band; §5 joining
+  while §6 is still in it (the EARLIEST in document order must win, so the highlight advances only once
+  the outgoing section's tail leaves the band — a rule picking the last would flicker across every
+  boundary, and both rules look identical in a single-section test); then §5 leaving. A positive control
+  asserts the observer actually observed the real section elements, so an empty highlight would mean the
+  rule said nothing rather than that the wiring never ran.*
+  *Mutation-witnessed: flipping `<` to `>` in the earliest-wins comparison reddens it at `EXIT=1`.
+  Source restored and verified by SHA-256.*
+  *NOT asserted, and named: the `rootMargin` geometry, and the empty-band geometric fallback. jsdom
+  gives every element a zero rect, so `top <= 0` is true of every section there and a test would pin an
+  artifact of the environment rather than the rule. Both were verified by scrolling a real browser —
+  see the measured sequence below.* — (`packages/app-core/test/help/help-browser.test.tsx`)
 - **15.24** ✅ One `Next` pager per section EXCEPT THE LAST, pointing at the next section's anchor and
   named with its title. Asserted as a COUNT against the real document rather than by finding one pager
   and calling it proved, because the off-by-one is the whole defect class: a pager on the last section
@@ -173,13 +194,21 @@ written to make it work.*
   (`packages/app-core/test/help/help-browser.test.tsx`)
 
 *NOT covered by any test, and named rather than implied: the sidebar's CSS — its 274px width, the
-sticky behaviour, the stacking breakpoint below 48rem, the active row's `aria-current='location'`
-treatment, the eyebrow/pager type, and the switch's geometry. All were verified by live measurement in
-a real browser across both apps and all six style×theme combinations, and none has an assertion — the
-same honest gap 15.14–15.16 record. `/help` is in none of the e2e-stack ratchet baselines, so nothing
-there could have caught a regression either.*
-*Measured values, so a later reader can tell a regression from a redesign. Active row contrast: worst
-4.54:1 under hig/minimal light, against a 4.5 floor. The switch against the reference's own inline
+sticky behaviour, the stacking breakpoint below 48rem, the active row's VISUAL treatment (15.25 asserts
+the `aria-current` attribute; nothing asserts the fill, the weight or the depressed shadow), the
+eyebrow/pager type, and the switch's geometry. All were verified by live measurement in a real browser
+across both apps and all six style×theme combinations, and none has an assertion — the same honest gap
+15.14–15.16 record. `/help` is in none of the e2e-stack ratchet baselines, so nothing there could have
+caught a regression either.*
+*Measured values, so a later reader can tell a regression from a redesign. Active row: `--gn-accent` +
+`--gn-accent-text` at 600, contrast **5.26:1 light / 7.48:1 dark** against a 4.5 floor — up from the
+4.54:1 the earlier `--gn-text-accent`-on-`--gn-fill-tertiary` wash gave. Inactive rows
+`--gn-text-muted` at 15px/400, 8.71:1 at worst. Rows 34px tall (WCAG 2.5.8 floor is 24px), 15px text
+(this repo's enforced floor is 12px). `--gn-shadow-sunken` on the active row verified PRESENT under
+`neo` both themes and `none` under `hig`/`minimal` — the depressed reading the owner asked for, in the
+only style that has a real inset shadow. Scroll spy measured at five positions: exactly one row marked
+at every one, the first section at the top of the document, and the first section again on return.
+The switch against the reference's own inline
 styles: tray `padding: 2px` / `gap: 2px` exact, segments `flex: 1` at 118px in a 242px tray, 15.2px
 against its 15px, weights 600 selected / 500 unselected exact, side by side. ONE deliberate divergence
 — segment height 44px against the reference's 36px, because `ui.css` records that 40px reddened the

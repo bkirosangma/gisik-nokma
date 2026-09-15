@@ -265,6 +265,107 @@ function useUrlFragment(): string {
  * would leave the sidebar marking nothing while the reader sat in the middle of
  * a section it could have named.
  */
+/**
+ * Which section is currently in the reading pane.
+ *
+ * The whole document is on the page, so "where am I" is a question about SCROLL
+ * POSITION and not about the last thing clicked — the owner's instruction was
+ * "since it's a single page document, highlight the section that is currently
+ * displayed in the reading pane". A reader who scrolls with the wheel never
+ * touches a link, and until this existed the sidebar went on marking whatever
+ * anchor they last followed, or nothing at all.
+ *
+ * ## `IntersectionObserver` and not a scroll handler
+ *
+ * A `scroll` listener fires on every frame of a flick and would have to measure
+ * 16 or 29 elements each time. The observer reports only when a boundary is
+ * actually crossed, off the main thread's critical path.
+ *
+ * `rootMargin: '-15% 0px -70% 0px'` narrows the root to a band across the upper
+ * quarter of the viewport — the reading position, rather than "anywhere on
+ * screen", which on a wide monitor is three sections at once.
+ *
+ * ## The rule when two sections share the band, stated because it is a choice
+ *
+ * The EARLIEST in document order wins. So the highlight advances when the
+ * outgoing section's tail leaves the band, not the moment the next heading
+ * appears in it — which keeps the marked row matching the prose the reader is
+ * still in, and makes the transition happen once rather than flickering back
+ * and forth across a boundary.
+ *
+ * ## When the band holds NOTHING, which is the common case at the top
+ *
+ * The first cut of this kept the last answer, reasoning that "no section" is
+ * never true of a document being scrolled through. Both halves of that were
+ * wrong, and scrolling a real browser said so:
+ *
+ * - **At the top, nothing is in the band at all.** The `h1`, the search box and
+ *   the document intro fill the upper third of the viewport, so the first
+ *   section starts below the band and NO row was marked — where the reference
+ *   marks the first one.
+ * - **Scrolling back up left a stale mark.** "Keep the last answer" means the
+ *   row for §8 stays lit after the reader returns to the top, which is worse
+ *   than marking nothing: it is a confident wrong answer.
+ *
+ * So an empty band falls back to GEOMETRY: the last section whose top edge has
+ * already passed the top of the viewport, or the FIRST section when none has —
+ * which is the top-of-document case, and the reference's own behaviour. The
+ * measurement runs only when the band is empty, which is rare.
+ *
+ * ## Where there is no `IntersectionObserver` at all
+ *
+ * jsdom. This returns `null` for good and the caller falls back to the URL
+ * fragment. Note the geometric branch above is NOT meaningfully testable there
+ * either: jsdom gives every element a zero rect, so `top <= 0` is true of every
+ * section and the fallback would pick the last one. That is an artifact of the
+ * environment, not this rule, and no test asserts it.
+ */
+function useVisibleSection(document: HelpDocument | undefined): string | null {
+  const [visible, setVisible] = useState<string | null>(null);
+  useEffect(() => {
+    setVisible(null);
+    if (document === undefined || typeof IntersectionObserver === 'undefined') return;
+    const prefix = `${document.id}-`;
+    const rank = new Map(document.sections.map((section, i) => [`${prefix}${section.id}`, i]));
+    const inBand = new Set<string>();
+    const ids = [...rank.keys()];
+    const resolve = (): string | null => {
+      let earliest: string | null = null;
+      for (const id of inBand) {
+        if (earliest === null || (rank.get(id) ?? 0) < (rank.get(earliest) ?? 0)) earliest = id;
+      }
+      if (earliest !== null) return earliest;
+      // Band empty — see the docblock. The last section already scrolled past
+      // the top of the viewport, else the first section (top of the document).
+      let passed: string | null = null;
+      for (const id of ids) {
+        const element = window.document.getElementById(id);
+        if (element !== null && element.getBoundingClientRect().top <= 0) passed = id;
+      }
+      return passed ?? ids[0] ?? null;
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) inBand.add(entry.target.id);
+          else inBand.delete(entry.target.id);
+        }
+        const found = resolve();
+        setVisible(found === null ? null : found.slice(prefix.length));
+      },
+      { rootMargin: '-15% 0px -70% 0px' },
+    );
+    for (const id of rank.keys()) {
+      const element = window.document.getElementById(id);
+      if (element !== null) observer.observe(element);
+    }
+    return () => {
+      observer.disconnect();
+    };
+  }, [document]);
+  return visible;
+}
+
 function sectionOfFragment(document: HelpDocument, fragment: string): string | null {
   const prefix = `${document.id}-`;
   if (fragment === '' || !fragment.startsWith(prefix)) return null;
@@ -486,7 +587,23 @@ export function HelpBrowser() {
   const result = useMemo(() => searchHelp(HELP_CONTENT, query), [query]);
   const active = HELP_CONTENT.find((d) => d.id === documentId) ?? HELP_CONTENT[0];
   const fragment = useUrlFragment();
-  const activeSection = active === undefined ? null : sectionOfFragment(active, fragment);
+  const visibleSection = useVisibleSection(active);
+  /*
+    SCROLL POSITION FIRST, the URL second, and both are needed.
+
+    The scroll spy is the answer to "which section is the reader looking at",
+    which is the question the owner asked. But it reports nothing until its
+    first callback lands — one frame after mount — and it reports nothing at all
+    where `IntersectionObserver` is absent. The fragment covers exactly those
+    gaps: a deep link into `#manual-10-…` marks the right row on the FIRST
+    paint instead of a frame later, and it is the only one of the two that jsdom
+    can exercise, so the fallback is also the testable half.
+
+    They agree once both have an answer: the browser scrolls a fragment target
+    into view, so the spy's verdict a frame later is the fragment's section.
+  */
+  const activeSection =
+    visibleSection ?? (active === undefined ? null : sectionOfFragment(active, fragment));
 
   return (
     <div className="gn-help">

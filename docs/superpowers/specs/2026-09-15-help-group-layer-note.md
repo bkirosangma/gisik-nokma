@@ -142,11 +142,26 @@ simply than this note expected:
   that flows. Drawn as a real anchor to the next section's id, so it works with
   middle-click and the back button, and it leaves a fragment the sidebar's
   active marker then reads.
-- **The active marker reads the URL, not a click handler.** Three things set the
-  fragment — a sidebar link, a search result, an external deep link — and all
-  three light up the same sidebar row. A search result's fragment names an
-  ENTRY, so it resolves to the section that owns it; without that lookup, using
-  the search would leave the sidebar marking nothing.
+- **The active marker follows the reader.** A scroll spy over the rendered
+  sections, added on the owner's instruction — *"since its a single page
+  document, highlight the section that is currently displayed in the reading
+  pane"*. This note's first version called the eyebrow a possible scroll-spy and
+  then said the eyebrow made one unnecessary; that was right about the EYEBROW
+  and wrong about the SIDEBAR, which does need one, because a reader who scrolls
+  with the wheel never touches a link.
+
+  The URL fragment is kept as the second half rather than replaced: it marks the
+  right row on the first paint, before the observer's first callback, and it is
+  the only one of the two that jsdom can exercise. A search result's fragment
+  names an ENTRY, so that path resolves entry → owning section.
+
+  Two defects in the spy came out of scrolling a real browser, not reasoning.
+  Keeping the last answer when the detection band empties meant NO row was
+  marked at the top of the document — the `h1`, search box and intro fill the
+  band — and a STALE row stayed marked after scrolling back up, which is a
+  confident wrong answer and worse than none. An empty band now falls back to
+  geometry: the last section whose top has passed the viewport top, else the
+  first section.
 
 ## What this left open, and how each was settled
 
