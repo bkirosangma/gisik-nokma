@@ -109,7 +109,20 @@ input, textarea, select { font-family: inherit; }
    `/mcp/authorize`, `/workspaces`, and every `/w/*` screen), and 34px is the
    prototype's page-title size across screens. The existing `margin` stays
    exactly as it was — see `.gn-workspaces__head .gn-page-title` below for the
-   one page that resets it, scoped rather than here. */
+   one page that resets it, scoped rather than here.
+
+   UNRESOLVED, flagged rather than silently fixed: `-0.025em` is Task 4's
+   brief's verbatim value, used as instructed. Two sibling rules for this
+   same 34px/700 title — `.gn-account .gn-page-title` (this file, below) and
+   `.gn-help__title` (`packages/ui/src/ui.css:1697`) — both carry `-0.0118em`
+   instead, each with a note dated 2026-09-15 recording that `-0.025em`
+   measured −0.85px live against the prototype's −0.4px tracking, and that
+   −0.4px ÷ 34px = −0.0118em. Neither of those two pages is affected by this
+   rule's value (both override it at higher specificity), but the other
+   eleven pages that read this base rule with no override of their own are.
+   Whether this base rule should carry the corrected tracking is a call for
+   whoever reconciles Task 4 against those two same-day corrections, not
+   made here. */
 .gn-page-title {
   margin: 1.2rem 0 0.4rem;
   font-size: 2.125rem;
@@ -143,7 +156,12 @@ input, textarea, select { font-family: inherit; }
    `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
    workspace home uses 1100px — so it lives here rather than widening or
    narrowing every route that shares the shell. `.gn-workspace-founding`
-   existing apart from `.gn-project-founding` is the same precedent. */
+   existing apart from `.gn-project-founding` is the same precedent.
+
+   The padding below is the brief's verbatim value and STACKS with
+   `.gn-shell`'s own `padding: 0 1.25rem 3rem`, because Task 4 was told not
+   to touch `.gn-shell` — the rendered gutter is therefore 2.75rem
+   horizontal / 5.5rem bottom, not the prototype's 24px/40px alone. */
 .gn-workspaces {
   max-width: 73.75rem;
   margin: 0 auto;
