@@ -278,13 +278,15 @@ hides a kind from what is READ; it never stops the row from being WRITTEN.*
 Notifications section it feeds. Driven against the REAL `createHttpClient` over a scripted `fetch`,
 matching `notifications.test.ts`'s own argument against a hand-written `HttpClient` stub.*
 - **11.201** ✅ `createHttpNotificationPreferencesGateway`'s `load()` GETs `/v1/me/notification-preferences` with no query string and parses the result through the domain's own schema — (`packages/app-core/test/online/notification-preferences.test.ts`)
-- **11.202** ✅ `save()` PUTs the whole document to the same path — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.202** ✅ `save()` PUTs the whole document to the same path — asserted against the actual PARSED body `scriptedHttp` captured, not merely a `hadBody: true` flag, so a mutation sending `{}`, a hardcoded document, or a renamed key reddens this rather than passing unnoticed (coordinator review, 2026-09-15) — (`packages/app-core/test/online/notification-preferences.test.ts`)
 - **11.203** ✅ `load()` refuses a body naming a kind outside the five, rather than handing it to the view — (`packages/app-core/test/online/notification-preferences.test.ts`)
 - **11.204** ✅ `load()` names the door on a 404 rather than handing zod a bare `null` to parse — this route is session-gated and answers 401 to a stranger, never 404, so a 404 here means the request never reached the route at all — (`packages/app-core/test/online/notification-preferences.test.ts`)
 - **11.205** ✅ `NotificationsSection` renders one checked-by-default row per real kind, five rows — no invented "email" column, no "weekly digest" row, since neither exists server-side — (`packages/app-core/test/account/notifications-section.test.tsx`)
 - **11.206** ✅ A muted kind renders unchecked, and only that one — (`packages/app-core/test/account/notifications-section.test.tsx`)
 - **11.207** ✅ Clicking a row calls `onToggle` with that kind and does not flip local state itself — the component is controlled, owning no state of its own — (`packages/app-core/test/account/notifications-section.test.tsx`)
 - **11.208** ✅ The wiring witness: `/account` reads real preferences through `useAppServices().notificationPreferences` and renders the muted row unchecked — proof the seam carries a real answer through, which the page's own un-stubbed-rejects-to-all-on fallback (every other case in this file) cannot show — (`apps/web/test/account-page.test.tsx`)
+- **11.209** ✅ Toggling an unmuted row on `/account` flips it and calls `notificationPreferences.save()` with the expected next `mutedKinds` — the ONLY state update on the success path, so the flip standing is `toggleKind`'s own optimistic `setPrefs`, not an accident of the mock (coordinator review, 2026-09-15: `toggleKind`'s optimistic-flip-then-revert had zero coverage before this and 11.210) — (`apps/web/test/account-page.test.tsx`)
+- **11.210** ✅ A refused save reverts the optimistic flip once the reload settles — `load()` is called a second time (the `.catch()`'s reload firing, not the DOM settling on its own) and the row is drawn from that reloaded answer, so the optimistic mute does not stick — the same mechanism `/inbox`'s own `markRead` catch uses (case 11.147) — (`apps/web/test/account-page.test.tsx`)
 
 ## Permanently unused id ranges
 
@@ -302,9 +304,11 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.209.**  
-*(11.208 is IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
-server half 11.197–11.200, Task 6's client half 11.201–11.208). This pointer means the NEXT FREE id —
+**New cases continue from 11.211.**  
+*(11.210 is IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
+server half 11.197–11.200, Task 6's client half 11.201–11.210 — the last two, 11.209–11.210, added on
+2026-09-15 coordinator review to close a coverage gap in `toggleKind`'s optimistic-flip-then-revert
+logic that 11.201–11.208 left unexercised). This pointer means the NEXT FREE id —
 that is the convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188).
 #293 set it equal to the highest id instead of one past it, and #304 then minted exactly the id the
 pointer named; no duplicate resulted only because #304 advanced the pointer to its own new maximum,

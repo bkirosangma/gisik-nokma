@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { NotificationPreferences } from '@gisik-nokma/domain';
 import { createHttpClient, type FetchLike } from '../../src/online/http.js';
 import { createHttpNotificationPreferencesGateway } from '../../src/online/notification-preferences.js';
 
@@ -17,10 +18,21 @@ import { createHttpNotificationPreferencesGateway } from '../../src/online/notif
  * scripted bodies are shaped after.
  */
 function scriptedHttp(routes: Record<string, { status: number; body?: unknown }>) {
-  const seen: Array<{ method: string; path: string; hadBody: boolean }> = [];
+  const seen: Array<{ method: string; path: string; hadBody: boolean; body: unknown }> = [];
   const fetchImpl: FetchLike = async (input, init) => {
     const method = init?.method ?? 'GET';
-    seen.push({ method, path: input, hadBody: init?.body !== undefined });
+    const hadBody = init?.body !== undefined;
+    seen.push({
+      method,
+      path: input,
+      hadBody,
+      // Parsed, not left as the raw JSON string — a case asserting on this is
+      // asserting the actual DOCUMENT `save()` sent (coordinator review,
+      // Important #1: `hadBody` alone would pass for `{}`, a hardcoded body,
+      // or a renamed key), not incidentally pinning `JSON.stringify`'s own
+      // key order too.
+      body: hadBody ? JSON.parse(init!.body as string) : undefined,
+    });
     const scripted = routes[`${method} ${input}`];
     if (scripted === undefined) throw new Error(`this case scripted no ${method} ${input}`);
     return new Response(
@@ -44,18 +56,27 @@ describe('createHttpNotificationPreferencesGateway — against the route Task 5 
     const gateway = createHttpNotificationPreferencesGateway(http);
     await expect(gateway.load()).resolves.toEqual({ mutedKinds: ['mention'] });
     expect(seen).toEqual([
-      { method: 'GET', path: '/v1/me/notification-preferences', hadBody: false },
+      { method: 'GET', path: '/v1/me/notification-preferences', hadBody: false, body: undefined },
     ]);
   });
 
-  it('11.202 save() PUTs the whole document', async () => {
+  it('11.202 save() PUTs the whole document — the actual body, not merely a body', async () => {
     const { http, seen } = scriptedHttp({
       'PUT /v1/me/notification-preferences': { status: 204 },
     });
     const gateway = createHttpNotificationPreferencesGateway(http);
-    await gateway.save({ mutedKinds: ['stale-ticket'] });
+    const document: NotificationPreferences = { mutedKinds: ['stale-ticket'] };
+    await gateway.save(document);
+    // Asserting the parsed `body`, not just `hadBody: true` — a mutation that
+    // sent `{}`, a hardcoded document, or a renamed key would have passed the
+    // weaker assertion unnoticed (coordinator review, Important #1).
     expect(seen).toEqual([
-      { method: 'PUT', path: '/v1/me/notification-preferences', hadBody: true },
+      {
+        method: 'PUT',
+        path: '/v1/me/notification-preferences',
+        hadBody: true,
+        body: document,
+      },
     ]);
   });
 

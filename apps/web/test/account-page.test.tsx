@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
@@ -99,6 +99,68 @@ describe('AccountPage — Notifications', () => {
     // load that resolves to something OTHER than the fallback default can.
     expect(await screen.findByLabelText(/mentioned/i)).not.toBeChecked();
     expect(screen.getByLabelText(/assigned/i)).toBeChecked();
+  });
+
+  it('11.209 toggling an unmuted row flips it and saves the expected next mutedKinds', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          { notificationPreferences: { load: async () => ({ mutedKinds: [] }), save } },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    expect(mentionRow).toBeChecked();
+    await user.click(mentionRow);
+    // The optimistic `setPrefs(next)` in `toggleKind` — this is the ONLY state
+    // update on the success path (nothing re-reads after a successful save),
+    // so the flip standing here is what that call did, not a coincidence of
+    // `save`'s own mock also resolving to something matching.
+    expect(mentionRow).not.toBeChecked();
+    expect(save).toHaveBeenCalledWith({ mutedKinds: ['mention'] });
+  });
+
+  it('11.210 a refused save reverts the optimistic flip once the reload settles, rather than leaving an invented mute standing', async () => {
+    let loadCalls = 0;
+    const load = vi.fn(async () => {
+      loadCalls += 1;
+      // The SAME true value both times: the save never landed, so a correct
+      // revert reads back exactly what was there before the click.
+      return { mutedKinds: [] };
+    });
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load,
+              save: async () => {
+                throw new Error('save refused');
+              },
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    expect(loadCalls).toBe(1);
+    await user.click(mentionRow);
+    // `toggleKind`'s `.catch()` re-reads the true stored state — the same
+    // mechanism `/inbox`'s own `markRead` catch uses (case 11.147) — so a
+    // second `load()` call is the mechanism firing, not merely a coincidence
+    // of the DOM settling back on its own.
+    await waitFor(() => expect(loadCalls).toBe(2));
+    // Drawn from the reloaded answer: the optimistic mute did not stick.
+    await waitFor(() => expect(screen.getByLabelText(/mentioned/i)).toBeChecked());
   });
 });
 
