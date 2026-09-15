@@ -455,6 +455,51 @@ export const primitives = {
    */
   textSubtleLight: '#5e5e62',
   textSubtleDark: '#a0a0a5',
+
+  /**
+   * ## Owner round 4 — the prototype's text is not pure (2026-09-16)
+   *
+   * The owner: *"seems the text color in the prototype is not really white.
+   * follow that."* Ruled PRODUCT-WIDE, not page-scoped (`apps/desktop/src/main.tsx`
+   * imports this same stylesheet, so both shells move together). `ink`
+   * (`#000000`) and `white` (`#ffffff`) are the WCAG MAXIMUM-contrast case;
+   * the prototype never uses either for text — see
+   * `design-system/interactive/desktop.dc.html:12-48`.
+   *
+   * ADDED rather than mutating `ink`/`white` in place: other roles may still
+   * reference those two primitives for non-text purposes, and editing a
+   * primitive in place makes that blast radius invisible. After this change,
+   * `ink`, `white`, `fog` and `navy900` are referenced by NO role in `themes`
+   * or `STYLE_COLOR_OVERRIDES` (verified: `themes.light`/`themes.dark` were
+   * their only referents, and every one of those nine lines is repointed
+   * below). They are kept rather than deleted — see the owner round-4 report
+   * for the standing question of whether to remove them.
+   *
+   * `labelWarmLight`/`labelWarmDark` are the export's `--label`
+   * (`desktop.dc.html:16` light, `:36` dark) — the `text` role in both
+   * themes.
+   *
+   * `onColorWarmLight`/`onColorWarmDark` are the export's `--onColor`
+   * (`:18` light, `:38` dark) — every role that paints text ON a filled
+   * background: `accentText` (both themes), `dangerText`/`warningText`/
+   * `successText` in LIGHT theme only (their dark values — `redInk`/
+   * `amberInk`/`greenInk` — were already non-pure and are untouched), and
+   * `textInverted` in BOTH themes. `ui.css:2596-2599`'s own comment already
+   * ties `textInverted`'s semantic to the export's `--onColor` ("the same
+   * semantic the export's own `--onColor` carries"), which is the
+   * justification for reusing this pair here rather than deriving a third.
+   *
+   * Every `CONTRAST_PAIRS` row naming one of these roles was re-measured
+   * before and after this change (`packages/ui/test/tokens.test.ts`'s
+   * declared-pairs suite, run across all three styles) and every one stays
+   * clear of its minimum — tightest is `warningText` on `warning` (light) at
+   * 4.876 against its 4.5 floor. See the owner round-4 report for the full
+   * before/after table.
+   */
+  labelWarmLight: '#202b49',
+  labelWarmDark: '#f2e9e1',
+  onColorWarmLight: '#fbf7f3',
+  onColorWarmDark: '#141a2e',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -618,10 +663,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'warmRaised',
     surfaceSunken: 'warmSunken',
     surfaceOverlay: 'overlayWarmHig',
-    text: 'ink',
+    text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
-    textInverted: 'white',
+    textInverted: 'onColorWarmLight',
     textAccent: 'textAccentLight',
     border: 'grayAccessible',
     borderStrong: 'grayAccessible',
@@ -634,13 +679,13 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     shadow: 'scrimLight',
     brand: 'brandOrange',
     accent: 'blue600',
-    accentText: 'white',
+    accentText: 'onColorWarmLight',
     danger: 'red600',
-    dangerText: 'white',
+    dangerText: 'onColorWarmLight',
     warning: 'amber700',
-    warningText: 'white',
+    warningText: 'onColorWarmLight',
     success: 'green700',
-    successText: 'white',
+    successText: 'onColorWarmLight',
     categoryOpen: 'grayAccessible',
     categoryActive: 'blue600',
     categoryTerminal: 'green700',
@@ -655,10 +700,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'navyRaised',
     surfaceSunken: 'navySunken',
     surfaceOverlay: 'overlayNavyHig',
-    text: 'fog',
+    text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
-    textInverted: 'ink',
+    textInverted: 'onColorWarmDark',
     textAccent: 'textAccentDark',
     border: 'grayAccessibleDark',
     borderStrong: 'grayAccessibleDark',
@@ -671,7 +716,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     shadow: 'scrimDark',
     brand: 'brandOrange',
     accent: 'blue300',
-    accentText: 'navy900',
+    accentText: 'onColorWarmDark',
     danger: 'red300',
     dangerText: 'redInk',
     warning: 'amber300',

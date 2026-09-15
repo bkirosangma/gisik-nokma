@@ -382,7 +382,11 @@ describe('HIG adoption — the deliberate departures', () => {
     const appleGreen = '#248a3d';
     const withApple = contrastRatio(colorOf('light', 'successText'), appleGreen);
     expect(withApple).toBeLessThan(4.5);
-    expect(withApple).toBeCloseTo(4.4, 1);
+    // Owner round 4 (2026-09-16): `successText` moved off pure `white` to the
+    // prototype's warm `onColorWarmLight` (`#fbf7f3`), which is darker than
+    // `#ffffff` — so this counterfactual against Apple's green moved too
+    // (4.40 → 4.12). Re-measured, not assumed; still clears "less than 4.5".
+    expect(withApple).toBeCloseTo(4.12, 1);
   });
 
   /**
@@ -739,7 +743,12 @@ describe('brand — Round 2d (2026-09-09)', () => {
     const light = contrastRatio(colorOf('light', 'textInverted'), colorOf('light', 'brand'));
     const dark = contrastRatio(colorOf('dark', 'textInverted'), colorOf('dark', 'brand'));
     expect(light).toBeLessThan(3);
-    expect(light).toBeCloseTo(2.87, 1);
+    // Owner round 4 (2026-09-16): `textInverted` moved off pure `white`/`ink`
+    // to the prototype's `onColorWarmLight`/`onColorWarmDark`
+    // (`#fbf7f3`/`#141a2e`) — light's number moved with it (2.87 → 2.69, both
+    // still well below the 3:1 this pair is exempted from). Re-measured, not
+    // assumed.
+    expect(light).toBeCloseTo(2.69, 1);
     expect(dark).toBeGreaterThanOrEqual(4.5);
     // And no CONTRAST_PAIRS row was added to paper over it — the exemption is
     // stated in the `brand` role's docblock, not silently un-enforced.
