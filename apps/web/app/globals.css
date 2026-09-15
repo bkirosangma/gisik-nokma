@@ -145,7 +145,18 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
 }
 .gn-type-editor-header .gn-page-title { margin: 0; }
-.gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
+/* `auto-fit`, not `auto-fill`: `auto-fill` keeps empty tracks, so three
+   workspaces render at their 280px minimum with dead space to the right of
+   them. `auto-fit` collapses the empty tracks and lets the real cards
+   stretch. Prototype: `desktop.dc.html:185`. */
+.gn-workspace-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));
+  gap: 1.125rem;
+  margin-top: 1.625rem;
+  padding: 0;
+  list-style: none;
+}
 
 /* The prototype caps this screen at 1180px (`desktop.dc.html:177`), not at
    `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
@@ -230,21 +241,29 @@ input, textarea, select { font-family: inherit; }
    ordinary flex row for the avatar+titles, same as `.gn-workspace-card__
    titles` beside it.
 
-   The door's `margin`/`padding` are exact negatives of `.gn-card`'s own
-   0.75rem (`packages/ui/src/ui.css`): pulling the anchor out to the card's
-   edges and re-applying the same padding inside it means the door's box —
-   and its hover/focus affordance — covers the full card with no visible seam,
-   while every descendant keeps the same effective spacing it had when the
-   card itself owned that padding. `--gn-surface-sunken` on hover is the same
-   role `.gn-table__row--clickable` already uses for exactly this; the focus
-   ring is `.gn-button`'s own `--gn-focus-ring` pair. */
+   The door's `margin` is the exact negative of `.gn-card`'s own 0.75rem
+   (`packages/ui/src/ui.css`): pulling the anchor out to the card's edges and
+   re-applying padding inside it means the door's box — and its hover/focus
+   affordance — covers the full card with no visible seam. Task 5 sets that
+   inner padding to 1.25rem (the prototype's 20px) rather than 0.75rem, so
+   every descendant now sits at the prototype's own inset rather than the
+   card's borrowed one — see `.gn-workspace-card__door`'s own comment below
+   for the asymmetry. `--gn-surface-sunken` on hover is the same role
+   `.gn-table__row--clickable` already uses for exactly this; the focus ring
+   is `.gn-button`'s own `--gn-focus-ring` pair. */
 .gn-workspace-card__door {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   color: var(--gn-text);
   text-decoration: none;
   border-radius: var(--gn-radius-card);
+  /* The negative margin and the padding are EXACT NEGATIVES of `.gn-card`'s
+     own 0.75rem, so the hover fill reaches the card's edge. The prototype's
+     card padding is 20px; the door absorbs the extra 0.5rem. Change one of
+     these numbers without the other and a seam opens at the card edge. */
   margin: -0.75rem;
-  padding: 0.75rem;
+  padding: 1.25rem;
 }
 .gn-workspace-card__door:hover { background: var(--gn-surface-sunken); }
 .gn-workspace-card__door:focus-visible {
@@ -254,11 +273,23 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-card__head { display: flex; align-items: flex-start; gap: 0.6rem; }
 .gn-workspace-card__titles { display: flex; flex-direction: column; min-width: 0; }
 .gn-workspace-card__titles h2 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
-.gn-workspace-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.6rem 0 0; }
-.gn-workspace-card__projects { margin: 0.7rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.gn-workspace-card__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* `margin: 0`, not a deleted declaration: the door's flex `gap` now owns the
+   top offset, but `<ul>`'s UA-default `margin-block: 1em` has nothing else in
+   this file resetting it, and would otherwise reappear on top of the gap
+   rather than being replaced by it. */
+.gn-workspace-card__projects { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
 .gn-workspace-card__project { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .gn-workspace-card__project-count { font-size: 0.8rem; color: var(--gn-text-muted); }
-.gn-workspace-card__restricted { margin: 0.55rem 0 0; font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Same `margin: 0` reasoning as `__projects` above (`<p>`'s UA default is
+   `margin-block: 1em`). This class is ALSO rendered at `/w/[workspaceId]`
+   (`app/w/[workspaceId]/page.tsx:666`), outside any flex-gap door — that
+   usage loses its former 0.55rem top offset with this change, and no test in
+   this repo guards its spacing. Flagged, not fixed here: splitting that
+   usage onto its own class is a page-content change, out of this task's
+   scope (grid/container geometry only) — left for whichever of Task 6/7
+   next touches `__restricted`. */
+.gn-workspace-card__restricted { margin: 0; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen
