@@ -264,11 +264,10 @@ input, textarea, select { font-family: inherit; }
    it sits several levels below that page's own `<h1>`, inside the card's
    door. `(0,2,0)` beats the bare-class rule above regardless of source
    order, so this stays here beside its base rule rather than at the file's
-   end. */
-.gn-page-title + .gn-workspace-list__role {
-  font-size: 0.8rem;
-  line-height: inherit;
-}
+   end. Written SINGLE-LINE, like every rule `workspace-restricted-spacing
+   .test.ts` scans, so the same one-rule-per-line scan convention could check
+   this one too if a later task wants that guarded as well as commented. */
+.gn-page-title + .gn-workspace-list__role { font-size: 0.8rem; line-height: inherit; }
 
 /* ── Task 18: the workspace card. ───────────────────────────────────────────
    Every colour is a token role. The card's own surface, radius and shadow are
