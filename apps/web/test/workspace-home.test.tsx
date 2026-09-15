@@ -184,7 +184,10 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       name: 'Show archived projects in Convenience Corner',
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent('Show 1 archived');
+    // Round 20: the VISIBLE text is the reference's ("1 archived · show"), while
+    // the accessible name above stays the sentence that names the workspace —
+    // deliberately two different strings, argued at the control's own call site.
+    expect(toggle).toHaveTextContent('1 archived · show');
     // ...and MARKED once revealed.
     await userEvent.click(toggle);
     expect(within(row('p3')).getByText('Old signage')).toBeInTheDocument();
@@ -221,10 +224,11 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     ]);
 
     const only = await screen.findByTestId('project-row-p1');
-    // The name is plain text now (Round 19b): "Open board" is the row's one
-    // door, not the name doubling as a second link to the same target.
+    // Round 20 (owner ruling): the card's BODY is the door and "Open board" is
+    // gone — the name is inside that one link, named by it, rather than plain
+    // text beside a second link to the same target.
     expect(within(only).getByText('Shop operations')).toBeInTheDocument();
-    expect(within(only).getByRole('link', { name: 'Open board' })).toHaveAttribute(
+    expect(within(only).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
       'href',
       `/w/${WORKSPACE}/p/p1`,
     );
@@ -591,22 +595,116 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
 });
 
 /**
- * 13.396 — the project card: "Open board" for an archived project too (the
- * same label a live one gets, never "read-only" — archiving is not a
- * permission), and Archive/Restore read the same role value the server gate
- * answers independently (13.388's half; 13.385 already drives the pairing).
+ * 13.396 — an archived project's card opens exactly like a live one's: the same
+ * door, at its own href, and never "read-only". Archiving is a workspace
+ * decision, not a permission (Task 16), so the board underneath stays writable
+ * and the prototype's "Open read-only" would be a false claim about this
+ * product's own rule.
+ *
+ * Round 20 rewrote the ASSERTION and not the claim. The label this used to read
+ * ("Open board") no longer exists — the owner ruled the card's body into the
+ * door — so the case now names the door the way a screen reader reaches it.
+ *
+ * The accessible name is asserted to CARRY "archived", and that is the half
+ * with teeth: `aria-label` overrides everything inside the anchor, so the
+ * visible "Archived" chip is invisible to assistive tech, and a non-admin gets
+ * no Archive/Restore button to infer the state from either. A door named
+ * plainly "Old signage" would leave an archived project indistinguishable from
+ * a live one for exactly the callers who cannot see the chip.
  */
-describe('13.396 archived projects still open, with the same label a live one gets', () => {
-  it('offers "Open board" — not "Open read-only" — for an archived project, at the archived project\'s own href', async () => {
+describe('13.396 archived projects still open, through the same door a live one gets', () => {
+  it("names the archived project's door with its archived state, at its own href, and never read-only", async () => {
     mount([[workspaceAs('admin')]]);
     await userEvent.click(
       await screen.findByRole('button', { name: 'Show archived projects in Convenience Corner' }),
     );
     const archivedRow = row('p3');
     expect(
-      within(archivedRow).getByRole('link', { name: 'Open board' }),
+      within(archivedRow).getByRole('link', { name: 'Old signage, archived' }),
     ).toHaveAttribute('href', `/w/${WORKSPACE}/p/p3`);
     expect(within(archivedRow).queryByText(/read-only/i)).toBeNull();
+    // The POSITIVE CONTROL for the name above: a LIVE project in the same
+    // render is named WITHOUT the suffix. Asserting only the archived name
+    // passes against a page that appended ", archived" to every project.
+    expect(within(row('p1')).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    expect(within(row('p1')).queryByRole('link', { name: /archived/ })).toBeNull();
+  });
+});
+
+/**
+ * 13.413 — THE CARD IS THE DOOR, and the admin control is not inside it
+ * (Round 20, owner ruling reversing Round 19b's "Open board" button).
+ *
+ * Three things, and each fails a different plausible implementation:
+ *
+ * 1. **Exactly ONE link per card.** The ruling removes "Open board" rather than
+ *    leaving it beside the new door — a card that was a link AND held an "Open
+ *    board" button would be the two-doors-to-one-target failure 19b named,
+ *    arrived at from the other side. An implementation that merely wrapped the
+ *    existing row in a link passes every other assertion here and fails this.
+ *
+ * 2. **Archive/Restore is NOT a descendant of the anchor.** `<a>` may not
+ *    contain `<button>`; a nested one is invalid HTML that renders, so nothing
+ *    would look wrong. jsdom will not complain either — the containment is
+ *    asserted directly.
+ *
+ * 3. **The archived card is dimmed IN PLACE**, keeping the served order, rather
+ *    than sinking to the end of the grid. `[...live, ...archived]` — the
+ *    obvious way to build one list out of the two bindings already in scope —
+ *    passes 1 and 2 and reorders the grid.
+ *
+ *    **That third assertion needs its OWN fixture, and the shared one would
+ *    have made it vacuous.** `workspaceAs` serves p1, p2, p3 with p3 archived —
+ *    already last — so `[...live, ...archived]` produces the identical order and
+ *    the check could not have failed against the very implementation it exists
+ *    to rule out. The fixture below puts the archived project in the MIDDLE,
+ *    which is the only arrangement where the two expressions disagree.
+ */
+describe('13.413 each project card is one door, with the admin control outside the anchor', () => {
+  it('carries exactly one link and does not nest the archive button in it', async () => {
+    mount([[workspaceAs('admin')]]);
+    const liveCard = await screen.findByTestId('project-row-p1');
+
+    // 1 — one door, and no "Open board" anywhere on the page any more.
+    expect(within(liveCard).getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Open board' })).toBeNull();
+
+    // 2 — the button exists, and the anchor does not contain it.
+    const door = within(liveCard).getByRole('link', { name: 'Shop operations' });
+    const archiveButton = within(liveCard).getByRole('button', { name: 'Archive Shop operations' });
+    expect(door.contains(archiveButton)).toBe(false);
+    expect(archiveButton.closest('a')).toBeNull();
+  });
+
+  it('reveals an archived project IN PLACE, keeping the order the server served', async () => {
+    // Archived in the MIDDLE — see the docblock. Under one filter the disclosed
+    // grid reads p1, p2, p3; under `[...live, ...archived]` it reads p1, p3, p2.
+    mount([
+      [
+        workspaceAs('admin', {
+          projects: [
+            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p2', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
+            { id: 'p3', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+          ],
+        }),
+      ],
+    ]);
+
+    // POSITIVE CONTROL: collapsed, the archived one is absent and the two live
+    // ones are in served order — so a failure below is about the disclosure and
+    // not about the grid never having been ordered at all.
+    await screen.findByTestId('project-row-p1');
+    expect(
+      screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
+    ).toEqual(['project-row-p1', 'project-row-p3']);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show archived projects in Convenience Corner' }),
+    );
+    expect(
+      screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
+    ).toEqual(['project-row-p1', 'project-row-p2', 'project-row-p3']);
   });
 });
 

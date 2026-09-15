@@ -2411,7 +2411,8 @@ repo-wide grep for every `13.4\d\d` occurrence at this branch's HEAD found the t
 still `13.410` (the `13.411` hit was this pointer's own prose, reproducing the exact trap this file's
 "CORRECTED 2026-09-15" paragraph above already documented once). **`13.411` is minted below** for the
 `sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **`13.412` is minted below**
-for the `selected` shadow role. **The next free BLOCK is now `13.413`.**
+for the `selected` shadow role. **`13.413` is minted at the foot of this file** for Round 20, the
+workspace-home prototype port. **The next free BLOCK is now `13.414`.**
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -3215,11 +3216,19 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   body, and dies if either reverts to reading the number. A guest's line carries no member-count prefix
   at all, never a `0`. —
   (`workspace-home.test.tsx`)
-- **13.396** ✅ An archived project still offers **"Open board"** — never "Open read-only" — at its own
-  href; archiving is a workspace decision (Task 16), not a permission, and the board underneath stays
-  writable, so the prototype's read-only label would be a false claim about this product's own rule.
-  Archive/Restore reads the same `isAdmin` value 13.388's server-side door answers independently — this
-  case does not re-derive a second opinion, it drives the pairing 13.385 already owns. —
+- **13.396** ✅ An archived project still opens through the **same door a live one gets** — never "Open
+  read-only" — at its own href; archiving is a workspace decision (Task 16), not a permission, and the
+  board underneath stays writable, so the prototype's read-only label would be a false claim about this
+  product's own rule. Archive/Restore reads the same `isAdmin` value 13.388's server-side door answers
+  independently — this case does not re-derive a second opinion, it drives the pairing 13.385 already
+  owns. **Round 20 rewrote the ASSERTION, not the claim:** the "Open board" button this used to name no
+  longer exists (the owner ruled the card's body into the door — 13.413), so the case now reaches the
+  door by its accessible name, and asserts that name CARRIES "archived". That half has teeth:
+  `aria-label` overrides everything inside the anchor, so the visible Archived chip is invisible to
+  assistive tech and a non-admin gets no Archive/Restore button to infer the state from — a door named
+  plainly "Old signage" would leave an archived project indistinguishable from a live one for exactly
+  the callers who cannot see the chip. A LIVE project in the same render is asserted named WITHOUT the
+  suffix, as the positive control against a page that appended it to everything. —
   (`workspace-home.test.tsx`)
 - **13.397** ✅ The home's archived-disclosure control is ABSENT, not merely collapsed, when nothing is
   archived — the SAME rule Task 18/19 already shipped on the `/workspaces` card, restated here because
@@ -3652,3 +3661,44 @@ first stated.
   geometry (the prototype's `--segOnShadow`, `inset 3px 3px 6px`) rather than either existing step, and is
   deliberately left untouched — a separate scope decision for the owner, out of this block. —
   (`packages/ui/test/tokens.test.ts`)
+
+### Round 20 — the workspace-home prototype port (`/w/[workspaceId]`)
+
+Block `13.413`, the next free one this file's own pointer recorded after `13.411` and `13.412` were
+minted for the shadow-role work. **The next free BLOCK is now `13.414`.** Round 20 ports the desktop prototype's `isWorkspace`
+screen onto the page Task 19 built: the project list becomes a GRID of per-project cards, the "Projects"
+heading and its toggle leave the `<Card>` that used to wrap them, the archived list merges into the one
+grid, the toggle takes the reference's own label, and the five door-cards move BELOW the projects and the
+founding form. Five prototype elements were deliberately NOT transcribed, each for a reason that already
+exists in this repo: a project `desc` (no such field is served), "Open read-only" (13.396 forbids it),
+"0 archived · show" (13.397 forbids it), "Ask to be named" rows (rulings P32/P38 serve a COUNT, not
+rows), and "Delete this workspace" (the prototype's own handler refuses it as irreversible).
+
+**The bottom "Workspace" card is NOT ported, and that is a measured omission rather than an oversight.**
+Its rename field is gated on admin, but `apps/server/src/permissions/check-permission.ts:349-358` records
+that `workspace.renamed` is not in `ADMIN_ONLY_TYPES`, that a workspace GUEST is admitted for it today,
+and that "which roles may rename a workspace is a product decision no plan in this series has taken".
+Shipping an admin-gated field would therefore render a permission rule the product has not decided —
+unlike every other admin affordance on this page, whose hiding is a DISPLAY of a real server gate, there
+is no gate behind this one to display. **Owner: whoever next takes the rename-permission decision.**
+
+- **13.413** ✅ **Each project card is ONE door, and the admin control is not inside it.** Round 20's owner
+  ruling reverses Round 19b's separate "Open board" button: the card's informational body (name, archived
+  badge, counts) is a single `<Link>` to that project's board. Three things are pinned, and each fails a
+  different plausible implementation. **One link per card**, and no "Open board" anywhere on the page —
+  the ruling REMOVES that button rather than leaving it beside the new door, because a card that was a
+  link and also held an "Open board" button would be the two-doors-to-one-target failure Round 19b named,
+  arrived at from the other side; an implementation that merely wrapped the existing row in a link passes
+  every other assertion here and fails this. **Archive/Restore is not a descendant of the anchor** —
+  `<a>` may not contain `<button>`, a nested one is invalid HTML that renders anyway, and jsdom does not
+  complain, so containment is asserted directly (`door.contains(button)` false, `button.closest('a')`
+  null). **The archived card is revealed IN PLACE**, keeping the served order, which is what the page's
+  single `filter(p => showArchived || !p.archived)` preserves and what `[...live, ...archived]` — the
+  obvious way to build one list from the two bindings already in scope — would break by sinking every
+  archived project to the end. **That third assertion needed its OWN fixture and the shared one would
+  have made it vacuous:** `workspaceAs` serves p1, p2, p3 with p3 archived, already last, so both
+  expressions yield the identical order and the check could not have failed against the implementation it
+  exists to rule out. The case's fixture puts the archived project in the MIDDLE — the only arrangement
+  where the two disagree — and asserts the collapsed order first as a positive control, so a failure is
+  about the disclosure rather than about the grid never having been ordered at all. —
+  (`workspace-home.test.tsx`)

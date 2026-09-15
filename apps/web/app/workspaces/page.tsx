@@ -227,8 +227,11 @@ function ChipRow({
  * ## Nothing removed is unreachable
  *
  * `/w/<id>` — one click through the door — already carries a "My Work" link,
- * every project as its own "Open board" link, and its own admin archive/
- * restore controls (`app/w/[workspaceId]/page.tsx`, Task 19 / Round 19b).
+ * every project as its own card-shaped door to that project's board, and its
+ * own admin archive/restore controls (`app/w/[workspaceId]/page.tsx`, Task 19
+ * / Round 20; that page's per-project "Open board" button was REMOVED when the
+ * owner ruled its project cards into doors too, so this bullet no longer names
+ * a control that exists).
  * Stripping this card down to the door plus plain info is not a loss of
  * function, only of a second, redundant place to reach the same controls.
  *
