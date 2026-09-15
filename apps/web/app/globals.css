@@ -146,17 +146,46 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
 }
 .gn-type-editor-header .gn-page-title { margin: 0; }
-/* `auto-fit`, not `auto-fill`: `auto-fill` keeps empty tracks, so three
-   workspaces render at their 280px minimum with dead space to the right of
-   them. `auto-fit` collapses the empty tracks and lets the real cards
-   stretch. Prototype: `desktop.dc.html:184`. */
+/* OWNER DEVIATION from the prototype (round 2 review) — do NOT "restore" this
+   to the prototype's `repeat(auto-fit, minmax(280px, 1fr))` as a fix; that
+   value was tried first and the owner explicitly rejected the behaviour it
+   produces. `auto-fit` COLLAPSES empty tracks, so a lone workspace's card
+   stretches to fill the entire row — the owner's ruling is the opposite:
+   exactly THREE columns, always, and with fewer than three workspaces the
+   remaining cells stay visibly EMPTY rather than the real card growing to
+   cover them.
+
+   `repeat(3, minmax(0, 1fr))` is that ruling: a fixed track count (never
+   auto-fit/auto-fill) so empty cells are real empty grid cells, not
+   stretched content. `minmax(0, 1fr)` rather than a bare `1fr` on each
+   track, so one long unbroken workspace name cannot force its column wider
+   than its equal third — a bare `1fr` track's automatic minimum is
+   `auto` (content-based), which lets intrinsic content size win the fight
+   over the equal-thirds split this rule exists to guarantee.
+
+   Responsive collapse re-uses the two breakpoints this file already has
+   rather than inventing new ones: `@media (max-width: 60rem)` is the same
+   960px point `.gn-shell` itself steps down at (see that rule above), so the
+   grid and the shell's own gutter change together; `@media (max-width:
+   40rem)` (640px) is this file's other existing breakpoint (see the
+   `.gn-notfound`/`.gn-legal` rules below). 3 columns down to 2 at 60rem, 2
+   down to 1 at 40rem — chosen, not merely reused, because 390px (the e2e
+   sideways-scroll ratchet's phone width) sits well inside the ≤40rem single
+   column arm, so three fixed 17.5rem-minimum columns can never be asked to
+   fit a 390px viewport. */
 .gn-workspace-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.125rem;
   margin-top: 1.625rem;
   padding: 0;
   list-style: none;
+}
+@media (max-width: 60rem) {
+  .gn-workspace-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .gn-workspace-list { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* The prototype caps this screen at 1180px (`desktop.dc.html:178`), not at
@@ -322,9 +351,10 @@ input, textarea, select { font-family: inherit; }
    inner padding to 1.25rem (the prototype's 20px) rather than 0.75rem, so
    every descendant now sits at the prototype's own inset rather than the
    card's borrowed one — see `.gn-workspace-card__door`'s own comment below
-   for the asymmetry. `--gn-surface-sunken` on hover is the same role
-   `.gn-table__row--clickable` already uses for exactly this; the focus ring
-   is `.gn-button`'s own `--gn-focus-ring` pair. */
+   for the asymmetry. The focus ring is `.gn-button`'s own `--gn-focus-ring`
+   pair. (Hover used to be `--gn-surface-sunken`, the same role
+   `.gn-table__row--clickable` uses for exactly this — round 2 replaced it
+   with a brightness filter; see the comment on that rule below for why.) */
 .gn-workspace-card__door {
   display: flex;
   flex-direction: column;
@@ -346,7 +376,62 @@ input, textarea, select { font-family: inherit; }
   margin: -0.75rem;
   padding: 1.25rem;
 }
-.gn-workspace-card__door:hover { background: var(--gn-surface-sunken); }
+/* Round 2 owner correction, REPLACING the `background: var(--gn-surface-
+   sunken)` hover this used to carry. Under `neo` — the shipped default —
+   `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex (see
+   `tokens.ts`), so that swap traded a colour for an identical colour and
+   rendered NOTHING: measured, not assumed, by reading the three neo values
+   side by side. The prototype's own hover treatment is not a background
+   swap at all — its card is a `<button>`, and the only rule it carries is a
+   brightness `filter` (`desktop.dc.html:85-86`), asymmetric on purpose:
+   light gets DARKER (0.97), dark gets LIGHTER (1.18). Owner ruling: match
+   both numbers and both directions exactly, not a normalised "always
+   darken" or "always lighten".
+
+   WHERE THE FILTER GOES, and why not on `.gn-workspace-card__door` itself.
+   In the prototype the card IS the button, so `background` and `filter`
+   live on one element. Here they are split: `.gn-card` (`packages/ui/src/
+   ui.css`) paints the card's actual background, and `.gn-workspace-card__
+   door` is a `<Link>` nested inside it (`app/workspaces/page.tsx`). A
+   `filter` on the door would filter only the door's own painted box — which
+   has no background of its own, `.gn-card` supplies it — and leave the
+   card's real background untouched: a half-applied effect, visible as
+   nothing happening, same failure mode as the swap this replaces. `filter`
+   has to sit on `.gn-card`, the element that actually paints the surface
+   this is meant to brighten/darken.
+
+   `.gn-card:has(> .gn-workspace-card__door:hover)` reaches it WITHOUT the
+   `.gn-workspace-list .gn-card` descendant selector `neo-card-radius.test.ts`
+   (case 13.355) forbids: `:has()` is scoped by the child class already
+   unique to this component (`.gn-workspace-card__door` renders nowhere
+   else), so no `.gn-workspace-list` ancestor qualifier is needed at all —
+   this selector does not contain that banned text in any form, checked with
+   `grep -n "gn-workspace-list .gn-card"` after writing it. `:focus-visible`
+   is UNCHANGED below: it is a separate rule, on the door, and this edit
+   does not touch it.
+
+   Three declarations, not two, because "system" (the default theme choice,
+   `theme-toggle.tsx`) tracks OS preference at runtime with no `data-theme`
+   attribute present at all — a rule keyed only to `[data-theme="dark"]`
+   would silently give System-dark users the light (darkening) filter. The
+   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) …`
+   arm is the same OS-preference pattern `tokens.ts`'s `themeStylesheet()`
+   already uses for the token stylesheet itself, reused here for parity
+   rather than invented fresh. `filter` creates a containing block and a new
+   stacking context on `.gn-card`, but only for that element's own
+   descendants — `.gn-workspace-card__door`'s focus outline and `.gn-card`'s
+   own `box-shadow` (`ui.css`) both stay attached to boxes already inside
+   that same element, so neither is clipped or displaced; verified in a real
+   browser, not assumed (see the round-2 report). */
+.gn-card:has(> .gn-workspace-card__door:hover) { filter: brightness(0.97); }
+[data-theme="dark"] .gn-card:has(> .gn-workspace-card__door:hover) {
+  filter: brightness(1.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gn-card:has(> .gn-workspace-card__door:hover) {
+    filter: brightness(1.18);
+  }
+}
 .gn-workspace-card__door:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
