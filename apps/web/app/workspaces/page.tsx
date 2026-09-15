@@ -467,64 +467,84 @@ function InvitationBanner() {
 
   return (
     <section className="gn-invitations" aria-labelledby="gn-invitations-heading">
-      <h2 className="gn-invitations__heading" id="gn-invitations-heading">
-        {invitations.length === 1
-          ? 'One invitation is waiting'
-          : `${invitations.length} invitations are waiting`}
-      </h2>
-      <ul className="gn-invitations__list">
-        {invitations.map((invitation) => {
-          const workspace = named(invitation.workspaceName) ?? 'a workspace that has not been named yet';
-          const inviter = named(invitation.invitedByName) ?? 'Someone';
-          return (
-            <li
-              key={invitation.inviteId}
-              className="gn-invitations__item"
-              data-testid={`invitation-${invitation.inviteId}`}
-            >
-              <p className="gn-invitations__offer">
-                {`${inviter} invited you to ${workspace} ${ROLE_SENTENCE[invitation.role]}.`}
-              </p>
-              {/* ONE interpolation, not three. React renders each JSX
-                  interpolation as its own text node, so a sentence assembled
-                  out of them is split in the accessibility tree and in every
-                  `getByText` that looks for it — the failure that caught this
-                  the first time it was written. */}
-              <p className="gn-invitations__when">
-                {`Invited ${onDay(invitation.invitedAt)} · lapses ${onDay(invitation.expiresAt)}`}
-              </p>
-              <div className="gn-invitations__actions">
-                {/* The accessible names carry the workspace, so two waiting
-                    invitations do not present two identically-named buttons —
-                    the accessible-name floor this shell ratchets is about
-                    exactly that. */}
-                <Button
-                  variant="primary"
-                  type="button"
-                  disabled={busy !== null}
-                  aria-label={`Accept the invitation to ${workspace}`}
-                  onClick={() => act(invitation, 'accept')}
-                >
-                  Accept
-                </Button>
-                <Button
-                  type="button"
-                  disabled={busy !== null}
-                  aria-label={`Decline the invitation to ${workspace}`}
-                  onClick={() => act(invitation, 'decline')}
-                >
-                  Decline
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {refusal !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--server">
-          {refusal}
-        </p>
-      ) : null}
+      {/* Decorative: the heading already says an invitation is waiting, so an
+          accessible name here would be the same sentence read twice. */}
+      <svg
+        className="gn-invitations__icon"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v5" />
+        <path d="M12 16h.01" />
+      </svg>
+      <div className="gn-invitations__body">
+        <h2 className="gn-invitations__heading" id="gn-invitations-heading">
+          {invitations.length === 1
+            ? 'One invitation is waiting'
+            : `${invitations.length} invitations are waiting`}
+        </h2>
+        <ul className="gn-invitations__list">
+          {invitations.map((invitation) => {
+            const workspace = named(invitation.workspaceName) ?? 'a workspace that has not been named yet';
+            const inviter = named(invitation.invitedByName) ?? 'Someone';
+            return (
+              <li
+                key={invitation.inviteId}
+                className="gn-invitations__item"
+                data-testid={`invitation-${invitation.inviteId}`}
+              >
+                <p className="gn-invitations__offer">
+                  {`${inviter} invited you to ${workspace} ${ROLE_SENTENCE[invitation.role]}.`}
+                </p>
+                {/* ONE interpolation, not three. React renders each JSX
+                    interpolation as its own text node, so a sentence assembled
+                    out of them is split in the accessibility tree and in every
+                    `getByText` that looks for it — the failure that caught this
+                    the first time it was written. */}
+                <p className="gn-invitations__when">
+                  {`Invited ${onDay(invitation.invitedAt)} · lapses ${onDay(invitation.expiresAt)}`}
+                </p>
+                <div className="gn-invitations__actions">
+                  {/* The accessible names carry the workspace, so two waiting
+                      invitations do not present two identically-named buttons —
+                      the accessible-name floor this shell ratchets is about
+                      exactly that. */}
+                  <Button
+                    variant="primary"
+                    type="button"
+                    disabled={busy !== null}
+                    aria-label={`Accept the invitation to ${workspace}`}
+                    onClick={() => act(invitation, 'accept')}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={busy !== null}
+                    aria-label={`Decline the invitation to ${workspace}`}
+                    onClick={() => act(invitation, 'decline')}
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {refusal !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {refusal}
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }

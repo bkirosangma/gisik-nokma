@@ -961,33 +961,65 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-project-founding__field { flex: 1; min-width: 13.75rem; }
 
-/* Task 17 — the invitations banner. Same surface treatment as the two
-   founding forms above (`.gn-project-founding` in particular): it sits BESIDE
-   the list rather than inside a card, so it carries its own surface, and fill
-   plus spacing separate it rather than a border (R1(c)). Every value is a
-   token role or a rem — `--gn-radius-card` and `--gn-shadow-raised` are the
-   SAME roles `.gn-card` uses, so under `neo` this panel reads as a raised
-   surface exactly like the cards beside it instead of a flatter outlier. The
-   one thing it does NOT share with them is the accent edge: an invitation is
-   the only thing on this page addressed to the person personally, and the
-   edge is what says so without a second heading level. */
+/* Task 8 (workspaces-prototype-port, 2026-09-15) — the invitations banner
+   becomes a flat warning wash, not a card you could open. The prototype
+   fills this banner with a warning tint and gives it neither a shadow nor an
+   edge (`design-system/interactive/desktop.dc.html:208`). Task 17's original
+   treatment borrowed the raised-card surface (`--gn-surface-raised` /
+   `--gn-shadow-raised`, the same roles `.gn-card` uses) plus an accent
+   inline-start rule; both are gone. `--gn-tint-warning` is the fill — an
+   ALPHA role measured as a COMPOSITE over `surface` (see
+   `packages/ui/test/tokens.test.ts`'s `tintWarning` block), which holds only
+   because this banner sits at page level, not inside a card or other raised
+   surface. `.gn-invitations__body` groups the heading/list/actions so the
+   decorative icon can sit beside them as a flex sibling. */
 .gn-invitations {
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 1.1rem;
-  padding: 1rem;
-  background: var(--gn-surface-raised);
+  gap: 1rem;
+  align-items: flex-start;
+  margin-top: 2.125rem;
+  padding: 1.25rem;
+  background: var(--gn-tint-warning);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
-  border-inline-start: 0.25rem solid var(--gn-text-accent);
 }
-.gn-invitations__heading { margin: 0; }
+
+.gn-invitations__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* `color`, not `background` — this is the icon's STROKE (the svg carries
+   `stroke="currentColor"`), a saturated hue meant for a 22px glyph, not a
+   surface fill. */
+.gn-invitations__icon {
+  flex: none;
+  color: var(--gn-warning);
+}
+
+.gn-invitations__heading {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  font-weight: 600;
+}
 .gn-invitations__list { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
 .gn-invitations__item { display: flex; flex-direction: column; gap: 0.35rem; }
-.gn-invitations__offer { margin: 0; }
-.gn-invitations__when { margin: 0; font-size: 0.8rem; color: var(--gn-text-muted); }
-.gn-invitations__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.15rem; }
+
+.gn-invitations__offer,
+.gn-invitations__when {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-invitations__actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.625rem;
+  flex-wrap: wrap;
+}
 /* The failed-read line, which is NOT a refusal panel: this read is a small
    extra on a page whose main job is the list and the founding form, so its
    failure must not look like the page refusing. Muted, one line, no surface. */
