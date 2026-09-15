@@ -34,4 +34,17 @@ describe('SessionsSection', () => {
     await user.click(screen.getByRole('button', { name: /sign out/i }));
     expect(onRevoke).toHaveBeenCalledWith('t2');
   });
+
+  it('"Last active" goes through formatDateTime, never the raw ISO string', () => {
+    // Pins the clock rule Features.md states for every other date on this
+    // shell (formatIstInstant, never an ISO slice): '2026-09-10T00:00:00Z' is
+    // NOT what should reach the screen, and this is the one place that raw
+    // value would otherwise leak through unnoticed — no other case in this
+    // file reads the "Last active" text at all. Expected string confirmed by
+    // running `formatDateTime('2026-09-10T00:00:00Z')` directly rather than
+    // computed by hand.
+    render(<SessionsSection sessions={SESSIONS} onRevoke={vi.fn()} />);
+    expect(screen.getByText('Last active 10 Sep 2026, 05:30 IST')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-09-10T00:00:00Z/)).not.toBeInTheDocument();
+  });
 });
