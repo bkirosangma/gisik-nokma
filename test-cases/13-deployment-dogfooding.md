@@ -3783,7 +3783,11 @@ caught by something other than the literal expected in the case itself, which wa
 the four targets happen to coincide with routes 13.392 does check, so the real gap is narrow — but the
 claim was wrong about this case, and a wrong claim about coverage is worse than no claim.
 
-**RULED AND CLOSED, 2026-09-16 — "once inside a workspace, the board nav bar item should be always
+**SUPERSEDED THE SAME DAY BY ROUND 23 — read that section first: the Board item is GONE, not merely
+conditional.** What follows is the Round 22 ruling as taken, kept because its reasoning is what rules
+out the implementation somebody will otherwise reach for.
+
+**RULED, 2026-09-16 — "once inside a workspace, the board nav bar item should be always
 visible" is NOT adopted; Board stays conditional on a project being in the route.** The owner was given
 the three options below and chose to leave the behaviour as it is, so `app-nav.tsx` is unchanged by this
 round and the prototype's `navDef` divergence on Board is now a DECIDED difference rather than an
@@ -3807,3 +3811,41 @@ which is a state model this product does not have. The two alternatives put to t
 shape this repo has ruled against twice). **Both were declined in favour of the current behaviour: the
 nav does not offer a link that cannot resolve, which is the prototype's own stated filter rule, and
 that rule wins over its Board row's particular placement.**
+
+### Round 23 — the Board nav item is removed
+
+**No new ids: the next free BLOCK is still `13.416`.** Owner, hours after the Round 22 ruling above:
+"the board on the nav bar doesn't work. lets remove it." It is gone, along with `AppNav`'s `projectId`
+prop, whose only consumer it was.
+
+**It could not have worked, and that is the finding worth keeping.** Round 22 asked the narrower
+question — should the item be visible without a project — and answering "leave it conditional" left in
+place something nobody had stated plainly: this product has one board per PROJECT, so Board's only
+possible target was `/w/<id>/p/<pid>`, so it could render only when the route already carried a
+project, which is exactly when the reader is already standing on that board. **The item was a link to
+the current page in every state it could reach, and `aria-current` resolved to `"page"` every time it
+appeared.** No regression made it useless; it had no useful state. The Round 22 options remain the only
+ways it could return, and both still need a decision nobody has taken.
+
+Three cases moved, none minted:
+
+- **11.185** ✅ Its third arm — "WITH a workspace AND a project" — **kept, with its job changed**: it
+  used to prove a project in the route ADDS Board, and now proves a project in the route adds NOTHING.
+  Its expected array is now deliberately identical to the second arm's, because the two nav shapes have
+  collapsed into one. That is not a redundant arm: the nav still reads `usePathname()`, so a board route
+  remains a distinct input, and a future project-conditional link would redden this arm while leaving
+  the second green — which is what would name the fault. Two explicit negatives were added beside the
+  array (`not.toContain('/w/ws_1/p/p_1')`, and no link named `Board`) so a failure says what came back
+  rather than only that an array grew. The arm's own docblock, which used to describe the Board mutation
+  witness, was rewritten rather than left describing a link that no longer exists.
+- **13.392** ✅ `/w/ws_1/p/p_1` left the route table. The case checks routes the nav RENDERS, and the
+  board route is no longer one — it still exists and is still reached from the workspace home's project
+  cards. The table is bidirectional (rendered hrefs are subtracted from it), so a stale row would have
+  failed loudly as "nav does not render it" rather than rotting quietly.
+- **13.391** ✅ Untouched and still green, but **re-verified rather than assumed**: its scope note says
+  "pick one to reach its board, members and settings", and this round removed the bar's only Board link.
+  The sentence describes what picking a workspace GETS you, not what the bar renders — a board is one
+  click from the workspace home's project grid — so it stays true. It would become false only if boards
+  stopped being reachable from a workspace at all. This was checked because the case was made green one
+  round earlier on precisely that sentence's accuracy, and a claim that was true when written is exactly
+  the kind that goes stale without anyone looking.

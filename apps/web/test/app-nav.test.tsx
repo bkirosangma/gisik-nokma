@@ -195,17 +195,27 @@ describe('AppNav — the mounts, not the components', () => {
     });
 
     /**
-     * The Board mutation witness (case 13.391's own words): mutating the
-     * filter that reads `projectId !== undefined` to drop that condition —
-     * so Board renders for any workspace, project or not — reddens THIS arm
-     * alone, because it is the only one of the three whose expected set has
-     * no Board entry at all while a workspace and no project are both true.
+     * **This arm survives the removal of Board (Round 23) and its job changed**
+     * — it used to prove a project in the route ADDS the Board item; it now
+     * proves a project in the route adds NOTHING.
+     *
+     * Keeping it is not ceremony. The nav still reads `usePathname()`, so a
+     * board route is a distinct input to this component, and "no project-scoped
+     * item sneaks back in" is exactly the regression the Board removal makes
+     * possible. The expected array is deliberately identical to the arm above:
+     * the two shapes have collapsed into one, and a future change that
+     * re-introduces a project-conditional link reddens this arm while leaving
+     * that one green, which is what names the fault.
+     *
+     * `projectId` is no longer passed because the prop no longer exists — Board
+     * was its only consumer. The project is expressed by `currentPath` alone,
+     * which is all the component ever reads it from now.
      */
-    it('WITH a workspace AND a project: Board joins too, pointed at that project', async () => {
+    it('WITH a workspace AND a project in the route: the set is UNCHANGED, no Board', async () => {
       currentPath = '/w/ws_1/p/p_1';
       render(
         <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
-          <AppNav workspaceId="ws_1" projectId="p_1" />
+          <AppNav workspaceId="ws_1" />
         </Providers>,
       );
       await screen.findByRole('link', { name: 'Convenience Corner' });
@@ -213,7 +223,6 @@ describe('AppNav — the mounts, not the components', () => {
       expect(hrefs).toEqual([
         '/workspaces',
         '/w/ws_1',
-        '/w/ws_1/p/p_1',
         '/w/ws_1/my-work',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
@@ -221,6 +230,10 @@ describe('AppNav — the mounts, not the components', () => {
         '/help',
         '/account',
       ]);
+      // Named, so the failure says what came back rather than only that an
+      // array grew: nothing points at the board this route is showing.
+      expect(hrefs).not.toContain('/w/ws_1/p/p_1');
+      expect(screen.queryByRole('link', { name: 'Board' })).toBeNull();
     });
   });
 });
@@ -367,7 +380,12 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
   const ROUTES: Array<[string, string]> = [
     ['/workspaces', 'app/workspaces/page.tsx'],
     ['/w/ws_1', 'app/w/[workspaceId]/page.tsx'],
-    ['/w/ws_1/p/p_1', 'app/w/[workspaceId]/p/[projectId]/page.tsx'],
+    // `/w/ws_1/p/p_1` left this table in Round 23 with the Board item. This
+    // case checks the routes the nav RENDERS; the board route still exists and
+    // is still reached from the workspace home's project cards, it is simply
+    // not a nav target any more. The loop below subtracts rendered hrefs from
+    // this table, so a stale row here would fail as "nav does not render it"
+    // rather than sitting unnoticed.
     ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
     ['/w/ws_1/members', 'app/w/[workspaceId]/members/page.tsx'],
@@ -380,7 +398,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     currentPath = '/w/ws_1/p/p_1';
     render(
       <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
-        <AppNav workspaceId="ws_1" projectId="p_1" />
+        <AppNav workspaceId="ws_1" />
       </Providers>,
     );
     await screen.findByRole('link', { name: 'Convenience Corner' });

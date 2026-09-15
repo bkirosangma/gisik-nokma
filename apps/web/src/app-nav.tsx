@@ -19,12 +19,37 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * Help, Account) plus a scope note. With one, the workspace's own served name,
  * My Work, Members and Settings join them.
  *
- * **`projectId` is a second, narrower scope this product has and the prototype
- * does not: one board per PROJECT, not one per workspace.** The prototype's
- * `always` filter — a link appears only when its target exists — is applied
- * one level down for Board: it renders only when the route carries a project
- * (`/w/[workspaceId]/p/[projectId]/**`), and points at that project's board.
- * A workspace with no project in scope has no true Board target.
+ * ## There is NO Board item, and the `projectId` prop went with it (Round 23,
+ * ## owner: "the board on the nav bar doesn't work. lets remove it")
+ *
+ * **It could not have worked, and the shape is worth keeping on record because
+ * the prototype will keep suggesting it.** This product has one board per
+ * PROJECT, not one per workspace, so Board's only possible target was
+ * `/w/<id>/p/<pid>` — which meant it could render only when the route already
+ * carried a project. That is precisely when you are already standing on that
+ * board. The item was therefore a link to the current page, and never anything
+ * else: `aria-current` resolved to `"page"` every single time it appeared. It
+ * was not broken by a regression; it had no reachable state in which it was
+ * useful.
+ *
+ * The day before, the owner was asked whether to make it unconditional and
+ * declined (`test-cases/13`, Round 22), keeping "the nav does not offer a link
+ * that cannot resolve". Removing it is that same rule applied once more: an
+ * item that resolves only to where you are is not a destination. The two
+ * options declined then — a `/w/<id>/board` picker route, or pointing Board at
+ * `/w/<id>` — remain the only ways it could come back, and both need a decision
+ * this round did not take.
+ *
+ * `projectId` was this component's ONLY use for that prop, so it is gone from
+ * the signature rather than left as a parameter nothing reads; the board page
+ * (its one caller) stopped passing it in the same change.
+ *
+ * **The scope note below still says "pick one to reach its board, members and
+ * settings", and that is still TRUE** — checked rather than assumed, because
+ * case 13.391 was made green last round on exactly that sentence's accuracy.
+ * It describes what picking a workspace gets you, not what this bar renders: a
+ * board is one click from the workspace home's project grid. Members and
+ * Settings happen to also be nav items; a board never was.
  *
  * ## Settings REJOINED the workspace-scoped group (Round 21, owner: "move back
  * ## the nav bar settings to only be visible once a workspace is opened")
@@ -69,13 +94,7 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * a position change only, and it puts the three person-scoped destinations
  * (Inbox, Help, Account) together at the bar's end.
  */
-export function AppNav({
-  workspaceId,
-  projectId,
-}: {
-  workspaceId?: string;
-  projectId?: string;
-}) {
+export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useCurrentUser();
@@ -110,15 +129,9 @@ export function AppNav({
             {workspaceName}
           </Link>
         ) : null}
-        {/* Board: only with a PROJECT in the route (see the docblock above). */}
-        {!noWorkspace && projectId !== undefined ? (
-          <Link
-            href={`/w/${workspaceId}/p/${projectId}`}
-            aria-current={current(`/w/${workspaceId}/p/${projectId}`)}
-          >
-            Board
-          </Link>
-        ) : null}
+        {/* NO Board item (Round 23, owner: "the board on the nav bar doesn't
+            work. lets remove it"). See the docblock above for why it could
+            never have worked. */}
         {!noWorkspace ? (
           <Link
             href={`/w/${workspaceId}/my-work`}
@@ -187,12 +200,18 @@ export function AppNav({
             named "settings" as workspace-scoped while the bar plainly showed a
             Settings link, so it was FALSE and commenting it out was right. The
             same ruling that put Settings back behind a workspace makes it true
-            again, so it renders again. All three nouns are verified against the
-            code above rather than assumed: Board needs `projectId`, Members
-            needs `!noWorkspace`, and Settings needs `!noWorkspace` as of this
-            round. Case 13.391 has been red since `762b1c8d`; it goes green here
-            because the claim it asserts became true, not because the assertion
-            was relaxed to fit the code. */}
+            again, so it renders again. Members and Settings are verified against
+            the code above rather than assumed: both need `!noWorkspace`. Case
+            13.391 had been red since `762b1c8d`; it went green there because the
+            claim it asserts became true, not because the assertion was relaxed
+            to fit the code.
+
+            "its board" is the one noun this bar does NOT render a link for, and
+            it was re-checked when Board was removed in Round 23 rather than left
+            to drift: the sentence describes what picking a workspace gets you,
+            and a board is one click from the workspace home's project grid. It
+            would only become false if boards stopped being reachable from a
+            workspace at all. */}
         {noWorkspace ? (
           <span className="gn-nav__scope">
             No workspace selected — pick one to reach its board, members and settings.

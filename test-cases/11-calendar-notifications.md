@@ -220,8 +220,21 @@ it stayed in `apps/web` when the gateway left.*
   eight links, unchanged in count. With one AND a project: Board joins too — nine, unchanged in count.
   **Two of the three arms would have stayed green on the Inbox move alone had they been unordered
   sets**, which is why they are asserted in order; the adjacency itself is pinned separately by 13.414,
-  because an ordered whole-array assertion still passes if Inbox and Help move together within it. —
-  (`app-nav.test.tsx`)
+  because an ordered whole-array assertion still passes if Inbox and Help move together within it.
+  **AMENDED AGAIN 2026-09-16 (Round 23, owner: "the board on the nav bar doesn't work. lets remove
+  it"): there are now TWO nav shapes, not three, and the third arm proves it.** Board is gone — it could
+  only ever render when the route already carried a project, which is exactly when the reader was
+  already standing on that board, so it was a link to the current page in every state it could reach.
+  `AppNav`'s `projectId` prop went with it, Board being its only consumer, so the third arm expresses
+  "a project is in the route" through `currentPath` alone. **The arm is KEPT rather than deleted, and
+  its job is now the inverse of what it was:** it used to prove a project ADDS Board, and now proves a
+  project adds NOTHING, with an expected array deliberately identical to the second arm's. That is not
+  a redundant duplicate — the nav still reads `usePathname()`, so a board route remains a distinct
+  input, and a future project-conditional link would redden this arm while leaving the second green,
+  which is what names the fault. Two explicit negatives sit beside the array (nothing points at
+  `/w/ws_1/p/p_1`; no link is named `Board`) so a failure says what came back rather than only that an
+  array grew. The shapes are now: without a workspace, four links; with one, eight; with one AND a
+  project, the same eight. — (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
 - **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the

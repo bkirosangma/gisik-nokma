@@ -446,7 +446,10 @@ function ProjectBoard() {
 
   return (
     <main className="gn-shell">
-      <AppNav workspaceId={workspaceId} projectId={projectId} />
+      {/* No `projectId`: the nav's Board item was removed in Round 23 and that
+          prop was its only consumer, so passing it would be feeding a parameter
+          nothing reads. */}
+      <AppNav workspaceId={workspaceId} />
       <div className="gn-shell__main">
         {expired ? (
           // ONE notice for the page. Four reads can 401 together and they are one
