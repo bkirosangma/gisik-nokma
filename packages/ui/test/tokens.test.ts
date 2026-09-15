@@ -258,6 +258,20 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toContain('2px 2px 4px');
     expect(shadowValueOf('neo', 'light', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'light', 'sunken'));
     expect(shadowValueOf('neo', 'dark', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'dark', 'sunken'));
+    // Pinned full values, not just shape: the `toContain` checks above would
+    // stay green even if a future edit swapped in the WRONG reused primitive
+    // (e.g. `shadowNeoSunkenDarkLight` for `shadowNeoRaisedDarkLight`) —
+    // still inset, still 2px/2px/4px, still a different string than
+    // `sunken`, but the wrong rendered colour. These two lock the exact
+    // layer colours the prototype's `--chipShadow` measures to (see
+    // `shadowNeoSunkenCompactDarkDark`'s docblock in tokens.ts for the
+    // rgba→hex arithmetic).
+    expect(shadowValueOf('neo', 'light', 'sunken-compact')).toBe(
+      'inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2',
+    );
+    expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toBe(
+      'inset 2px 2px 4px #0000008c, inset -2px -2px 4px #ffffff0d',
+    );
   });
 
   /**
