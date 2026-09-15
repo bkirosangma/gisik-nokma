@@ -1932,6 +1932,19 @@ the gate would have stayed 33/33.*
   `sweepAccessibleNames` tracks; its accessible name comes from text content and its role is
   implicit from the tag. 13.285 is inert against the loss of a whole unlabelled button — a real
   gap in that guard, reported rather than papered over. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+> **13.292 AMENDED AGAIN, 2026-09-15 (final whole-branch review of the account/help-screens plan, fix
+> wave item 1).** The "count 0 ... for the passkey button" sentence above described the case as it
+> stood *before* Task 8: registration now exists on `/account`, so the passkey button is no longer one
+> of the two methods "that could not work". The case's own code kept asserting `toHaveCount(0)` for it
+> anyway — a stale assertion Task 8's own audit had already found and fixed once, in the identical
+> shape, in `apps/web/e2e/smoke.spec.ts`; this file just sat outside that audit's `apps/web/e2e/` grep
+> scope. Deterministic red, not gated by CI (this suite isn't in the turbo gate), caught only by this
+> review. Fixed to `toBeVisible()`: the passkey button is not gated on `/v1/auth/methods` the way
+> Google/Apple are (it needs no provider), so it is the one control that survives the all-refused
+> answer this case drives — the honest expectation is now Google absent, Apple absent, the passkey
+> button visible, and no `.gn-sign-in__marks` row.
+
 - **13.293** ✅ The adopted helper text ("It expires in 15 minutes.") renders on the Email method
   only, not on Phone. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 - **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method

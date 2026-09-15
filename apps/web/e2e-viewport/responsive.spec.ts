@@ -1051,6 +1051,19 @@ for (const route of UNAUTHED_ROUTES) {
        * credentials, so the honest expectation here is ZERO social buttons — the
        * dev stack's real state, asserted rather than worked around.
        *
+       * **The passkey half of that history ENDED with the account/help-screens
+       * plan's Task 8**, which built registration on `/account` — so the button
+       * is back, it is asserted VISIBLE below (not absent), and it is
+       * deliberately grouped with the social-absence assertions only because they
+       * share one page load, not because passkey is gated the same way: a
+       * passkey needs no provider and no server capability check, so unlike
+       * Google/Apple it does not disappear when `/v1/auth/methods` answers all
+       * false. **The final whole-branch review found this case still asserted
+       * `toHaveCount(0)` for the passkey button** — the identical defect already
+       * found and fixed once in `apps/web/e2e/smoke.spec.ts` (see that file's own
+       * docblock for the same fix, applied here), just in a sibling directory
+       * that audit's grep scope could not reach.
+       *
        * The both-directions half of this property lives in
        * `apps/web/test/sign-in.test.tsx` (13.326), where the server's answer can
        * be driven to `true`. A viewport suite cannot set the server's env, so
@@ -1125,7 +1138,22 @@ for (const route of UNAUTHED_ROUTES) {
 
       await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
+      /* Final whole-branch review (C1) — THE SAME TRAP AS 13.292's OWN HISTORY,
+       * sprung a second time in this file: this line read
+       * `…'Sign in with a passkey' }).toHaveCount(0)` until the account/
+       * help-screens plan's Task 8 put the button back (registration now exists
+       * on `/account`), which made this assertion flatly false the moment that
+       * commit landed — this suite is not in the turbo gate, so nothing reddened
+       * for it. `apps/web/e2e/smoke.spec.ts` hit the identical defect and was
+       * already fixed; this file just sat outside that fix's grep scope
+       * (`apps/web/e2e/`, not `apps/web/e2e-viewport/`). The assertion below is
+       * the sharpest one this block can make: with the server answering
+       * `{google:false, apple:false, phone:false}`, every method GATED on that
+       * answer (Google, Apple, the social marks row) is asserted absent above,
+       * and the passkey button surviving that same all-refused answer is the
+       * whole property — a passkey needs no provider and no server capability
+       * check, so it is deliberately NOT gated on `/v1/auth/methods`. */
+      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
       await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
       await page.unroute('**/v1/auth/methods');
 

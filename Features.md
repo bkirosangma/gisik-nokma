@@ -138,8 +138,13 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
   negative control (an invented member, which failed `TS2339`) is what rules out the vacuous reading
   that the surface is `any`. **Unlike every other section on this page, a refusal here is NOT silent
   and NOT collapsed:** a refused add or remove renders better-auth's own message verbatim in a
-  `role="alert"` (the shared `.gn-shell__refusal`, as Profile's save refusal does), and a refusal that
-  carries NO message still surfaces, because `error?.message ?? null` would read a message-less
+  `role="alert"` (`gn-refusal gn-refusal--server` — **corrected by the final whole-branch review**:
+  this used to be the same `.gn-shell__refusal` class Profile's save refusal uses, copied forward from
+  Task 3's ruling without noticing `PasskeysSection` lives in `@gisik-nokma/app-core`, not `apps/web`,
+  and `.gn-shell__refusal` is defined only in `apps/web/app/globals.css` — invisible on `apps/desktop`,
+  which never loads that stylesheet. `gn-refusal`/`gn-refusal--server` is the real, visually identical
+  app-core-level equivalent, already used the same way by three other app-core views), and a refusal
+  that carries NO message still surfaces, because `error?.message ?? null` would read a message-less
   refusal as success and a silent no-op after somebody touched a fingerprint sensor is
   indistinguishable from the passkey having been saved. Only the passive list read keeps the
   silent-omission treatment its three siblings have. **The passkey list is also the one mount-time
@@ -162,7 +167,23 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
   specifically about an ANONYMOUS `/sign-in` PAGE LOAD, which still charges ZERO — measured in a real
   browser as one `GET /v1/auth/methods`, a `/v1/*` route the limiter never charges, and nothing under
   `/api/auth/*`. Every figure above is a deliberate action by a signed-in person; the remedy if it ever
-  bites is an operator raising `RATE_LIMIT_AUTH_MAX`. `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
+  bites is an operator raising `RATE_LIMIT_AUTH_MAX`. **A cumulative named absence, disclosed by the
+  final whole-branch review rather than by any one task above:** the whole page renders with no CSS
+  styling of its own. Every one of the CSS classes the five sections above emit —
+  `gn-account__section`/`gn-account__section-title`, `gn-account__appearance`, `gn-account__profile`/
+  `gn-account__readonly`, `gn-account__workspaces`/`gn-account__workspace-row`/-`name`/-`role`/-`count`,
+  `gn-account__notifications`/`gn-account__notification-row`, and `gn-account__sessions`/
+  `gn-account__session-row`, `gn-account__passkeys`/`gn-account__passkey-row` — carries zero rules
+  anywhere in the codebase. The one exception is a single pre-existing rule, `.gn-account ul`
+  (`apps/web/app/globals.css:157`), which happens to apply list spacing to the three `<ul>` elements
+  this page renders (`gn-account__workspace-list`, `gn-account__session-list`,
+  `gn-account__passkey-list`) — everything else, including every section wrapper, heading, row and
+  field, is unstyled plain text and default browser control chrome. Each of Tasks 2–8 individually and
+  correctly deferred its own section's styling as out of scope; nothing before this review stated the
+  cumulative fact that the sum of five individually-reasonable deferrals is a page with no styling at
+  all. Not fixed here — styling sixteen-odd classes across five sections is real design work, out of
+  scope for this fix wave; disclosed here so it is a named absence rather than a silent one.
+  `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
   `apps/web/src/account/workspaces-section.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
   `packages/app-core/src/account/notification-preferences-gateway.ts`,
   `packages/app-core/src/online/notification-preferences.ts`, `apps/web/src/providers.tsx`,

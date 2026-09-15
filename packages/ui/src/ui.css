@@ -1626,11 +1626,32 @@
   font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
   border-radius: calc(var(--gn-radius-control) - 0.2rem);
 }
-.gn-help__tab:hover { background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-sunken); }
-/* The selected document is marked by a raised SHADOW as well as background: colour alone is not an indicator, and `aria-pressed` carries it to assistive tech. */
+/* Final whole-branch review (I2): under `hig` and `minimal`, `--gn-shadow-sunken`
+   resolves to `none` (`tokens.ts`'s `SHADOWS` table — only `neo` has a real
+   sunken shadow), so a hover cue that was ONLY a shadow was a no-op in 4 of 6
+   style×theme combinations, and the background value below used to equal the
+   resting tab's own background, compounding it. `--gn-fill-secondary` is a
+   real, distinct token in every style (a translucent fill over the surface,
+   never `none` — the same token `.gn-refusal` uses), so this is a genuine
+   background-colour change everywhere; the sunken shadow layers on top as a
+   bonus cue where the style has a real one (neo). */
+.gn-help__tab:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
+/* Final whole-branch review (I2): the selected tab used to be marked by a
+   raised shadow plus a background identical to the RESTING tab's own
+   `--gn-surface-raised` — under `minimal`, `--gn-shadow-raised` is ALSO
+   `none` (both shadow roles are `none` under `minimal` by design), so nothing
+   but `font-weight` distinguished selected from resting, and nothing but
+   `font-weight` distinguished selected from hovered either. `--gn-text-accent`
+   is a real, distinct colour token in every style×theme (the same accent-hued
+   text role `.gn-help__result-title`/`.gn-help__toc-link` already use on a
+   neutral surface), so colour + weight now carry the distinction under EVERY
+   combination; the raised shadow layers on top where the style has a real one
+   (hig, neo). `aria-pressed` still carries the same fact to assistive tech
+   regardless of what renders. */
 .gn-help__tab[aria-pressed='true'] {
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-accent);
   font-weight: 600;
 }
 

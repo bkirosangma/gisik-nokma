@@ -30,13 +30,24 @@ export type PasskeysSectionProps = {
  * a row that reads "Delete passkey MacBook Touch ID" beside the words "MacBook
  * Touch ID" says the name twice.
  *
- * ## The refusal uses `.gn-shell__refusal`, an EXISTING rule
+ * ## The refusal uses `gn-refusal gn-refusal--server`, an EXISTING rule —
+ * REVISED, and the revision is the finding
  *
- * `apps/web/app/globals.css:669` — the same class `sign-in/page.tsx:426` and
- * `src/account/profile-section.tsx` already use for their own refusal alerts.
- * Not an invented `gn-account__error`: a class that looks real and matches no
- * rule renders an unstyled paragraph that reads as ordinary copy rather than
- * as a refusal.
+ * The final whole-branch review caught this: it previously used
+ * `.gn-shell__refusal` (`apps/web/app/globals.css:669`, the same class
+ * `sign-in/page.tsx:426` and `src/account/profile-section.tsx` use), copied
+ * forward from Task 3's ruling for its OWN `apps/web`-only file without
+ * noticing this component lives in `@gisik-nokma/app-core` — the package
+ * whose entire point is cross-app reuse (web AND desktop). `apps/desktop`
+ * never loads `globals.css`, so a passkey refusal there rendered as plain
+ * unstyled text. `gn-refusal`/`gn-refusal--server` (`packages/ui/src/ui.css`,
+ * near `.gn-transition__notice`) is the real app-core-level equivalent —
+ * visually identical (`background: var(--gn-fill-secondary); box-shadow:
+ * inset 4px 0 0 var(--gn-danger)`) and already used the same way by
+ * `transition-dialog.tsx`, `create-ticket-flow.tsx` and `reopen-dialog.tsx`
+ * in this same package. Not an invented `gn-account__error` either: a class
+ * that looks real and matches no rule renders an unstyled paragraph that
+ * reads as ordinary copy rather than as a refusal.
  *
  * Otherwise unstyled by the same DISCLOSED convention `ProfileSection`,
  * `WorkspacesSection` and `SessionsSection` already establish on this page:
@@ -65,7 +76,7 @@ export function PasskeysSection({ passkeys, onAdd, onRemove, error = null }: Pas
     <section className="gn-account__section gn-account__passkeys">
       <h2 className="gn-account__section-title">Passkeys</h2>
       {error !== null ? (
-        <p role="alert" className="gn-shell__refusal">
+        <p role="alert" className="gn-refusal gn-refusal--server">
           {error}
         </p>
       ) : null}
