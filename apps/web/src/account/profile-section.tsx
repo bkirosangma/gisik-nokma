@@ -51,7 +51,7 @@ export function ProfileSection({ name, email, onSave }: ProfileSectionProps) {
         <span>{email}</span>
       </p>
       {error !== null ? (
-        <p role="alert" className="gn-account__error">
+        <p role="alert" className="gn-shell__refusal">
           {error}
         </p>
       ) : null}
