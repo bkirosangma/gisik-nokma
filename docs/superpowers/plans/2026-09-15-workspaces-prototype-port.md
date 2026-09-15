@@ -43,7 +43,7 @@
 
 ### Task 0: Record the viewport E2E baseline
 
-The viewport sweep is **already red** on the tap-target ratchet from the `/help` work (3 failed / 28 passed). Without a recorded baseline, a new `/workspaces` offender gets filed under "the known `/help` failures" and never surfaces. This task produces the file every later verification compares against.
+The viewport sweep is **already red**. Without a recorded baseline, a new `/workspaces` offender gets filed under the known pre-existing failures and never surfaces. This task produces the file every later verification compares against.
 
 **Files:**
 - Create: `.superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log`
@@ -67,7 +67,7 @@ tail -60 .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline
 grep -c "✘\|failed" .superpowers/sdd/2026-09-15-workspaces-prototype-port/viewport-baseline.log
 ```
 
-Expected: failures confined to `/help`. **If any current failure names `/workspaces`, stop and report it** — it changes what "no regression" means for this plan.
+**If any current failure names `/workspaces`, stop and report it** — it changes what "no regression" means for this plan.
 
 - [ ] **Step 3: Record the baseline in the plan's working notes**
 
@@ -1286,7 +1286,7 @@ diff <(grep -o "✘.*" .superpowers/sdd/2026-09-15-workspaces-prototype-port/vie
      <(grep -o "✘.*" /tmp/workspaces-port-after.log | sort)
 ```
 
-Expected: **no new failures**. The `/help` offenders from the baseline are still there and are not this plan's to fix. Any line naming `/workspaces` is a regression this plan introduced — fix it rather than recording it.
+Expected: **no new failures**. The `/my-work` and `/w/{workspaceId}` offenders from the baseline are still there and are not this plan's to fix. Any line naming `/workspaces` is a regression this plan introduced — fix it rather than recording it.
 
 - [ ] **Step 5: Check for orphaned vitest workers**
 
