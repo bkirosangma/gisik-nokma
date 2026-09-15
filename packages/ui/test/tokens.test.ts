@@ -498,6 +498,62 @@ describe('tintWarning composites legibly on every surface it can reach', () => {
 });
 
 /**
+ * `.gn-chip` (hig/minimal) — `text` on `fillTertiary`, composited. Task 3
+ * fix round 1 (task-3-report.md, finding 3): the existing fillTertiary
+ * checks in this file (13.360's ghost-button case, and the ratio above it)
+ * both measure `textAccent`, which is a DIFFERENT foreground from the chip's
+ * own `color: var(--gn-text)`, and both composite `fillTertiary` over
+ * `surface`, a DIFFERENT ground from the chip's actual one — it sits on
+ * `.gn-card`, whose background is `surfaceRaised`. Nothing existing measures
+ * `text`-on-fillTertiary-over-`surfaceRaised`, so it is not obligated by any
+ * `CONTRAST_PAIRS` row (`fillTertiary` is alpha; `tokens.ts:228` says alpha
+ * roles cannot be named in that array — the obligation is against the
+ * composite, same reasoning as the `tintWarning` block above). The
+ * `surface` composite is checked too, for the same "cannot yet prove no
+ * chip is ever rendered directly on bare page" reason 13.360's own case
+ * checks both fillTertiary composites it does.
+ */
+describe('the chip label composites legibly on fillTertiary, over every ground it can reach', () => {
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number =>
+      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  for (const style of STYLE_NAMES) {
+    for (const theme of THEME_NAMES) {
+      it(`${style}/${theme}: the chip's text clears 4.5 on the fillTertiary composite`, () => {
+        const fill = colorOf(theme, 'fillTertiary', style);
+        const raised = colorOf(theme, 'surfaceRaised', style);
+        const surface = colorOf(theme, 'surface', style);
+        const overRaised = over(fill, raised);
+        const overSurface = over(fill, surface);
+
+        // THE ANTI-VACUOUS CONTROL: a fully transparent fill composites to
+        // the bare ground itself, and the assertions below would then pass
+        // by measuring `text` on a plain surface — which already passes per
+        // `CONTRAST_PAIRS`. Without this the check cannot fail for the
+        // reason it exists.
+        expect(overRaised, `${style}/${theme}: the fill composites to nothing over surfaceRaised`).not.toBe(raised);
+        expect(overSurface, `${style}/${theme}: the fill composites to nothing over surface`).not.toBe(surface);
+
+        expect(
+          contrastRatio(colorOf(theme, 'text', style), overRaised),
+          `${style}/${theme}: the chip's text no longer clears 4.5 on the card-composited fill`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(colorOf(theme, 'text', style), overSurface),
+          `${style}/${theme}: the chip's text no longer clears 4.5 on the page-composited fill`,
+        ).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+/**
  * Round 2d (2026-09-09) — the sign-in neo alignment's token-level changes:
  * the retired accent hex, the new `textAccent` role that replaces it as a
  * text-contrast guarantee, and the new pairless `brand` role.
