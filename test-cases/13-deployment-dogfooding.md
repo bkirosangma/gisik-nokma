@@ -3196,10 +3196,17 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   `name` and `email`, edits and saves the name through `authClient.updateUser({ name })` (verified
   against the installed `better-auth@1.7.2` client's generated types, not assumed), and a save that
   comes back with an `error` renders that door's `message` verbatim in a `role="alert"` rather than a
-  paraphrase. **Not yet ID-allocated**: this file's own header requires the next free block (after
-  13.399) to be requested from the controller before minting, and this task has no channel to request
-  one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block already
-  carries for its three cases (`/help` and `/account` mounting `AppNav`), unresolved before Task 2,
-  unresolved after Task 2, and still unresolved after Task 3. Rename every case in this block to real
-  case ids, in order, once a block is requested. —
-  (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`)
+  paraphrase. **Task 4 adds one more case to this same pending block:** the Your workspaces section
+  lists every workspace `dataSource.query.getMyWorkspaces()` answers, each row showing its real `role`
+  (verbatim from `proj_memberships.role`) and `projects.length` as "N project"/"N projects" — no
+  invented fields; two workspaces with different roles and project counts (one with a project, one
+  without) render correctly and independently in the same list. A failed read is out of scope for this
+  case — it collapses to the same empty render an honestly-empty answer produces (disclosed in
+  `Features.md`'s bullet, not asserted here). **Not yet ID-allocated**: this file's own header requires
+  the next free block (after 13.399) to be requested from the controller before minting, and this task
+  has no channel to request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx`
+  describe block already carries for its three cases (`/help` and `/account` mounting `AppNav`),
+  unresolved before Task 2, unresolved after Task 2, unresolved after Task 3, and still unresolved
+  after Task 4. Rename every case in this block to real case ids, in order, once a block is requested. —
+  (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`,
+  `apps/web/src/account/workspaces-section.tsx`)

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { WorkspaceRef } from '@gisik-nokma/app-core';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/account',
@@ -69,5 +70,34 @@ describe('AccountPage — Profile', () => {
     mount();
     await user.click(await screen.findByRole('button', { name: 'Save name' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Name cannot be empty');
+  });
+});
+
+function workspace(over: Partial<WorkspaceRef> = {}): WorkspaceRef {
+  return {
+    id: 'w1', name: 'Meghalaya Rollout', role: 'admin',
+    memberCount: 4, nameRestrictedProjectCount: 0, projects: [],
+    ...over,
+  };
+}
+
+describe('AccountPage — Your workspaces', () => {
+  it('lists each workspace with its real role and project count', async () => {
+    render(
+      <Providers services={stubServices({
+        getMyWorkspaces: async () => [
+          workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin', projects: [{ id: 'p1', name: 'Delivery', archived: false, ticketCount: 3, blockedCount: 0 }] }),
+          workspace({ id: 'w2', name: 'Field Support', role: 'member', projects: [] }),
+        ],
+      }, {})}>
+        <AccountPage />
+      </Providers>,
+    );
+    expect(await screen.findByText('Meghalaya Rollout')).toBeInTheDocument();
+    expect(screen.getByText('admin')).toBeInTheDocument();
+    expect(screen.getByText('1 project')).toBeInTheDocument();
+    expect(screen.getByText('Field Support')).toBeInTheDocument();
+    expect(screen.getByText('member')).toBeInTheDocument();
+    expect(screen.getByText('0 projects')).toBeInTheDocument();
   });
 });
