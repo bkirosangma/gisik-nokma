@@ -13,6 +13,7 @@ import type { NotificationKind, NotificationPreferences } from '@gisik-nokma/dom
 import { AppNav } from '../../src/app-nav.js';
 import { AppearanceSection } from '../../src/account/appearance-section.js';
 import { createPasskeyClient, createSessionsClient } from '../../src/account/account-clients.js';
+import { McpTokensScreen } from '../../src/mcp-tokens-screen.js';
 import { ProfileSection } from '../../src/account/profile-section.js';
 import { WorkspacesSection } from '../../src/account/workspaces-section.js';
 import { authClient } from '../../src/auth-client.js';
@@ -277,6 +278,31 @@ export default function AccountPage() {
             error={passkeyError}
           />
         ) : null}
+        {/* Connected assistants — MOVED HERE in Round 21 (owner: "lets move MCP
+            tokens to the account page. as this should not be scoped to a
+            workspace"), from the workspace home's section cards and from
+            `/settings`' sidebar. An MCP token is minted for a PERSON and carries
+            their permissions in every workspace they belong to — which
+            `app/mcp/tokens/page.tsx` had argued from the beginning as the reason
+            its URL holds no workspace — so listing it among a workspace's own
+            sections said something false about what revoking does.
+
+            LAST, and outside the spec's card order rather than inserted into it.
+            That order is the prototype's `isAccount` screen (see the comment
+            above) and the prototype has no MCP section at all, so there is no
+            position in it to transcribe; appending is the honest placement. It
+            also lands where it belongs by subject: Sign-in and devices and
+            Passkeys are the other two cards about credentials that can act as
+            you, and this is the third.
+
+            NOT gated on `user !== null`, unlike Profile above. The screen reads
+            `useSessionStatus()` itself and distinguishes 'loading' from
+            'signed-out' — a distinction `user === null` collapses — so gating it
+            here would replace a correct three-state answer with a two-state one
+            and flash a sign-in prompt at somebody whose session is still
+            resolving. It also costs no request while signed out: its own effect
+            fires only on `kind === 'signed-in'`. */}
+        <McpTokensScreen heading="h2" variant="account" />
       </div>
     </main>
   );

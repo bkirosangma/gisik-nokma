@@ -967,10 +967,13 @@ input, textarea, select { font-family: inherit; }
    projects and the founding form, where the reference puts it; only its
    margins changed with the move — the grid, the notes and every href did not,
    and 13.387 is scoped by the nav's accessible name rather than by position. */
-/* Round 19b: the header row — the 56px monogram, the title+meta column, and
-   the Members/Settings buttons at the row's end. `flex-wrap` for the same
-   reason every other nav/list row in this file carries it: the buttons must
-   not push the title off a phone viewport. */
+/* Round 19b: the header row — the 56px monogram and the title+meta column.
+   Round 21 removed the third child, the Members/Settings buttons at the row's
+   end (owner ruling); `.gn-workspace-home__header-actions` went with them
+   rather than being left as a rule nothing emits. `flex-wrap` stays for the
+   same reason every other nav/list row in this file carries it, and the layout
+   is unaffected by the removal: `.gn-workspace-home__header-titles` already
+   carries `flex: 1`, so it absorbed the freed space instead of re-centring. */
 .gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-workspace-home__header-titles { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
 .gn-workspace-home__header-titles .gn-page-title { margin: 0; }
@@ -983,7 +986,6 @@ input, textarea, select { font-family: inherit; }
    Letting both stack here would double the gap to 0.3rem (measured: 4.8px)
    instead of matching the pre-Task-6 2.4px — zeroed rather than restored. */
 .gn-workspace-home__header-titles .gn-workspace-list__role--pinned { margin-top: 0; }
-.gn-workspace-home__header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 1.4rem 0 0; }
 .gn-workspace-home__link {
   background: var(--gn-surface-raised);
@@ -996,7 +998,28 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text);
   text-decoration: none;
 }
-.gn-workspace-home__link:hover { background: var(--gn-surface-sunken); }
+/* The section cards (My Work, Members, Ticket types, Workflows) lighten on
+   hover exactly as the workspace and project cards do (Round 21, owner: "also
+   lighten the setting cards").
+
+   This REPLACES a background swap to `--gn-surface-sunken`, which was the odd
+   one out: three card surfaces on two pages answered the pointer by brightening
+   and this one answered by changing its fill, so the same gesture produced two
+   different kinds of feedback depending on which card was under it. The
+   brightness pair is the same measured 0.97/1.18 — not re-chosen — for the
+   reason the project card's action button reuses it too: one hover vocabulary
+   across every card-shaped door in the product.
+
+   Applied to the link ITSELF, not via `.gn-card:has(...)`: unlike a project
+   card this element IS the raised surface (it carries its own
+   `--gn-surface-raised` and `--gn-shadow-raised` above) and holds no sibling
+   control, so there is no inner door to scope the hover to and nothing on the
+   card that must stay unlit. */
+.gn-workspace-home__link:hover { filter: brightness(0.97); }
+[data-theme="dark"] .gn-workspace-home__link:hover { filter: brightness(1.18); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gn-workspace-home__link:hover { filter: brightness(1.18); }
+}
 .gn-workspace-home__link:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-workspace-home__link-label { font-size: 1.05rem; font-weight: 600; }
 .gn-workspace-home__link-note { font-size: 0.8rem; color: var(--gn-text-muted); }
@@ -1011,13 +1034,28 @@ input, textarea, select { font-family: inherit; }
    the page rather than a caption inside a card. */
 .gn-workspace-home__projects-heading { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin: 1.4rem 0 0.75rem; }
 .gn-workspace-home__heading { margin: 0; font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; }
-/* Round 20: the reference's project GRID — `repeat(auto-fit, minmax(280px,
-   1fr))`, 280px written as 17.5rem. Same responsive pattern
-   `.gn-workspace-home__links` below already uses, so a phone gets one column
-   and a wide screen gets as many as fit, without a breakpoint. `align-items:
-   start` so a card with one chip does not stretch to the height of a card
-   with two — the reference carries it for the same reason. */
-.gn-workspace-home__projects { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr)); gap: 1rem; align-items: start; }
+/* Round 21 (owner: "3 columns like for workspaces"): a FIXED three-track grid
+   with `.gn-workspace-list`'s own two breakpoints, replacing Round 20's
+   `repeat(auto-fit, minmax(17.5rem, 1fr))`.
+
+   The auto-fit version was not merely a different column count — it made the
+   count depend on the VIEWPORT, so the workspace directory and the workspace
+   home showed the same cards in different arrangements at the same width. The
+   60rem→2 / 40rem→1 steps are copied from that rule rather than re-chosen, so
+   the two pages step together; `minmax(0, 1fr)` (a ZERO floor, not 17.5rem)
+   is what lets the single-column arm shrink inside a 390px phone viewport
+   without ever overflowing it — the same reasoning `.gn-workspace-list`'s own
+   comment records, and the reason the tracks are not `1fr`.
+
+   `align-items: start` so a card with one chip does not stretch to the height
+   of a card with two — the reference carries it for the same reason. */
+.gn-workspace-home__projects { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+@media (max-width: 60rem) {
+  .gn-workspace-home__projects { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .gn-workspace-home__projects { grid-template-columns: minmax(0, 1fr); }
+}
 /* Round 20: one project = one raised card. `padding` overrides `.gn-card`'s
    own 0.75rem with the reference's 20px; NO `border-radius` is declared here,
    deliberately — case 13.355 (`neo-card-radius.test.ts`) exists because
@@ -1025,9 +1063,20 @@ input, textarea, select { font-family: inherit; }
    moment the radius became a token, and this class would be the next one. */
 .gn-project-card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; }
 /* Dimmed IN PLACE rather than moved to a list of its own — the reference's
-   0.72, and the whole point of the single grid: an archived project keeps the
-   position the server gave it. */
-.gn-project-card--archived { opacity: 0.72; }
+   0.72. Round 21 sorts archived cards to the END of the grid (owner ruling),
+   so the dimming is no longer what marks them out of sequence; it is what
+   marks them retired, alongside the "Archived" chip.
+
+   THE DIMMING IS SCOPED TO THE DOOR, NOT THE CARD (Round 21, owner: "similar
+   button lightening on hover on the archived card"). The reference puts 0.72
+   on the whole card, but the reference's archived card holds no control — this
+   one holds Restore, and a button at 0.72 beside full-strength buttons
+   elsewhere on the page reads as DISABLED, which is a false statement: Restore
+   is the one control on an archived card that is always live. Dimming the door
+   alone keeps the retired look on the content that is retired and leaves the
+   control at full strength, so its hover reads identically on a live and an
+   archived card — which is exactly what the owner's bullet asked for. */
+.gn-project-card--archived .gn-project-card__door { opacity: 0.72; }
 /* The card's BODY is the door (Round 20, owner ruling). Unlike
    `.gn-workspace-card__door` this one does NOT full-bleed itself with a
    negative margin, because it is not the whole card: Archive/Restore is its
@@ -1042,6 +1091,36 @@ input, textarea, select { font-family: inherit; }
 .gn-project-card__name { font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .gn-project-card__chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
 .gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+/* Archive/Restore lights up UNDER THE POINTER, and the card body does not
+   (Round 21, owner: "on hover over the archive button, light up the button and
+   the card body stays normal").
+
+   The second half needed no change and is worth stating so nobody "fixes" it:
+   the card's own hover is `.gn-card:has(> .gn-project-card__door:hover)`, whose
+   `>` combinator matches only the DOOR as a direct child, so hovering this
+   button was already inert on the card. What was missing is the button's own
+   cue — `.gn-button` carries no `:hover` rule anywhere in the product
+   (`packages/ui/src/ui.css`), so before this the pointer produced nothing at
+   all here.
+
+   SCOPED to this actions strip rather than added to `.gn-button` globally: a
+   bare `.gn-button:hover` would introduce a hover treatment to every button in
+   the product in one commit, which is a product-wide visual decision and not
+   what was asked for. The brightness PAIR is the card hover's own measured
+   0.97/1.18 rather than a second set of numbers — one hover vocabulary on this
+   page, so the button and the card it sits in cannot drift apart. `:disabled`
+   is excluded: the button is disabled while a submission is in flight, and a
+   control that lights under the pointer while refusing the click is telling
+   two different stories at once. */
+.gn-project-card__actions .gn-button:hover:not(:disabled) { filter: brightness(0.97); }
+[data-theme="dark"] .gn-project-card__actions .gn-button:hover:not(:disabled) {
+  filter: brightness(1.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gn-project-card__actions .gn-button:hover:not(:disabled) {
+    filter: brightness(1.18);
+  }
+}
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
@@ -1053,8 +1132,8 @@ input, textarea, select { font-family: inherit; }
 
 /* ── `/settings` — the global settings door (Round 19c, owner reference
    screenshots). A sidebar of section links beside whichever section's
-   content this route is showing (Ticket types, inline; Workflows and MCP
-   tokens are real separate pages the sidebar links to — see the page's own
+   content this route is showing. Two sections since Round 21 moved MCP tokens
+   to `/account` (Ticket types and Workflows, both inlined — see the page's own
    docblock). Same shape as every other admin-ish layout in this file: raised
    surface, token roles only, `aria-current` for the active section reusing
    `.gn-nav`'s own pattern rather than inventing a second one. */
@@ -1956,6 +2035,14 @@ input, textarea, select { font-family: inherit; }
    sentence above the list carries the weight, not the colour. */
 
 .gn-mcp-tokens__card { max-width: 34rem; }
+/* On `/account` (Round 21) the screen is one section of a 42.5rem column, so
+   the 34rem cap above — right for a standalone page that would otherwise run
+   the full shell width — leaves it visibly short of every sibling card's right
+   edge. A MODIFIER on the element rather than a `.gn-account__column
+   .gn-mcp-tokens__card` descendant rule: page-scoped overrides of a shared card
+   class are the shape case 13.355 exists about, and this class has two callers
+   now. */
+.gn-mcp-tokens__card--account { max-width: none; }
 
 .gn-mcp-tokens__lead { margin: 0 0 1.25rem; }
 

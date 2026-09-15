@@ -2412,7 +2412,7 @@ still `13.410` (the `13.411` hit was this pointer's own prose, reproducing the e
 "CORRECTED 2026-09-15" paragraph above already documented once). **`13.411` is minted below** for the
 `sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **`13.412` is minted below**
 for the `selected` shadow role. **`13.413` is minted at the foot of this file** for Round 20, the
-workspace-home prototype port. **The next free BLOCK is now `13.414`.**
+workspace-home prototype port. **The next free BLOCK is now `13.416`.**
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -3665,7 +3665,7 @@ first stated.
 ### Round 20 — the workspace-home prototype port (`/w/[workspaceId]`)
 
 Block `13.413`, the next free one this file's own pointer recorded after `13.411` and `13.412` were
-minted for the shadow-role work. **The next free BLOCK is now `13.414`.** Round 20 ports the desktop prototype's `isWorkspace`
+minted for the shadow-role work. **The next free BLOCK is now `13.416`.** Round 20 ports the desktop prototype's `isWorkspace`
 screen onto the page Task 19 built: the project list becomes a GRID of per-project cards, the "Projects"
 heading and its toggle leave the `<Card>` that used to wrap them, the archived list merges into the one
 grid, the toggle takes the reference's own label, and the five door-cards move BELOW the projects and the
@@ -3702,3 +3702,58 @@ is no gate behind this one to display. **Owner: whoever next takes the rename-pe
   where the two disagree — and asserts the collapsed order first as a positive control, so a failure is
   about the disclosure rather than about the grid never having been ordered at all. —
   (`workspace-home.test.tsx`)
+
+### Round 21 — owner corrections to the workspace-home port
+
+Block `13.414`–`13.415`, the next free ids this file's own pointer recorded after Round 20 minted
+`13.413`. **The next free BLOCK is now `13.416`.** Seven owner corrections, of which three touch cases:
+archived projects sort to the END of the disclosed grid (reversing 13.413), MCP tokens moves off the
+workspace home and out of `/settings` to `/account` (revising 13.387, minting 13.415), and the nav's
+Settings link goes back behind a workspace while Inbox moves to just before Help (minting 13.414 and
+amending 11.185's three arms). The other four are CSS-only and mint nothing: the projects grid becomes
+three fixed columns on `/workspaces`' own breakpoints, Archive/Restore gains a hover, the archived
+dimming moves from the card onto its door, and the four section cards trade a background swap for the
+same brightness pair.
+
+- **13.413** ✅ **REVERSED, not deleted** — the archived cards now sort to the END of the disclosed grid
+  (owner: "always sort the archived projects to the end"), where Round 20 asserted the served order.
+  `[...live, ...archived]` was the implementation Round 20 named as the thing to rule out; it is the
+  requirement now, and the single filter it replaced is what this case rules out. **The cost Round 20
+  argued from was ACCEPTED, not refuted:** a disclosed project does move twice on one click (in, and
+  down); the owner weighed that against grouping retired work and chose the grouping. The other two
+  assertions in this case (exactly one link per card; Archive/Restore not nested in the anchor) are
+  untouched. **Round 20's fixture is what made this a one-line flip** — it puts the archived project in
+  the MIDDLE, the only arrangement where the two expressions disagree, so it discriminates in EITHER
+  direction; had the case been written against the shared `workspaceAs` fixture (p3 archived, already
+  last) it would have been vacuous before and after, and the reversal would have been invisible. —
+  (`workspace-home.test.tsx`)
+- **13.387** ✅ **REVISED from five doors to four.** `/mcp/tokens` left this nav for `/account`, and its
+  absence is now asserted by name rather than left to the length check, so restoring the link reddens the
+  case with a sentence instead of "expected 5 to be 4". The case's ARGUMENT survives the removal, which
+  is why the literals stay: `/mcp/tokens` was the obvious non-`/w/<id>/…` door, but Ticket types is still
+  one (`/settings?workspaceId=<id>&tab=…`, workspace as a query param), so a builder-based rewrite would
+  now emit `/w/<id>/settings?…` and break that door instead — the same defect, one door over. The
+  negative assertion was repointed accordingly. Its other half is 13.415. — (`workspace-home.test.tsx`)
+- **13.414** ✅ Inbox renders IMMEDIATELY before Help (owner: "move inbox to just before help"). Nothing
+  else in the suite pinned nav ORDER — 11.170/11.171 assert presence, and 11.185's arms assert the full
+  ordered set but would keep passing if this pair moved together within it. Asserted over the DOM's own
+  order (`compareDocumentPosition`) plus an adjacency check on the rendered link list, so a link inserted
+  between them fails rather than passing the looser "somewhere after". — (`app-nav.test.tsx`)
+- **13.415** ✅ `/account` mounts the "Connected assistants" section, at heading level 2. **The other half
+  of 13.387's removal**, and the reason it is a separate case: an absence asserted alone is satisfied by
+  deleting the feature outright, so one case proves the link left the workspace and this one proves the
+  screen arrived. **`level: 2` is load-bearing, not decoration** — `McpTokensScreen` defaults to `h1`,
+  right for the standalone `/mcp/tokens` page and wrong here, where `/account`'s own `<h1>Your account</h1>`
+  already owns level 1; mounting it with the default would pass a name-only query and fail this one. —
+  (`account-page.test.tsx`)
+
+**13.391 went GREEN in this round, having been red since `762b1c8d`, and it was not fixed — it became
+true.** That commit moved Settings to the always tier, which made the scope note's sentence ("pick one to
+reach its board, members and settings") false while a Settings link sat plainly in the bar; the note was
+commented out and the case left failing. Round 21's ruling put Settings back behind a workspace, so all
+three nouns the sentence names are workspace-conditional again — verified against the component rather
+than assumed (Board needs `projectId`, Members and Settings need `!noWorkspace`) — and the note renders
+again. The assertion was not touched. Its sibling case in the same describe was rewritten: Settings is
+now asserted as workspace-conditional, and it pins the href that must NOT come back with the revert
+(`/w/<id>/settings/ticket-types`, the sidebar-less page whose Edit button opened a third route), because
+the obvious way to "move it back" is to restore the old target along with the old condition.

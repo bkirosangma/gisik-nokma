@@ -126,6 +126,29 @@ describe('AccountPage — the global settings shell', () => {
     expect(await screen.findByRole('tablist', { name: 'Style' })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Theme' })).toBeInTheDocument();
   });
+
+  /**
+   * 13.415 — MCP tokens LANDED here (Round 21, owner: "lets move MCP tokens to
+   * the account page. as this should not be scoped to a workspace").
+   *
+   * The other half of the move: `workspace-home.test.tsx`'s 13.387 asserts the
+   * link is GONE from the workspace-scoped nav, and a removal asserted only as
+   * an absence is satisfied by deleting the feature outright. This is the case
+   * that fails if it went nowhere.
+   *
+   * **`level: 2` is the assertion, not decoration.** `McpTokensScreen` defaults
+   * to `h1`, which is what the standalone `/mcp/tokens` page wants and what this
+   * page must not have — `/account`'s own `<h1>Your account</h1>` already owns
+   * level 1, and a second h1 is a broken outline for a screen reader rather than
+   * a style slip. Mounting the screen with its default would pass a bare
+   * name-only query and fail this one.
+   */
+  it('13.415 mounts the Connected assistants section, at heading level 2', async () => {
+    mount();
+    expect(
+      await screen.findByRole('heading', { name: 'Connected assistants', level: 2 }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('AccountPage — Profile', () => {

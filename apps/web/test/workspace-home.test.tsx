@@ -415,17 +415,26 @@ describe('13.386 archive hides a project and restore returns it — read from th
 });
 
 /**
- * 13.387 — the five doors out of this page resolve to the routes that exist.
+ * 13.387 — the four doors out of this page resolve to the routes that exist.
  *
- * **Asserted as five LITERAL paths, and that is the whole case.** Three of the
- * five live under `app/w/[workspaceId]/`; `/mcp/tokens` does NOT — it is a
- * global route that takes no `workspaceId`. A page that built its hrefs from one
- * `/w/${id}/` prefix would emit `/w/<id>/mcp/tokens`, which resolves to nothing,
- * and a test that built its expectations the same way would agree with the bug.
+ * **Asserted as four LITERAL paths, and that is the whole case.** Three of the
+ * four live under `app/w/[workspaceId]/`; Ticket types does NOT — it carries its
+ * workspace as a QUERY PARAM on the global `/settings` route. A page that built
+ * its hrefs from one `/w/${id}/` prefix would emit `/w/<id>/settings?…`, which
+ * resolves to nothing, and a test that built its expectations the same way would
+ * agree with the bug.
  *
- * **Ticket types is the SECOND non-`/w/<id>/…` door, since owner feedback
- * 2026-09-09 ("the ticket type edit is opening in a separate route... repoint
- * it").** It targets `/settings?workspaceId=<id>&tab=ticket-types` now, not
+ * **Five until Round 21 (owner: "move MCP tokens to the account page. as this
+ * should not be scoped to a workspace").** `/mcp/tokens` used to be the obvious
+ * non-`/w/` door and carried this case's whole argument; the argument SURVIVES
+ * it, which is why the literals stay. Its absence is now asserted here too, so
+ * restoring the link reddens this case rather than passing unnoticed — and
+ * `account-page.test.tsx` holds the other half, that the screen actually landed
+ * where it went. A removal nobody asserts is a removal that comes back.
+ *
+ * **Ticket types became a non-`/w/<id>/…` door with owner feedback 2026-09-09
+ * ("the ticket type edit is opening in a separate route... repoint it").** It
+ * targets `/settings?workspaceId=<id>&tab=ticket-types` now, not
  * `/w/<id>/settings/ticket-types` — that bare list page's own Edit button
  * opened the ticket-type editor as a THIRD, sidebar-less route, the exact
  * defect `/settings` itself was just fixed to close; leaving this link
@@ -451,7 +460,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.387 the workspace-section links resolve to the real routes', () => {
-  it('carries five links, four workspace-scoped and one global', async () => {
+  it('carries four links, three workspace-scoped and one query-scoped', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     const expected: Array<[string, string]> = [
@@ -459,18 +468,23 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
       ['Members', `/w/${WORKSPACE}/members`],
       ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
       ['Workflows', `/w/${WORKSPACE}/settings/workflows`],
-      ['MCP tokens', '/mcp/tokens'],
     ];
     for (const [name, href] of expected) {
       expect(within(nav).getByRole('link', { name }), name).toHaveAttribute('href', href);
     }
     expect(within(nav).getAllByRole('link')).toHaveLength(expected.length);
-    // The negative that names the actual defect: nothing here points at a
-    // workspace-scoped MCP route, which does not exist.
-    expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).not.toHaveAttribute(
+    // The negative that names the actual defect the literals exist to prevent:
+    // nothing here points at a workspace-scoped `/settings` PATH, which does not
+    // exist — the workspace rides as a query param or the route resolves to
+    // nothing.
+    expect(within(nav).getByRole('link', { name: 'Ticket types' })).not.toHaveAttribute(
       'href',
-      `/w/${WORKSPACE}/mcp/tokens`,
+      `/w/${WORKSPACE}/settings?tab=ticket-types`,
     );
+    // Round 21: MCP tokens is GONE from this workspace-scoped nav. Asserted
+    // rather than left to the length check above, so the failure names the
+    // reason instead of reading "expected 5 to be 4".
+    expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).toBeNull();
   });
 
   /**
@@ -491,9 +505,11 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
     expect(
       within(nav).getByText('States, transitions and published versions.'),
     ).toBeInTheDocument();
-    expect(
-      within(nav).getByText('Let an assistant act as you, with your permissions.'),
-    ).toBeInTheDocument();
+    // The MCP tokens note ("Let an assistant act as you, with your
+    // permissions.") is NOT asserted here any more — Round 21 moved that door to
+    // `/account`, and its own note travelled with it. Named rather than silently
+    // dropped, so a reader comparing this list to the four links above can see
+    // the fifth left on purpose.
   });
 
   it("13.398 a guest's Members note carries no number — memberCount is withheld, not zero", async () => {
@@ -648,17 +664,27 @@ describe('13.396 archived projects still open, through the same door a live one 
  *    would look wrong. jsdom will not complain either — the containment is
  *    asserted directly.
  *
- * 3. **The archived card is dimmed IN PLACE**, keeping the served order, rather
- *    than sinking to the end of the grid. `[...live, ...archived]` — the
- *    obvious way to build one list out of the two bindings already in scope —
- *    passes 1 and 2 and reorders the grid.
+ * 3. **The archived cards sort to the END of the disclosed grid** (Round 21,
+ *    owner: "always sort the archived projects to the end"), rather than
+ *    appearing in the position the server served them.
+ *
+ *    **THIS ASSERTION WAS REVERSED IN ROUND 21, and it is the same check
+ *    pointing the other way — not a deleted one.** Round 20 asserted the served
+ *    order and named `[...live, ...archived]` as the implementation to rule out;
+ *    that expression is now the REQUIREMENT, and the single filter it replaced
+ *    is what this case rules out. The cost Round 20 argued from is unchanged and
+ *    was accepted, not refuted: a disclosed project does move twice on one click
+ *    (in, and down). The owner weighed that against grouping retired work and
+ *    chose the grouping.
  *
  *    **That third assertion needs its OWN fixture, and the shared one would
- *    have made it vacuous.** `workspaceAs` serves p1, p2, p3 with p3 archived —
- *    already last — so `[...live, ...archived]` produces the identical order and
- *    the check could not have failed against the very implementation it exists
- *    to rule out. The fixture below puts the archived project in the MIDDLE,
- *    which is the only arrangement where the two expressions disagree.
+ *    make it vacuous IN EITHER DIRECTION.** `workspaceAs` serves p1, p2, p3 with
+ *    p3 archived — already last — so the single filter and the concatenation
+ *    produce the identical order, and the check could not fail against whichever
+ *    implementation it exists to rule out. The fixture below puts the archived
+ *    project in the MIDDLE, the only arrangement where the two expressions
+ *    disagree. It was built that way in Round 20 and it is what let this case be
+ *    turned around here by flipping one expected array.
  */
 describe('13.413 each project card is one door, with the admin control outside the anchor', () => {
   it('carries exactly one link and does not nest the archive button in it', async () => {
@@ -676,9 +702,10 @@ describe('13.413 each project card is one door, with the admin control outside t
     expect(archiveButton.closest('a')).toBeNull();
   });
 
-  it('reveals an archived project IN PLACE, keeping the order the server served', async () => {
-    // Archived in the MIDDLE — see the docblock. Under one filter the disclosed
-    // grid reads p1, p2, p3; under `[...live, ...archived]` it reads p1, p3, p2.
+  it('sorts a revealed archived project to the END, after every live one', async () => {
+    // Archived in the MIDDLE — see the docblock. Under `[...live, ...archived]`
+    // the disclosed grid reads p1, p3, p2; under a single filter over the served
+    // array it reads p1, p2, p3. Only this arrangement tells them apart.
     mount([
       [
         workspaceAs('admin', {
@@ -692,8 +719,11 @@ describe('13.413 each project card is one door, with the admin control outside t
     ]);
 
     // POSITIVE CONTROL: collapsed, the archived one is absent and the two live
-    // ones are in served order — so a failure below is about the disclosure and
-    // not about the grid never having been ordered at all.
+    // ones are in served order — so a failure below is about where disclosure
+    // PUTS the archived card, and not about the grid never having been ordered
+    // at all. It also pins that the live projects keep the served order among
+    // themselves, which is what makes "archived last" a reordering of the two
+    // GROUPS rather than a sort of the whole list.
     await screen.findByTestId('project-row-p1');
     expect(
       screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
@@ -704,7 +734,7 @@ describe('13.413 each project card is one door, with the admin control outside t
     );
     expect(
       screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
-    ).toEqual(['project-row-p1', 'project-row-p2', 'project-row-p3']);
+    ).toEqual(['project-row-p1', 'project-row-p3', 'project-row-p2']);
   });
 });
 

@@ -208,7 +208,19 @@ it stayed in `apps/web` when the gateway left.*
   before (`Settings` joined the always tier). With one and no project: the served name, `/w/<id>/
   my-work` and `/w/<id>/members` join after `/workspaces`, and `/settings?workspaceId=<id>` sits where
   the old workspace-scoped `Settings` link did — eight links, same count as before this round, Board
-  absent. With one AND a project: Board joins too — nine links, same count as before.** —
+  absent. With one AND a project: Board joins too — nine links, same count as before.** **AMENDED AGAIN
+  2026-09-16 (Round 21, owner: "move back the nav bar settings to only be visible once a workspace is
+  opened... and move inbox to just before help"): `Settings` REJOINED the workspace-scoped group, and
+  `Inbox` moved to the bar's end.** Both reverse-or-move a link inside arms this case already owned, so
+  all three expected arrays changed in the same change set that changed the component — the discipline
+  this case exists to enforce, applied to itself. The shapes are now: without a workspace,
+  `/workspaces`, `/inbox`, `/help`, `/account` — FOUR, back to the pre-19c count, `/settings` having
+  left the always tier. With one and no project: the served name, `/w/<id>/my-work`, `/w/<id>/members`
+  and `/settings?workspaceId=<id>` join, with `/inbox` now sitting AFTER them, just before `/help` —
+  eight links, unchanged in count. With one AND a project: Board joins too — nine, unchanged in count.
+  **Two of the three arms would have stayed green on the Inbox move alone had they been unordered
+  sets**, which is why they are asserted in order; the adjacency itself is pinned separately by 13.414,
+  because an ordered whole-array assertion still passes if Inbox and Help move together within it. —
   (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)

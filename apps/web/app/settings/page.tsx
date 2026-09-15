@@ -6,14 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { TicketTypeListScreen, WorkflowListScreen } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
-import { McpTokensScreen } from '../../src/mcp-tokens-screen.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
 import { useWorkspaceName } from '../../src/use-workspace-name.js';
 
-type SettingsTab = 'ticket-types' | 'workflows' | 'mcp-tokens';
+type SettingsTab = 'ticket-types' | 'workflows';
 
 function isSettingsTab(value: string | null): value is SettingsTab {
-  return value === 'ticket-types' || value === 'workflows' || value === 'mcp-tokens';
+  return value === 'ticket-types' || value === 'workflows';
 }
 
 function tabHref(workspaceId: string | null, tab: SettingsTab): string {
@@ -60,8 +59,13 @@ function typeEditHref(workspaceId: string, typeId: string): string {
  * still sent Workflows to `/w/<id>/settings/workflows`, MCP tokens to
  * `/mcp/tokens`, and (once ticket types themselves were inlined) the ticket-
  * type EDITOR to `/w/<id>/settings/ticket-types/[typeId]` — real, separate
- * routes each time, exactly what the owner kept pointing at as wrong. This
- * round inlines all four sub-screens the prototype's `isSettingsShell` names.
+ * routes each time, exactly what the owner kept pointing at as wrong. That
+ * round inlined all four sub-screens the prototype's `isSettingsShell` names.
+ *
+ * **This shell now carries three of those four**, MCP tokens having moved to
+ * `/account` in Round 21 (see below). The prototype's own grouping is what
+ * changed, on the owner's ruling, so the divergence from `settingsNav` here is
+ * deliberate rather than an incomplete transcription.
  *
  * ## `tab`, not four files, and nothing reimplemented to get there
  *
@@ -105,17 +109,36 @@ function typeEditHref(workspaceId: string, typeId: string): string {
  *
  * ## `tab`, like `workspaceId`, is a query param — not three files
  *
- * `/settings?workspaceId=<id>&tab=workflows` is still `/settings`, the one
- * route the nav's Settings link is unconditional about; switching tabs is a
- * same-page navigation (`usePathname()` unaffected), not a route change.
+ * `/settings?workspaceId=<id>&tab=workflows` is still `/settings`, one route;
+ * switching tabs is a same-page navigation (`usePathname()` unaffected), not a
+ * route change.
+ *
+ * ## MCP tokens LEFT this shell (Round 21)
+ *
+ * It was the third tab until the owner ruled that it "should not be scoped to a
+ * workspace" and moved it to `/account`, where `McpTokensScreen` is now mounted
+ * (same component, no second implementation — the whole point of extracting it).
+ * `/mcp/tokens` still resolves; nobody asked for a URL to stop working, and it
+ * mounts the same screen it always did.
+ *
+ * This does not reverse the ruling that put it here ("workflows and mcp tokens
+ * should not be opening up a separate route. it should live inside settings") —
+ * it moves it to the settings shell it actually belongs to. `/account` IS a
+ * person's settings; this shell is a workspace's.
  *
  * ## With no workspace in the query
  *
- * Ticket types and Workflows have no target — this shell remembers no
- * "current workspace" outside a route or query param, and none is present.
- * MCP tokens still does, being global, so it stays a real link and a working
- * tab either way; the other two render as plain text with one line saying a
- * workspace has to be picked first, and a link to `/workspaces`.
+ * Neither remaining section has a target — this shell remembers no "current
+ * workspace" outside a route or query param, and none is present — so both
+ * render as plain text with one line saying a workspace has to be picked first,
+ * and a link to `/workspaces`.
+ *
+ * **So `/settings` with no `?workspaceId=` now offers nothing usable**, where
+ * MCP tokens used to be the one tab that worked there. That is a consequence of
+ * this round and not an oversight: the same round made the nav's Settings link
+ * render only with a workspace in scope (`src/app-nav.tsx`), so the bar no
+ * longer sends anyone to the bare route. It still resolves when typed, and what
+ * it says then is accurate.
  *
  * `useSearchParams()` opts a client page out of static prerendering, and Next
  * 15 makes that a BUILD ERROR rather than a warning unless it is wrapped in a
@@ -173,17 +196,14 @@ function SettingsContent() {
           ) : (
             <span className="gn-settings__sidebar-item--disabled">Workflows</span>
           )}
-          <Link
-            href={tabHref(workspaceId, 'mcp-tokens')}
-            aria-current={tab === 'mcp-tokens' ? 'page' : undefined}
-          >
-            MCP tokens
-          </Link>
+          {/* NO "MCP tokens" entry (Round 21, owner: "move MCP tokens to the
+              account page. as this should not be scoped to a workspace"). It
+              lives on `/account` now — see that page's own comment. Both
+              remaining sections are workspace-scoped, which is what this shell
+              is for. */}
         </nav>
         <div className="gn-settings__content">
-          {tab === 'mcp-tokens' ? (
-            <McpTokensScreen heading="h2" />
-          ) : workspaceId === null ? (
+          {workspaceId === null ? (
             <p>
               Pick a workspace to see its ticket types and workflows —{' '}
               <Link href="/workspaces">open one</Link>.

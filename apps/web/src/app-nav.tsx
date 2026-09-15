@@ -15,9 +15,9 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * desktop.dc.html`, `navDef` + its `navItems` filter), not only its picture:
  * a link renders only when its target exists. Without a workspace in the route
  * (`workspaceId` undefined — `/workspaces`, `/inbox`, `/help`, `/account`,
- * `/settings`, `/mcp/*`) only the five ALWAYS items render (Workspaces, Inbox,
- * Settings, Help, Account) plus a scope note. With one, the workspace's own
- * served name, My Work and Members join them.
+ * `/settings`, `/mcp/*`) only the four ALWAYS items render (Workspaces, Inbox,
+ * Help, Account) plus a scope note. With one, the workspace's own served name,
+ * My Work, Members and Settings join them.
  *
  * **`projectId` is a second, narrower scope this product has and the prototype
  * does not: one board per PROJECT, not one per workspace.** The prototype's
@@ -26,28 +26,48 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * (`/w/[workspaceId]/p/[projectId]/**`), and points at that project's board.
  * A workspace with no project in scope has no true Board target.
  *
- * ## Settings LEFT the workspace-scoped group; Members did not (owner
- * feedback, 2026-09-09: "move members into settings and settings should
- * always be visible on the nav bar")
+ * ## Settings REJOINED the workspace-scoped group (Round 21, owner: "move back
+ * ## the nav bar settings to only be visible once a workspace is opened")
  *
- * Settings used to render only `!noWorkspace`, pointed at `/w/${workspaceId}/
- * settings/ticket-types`. The owner asked for it to sit at the SAME tier as
- * Inbox/Help/Account — always present, not conditional on a workspace being
- * in the route — which a workspace-typed href cannot do on its own: there is
- * no "current workspace" this component (or anything else in this shell)
- * remembers outside the URL's own `workspaceId` segment. So the link is
- * unconditional and its TARGET carries the workspace forward as a QUERY
- * PARAM instead of a path segment when one is in scope — `/settings` (new,
- * `app/settings/page.tsx`) is a real route either way, with or without
- * `?workspaceId=`; its own docblock explains what it renders in each case.
- * The owner's OWN reference (screenshots, same feedback round) keeps Members
- * as its own top-level link beside Settings rather than folded under it — an
- * earlier draft of this change removed Members entirely, which the reference
- * contradicts; it is restored here, unchanged from before. `inSettings`,
- * which used to widen the old workspace-scoped `Settings` link's
- * `aria-current` to any `/settings/*` sub-route, is gone: the nav's `Settings`
- * is one literal route (`/settings`, `usePathname()` ignores the query
- * string), and plain equality (`current`, below) is enough.
+ * Round 19c had moved it out, on the owner's earlier instruction that it "should
+ * always be visible on the nav bar", and that move is now reversed. **Only the
+ * VISIBILITY rule reverted; the TARGET did not.** The link renders under
+ * `!noWorkspace` again, exactly as it did before 19c, but still points at
+ * `/settings?workspaceId=<id>` rather than the pre-19c
+ * `/w/<id>/settings/ticket-types`: that bare path is the sidebar-less list page
+ * whose own Edit button opened the ticket-type editor as a third route, and
+ * `/settings` is the shell built to replace it (`app/settings/page.tsx`'s own
+ * docblock). Reverting the href as well would have re-opened a defect the
+ * owner asked to have closed, in the name of a ruling that said nothing about
+ * where the link points.
+ *
+ * Two consequences, both deliberate:
+ *
+ * - **The scope note renders again.** It reads "pick one to reach its board,
+ *   members and settings", which was FALSE from 19c onward — hence its being
+ *   commented out in `762b1c8d`, leaving case 13.391 red — and is true again
+ *   now that all three of those nouns are workspace-conditional.
+ * - **`/settings` with no `?workspaceId=` is no longer reachable from the
+ *   nav.** It still resolves, and typing it still works; nothing about that
+ *   route changed. But it is no longer a destination this bar offers, which is
+ *   what makes it safe for MCP tokens to have left its sidebar for `/account`
+ *   in the same round — see `app/settings/page.tsx`.
+ *
+ * `inSettings`, which used to widen the pre-19c workspace-scoped link's
+ * `aria-current` to any `/settings/*` sub-route, stays gone: the nav's
+ * `Settings` is one literal route (`/settings`, `usePathname()` ignores the
+ * query string), and plain equality (`current`, below) is enough.
+ *
+ * Members was never part of this and is unchanged: the owner's own reference
+ * (screenshots, 2026-09-09) keeps it as its own top-level link beside Settings
+ * rather than folded under it.
+ *
+ * ## Inbox sits with the global links, not the workspace ones (Round 21)
+ *
+ * It was beside My Work from Round 19b; the owner moved it to just before Help.
+ * It stays unconditional — the inbox is global and always has been — so this is
+ * a position change only, and it puts the three person-scoped destinations
+ * (Inbox, Help, Account) together at the bar's end.
  */
 export function AppNav({
   workspaceId,
@@ -107,13 +127,6 @@ export function AppNav({
             My Work
           </Link>
         ) : null}
-        {/* Beside the view links and BEFORE the spacer, because it is a
-            destination like Workspaces and My Work. Unconditional on
-            `workspaceId`: the inbox is a global route (`app/inbox/page.tsx`)
-            and a reader can be told about a ticket in a workspace they are
-            not currently looking at. The badge's own read is gated on a
-            session inside `InboxNavLink`. */}
-        <InboxNavLink active={pathname === "/inbox"} />
         {!noWorkspace ? (
           <Link
             href={`/w/${workspaceId}/members`}
@@ -122,16 +135,31 @@ export function AppNav({
             Members
           </Link>
         ) : null}
-        {/* Settings — GLOBAL and unconditional (owner feedback, 2026-09-09),
-            same tier as Inbox/Help/Account, carrying the workspace forward as
-            a QUERY PARAM when one is in scope. See this component's own
-            docblock for why Settings alone left the workspace-scoped group. */}
-        <Link
-          href={noWorkspace ? "/settings" : `/settings?workspaceId=${workspaceId}`}
-          aria-current={current("/settings")}
-        >
-          Settings
-        </Link>
+        {/* Settings — WORKSPACE-SCOPED again (Round 21, owner: "move back the
+            nav bar settings to only be visible once a workspace is opened").
+            The TARGET keeps Round 19c's query-param shape rather than reverting
+            to the old `/w/<id>/settings/ticket-types` path: `/settings` is the
+            real shell with the sidebar and the inlined editor, and the bare
+            path is the sidebar-less page that shell was built to replace. So
+            this reverts the VISIBILITY rule and keeps the destination. */}
+        {!noWorkspace ? (
+          <Link
+            href={`/settings?workspaceId=${workspaceId}`}
+            aria-current={current("/settings")}
+          >
+            Settings
+          </Link>
+        ) : null}
+        {/* Inbox sits JUST BEFORE Help (Round 21, owner ruling), at the end of
+            the bar with the other global destinations, rather than among the
+            workspace-scoped view links where Round 19b put it. Still
+            unconditional on `workspaceId`: the inbox is a global route
+            (`app/inbox/page.tsx`) and a reader can be told about a ticket in a
+            workspace they are not currently looking at — the move groups it
+            with the other links that are true of the PERSON, which is what it
+            always was. The badge's own read is gated on a session inside
+            `InboxNavLink`. */}
+        <InboxNavLink active={pathname === "/inbox"} />
         {/* Help and Account (Task 18), both GLOBAL routes and both unconditional
             on `workspaceId` for the reason the inbox link above is: neither is a
             fact about the workspace you are currently looking at. `/help` already
@@ -152,12 +180,24 @@ export function AppNav({
         </Link>
         {/* The scope note reads `workspaceId` ALONE — never `workspaceName`, so a
             slow or failed name lookup cannot make this say "no workspace
-            selected" while the route plainly carries one. */}
-        {/* {noWorkspace ? (
+            selected" while the route plainly carries one.
+
+            RESTORED in Round 21, having been commented out (not deleted) when
+            Settings went global in `762b1c8d` — at which point the sentence
+            named "settings" as workspace-scoped while the bar plainly showed a
+            Settings link, so it was FALSE and commenting it out was right. The
+            same ruling that put Settings back behind a workspace makes it true
+            again, so it renders again. All three nouns are verified against the
+            code above rather than assumed: Board needs `projectId`, Members
+            needs `!noWorkspace`, and Settings needs `!noWorkspace` as of this
+            round. Case 13.391 has been red since `762b1c8d`; it goes green here
+            because the claim it asserts became true, not because the assertion
+            was relaxed to fit the code. */}
+        {noWorkspace ? (
           <span className="gn-nav__scope">
             No workspace selected — pick one to reach its board, members and settings.
           </span>
-        ) : null} */}
+        ) : null}
         <span className="gn-nav__spacer" />
       </div>
       {user !== null ? (

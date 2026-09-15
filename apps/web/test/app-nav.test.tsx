@@ -159,7 +159,7 @@ describe('AppNav — the mounts, not the components', () => {
    * this file's own case-id line in `test-cases/11-calendar-notifications.md`.
    */
   describe('11.185 the link set is closed at each of the three nav shapes', () => {
-    it('WITHOUT a workspace: only the five ALWAYS items, no My Work/Board', () => {
+    it('WITHOUT a workspace: only the four ALWAYS items, no My Work/Board/Settings', () => {
       currentPath = '/workspaces';
       render(
         <Providers services={NO_NAV_SERVICES}>
@@ -167,7 +167,10 @@ describe('AppNav — the mounts, not the components', () => {
         </Providers>,
       );
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-      expect(hrefs).toEqual(['/workspaces', '/inbox', '/settings', '/help', '/account']);
+      // Round 21: `/settings` LEFT this arm — the owner moved Settings back
+      // behind a workspace — and Inbox moved to just before Help. Both are
+      // ordered assertions, so the move is witnessed here as well as by 13.414.
+      expect(hrefs).toEqual(['/workspaces', '/inbox', '/help', '/account']);
     });
 
     it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
@@ -183,9 +186,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
-        '/inbox',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        '/inbox',
         '/help',
         '/account',
       ]);
@@ -212,9 +215,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1',
         '/w/ws_1/p/p_1',
         '/w/ws_1/my-work',
-        '/inbox',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        '/inbox',
         '/help',
         '/account',
       ]);
@@ -272,35 +275,85 @@ describe('13.391 the nav is contextual', () => {
   });
 
   /**
-   * Settings is now GLOBAL (owner feedback, 2026-09-09) — one literal route,
-   * unconditional on `workspaceId`, so it needs no "any sub-route" widening
-   * the old `/w/[id]/settings/ticket-types` target did. It still carries the
-   * workspace forward as a QUERY PARAM when one is in scope (`/settings?
-   * workspaceId=<id>`), so `/settings`'s own page can show that workspace's
-   * ticket types without the link itself being workspace-typed —
-   * `usePathname()` ignores the query string, so `aria-current` reads the
-   * same regardless of which workspace (or none) is attached.
+   * Settings is WORKSPACE-SCOPED again (Round 21, owner: "move back the nav bar
+   * settings to only be visible once a workspace is opened"), reversing Round
+   * 19c's move to the always tier.
+   *
+   * **The visibility rule reverted; the TARGET did not**, and this case pins
+   * both halves because the obvious way to "move it back" is to restore the
+   * pre-19c href along with the condition — which would re-open a closed defect.
+   * `/w/<id>/settings/ticket-types` is the sidebar-less list page whose own Edit
+   * button opened the editor as a third route; `/settings?workspaceId=<id>` is
+   * the shell built to replace it. So the assertion below is deliberately not
+   * just "absent without a workspace": it names the href that must survive.
+   *
+   * `aria-current` still needs no "any sub-route" widening — the nav's Settings
+   * is one literal route and `usePathname()` ignores the query string, so it
+   * reads `page` on `/settings` whichever workspace is attached.
    */
-  it('Settings is a global link that carries the workspace as a query param, current only on /settings', async () => {
+  it('Settings renders only with a workspace, keeps its query-param target, and is current on /settings', async () => {
     currentPath = '/w/ws_1/my-work';
     const { rerender } = render(
       <Providers services={workspacesOf([workspace({ id: 'ws_1' })])}>
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    let settings = await screen.findByRole('link', { name: 'Settings' });
+    const settings = await screen.findByRole('link', { name: 'Settings' });
     expect(settings).toHaveAttribute('href', '/settings?workspaceId=ws_1');
     expect(settings).not.toHaveAttribute('aria-current');
+    // The href the revert must NOT restore — see the docblock.
+    expect(settings).not.toHaveAttribute('href', '/w/ws_1/settings/ticket-types');
 
     currentPath = '/settings';
+    rerender(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+
+    // And the rule itself: no workspace in the route, no Settings link at all.
+    currentPath = '/workspaces';
     rerender(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
       </Providers>,
     );
-    settings = screen.getByRole('link', { name: 'Settings' });
-    expect(settings).toHaveAttribute('href', '/settings');
-    expect(settings).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  /**
+   * 13.414 — Inbox sits JUST BEFORE Help (Round 21, owner ruling), where
+   * nothing else in the suite pins nav ORDER.
+   *
+   * Asserted as the order of the whole rendered link list rather than as
+   * "Inbox exists" plus "Help exists", because both of those already passed
+   * before the move and would keep passing after any future one. The comparison
+   * is over `compareDocumentPosition`, so it reads the DOM's own order and not
+   * the order the query happened to return.
+   *
+   * The signed-out shape is used deliberately: `NO_NAV_SERVICES` with no
+   * workspace renders the four always items, which is the arrangement the
+   * owner's instruction is about — Inbox leaving the workspace-scoped view
+   * links for the tail of the bar.
+   */
+  it('13.414 renders Inbox immediately before Help', () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const inbox = screen.getByRole('link', { name: /Inbox/ });
+    const help = screen.getByRole('link', { name: 'Help' });
+    // `DOCUMENT_POSITION_FOLLOWING` (4) — Help comes after Inbox in the DOM.
+    expect(inbox.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // IMMEDIATELY before: nothing renders between them. Compared over the nav's
+    // own link list so a future insertion here fails rather than passing on the
+    // looser "somewhere after" check above.
+    const names = screen.getAllByRole('link').map((node) => node.textContent ?? '');
+    const inboxAt = names.findIndex((text) => /Inbox/.test(text));
+    expect(names[inboxAt + 1]).toBe('Help');
   });
 });
 

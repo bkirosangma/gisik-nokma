@@ -430,29 +430,35 @@ function ProjectCard({
 }
 
 /**
- * The five doors out of this page.
+ * The four doors out of this page — five until Round 21 moved MCP tokens to
+ * `/account` (owner: "this should not be scoped to a workspace").
  *
- * **Three are workspace-scoped path segments and two are not**, and that
- * asymmetry is the whole reason these are five literal strings rather than a
- * mapped prefix. `/mcp/tokens` is a GLOBAL route (`app/mcp/tokens/page.tsx`
- * takes no `workspaceId` and reads none), so a uniform `/w/${workspaceId}/…`
- * builder would emit `/w/<id>/mcp/tokens`, which resolves to nothing — and a
+ * **Three are workspace-scoped path segments and one is not**, and that
+ * asymmetry is the whole reason these are four literal strings rather than a
+ * mapped prefix: Ticket types targets `/settings?workspaceId=<id>&tab=…`,
+ * where the workspace rides as a QUERY PARAM, so a uniform `/w/${workspaceId}/…`
+ * builder would emit `/w/<id>/settings?…`, which resolves to nothing — and a
  * test that built its expectations the same way would agree with the bug.
- * Case 13.387 asserts the five paths as literals for exactly that reason.
- * TARGETS are unchanged by Round 19b.
+ * Case 13.387 asserts the four paths as literals for exactly that reason.
+ * **The asymmetry SURVIVED the removal of `/mcp/tokens`**, which is why the
+ * literals stay: the departing link was the most obvious non-`/w/` door, and
+ * replacing these with a builder now would break Ticket types instead — the
+ * same defect, one door over.
  *
- * **Ticket types joined `/mcp/tokens` as the second non-`/w/<id>/…` door
- * (owner feedback, 2026-09-09: "the ticket type edit is opening in a separate
- * route... repoint it").** It used to point at
+ * **Ticket types became a non-`/w/<id>/…` door in Round 19b** (owner feedback,
+ * 2026-09-09: "the ticket type edit is opening in a separate route... repoint
+ * it") — the SECOND such door then, and the only one since Round 21 sent
+ * `/mcp/tokens` to `/account`. It used to point at
  * `/w/<id>/settings/ticket-types` — the bare, sidebar-less list page whose own
  * Edit button opened the ticket-type editor as a THIRD route, the exact
  * defect fixed on `/settings` itself (`app/settings/page.tsx`'s own
  * docblock). Fixing the editor there and leaving this link pointed at the
  * page it bypasses would leave the identical bug reachable a second way, so
  * it now targets `/settings?workspaceId=<id>&tab=ticket-types` — the real
- * shell, sidebar and inlined editor included. The header's own `Settings`
- * button (below) carried the same stale href and is repointed the same way,
- * to `/settings?workspaceId=<id>` with no tab (the shell's own default).
+ * shell, sidebar and inlined editor included. (The page header carried a
+ * `Settings` button with the same stale href, repointed in the same round;
+ * Round 21 removed that button outright — see the header's own comment — so
+ * this link is now the only Ticket-types door on the page.)
  * **Workflows is deliberately UNCHANGED** — `/w/<id>/settings/workflows`
  * still has no sidebar, but unlike ticket types its own editor (the
  * workflow BUILDER) was never inlined into `/settings` either, on purpose
@@ -552,20 +558,15 @@ function WorkspaceLinks({
           States, transitions and published versions.
         </span>
       </Link>
-      {/* Global, deliberately: an MCP token belongs to a person rather than to a
-          workspace. It is listed here because this is where somebody goes
-          looking for it, not because this page owns it. */}
-      <Link
-        href="/mcp/tokens"
-        className="gn-workspace-home__link"
-        aria-label="MCP tokens"
-        aria-describedby="gn-link-note-mcp-tokens"
-      >
-        <span className="gn-workspace-home__link-label">MCP tokens</span>
-        <span className="gn-workspace-home__link-note" id="gn-link-note-mcp-tokens">
-          Let an assistant act as you, with your permissions.
-        </span>
-      </Link>
+      {/* MCP tokens is NOT here (Round 21, owner: "move MCP tokens to the
+          account page. as this should not be scoped to a workspace"). Round 19b
+          listed it precisely because it was global — "this is where somebody
+          goes looking for it" — and that reasoning is what the owner overruled:
+          a global credential listed among four workspace sections reads as a
+          workspace's own, and the card gave no hint otherwise. It now lives on
+          `/account`, beside the sessions and passkeys it belongs with, and this
+          nav holds only `/w/<id>/…` destinations plus the one `/settings` tab
+          that is workspace-scoped by its query param. */}
     </nav>
   );
 }
@@ -588,19 +589,27 @@ function WorkspaceHome({
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
   /**
-   * The ONE list the grid renders (Round 20), and the reference's own
-   * expression: `filter(p => showArchived || !p.archived)`.
+   * The ONE list the grid renders, LIVE FIRST AND ARCHIVED LAST (Round 21,
+   * owner: "always sort the archived projects to the end").
    *
-   * `live` and `archived` are still bound above and still earn their place —
-   * `live.length` is the meta line's "N active projects" and `archived.length`
-   * gates the toggle — but the grid is no longer built by concatenating them.
-   * That matters beyond tidiness: `[...live, ...archived]` would REORDER the
-   * disclosed grid, sinking every archived project to the end regardless of
-   * where the server put it, so a project would move twice on one click (in,
-   * and down). A single filter over `workspace.projects` preserves the served
-   * order, which is the only order this page has any claim to.
+   * Round 20 built this as a single `filter(p => showArchived || !p.archived)`
+   * over `workspace.projects` and argued FOR the served order: concatenating
+   * would sink an archived project to the end regardless of where the server
+   * put it, so a project would move twice on one click — in, and down. The
+   * owner has ruled the other way, and the cost is ACCEPTED rather than
+   * forgotten: disclosure is a MODE CHANGE, not an insertion, and in the
+   * disclosed mode the order is live-then-archived. A reader who opens the
+   * disclosure is asking "what else is here", and the answer groups the
+   * retired work at the end instead of interleaving it through the grid at
+   * positions only the server's ordering explains.
+   *
+   * `live` and `archived` are the same two arrays the meta line and the toggle
+   * already read (`live.length` is "N active projects", `archived.length` gates
+   * the control), so the grid cannot disagree with either about which projects
+   * are which — one partition, three consumers. Within each group the served
+   * order is preserved; it is only the two GROUPS that are ordered here.
    */
-  const shown = workspace.projects.filter((project) => showArchived || !project.archived);
+  const shown = showArchived ? [...live, ...archived] : live;
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
@@ -636,14 +645,13 @@ function WorkspaceHome({
               rule in globals.css for why. */}
           <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{meta}</p>
         </div>
-        <div className="gn-workspace-home__header-actions">
-          <Link href={`/w/${workspace.id}/members`} className="gn-button">
-            Members
-          </Link>
-          <Link href={`/settings?workspaceId=${workspace.id}`} className="gn-button">
-            Settings
-          </Link>
-        </div>
+        {/* NO Members/Settings buttons here (Round 21, owner: "remove the
+            members and settings button, not the nav bar item, but the buttons
+            on the right side of the workspace viewport"). Both destinations
+            remain reachable and neither is orphaned: Members is one of the
+            section cards below AND a nav item once a workspace is open, and
+            Settings is the nav's own workspace-scoped item (Round 21 item 6).
+            The header is now the monogram and the titles, nothing else. */}
       </div>
 
       {/* Round 20: the heading and its toggle sit in a BARE row above the grid,
@@ -683,10 +691,10 @@ function WorkspaceHome({
         // "there are no projects" would be a claim about the workspace.
         <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
       ) : (
-        // ONE grid, not a live list plus a disclosed second one (Round 20). The
-        // archived cards are drawn dimmed and badged IN PLACE, in the order the
-        // server served them, which is what `shown`'s single filter preserves —
-        // see its own comment above.
+        // ONE grid, not a live list plus a disclosed second one (Round 20) —
+        // but the archived cards sort to its END (Round 21, owner ruling), dimmed
+        // and badged rather than moved to a section of their own. See `shown`'s
+        // own comment above for the order and what it costs.
         <ul className="gn-workspace-home__projects">
           {shown.map((project) => (
             <ProjectCard

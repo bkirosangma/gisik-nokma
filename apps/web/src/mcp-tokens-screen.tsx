@@ -53,12 +53,43 @@ function approvedOn(iso: string): string {
 
 /**
  * `heading` defaults to `'h1'` — the standalone `/mcp/tokens` page's own top
- * heading, unchanged from before this extraction. `/settings` passes `'h2'`:
- * its own `<h1>Settings</h1>` already owns level 1, and nesting a second h1
- * under it would be the wrong heading structure for a screen reader outline,
- * not merely a style choice.
+ * heading, unchanged from before this extraction. A host whose own `<h1>`
+ * already owns level 1 passes `'h2'`: nesting a second h1 under it would be the
+ * wrong heading structure for a screen reader outline, not merely a style
+ * choice. (`/settings` passed `'h2'` for that reason until Round 21 moved this
+ * screen off that shell; `/account` passes it now, for the same reason.)
+ *
+ * `variant` is a SEPARATE knob from `heading` because the two answer different
+ * questions — `heading` is the document outline, `variant` is the surface this
+ * screen is drawn on — and they genuinely vary independently.
+ *
+ * `'account'` (Round 21, owner: "move MCP tokens to the account page") adapts
+ * three things to `/account`'s column, all of which would otherwise be visibly
+ * or factually wrong there:
+ *
+ * - **The heading class.** `gn-page-title` is roughly twice the size of the
+ *   `gn-account__section-title` every sibling section uses.
+ * - **The card width.** `.gn-mcp-tokens__card`'s 34rem cap is narrower than the
+ *   42.5rem column, so the card would sit visibly short of its neighbours'
+ *   edges. The modifier lifts the cap rather than a `.gn-account__column
+ *   .gn-mcp-tokens__card` descendant rule — a page-scoped override of a shared
+ *   class is the shape case 13.355 exists about.
+ * - **The sign-in return path**, which is the one that is not cosmetic: the
+ *   signed-out branch below says "you land back here", and `next` decides
+ *   whether that sentence is TRUE. Hard-coded to `/mcp/tokens`, a signed-out
+ *   visitor to `/account` would be promised this page and delivered another.
+ *
+ * It is derived from `variant` rather than taking a third prop precisely so the
+ * promise and the surface cannot be configured to disagree.
+ *
+ * The card itself is NOT wrapped in `.gn-account__section` by the caller: that
+ * class is already a raised card (radius, surface, shadow, padding), so the two
+ * together would be a card holding a card. `<Card>` here IS the section.
  */
-export function McpTokensScreen({ heading = 'h1' }: { heading?: 'h1' | 'h2' } = {}): React.JSX.Element {
+export function McpTokensScreen({
+  heading = 'h1',
+  variant = 'page',
+}: { heading?: 'h1' | 'h2'; variant?: 'page' | 'account' } = {}): React.JSX.Element {
   // The discriminated union, not `useCurrentUser()`: that hook answers `null`
   // for BOTH 'still loading' and 'signed out', and flashing a sign-in prompt at
   // somebody who is already signed in is a false statement about their session.
@@ -111,17 +142,25 @@ export function McpTokensScreen({ heading = 'h1' }: { heading?: 'h1' | 'h2' } = 
   };
 
   const Heading = heading;
+  const onAccount = variant === 'account';
+  // See the docblock: all three follow from ONE decision, so they cannot be
+  // configured into disagreeing about which page this is.
+  const headingClass = onAccount ? 'gn-account__section-title' : 'gn-page-title';
+  const cardClass = onAccount
+    ? 'gn-mcp-tokens__card gn-mcp-tokens__card--account'
+    : 'gn-mcp-tokens__card';
+  const returnTo = onAccount ? '/account' : '/mcp/tokens';
 
   return (
     <>
-      <Heading className="gn-page-title">Connected assistants</Heading>
+      <Heading className={headingClass}>Connected assistants</Heading>
 
-      <Card className="gn-mcp-tokens__card">
+      <Card className={cardClass}>
         {session.kind === 'loading' ? (
           <p>Checking your session…</p>
         ) : session.kind === 'signed-out' ? (
           <p className="gn-mcp-tokens__signed-out">
-            <Link href={`/sign-in?next=${encodeURIComponent('/mcp/tokens')}`}>Sign in</Link> to see
+            <Link href={`/sign-in?next=${encodeURIComponent(returnTo)}`}>Sign in</Link> to see
             and revoke the assistants connected to your account — you land back here.
           </p>
         ) : (
