@@ -117,6 +117,37 @@ export default function AccountPage() {
    * task adds a third, which is named here and in the task report rather than
    * slipped in under a change whose whole headline is auth-bucket hygiene.
    *
+   * ## AND THE CEREMONIES COST MORE THAN THE PAGE LOAD — the half of the
+   * ## disclosure an owner actually has to act on
+   *
+   * A page load is the cheap part. Counted from `@better-auth/passkey`'s own
+   * `dist/client.mjs` plus this component's re-reads, against the same budget
+   * of 10 per 60s:
+   *
+   * | action | requests under `/api/auth/*` | units |
+   * |---|---|---|
+   * | `/account` load (signed in) | `get-session`, `list-sessions`, `list-user-passkeys` | **3** |
+   * | Add a passkey, succeeding | `generate-register-options`, `verify-registration`, then the re-list | **3** |
+   * | Add a passkey, ABORTED at the prompt | `generate-register-options` only — `startRegistration` throws before the verify | **1** |
+   * | Delete a passkey | `delete-passkey`, then the re-list | **2** |
+   * | Sign in with a passkey (`/sign-in`) | `generate-authenticate-options`, `verify-authentication` | **2** |
+   *
+   * So arriving on this page and registering once is **six units of ten**, and a
+   * person who fumbles the prompt two or three times and retries can exhaust the
+   * window — on a key shared with everyone behind the same web container, whose
+   * sign-in is then refused. **That is a real operational cost and it is stated
+   * here rather than discovered.**
+   *
+   * **It does NOT weaken the constraint this task exists to protect**, and the
+   * two must not be run together: that constraint is specifically about an
+   * ANONYMOUS `/sign-in` PAGE LOAD, which still charges the bucket ZERO times
+   * (measured in a real browser: one `GET /v1/auth/methods`, a `/v1/*` route the
+   * limiter never charges, and nothing under `/api/auth/*`). Every figure in the
+   * table above is the cost of a DELIBERATE action by a signed-in person, which
+   * is a budget being spent on work, not on a page merely being opened. The
+   * remedy if it ever bites is an operator raising `RATE_LIMIT_AUTH_MAX`, not a
+   * change here.
+   *
    * Gating on `user !== null` is what keeps the third charge from being spent
    * on a request that CANNOT succeed: the endpoint sits behind better-auth's
    * `sessionMiddleware`, so an anonymous `/account` load would buy a 401 with

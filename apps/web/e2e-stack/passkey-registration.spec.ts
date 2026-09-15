@@ -87,17 +87,42 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     await signIn(page, OWNER_EMAIL);
 
     await page.goto('/account');
-    // The empty state is asserted BEFORE the add, so the row appearing below is
-    // a fact about registration and not about a list that was already populated
-    // by an earlier run of this spec.
-    await expect(page.getByText('You have no passkeys yet.')).toBeVisible();
 
-    await page.getByLabel('Passkey name').fill('Test authenticator');
+    /**
+     * A PER-RUN-UNIQUE NAME, AND NOT AN EMPTY-LIST PRECONDITION.
+     *
+     * This read `await expect(page.getByText('You have no passkeys yet.'))
+     * .toBeVisible()` before the add, reaching for a real property: that the row
+     * appearing below is a fact about THIS registration rather than about a list
+     * some earlier run already populated. But this spec never deletes what it
+     * creates, so that precondition is only true on the FIRST run against fresh
+     * containers. A local re-run, or any CI with cached volumes, would fail on
+     * the precondition — **and it would fail looking exactly like a feature
+     * regression rather than like test residue**, which is the worst way for a
+     * suite to be wrong.
+     *
+     * A unique name carries the same discriminating weight without needing an
+     * empty database or a cleanup step: a row labelled with THIS run's timestamp
+     * cannot have been left behind by anything else, so its presence is
+     * attributable to the registration performed three lines below and to
+     * nothing else. The list may hold residue from earlier runs; this assertion
+     * does not care, which is the point.
+     */
+    const passkeyName = `Test authenticator ${Date.now()}`;
+
+    await page.getByLabel('Passkey name').fill(passkeyName);
     await page.getByRole('button', { name: 'Add a passkey' }).click();
     // The row is drawn from a RE-READ of `/passkey/list-user-passkeys`, not from
     // the typed name — `app/account/page.tsx` re-lists rather than pushing
-    // locally — so this is the server confirming it stored the credential.
-    await expect(page.getByText('Test authenticator')).toBeVisible();
+    // locally — so this is the server confirming it stored the credential under
+    // the label this run chose.
+    await expect(page.getByText(passkeyName)).toBeVisible();
+    // The per-row delete control's ACCESSIBLE name carries that same unique
+    // label, which is the one assertion that proves the row is a real
+    // `PasskeysSection` row rather than the typed text lingering in the field.
+    await expect(
+      page.getByRole('button', { name: `Delete passkey ${passkeyName}` }),
+    ).toBeVisible();
 
     // AppNav's control, addressed by its full accessible name (`Sign out
     // {name}`). A bare `/sign out/i` would also match every Sessions row's own

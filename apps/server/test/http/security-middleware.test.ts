@@ -1179,16 +1179,38 @@ describe('rate limiting — the passkey probe, and /sign-in’s zero-cost rule',
   });
 
   /**
-   * ONE CLICK IS AFFORDABLE, WHICH IS THE OTHER HALF OF THE DESIGN.
+   * ONE PROBE LEAVES THE MAGIC LINK AVAILABLE — and the NAME of this case is a
+   * correction, recorded because the first name was a claim the test could not
+   * support.
    *
-   * The button is not free — nothing under `/api/auth/*` is — and this case
-   * pins what it actually costs so the trade is visible rather than implied: a
-   * single deliberate click spends ONE unit of ten, and the person's own
-   * magic-link fallback is still there afterwards. A design that made the
-   * button click-only but left each click costing five would have satisfied
-   * every assertion above and still be wrong.
+   * It was called *"a single deliberate click costs one unit"*, and its docblock
+   * asserted that *"a design that made the button click-only but left each click
+   * costing five would have satisfied every assertion above and still be
+   * wrong."* **Both were false, and the second was false about this very
+   * assertion.** With `authMax: 10`, one probe followed by a magic link that must
+   * not be refused passes under ANY per-request cost from 0 to 9 — including the
+   * five-unit design the docblock named as the thing it excluded. It measured
+   * "one probe does not exhaust ten", which is nearly nothing, while its name
+   * promised a per-unit cost.
+   *
+   * The real per-probe cost is pinned by the BOUNDARY PAIR below plus the
+   * ten-probe case above, not by this one. This case is kept, narrowly, for the
+   * one thing it does show: the ordinary single-click path leaves the person's
+   * own magic-link fallback working.
+   *
+   * ## What a completed click ACTUALLY costs, which no case here can charge
+   *
+   * **At least TWO units, not one.** `signInPasskey` (`dist/client.mjs`) issues
+   * `GET /passkey/generate-authenticate-options` FIRST — the probe these cases
+   * inject — and then, after the browser ceremony resolves, a second
+   * `POST /passkey/verify-authentication`. Both are under `/api/auth/*` and
+   * both are absent from `SIGN_IN_PREFIXES`, so both are charged to `auth:`.
+   * The second one cannot be reached by `app.inject` without a real
+   * authenticator, which is why these cases inject the first only and why this
+   * paragraph exists rather than a test. Registration is dearer still — see the
+   * disclosure in `apps/web/app/account/page.tsx`'s docblock.
    */
-  it('a single deliberate click costs one unit, and leaves the magic link available', async () => {
+  it('one probe leaves the magic link available', async () => {
     const { app } = build(limits({ authMax: 10 }));
     await app.inject({ method: 'GET', url: PROBE });
     const link = await app.inject({
@@ -1198,6 +1220,46 @@ describe('rate limiting — the passkey probe, and /sign-in’s zero-cost rule',
     });
     await app.close();
     expect(link.statusCode).not.toBe(429);
+  });
+
+  /**
+   * THE BOUNDARY, AND THE ONLY CASE HERE THAT PINS A PER-PROBE COST.
+   *
+   * NINE probes, not ten, then the magic link — which is the TENTH request
+   * against `authMax: 10` and must therefore be served. Read together with "ten
+   * passkey probes exhaust the production auth budget" above, which sends the
+   * ELEVENTH and must be refused, the pair brackets the limiter exactly:
+   *
+   *     9 probes + 1 magic link  = 10 requests → served
+   *    10 probes + 1 magic link  = 11 requests → 429
+   *
+   * Only a charge of exactly ONE unit per probe satisfies both. At two units a
+   * probe, nine probes would already have spent eighteen and this case would go
+   * red; at zero, the ten-probe case above could never reach 429. **Neither case
+   * alone can say that — each is satisfiable by a whole range of costs — which
+   * is precisely the gap the mis-named case above left standing.**
+   *
+   * The off-by-one is the point, so it is spelled out rather than left to the
+   * reader: `makeFixedWindowLimiter` refuses when `count > max`, so the tenth
+   * request against a max of ten is the last one allowed.
+   */
+  it('nine probes leave exactly one unit, and the tenth request is still served', async () => {
+    const { app } = build(limits({ authMax: 10 }));
+    for (let i = 0; i < 9; i += 1) {
+      await app.inject({ method: 'GET', url: PROBE });
+    }
+    const tenth = await app.inject({
+      method: 'POST',
+      url: MAGIC_LINK,
+      payload: { email: 'someone-else@example.test' },
+    });
+    await app.close();
+    expect(
+      tenth.statusCode,
+      'nine probes already exhausted a budget of ten, so a probe is costing MORE than one unit — ' +
+        'or the magic-link path is being charged twice. Either way the sibling case that sends ten ' +
+        'probes is no longer measuring what its name says.',
+    ).not.toBe(429);
   });
 });
 

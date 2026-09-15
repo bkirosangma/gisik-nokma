@@ -150,7 +150,19 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
   disclosed rather than slipped in:** for a SIGNED-IN visitor this does add a third `auth:` charge per
   `/account` load (`/get-session`, `/list-sessions`, `/passkey/list-user-passkeys`) against a
   `RATE_LIMIT_AUTH_MAX` of 10; `/passkey/*` is absent from `SIGN_IN_PREFIXES`, so none of it touches
-  the tighter `signin:` bucket. `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
+  the tighter `signin:` bucket. **And the CEREMONIES cost more than the page load, which is the half of
+  this disclosure an operator actually has to act on:** counted from `@better-auth/passkey`'s own
+  `dist/client.mjs`, a successful Add is **3** units (`generate-register-options`,
+  `verify-registration`, then the re-list), an Add aborted at the prompt is **1**, a Delete is **2**,
+  and a passkey sign-in click on `/sign-in` is **2** (`generate-authenticate-options`,
+  `verify-authentication` — so a completed click costs two, not one). Arriving on `/account` and
+  registering once is six units of ten, and a person who fumbles the prompt a few times and retries can
+  exhaust the window on a key shared across every browser behind the web container. **This does NOT
+  weaken the rate-limit-neutral constraint and the two must not be run together:** that constraint is
+  specifically about an ANONYMOUS `/sign-in` PAGE LOAD, which still charges ZERO — measured in a real
+  browser as one `GET /v1/auth/methods`, a `/v1/*` route the limiter never charges, and nothing under
+  `/api/auth/*`. Every figure above is a deliberate action by a signed-in person; the remedy if it ever
+  bites is an operator raising `RATE_LIMIT_AUTH_MAX`. `apps/web/app/account/page.tsx`, `apps/web/src/account/profile-section.tsx`,
   `apps/web/src/account/workspaces-section.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
   `packages/app-core/src/account/notification-preferences-gateway.ts`,
   `packages/app-core/src/online/notification-preferences.ts`, `apps/web/src/providers.tsx`,
