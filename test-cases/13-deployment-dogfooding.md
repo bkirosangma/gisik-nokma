@@ -5079,7 +5079,9 @@ the actual run: `13.485` is a refusal too, off `todo → todo`) — while the fi
   definition with a `flagged` state reachable only by `* -> flagged`. — (same files)
 - **13.485** ✅ A move back onto the current state refuses like any other undeclared move —
   `transitionOptions` already excludes `to === fromStateId`, even against a wildcard edge that would
-  otherwise reach it. — (same files)
+  otherwise reach it. Asserts both `kind: 'refused'` and `available: ['doing']`; the mutation above
+  kills it on the `available` half — self-exclusion itself (the `kind`) is pinned by
+  `transitionOptions`'s own tests in `transition-dialog.test.tsx`, not mutated here. — (same files)
 
 `tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2, `pnpm exec vitest run
 test/views/board-moves.test.ts`: 8/8 green). `node scripts/check-case-ids.mjs` re-run after minting:
