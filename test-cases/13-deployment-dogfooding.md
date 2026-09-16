@@ -5055,10 +5055,12 @@ board-moves.test.ts` re-run after each edit, then reverted with a targeted `Edit
 --`, which has destroyed uncommitted work in this repo before). Replacing the `transitionOptions` call
 with a naive re-derivation that scanned `def.transitions` in array order and stopped at the first edge
 reaching `toStateId` — ignoring exact-before-wildcard — reddened `13.483` alone; every other case in the
-file stayed green. Hardcoding `available: []` on the refused branch reddened `13.478` and `13.479`
-(`available` no longer equals the declared list) while `13.480`/`13.481` (no refused branch reached) stayed
-green. Inverting the rules check (`rules.length === 0` routing to `needs-dialog`, anything else to
-`direct`) reddened `13.480`/`13.481`/`13.482`/`13.483` (every direct/needs-dialog case swapped kind) while
+file stayed green. Hardcoding `available: []` on the refused branch reddened all three REFUSED cases —
+`13.478`, `13.479`, **and `13.485`** (a first prediction named only the first two and was corrected against
+the actual run: `13.485` is a refusal too, off `todo → todo`) — while the five direct/needs-dialog cases,
+`13.480`–`13.484`, which never reach that branch, stayed green. Inverting the rules check
+(`rules.length === 0` routing to `needs-dialog`, anything else to `direct`) reddened exactly those five —
+`13.480`/`13.481`/`13.482`/`13.483`/`13.484`, every direct/needs-dialog case swapping kind — while
 `13.478`/`13.479`/`13.485` (the refused cases, unreached by that branch) stayed green.
 
 - **13.478** ✅ Refuses an undeclared target and names the one move that IS available from that state. —
