@@ -4154,3 +4154,25 @@ rather than merely re-passing the full file in its usual order.
 
 Neither case ID changes: 13.431 and 13.432 still name the same two behaviours, now proven true
 independent of run order and with the DOM shape the metrics table actually describes.
+
+## Task 3 — the board's own filter vocabulary (board-prototype-port plan, 2026-09-16)
+
+**Block `13.433`–`13.434` minted here; the next free BLOCK is `13.435`.** The plan's draft proposed
+synthesizing a `TicketState` from a `BoardCard` so the board could reuse `matchesFilter` directly;
+rejected before being built, because `matchesFilter` fails CLOSED on every axis a card cannot supply
+(`collaboratorIds`, `dueBefore`/`dueAfter`, any `fields` clause) and a synthesized state would EMPTY
+the board rather than narrow it. `BoardFilterSpec` is `Pick<FilterSpec, …>` over the six axes a board
+can answer; the four it cannot are unrepresentable, a compile error rather than a wrong answer on
+screen. Two cases, and neither substitutes for the other: agreement proves the shared axes decide
+alike, the compile-time case proves the narrowing is real rather than merely documented.
+
+- **13.433** ✅ `matchesBoardCard` and `matchesFilter` decide identically on all six shared axes
+  (assignee, type, state, state category, project, text — matching and non-matching, plus the empty
+  spec) over a `BoardCard`/`BoardColumn` pair and the equivalent `TicketState`. A dedicated control
+  asserts the corpus contains at least one rejection, so the agreement is not vacuously true of two
+  predicates that both always answer `true`. — (`packages/app-core/test/filter/board-filter.test.ts`)
+- **13.434** ✅ `collaboratorIds` and `dueBefore` are rejected on a `BoardFilterSpec` literal at
+  COMPILE TIME (`@ts-expect-error`), not merely absent from a runtime check — witnessed by temporarily
+  widening `BoardFilterSpec` from the `Pick` to bare `FilterSpec` and confirming `tsc` then reports
+  both directives as unused (`TS2578`), proving the narrowing is what rejects the two axes rather than
+  a typo the compiler happened not to catch. — (`packages/app-core/test/filter/board-filter.test.ts`)

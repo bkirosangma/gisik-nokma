@@ -138,6 +138,11 @@ export {
   type IsEpicType,
 } from './hierarchy/epic-ancestor.js';
 export { matchesFilter } from './filter/matches-filter.js';
+// The board's own filter vocabulary (Plan: board-prototype-port, Task 3) —
+// `BoardFilterSpec` is declared in `filter/board-filter.ts` and has exactly
+// one export path, unlike `FilterSpec` above, which already leaves through
+// `view-types.ts`'s `export *`.
+export { matchesBoardCard, type BoardFilterSpec } from './filter/board-filter.js';
 export {
   buildCalendarModel,
   type CalendarBar,
