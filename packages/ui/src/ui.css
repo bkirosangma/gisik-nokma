@@ -1661,6 +1661,21 @@
   color: var(--gn-accent-text);
 }
 
+/* `background: var(--gn-surface)` is DELIBERATE, not a default this rule
+   happened to skip. Without it, this row inherits `.gn-calendar__grid`'s new
+   `--gn-surface-sunken` tray (nothing between them paints an opaque ground of
+   its own), and `.gn-calendar__item--custom`'s text colour — UNCHANGED by
+   this task, per its one exception — was only ever measured against
+   `--gn-surface`: "`customMarker` on neo's paper is 4.807" (task brief).
+   Measured before shipping, not assumed: `customMarker` on `--gn-surface-
+   sunken` is 4.310 on `hig`/`minimal` LIGHT — a real regression BELOW 4.5,
+   because `warmSunken` (`#e4d8cc`) is close enough to the marker's violet hue
+   to erode the margin that already had "by a hair" written about it,
+   `warmPaper`'s own extra distance was the entire margin. `neo` collapses
+   `surface`/`surfaceSunken` to one hex so it was never at risk. Pinning this
+   row back to `--gn-surface` keeps every item — marker, bar and custom alike
+   — on the exact ground its contrast was last measured against, regardless
+   of which day cell it happens to be drawn under. */
 .gn-calendar__items {
   list-style: none;
   margin: 0;
@@ -1668,6 +1683,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+  background: var(--gn-surface);
 }
 /* "Event pill": `radius 6px; padding 2px 7px; 12px/16px; accent ground;
    onColor`. ONE exception, task-10-brief's own: the custom-field marker

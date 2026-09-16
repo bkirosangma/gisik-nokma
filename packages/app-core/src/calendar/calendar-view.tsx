@@ -401,11 +401,14 @@ export function CalendarView(props: CalendarViewProps) {
                   return (
                     <div
                       key={day}
-                      className={[
-                        'gn-calendar__day',
-                        isToday ? 'gn-calendar__day--today' : '',
-                        outside ? 'gn-calendar__day--outside' : '',
-                      ]
+                      // No `--today` modifier class here: the ring it used to
+                      // draw moved onto `.gn-calendar__day-number--today`
+                      // below, and a class with no rule left to style it is
+                      // the exact "reads as doing something, renders nothing"
+                      // shape this file's own legend rows were just written
+                      // to avoid — `data-today`/`aria-current` already carry
+                      // the cell-level signal for both CSS and tests.
+                      className={['gn-calendar__day', outside ? 'gn-calendar__day--outside' : '']
                         .filter(Boolean)
                         .join(' ')}
                       data-day={day}
