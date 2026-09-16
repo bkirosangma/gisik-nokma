@@ -503,6 +503,58 @@
   padding: 0.2rem 0 0;
   text-align: left;
 }
+/* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
+   button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
+   15px/600`. `ctlBg` → `--gn-fill-tertiary`, `accent` (as TEXT) → `--gn-text-
+   accent` — the same two roles `.gn-button`, `.gn-calendar__nav` and
+   `.gn-project__workflow-select` already resolve this identical prototype
+   pairing to, each citing the reason at length in its own docblock.
+   `ctlShadow` is DELIBERATELY OMITTED, the SAME already-recorded, product-
+   wide open decision every one of those three rules already states
+   (`.gn-button`'s own docblock, `:22-30` above; the board port's own plan,
+   `docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`: "Board
+   controls use `.gn-button` unchanged").
+
+   `min-height`/`min-width` DIVERGE from the spec's own `32px`/`36px` —
+   DELIBERATELY, the SAME kind of divergence the board port's own plan
+   already made once, for the tab rail (`:56`: "Tab height is 2.75rem, not
+   the prototype's 40px... `ui.css:2424-2430` records why 40px was wrong: it
+   fails the 44px tap-target floor (WCAG 2.5.5) and reddens `/sign-in` on all
+   three viewports"). `apps/web/e2e-viewport/tap-targets.ts` sweeps every
+   `button` on every real page against that same 44px floor with no per-
+   component exemption, and this repo already has one measured casualty at
+   40px — a 32×36 control would fail the identical gate the moment `Board`'s
+   arrows are reachable in a real e2e run, which they are as of this task
+   (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` wires `moves`).
+   The metric's own VISUAL treatment — `ctlBg`, accent text, 15px/600 — is
+   kept exactly as specified; only the tap target is raised, matching the
+   tab rail's own precedent rather than inventing a new rule for this one
+   control. */
+.gn-board-card__moves { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.gn-board-card__move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px, not the prototype's 32px — see the rule block's own comment */
+  min-width: 2.75rem; /* 44px, not the prototype's 36px — see the rule block's own comment */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-board-card__move:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+/* Spec row "Move button, unavailable": `opacity:0.4; cursor:not-allowed` —
+   this component's OWN metric, not `.gn-button`'s generic `:disabled` rule
+   (0.55 — `:79-82` above): the spec gives this control its own number, kept
+   rather than folded into the shared default. */
+.gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 .gn-list__controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .gn-list__summary { color: var(--gn-text-muted); }

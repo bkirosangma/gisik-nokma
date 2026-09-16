@@ -5200,3 +5200,98 @@ those three `13.489` sub-cases.
 
 `tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2). `node
 scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413` only.
+
+## Task 13 — move arrows: refusal and its positive control (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.490`–`13.503` minted here**, continuing directly from `13.489` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool was
+`13.489` — never the file's own "next free BLOCK" prose, an already-recorded false hit). Phase 6, Board
+writes: per-card `‹ ›` move arrows, the first WRITE path in this port. `arrowTarget`
+(`views/board-arrows.ts`) resolves each arrow's target — the nearest state in that direction for which
+`transitionOptions` declares a real edge, never the literal adjacent column — and `MoveArrows`
+(`views/board.tsx`) routes every click through `moveOutcome` (Task 12) without re-deriving its verdict.
+
+**`board-arrows.test.ts` — 8 cases (`13.490`–`13.497`), all against the pure `arrowTarget` scan.**
+Fixture: `WF_ERRAND` for the ordinary and wildcard cases, plus one purpose-built three-state definition
+(`todo -> done` declared, `doing` undeclared and sitting between them in column order) for the brief's own
+canonical illustration.
+
+**Mutation-witnessed** (`board-arrows.ts` edited in place — `scanRange.find((id) => declared.has(id)) ??
+null` replaced with the naive `scanRange[0] ?? null`, i.e. the literal adjacent column, ignoring
+`declared` entirely — `pnpm exec vitest run test/views/board-arrows.test.ts` re-run, then reverted with a
+targeted `Edit`; a functional re-run of the full 8-case file afterward confirmed the revert, since a new,
+still-untracked file shows no `git diff` either way). Prediction, written before running: reddens exactly
+the two cases built to distinguish "nearest declared" from "literal adjacent" — `13.494` and `13.496` —
+leaving the other six green, since every other case's expected answer happens to coincide with the literal
+adjacent column for reasons unrelated to the scan (either only one candidate exists, or none does).
+Result matched exactly: 6 passed / 2 failed, the failing set precisely `13.494` and `13.496` —
+`expected 'waiting' to be 'doing'` and `expected 'doing' to be 'done'` respectively.
+
+- **13.490** ✅ The nearest declared forward target IS the adjacent column — the ordinary case, `todo`
+  `next` → `doing`. — (`packages/app-core/src/views/board-arrows.ts`,
+  `packages/app-core/test/views/board-arrows.test.ts`)
+- **13.491** ✅ No declared edge points back at `todo` from anywhere, so `previous` answers `null`. —
+  (same files)
+- **13.492** ✅ From `doing`, THREE targets are declared (`todo` via wildcard, `waiting`, `done`); `next`
+  picks the NEARER of the two forward ones (`waiting`), not merely a declared one — proves "nearest",
+  not "any". — (same files)
+- **13.493** ✅ `previous` from `doing` resolves through the WILDCARD edge (`* -> todo`), not only an
+  exact one. — (same files)
+- **13.494** ✅ THE SKIP CASE inside the shared fixture: from `done`, `waiting` sits between `doing` and
+  `done` in column order but is NOT declared reachable from `done`; `previous` skips it and lands on the
+  further, genuinely declared `doing`. The mutation's own witness. — (same files)
+- **13.495** ✅ `done` is the last column; `next` has nothing to scan forward into and answers `null`. —
+  (same files)
+- **13.496** ✅ THE BRIEF'S OWN CANONICAL EXAMPLE, its own purpose-built fixture: `todo -> done` declared,
+  `doing` sitting between them purely visually with no edge touching it at all. `next` from `todo`
+  resolves straight to `done`, never the physically adjacent `doing`; the paired control confirms `doing`
+  itself has no move in EITHER direction, so the skip did not merely relabel which arrow `doing` answers
+  to. The mutation's other witness. — (same files)
+- **13.497** ✅ A `fromStateId` absent from `columnOrder` entirely has no column to scan from and answers
+  `null` in both directions. — (same files)
+
+**`board-moves-ui.test.tsx` — 6 cases (`13.498`–`13.503`), the component-level wiring: `Board`'s `moves`
+capability, `MoveArrows`, and `MoveRefusalNotice`.**
+
+**Why the refusal path is proven at the `moveOutcome`/`refusalCopy`/`MoveRefusalNotice` seam, not through a
+simulated wrong click.** `MoveArrows` computes each arrow's target via `arrowTarget`, which by
+construction only ever returns a member of `transitionOptions(workflow, fromStateId)` — the SAME set
+`moveOutcome`'s own refusal check reads off the identical `(workflow, fromStateId)`. So a target this
+component ever actually SUBMITS is, by construction, always declared, and a live click on an ENABLED arrow
+cannot organically drive `moveOutcome` into its `refused` branch. `13.502`/`13.503` prove the real refusal
+RENDERING instead — the actual `moveOutcome` output, fed into the actual `refusalCopy`/`MoveRefusalNotice`
+— which is the honest seam given the click-side is provably unreachable, and is also exactly the pipeline
+Task 14's drag-and-drop reuses for real, since a drop target is not filtered this way.
+
+- **13.498** ✅ THE POSITIVE CONTROL the brief demands: clicking an available arrow on a declared,
+  rules-free edge submits the SHIPPED `{to}` `ticket.transitioned` payload (never `{toStateId}`), with the
+  right `actorId`/`origin`, calls `onMoved`, and renders no refusal of either kind. Only this case tells a
+  refusal that fires on everything apart from a refusal that actually works. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.499** ✅ THE PAIRED NEGATIVE CONTROL: the direction with no declared target is a genuinely disabled
+  button (native `disabled`, not merely styled to look inert), and firing a click at it anyway submits
+  nothing. — (same files)
+- **13.500** ✅ The `moves` capability itself absent (not passed to `Board` at all) renders NO move arrows
+  whatsoever — the whole feature absent, not merely every direction disabled. — (same files)
+- **13.501** ✅ A declared edge whose rules are NOT already met (`require-comment` on the nearest-declared
+  edge, a purpose-built gated `WF_ERRAND` variant) opens `TransitionDialog` rather than submitting blind;
+  completing the dialog submits the SHIPPED `{to, comment: {text}}` payload — proving the dialog opens
+  aimed at the right `(workflow, fromStateId)`, not merely that SOME dialog opens. — (same files)
+- **13.502** ✅ The refusal pipeline, end to end and for real: `moveOutcome(WF_ERRAND, 'todo', 'waiting',
+  {})` refuses with `available: ['doing']` (the one real alternative — `moveOutcome`'s own test suite
+  already proves this fact; this case's job is only what renders from it), and `MoveRefusalNotice` fed
+  that exact output renders text naming "Doing" BY NAME — never a bare "you can't do that", and never the
+  raw id leaking through unnamed. — (same files)
+- **13.503** ✅ The zero-alternatives sentence (`moveOutcome`'s `available: []`) is still an honest one —
+  `"This ticket can't move from here."`, not `"try ."` — both from `refusalCopy` directly and from
+  `MoveRefusalNotice`'s own rendering. — (same files)
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core`; `tsc -p tsconfig.json --noEmit && tsc -p
+tsconfig.e2e.json --noEmit` (the package's own `typecheck` script) clean on `apps/web`. Node `v22.23.2`.
+Full `packages/app-core` suite: 87 files, 1263 tests, green (up from 83/1249 before this task — the two
+new files' 14 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
+`page.tsx` — whether any of those 363 tests exercise the project page's board tab with a signed-in session
+was not individually traced; the claim made here is only the measured one, that the full suite stayed
+green with the wiring in place, not a claim about which tests do or do not reach the new code path.
+`node scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413`
+only.

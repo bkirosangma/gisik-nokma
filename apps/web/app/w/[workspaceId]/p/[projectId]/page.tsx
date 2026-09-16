@@ -1295,6 +1295,40 @@ function ProjectBoard() {
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
+                  /*
+                    THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
+                    13). Gated on `session.kind === 'signed-in'`, the SAME
+                    precedent `createRegion` above already sets for
+                    `CreateTicketFlow` and for the identical reason spelled
+                    out at `currentUserId`'s own declaration: a click landing
+                    in the load window, or from a signed-out viewer, would
+                    build `makeSubmittedFactory({actorId: '', ...})` and post
+                    an event with an empty actor — the door refuses it as a
+                    permission problem when the truth is "not signed in yet",
+                    the exact wrong-sentence failure that fix already exists
+                    to prevent. `undefined` here is what `Board`'s own
+                    `moves?` treats as the capability being entirely absent —
+                    no arrows drawn, not dead ones with no session behind
+                    them (`board.tsx`'s own `BoardMoveCapability` docblock).
+
+                    `onMoved: board.reload` mirrors `TicketSheet.
+                    submitTransition`'s own `read.reload()` call: an
+                    immediate reload rather than relying solely on
+                    `useLiveQuery`'s debounced stream refetch, which can lag
+                    up to 200ms behind a move the person just watched
+                    succeed.
+                  */
+                  {...(session.kind === 'signed-in'
+                    ? {
+                        moves: {
+                          dataSource,
+                          workspaceId,
+                          currentUserId,
+                          onMoved: board.reload,
+                          cache,
+                        },
+                      }
+                    : {})}
                 />
               ) : (
                 <p>Loading…</p>
