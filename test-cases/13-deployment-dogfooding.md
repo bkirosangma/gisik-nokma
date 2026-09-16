@@ -5948,3 +5948,8 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   (it would silently WIDEN the board: `excludedBy(list, [])` is never out).
 - **13.541** ✅ `13.433`'s agreement corpus extended with eight exclude cases and a rejection control;
   mutation (the `stateIds` exclude line deleted) kills the `excluded state` case.
+- **13.542** ✅ `matchesListRow` agrees with `matchesFilter` over one ticket rendered as a `ListRow` on 28
+  cases spanning every axis it serves — the five id axes, text, both due bounds (inclusive; undated
+  excluded), field clauses (string, number-as-text, mismatch, unknown) and the exclude half — with a
+  rejection control. Mutations: `dueAfter` line → its case fails; `projectIds` exclude line → its case fails.
+- **13.543** ✅ `ListFilterSpec` rejects `collaboratorIds` in both halves at compile time.

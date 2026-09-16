@@ -156,6 +156,8 @@ export { matchesFilter } from './filter/matches-filter.js';
 // one export path, unlike `FilterSpec` above, which already leaves through
 // `view-types.ts`'s `export *`.
 export { matchesBoardCard, type BoardFilterSpec } from './filter/board-filter.js';
+// Exclude-mode spec §2 (2026-09-17): the list-row predicate, beside the board's.
+export { matchesListRow, type ListFilterSpec } from './filter/list-filter.js';
 export {
   buildCalendarModel,
   type CalendarBar,
