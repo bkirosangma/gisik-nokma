@@ -287,31 +287,26 @@ describe('13.438 the strip is not unconditionally present', () => {
 });
 
 /**
- * ## The mirror note (Task 4 fix round 1, coordinator Ruling 10; WIDENED,
- * final whole-branch review's fix wave, Finding 1, 2026-09-16)
+ * ## The mirror note — HISTORY (Task 4 fix round 1, coordinator Ruling 10;
+ * WIDENED, final whole-branch review's fix wave, Finding 1, 2026-09-16;
+ * RETIRED 2026-09-17)
  *
- * The search box sits page-level, above the tab rail, on every tab — but only
- * the BOARD path applies it (`useBoard` cannot be narrowed by anything; the
- * spec's own search ruling exists to avoid "one search box... answer[ing]
- * differently on two tabs"). A sighted person on List/Calendar/Timeline who
- * types into it would otherwise watch nothing happen with no explanation.
- * This note is the fix — and it must appear ONLY while something is actually
- * set on `filter` (never a permanent sentence on three tabs) and ONLY on the
- * tabs where that something does not apply (never on Board, where at least
- * part of it does).
+ * From Task 4 to 2026-09-17 the search box sat page-level, above the tab
+ * rail, on every tab, but only the BOARD path applied it (`useBoard` could
+ * not be narrowed by anything). A note
+ * (`data-testid="search-not-applied-note"`) told a sighted person on
+ * List/Calendar/Timeline that what they typed did not apply there. Ruling 10
+ * gated it on `text` alone; Finding 1 (2026-09-16) widened the gate to cover
+ * the five other axes Task 5's Filters sheet later reached onto the same
+ * `filter` from every tab.
  *
- * Exercised on all three non-board tabs individually (List and Timeline
- * below, Calendar in `13.444` — a Minor from the review: the gate is one
- * uniform `view !== 'board'` check, so divergence was unlikely, but
- * "unlikely" is not "tested").
- *
- * Finding 1: the gate was `activeFilterChips.some((chip) => chip.key ===
- * 'text')` — inert on the FIVE other axes Task 5's Filters sheet later
- * reached onto the same `filter` from every tab (open Filters on List, tick
- * an assignee, press Done: the list does not change, and nothing said so).
- * `13.517` below drives that exact path through the real sheet, on a
- * non-board tab, and is the case that would redden if the gate reverted to
- * the `text`-only check.
+ * RETIRED (exclude-mode spec §3, 2026-09-17): the filter now reaches every
+ * tab for real (`matchesListRow`/`listNarrowing`), so there is nothing left
+ * for the note to apologise for. `13.439`/`13.444`, which exercised the note
+ * directly, retired with it — their numbers stay unused, never reassigned.
+ * `13.517`, which exercised Finding 1's widened gate, FLIPPED into a case
+ * (below) asserting the List tab actually NARROWS instead of merely
+ * disclosing that it can't.
  */
 /**
  * 13.557 — the search box reaches the List tab (exclude-mode spec §3). The
@@ -345,7 +340,7 @@ describe('13.557 the search narrows the List tab, and the note that said otherwi
     expect(screen.getByTestId('list-narrowing')).toHaveTextContent('narrowed to your filters');
   });
 
-  it('13.558 the Calendar and Timeline tabs draw from the same narrowed rows', async () => {
+  it('13.558 the Timeline draws from the narrowed rows at ticket level; the Calendar shows the same count', async () => {
     // `fields.dueDate`, not the top-level `ListRow.dueDate` the brief's own
     // snippet set — `dateClaimOf` reads `row.fields` verbatim (see
     // `fieldClaim`'s own docblock above), so a fixture setting only the
@@ -415,14 +410,19 @@ describe('13.557 the search narrows the List tab, and the note that said otherwi
 });
 
 /**
- * ## Finding 1, final whole-branch review's fix wave (2026-09-16)
+ * ## Finding 1, final whole-branch review's fix wave (2026-09-16) — HISTORY,
+ * FLIPPED 2026-09-17 (exclude-mode spec §3)
  *
- * Drives the actual Filters sheet — open it, tick a real checkbox, press
- * Done — rather than writing `filter.assigneeIds` directly, so this proves
- * the real user path Finding 1 named, not a shortcut approximation of it.
- * Needs a real roster (`board-narrowing.test.tsx`'s own `servedBoard` stubs
- * `getMembers` to `[]`), so this case builds its own services inline rather
- * than widening the shared helper for one case.
+ * Finding 1 found the (now-retired) mirror note's gate inert on five
+ * Filters-sheet axes beyond `text`; `13.517` originally drove the Filters
+ * sheet's real Assignee control — open it, tick a real checkbox, press Done,
+ * rather than writing `filter.assigneeIds` directly — to prove the note
+ * appeared. The mirror note no longer exists (see its own docblock above),
+ * so `13.517` below is FLIPPED: the SAME real path, now asserting the List
+ * tab actually NARROWS rather than that a note appears. `ROSTER` (a real
+ * roster; `board-narrowing.test.tsx`'s own `servedBoard` stubs `getMembers`
+ * to `[]`) is still what that real path needs, reused by `13.560`/`13.561`
+ * and `13.556b` (all below) as well.
  */
 const ROSTER: Array<{ id: string; name: string }> = [{ id: 'u1', name: 'Uma One' }];
 
@@ -551,6 +551,57 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
     const options = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
     expect(options).toContain('A ticket nobody owns');
     await userEvent.keyboard('{Escape}');
+  });
+});
+
+/**
+ * 13.556b — controller ruling on Task 10's fix round 1: the scope note names
+ * the tab it is on. `collaboratorIds` is `ListFilterSpec`'s one unanswerable
+ * axis (same reason `board-filter.ts` gives for the board — see
+ * `describeUnappliedListAxes`'s own docblock in `board-search-scope.ts`), so
+ * an excluded collaborator on the LIST tab narrows nothing and earns no chip
+ * in either direction — the scope note is the only disclosure, and it must
+ * say "the list", not "the board", now that it renders on both.
+ */
+describe('13.556b the scope note names the LIST tab, not the board, when it renders there', () => {
+  it('an excluded collaborator on the List tab narrows nothing and the note says "the list"', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => boardOf(threeCards),
+          getAttention: async () => [],
+          getMembers: async () => ROSTER,
+          getTicketTypes: async () => [],
+          getTickets: async (): Promise<TicketListView> => ({
+            projectId: PROJECT_ID,
+            rows: [
+              listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf' }),
+              listRow({ ticketId: 'lt_2', title: 'A ticket nobody owns' }),
+            ],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    await screen.findByText('A ticket nobody owns');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    const group = within(dialog).getByRole('group', { name: 'Collaborators' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    const note = await screen.findByTestId('board-scope-note');
+    expect(note).toHaveTextContent(/not applied on the list/i);
+    expect(note).toHaveTextContent(/collaborator/i);
+    expect(screen.queryByTestId('board-filter-chip-exclude.collaboratorIds')).not.toBeInTheDocument();
+    expect(screen.getByTestId('board-narrowing')).toBeInTheDocument();
+    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.getByText('A ticket nobody owns')).toBeInTheDocument();
   });
 });
 

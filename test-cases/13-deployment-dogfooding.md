@@ -6005,17 +6005,23 @@ need for per-tab filter variants. These eleven tasks build that capability from 
 - `13.447`/`13.448`/`13.451`/`13.452`/`13.460` updated for the control change (checkbox → button;
   `aria-pressed` → `data-mode`).
 - **13.556** ✅ `listNarrowingWord`: undefined / "tickets in progress" / "your filters" / both joined.
+- **13.556b** ✅ (controller ruling, Task 10 fix round 1, 2026-09-17) The scope note names its OWN tab, not
+  always "the board": on the List tab, an excluded collaborator (`ListFilterSpec`'s one unanswerable axis,
+  same as the board's) narrows nothing and earns no chip, and `board-scope-note` reads "Not applied on the
+  list: collaborator." — both list rows stay on screen, the strip itself still renders. Mutation (hard-coding
+  `tabNoun` to `'board'`) kills it — the note then reads "the board" while sitting on the List tab.
 - **13.557** ✅ The search box narrows the List tab: the non-matching row drops, the strip shows the LIST's
   own count ("1 of 2 shown", never the board's 3), the text chip is there, the old mirror note's testid
   is absent, and `TicketList`'s summary reads "narrowed to your filters". Mutation (`rows={list.rows}`)
   kills it via its row-absence assertion; the same mutation also killed 13.517 and 13.560, which assert
   row absence too.
-- **13.558** ✅ Calendar and Timeline draw from the same narrowed rows ("1 of 2 shown" on each; no mirror
-  note). The strip's own count is `listNarrowing`'s alone and cannot distinguish a correct `dateInputs`
-  from a stale one, so the real proof is a title check on the Timeline tab (left active after the loop):
-  a due-only fixture ticket lands in `TicketList`'s Timeline cousin's own `sideList` ("Undated or partially
-  dated"), which renders `entry.title` regardless of a missing `startDate` — Calendar's own due-only
-  marker does not render the ticket's title at all, so Timeline is the tab that can prove this. The
+- **13.558** ✅ The Timeline draws from the narrowed rows at TICKET LEVEL; the Calendar shows the same
+  count ("1 of 2 shown" on each; no mirror note). The strip's own count is `listNarrowing`'s alone and
+  cannot distinguish a correct `dateInputs` from a stale one, so the real proof is a title check on the
+  Timeline tab (left active after the loop): a due-only fixture ticket lands in `TimelineView`'s own
+  `sideList` ("Undated or partially dated"), which renders `entry.title` regardless of a missing
+  `startDate` — Calendar's own due-only marker does not render the ticket's title at all, so Timeline is
+  the tab that can prove this at ticket level (Calendar's own assertion stays at the count level). The
   fixture needs `fields.dueDate`/`fields.title` as real `FieldClaim`s (`fieldClaim()`), not the top-level
   `ListRow.dueDate` convenience field alone — `dateClaimOf`/`titleOf` read `row.fields` verbatim and never
   look at it. Mutation (`dateInputs` from `list.rows`) kills it.

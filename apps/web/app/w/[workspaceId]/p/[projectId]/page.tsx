@@ -753,9 +753,11 @@ function ProjectBoard() {
    * THE STRIP'S FULL CHIP LIST — `activeFilterChips` plus `workflowChip`
    * when one is active, merged ONLY here, at the render boundary. Every
    * other reader of `activeFilterChips` (the gate's `chipCount` term below,
-   * and the mirror note further down that checks for the `text` chip
-   * specifically) keeps reading `activeFilterChips` alone, unmerged — the
-   * gate does not need `workflowChip` counted in `chipCount` because
+   * and the strip's own `chips` selection for every tab but Board, since
+   * 2026-09-17 — `workflowChip` never reaches List/Calendar/Timeline,
+   * because it narrows GROUPS only the board renders) keeps reading
+   * `activeFilterChips` alone, unmerged — the gate does not need
+   * `workflowChip` counted in `chipCount` because
    * `shouldRenderNarrowingStrip`'s independent third term
    * (`shown !== total`) already fires for group-dropping on its own (see
    * `boardNarrowing`'s own docblock above); double-counting it into
@@ -1154,10 +1156,19 @@ function ProjectBoard() {
 
             {/*
               THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's
-              workflow picker also feeds). Board-tab-only: the count and the
-              scope note are both facts about the BOARD's own narrowing, and
-              showing them on a tab they say nothing about would be its own
-              small lie.
+              workflow picker also feeds) — ONE strip, rendered once, with
+              PER-TAB inputs since 2026-09-17 (exclude-mode spec §3): Board
+              reads `boardNarrowing`/`boardUnappliedAxes` and the picker's own
+              chip; List, Calendar and Timeline read
+              `listNarrowing`/`listUnappliedAxes` and the filter chips alone.
+
+              UNTIL 2026-09-17 this was Board-tab-only: the count and the
+              scope note were both facts about the BOARD's own narrowing, and
+              showing them on a tab they said nothing about would have been
+              its own small lie. What changed is `matchesListRow`/
+              `listNarrowing` making the list's own narrowing exactly such a
+              fact, computed once per tab it actually describes — the
+              mechanism below generalises rather than being abandoned.
 
               Gated on having something to disclose, not merely on `view ===
               'board'` — with no active axis at all and nothing hidden, the
@@ -1183,7 +1194,9 @@ function ProjectBoard() {
 
               `chipCount` below reads `activeFilterChips.length`, NOT
               `narrowingChips.length` (the list actually rendered two lines
-              down, which also includes `workflowChip` when one is active).
+              down ON THE BOARD TAB ONLY — the other three tabs render
+              `activeFilterChips` directly and never touch `narrowingChips` at
+              all — which also includes `workflowChip` when one is active).
               That is not an oversight: `workflowChip` does not need to be
               counted into this gate for the gate to fire correctly WHENEVER
               A CARD IS ACTUALLY HIDDEN — the third term above already does
@@ -1204,18 +1217,18 @@ function ProjectBoard() {
               non-default pick regardless of whether the strip renders
               beside it, so nothing is lost; but the old sentence claimed
               more certainty than that.
-
-              PER TAB since 2026-09-17 (exclude-mode spec §3): Board reads
-              `boardNarrowing`/`boardUnappliedAxes` and the picker's chip; the
-              other three read `listNarrowing`/`listUnappliedAxes` and the
-              filter chips alone — the workflow picker narrows groups the
-              board renders and is meaningless elsewhere. One strip, rendered
-              once with per-tab inputs, never two.
             */}
             {(() => {
               const narrowing = view === 'board' ? boardNarrowing : listNarrowing;
               const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
               const chips = view === 'board' ? narrowingChips : activeFilterChips;
+              // Controller ruling, Task 10 fix round 1: the scope note names
+              // the tab it is actually on, rather than always saying "the
+              // board" for List/Calendar/Timeline too. Matches `view`'s own
+              // union exactly, so a fifth tab added later is a compile error
+              // here rather than a silently-wrong noun.
+              const tabNoun =
+                view === 'board' ? 'board' : view === 'list' ? 'list' : view === 'calendar' ? 'calendar' : 'timeline';
               if (
                 narrowing === null ||
                 !shouldRenderNarrowingStrip({
@@ -1252,14 +1265,16 @@ function ProjectBoard() {
                   ))}
                   {unapplied.length > 0 ? (
                     /**
-                     * THE LOCATION CLAUSE — REMOVED (Task 5). Task 4 shipped
-                     * "— set on the list tab, where a ticket carries the
-                     * field", written before this sheet existed and flagged in
-                     * that task's own report for re-verification once it
-                     * landed. It is not re-pointed at the Filters sheet:
-                     * `boardUnappliedAxes` can join UP TO THREE axis names in
+                     * THE LOCATION CLAUSE — REMOVED (Task 5), NAMES ITS TAB
+                     * (controller ruling, Task 10 fix round 1, 2026-09-17).
+                     * Task 4 shipped "— set on the list tab, where a ticket
+                     * carries the field", written before this sheet existed
+                     * and flagged in that task's own report for
+                     * re-verification once it landed. It is not re-pointed at
+                     * the Filters sheet: on the BOARD, `unapplied` (there,
+                     * `boardUnappliedAxes`) can join UP TO THREE axis names in
                      * one sentence (collaborator, due date, custom field), and
-                     * after this task only ONE of those three — collaborator —
+                     * after Task 5 only ONE of those three — collaborator —
                      * has a control anywhere in the product, and it lives in
                      * the Filters sheet, not the list tab. `dueBefore`/
                      * `dueAfter`/`fields` remain unsettable anywhere today (see
@@ -1272,9 +1287,21 @@ function ProjectBoard() {
                      * was asked to avoid. Saying only what is true (the axis is
                      * not applied here) outlives whichever surface next grows a
                      * control for the other two.
+                     *
+                     * On the OTHER three tabs, `unapplied` is
+                     * `describeUnappliedListAxes`'s result — collaborator, and
+                     * nothing else, is the only axis that function can ever
+                     * return (its own docblock in `board-search-scope.ts`:
+                     * `matchesListRow` answers the due bounds and field
+                     * clauses itself) — so the "UP TO THREE" reasoning above
+                     * is Board-specific; List/Calendar/Timeline can only ever
+                     * join a ONE-entry list. `tabNoun` (computed above) is
+                     * what keeps the WHERE half of the sentence honest per
+                     * tab, the same way `unapplied` keeps the WHAT half
+                     * honest per tab.
                      */
                     <span className="gn-project__scope-note" data-testid="board-scope-note">
-                      Not applied on the board: {unapplied.join(', ')}.
+                      Not applied on the {tabNoun}: {unapplied.join(', ')}.
                     </span>
                   ) : null}
                 </div>
@@ -1419,18 +1446,26 @@ function ProjectBoard() {
                 // reaches this tab as of this task. `listNarrowingWord` names
                 // either, both (joined), or neither; `undefined` is what
                 // makes the unnarrowed count still read as the project's
-                // own. `listNarrowing.shown !== listNarrowing.total` is the
-                // same "did the filter actually hide something" fact
-                // `shouldRenderNarrowingStrip`'s third term reads above —
-                // included here too because `listUnappliedAxes`/
-                // `activeFilterChips` alone would miss the ONE list-only
-                // mechanism that can narrow with neither: a `dueBefore`/
-                // `dueAfter`/`fields` clause set with no chip and no
-                // unapplied-axis entry (both are BOARD-shaped enumerations).
+                // own. The second argument calls the SAME
+                // `shouldRenderNarrowingStrip` gate the strip above uses for
+                // this tab, so the summary word and the strip's own
+                // visibility agree BY CONSTRUCTION — one gate, not two hand-
+                // written copies of it that could drift apart. Its third
+                // term (`shown !== total`) is why this is not just
+                // `listUnappliedAxes`/`activeFilterChips`: those two alone
+                // would miss the ONE list-only mechanism that can narrow with
+                // neither: a `dueBefore`/`dueAfter`/`fields` clause set with
+                // no chip and no unapplied-axis entry (both are list-shaped
+                // enumerations).
                 {...(() => {
                   const word = listNarrowingWord(
                     activeOnly,
-                    activeFilterChips.length > 0 || listUnappliedAxes.length > 0 || listNarrowing.shown !== listNarrowing.total,
+                    shouldRenderNarrowingStrip({
+                      chipCount: activeFilterChips.length,
+                      unappliedAxisCount: listUnappliedAxes.length,
+                      shown: listNarrowing.shown,
+                      total: listNarrowing.total,
+                    }),
                   );
                   return word === undefined ? {} : { narrowing: word };
                 })()}
