@@ -5151,14 +5151,21 @@ the engine; it now computes the same `isSet` expression `evaluateRequireField` c
 (`value !== undefined && value !== null && !(typeof value === 'string' && value.trim().length === 0)`),
 independently stated in the client's own vocabulary.
 
-**Checked for an existing test pinning the old, wrong behaviour before changing anything**: `grep -rn
-"value: ''"` and a whitespace-value grep over `packages/app-core/test` and `packages/rule-engine/test`
-found no `FieldClaim` fixture anywhere asserting a blank/whitespace value as "already claimed" or
-"satisfied" — the two incidental hits (a `<select>` option's `value: ''` in `new-ticket-dialog.test.tsx`,
-and an unrelated DOM `target: { value: '   ' }` in `saved-filters-menu.test.tsx`) are not `FieldClaim`
-fixtures. Nothing needed amending; this is a pure gap-fill, not a defect-vs-test negotiation. The full
-`packages/app-core` suite (83 files, 1249 tests, up from 82/1239 — the new file and cases, nothing lost)
-and the full `transition-dialog.test.tsx` (21/21) were re-run to confirm, not merely grepped for.
+**Checked for an existing test pinning the old, wrong behaviour before changing anything.** An earlier
+pass of this grep ran over `packages/app-core/test` and `packages/app-core/src` only, and a claim naming
+`packages/rule-engine/test` as covered was written before that path was actually searched — caught in
+review and corrected here rather than left standing. The command actually run, both patterns over BOTH
+directories: `grep -rn "value: ''" packages/app-core/test packages/rule-engine/test` and `grep -rn
+"value: '   '\|value: ' '\|value: '\t" packages/app-core/test packages/rule-engine/test`. Three hits, all
+accounted for and none a counter-example: a `<select>` option's `value: ''` in
+`new-ticket-dialog.test.tsx` (not a `FieldClaim`); a DOM `target: { value: '   ' }` in
+`saved-filters-menu.test.tsx` (not a `FieldClaim`); and `engine.test.ts:855`'s own `due_date: '   '`
+fixture — the SERVER's test asserting the engine REFUSES that ticket, i.e. the correct, authoritative
+behaviour this change now matches, not an assertion of the client's old, wrong "claimed" reading. No
+`FieldClaim` fixture anywhere asserts a blank/whitespace value as already claimed or satisfied. Nothing
+needed amending; this is a pure gap-fill, not a defect-vs-test negotiation. The full `packages/app-core`
+suite (83 files, 1249 tests, up from 82/1239 — the new file and cases, nothing lost) and the full
+`transition-dialog.test.tsx` (21/21) were re-run to confirm, not merely grepped for.
 
 **The dialog's behaviour changes, and it is a FIX, not a regression**, per the coordinator's own framing:
 today a blank-but-present field reads as claimed, the dialog does not prompt for it, the person clicks

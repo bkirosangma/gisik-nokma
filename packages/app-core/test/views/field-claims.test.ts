@@ -26,15 +26,20 @@ import { WF_ERRAND } from '../helpers/seed.js';
  * shows up as a wrong `expectSet` comparison rather than a silent match.
  */
 function stubContext(): EngineContext {
-  const notUsed = (name: string) => () => {
-    throw new Error(`evaluateRequireField reads only ticket.fields; ${name} must not be called`);
-  };
+  // No `as unknown as EngineContext`: each stub is typed to the interface's
+  // OWN method signature, so a fifth required method added to `EngineContext`
+  // later is a compile error here rather than a silently-satisfied cast.
+  const notUsed =
+    (name: string) =>
+    async (): Promise<never> => {
+      throw new Error(`evaluateRequireField reads only ticket.fields; ${name} must not be called`);
+    };
   return {
     getEntityState: notUsed('getEntityState'),
     getChildrenStates: notUsed('getChildrenStates'),
     getWorkflowDef: notUsed('getWorkflowDef'),
     getTicketTypeDef: notUsed('getTicketTypeDef'),
-  } as unknown as EngineContext;
+  };
 }
 
 function inputWithField(fields: Record<string, FieldClaim>): TransitionRuleInput {
