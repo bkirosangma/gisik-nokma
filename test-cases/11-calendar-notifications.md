@@ -339,3 +339,32 @@ that is the convention this file was created with (`e09666c`: pointer 11.189, hi
 pointer named; no duplicate resulted only because #304 advanced the pointer to its own new maximum,
 carrying the fault forward. Restored to max+1 there, and kept at max+1 here. Nothing validates this
 line, so it is checked by reading.)*
+
+### Round 24 (2026-09-16) — five cases re-aimed, none minted here
+
+**No new ids in §11.** The account-menu and inbox-icon work minted `13.416`–`13.422` in
+`13-deployment-dogfooding.md`; the cases below are existing ones whose ASSERTION SURFACE moved because
+the nav stopped rendering `UnreadBadge`.
+
+Owner: *"make inbox an icon. with an indicator (green dot?) if there is an unread event."* Ruled: the
+dot is the visible signal and **the count moves into the link's accessible name** (`"Inbox, 3 unread
+notifications"`; a bare `"Inbox"` at zero). `UnreadBadge` itself is untouched and still renders the
+number on `/inbox`, so its own cases are unaffected.
+
+- **11.152** ✅ Same claim, read off the link's accessible name instead of the badge's `role="img"`,
+  plus the dot's presence. — (`apps/web/test/inbox-nav-link.test.tsx`)
+- **11.153** ✅ Unchanged in substance; the "no badge drawn" half now reads as a bare `"Inbox"` name and
+  an absent dot. An absence still claims nothing, which was always the point.
+- **11.155** ✅ Same cadence claim, count read from the accessible name.
+- **11.156** ✅ **Still measures exactly what it did**: the count after a FAILED refresh. A reset to 0
+  would now drop the dot and rename the link to a bare `"Inbox"` — telling the reader there is nothing
+  waiting, on the strength of a request that failed — so the case asserts both.
+- **11.169** ✅ Clears the count when the session ends in place. **Asserts BOTH the name and the dot,
+  deliberately:** a dot that vanished while the name still read "3 unread" would leave the previous
+  session's count being announced to whoever is looking now, which is the exact defect this case exists
+  for, and a dot-only assertion would pass on it.
+- **11.185** ✅ Its three closed link sets each lost `/help` and `/account`, which are now menu items —
+  an `<a role="menuitem">` carries the menuitem role, not `link`, so `getAllByRole('link')` cannot see
+  them by design even with the menu open. Their reachability is pinned separately at **13.417**, which
+  is what keeps this shortening honest: a shorter expected list is also what deleting the links would
+  produce.

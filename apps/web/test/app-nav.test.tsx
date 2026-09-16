@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,7 +47,13 @@ vi.mock('next/navigation', () => ({
 // needs `useCurrentUser`/`useSessionStatus` to answer "nobody", and every
 // other case in this file needs the seeded Kiro session it always answered
 // before this became a variable.
-let mockSessionUser: { id: string; name: string } | null = { id: 'u_kiro', name: 'Kiro' };
+// `email` joined in Round 24: the account menu's header names the signed-in
+// person, and `useCurrentUser` now carries the address for it.
+let mockSessionUser: { id: string; name: string; email?: string } | null = {
+  id: 'u_kiro',
+  name: 'Kiro',
+  email: 'kiro@example.com',
+};
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
     useSession: () => ({ data: mockSessionUser === null ? null : { user: mockSessionUser } }),
@@ -85,6 +92,11 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
 }
 
 const NO_NAV_SERVICES = stubServices({}, { notifications: { unreadCount: async () => 0 } });
+
+/** Round 24: the inbox indicator's two states need a settable unread count. */
+function navServicesWithUnread(count: number) {
+  return stubServices({}, { notifications: { unreadCount: async () => count } });
+}
 
 describe('AppNav — the mounts, not the components', () => {
   /**
@@ -168,9 +180,14 @@ describe('AppNav — the mounts, not the components', () => {
       );
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
       // Round 21: `/settings` LEFT this arm — the owner moved Settings back
-      // behind a workspace — and Inbox moved to just before Help. Both are
-      // ordered assertions, so the move is witnessed here as well as by 13.414.
-      expect(hrefs).toEqual(['/workspaces', '/inbox', '/help', '/account']);
+      // behind a workspace.
+      //
+      // ROUND 24: `/help` and `/account` left it too, into `AccountMenu`. They
+      // are absent from this list even when the menu is OPEN, and that is not an
+      // oversight: an `<a role="menuitem">` has the menuitem role, not `link`,
+      // so `getAllByRole('link')` cannot see them by design. Their reachability
+      // is asserted where it now lives — the account-menu block below.
+      expect(hrefs).toEqual(['/workspaces', '/inbox']);
     });
 
     it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
@@ -188,9 +205,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
+        // menuitems, not links — see the first arm's comment.
         '/inbox',
-        '/help',
-        '/account',
       ]);
     });
 
@@ -226,9 +243,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
+        // menuitems, not links — see the first arm's comment.
         '/inbox',
-        '/help',
-        '/account',
       ]);
       // Named, so the failure says what came back rather than only that an
       // array grew: nothing points at the board this route is showing.
@@ -350,23 +367,221 @@ describe('13.391 the nav is contextual', () => {
    * owner's instruction is about — Inbox leaving the workspace-scoped view
    * links for the tail of the bar.
    */
-  it('13.414 renders Inbox immediately before Help', () => {
+  /**
+   * **13.414 IS SUPERSEDED BY ROUND 24 AND ITS SUBJECT IS GONE.** Help is no
+   * longer a link in this bar — it is an item in `AccountMenu` — so "Inbox
+   * immediately before Help" is not a false assertion, it is an unaskable one.
+   *
+   * It is replaced rather than deleted, and by a case that pins what the
+   * owner's Round 24 instruction actually said: the inbox sits immediately
+   * LEFT OF THE AVATAR. That is the same KIND of claim (adjacency in the bar's
+   * tail), re-aimed at the arrangement that now exists, so the ordering
+   * tripwire Round 21 bought is not lost in the move.
+   */
+  it('13.416 renders the inbox icon immediately left of the account menu trigger', () => {
     currentPath = '/workspaces';
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
       </Providers>,
     );
-    const inbox = screen.getByRole('link', { name: /Inbox/ });
-    const help = screen.getByRole('link', { name: 'Help' });
-    // `DOCUMENT_POSITION_FOLLOWING` (4) — Help comes after Inbox in the DOM.
-    expect(inbox.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // IMMEDIATELY before: nothing renders between them. Compared over the nav's
-    // own link list so a future insertion here fails rather than passing on the
-    // looser "somewhere after" check above.
-    const names = screen.getAllByRole('link').map((node) => node.textContent ?? '');
-    const inboxAt = names.findIndex((text) => /Inbox/.test(text));
-    expect(names[inboxAt + 1]).toBe('Help');
+    const inbox = screen.getByRole('link', { name: 'Inbox' });
+    const trigger = screen.getByRole('button', { name: 'Account menu for Kiro' });
+    // `DOCUMENT_POSITION_FOLLOWING` (4) — the trigger comes after the inbox.
+    expect(inbox.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // IMMEDIATELY: they are siblings in the corner with nothing between them.
+    expect(inbox.nextElementSibling).toBe(trigger.parentElement);
+  });
+});
+
+/**
+ * Round 24 — the account menu. The owner's instruction: "make it into a round
+ * profile pic like thing, that opens up a context menu on click. signout option
+ * will be moved to the bottom of that menu. along with the help and account
+ * item from the nav bar."
+ */
+describe('Round 24 the account menu', () => {
+  /**
+   * 13.417 — the two destinations that left the bar are still reachable.
+   *
+   * This is the case that makes 11.185's shortened link list safe to assert.
+   * That list got shorter by two entries, and a shorter expected array is
+   * exactly what a test would also show if the links had been DELETED rather
+   * than moved. Without this case the suite would agree with that bug.
+   */
+  it('13.417 holds Help and Account, reachable once the menu is open', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    // Closed to start: a menu that is open on load is not a menu.
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'Account menu for Kiro' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveAttribute('href', '/help');
+    expect(screen.getByRole('menuitem', { name: 'Account' })).toHaveAttribute('href', '/account');
+  });
+
+  /**
+   * 13.418 — sign out is LAST, and keeps the accessible name it always had.
+   *
+   * Two claims in one case because they fail together: the owner asked for it
+   * at the bottom, and the shell ratchets an accessible-name floor on the
+   * string `Sign out {name}` — which `apps/web/e2e-stack/
+   * passkey-registration.spec.ts` also addresses the control by. The control
+   * moved into a menu; the name did not move with it unless asserted.
+   */
+  it('13.418 puts Sign out last in the menu, still named "Sign out Kiro"', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+
+    const items = screen.getAllByRole('menuitem');
+    const signOut = screen.getByRole('menuitem', { name: 'Sign out Kiro' });
+    expect(items[items.length - 1]).toBe(signOut);
+    // Visible text is the short label; the person's name lives in the
+    // accessible name only, exactly as the old nav button had it.
+    expect(signOut).toHaveTextContent('Sign out');
+    expect(signOut.textContent).not.toMatch(/Kiro/);
+  });
+
+  /**
+   * 13.419 — the menu names WHO is signed in.
+   *
+   * The control this replaced was `Sign out {name}`: its accessible name
+   * carried the signed-in identity on every page. A monogram avatar carries
+   * none — two people with the same initial render identically — so without
+   * this header the restyle would have quietly deleted that information.
+   */
+  it('13.419 heads the menu with the signed-in name and email', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveTextContent('Kiro');
+    expect(menu).toHaveTextContent('kiro@example.com');
+  });
+
+  /**
+   * 13.420 — Escape closes AND returns focus to the trigger.
+   *
+   * The focus half is the load-bearing one. Closing without it strands focus at
+   * the document root, so a keyboard user who opens the menu and changes their
+   * mind has to tab from the top of the page to get back to where they were.
+   * A test that only asserted the menu had gone would pass on that bug.
+   */
+  it('13.420 closes on Escape and returns focus to the trigger', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Account menu for Kiro' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    // Focus is INSIDE the menu first — without this line the assertion below
+    // is vacuous, because focus would never have left the trigger and
+    // "returns focus to the trigger" would hold with the return deleted. That
+    // is not hypothetical: the first implementation shipped exactly that, and
+    // this case passed against it until focus-on-open was added.
+    expect(trigger).not.toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  /**
+   * 13.423 — opening moves focus into the menu, and the arrows walk it.
+   *
+   * The focus-on-open half is also 13.420's precondition, asserted here in its
+   * own right so a change that removed it fails by name rather than by quietly
+   * making that case vacuous again.
+   */
+  it('13.423 focuses the first item on open and walks the items with the arrows', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus();
+
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Account' })).toHaveFocus();
+
+    await userEvent.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus();
+
+    // Wraps backwards off the first item to the last, which is Sign out.
+    await userEvent.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'Sign out Kiro' })).toHaveFocus();
+  });
+});
+
+/**
+ * Round 24 — the inbox indicator. Owner: "make inbox an icon. with an indicator
+ * (green dot?) if there is an unread event."
+ */
+describe('Round 24 the inbox indicator', () => {
+  /**
+   * 13.421 — the count did not vanish, it moved into the accessible name.
+   *
+   * The owner chose the dot for the VISIBLE signal and the count for the
+   * accessible one. Asserting only "a dot appears" would pass on an
+   * implementation that dropped the number entirely, which is the change this
+   * case exists to forbid — and which would also leave unread state signalled
+   * by colour alone (WCAG 1.4.1).
+   */
+  it('13.421 names the unread count, and shows a dot, only when there is one', async () => {
+    currentPath = '/workspaces';
+    const { rerender } = render(
+      <Providers services={navServicesWithUnread(0)}>
+        <AppNav />
+      </Providers>,
+    );
+    // At zero: a bare name and NO dot. An absence, which claims nothing.
+    expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(document.querySelector('.gn-nav__inbox-dot')).toBeNull();
+
+    rerender(
+      <Providers services={navServicesWithUnread(3)}>
+        <AppNav />
+      </Providers>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Inbox, 3 unread notifications' })).toBeInTheDocument();
+    expect(document.querySelector('.gn-nav__inbox-dot')).not.toBeNull();
+  });
+
+  /** 13.422 — singular at one, because "1 unread notifications" is a defect people notice. */
+  it('13.422 says "1 unread notification" in the singular', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={navServicesWithUnread(1)}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(await screen.findByRole('link', { name: 'Inbox, 1 unread notification' })).toBeInTheDocument();
   });
 });
 
@@ -402,7 +617,18 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
       </Providers>,
     );
     await screen.findByRole('link', { name: 'Convenience Corner' });
-    const hrefs = new Set(screen.getAllByRole('link').map((a) => a.getAttribute('href')));
+    // ROUND 24: `/help` and `/account` are inside `AccountMenu` now, and an
+    // `<a role="menuitem">` is NOT matched by `getAllByRole('link')`. The menu
+    // is opened and both roles are gathered, rather than dropping those two
+    // rows from the table — this case's whole job is that EVERY target the nav
+    // offers resolves to a real page, and a target that moved one level down is
+    // still a target the nav offers.
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    const hrefs = new Set(
+      [...screen.getAllByRole('link'), ...screen.getAllByRole('menuitem')]
+        .map((a) => a.getAttribute('href'))
+        .filter((href): href is string => href !== null),
+    );
 
     // `test/setup.ts` runs vitest rooted at `apps/web` (`vitest.config.ts`'s
     // `include: ['test/**/*.test.{ts,tsx}']`), so `process.cwd()` there IS
@@ -446,24 +672,28 @@ describe('13.393 exactly one nav item is current, and sign-out keeps its full na
   });
 
   /**
-   * The visible label shrinks to "Sign out" (the reference's monogram +
-   * short label); the accessible name keeps "Sign out {name}", the sentence
-   * this button always carried, via `aria-label`. A regression here is
-   * exactly what the accessible-name floor this shell ratchets exists to
-   * catch, and this is that floor's unit-level witness.
+   * **ROUND 24 MOVED THIS CONTROL INTO THE MENU.** The bar no longer holds a
+   * sign-out button at all — it holds a monogram trigger — so what this case
+   * can still assert from the bar is that the monogram renders and that the
+   * sign-out control is NOT sitting in the nav beside it.
+   *
+   * The accessible-name floor this case was the unit-level witness for did not
+   * lapse; it moved with the control, to 13.418, which asserts the same
+   * `Sign out {name}` string on the menu item. The two halves are deliberately
+   * in different cases: this one fails if the button leaks back into the bar,
+   * that one fails if the name is lost in the move.
    */
-  it('renders the monogram and "Sign out" visibly, and "Sign out Kiro" as the accessible name', () => {
+  it('renders the monogram trigger, and no sign-out button in the bar itself', () => {
     currentPath = '/workspaces';
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
       </Providers>,
     );
-    const button = screen.getByRole('button', { name: 'Sign out Kiro' });
-    expect(button).toHaveTextContent('Sign out');
-    // The name did NOT stay in the visible text — only in the accessible one.
-    expect(button.textContent).not.toMatch(/Kiro/);
+    expect(screen.getByRole('button', { name: 'Account menu for Kiro' })).toBeInTheDocument();
     expect(screen.getByLabelText('Kiro', { selector: '.gn-avatar' })).toBeInTheDocument();
+    // Closed menu: the sign-out control is not rendered anywhere yet.
+    expect(screen.queryByRole('button', { name: 'Sign out Kiro' })).not.toBeInTheDocument();
   });
 });
 
@@ -483,17 +713,20 @@ describe('13.393 exactly one nav item is current, and sign-out keeps its full na
 describe('pending-13.4xx AppNav is mounted on every page that must always show it', () => {
   it('/help mounts AppNav — signed in, and needs no workspace to show it', async () => {
     currentPath = '/help';
-    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
     render(
       <Providers services={NO_NAV_SERVICES}>
         <HelpPage />
       </Providers>,
     );
-    expect(await screen.findByRole('link', { name: 'Help' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    // ROUND 24: signed in, Help is a MENU item, so the mount is witnessed by
+    // the two controls the bar itself always renders. `aria-current` on Help
+    // did not lapse — it moved into the menu and is asserted below, once the
+    // menu is opened.
+    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'Account menu for Kiro' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveAttribute('aria-current', 'page');
   });
 
   /**
@@ -536,16 +769,20 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
    */
   it('/account mounts AppNav', async () => {
     currentPath = '/account';
-    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AccountPage />
       </Providers>,
     );
-    expect(await screen.findByRole('link', { name: 'Account' })).toHaveAttribute(
+    // ROUND 24: same shape as `/help`'s witness above — Account is a menu item
+    // for a signed-in viewer, so the mount is proven by the bar's own controls
+    // and `aria-current` is checked inside the opened menu.
+    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    expect(screen.getByRole('menuitem', { name: 'Account' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
   });
 });

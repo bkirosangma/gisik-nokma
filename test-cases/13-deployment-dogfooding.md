@@ -3849,3 +3849,73 @@ Three cases moved, none minted:
   stopped being reachable from a workspace at all. This was checked because the case was made green one
   round earlier on precisely that sentence's accuracy, and a claim that was true when written is exactly
   the kind that goes stale without anyone looking.
+
+### Round 24 — the account menu, and the inbox becomes an icon
+
+**Block `13.416`–`13.422` minted here; the next free BLOCK is `13.423`.** Owner, two instructions in one
+message: *"Current Signout button: make it into a round profile pic like thing, that opens up a context
+menu on click. signout option will be moved to the bottom of that menu. along with the help and account
+item from the nav bar"* and *"make inbox an icon. with an indicator (green dot?) if there is an unread
+event. place it on the left of the round profile pic like thing."*
+
+**This is the first surface on this branch with no prototype to transcribe.** Every other port here
+could point at `desktop.dc.html`. Its nav is a flat `navDef` list (`:2277`) with no avatar, no menu and
+no popover anywhere in the file, so the menu follows the prototype's CONTROL metrics while the behaviour
+is the product's own. A later round that "restores prototype fidelity" here would be restoring something
+that never existed.
+
+**Two owner rulings taken before implementation, both on questions the instruction left open:**
+
+1. **The unread count.** A dot can only say "some", and the badge it replaces said "3". Ruled: dot for
+   the visible signal, **count in the accessible name**. Dropping the number would have removed it for
+   exactly the readers least able to go looking, and would leave unread state signalled by COLOUR ALONE
+   (WCAG 1.4.1). `UnreadBadge` is untouched and still renders the number on `/inbox` itself.
+2. **The menu's header.** Ruled: **name and email**. The control being replaced was `Sign out {name}`,
+   whose accessible name carried the signed-in identity on every page; a monogram carries none, two
+   people with the same initial rendering identically. `useCurrentUser` gained `email` to serve it.
+
+**A regression caught during implementation, recorded because the test that would have caught it was
+already there and green.** The first cut had `AccountMenu` return `null` when signed out — correct in
+itself, it has no name, no email and nothing to sign out of — which silently deleted the only route to
+`/help` from the signed-out shell, on a page explicitly reachable signed out. Help and Account therefore
+**stay bar links when there is no session**, and the pre-existing case "AppNav renders its always-items
+with NO session at all" passes unmodified, which is the evidence the fallback is right rather than
+merely present.
+
+**13.414 is SUPERSEDED, and its subject is gone rather than its claim being false.** Help is no longer a
+link in this bar, so "renders Inbox immediately before Help" is not wrong — it is unaskable. It is
+replaced by 13.416, which pins the same KIND of claim (adjacency in the bar's tail) at the arrangement
+that now exists, so the ordering tripwire Round 21 bought is not lost in the move.
+
+- **13.414** 🚫 SUPERSEDED by Round 24 — see above. Not renumbered, not reused.
+- **13.416** ✅ The inbox icon renders immediately left of the account-menu trigger, asserted over
+  `compareDocumentPosition` plus sibling adjacency so an element inserted between them fails.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.417** ✅ The menu holds Help and Account, both reachable once opened, both with their real hrefs;
+  and the menu is CLOSED on mount with `aria-expanded="false"`. **This case is what makes 11.185's
+  shortened link list safe to assert** — that list got shorter by two entries, which is also exactly
+  what DELETING the links would produce, so without this the suite would agree with that bug.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.418** ✅ Sign out is the LAST menu item and keeps the accessible name `Sign out {name}`. Two
+  claims in one case because they fail together: the owner asked for it at the bottom, and the shell
+  ratchets an accessible-name floor on that string which `e2e-stack/passkey-registration.spec.ts` also
+  addresses the control by. — (`apps/web/test/app-nav.test.tsx`)
+- **13.419** ✅ The menu heads with the signed-in name and email, the identity the replaced control used
+  to carry. — (`apps/web/test/app-nav.test.tsx`)
+- **13.420** ✅ Escape closes the menu AND returns focus to the trigger. The focus half is the
+  load-bearing one: closing without it strands focus at the document root, so a keyboard user who opens
+  the menu and changes their mind must tab from the top of the page. A case asserting only that the menu
+  had gone would pass on that bug. — (`apps/web/test/app-nav.test.tsx`)
+- **13.421** ✅ The dot appears only when unread > 0, and the count is in the link's accessible name at
+  both states. Asserting only "a dot appears" would pass on an implementation that dropped the number,
+  which is the change this case exists to forbid. — (`apps/web/test/app-nav.test.tsx`)
+- **13.422** ✅ "1 unread notification" is singular. — (`apps/web/test/app-nav.test.tsx`)
+
+**Five existing cases in `inbox-nav-link.test.tsx` were re-aimed, not weakened.** 11.152, 11.155, 11.156,
+11.169 and the load-window case all asserted the count through `UnreadBadge`'s `role="img"`, which the
+nav no longer renders. Each now asserts the same count through the link's accessible name, plus the
+dot's presence or absence — so 11.156 ("keeps the last count when a refresh fails") and 11.169 ("clears
+the count when the session ends in place") still measure exactly what they always did. 11.169 asserts
+BOTH the name and the dot deliberately: a dot that disappeared while the name still read "3 unread"
+would leave the previous session's count being announced to whoever is looking now, which is the defect
+that case exists for.

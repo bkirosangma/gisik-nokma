@@ -1535,10 +1535,103 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__links { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0; }
 .gn-nav__spacer { flex: 1; }
 /* Never shrinks and never wraps — the other half of the split above. Its
-   rendered width is fixed (avatar + the static "Sign out" text), so unlike
+   rendered width is fixed (the inbox icon + the avatar), so unlike
    `.gn-nav__links` it does not need `min-width: 0` to be safe: there is no
-   long, data-dependent content inside it left to overflow. */
-.gn-nav__signout { flex: none; }
+   long, data-dependent content inside it left to overflow.
+
+   ROUND 24 replaced `.gn-nav__signout` with this. The rule the old comment
+   described still holds and is why the class was kept rather than dropped: the
+   corner is the row's LAST child, and this bar's height is driven by whichever
+   child is last (see the 4.35rem derivation above). What changed is that the
+   corner's width is now fixed by two 2.75rem controls rather than by an
+   avatar plus a static text label — which is narrower, not wider, so the
+   viewport overflow assertion cannot newly fail on account of it. */
+.gn-nav__corner { display: flex; align-items: center; gap: 0.5rem; flex: none; }
+
+/* The trigger is a circle because the owner asked for "a round profile pic like
+   thing". It carries no fill of its own: the `Avatar` inside already paints
+   one, and a second ground behind it would read as a ring at every style. The
+   2.75rem tap floor comes from `.gn-nav a, .gn-nav button` above — not repeated
+   here, so there is one place that number lives. */
+.gn-nav__account { position: relative; }
+.gn-nav__avatar-button {
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* The dot is positioned against the LINK, so it tracks the icon rather than the
+   2.75rem tap box — pinned to the glyph's top-right, which is where an unread
+   marker is read as belonging to the icon and not floating in the bar. */
+.gn-nav__inbox { position: relative; }
+.gn-nav__inbox-dot {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--gn-success);
+  /* A ring in the bar's own ground, so the dot stays legible where it overlaps
+     the dark part of the glyph. `--gn-surface` is what `.gn-nav` sits on. */
+  box-shadow: 0 0 0 0.125rem var(--gn-surface);
+}
+
+.gn-nav__menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 0.5rem);
+  min-width: 14rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+  /* Above page content. The nav is the topmost chrome and this hangs off it. */
+  z-index: 50;
+}
+.gn-nav__menu-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem 0.625rem;
+}
+.gn-nav__menu-name { font-weight: 600; }
+.gn-nav__menu-email {
+  font-size: 0.8125rem;
+  color: var(--gn-text-muted);
+  /* An address longer than the menu must not widen it off-screen. */
+  overflow-wrap: anywhere;
+}
+/* Two classes deep, which beats the `.gn-nav a, .gn-nav button` rule's 0,1,1
+   on specificity without `!important`. That rule centres its children, which is
+   right for a bar and wrong for a stacked menu. */
+.gn-nav__menu .gn-nav__menu-item {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 0.625rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.gn-nav__menu .gn-nav__menu-item:hover { background: var(--gn-fill-quaternary); }
+/* Sign out sits at the bottom behind a separator (owner, Round 24). The rule is
+   on the ITEM rather than a dedicated `<hr>` so the menu has no element that
+   exists only to draw a line — one an assistive technology would otherwise have
+   to skip. */
+.gn-nav__menu .gn-nav__menu-item--signout {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--gn-border);
+  border-radius: 0 0 var(--gn-radius-control) var(--gn-radius-control);
+}
 
 /* Measured on the signed-in shell at 390px: `89x23` on the nav's links — nine
    of `/my-work`'s nine tap-target offenders, and the reason the shared

@@ -152,11 +152,30 @@ export function useAppServices(): AppServices {
   return services;
 }
 
-/** The signed-in user, or null while the session loads / when signed out. */
-export function useCurrentUser(): { id: string; name: string } | null {
+/**
+ * The signed-in user, or null while the session loads / when signed out.
+ *
+ * `email` joined in Round 24, for the account menu's header: the nav's control
+ * became a monogram avatar, and a monogram does not say WHO is signed in the
+ * way the old `Sign out {name}` button did. The menu says it instead, and needs
+ * the email to distinguish two accounts whose names match.
+ *
+ * It is `string | null`, not `string`. `/account` reads `user.email` directly
+ * off the session and can assume it, because that page renders only under a
+ * resolved session; this hook answers on every page in the product including
+ * ones where the session is still in flight, and a `??  ''` here would hand the
+ * menu an empty string to render as though it were an address. `null` is the
+ * absence, and the menu omits the line rather than drawing a blank one.
+ */
+export function useCurrentUser(): { id: string; name: string; email: string | null } | null {
   const session = authClient.useSession();
   const user = session.data?.user;
-  return user === undefined || user === null ? null : { id: user.id, name: user.name ?? user.id };
+  if (user === undefined || user === null) return null;
+  return {
+    id: user.id,
+    name: user.name ?? user.id,
+    email: typeof user.email === 'string' && user.email !== '' ? user.email : null,
+  };
 }
 
 /**

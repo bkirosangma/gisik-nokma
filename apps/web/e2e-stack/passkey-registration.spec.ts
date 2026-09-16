@@ -127,7 +127,13 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     // AppNav's control, addressed by its full accessible name (`Sign out
     // {name}`). A bare `/sign out/i` would also match every Sessions row's own
     // revoke button on this very page, which is a different control entirely.
-    await page.getByRole('button', { name: /^Sign out .+/ }).click();
+    //
+    // ROUND 24 put it inside the account menu, so the trigger is opened first.
+    // The sign-out control's accessible name did NOT change in that move —
+    // which is why this selector is unchanged below and only gained a step
+    // above it.
+    await page.getByRole('button', { name: /^Account menu for / }).click();
+    await page.getByRole('menuitem', { name: /^Sign out .+/ }).click();
 
     await page.goto('/sign-in');
     await page.getByRole('button', { name: 'Sign in with a passkey' }).click();

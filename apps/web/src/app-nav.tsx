@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Avatar, Button } from "@gisik-nokma/ui";
-import { authClient } from "./auth-client.js";
+import { usePathname } from "next/navigation";
+import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
@@ -93,10 +92,34 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * It stays unconditional — the inbox is global and always has been — so this is
  * a position change only, and it puts the three person-scoped destinations
  * (Inbox, Help, Account) together at the bar's end.
+ *
+ * ## Round 24 SUPERSEDES the arrangement above, and keeps its principle
+ *
+ * Owner: "Current Signout button: make it into a round profile pic like thing,
+ * that opens up a context menu on click. signout option will be moved to the
+ * bottom of that menu. along with the help and account item from the nav bar" —
+ * and "make inbox an icon. with an indicator (green dot?) if there is an unread
+ * event. place it on the left of the round profile pic like thing."
+ *
+ * So the three person-scoped destinations are still together at the bar's end;
+ * they are just no longer three top-level links. Help and Account are now items
+ * inside `AccountMenu`, and Inbox is an icon beside its trigger. **Case 13.414
+ * ("renders Inbox immediately before Help") loses its subject** — Help is not in
+ * this bar to be after anything — and is recorded as SUPERSEDED in
+ * `test-cases/13-deployment-dogfooding.md` rather than deleted, because the
+ * ruling it pinned was a real one and the reason it stopped applying is the
+ * part worth keeping.
+ *
+ * What did NOT change, and was checked rather than assumed: both routes are
+ * still reachable, still unconditional on `workspaceId`, and `13.392`'s
+ * "every nav target resolves to a real page.tsx" still holds — the targets moved
+ * one level down, they did not stop existing.
  */
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
-  const router = useRouter();
   const pathname = usePathname();
+  // The sign-out CALL moved into `AccountMenu` with the control that used it
+  // (Round 24). `useCurrentUser` stayed, for one branch only: whether this bar
+  // shows the menu or the signed-out Help/Account fallback below.
   const user = useCurrentUser();
   const workspaceName = useWorkspaceName(workspaceId);
   const noWorkspace = workspaceId === undefined;
@@ -163,34 +186,44 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             Settings
           </Link>
         ) : null}
-        {/* Inbox sits JUST BEFORE Help (Round 21, owner ruling), at the end of
-            the bar with the other global destinations, rather than among the
-            workspace-scoped view links where Round 19b put it. Still
-            unconditional on `workspaceId`: the inbox is a global route
-            (`app/inbox/page.tsx`) and a reader can be told about a ticket in a
-            workspace they are not currently looking at — the move groups it
-            with the other links that are true of the PERSON, which is what it
-            always was. The badge's own read is gated on a session inside
+        {/* Inbox LEFT this group in Round 24 — it now renders in
+            `.gn-nav__corner` below, immediately left of the avatar. It is still
+            unconditional on `workspaceId` for the reason it always was: the
+            inbox is a global route (`app/inbox/page.tsx`) and a reader can be
+            told about a ticket in a workspace they are not currently looking
+            at. The unread read is still gated on a session inside
             `InboxNavLink`. */}
-        <InboxNavLink active={pathname === "/inbox"} />
-        {/* Help and Account (Task 18), both GLOBAL routes and both unconditional
-            on `workspaceId` for the reason the inbox link above is: neither is a
-            fact about the workspace you are currently looking at. `/help` already
-            existed and needed only the link; `/account` ships in the same change
-            set as a stub that enumerates what it does not do, because a nav entry
-            pointing at a 404 is a defect and the alternative was to edit this nav
-            again from a task about passkeys.
+        {/* Help and Account (Task 18) are both GLOBAL routes, unconditional on
+            `workspaceId` for the reason the inbox is: neither is a fact about
+            the workspace you are currently looking at. Account is the PERSON's
+            settings — profile, notifications, sessions — and not a workspace's,
+            which live at `/w/[workspaceId]/settings/*`; anyone who conflates
+            the two will put a workspace control on a global page.
 
-            Account is the person's own settings — profile, notifications,
-            sessions — and NOT a workspace's, which live at
-            `/w/[workspaceId]/settings/*`. Anyone who conflates the two will put a
-            workspace control on a global page. */}
-        <Link href="/help" aria-current={current("/help")}>
-          Help
-        </Link>
-        <Link href="/account" aria-current={current("/account")}>
-          Account
-        </Link>
+            ROUND 24 MOVED BOTH INTO THE ACCOUNT MENU — but only for a viewer
+            who HAS one.
+
+            Signed out there is no menu: `AccountMenu` needs a name, an email
+            and a sign-out target, and none of the three exists. Folding these
+            two links into it unconditionally would therefore have deleted the
+            only route to `/help` from the signed-out shell — on a page that is
+            explicitly reachable signed out, which is what the case below
+            ("renders its always-items with NO session at all") pins. So they
+            fall back to being bar links exactly as they were before Round 24.
+
+            This is a real branch, not defensive padding: `/help` renders for a
+            signed-out reader by design, and it is the route most likely to be
+            wanted by someone who cannot get in. */}
+        {user === null ? (
+          <>
+            <Link href="/help" aria-current={current("/help")}>
+              Help
+            </Link>
+            <Link href="/account" aria-current={current("/account")}>
+              Account
+            </Link>
+          </>
+        ) : null}
         {/* The scope note reads `workspaceId` ALONE — never `workspaceName`, so a
             slow or failed name lookup cannot make this say "no workspace
             selected" while the route plainly carries one.
@@ -219,24 +252,13 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         ) : null}
         <span className="gn-nav__spacer" />
       </div>
-      {user !== null ? (
-        // The visible label shrinks to "Sign out"; the monogram beside it is
-        // decoration. The ACCESSIBLE NAME keeps the full "Sign out {name}" this
-        // button always carried, via `aria-label`, so the accessible-name floor
-        // this shell ratchets does not fall when the visible text does.
-        <Button
-          className="gn-nav__signout"
-          aria-label={`Sign out ${user.name}`}
-          onClick={() =>
-            void authClient.signOut().then(() => {
-              router.push("/sign-in");
-            })
-          }
-        >
-          <Avatar size="small" name={user.name} />
-          Sign out
-        </Button>
-      ) : null}
+      {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
+          both outside `.gn-nav__links` so they stay pinned as a pair at the
+          bar's end rather than wrapping into the destination group. */}
+      <div className="gn-nav__corner">
+        <InboxNavLink active={pathname === "/inbox"} />
+        <AccountMenu />
+      </div>
       </div>
     </nav>
   );

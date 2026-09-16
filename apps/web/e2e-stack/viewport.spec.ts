@@ -54,11 +54,21 @@ import {
  * workspace is in scope (`My Work`, and the rest), and it is the longer row that
  * runs past the edge. The case therefore has to reach a WORKSPACE-SCOPED page.
  *
- * WHY THE OVERFLOW IS DATA-DEPENDENT, which is what makes a fixed-width guess
- * the wrong fix: the row's last child is `Sign out {user.name}`, so its width
- * follows the signed-in user's name. 10px was the seeded owner's; a longer name
- * runs further. `.gn-nav` now sets `flex-wrap: wrap` (`globals.css`), which is
- * what every other flex row of its shape in the two stylesheets already did.
+ * WHY THE OVERFLOW WAS DATA-DEPENDENT, which is what made a fixed-width guess
+ * the wrong fix: the row's last child was `Sign out {user.name}`, so its width
+ * followed the signed-in user's name. 10px was the seeded owner's; a longer
+ * name ran further. `.gn-nav` now sets `flex-wrap: wrap` (`globals.css`), which
+ * is what every other flex row of its shape in the two stylesheets already did.
+ *
+ * **ROUND 24 REMOVED THAT PARTICULAR DATA-DEPENDENCE, and the fix still
+ * stands.** The last child is now `.gn-nav__corner` — an inbox icon and a
+ * monogram avatar, two controls at a fixed 2.75rem each — so the tail of the
+ * bar no longer grows with the user's name. The wrap is kept because the part
+ * that overflowed is `.gn-nav__links`, whose width follows the WORKSPACE NAME
+ * and the number of workspace-scoped items, and neither of those became fixed.
+ * The corner got narrower, so this case cannot newly fail on its account; it is
+ * retained because the links row is still data-dependent and still the thing
+ * being measured.
  *
  * THE INSTRUMENT ASSERTS ITSELF FIRST. `page.setViewportSize` is trusted by
  * nobody here: this repo has a recorded failure where a resize reported success
