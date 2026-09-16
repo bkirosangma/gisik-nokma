@@ -27,6 +27,8 @@ import {
   toTicketDatesInput,
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
+import { useProjectName } from '../../../../../src/use-project-name.js';
+import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -123,6 +125,16 @@ function ProjectBoard() {
    */
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
+  /**
+   * The breadcrumb and the title (Task 2 fix round 1 — coordinator Ruling 6).
+   * Both read `GET /v1/me/workspaces`, the SAME call `<AppNav>` below already
+   * makes for its own workspace-name link — `useWorkspaceName` is one shared
+   * hook, not a second derivation, and `useProjectName` narrows one step
+   * further into the same served rows. Both omit (render nothing) while
+   * pending or refused; see each hook's own docblock.
+   */
+  const workspaceName = useWorkspaceName(workspaceId);
+  const projectName = useProjectName(workspaceId, projectId);
   const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
   /**
    * The list's narrowing, and the reason there is one at all.
@@ -521,8 +533,26 @@ function ProjectBoard() {
               directly rather than scoping from the tablist container, so the move
               changes no test's reach (`page-refusals.test.tsx`,
               `project-create-gate.test.tsx`).
+
+              BREADCRUMB AND TITLE (fix round 1, Ruling 6) render here too, each
+              independently omitted — not a placeholder, not the raw id — while its
+              own hook holds `null`. Neither reserves space while absent: there is
+              no fixed-height wrapper around either, so `.gn-project__header` is
+              exactly as tall as its present children and grows once a name
+              resolves, rather than holding blank space that a name then fills.
+              `.gn-project__summary` (the `N of M shown` line) is deliberately NOT
+              rendered here — this task has no true count to put in it; see the
+              report for that choice.
             */}
-            <div className="gn-project__header">{createRegion}</div>
+            <div className="gn-project__header">
+              {workspaceName !== null ? (
+                <p className="gn-project__breadcrumb">{workspaceName}</p>
+              ) : null}
+              {projectName !== null ? (
+                <h1 className="gn-project__title">{projectName}</h1>
+              ) : null}
+              {createRegion}
+            </div>
 
             {/*
               The segmented control (`ui.css`'s shared `.gn-segmented` /

@@ -4076,6 +4076,44 @@ the two files' rules would otherwise cascade-order against each other).
   boolean that sets `aria-selected` rather than two comparisons kept in agreement by hand.
   — (`apps/web/test/project-calendar-timeline.test.tsx`)
 
+**Task 2 fix round 1 (coordinator Rulings 5 and 6, same day) — the two findings above were correct,
+and both are now closed rather than merely flagged.**
+
+**Block `13.431`–`13.432` minted here; the next free BLOCK is `13.433`.** Ruling 5: `.gn-project`
+drops its horizontal `padding` entirely (it kept only `flex-direction`/`gap`/bottom `padding`) — the
+brief's literal `padding: 0 2rem 1.5rem` stacked additively on top of `.gn-shell`'s own
+`padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`), landing this page's content at 52px from
+the viewport edge (20px + 32px) rather than the prototype's own 32px. `.gn-workspaces`
+(`globals.css:210`) already answers this exact shape for a sibling page — it keeps ONLY what
+`.gn-shell` does not already provide — and `.gn-project` now follows the same rule, with the
+residual 20px-vs-32px gap recorded in a comment on the rule rather than closed: closing it would mean
+moving `.gn-shell` itself, shifting every route in the product for one page's inset.
+
+Ruling 6: the CSS gap was real, but the DATA gap was not — `ProjectRef.name`
+(`packages/app-core/src/view-types.ts:15-23`) already travels on `WorkspaceRef.projects`, served by
+the SAME `getMyWorkspaces()` read `apps/web/src/use-workspace-name.ts` already makes for this page's
+own `<AppNav>` link. Added `apps/web/src/use-project-name.ts`, mirroring `use-workspace-name.ts`'s
+shape and its "omission, never the id" contract exactly, but WITHOUT that hook's module-scoped name
+cache: `AppNav` remounts on every client-side navigation (Round 26's whole reason for caching), while
+this hook mounts once per page load, so there is nothing a cache would buy here and the asymmetry is
+recorded as a decision in the new hook's own docblock. `page.tsx` now renders the workspace name in
+`.gn-project__breadcrumb` and the project name in `<h1 className="gn-project__title">`, each
+independently omitted (not the raw id, not a placeholder) while its own hook holds `null`. Neither
+reserves layout space while absent — no fixed-height wrapper sits around either — so
+`.gn-project__header` is exactly as tall as whichever of its children have resolved and grows once a
+name mounts, rather than holding blank space that a name later fills. `.gn-project__summary` (the
+`N of M shown` line) is UNCHANGED from Round 27: still declared, still unconsumed, left for the task
+that adds the count rather than filled with an invented number.
+
+- **13.431** ✅ A resolved `getMyWorkspaces` read names both the breadcrumb (the workspace) and the
+  title (the project), each independently, disambiguated from `<AppNav>`'s own workspace-name link by
+  scoping to `.gn-project__breadcrumb`. — (`apps/web/test/project-page-chrome.test.tsx`)
+- **13.432** ✅ While `getMyWorkspaces` has not answered (left unstubbed — pending or refused, the same
+  state either way to the caller), neither the breadcrumb nor the title element exists at all, and
+  specifically the raw workspace/project ids are absent from the document — the failure this pair
+  exists to catch is the id standing in for the name nobody could confirm.
+  — (`apps/web/test/project-page-chrome.test.tsx`)
+
 No new token roles: Task 1 was struck, so every `var(--gn-…)` referenced above (`--gn-text-muted`)
 was already declared before this change — the same role `.gn-field__label` already reads in the same
 file. `packages/ui/test/tokens.test.ts`'s role-existence guard and `token-discipline.test.ts`'s

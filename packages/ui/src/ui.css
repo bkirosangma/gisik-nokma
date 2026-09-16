@@ -2648,21 +2648,44 @@
   color: var(--gn-text-muted);
 }
 
-/* ── Project page chrome (board-prototype-port, Task 2, 2026-09-16). Metrics
-   from the spec's Page chrome table (`docs/superpowers/specs/2026-09-16-board-
-   prototype-port-design.md`, itself `desktop.dc.html:314-352`). No new token
-   roles — Task 1 of this port was STRUCK, so every `var(--gn-…)` below is one
-   already declared in `tokens.ts` (`--gn-text-muted` is `.gn-field__label`'s
-   own role a few hundred lines up in this same file).
+/* ── Project page chrome (board-prototype-port, Task 2, 2026-09-16; fix round
+   1, 2026-09-16). Metrics from the spec's Page chrome table (`docs/
+   superpowers/specs/2026-09-16-board-prototype-port-design.md`, itself
+   `desktop.dc.html:314-352`). No new token roles — Task 1 of this port was
+   STRUCK, so every `var(--gn-…)` below is one already declared in
+   `tokens.ts` (`--gn-text-muted` is `.gn-field__label`'s own role a few
+   hundred lines up in this same file).
 
-   `.gn-project__breadcrumb`, `.gn-project__title` and `.gn-project__summary`
-   are DECLARED HERE, UNCONSUMED: this page reads no project name anywhere
-   (`BoardView` is `{projectId, groups}`, and `DataSourceQuery` has no
-   `getProject`/`getProjects` method — only `getMyWorkspaces` carries project
-   names, on the workspace-home page, not here), and no task in this port's
-   plan wires one. Recorded rather than guessed at; a future task supplies the
-   read before these three rules render anything. */
-.gn-project { display: flex; flex-direction: column; gap: 0.875rem; padding: 0 2rem 1.5rem; }
+   `.gn-project__breadcrumb` and `.gn-project__title` are now CONSUMED
+   (`use-workspace-name.ts` / `use-project-name.ts`, wired in `page.tsx` per
+   coordinator Ruling 6) — they were declared unconsumed in the original Task
+   2 commit; that gap is closed.
+
+   `.gn-project__summary` (the `N of M shown` line) is STILL DECLARED,
+   STILL UNCONSUMED: this task has no true count to put in it, and rendering
+   one before a filtering task exists would be inventing a number. Left in
+   place rather than dropped, since the task that adds the count will need
+   this exact rule back immediately. */
+.gn-project { display: flex; flex-direction: column; gap: 0.875rem; padding: 0 0 1.5rem; }
+/* NO horizontal padding (Ruling 5, fix round 1) — it stacked. `.gn-shell`
+   already carries `padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`)
+   around `<AppNav>` and everything below it, so this rule's original literal
+   `padding: 0 2rem 1.5rem` (from the brief's table, applied verbatim) added
+   32px on top of that 20px rather than replacing it — 52px total, against a
+   prototype whose own wrapper has no outer gutter at all and IS the 32px.
+   `.gn-workspaces` (`globals.css:210`) already answers this exact shape for a
+   sibling page: it sets ONLY what `.gn-shell` does not already provide (there,
+   `max-width`/`margin`/`padding-top`, no horizontal component at all), with
+   its own docblock naming the residual gap explicitly — "20px vs the
+   prototype's 24px side gutter" for that page. Followed here the same way:
+   this rule keeps its bottom padding (24px, since `.gn-shell`'s own 48px
+   bottom does not double as this row's tighter one) and drops the horizontal
+   component entirely. **Residual divergence, recorded rather than fixed: the
+   project page now sits at `.gn-shell`'s 20px side gutter, not the
+   prototype's 32px.** Closing that gap would mean moving `.gn-shell` itself,
+   which would shift every route in the product for one page's inset —
+   `.gn-workspaces`' own docblock already made and recorded this exact
+   trade-off, and this rule inherits its reasoning rather than re-deriving it. */
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
