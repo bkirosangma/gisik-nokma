@@ -30,6 +30,8 @@ import {
   shouldRenderNarrowingStrip,
   type BoardFilterChip,
 } from '../../../../../src/board-search-scope.js';
+import { choiceMode, withCycledId } from '../../../../../src/filter-cycle.js';
+import { TriStateChoice } from '../../../../../src/tri-state-choice.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
 import {
@@ -253,6 +255,19 @@ function ProjectBoard() {
       stateIds: filter.stateIds,
       stateCategories: filter.stateCategories,
       projectIds: filter.projectIds,
+      // The exclude half, the same five — `collaboratorIds` deliberately dropped
+      // (`BoardFilterSpec.exclude` cannot carry it; `describeUnappliedBoardAxes`
+      // discloses it). Exclude-mode spec §1/§3.
+      exclude:
+        filter.exclude === undefined
+          ? undefined
+          : {
+              assigneeIds: filter.exclude.assigneeIds,
+              typeIds: filter.exclude.typeIds,
+              stateIds: filter.exclude.stateIds,
+              stateCategories: filter.exclude.stateCategories,
+              projectIds: filter.exclude.projectIds,
+            },
     }),
     [
       filter.text,
@@ -261,6 +276,7 @@ function ProjectBoard() {
       filter.stateIds,
       filter.stateCategories,
       filter.projectIds,
+      filter.exclude,
     ],
   );
 
@@ -402,7 +418,7 @@ function ProjectBoard() {
    */
   const boardUnappliedAxes = useMemo(
     () => describeUnappliedBoardAxes(filter),
-    [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields],
+    [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields, filter.exclude],
   );
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
@@ -1452,21 +1468,6 @@ const STATE_CATEGORY_LABELS: Record<StateCategory, string> = {
   terminal: 'Terminal',
 };
 
-/** Toggle `value` in-or-out of an optional id list, collapsing back to `undefined` rather than `[]` — matching `buildFilterChips`'s own `clear()` convention, so a fully-deselected axis is indistinguishable from one never touched. */
-function toggledArray<T>(current: T[] | undefined, value: T): T[] | undefined {
-  const existing = current ?? [];
-  const next = existing.includes(value) ? existing.filter((item) => item !== value) : [...existing, value];
-  return next.length === 0 ? undefined : next;
-}
-
-function withToggledId(
-  filter: FilterSpec,
-  key: 'assigneeIds' | 'collaboratorIds' | 'typeIds' | 'stateIds',
-  id: string,
-): FilterSpec {
-  return { ...filter, [key]: toggledArray(filter[key], id) };
-}
-
 /**
  * RULING 13's own regression: "Clear all" (Ruling 12's fix) cleared a
  * DIFFERENT six than its own docblock and both commit messages claimed —
@@ -1479,7 +1480,9 @@ function withToggledId(
  * produced the wrong six twice. The six `BoardFilterSpec` fields
  * (`buildFilterChips`'s own domain) plus `collaboratorIds` (this
  * sheet's one board-blind axis, which discloses through the scope note
- * rather than a chip — see `FiltersSheet`'s own docblock).
+ * rather than a chip — see `FiltersSheet`'s own docblock) — plus `exclude`
+ * (exclude-mode spec §4, 2026-09-17): the whole exclude half, so "Clear all"
+ * clears what the tri-state controls set in EITHER direction.
  */
 export const FILTERS_SHEET_CLEARABLE_AXES = [
   'text',
@@ -1489,6 +1492,7 @@ export const FILTERS_SHEET_CLEARABLE_AXES = [
   'stateCategories',
   'projectIds',
   'collaboratorIds',
+  'exclude',
 ] as const satisfies readonly (keyof FilterSpec)[];
 
 /**
@@ -1555,11 +1559,12 @@ type FiltersSheetProps = {
  * ## Which axes get a control here, and which do not
  *
  * Five of `BoardFilterSpec`'s six axes get a control (`text` already has the
- * search box built by Task 4): **Assignee** and **Collaborators** as
- * "person row" checkbox lists (`assigneeIds`/`collaboratorIds`), **Type**
- * and **State** as "category chip" multi-selects (`typeIds`/`stateIds`), and
- * **Category** as the same chip idiom over the three fixed
- * `stateCategories` values. `projectIds` gets none: this page is already
+ * search box built by Task 4): **Assignee**, **Collaborators**, **Type**,
+ * **State** and **Category** (`assigneeIds`/`collaboratorIds`/`typeIds`/
+ * `stateIds`/`stateCategories`). Every value is ONE control, `TriStateChoice`
+ * (exclude-mode spec §4, 2026-09-17): off → include → exclude → off, cycled
+ * through `withCycledId` onto this same `filter`; the person rows keep their
+ * avatar and name inside that button. `projectIds` gets none: this page is already
  * scoped to the one project it is showing, Task 4's own report found no
  * natural label source for it here ("a project-picker axis has no natural
  * label source... the chip names a COUNT"), and the brief's own curated
@@ -1690,12 +1695,13 @@ function FiltersSheet({
       ) : (
         <div className="gn-filters__person-list">
           {members.map((member) => (
-            <label key={member.id} className="gn-filters__person-row">
-              <input
-                type="checkbox"
-                checked={filter[key]?.includes(member.id) ?? false}
-                onChange={() => setFilter((current) => withToggledId(current, key, member.id))}
-              />
+            <TriStateChoice
+              key={member.id}
+              className="gn-filters__choice--row"
+              label={member.name}
+              mode={choiceMode(filter, key, member.id)}
+              onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
+            >
               {/*
                 `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
                 its span (`components/avatar.tsx`), so left unhidden it
@@ -1709,7 +1715,7 @@ function FiltersSheet({
                 <Avatar name={member.name} size="small" />
               </span>
               <span>{member.name}</span>
-            </label>
+            </TriStateChoice>
           ))}
         </div>
       )}
@@ -1745,20 +1751,14 @@ function FiltersSheet({
             ) : (
               <>
                 <div className="gn-filters__chip-list">
-                  {typeOptions.map((type) => {
-                    const selected = filter.typeIds?.includes(type.id) ?? false;
-                    return (
-                      <button
-                        key={type.id}
-                        type="button"
-                        className="gn-filters__chip"
-                        aria-pressed={selected}
-                        onClick={() => setFilter((current) => withToggledId(current, 'typeIds', type.id))}
-                      >
-                        {type.name}
-                      </button>
-                    );
-                  })}
+                  {typeOptions.map((type) => (
+                    <TriStateChoice
+                      key={type.id}
+                      label={type.name}
+                      mode={choiceMode(filter, 'typeIds', type.id)}
+                      onCycle={() => setFilter((current) => withCycledId(current, 'typeIds', type.id))}
+                    />
+                  ))}
                 </div>
                 {typesPending ? <p className="gn-filters__pending">{BUILTIN_LADDER_NOTICE}</p> : null}
               </>
@@ -1775,20 +1775,14 @@ function FiltersSheet({
               <p className="gn-filters__pending">This project’s board has not loaded yet.</p>
             ) : boardStateOptions.length > 0 ? (
               <div className="gn-filters__chip-list">
-                {boardStateOptions.map((state) => {
-                  const selected = filter.stateIds?.includes(state.id) ?? false;
-                  return (
-                    <button
-                      key={state.id}
-                      type="button"
-                      className="gn-filters__chip"
-                      aria-pressed={selected}
-                      onClick={() => setFilter((current) => withToggledId(current, 'stateIds', state.id))}
-                    >
-                      {state.name}
-                    </button>
-                  );
-                })}
+                {boardStateOptions.map((state) => (
+                  <TriStateChoice
+                    key={state.id}
+                    label={state.name}
+                    mode={choiceMode(filter, 'stateIds', state.id)}
+                    onCycle={() => setFilter((current) => withCycledId(current, 'stateIds', state.id))}
+                  />
+                ))}
               </div>
             ) : null}
           </fieldset>
@@ -1796,25 +1790,14 @@ function FiltersSheet({
           <fieldset className="gn-filters__section">
             <legend className="gn-filters__section-label">Category</legend>
             <div className="gn-filters__chip-list">
-              {STATE_CATEGORIES.map((category) => {
-                const selected = filter.stateCategories?.includes(category) ?? false;
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    className="gn-filters__chip"
-                    aria-pressed={selected}
-                    onClick={() =>
-                      setFilter((current) => ({
-                        ...current,
-                        stateCategories: toggledArray(current.stateCategories, category),
-                      }))
-                    }
-                  >
-                    {STATE_CATEGORY_LABELS[category]}
-                  </button>
-                );
-              })}
+              {STATE_CATEGORIES.map((category) => (
+                <TriStateChoice
+                  key={category}
+                  label={STATE_CATEGORY_LABELS[category]}
+                  mode={choiceMode(filter, 'stateCategories', category)}
+                  onCycle={() => setFilter((current) => withCycledId(current, 'stateCategories', category))}
+                />
+              ))}
             </div>
           </fieldset>
         </div>

@@ -137,7 +137,7 @@ async function openFilters() {
 async function openFiltersAndPickCollaborator(name: string) {
   const dialog = await openFilters();
   const group = within(dialog).getByRole('group', { name: 'Collaborators' });
-  await userEvent.click(within(group).getByRole('checkbox', { name }));
+  await userEvent.click(within(group).getByRole('button', { name }));
 }
 
 describe('13.445 the sheet is a real dialog, and focus moves into it on open', () => {
@@ -191,7 +191,7 @@ describe('13.447 picking an assignee narrows the board and discloses it', () => 
 
     const dialog = await openFilters();
     const group = within(dialog).getByRole('group', { name: 'Assignee' });
-    await userEvent.click(within(group).getByRole('checkbox', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
     await userEvent.keyboard('{Escape}');
 
     expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
@@ -212,9 +212,9 @@ describe('13.448 picking a type chip narrows the board and discloses it', () => 
 
     const dialog = await openFilters();
     const group = within(dialog).getByRole('group', { name: 'Type' });
-    const bugChip = within(group).getByRole('button', { name: 'Bug' });
+    const bugChip = within(group).getByRole('button', { name: /^Bug/ });
     await userEvent.click(bugChip);
-    expect(bugChip).toHaveAttribute('aria-pressed', 'true');
+    expect(bugChip).toHaveAttribute('data-mode', 'include');
     await userEvent.keyboard('{Escape}');
 
     expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
@@ -301,13 +301,13 @@ describe('13.452 Clear all resets every axis the sheet owns, without closing', (
 
     const dialog = await openFilters();
     const group = within(dialog).getByRole('group', { name: 'Assignee' });
-    const checkbox = within(group).getByRole('checkbox', { name: 'Uma One' });
-    await userEvent.click(checkbox);
-    expect(checkbox).toBeChecked();
+    const row = within(group).getByRole('button', { name: 'Uma One' });
+    await userEvent.click(row);
+    expect(row).toHaveAttribute('data-mode', 'include');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Clear all' }));
 
-    expect(checkbox).not.toBeChecked();
+    expect(row).toHaveAttribute('data-mode', 'off');
     // Clear all does not close the sheet — it is a distinct action from Done.
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
 
@@ -523,8 +523,25 @@ describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus co
         'stateCategories',
         'projectIds',
         'collaboratorIds',
+        'exclude',
       ]),
     );
+  });
+
+  it('clears the whole exclude half too — one axis in this list, not five separately', () => {
+    expect(
+      clearFilterAxes({ text: 'x', exclude: { typeIds: ['bug'] }, dueBefore: '2026-01-01' }),
+    ).toEqual({
+      text: undefined,
+      assigneeIds: undefined,
+      typeIds: undefined,
+      stateIds: undefined,
+      stateCategories: undefined,
+      projectIds: undefined,
+      collaboratorIds: undefined,
+      exclude: undefined,
+      dueBefore: '2026-01-01',
+    });
   });
 
   it('clears projectIds — the axis Ruling 13 found silently omitted — even though no UI control sets it', () => {
@@ -602,5 +619,132 @@ describe('13.462 clicking the scrim closes the sheet', () => {
     await userEvent.click(screen.getByTestId('filters-scrim'));
 
     expect(dialog).not.toBeInTheDocument();
+  });
+});
+
+/** 13.552 — the cycle, through the real sheet (exclude-mode spec §4). */
+describe('13.552 a person row cycles off → included → excluded → off, in its accessible name', () => {
+  it('three clicks walk the three names and return to the start', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+
+    const row = within(group).getByRole('button', { name: 'Uma One' });
+    expect(row).not.toHaveAttribute('aria-pressed');
+    await userEvent.click(row);
+    expect(within(group).getByRole('button', { name: 'Uma One, included' })).toHaveAttribute('data-mode', 'include');
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    expect(within(group).getByRole('button', { name: 'Uma One, excluded' })).toHaveAttribute('data-mode', 'exclude');
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, excluded' }));
+    expect(within(group).getByRole('button', { name: 'Uma One' })).toHaveAttribute('data-mode', 'off');
+  });
+});
+
+/** 13.553 — exclusion narrows the BOARD and is disclosed as "Not assignee". */
+describe('13.553 excluding an assignee drops that card from the board and shows a "Not assignee" chip', () => {
+  it('two clicks on Uma One leave only the unassigned card, under a "1 of 2 shown" strip', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-exclude.assigneeIds')).toHaveTextContent('Not assignee: Uma One');
+    expect(screen.queryByTestId('board-filter-chip-assigneeIds')).not.toBeInTheDocument();
+    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.queryByText('Carve the new workflow')).not.toBeInTheDocument();
+  });
+
+  it("the exclude chip's × clears the exclusion and restores both cards", async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    await userEvent.keyboard('{Escape}');
+    await screen.findByText('1 of 2 shown');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove filter — Not assignee: Uma One' }));
+
+    expect(await screen.findByText('Carve the new workflow')).toBeInTheDocument();
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
+
+/** 13.554 — a type chip excluded, the same way; and the category chips cycle too. */
+describe('13.554 type and category chips cycle and exclude', () => {
+  it('excluding the Bug type drops the bug card', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Type' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Bug' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Bug, included' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-exclude.typeIds')).toHaveTextContent('Not type: Bug');
+    expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
+  });
+
+  it('a category chip reaches the excluded state', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Category' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Active' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Active, included' }));
+    expect(within(group).getByRole('button', { name: 'Active, excluded' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    // Both cards sit in the one `active` column, so excluding the category empties the board honestly.
+    expect(await screen.findByText('0 of 2 shown')).toBeInTheDocument();
+  });
+});
+
+/** 13.555 — "Clear all" clears the exclude half too, through the real button. */
+describe('13.555 Clear all clears an exclusion', () => {
+  it('after Clear all the excluded row reads off and both cards are back', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    await screen.findByText('1 of 2 shown');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear all' }));
+
+    expect(within(group).getByRole('button', { name: 'Uma One' })).toHaveAttribute('data-mode', 'off');
+    expect(dialog).toBeInTheDocument(); // Clear all does not close (Ruling 12)
+    expect(screen.queryByText('1 of 2 shown')).not.toBeInTheDocument();
   });
 });

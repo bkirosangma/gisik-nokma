@@ -387,7 +387,7 @@ async function openFiltersAndPickAssignee(name: string) {
   await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
   const dialog = await screen.findByRole('dialog', { name: 'Filters' });
   const group = within(dialog).getByRole('group', { name: 'Assignee' });
-  await userEvent.click(within(group).getByRole('checkbox', { name }));
+  await userEvent.click(within(group).getByRole('button', { name }));
   // Finding 1's own scenario: "tick an assignee, press Done" — Done and
   // Escape both close the sheet (`13.446`/`13.461` prove that separately),
   // but this drives the literal path named rather than a merely-equivalent one.
