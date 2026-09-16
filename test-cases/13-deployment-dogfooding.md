@@ -5036,3 +5036,49 @@ introduced).
   shared do-not-edit selectors confirmed unedited by a full-diff grep. Not verified by a live render in
   any style or theme. — (`packages/ui/src/components/table.tsx`, `packages/ui/src/ui.css`,
   `packages/app-core/src/views/ticket-list.tsx`)
+
+## Task 12 — the transition gate, as a pure function (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.478`–`13.485` minted here**, continuing directly from `13.477` (verified against the real
+case list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool is
+`13.477` — never the file's own "next free BLOCK" prose at :2415, which an earlier task already found to
+be a false hit). Phase 6, Board writes: `moveOutcome(def, fromStateId, toStateId)` is the gate Tasks 13
+(move arrows) and 14 (drag-and-drop) both route a proposed move through before anything is submitted. It
+ships no UI and derives nothing of its own — built entirely over `transitionOptions`
+(`views/transition-dialog.tsx:41-61`), which already predicts the engine's own `find(exact) ?? find('*')`
+resolution (`rule-engine/src/transition.ts:91-93`). Fixture: `WF_ERRAND` (`test/helpers/seed.ts`), which
+already declares a wildcard edge (`* -> todo`), so the plain wildcard-reachable case needed no second
+fixture; two purpose-built definitions cover the precedence and wildcard-carries-rules cases below.
+
+**Mutation-witnessed** (`board-moves.ts` edited in place, `pnpm exec vitest run test/views/
+board-moves.test.ts` re-run after each edit, then reverted with a targeted `Edit` — never `git checkout
+--`, which has destroyed uncommitted work in this repo before). Replacing the `transitionOptions` call
+with a naive re-derivation that scanned `def.transitions` in array order and stopped at the first edge
+reaching `toStateId` — ignoring exact-before-wildcard — reddened `13.483` alone; every other case in the
+file stayed green. Hardcoding `available: []` on the refused branch reddened `13.478` and `13.479`
+(`available` no longer equals the declared list) while `13.480`/`13.481` (no refused branch reached) stayed
+green. Inverting the rules check (`rules.length === 0` routing to `needs-dialog`, anything else to
+`direct`) reddened `13.480`/`13.481`/`13.482`/`13.483` (every direct/needs-dialog case swapped kind) while
+`13.478`/`13.479`/`13.485` (the refused cases, unreached by that branch) stayed green.
+
+- **13.478** ✅ Refuses an undeclared target and names the one move that IS available from that state. —
+  (`packages/app-core/src/views/board-moves.ts`, `packages/app-core/test/views/board-moves.test.ts`)
+- **13.479** ✅ Refusing from a state with THREE declared edges names all three, in `transitionOptions`'
+  own order — not merely a non-empty list. — (same files)
+- **13.480** ✅ A declared, rules-free edge answers `direct`. — (same files)
+- **13.481** ✅ A declared edge carrying `require-comment` answers `needs-dialog`. — (same files)
+- **13.482** ✅ A target reachable ONLY through the wildcard edge (no exact edge exists to it) still
+  answers `direct`, off the wildcard edge's own (empty) rules. — (same files)
+- **13.483** ✅ Wildcard declared FIRST and carrying rules, exact declared SECOND and rules-free, both
+  reaching the SAME target: the exact edge's rules win — `direct`, matching the engine's `find(exact) ??
+  find('*')` regardless of array order. This is ruling P27's own concern one level up, and the case the
+  re-derivation mutation above reddens alone. — (same files)
+- **13.484** ✅ A wildcard-only edge that DOES carry rules answers `needs-dialog`, on a purpose-built
+  definition with a `flagged` state reachable only by `* -> flagged`. — (same files)
+- **13.485** ✅ A move back onto the current state refuses like any other undeclared move —
+  `transitionOptions` already excludes `to === fromStateId`, even against a wildcard edge that would
+  otherwise reach it. — (same files)
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2, `pnpm exec vitest run
+test/views/board-moves.test.ts`: 8/8 green). `node scripts/check-case-ids.mjs` re-run after minting:
+duplicate list unchanged at `13.387`/`13.413` only.
