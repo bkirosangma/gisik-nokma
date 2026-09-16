@@ -5955,3 +5955,12 @@ need for per-tab filter variants. These eleven tasks build that capability from 
 - **13.543** ✅ `ListFilterSpec` rejects `collaboratorIds` in both halves at compile time.
 - **13.544** ✅ `toServerFilterSpec` throws `UnexpressibleFilterError('exclude', …)` naming the axes on any
   non-empty exclude; an empty object or empty lists pass through unrefused.
+- **13.545** ✅ `withIdAxis` (`apps/web/src/filter-edits.ts`) — the one writer of either half of one axis:
+  empty list → `undefined`, an exclude half with no defined axis → `undefined`; pure.
+- **13.546** ✅ `buildFilterChips` (renamed from `buildBoardFilterChips`) emits `exclude.<axis>` chips
+  labelled "Not assignee/type/state/category/project: …" directly after each axis's include chip, with
+  `mode`; an exclude chip's × clears only that half (the include half survives, and vice versa); the last
+  exclude axis removed collapses `exclude`; empty lists earn no chip. Mutation (clearExclude clearing the
+  whole half) kills the only-that-axis case.
+- **13.547** ✅ `describeUnappliedBoardAxes` names collaborator for `exclude.collaboratorIds` (once);
+  `describeUnappliedListAxes` names collaborator only — due dates and fields are answered by the list.

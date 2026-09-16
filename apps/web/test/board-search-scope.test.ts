@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BoardFilterSpec, FilterSpec } from '@gisik-nokma/app-core';
 import {
-  buildBoardFilterChips,
+  buildFilterChips,
   describeUnappliedBoardAxes,
-  shouldRenderBoardNarrowingStrip,
+  describeUnappliedListAxes,
+  shouldRenderNarrowingStrip,
 } from '../src/board-search-scope.js';
 
 const RESOLVERS = {
@@ -104,7 +105,7 @@ describe('13.441 the combined case names all active axes, in a stable order', ()
  */
 describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not only text', () => {
   it('emits no chip for an empty boardFilter', () => {
-    const chips = buildBoardFilterChips({}, RESOLVERS, vi.fn());
+    const chips = buildFilterChips({}, RESOLVERS, vi.fn());
     expect(chips).toEqual([]);
   });
 
@@ -118,7 +119,7 @@ describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not on
       stateCategories: ['active'],
       projectIds: ['p_1', 'p_2'],
     };
-    const chips = buildBoardFilterChips(filter, RESOLVERS, setFilter);
+    const chips = buildFilterChips(filter, RESOLVERS, setFilter);
     expect(chips.map((chip) => chip.key)).toEqual([
       'text',
       'assigneeIds',
@@ -138,25 +139,25 @@ describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not on
   });
 
   it('resolves an id through the RESOLVER, never printing a raw id when a name is known', () => {
-    const chips = buildBoardFilterChips({ assigneeIds: ['u1'] }, RESOLVERS, vi.fn());
+    const chips = buildFilterChips({ assigneeIds: ['u1'] }, RESOLVERS, vi.fn());
     expect(chips[0]?.label).toBe('Assignee: Ada');
     expect(chips[0]?.label).not.toContain('u1');
   });
 
   it('falls back to the raw id when the resolver has no name for it', () => {
-    const chips = buildBoardFilterChips({ assigneeIds: ['u_unknown'] }, RESOLVERS, vi.fn());
+    const chips = buildFilterChips({ assigneeIds: ['u_unknown'] }, RESOLVERS, vi.fn());
     expect(chips[0]?.label).toBe('Assignee: u_unknown');
   });
 
   it('ignores an EMPTY list axis — it does not narrow, so it earns no chip', () => {
-    const chips = buildBoardFilterChips({ assigneeIds: [] }, RESOLVERS, vi.fn());
+    const chips = buildFilterChips({ assigneeIds: [] }, RESOLVERS, vi.fn());
     expect(chips).toEqual([]);
   });
 
   it("each chip's onRemove clears exactly its own axis and no other", () => {
     const setFilter = vi.fn();
     const filter: BoardFilterSpec = { text: 'board', assigneeIds: ['u1'] };
-    const chips = buildBoardFilterChips(filter, RESOLVERS, setFilter);
+    const chips = buildFilterChips(filter, RESOLVERS, setFilter);
     const assigneeChip = chips.find((chip) => chip.key === 'assigneeIds');
     assigneeChip?.onRemove();
 
@@ -184,19 +185,19 @@ describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not on
 describe('13.443 shouldRenderBoardNarrowingStrip is not blind to narrowing with no named axis', () => {
   it('is false when nothing is active and nothing is hidden', () => {
     expect(
-      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 3, total: 3 }),
+      shouldRenderNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 3, total: 3 }),
     ).toBe(false);
   });
 
   it('is true on a chip alone (remedy 1’s own case)', () => {
     expect(
-      shouldRenderBoardNarrowingStrip({ chipCount: 1, unappliedAxisCount: 0, shown: 3, total: 3 }),
+      shouldRenderNarrowingStrip({ chipCount: 1, unappliedAxisCount: 0, shown: 3, total: 3 }),
     ).toBe(true);
   });
 
   it('is true on an unapplied axis alone', () => {
     expect(
-      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 1, shown: 3, total: 3 }),
+      shouldRenderNarrowingStrip({ chipCount: 0, unappliedAxisCount: 1, shown: 3, total: 3 }),
     ).toBe(true);
   });
 
@@ -205,13 +206,94 @@ describe('13.443 shouldRenderBoardNarrowingStrip is not blind to narrowing with 
     // set at all) produces: something is hidden, but neither of the first
     // two terms has any way to know it.
     expect(
-      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 1, total: 3 }),
+      shouldRenderNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 1, total: 3 }),
     ).toBe(true);
   });
 
   it('is true when all three terms are true at once', () => {
     expect(
-      shouldRenderBoardNarrowingStrip({ chipCount: 1, unappliedAxisCount: 1, shown: 1, total: 3 }),
+      shouldRenderNarrowingStrip({ chipCount: 1, unappliedAxisCount: 1, shown: 1, total: 3 }),
     ).toBe(true);
+  });
+});
+
+/** 13.546 — the exclude half's chips (exclude-mode spec §2/§4): one per axis set, "Not …", removable by half. */
+describe('13.546 buildFilterChips emits a "Not …" chip for each exclude axis, beside its include chip', () => {
+  it('labels and keys every exclude axis, directly after the same axis\'s include chip', () => {
+    const chips = buildFilterChips(
+      {
+        assigneeIds: ['u1'],
+        exclude: { assigneeIds: ['u_unknown'], typeIds: ['task'], stateIds: ['doing'], stateCategories: ['terminal'], projectIds: ['p_1', 'p_2'] },
+      },
+      RESOLVERS,
+      vi.fn(),
+    );
+    expect(chips.map((chip) => chip.key)).toEqual([
+      'assigneeIds',
+      'exclude.assigneeIds',
+      'exclude.typeIds',
+      'exclude.stateIds',
+      'exclude.stateCategories',
+      'exclude.projectIds',
+    ]);
+    expect(chips.map((chip) => chip.label)).toEqual([
+      'Assignee: Ada',
+      'Not assignee: u_unknown',
+      'Not type: Task',
+      'Not state: Doing',
+      'Not category: Terminal',
+      'Not project: 2 selected',
+    ]);
+    expect(chips.map((chip) => chip.mode)).toEqual(['include', 'exclude', 'exclude', 'exclude', 'exclude', 'exclude']);
+  });
+
+  it('an exclude chip\'s onRemove clears ONLY that exclude axis — the include half of the same axis survives', () => {
+    const setFilter = vi.fn();
+    const chips = buildFilterChips({ assigneeIds: ['u1'], exclude: { assigneeIds: ['u2'], typeIds: ['task'] } }, RESOLVERS, setFilter);
+    chips.find((chip) => chip.key === 'exclude.assigneeIds')?.onRemove();
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    expect(updater({ assigneeIds: ['u1'], exclude: { assigneeIds: ['u2'], typeIds: ['task'] } })).toEqual({
+      assigneeIds: ['u1'],
+      exclude: { assigneeIds: undefined, typeIds: ['task'] },
+    });
+  });
+
+  it('removing the last exclude axis collapses the exclude half to undefined', () => {
+    const setFilter = vi.fn();
+    const chips = buildFilterChips({ exclude: { typeIds: ['task'] } }, RESOLVERS, setFilter);
+    chips[0]?.onRemove();
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    expect(updater({ text: 'x', exclude: { typeIds: ['task'] } })).toEqual({ text: 'x', exclude: undefined });
+  });
+
+  it('an include chip\'s onRemove leaves the exclude half of the same axis alone', () => {
+    const setFilter = vi.fn();
+    const chips = buildFilterChips({ assigneeIds: ['u1'], exclude: { assigneeIds: ['u2'] } }, RESOLVERS, setFilter);
+    chips.find((chip) => chip.key === 'assigneeIds')?.onRemove();
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    expect(updater({ assigneeIds: ['u1'], exclude: { assigneeIds: ['u2'] } })).toEqual({
+      assigneeIds: undefined,
+      exclude: { assigneeIds: ['u2'] },
+    });
+  });
+
+  it('empty exclude lists earn no chip', () => {
+    expect(buildFilterChips({ exclude: { typeIds: [] } }, RESOLVERS, vi.fn())).toEqual([]);
+  });
+});
+
+/** 13.547 — the axes each tab cannot evaluate, in both halves. */
+describe('13.547 unapplied axes name the exclude half too, per tab', () => {
+  it('the board discloses exclude.collaboratorIds as "collaborator", once, even when the include half sets it too', () => {
+    expect(describeUnappliedBoardAxes({ exclude: { collaboratorIds: ['u9'] } })).toEqual(['collaborator']);
+    expect(describeUnappliedBoardAxes({ collaboratorIds: ['u1'], exclude: { collaboratorIds: ['u9'] } })).toEqual(['collaborator']);
+    expect(describeUnappliedBoardAxes({ exclude: { collaboratorIds: [] } })).toEqual([]);
+  });
+
+  it('the list discloses only collaborator — it answers due dates and fields itself', () => {
+    expect(describeUnappliedListAxes({})).toEqual([]);
+    expect(describeUnappliedListAxes({ collaboratorIds: ['u1'] })).toEqual(['collaborator']);
+    expect(describeUnappliedListAxes({ exclude: { collaboratorIds: ['u9'] } })).toEqual(['collaborator']);
+    expect(describeUnappliedListAxes({ dueBefore: '2026-09-30', fields: { priority: 'high' } })).toEqual([]);
   });
 });

@@ -25,9 +25,9 @@ import {
 import { Avatar } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import {
-  buildBoardFilterChips,
+  buildFilterChips,
   describeUnappliedBoardAxes,
-  shouldRenderBoardNarrowingStrip,
+  shouldRenderNarrowingStrip,
   type BoardFilterChip,
 } from '../../../../../src/board-search-scope.js';
 import { istToday } from '../../../../../src/ist-today.js';
@@ -242,7 +242,7 @@ function ProjectBoard() {
    * review that asked for this, they were two independently hand-written
    * lists of "which axes exist" that had already drifted (the chip builder
    * only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
-   * `buildBoardFilterChips` for the full account. A future axis added to
+   * `buildFilterChips` for the full account. A future axis added to
    * `BoardFilterSpec` now has exactly one object literal to update, not two.
    */
   const boardFilter: BoardFilterSpec = useMemo(
@@ -352,7 +352,7 @@ function ProjectBoard() {
    * empty, or omits a group's rail entirely, rather than vanishing — the
    * `N of M shown` count and the removable chip(s) below are the only
    * disclosure, which is the invariant's whole point. This is also exactly
-   * why `shouldRenderBoardNarrowingStrip`'s third term (`shown !== total`)
+   * why `shouldRenderNarrowingStrip`'s third term (`shown !== total`)
    * exists independently of `activeFilterChips`/`boardUnappliedAxes`: no
    * axis enumeration can ever name "a whole group was dropped", so the gate
    * would otherwise miss this mechanism entirely — see that function's own
@@ -606,7 +606,7 @@ function ProjectBoard() {
    * THE REMOVABLE CHIP HALF of the disclosure invariant — built from
    * `boardFilter` itself (declared above, alongside `boardNarrowing`), one
    * chip per axis actually set, covering all SIX of `BoardFilterSpec`'s
-   * fields rather than only `text`. See `buildBoardFilterChips`'s own
+   * fields rather than only `text`. See `buildFilterChips`'s own
    * docblock in `board-search-scope.ts` for why this single-enumeration
    * design is the fix, not a style choice: the previous version silently
    * closed the disclosure gate on any of the other five axes narrowing the
@@ -619,7 +619,7 @@ function ProjectBoard() {
    */
   const activeFilterChips = useMemo(
     () =>
-      buildBoardFilterChips(
+      buildFilterChips(
         boardFilter,
         {
           assigneeName: nameOf,
@@ -633,12 +633,12 @@ function ProjectBoard() {
 
   /**
    * THE WORKFLOW PICKER'S OWN CHIP (Task 8) — built separately from
-   * `buildBoardFilterChips`, on purpose: that function enumerates
+   * `buildFilterChips`, on purpose: that function enumerates
    * `boardFilter`'s six fields one by one, and `workflowFilter` is not one
    * of them (see its own declaration above) and never can be —
    * `matchesBoardCard` has no group in its signature for a seventh axis to
    * join. So this is a second, small builder rather than a seventh case
-   * inside `buildBoardFilterChips`, shaped identically (`BoardFilterChip`)
+   * inside `buildFilterChips`, shaped identically (`BoardFilterChip`)
    * so it can join the SAME strip at the render site below without a second
    * chip idiom. `null` while `workflowFilter === 'all'` — the resting state
    * discloses nothing because it has dropped nothing (R3).
@@ -666,7 +666,7 @@ function ProjectBoard() {
       (candidate) => candidate.workflowId === resolvedWorkflowFilter,
     );
     const label = `Workflow: ${group?.workflowName ?? resolvedWorkflowFilter}`;
-    return { key: 'workflow', label, onRemove: () => setWorkflowFilter('all') };
+    return { key: 'workflow', label, mode: 'include', onRemove: () => setWorkflowFilter('all') };
   }, [resolvedWorkflowFilter, board.data]);
 
   /**
@@ -676,7 +676,7 @@ function ProjectBoard() {
    * and the mirror note further down that checks for the `text` chip
    * specifically) keeps reading `activeFilterChips` alone, unmerged — the
    * gate does not need `workflowChip` counted in `chipCount` because
-   * `shouldRenderBoardNarrowingStrip`'s independent third term
+   * `shouldRenderNarrowingStrip`'s independent third term
    * (`shown !== total`) already fires for group-dropping on its own (see
    * `boardNarrowing`'s own docblock above); double-counting it into
    * `chipCount` too would not change the gate's answer, only obscure which
@@ -1090,7 +1090,7 @@ function ProjectBoard() {
               agree.
 
               THREE TERMS, not two (Task 4 review, Important finding,
-              remedy 2 — `shouldRenderBoardNarrowingStrip` in
+              remedy 2 — `shouldRenderNarrowingStrip` in
               `board-search-scope.ts`): `activeFilterChips.length > 0` and
               `boardUnappliedAxes.length > 0` only cover mechanisms this file
               can NAME — a filter axis, or an axis outside `BoardFilterSpec`.
@@ -1127,7 +1127,7 @@ function ProjectBoard() {
             */}
             {view === 'board' &&
             boardNarrowing !== null &&
-            shouldRenderBoardNarrowingStrip({
+            shouldRenderNarrowingStrip({
               chipCount: activeFilterChips.length,
               unappliedAxisCount: boardUnappliedAxes.length,
               shown: boardNarrowing.shown,
@@ -1210,15 +1210,15 @@ function ProjectBoard() {
               `projectIds`) onto the SAME page-level `filter`, from every
               tab — a `chip.key === 'text'` gate goes silently inert on all
               five, the identical one-axis-enumeration defect
-              `buildBoardFilterChips` was already rewritten to stop
+              `buildFilterChips` was already rewritten to stop
               repeating for the strip above. GATED NOW on
               `activeFilterChips.length > 0 || boardUnappliedAxes.length >
               0` — the SAME two terms the strip's own gate reads for the
-              board (`shouldRenderBoardNarrowingStrip`'s first two), never
+              board (`shouldRenderNarrowingStrip`'s first two), never
               its third (`shown !== total`): that term is a fact about what
               the BOARD rendered, meaningless on a tab the board never
               touches. `activeFilterChips` already enumerates every
-              `BoardFilterSpec` axis (`buildBoardFilterChips`'s own
+              `BoardFilterSpec` axis (`buildFilterChips`'s own
               docblock); `boardUnappliedAxes` covers the three the board
               itself cannot evaluate either. Between the two, every axis
               this `filter` state can carry is covered.
@@ -1318,7 +1318,7 @@ function ProjectBoard() {
                 //
                 // `isNarrowed` (Ruling 19, board-prototype-port Task 7 fix,
                 // 2026-09-16): `shown !== total` is the SAME expression
-                // `shouldRenderBoardNarrowingStrip` above already reads as one
+                // `shouldRenderNarrowingStrip` above already reads as one
                 // of its three terms, not a second definition of "narrowed" —
                 // true exactly when the filter actually dropped a card, which
                 // (since narrowing drops cards only, never columns or groups)
@@ -1452,7 +1452,7 @@ const STATE_CATEGORY_LABELS: Record<StateCategory, string> = {
   terminal: 'Terminal',
 };
 
-/** Toggle `value` in-or-out of an optional id list, collapsing back to `undefined` rather than `[]` — matching `buildBoardFilterChips`'s own `clear()` convention, so a fully-deselected axis is indistinguishable from one never touched. */
+/** Toggle `value` in-or-out of an optional id list, collapsing back to `undefined` rather than `[]` — matching `buildFilterChips`'s own `clear()` convention, so a fully-deselected axis is indistinguishable from one never touched. */
 function toggledArray<T>(current: T[] | undefined, value: T): T[] | undefined {
   const existing = current ?? [];
   const next = existing.includes(value) ? existing.filter((item) => item !== value) : [...existing, value];
@@ -1477,7 +1477,7 @@ function withToggledId(
  * array so `clearAll` and `filters-sheet.test.tsx` read the SAME list rather
  * than two independently hand-typed copies — the exact mechanism that
  * produced the wrong six twice. The six `BoardFilterSpec` fields
- * (`buildBoardFilterChips`'s own domain) plus `collaboratorIds` (this
+ * (`buildFilterChips`'s own domain) plus `collaboratorIds` (this
  * sheet's one board-blind axis, which discloses through the scope note
  * rather than a chip — see `FiltersSheet`'s own docblock).
  */

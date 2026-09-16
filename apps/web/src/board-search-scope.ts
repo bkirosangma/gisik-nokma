@@ -1,4 +1,22 @@
-import type { BoardFilterSpec, FilterSpec } from '@gisik-nokma/app-core';
+import type { BoardFilterSpec, FilterSpec, IdAxes } from '@gisik-nokma/app-core';
+import { withIdAxis } from './filter-edits.js';
+
+/** Either half naming collaborators — the one axis neither a BoardCard nor a ListRow can answer. */
+function collaboratorsSet(filter: FilterSpec): boolean {
+  const include = filter.collaboratorIds ?? [];
+  const exclude = filter.exclude?.collaboratorIds ?? [];
+  return include.length > 0 || exclude.length > 0;
+}
+
+/**
+ * The axes a LIST ROW cannot evaluate (exclude-mode spec §2): only
+ * collaborators, in either half — `matchesListRow` answers due bounds and
+ * field clauses itself, so unlike `describeUnappliedBoardAxes` there is
+ * nothing else to disclose. Same fixed order discipline: one possible entry.
+ */
+export function describeUnappliedListAxes(filter: FilterSpec): string[] {
+  return collaboratorsSet(filter) ? ['collaborator'] : [];
+}
 
 /**
  * Axes an active filter carries that a BOARD cannot evaluate at all —
@@ -20,9 +38,7 @@ import type { BoardFilterSpec, FilterSpec } from '@gisik-nokma/app-core';
  */
 export function describeUnappliedBoardAxes(filter: FilterSpec): string[] {
   const axes: string[] = [];
-  if (filter.collaboratorIds !== undefined && filter.collaboratorIds.length > 0) {
-    axes.push('collaborator');
-  }
+  if (collaboratorsSet(filter)) axes.push('collaborator');
   if (filter.dueBefore !== undefined || filter.dueAfter !== undefined) {
     axes.push('due date');
   }
@@ -32,7 +48,13 @@ export function describeUnappliedBoardAxes(filter: FilterSpec): string[] {
   return axes;
 }
 
-export type BoardFilterChip = { key: string; label: string; onRemove: () => void };
+export type BoardFilterChip = {
+  key: string;
+  label: string;
+  /** Which half the chip names — the strip prefixes exclude chips with the ⊘ glyph (spec §4). */
+  mode: 'include' | 'exclude';
+  onRemove: () => void;
+};
 
 /** How each `BoardFilterSpec` id axis turns a raw id into words a chip can show. */
 export type BoardFilterChipResolvers = {
@@ -46,10 +68,12 @@ function capitalizeWord(word: string): string {
 }
 
 /**
- * One removable chip per axis ACTUALLY SET on `boardFilter` — the same
- * six-field object handed to `matchesBoardCard` (`text`, `assigneeIds`,
- * `typeIds`, `stateIds`, `stateCategories`, `projectIds`), read directly
- * rather than re-declared as a second, independently-maintained list.
+ * One removable chip per axis ACTUALLY SET on `spec`, in EITHER half — the
+ * same six-field object handed to `matchesBoardCard`/`matchesListRow`
+ * (`text`, `assigneeIds`, `typeIds`, `stateIds`, `stateCategories`,
+ * `projectIds`) plus its `exclude` counterpart, now named `buildFilterChips`
+ * since Task 6 makes it emit the exclude half's "Not …" chips too
+ * (exclude-mode spec §2/§4), directly after each axis's include chip.
  *
  * THE DEFECT THIS REPLACES (Task 4 review, Important finding): the first
  * version of this function only ever checked `boardFilter.text`, because
@@ -68,53 +92,53 @@ function capitalizeWord(word: string): string {
  * resolver at all, since its three values (`open`/`active`/`terminal`) are
  * already words, only needing a capital letter.
  */
-export function buildBoardFilterChips(
-  boardFilter: BoardFilterSpec,
+export function buildFilterChips(
+  spec: BoardFilterSpec,
   resolvers: BoardFilterChipResolvers,
   setFilter: (updater: (current: FilterSpec) => FilterSpec) => void,
 ): BoardFilterChip[] {
   const chips: BoardFilterChip[] = [];
   const clear = (patch: Partial<FilterSpec>) => () =>
     setFilter((current) => ({ ...current, ...patch }));
+  const clearExclude = (axis: keyof IdAxes) => () =>
+    setFilter((current) => withIdAxis(current, 'exclude', axis, undefined));
+  const exclude = spec.exclude ?? {};
+  const has = (list: readonly unknown[] | undefined): list is readonly unknown[] & { length: number } =>
+    list !== undefined && list.length > 0;
 
-  const text = boardFilter.text?.trim();
+  const text = spec.text?.trim();
   if (text !== undefined && text !== '') {
-    chips.push({ key: 'text', label: `Search: "${text}"`, onRemove: clear({ text: undefined }) });
+    chips.push({ key: 'text', label: `Search: "${text}"`, mode: 'include', onRemove: clear({ text: undefined }) });
   }
-  if (boardFilter.assigneeIds !== undefined && boardFilter.assigneeIds.length > 0) {
-    chips.push({
-      key: 'assigneeIds',
-      label: `Assignee: ${boardFilter.assigneeIds.map(resolvers.assigneeName).join(', ')}`,
-      onRemove: clear({ assigneeIds: undefined }),
-    });
+  if (has(spec.assigneeIds)) {
+    chips.push({ key: 'assigneeIds', label: `Assignee: ${spec.assigneeIds.map(resolvers.assigneeName).join(', ')}`, mode: 'include', onRemove: clear({ assigneeIds: undefined }) });
   }
-  if (boardFilter.typeIds !== undefined && boardFilter.typeIds.length > 0) {
-    chips.push({
-      key: 'typeIds',
-      label: `Type: ${boardFilter.typeIds.map(resolvers.typeName).join(', ')}`,
-      onRemove: clear({ typeIds: undefined }),
-    });
+  if (has(exclude.assigneeIds)) {
+    chips.push({ key: 'exclude.assigneeIds', label: `Not assignee: ${exclude.assigneeIds.map(resolvers.assigneeName).join(', ')}`, mode: 'exclude', onRemove: clearExclude('assigneeIds') });
   }
-  if (boardFilter.stateIds !== undefined && boardFilter.stateIds.length > 0) {
-    chips.push({
-      key: 'stateIds',
-      label: `State: ${boardFilter.stateIds.map(resolvers.stateName).join(', ')}`,
-      onRemove: clear({ stateIds: undefined }),
-    });
+  if (has(spec.typeIds)) {
+    chips.push({ key: 'typeIds', label: `Type: ${spec.typeIds.map(resolvers.typeName).join(', ')}`, mode: 'include', onRemove: clear({ typeIds: undefined }) });
   }
-  if (boardFilter.stateCategories !== undefined && boardFilter.stateCategories.length > 0) {
-    chips.push({
-      key: 'stateCategories',
-      label: `Category: ${boardFilter.stateCategories.map(capitalizeWord).join(', ')}`,
-      onRemove: clear({ stateCategories: undefined }),
-    });
+  if (has(exclude.typeIds)) {
+    chips.push({ key: 'exclude.typeIds', label: `Not type: ${exclude.typeIds.map(resolvers.typeName).join(', ')}`, mode: 'exclude', onRemove: clearExclude('typeIds') });
   }
-  if (boardFilter.projectIds !== undefined && boardFilter.projectIds.length > 0) {
-    chips.push({
-      key: 'projectIds',
-      label: `Project: ${boardFilter.projectIds.length} selected`,
-      onRemove: clear({ projectIds: undefined }),
-    });
+  if (has(spec.stateIds)) {
+    chips.push({ key: 'stateIds', label: `State: ${spec.stateIds.map(resolvers.stateName).join(', ')}`, mode: 'include', onRemove: clear({ stateIds: undefined }) });
+  }
+  if (has(exclude.stateIds)) {
+    chips.push({ key: 'exclude.stateIds', label: `Not state: ${exclude.stateIds.map(resolvers.stateName).join(', ')}`, mode: 'exclude', onRemove: clearExclude('stateIds') });
+  }
+  if (has(spec.stateCategories)) {
+    chips.push({ key: 'stateCategories', label: `Category: ${spec.stateCategories.map(capitalizeWord).join(', ')}`, mode: 'include', onRemove: clear({ stateCategories: undefined }) });
+  }
+  if (has(exclude.stateCategories)) {
+    chips.push({ key: 'exclude.stateCategories', label: `Not category: ${exclude.stateCategories.map(capitalizeWord).join(', ')}`, mode: 'exclude', onRemove: clearExclude('stateCategories') });
+  }
+  if (has(spec.projectIds)) {
+    chips.push({ key: 'projectIds', label: `Project: ${spec.projectIds.length} selected`, mode: 'include', onRemove: clear({ projectIds: undefined }) });
+  }
+  if (has(exclude.projectIds)) {
+    chips.push({ key: 'exclude.projectIds', label: `Not project: ${exclude.projectIds.length} selected`, mode: 'exclude', onRemove: clearExclude('projectIds') });
   }
   return chips;
 }
@@ -133,8 +157,11 @@ export function buildBoardFilterChips(
  * one-pass count, so this term is true exactly when `<Board>` is rendering
  * fewer cards than the project actually has, regardless of which mechanism
  * caused it.
+ *
+ * Evaluated PER TAB since 2026-09-17 — the board with `boardNarrowing`'s
+ * count, the other tabs with `listNarrowing`'s (exclude-mode spec §3).
  */
-export function shouldRenderBoardNarrowingStrip(params: {
+export function shouldRenderNarrowingStrip(params: {
   chipCount: number;
   unappliedAxisCount: number;
   shown: number;
