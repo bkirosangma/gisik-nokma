@@ -22,6 +22,7 @@ import {
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../src/app-nav.js';
+import { describeUnappliedBoardAxes } from '../../../../../src/board-search-scope.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
 import {
@@ -274,29 +275,23 @@ function ProjectBoard() {
 
   /**
    * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
-   * cannot answer at all — `matchesBoardCard`'s own docblock names why
-   * (`collaboratorIds` has no equivalent field, `dueBefore`/`dueAfter` have no
-   * claimed date, `fields` has no custom-field claim on a board card). This is
-   * SEPARATE from `activeFilterChips` above and from the count: the count
-   * reports cards the board filtered, this reports axes the board never
-   * evaluated, and merging the two would put a number on a filter that never
-   * ran (spec's own words). Always computed from `filter` directly — never
-   * from `boardFilter` inside the memo above, which by construction cannot
-   * carry these four axes at all.
+   * cannot answer at all. This is SEPARATE from `activeFilterChips` above and
+   * from the count: the count reports cards the board filtered, this reports
+   * axes the board never evaluated, and merging the two would put a number on
+   * a filter that never ran (spec's own words). Always computed from `filter`
+   * directly — never from `boardFilter` inside the memo above, which by
+   * construction cannot carry these three axes at all.
+   *
+   * The logic itself lives in `src/board-search-scope.ts` as a pure function,
+   * not inline here — Task 4's fix round 1 (coordinator concern 4) extracted
+   * it specifically so it has a UNIT test that calls it directly, rather than
+   * shipping with zero executions until Task 5's Filters sheet became its
+   * first real caller.
    */
-  const boardUnappliedAxes = useMemo(() => {
-    const axes: string[] = [];
-    if (filter.collaboratorIds !== undefined && filter.collaboratorIds.length > 0) {
-      axes.push('collaborator');
-    }
-    if (filter.dueBefore !== undefined || filter.dueAfter !== undefined) {
-      axes.push('due date');
-    }
-    if (filter.fields !== undefined && Object.keys(filter.fields).length > 0) {
-      axes.push('custom field');
-    }
-    return axes;
-  }, [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields]);
+  const boardUnappliedAxes = useMemo(
+    () => describeUnappliedBoardAxes(filter),
+    [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields],
+  );
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
    *
@@ -804,6 +799,41 @@ function ProjectBoard() {
                   </span>
                 ) : null}
               </div>
+            ) : null}
+
+            {/*
+              THE MIRROR NOTE (Task 4 fix round 1, coordinator Ruling 10).
+              `matchesBoardCard` narrows the BOARD only — `useBoard` has no
+              way to be narrowed by anything else, and the spec's own search
+              ruling exists precisely because "one search box would then
+              answer differently on two tabs of one page" if it silently
+              filtered one and not the others. The `aria-label` on the
+              search box discloses this to a screen-reader user, but a
+              sighted person on List/Calendar/Timeline sees a search box,
+              types into it, and watches nothing happen — the SAME
+              asymmetry, from the other direction. This note is the fix:
+              on every tab BUT Board, when a search term is actually
+              present, say so in words, beside the existing "Only tickets
+              in progress" note (`.gn-list-filter__note`) rather than
+              replacing it.
+
+              Reuses `activeFilterChips` rather than re-deriving "is a
+              search term present" a second way — the chip for `text` and
+              the fact this note fires are one question, asked once.
+
+              GATED ON A TERM BEING PRESENT, not on the tab alone: a
+              permanent sentence on three tabs would be noise nobody reads,
+              and showing it while nothing is being searched would itself
+              be a small lie (a limit named for a filter that is not
+              active). Reuses `.gn-project__scope-note`'s own styling — no
+              new CSS rule — since this is the same KIND of fact (an axis
+              not applied here) the board's own scope note states, just
+              named on the other side of the same asymmetry.
+            */}
+            {view !== 'board' && activeFilterChips.some((chip) => chip.key === 'text') ? (
+              <p className="gn-project__scope-note" data-testid="search-not-applied-note">
+                Search narrows the board only — nothing on this tab is filtered by it yet.
+              </p>
             ) : null}
 
             {view === 'calendar' ? (

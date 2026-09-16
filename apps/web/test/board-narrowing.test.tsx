@@ -264,3 +264,69 @@ describe('13.438 the strip is not unconditionally present', () => {
     expect(screen.queryByText(/shown$/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ## The mirror note (Task 4 fix round 1, coordinator Ruling 10)
+ *
+ * The search box sits page-level, above the tab rail, on every tab — but only
+ * the BOARD path applies it (`useBoard` cannot be narrowed by anything; the
+ * spec's own search ruling exists to avoid "one search box... answer[ing]
+ * differently on two tabs"). A sighted person on List/Calendar/Timeline who
+ * types into it would otherwise watch nothing happen with no explanation.
+ * This note is the fix — and it must appear ONLY while a term is present
+ * (never a permanent sentence on three tabs) and ONLY on the tabs where the
+ * search does not apply (never on Board, where it does).
+ */
+describe('13.439 the tabs where search does not apply say so — only while a term is present', () => {
+  it('shows nothing on the List tab until a search term exists, then names the limit', async () => {
+    render(
+      <Providers services={servedBoard(threeCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+
+    // No term yet — a permanent sentence here would be noise nobody reads.
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+
+    await userEvent.type(await searchbox(), 'board');
+
+    const note = await screen.findByTestId('search-not-applied-note');
+    expect(note).toHaveTextContent(/board only/i);
+  });
+
+  it('never shows the note on the Board tab itself, even with a term present', async () => {
+    render(
+      <Providers services={servedBoard(threeCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    await userEvent.type(await searchbox(), 'board');
+    await screen.findByText('1 of 3 shown');
+
+    // The search DOES apply here — naming a limit that isn't real would be
+    // its own small lie.
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+  });
+
+  it('disappears again once the search term is cleared', async () => {
+    render(
+      <Providers services={servedBoard(threeCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
+    const search = await searchbox();
+
+    await userEvent.type(search, 'board');
+    await screen.findByTestId('search-not-applied-note');
+
+    await userEvent.clear(search);
+
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+  });
+});

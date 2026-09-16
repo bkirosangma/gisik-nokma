@@ -4178,7 +4178,7 @@ alike, the compile-time case proves the narrowing is real rather than merely doc
 
 ## Task 4 — the board's search box, count, chip, and scope note (board-prototype-port plan, 2026-09-16)
 
-**Block `13.435`–`13.438` minted here; the next free BLOCK is `13.439`.** `matchesBoardCard` (Task 3)
+**Block `13.435`–`13.441` minted here; the next free BLOCK is `13.442`.** `matchesBoardCard` (Task 3)
 had no caller. This task adds one: a page-level search box narrows the board through it, an
 `N of M shown` count and a removable chip are derived from the SAME pass that narrows the render
 (coordinator Ruling 1 — never a second count), and a scope note names the axes a `BoardFilterSpec`
@@ -4188,17 +4188,46 @@ argument, so the board's own total is never narrowed by the server-side "Only ti
 toggle, and the brief's literal assertion ("a bare `M` would claim the project holds more than it
 does") is false of the board's `M` specifically. The real, reachable version of that hazard — `M`
 accidentally sourced from the LIST's own (narrower) row count instead of the board's — is what
-`13.436` actually witnesses.
+`13.436` actually witnesses; its FIRST version used a zero-row list fixture, which could not
+distinguish a correct count from a wrong one (any wrong `M` would have failed the single assertion
+just as the real bug would), so it was rewritten (fix round 1) to a nonzero, unequal list fixture
+plus a negative assertion naming the exact wrong string a `list.rows`-sourced bug would print.
+**Fix round 1 (coordinator Ruling 10 and concern 4)** adds `13.439`–`13.441`: the search box sits on
+every tab but narrows only the board, which is the identical asymmetry the spec's own search ruling
+exists to avoid, just approached from the other direction (a WIRE search would narrow the list and
+leave the board unnarrowed; this client search narrows the board and leaves the other three
+unnarrowed with no visible sign of it) — `13.439` is the mirror note that names the limit, only
+while a search term is actually present. `describeUnappliedBoardAxes` (the board's own scope-note
+logic) was extracted to a pure function (`apps/web/src/board-search-scope.ts`) specifically so it
+could be unit-tested directly rather than shipping with zero executions until Task 5's Filters sheet
+became its first real caller — `13.440`/`13.441` are that unit test.
 
 - **13.435** ✅ Typing into the board's search box narrows the rendered grid AND reads an honest
   `N of M shown`: two of three fixture cards leave the DOM, the remaining one stays, and the count
   names both numbers correctly. — (`apps/web/test/board-narrowing.test.tsx`)
 - **13.436** ✅ The count is read from `board.data`, never from `list.rows.length` — a board fixture
-  of three cards against a list fixture of zero rows, with the "Only tickets in progress" toggle on,
-  still reads the board's own total (three) once the search box narrows it to one. — (`apps/web/test/board-narrowing.test.tsx`)
+  of three cards against a list fixture of TWO rows (nonzero, and different from three so a
+  `list.rows`-sourced bug prints a plausible wrong number rather than an obviously broken one), with
+  the "Only tickets in progress" toggle on, still reads the board's own total (three) once the
+  search box narrows it to one — and does NOT read "1 of 2 shown", the exact string a
+  `list.rows`-sourced `M` would produce. Mutation-verified: temporarily sourcing `M` from
+  `list.rows.length` was confirmed to fail this case with exactly that string before the fix
+  landed. — (`apps/web/test/board-narrowing.test.tsx`)
 - **13.437** ✅ The chip and the count move together: removing the one active filter chip clears the
   search box, restores every card, AND removes the count with it — no stale "M of M" survives an
   empty filter, because the strip they share is one conditional block, not two independently gated
   elements. — (`apps/web/test/board-narrowing.test.tsx`)
 - **13.438** ✅ The `.gn-project__narrowing` strip does not render at all while no filter is active —
   the count is not an unconditional fixture of the board tab. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.439** ✅ The List and Timeline tabs show no "search doesn't apply here" note until a search
+  term actually exists, name the limit once one is typed, and drop the note again once it is
+  cleared; the Board tab — where the search DOES apply — never shows the note at all, even with a
+  term present and cards visibly narrowed. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.440** ✅ `describeUnappliedBoardAxes` (unit, no page mount): an empty filter, an EMPTY
+  `collaboratorIds`/`fields` (which must not narrow), and each of `collaboratorIds`/`dueBefore`/
+  `dueAfter`/`fields` set individually — including `dueBefore` and `dueAfter` set TOGETHER, which
+  names "due date" exactly once, not twice. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.441** ✅ `describeUnappliedBoardAxes` names all three unapplied axes together in a FIXED
+  order (collaborator, due date, custom field) regardless of the order the caller supplied them on
+  the `FilterSpec` object, and never names a `BoardFilterSpec`-representable axis (`text`,
+  `assigneeIds`) as unapplied. — (`apps/web/test/board-search-scope.test.ts`)
