@@ -5203,7 +5203,7 @@ scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `1
 
 ## Task 13 — move arrows: refusal and its positive control (board-prototype-port plan, 2026-09-16)
 
-**Cases `13.490`–`13.503` minted here**, continuing directly from `13.489` (verified against the real case
+**Cases `13.490`–`13.504` minted here**, continuing directly from `13.489` (verified against the real case
 list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool was
 `13.489` — never the file's own "next free BLOCK" prose, an already-recorded false hit). Phase 6, Board
 writes: per-card `‹ ›` move arrows, the first WRITE path in this port. `arrowTarget`
@@ -5250,7 +5250,7 @@ Result matched exactly: 6 passed / 2 failed, the failing set precisely `13.494` 
 - **13.497** ✅ A `fromStateId` absent from `columnOrder` entirely has no column to scan from and answers
   `null` in both directions. — (same files)
 
-**`board-moves-ui.test.tsx` — 6 cases (`13.498`–`13.503`), the component-level wiring: `Board`'s `moves`
+**`board-moves-ui.test.tsx` — 7 cases (`13.498`–`13.504`), the component-level wiring: `Board`'s `moves`
 capability, `MoveArrows`, and `MoveRefusalNotice`.**
 
 **Why the refusal path is proven at the `moveOutcome`/`refusalCopy`/`MoveRefusalNotice` seam, not through a
@@ -5274,9 +5274,12 @@ Task 14's drag-and-drop reuses for real, since a drop target is not filtered thi
 - **13.500** ✅ The `moves` capability itself absent (not passed to `Board` at all) renders NO move arrows
   whatsoever — the whole feature absent, not merely every direction disabled. — (same files)
 - **13.501** ✅ A declared edge whose rules are NOT already met (`require-comment` on the nearest-declared
-  edge, a purpose-built gated `WF_ERRAND` variant) opens `TransitionDialog` rather than submitting blind;
-  completing the dialog submits the SHIPPED `{to, comment: {text}}` payload — proving the dialog opens
-  aimed at the right `(workflow, fromStateId)`, not merely that SOME dialog opens. — (same files)
+  edge, a purpose-built gated `WF_ERRAND` variant) opens `TransitionDialog` rather than submitting blind.
+  **The dialog is NOT pre-aimed at the arrow's own target** — only `(workflow, fromStateId)` are threaded
+  through; the dialog's own `<Select>` starts empty and this test picks "Doing" from it the same way a
+  person would. What it proves: the dialog opens on the right workflow and the right `fromStateId` (not
+  merely that SOME dialog opens), and completing it submits the SHIPPED `{to, comment: {text}}` payload. —
+  (same files)
 - **13.502** ✅ The refusal pipeline, end to end and for real: `moveOutcome(WF_ERRAND, 'todo', 'waiting',
   {})` refuses with `available: ['doing']` (the one real alternative — `moveOutcome`'s own test suite
   already proves this fact; this case's job is only what renders from it), and `MoveRefusalNotice` fed
@@ -5285,13 +5288,47 @@ Task 14's drag-and-drop reuses for real, since a drop target is not filtered thi
 - **13.503** ✅ The zero-alternatives sentence (`moveOutcome`'s `available: []`) is still an honest one —
   `"This ticket can't move from here."`, not `"try ."` — both from `refusalCopy` directly and from
   `MoveRefusalNotice`'s own rendering. — (same files)
+- **13.504** ✅ A REJECTED `ingest` (a transport failure, not a server answer) does not brick the card:
+  found in review, not authored blind — `submitDirect`'s own `submitting` latch (no precedent in
+  `TicketSheet.submitTransition`, which never disables its Move button in flight) was originally reset
+  only after a successful `await`, so a rejection left both arrows `disabled` forever with nothing on
+  screen. Fixed with `try/catch/finally`. Mutation-witnessed the other direction — the FIX reverted back
+  to the pre-fix shape, `pnpm exec vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this
+  case alone (`Unable to find role="alert"`, and the DOM dump shows both arrows `disabled=""`) — the other
+  six cases in the file stayed green, then reverted with a targeted `Edit`. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
 
 `tsc -p tsconfig.typecheck.json` clean on `packages/app-core`; `tsc -p tsconfig.json --noEmit && tsc -p
 tsconfig.e2e.json --noEmit` (the package's own `typecheck` script) clean on `apps/web`. Node `v22.23.2`.
-Full `packages/app-core` suite: 87 files, 1263 tests, green (up from 83/1249 before this task — the two
-new files' 14 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
+Full `packages/app-core` suite: 87 files, 1264 tests, green (up from 83/1249 before this task — the two
+new files' 15 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
 `page.tsx` — whether any of those 363 tests exercise the project page's board tab with a signed-in session
 was not individually traced; the claim made here is only the measured one, that the full suite stayed
 green with the wiring in place, not a claim about which tests do or do not reach the new code path.
+
+**A repo-wide `pnpm turbo run test` (dist freshly built for every upstream package, so `apps/web`'s own
+resolution of `@gisik-nokma/app-core` to `dist/` is proven against this task's REAL changes, not a stale
+build) surfaced 3 unrelated timeouts in `apps/server`** (`test/determinism.test.ts`,
+`test/seed/seed-dev.test.ts`, `test/visibility/grant-backfill.test.ts`, all `Error: Test timed out in
+30000ms`, 1518 passed / 5 skipped otherwise) — investigated, not waved off: this task changed zero files
+under `apps/server`, `apps/server:typecheck` already passed clean in the same run, the log's own error
+line names a DIFFERENT Node (`v24.11.1`) than every other package ran under in this task (`v22.23.2`), and
+all 18 tests across the three files pass cleanly when re-run in isolation under the correct Node with no
+contention from the other 16 packages building/testing at once. Pre-existing environmental flakiness
+and/or a Node-version drift in turbo's own subprocess spawning, not a regression this task introduced —
+see the task report for the full account. Every package this task actually touched (`ui` 309/309,
+`app-core` 1264/1264, `web` 363/363) passed clean in that same full run, as did every other untouched
+package.
+
+**Review caught two additional real defects before this landed, both fixed and both proven with their own
+mutation witnesses (case `13.504` above, and see that case for the specific witness); a third was a wording
+correction with no code change** — `board-moves-ui.test.tsx`'s own `13.501` describe block and the
+`13.501` bullet above both originally claimed `TransitionDialog` opens "aimed at the right target"; it does
+not — only `(workflow, fromStateId)` are threaded through, and the target is chosen from the dialog's own
+dropdown, the same way `TicketSheet`'s "Move…" button already works. Reworded in the test file, this
+file, and the task report rather than left standing. `.gn-board-card__move--previous`/`--next` were also
+dropped from the arrow buttons' `className` — empty class hooks with no corresponding `ui.css` rule, the
+exact shape this repo has already removed once (`481ad12c`).
+
 `node scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413`
 only.

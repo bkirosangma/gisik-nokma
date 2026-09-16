@@ -5,7 +5,7 @@ import type { WorkflowDef } from '@gisik-nokma/domain';
 import { Board, MoveRefusalNotice, refusalCopy, type BoardMoveCapability } from '../../src/views/board.js';
 import { moveOutcome } from '../../src/views/board-moves.js';
 import type { BoardGroup, BoardView } from '../../src/view-types.js';
-import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
 
 /**
@@ -35,9 +35,13 @@ function errandBoard(cards?: ReturnType<typeof boardCardSeed>[]): BoardView {
   return { projectId: 'prj_1', groups: [errandGroup(cards)] };
 }
 
-function movesFor(overrides: Partial<BoardMoveCapability> = {}, workflow: WorkflowDef = WF_ERRAND) {
+function movesFor(
+  overrides: Partial<BoardMoveCapability> = {},
+  workflow: WorkflowDef = WF_ERRAND,
+  ingestScript?: IngestScript,
+) {
   const onMoved = vi.fn();
-  const source = createFakeDataSource({ getWorkflowDef: async () => workflow });
+  const source = createFakeDataSource({ getWorkflowDef: async () => workflow }, ingestScript);
   const moves: BoardMoveCapability = {
     dataSource: source,
     workspaceId: WS,
@@ -109,6 +113,39 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
     expect(source.ingested).toHaveLength(0);
   });
 
+  /**
+   * 13.504 — A REJECTED `ingest` (a transport failure, not a server answer)
+   * must not brick the card. Caught in review: `submitDirect`'s own
+   * `submitting` latch — which has no precedent in `TicketSheet.
+   * submitTransition`, that function never disables its Move button while a
+   * submit is in flight — was originally reset only after a successful
+   * `await`, so a rejection left both arrows `disabled` forever with nothing
+   * on screen explaining why. Fixed with a `try/catch/finally`: `finally`
+   * always resets `submitting`, and `catch` renders something rather than
+   * letting the rejection become an unhandled promise rejection. This test
+   * is the proof, not the fix's own reasoning: an `ingestScript` that throws
+   * simulates the transport failure, and the assertions are exactly the two
+   * facts a bricked card would violate — the arrows are usable again, and a
+   * message is on screen.
+   */
+  it('a rejected ingest does not brick the card — arrows stay usable and something is on screen', async () => {
+    const user = userEvent.setup();
+    const { moves } = movesFor({}, WF_ERRAND, async () => {
+      throw new Error('network unreachable');
+    });
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(screen.getByRole('alert')).toHaveTextContent('network unreachable');
+    // The bug this guards: `submitting` left `true` forever disables BOTH
+    // arrows permanently. Both must be usable again once the rejection
+    // settles — "next" specifically, since that is the one just clicked.
+    expect(screen.getByRole('button', { name: 'Move to Doing' })).not.toBeDisabled();
+  });
+
   /** 13.500 — the capability itself absent ⇒ no move arrows at all, not merely disabled ones. */
   it('renders no move arrows whatsoever when the moves capability is not wired', async () => {
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
@@ -117,7 +154,7 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
   });
 });
 
-describe('Board move arrows — needs-dialog opens TransitionDialog aimed at the right target', () => {
+describe('Board move arrows — needs-dialog opens TransitionDialog on the right workflow and state', () => {
   /**
    * 13.501 — a declared edge whose rules are NOT already met opens the
    * dialog rather than submitting blind. Built on a purpose-built def (the
@@ -127,8 +164,17 @@ describe('Board move arrows — needs-dialog opens TransitionDialog aimed at the
    * nearer from `doing` and has no rules. Gating `todo -> doing` instead
    * keeps the SAME nearest-scan result (`doing` is still the only, and
    * therefore nearest, forward target from `todo`) while giving it a rule.
-   * Completing the dialog proves the full round trip: right workflow, right
-   * `fromStateId`, right target, the shipped `{to, comment}` spelling.
+   *
+   * **The dialog is NOT pre-aimed at the arrow's own target — say this
+   * plainly, since it is easy to assume otherwise.** `MoveArrows` threads
+   * only `(workflow, fromStateId)` into `TransitionDialog`; the dialog's own
+   * `toStateId` starts at `''` and its `<Select>` re-derives the full option
+   * list, exactly as it does when `TicketSheet` opens it from its "Move…"
+   * button. This test picks "Doing" from that SAME dropdown a person would —
+   * it is not asserting the arrow's computed target reached the dialog,
+   * which it does not. What this test actually proves: the dialog opens
+   * against the right `(workflow, fromStateId)`, and completing it submits
+   * the shipped `{to, comment}` spelling.
    */
   it('opens the dialog for a gated edge, and completing it submits the right move', async () => {
     const user = userEvent.setup();

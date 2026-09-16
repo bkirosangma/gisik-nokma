@@ -648,29 +648,56 @@ function MoveArrows({
    * `ticket.transitioned` in the SHIPPED spelling (`{to}`, not `{toStateId}`
    * — `ticket-sheet.tsx`'s own `submitTransition` is the precedent this
    * mirrors).
+   *
+   * **`submitting` is reset in a `finally`, not after the `await`, and a
+   * REJECTED `ingest` is caught rather than left to become an unhandled
+   * promise rejection.** This latch has no precedent in
+   * `TicketSheet.submitTransition` — that function never disables its own
+   * Move button while a submit is in flight, so a rejection there simply
+   * leaves it live and retryable. `MoveArrows` adds the latch (to stop a
+   * rapid double-click double-submitting through two arrows on the same
+   * card), and a latch that is only cleared on the happy path is worse than
+   * no latch at all: `ingest` is a network call, and a transport failure
+   * would otherwise leave both arrows `disabled` FOREVER, with nothing on
+   * screen saying why — a card silently bricked, caught in review before
+   * this shipped. `results[0]` being `undefined` (typed, not expected —
+   * `ingest` should answer one result per event submitted) gets the same
+   * treatment as a real refusal rather than a silent `return`, for the
+   * identical reason.
    */
   const submitDirect = async (toStateId: string): Promise<void> => {
     setSubmitting(true);
-    const transition = make({
-      workspaceId: moves.workspaceId,
-      entity: { kind: 'ticket', id: card.ticketId },
-      type: 'ticket.transitioned',
-      payload: { to: toStateId },
-    });
-    const results = await moves.dataSource.ingest([transition]);
-    setSubmitting(false);
-    const result = results[0];
-    if (result === undefined) return;
-    if (result.status === 'committed') {
-      setServerRefusal(null);
-      moves.onMoved();
-      return;
+    try {
+      const transition = make({
+        workspaceId: moves.workspaceId,
+        entity: { kind: 'ticket', id: card.ticketId },
+        type: 'ticket.transitioned',
+        payload: { to: toStateId },
+      });
+      const results = await moves.dataSource.ingest([transition]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal({ rule: 'no-response', reason: 'The server did not answer this move.' });
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        moves.onMoved();
+        return;
+      }
+      setServerRefusal(
+        result.status === 'refused'
+          ? { rule: result.rule, reason: result.reason }
+          : { rule: result.code, reason: result.message },
+      );
+    } catch (cause) {
+      setServerRefusal({
+        rule: 'transport',
+        reason: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setSubmitting(false);
     }
-    setServerRefusal(
-      result.status === 'refused'
-        ? { rule: result.rule, reason: result.reason }
-        : { rule: result.code, reason: result.message },
-    );
   };
 
   /**
@@ -748,7 +775,7 @@ function MoveArrows({
     <div className="gn-board-card__moves">
       <button
         type="button"
-        className="gn-board-card__move gn-board-card__move--previous"
+        className="gn-board-card__move"
         disabled={previousTarget === null || submitting}
         aria-label={
           previousTarget === null
@@ -763,7 +790,7 @@ function MoveArrows({
       </button>
       <button
         type="button"
-        className="gn-board-card__move gn-board-card__move--next"
+        className="gn-board-card__move"
         disabled={nextTarget === null || submitting}
         aria-label={
           nextTarget === null
