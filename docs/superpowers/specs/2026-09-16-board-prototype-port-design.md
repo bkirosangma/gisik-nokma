@@ -172,13 +172,56 @@ renderer of the list lives inside `list.error === null`, so a narrowing control
 placed among them is unreachable by the person past the cap who needs it most.
 It gains the prototype's chip treatment and nothing else.
 
-**Board cards are not filterable as they stand.** `BoardCard`
-(`view-types.ts:106-116`) carries `ticketId`, `title`, `typeId`, `assignee`,
-`stateProvenance`, `cause`, `rollup`, `pending` — while `stateId` and `category`
-live on the enclosing `BoardColumn`. A pure adapter
-`boardCardToFilterState(card, column)` supplies the missing halves so one
-vocabulary governs both surfaces. It is pure and exported, so its mapping is
-testable without mounting a board.
+**Board cards are not filterable as they stand, and the first design for fixing
+that was wrong.** `BoardCard` (`view-types.ts:106-116`) carries `ticketId`,
+`title`, `typeId`, `assignee`, `stateProvenance`, `cause`, `rollup`, `pending`;
+`stateId` and `category` live on the enclosing `BoardColumn`. This spec
+originally proposed a `boardCardToFilterState(card, column)` adapter
+synthesizing a `TicketState` so `matchesFilter` could be reused unchanged.
+**That adapter must not be built.**
+
+`matchesFilter` fails **closed** on every axis, so a synthesized state does not
+degrade — it empties the board:
+
+| Axis | `matches-filter.ts` | On a synthesized state |
+|---|---|---|
+| `collaboratorIds` | `:30` `some(id => state.collaboratorIds.includes(id))` | `[]` → false → **every card dropped** |
+| `dueBefore` / `dueAfter` | `:69-71` via `claimedDueDay` | no `dueDate` claim → null → **every card dropped** |
+| `fields` | `:83-84` `claimText(state.fields[id]?.value)` | absent → null ≠ wanted → **every card dropped** |
+
+A board reading `0 of 40 shown` while the list shows forty is worse than the
+failure `board.tsx:42-46` warns about, and the disclosure invariant cannot
+rescue it: the count would be telling the truth about a lie. Reuse would also
+require wrapping `card.title` in a fabricated `FieldClaim` with invented
+`actorId`, `clientTime` and `serverTime` (`entity-state.ts:6`) purely to satisfy
+`matchesFilter`'s `state.fields['title']` read — inventing provenance in an
+event-sourced product to feed a matcher.
+
+**The board is the only lossy surface.** `calendar-model.ts:271` and the
+timeline model both call `matchesFilter` on real `TicketState` (via
+`TicketDatesInput`), and the list has the server. Three of the four tabs serve
+all ten axes correctly; only the board's view-model has dropped the fields.
+
+**So the incapacity becomes a type, not a runtime surprise:**
+
+- `BoardFilterSpec = Pick<FilterSpec, 'text' | 'assigneeIds' | 'typeIds' |
+  'stateIds' | 'stateCategories' | 'projectIds'>` — **derived** with `Pick`, never
+  hand-copied, so it cannot drift from `FilterSpec` into the second vocabulary
+  `matches-filter.ts`'s docblock forbids.
+- A small pure predicate over that type consumes `BoardCard` + `BoardColumn` +
+  `BoardGroup` directly. No synthesized state, no invented provenance.
+- An axis the board cannot evaluate then fails `tsc` on the board path rather
+  than silently emptying the rail.
+
+**And the scope asymmetry is disclosed.** The type fix stops the wrong answer
+but not the surprise: a person can set a collaborator filter on the list tab,
+switch to Board, and see a different population. That is the same asymmetry the
+search ruling settled ("one box answering differently on two tabs"), so it is
+named the same way — the board tab states which active filters it cannot apply.
+This is disclosure of **scope**, and it sits *beside* the `N of M shown` count
+rather than inside it: the count reports cards the board filtered, the scope
+note reports axes the board never evaluated. Conflating them would put a number
+on a filter that never ran.
 
 **The count must not lie.** The prototype's `{shownCount}` reads `N of M shown`.
 When the server narrowing is on, `M` is *itself* narrowed — so the strip says so
@@ -474,9 +517,18 @@ control. The tabs keep `role="tablist"` / `role="tab"` / `aria-selected`; this i
 a restyle of the existing controls, not a rebuild.
 
 ### T3 — Client narrowing
-`boardCardToFilterState` adapter; Filters sheet; search box; active-filter chips;
-the honest `N of M shown` count. Control and behaviour land together — an inert
-Filters button is a button that lies.
+`BoardFilterSpec` (derived with `Pick`) and its pure predicate — **not** a
+synthesized `TicketState`; Filters sheet; search box; active-filter chips; the
+honest `N of M shown` count; and the board tab's scope note for axes it cannot
+evaluate. Control and behaviour land together — an inert Filters button is a
+button that lies.
+
+Two tests, and neither substitutes for the other: an **agreement** test that the
+board predicate and `matchesFilter` decide the six shared axes identically on
+equivalent inputs, and a **compile-time negative** (`@ts-expect-error`) proving
+`collaboratorIds` is rejected on the board path. Agreement alone would pass if
+both sides were wrong the same way; the negative is what proves the narrowing
+exists at all.
 
 ### T4 — Board view
 Columns as trays, cards, per-column empty state, and the workflow picker with
@@ -518,7 +570,9 @@ never a follow-up.
 | `packages/ui/test/tokens.test.ts` | composite contrast for any role T1 adds |
 | `apps/web/e2e-viewport/*` | three specs reference `gn-board-card__provenance` |
 
-New cases are needed for: the `boardCardToFilterState` mapping; the `N of M`
+New cases are needed for: the board predicate's agreement with `matchesFilter`
+on the six shared axes, and its compile-time rejection of the four it cannot
+serve; the board tab's scope note for unevaluated axes; the `N of M`
 count under an active server narrowing; the workflow picker's `All` default; a
 drop on an undeclared target; a drop on a rules-bearing edge opening the dialog;
 a drop on a declared rules-free edge that **succeeds** (T6's positive control);
