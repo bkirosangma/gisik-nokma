@@ -63,6 +63,14 @@ and keeps the checkboxes, field names and counts, adding `Due date` and
 **R5 — sync strip: "named absence, with the reason."** Not drawn. See
 *Stated divergences*.
 
+**R6 — the board with columns but no cards: extend the condition, keep the
+rail.** Ruled after the spec review, not before it — raised by the review pass
+that measured the third empty case. This one *did* go the recommended way, which
+is worth naming beside the tally above: the owner answered it in their own words
+("go with your recommendation") as free text, not by selecting an option this
+document had written for them. Detail in *The board that has columns but no
+cards*.
+
 ## What already matches — do not churn it
 
 - **`Chip` already is the prototype's chip.** The reference draws
@@ -363,7 +371,7 @@ measurement at `:287`. Measured in **both themes × all three styles** — and f
 `tintPurple` the ground is the calendar day cell (`cardBg` in month, `fill4`
 out), which is two grounds, not one.
 
-## One open question for the owner: the board that has columns but no cards
+## The board that has columns but no cards (R6)
 
 The per-column empty card (prototype, board metrics) and `EMPTY_BOARD_COPY` were
 described in this spec as covering different granularities, so no existing test
@@ -382,20 +390,26 @@ because "a page that had loaded, had refused nothing, and said nothing" cannot b
 told from one still painting. Six empty column cards may re-create exactly that
 failure one layer down.
 
-**Recommendation — extend the condition, keep the rail.** Show the pinned
-sentence and its create button *above* a rail that still renders, whenever the
-board holds zero cards in total rather than only when it holds zero groups. The
-rail is worth keeping in that state because it is the one place the attached
-workflow's states are visible. `groups.length === 0` implies `totalCards === 0`,
-so this is a strict superset and the existing assertion on the pinned copy stays
-green and unmodified; `EMPTY_BOARD_COPY`'s text does not change.
+**Ruled: extend the condition, keep the rail.** Show the pinned sentence and its
+create button *above* a rail that still renders, whenever the board holds zero
+cards in total rather than only when it holds zero groups. The rail stays because
+it is the one place the attached workflow's states are visible to someone who has
+just attached it.
 
-**The alternative** is to leave the condition alone and let the per-column cards
-carry it — fewer moving parts, and the rail is arguably self-explanatory to
-someone who just attached the workflow.
+`groups.length === 0` implies `totalCards === 0`, so the new condition is a
+strict **superset** of the old one. Three consequences the plan must honour:
 
-This is a product call, not a mechanical one. T4 is written against the
-recommendation; a ruling the other way changes T4 only.
+- `EMPTY_BOARD_COPY`'s text does not change, and neither does the existing
+  assertion on it — the zero-groups case still takes the branch it always took.
+- The zero-groups case keeps rendering `gn-board--empty` with **no** rail, since
+  there are no columns to draw. The rail appears only in the new case.
+- A new test is needed for the new case specifically — one group, every column
+  empty, sentence present *and* rail present. Without it the superset is
+  untested, because the existing assertion passes on the old branch either way.
+
+The alternative considered and not taken: leave the condition alone and let the
+per-column cards carry it. Fewer moving parts, but it leaves the board silent in
+exactly the state `board.tsx:70`'s docblock was written about.
 
 ## Tasks
 
@@ -426,8 +440,7 @@ Columns as trays, cards, per-column empty state, and the workflow picker with
 `All workflows` defaulted (R3). The picker satisfies the **disclosure invariant**
 above — the same one T3 satisfies, not a second one. Card styling lands on
 `.gn-board-card`; `.gn-card` is not touched (Blast radius). Includes the
-zero-cards-with-columns behaviour per the open question above, written against
-the recommendation there.
+zero-cards-with-columns behaviour per **R6**, with the new test that case needs.
 
 ### T5 — List, Calendar, Timeline
 Restyle per the metrics tables. The calendar legend is the R4 merge. The
@@ -453,7 +466,7 @@ never a follow-up.
 | `apps/web/test/project-create-gate.test.tsx` | New-ticket moves into the header row |
 | `apps/web/test/list-prefs-wiring.test.tsx` | Group-by / Columns restyled, wiring unchanged |
 | `apps/web/test/page-refusals.test.tsx` | all four refusal arms must still read the same |
-| `packages/app-core/test/views/board.test.tsx` | per-column empty state; `EMPTY_BOARD_COPY` unchanged |
+| `packages/app-core/test/views/board.test.tsx` | per-column empty state; the R6 zero-cards-with-columns case; `EMPTY_BOARD_COPY` text and its zero-groups assertion unchanged |
 | `packages/app-core/test/views/ticket-list.test.tsx` | table markup |
 | `packages/app-core/test/calendar/calendar-view.test.tsx` | merged legend — the per-field toggle must still toggle |
 | `packages/app-core/test/timeline/timeline-view.test.tsx` | `:396-441` modifier classes, `:539-625` row/bar/title |
@@ -465,8 +478,11 @@ never a follow-up.
 New cases are needed for: the `boardCardToFilterState` mapping; the `N of M`
 count under an active server narrowing; the workflow picker's `All` default; a
 drop on an undeclared target; a drop on a rules-bearing edge opening the dialog;
-and the per-column empty state. They go into `test-cases/` at the next free
-numbers in the owning section. **Existing IDs are never renumbered.**
+a drop on a declared rules-free edge that **succeeds** (T6's positive control);
+the per-column empty state; and the R6 case — one group, every column empty,
+sentence present *and* rail present, which the existing zero-groups assertion
+cannot witness. They go into `test-cases/` at the next free numbers in the owning
+section. **Existing IDs are never renumbered.**
 
 ## Verification
 
