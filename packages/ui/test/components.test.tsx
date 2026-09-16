@@ -418,20 +418,19 @@ describe('13.523 — a card that can be opened but not dragged still shows a poi
 });
 
 /**
- * Case 13.551 — exclude-mode spec §4 (2026-09-17). CSS binding for the
+ * Case 13.551 — exclude-mode spec §4 (2026-09-17; fix round 1, same date,
+ * dropped the `.gn-visually-hidden` case: the utility it gated was written
+ * for a naming mechanism — a visible label span plus a sibling
+ * visually-hidden suffix span — that measured RED and was replaced by
+ * `aria-label` before Task 8 shipped; the CSS rule was cut alongside it as
+ * YAGNI, so there is nothing left here to bind). CSS binding for the
  * tri-state choice and the strip's exclude chip: the three states are told
  * apart by ground + glyph + strike, never by colour alone. Same shape as
  * `13.513`/`13.523`: proves the rules exist with the right bodies, not that
  * they are wired — `apps/web/test/tri-state-choice.test.tsx` proves the
  * `data-mode` attribute these selectors key off.
  */
-describe('13.551 — tri-state choice rules, and the visually-hidden utility', () => {
-  it('.gn-visually-hidden clips to nothing without display:none, so the text stays in the accessible name', () => {
-    const body = rule('.gn-visually-hidden');
-    expect(body).toMatch(/clip:\s*rect\(0,\s*0,\s*0,\s*0\)/);
-    expect(body).toMatch(/position:\s*absolute/);
-    expect(body).not.toMatch(/display:\s*none/);
-  });
+describe('13.551 — tri-state choice rules', () => {
   it("include is the accent ground with accent text", () => {
     const body = rule(".gn-filters__choice[data-mode='include']");
     expect(body).toMatch(/background:\s*var\(--gn-accent\)/);

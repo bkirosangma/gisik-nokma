@@ -3613,21 +3613,6 @@
   outline-offset: 1px;
 }
 
-/* Visually hidden, NOT display:none — the text stays in the accessible name
-   (exclude-mode spec §4, 2026-09-17: the tri-state choice's ", included"/
-   ", excluded" suffix). The standard clip pattern. */
-.gn-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* The tri-state choice (exclude-mode spec §4) — the ONE control shape every
    value in the Filters sheet is now: off / include / exclude, told apart by
    ground + glyph + strike, never colour alone. Chip metrics are

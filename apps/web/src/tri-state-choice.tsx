@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ChoiceMode } from './filter-cycle.js';
 
 /**
@@ -24,48 +25,60 @@ export function ChoiceGlyph({ mode }: { mode: ChoiceMode }) {
 
 export type TriStateChoiceProps = {
   mode: ChoiceMode;
+  /** The plain-text name the accessible name is built from — "Uma One", "Bug", "Active". */
+  label: string;
   /** The button decides nothing: the caller cycles the filter (`withCycledId`) and re-renders with the new mode. */
   onCycle: () => void;
   /**
-   * A plain string, not `ReactNode`: the accessible name below is built by
-   * string-concatenating this value, not by letting the browser compute a
-   * name from rendered content. Widening this to `ReactNode` would silently
-   * defeat that — see the docblock below.
+   * What renders inside the button; defaults to `label`. A person row passes
+   * its avatar plus name here (an `aria-hidden` avatar span beside a plain
+   * name span). Never contributes to the accessible name — `aria-label`
+   * (built from `label`, below) overrides content computation entirely, so
+   * whatever markup `children` carries costs nothing on the name.
    */
-  children: string;
+  children?: ReactNode;
   className?: string;
 };
 
 /**
  * ONE control shape for every value in the Filters sheet (exclude-mode spec
- * §4): a cycling `<button>`. No `aria-pressed` — binary semantics would lie
- * for three states — so the state lives in the accessible NAME: "Uma One",
- * "Uma One, included", "Uma One, excluded".
+ * §4, amended 2026-09-17 fix round 1): a cycling `<button>`. No
+ * `aria-pressed` — binary semantics would lie for three states — so the
+ * state lives in the accessible NAME: "Uma One", "Uma One, included", "Uma
+ * One, excluded".
  *
- * That name is set via `aria-label`, not via a visually-hidden suffix span
- * read alongside the visible label. A first draft tried the sibling-span
- * approach and it FAILED measured: the browser's accessible-name-from-content
- * algorithm inserts a separator space between each child node's contribution
- * (so screen readers don't run adjacent words together — the same reason
- * `<button>Save<span>Draft</span></button>` reads as "Save Draft", never
- * "SaveDraft"). Two sibling `<span>`s therefore compute to `"Uma One ,
- * included"` — a space before the comma — never the exact string the name
- * needs to be. `aria-label` is the only mechanism that yields an exact
- * string, which is why `children` is typed `string` above rather than
- * `ReactNode`: the label text has to exist as a string to build it.
+ * That name is built from `label` (a required plain string) via `aria-label`
+ * — never from rendered content. `label` and `children` are deliberately
+ * separate: `children` is optional `ReactNode`, defaulting to `label` when
+ * omitted, so a caller is free to render an avatar plus the name (Task 9's
+ * person rows) without touching what the button is called. Fix round 1 split
+ * these apart — the original Task 8 shape used one `string children` for
+ * both the visible content and the name, which had nowhere to put a person
+ * row's avatar.
  *
- * The visible label is still its own `<span className="gn-filters__choice-label">`
- * (the CSS strike-through in exclude mode targets it) — it just no longer
- * carries the name; `aria-label` on the button does, unconditionally, for
- * all three modes, so there is one naming mechanism rather than a branch
- * that only applies to include/exclude.
+ * A first draft (before `aria-label` existed here at all) tried a visible
+ * label span plus a *sibling* visually-hidden suffix span, relying on the
+ * browser to concatenate them into the name. That measured RED: the
+ * accessible-name-from-content algorithm inserts a synthetic separator space
+ * between each child node's contribution (the same reason
+ * `<button>Save<span>Draft</span></button>` reads "Save Draft", never
+ * "SaveDraft" — verified with a scratch render), so two sibling spans
+ * compute to `"Uma One , included"` — a space before the comma — never the
+ * exact string required. `aria-label` sets the name to an exact string by
+ * definition, bypassing content computation, which is why it is built here
+ * unconditionally for all three modes rather than as a branch that only
+ * applies to include/exclude.
+ *
+ * The visible content still renders inside its own
+ * `<span className="gn-filters__choice-label">` (the CSS strike-through in
+ * exclude mode targets it) — it is display only now; `aria-label` on the
+ * button carries the name regardless of what that span contains.
  *
  * `data-mode` is the ONLY styling hook, keyed off the real state rather than
  * a parallel class.
  */
-export function TriStateChoice({ mode, onCycle, children, className }: TriStateChoiceProps) {
-  const name =
-    mode === 'off' ? children : `${children}, ${mode === 'include' ? 'included' : 'excluded'}`;
+export function TriStateChoice({ mode, label, onCycle, children, className }: TriStateChoiceProps) {
+  const name = mode === 'off' ? label : `${label}, ${mode === 'include' ? 'included' : 'excluded'}`;
   return (
     <button
       type="button"
@@ -75,7 +88,7 @@ export function TriStateChoice({ mode, onCycle, children, className }: TriStateC
       aria-label={name}
     >
       <ChoiceGlyph mode={mode} />
-      <span className="gn-filters__choice-label">{children}</span>
+      <span className="gn-filters__choice-label">{children ?? label}</span>
     </button>
   );
 }
