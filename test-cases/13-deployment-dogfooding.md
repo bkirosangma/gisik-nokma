@@ -4784,6 +4784,13 @@ by one, so a group's FIRST row would render unshaded. Read `timeline-view.tsx` t
 is what makes `:nth-of-type` — same-tag-name counting only — the correct fix rather than a coincidental
 one.
 
+**Row height is a floor, not a match.** `min-height: 2.625rem` (42px) sets the metric's own number, but
+`.gn-timeline__bar` carries `margin: 0.3125rem 0.1875rem` (5px top and bottom) inside the row, and
+`.gn-timeline__title` carries its own `padding: 0.25rem` — a row whose content needs more than 42px
+(the bar's 16px line-height plus its 10px of vertical margin already totals 26px before the title's own
+padding) renders taller than 42px rather than clipping to it, which is the correct behaviour for a floor
+but is worth naming since the prototype's own 42px may read as a fixed height rather than a minimum.
+
 **The two load-bearing checks named in this task's brief, both re-verified rather than assumed clean.**
 (1) `timeline-view.test.tsx:396-441`'s per-reason side-list modifier classes
 (`gn-timeline__side-entry--no-dates`/`--start-only`/`--due-only`/`--start-after-due`/`--unplaceable-day`)
@@ -4809,12 +4816,18 @@ declared. **No live cross-style/cross-theme visual check was performed** — the
 section calls for one ("A live read of the board, list, calendar and timeline in all three styles × both
 themes") and it is named here as a gap for whoever reviews this before merge, not silently skipped.
 
-- **13.474** 🧪 The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
+- **13.474** 🟡 The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
   `trayShadow` header grid, `minmax(0, 1fr)` week tracks, 42px zebra rows, a 6px-radius `accent`/
   `accentText` bar (still `0` on the clipped side only), and a `trayBg`/`trayShadow` undrawn footer.
-  Verified by the full `app-core`/`ui` suites (including the three updated pinned literals in
-  `timeline-view.test.tsx` and the untouched 11.77/`inbox-css-binding` gates) plus `tsc`; NOT verified by
-  a live render in any style or theme — manual, pending a reviewer's screen. —
+  **Covered:** the three literals `timeline-view.test.tsx` pins by exact equality/substring
+  (`--timeline-week-columns`'s two values, the `ui.css` leading-track string), re-run and green after
+  each edit; the untouched 11.77 modifier-class case and the `inbox-css-binding` self-test, both re-run
+  unchanged. **NOT covered:** every other geometry value in the table above (padding, margin, radius,
+  min-height, colours as rendered) — jsdom computes no layout, so nothing here mechanically asserts a
+  pixel. `🧪` is not used because that marker means a hand reproduction was actually performed
+  (this file's own legend), and no live render, in any style or theme, was — corrected from an initial
+  `🧪` marking that overstated what had been checked. Marked `🟡` pending that render, matching `13.475`'s
+  own honesty about what a suite-and-`tsc` pass does and does not prove for a pure restyle. —
   (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
   timeline-view.test.tsx`, `packages/ui/src/ui.css`)
 
