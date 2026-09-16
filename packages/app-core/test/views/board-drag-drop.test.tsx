@@ -128,6 +128,40 @@ describe('Board drag-and-drop — the positive control (declared, rules-free edg
     expect(batch[0]!.origin).toBe('web');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  /**
+   * 13.514 — THE REGISTRY MUST HOLD THE LATEST `attemptMove`, NOT A STALE
+   * ONE. Every other case in this file drops exactly once; this is the one
+   * case that drags and drops the SAME card TWICE in sequence, proving the
+   * `useEffect` that re-registers `attemptMove` on every render actually
+   * publishes the fresh closure — the one that sees `submitting` flip back
+   * to `false` once `submitDirect`'s own `finally` resets it — rather than a
+   * closure captured once (e.g. by an over-eager `useCallback`) that would
+   * silently freeze the registry's view of `submitting` and either brick the
+   * card after one move or bypass the double-submit latch entirely. Neither
+   * bug is hypothetical enough to skip: both are exactly the shape of
+   * mistake a well-meaning "let's memoize this" edit could introduce without
+   * touching a single line this file's other cases exercise.
+   */
+  it('a second drop after the first settles still submits — the registry holds the LATEST attemptMove', async () => {
+    const { source, moves, onMoved } = movesFor();
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    const first = fakeDataTransfer();
+    dragCard(boardCardSeed().ticketId, first);
+    dropOnColumn('doing', first);
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
+
+    const second = fakeDataTransfer();
+    dragCard(boardCardSeed().ticketId, second);
+    dropOnColumn('doing', second);
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(2));
+
+    expect(source.ingested).toHaveLength(2);
+    expect(source.ingested[0]![0]!.payload).toEqual({ to: 'doing' });
+    expect(source.ingested[1]![0]!.payload).toEqual({ to: 'doing' });
+  });
 });
 
 describe('Board drag-and-drop — the refusal path names the real alternatives', () => {

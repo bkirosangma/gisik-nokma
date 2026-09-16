@@ -5521,7 +5521,21 @@ whether the drop side actually reads what the drag side wrote.
   arrows at all" proof for the same `moves` capability being absent: the card's `<li>` carries
   `draggable="false"` when there is no `MoveArrows` instance behind it to register an `attemptMove`, and a
   drop aimed at it anyway is still inert, since `onDropCard` itself is `null` on that path and the column
-  never receives an `onDrop` handler at all. — (same files)
+  never receives an `onDrop` handler at all. — (same files). **The assertion is STRICTER than the CSS
+  contract it checks**: the selector `.gn-board__card-slot[draggable="true"]` is satisfied by
+  `draggable`'s ABSENCE too (an omitted attribute never matches `[draggable="true"]`, same as an explicit
+  `"false"`), while this case asserts the explicit string `'false'`. True of the current code
+  (`draggable={arrows !== null}` always renders one or the other), but a future refactor to a spread-based
+  omission (`{...(arrows !== null && { draggable: true })}`) would keep the CSS correct while reddening
+  this case for no real reason — worth knowing before treating a red `13.512` as proof of a CSS regression.
+- **13.514** ✅ THE REGISTRY MUST HOLD THE LATEST `attemptMove`, not one captured once. Every other case in
+  this file drops exactly once; this drags and drops the SAME card TWICE in sequence (both times onto the
+  declared, rules-free `doing` edge) and asserts BOTH submit — two `ingest` calls, `onMoved` called twice.
+  Proves the `useEffect` that re-registers `attemptMove` on every render actually publishes the fresh
+  closure (the one that sees `submitDirect`'s own `finally`-reset `submitting` flip back to `false`), not a
+  closure frozen at first render — the shape of bug an over-eager `useCallback` memoization could introduce
+  silently, either bricking the card after one move or bypassing the double-submit latch entirely, without
+  touching any line this file's other six cases exercise. — (same files)
 
 **Every outcome-dispatch case (`13.507`–`13.509`) and the `dragover` mechanism case (`13.510`) is
 mutation-witnessed, not merely passing once.** Two mutations, each applied via a targeted `Edit`, run
