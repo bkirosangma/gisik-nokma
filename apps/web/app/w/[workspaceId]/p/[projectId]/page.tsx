@@ -22,7 +22,11 @@ import {
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../src/app-nav.js';
-import { describeUnappliedBoardAxes } from '../../../../../src/board-search-scope.js';
+import {
+  buildBoardFilterChips,
+  describeUnappliedBoardAxes,
+  shouldRenderBoardNarrowingStrip,
+} from '../../../../../src/board-search-scope.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
 import {
@@ -212,6 +216,35 @@ function ProjectBoard() {
   const [filter, setFilter] = useState<FilterSpec>({});
 
   /**
+   * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
+   * field list, restated here exactly once. `boardNarrowing` below and
+   * `activeFilterChips` further down BOTH read this SAME value; before the
+   * review that asked for this, they were two independently hand-written
+   * lists of "which axes exist" that had already drifted (the chip builder
+   * only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
+   * `buildBoardFilterChips` for the full account. A future axis added to
+   * `BoardFilterSpec` now has exactly one object literal to update, not two.
+   */
+  const boardFilter: BoardFilterSpec = useMemo(
+    () => ({
+      text: filter.text,
+      assigneeIds: filter.assigneeIds,
+      typeIds: filter.typeIds,
+      stateIds: filter.stateIds,
+      stateCategories: filter.stateCategories,
+      projectIds: filter.projectIds,
+    }),
+    [
+      filter.text,
+      filter.assigneeIds,
+      filter.typeIds,
+      filter.stateIds,
+      filter.stateCategories,
+      filter.projectIds,
+    ],
+  );
+
+  /**
    * ONE PASS produces the narrowed board, its shown count, and its total — per
    * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
    * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
@@ -229,14 +262,6 @@ function ProjectBoard() {
    */
   const boardNarrowing = useMemo(() => {
     if (board.data === null) return null;
-    const boardFilter: BoardFilterSpec = {
-      text: filter.text,
-      assigneeIds: filter.assigneeIds,
-      typeIds: filter.typeIds,
-      stateIds: filter.stateIds,
-      stateCategories: filter.stateCategories,
-      projectIds: filter.projectIds,
-    };
     let total = 0;
     let shown = 0;
     const groups = board.data.groups.map((group) => ({
@@ -252,35 +277,17 @@ function ProjectBoard() {
       }),
     }));
     return { view: { ...board.data, groups }, shown, total };
-  }, [board.data, filter, projectId]);
-
-  /**
-   * THE REMOVABLE CHIP HALF of the disclosure invariant. One entry per
-   * user-set axis that narrows the BOARD, each carrying its own removal — the
-   * shared shape Task 8's workflow picker adds its own entry to, rather than
-   * inventing a second chip mechanism. Only `text` has a control today.
-   */
-  const activeFilterChips = useMemo(() => {
-    const chips: { key: string; label: string; onRemove: () => void }[] = [];
-    const text = filter.text?.trim();
-    if (text !== undefined && text !== '') {
-      chips.push({
-        key: 'text',
-        label: `Search: "${text}"`,
-        onRemove: () => setFilter((current) => ({ ...current, text: undefined })),
-      });
-    }
-    return chips;
-  }, [filter.text]);
+  }, [board.data, boardFilter, projectId]);
 
   /**
    * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
-   * cannot answer at all. This is SEPARATE from `activeFilterChips` above and
-   * from the count: the count reports cards the board filtered, this reports
-   * axes the board never evaluated, and merging the two would put a number on
-   * a filter that never ran (spec's own words). Always computed from `filter`
-   * directly — never from `boardFilter` inside the memo above, which by
-   * construction cannot carry these three axes at all.
+   * cannot answer at all. This is SEPARATE from `activeFilterChips` (declared
+   * further down, once the label resolvers it needs exist) and from the
+   * count: the count reports cards the board filtered, this reports axes the
+   * board never evaluated, and merging the two would put a number on a
+   * filter that never ran (spec's own words). Always computed from `filter`
+   * directly — never from `boardFilter` above, which by construction cannot
+   * carry these three axes at all.
    *
    * The logic itself lives in `src/board-search-scope.ts` as a pure function,
    * not inline here — Task 4's fix round 1 (coordinator concern 4) extracted
@@ -454,6 +461,59 @@ function ProjectBoard() {
     ticketTypes.data === null
       ? BUILTIN_TYPE_LADDER
       : ticketTypes.data.map((type) => ({ id: type.id, name: type.name }));
+
+  /**
+   * The board's own column names, id → name, for the `stateIds` chip below.
+   * Sourced from `board.data` directly rather than from `boardNarrowing.view`
+   * (which may already be narrowed) — a chip naming what a filter EXCLUDES
+   * must resolve against the FULL set of states the board has, not the
+   * narrowed remainder.
+   */
+  const boardStateNames = useMemo(() => {
+    const names = new Map<string, string>();
+    if (board.data !== null) {
+      for (const group of board.data.groups) {
+        for (const column of group.columns) {
+          names.set(column.stateId, column.name);
+        }
+      }
+    }
+    return names;
+  }, [board.data]);
+
+  const typeNameById = useMemo(
+    () => new Map(typeOptions.map((type) => [type.id, type.name])),
+    [typeOptions],
+  );
+
+  /**
+   * THE REMOVABLE CHIP HALF of the disclosure invariant — built from
+   * `boardFilter` itself (declared above, alongside `boardNarrowing`), one
+   * chip per axis actually set, covering all SIX of `BoardFilterSpec`'s
+   * fields rather than only `text`. See `buildBoardFilterChips`'s own
+   * docblock in `board-search-scope.ts` for why this single-enumeration
+   * design is the fix, not a style choice: the previous version silently
+   * closed the disclosure gate on any of the other five axes narrowing the
+   * board with no chip and no scope-note entry to show for it.
+   *
+   * Declared HERE, after `nameOf`/`typeOptions`/`boardStateNames`, because
+   * label resolution needs the roster and the type/state name maps — moving
+   * this below where they are ready, rather than moving three data reads
+   * above where `filter` is declared, is the smaller reshuffle.
+   */
+  const activeFilterChips = useMemo(
+    () =>
+      buildBoardFilterChips(
+        boardFilter,
+        {
+          assigneeName: nameOf,
+          typeName: (id) => typeNameById.get(id) ?? id,
+          stateName: (id) => boardStateNames.get(id) ?? id,
+        },
+        setFilter,
+      ),
+    [boardFilter, nameOf, typeNameById, boardStateNames],
+  );
 
   /**
    * Why the create control is GATED rather than mounted with a disabled picker.
@@ -759,18 +819,35 @@ function ProjectBoard() {
               small lie.
 
               Gated on having something to disclose, not merely on `view ===
-              'board'` — with no active axis at all, `activeFilterChips` and
-              `boardUnappliedAxes` are both empty and the strip renders
-              nothing, so a person who has touched no control never sees an
-              empty bar. The moment either becomes non-empty, the count comes
-              along with it (it lives inside the SAME conditional block as the
-              chips and the note), which is what keeps the invariant — count
-              and chip, always together — true by construction rather than by
-              two authors remembering to agree.
+              'board'` — with no active axis at all and nothing hidden, the
+              strip renders nothing, so a person who has touched no control
+              never sees an empty bar. The moment any of the three terms
+              becomes true, the count comes along with it (it lives inside
+              the SAME conditional block as the chips and the note), which is
+              what keeps the invariant — count and chip, always together —
+              true by construction rather than by two authors remembering to
+              agree.
+
+              THREE TERMS, not two (Task 4 review, Important finding,
+              remedy 2 — `shouldRenderBoardNarrowingStrip` in
+              `board-search-scope.ts`): `activeFilterChips.length > 0` and
+              `boardUnappliedAxes.length > 0` only cover mechanisms this file
+              can NAME — a filter axis, or an axis outside `BoardFilterSpec`.
+              `boardNarrowing.shown !== boardNarrowing.total` is independent
+              of naming anything: it is true whenever the board actually hid
+              a card, for ANY reason, which is what makes this gate correct
+              for Task 8's workflow picker — that narrows by dropping whole
+              GROUPS, not by setting a filter axis, so no enumeration of axes
+              could ever notice it on its own.
             */}
             {view === 'board' &&
             boardNarrowing !== null &&
-            (activeFilterChips.length > 0 || boardUnappliedAxes.length > 0) ? (
+            shouldRenderBoardNarrowingStrip({
+              chipCount: activeFilterChips.length,
+              unappliedAxisCount: boardUnappliedAxes.length,
+              shown: boardNarrowing.shown,
+              total: boardNarrowing.total,
+            }) ? (
               <div className="gn-project__narrowing" data-testid="board-narrowing">
                 <span className="gn-project__count" data-testid="board-narrowing-count">
                   {boardNarrowing.shown} of {boardNarrowing.total} shown

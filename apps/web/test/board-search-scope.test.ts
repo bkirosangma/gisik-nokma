@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import type { FilterSpec } from '@gisik-nokma/app-core';
-import { describeUnappliedBoardAxes } from '../src/board-search-scope.js';
+import { describe, expect, it, vi } from 'vitest';
+import type { BoardFilterSpec, FilterSpec } from '@gisik-nokma/app-core';
+import {
+  buildBoardFilterChips,
+  describeUnappliedBoardAxes,
+  shouldRenderBoardNarrowingStrip,
+} from '../src/board-search-scope.js';
+
+const RESOLVERS = {
+  assigneeName: (id: string) => (id === 'u1' ? 'Ada' : id),
+  typeName: (id: string) => (id === 'task' ? 'Task' : id),
+  stateName: (id: string) => (id === 'doing' ? 'Doing' : id),
+};
 
 /**
  * `describeUnappliedBoardAxes` is a pure function extracted from `page.tsx`
@@ -75,5 +85,133 @@ describe('13.441 the combined case names all active axes, in a stable order', ()
     // wasn't running when it was.
     const filter: FilterSpec = { text: 'board', assigneeIds: ['u1'] };
     expect(describeUnappliedBoardAxes(filter)).toEqual([]);
+  });
+});
+
+/**
+ * ## `buildBoardFilterChips` (Task 4 review, Important finding, remedy 1)
+ *
+ * The defect this replaces: the shipped chip builder only ever checked
+ * `boardFilter.text`, because `text` was the only axis with a UI control at
+ * the time it was written — so `assigneeIds`/`typeIds`/`stateIds`/
+ * `stateCategories`/`projectIds` could each narrow the board while producing
+ * NO chip, closing the disclosure gate on cards that had, in fact, been
+ * dropped. No control exists on this page yet for any of the other five
+ * (Task 5's Filters sheet and Task 8's workflow picker add them), so these
+ * cases call the function directly rather than through a page render that
+ * has nothing to click — the same reasoning the coordinator gave for testing
+ * the disclosure gate directly below.
+ */
+describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not only text', () => {
+  it('emits no chip for an empty boardFilter', () => {
+    const chips = buildBoardFilterChips({}, RESOLVERS, vi.fn());
+    expect(chips).toEqual([]);
+  });
+
+  it('emits a labelled, removable chip for each of the six axes when set', () => {
+    const setFilter = vi.fn();
+    const filter: BoardFilterSpec = {
+      text: 'board',
+      assigneeIds: ['u1'],
+      typeIds: ['task'],
+      stateIds: ['doing'],
+      stateCategories: ['active'],
+      projectIds: ['p_1', 'p_2'],
+    };
+    const chips = buildBoardFilterChips(filter, RESOLVERS, setFilter);
+    expect(chips.map((chip) => chip.key)).toEqual([
+      'text',
+      'assigneeIds',
+      'typeIds',
+      'stateIds',
+      'stateCategories',
+      'projectIds',
+    ]);
+    expect(chips.map((chip) => chip.label)).toEqual([
+      'Search: "board"',
+      'Assignee: Ada',
+      'Type: Task',
+      'State: Doing',
+      'Category: Active',
+      'Project: 2 selected',
+    ]);
+  });
+
+  it('resolves an id through the RESOLVER, never printing a raw id when a name is known', () => {
+    const chips = buildBoardFilterChips({ assigneeIds: ['u1'] }, RESOLVERS, vi.fn());
+    expect(chips[0]?.label).toBe('Assignee: Ada');
+    expect(chips[0]?.label).not.toContain('u1');
+  });
+
+  it('falls back to the raw id when the resolver has no name for it', () => {
+    const chips = buildBoardFilterChips({ assigneeIds: ['u_unknown'] }, RESOLVERS, vi.fn());
+    expect(chips[0]?.label).toBe('Assignee: u_unknown');
+  });
+
+  it('ignores an EMPTY list axis — it does not narrow, so it earns no chip', () => {
+    const chips = buildBoardFilterChips({ assigneeIds: [] }, RESOLVERS, vi.fn());
+    expect(chips).toEqual([]);
+  });
+
+  it("each chip's onRemove clears exactly its own axis and no other", () => {
+    const setFilter = vi.fn();
+    const filter: BoardFilterSpec = { text: 'board', assigneeIds: ['u1'] };
+    const chips = buildBoardFilterChips(filter, RESOLVERS, setFilter);
+    const assigneeChip = chips.find((chip) => chip.key === 'assigneeIds');
+    assigneeChip?.onRemove();
+
+    expect(setFilter).toHaveBeenCalledTimes(1);
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    const current: FilterSpec = { text: 'board', assigneeIds: ['u1'], typeIds: ['task'] };
+    // The patch clears ONLY assigneeIds — text and typeIds (an axis this
+    // chip does not own) pass through untouched.
+    expect(updater(current)).toEqual({ text: 'board', assigneeIds: undefined, typeIds: ['task'] });
+  });
+});
+
+/**
+ * ## `shouldRenderBoardNarrowingStrip` (Task 4 review, Important finding, remedy 2)
+ *
+ * `activeFilterChips.length > 0 || boardUnappliedAxes.length > 0` alone
+ * cannot notice a mechanism that narrows the board WITHOUT setting any
+ * filter axis at all — Task 8's workflow picker narrows by dropping whole
+ * GROUPS. That state cannot be constructed through this page's own inputs
+ * today (nothing on this page drops a group without going through a filter
+ * axis first), so per the coordinator's own instruction this tests the gate
+ * EXPRESSION directly rather than writing a page-render test that would pass
+ * for the wrong reason.
+ */
+describe('13.443 shouldRenderBoardNarrowingStrip is not blind to narrowing with no named axis', () => {
+  it('is false when nothing is active and nothing is hidden', () => {
+    expect(
+      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 3, total: 3 }),
+    ).toBe(false);
+  });
+
+  it('is true on a chip alone (remedy 1’s own case)', () => {
+    expect(
+      shouldRenderBoardNarrowingStrip({ chipCount: 1, unappliedAxisCount: 0, shown: 3, total: 3 }),
+    ).toBe(true);
+  });
+
+  it('is true on an unapplied axis alone', () => {
+    expect(
+      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 1, shown: 3, total: 3 }),
+    ).toBe(true);
+  });
+
+  it('THE CASE THAT WOULD FAIL WITHOUT REMEDY 2: shown !== total, no chip, no unapplied axis', () => {
+    // This is exactly the state a group-dropping mechanism (no filter axis
+    // set at all) produces: something is hidden, but neither of the first
+    // two terms has any way to know it.
+    expect(
+      shouldRenderBoardNarrowingStrip({ chipCount: 0, unappliedAxisCount: 0, shown: 1, total: 3 }),
+    ).toBe(true);
+  });
+
+  it('is true when all three terms are true at once', () => {
+    expect(
+      shouldRenderBoardNarrowingStrip({ chipCount: 1, unappliedAxisCount: 1, shown: 1, total: 3 }),
+    ).toBe(true);
   });
 });

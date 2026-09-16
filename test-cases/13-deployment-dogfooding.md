@@ -4178,7 +4178,7 @@ alike, the compile-time case proves the narrowing is real rather than merely doc
 
 ## Task 4 — the board's search box, count, chip, and scope note (board-prototype-port plan, 2026-09-16)
 
-**Block `13.435`–`13.441` minted here; the next free BLOCK is `13.442`.** `matchesBoardCard` (Task 3)
+**Block `13.435`–`13.444` minted here; the next free BLOCK is `13.445`.** `matchesBoardCard` (Task 3)
 had no caller. This task adds one: a page-level search box narrows the board through it, an
 `N of M shown` count and a removable chip are derived from the SAME pass that narrows the render
 (coordinator Ruling 1 — never a second count), and a scope note names the axes a `BoardFilterSpec`
@@ -4200,7 +4200,24 @@ unnarrowed with no visible sign of it) — `13.439` is the mirror note that name
 while a search term is actually present. `describeUnappliedBoardAxes` (the board's own scope-note
 logic) was extracted to a pure function (`apps/web/src/board-search-scope.ts`) specifically so it
 could be unit-tested directly rather than shipping with zero executions until Task 5's Filters sheet
-became its first real caller — `13.440`/`13.441` are that unit test.
+became its first real caller — `13.440`/`13.441` are that unit test. **Review fix round (Important
+finding) adds `13.442`–`13.444`.** The disclosure gate (`page.tsx`) enumerated a DIFFERENT axis set
+than the narrowing did: `activeFilterChips` covered only `text`, `boardUnappliedAxes` covered only
+the four board-blind axes, but the `boardFilter` object handed to `matchesBoardCard` carries SIX
+(`text`, `assigneeIds`, `typeIds`, `stateIds`, `stateCategories`, `projectIds`) — so five of those
+six could narrow the rendered cards while tripping neither term, closing the whole disclosure strip
+(count included) on cards that had, in fact, been dropped. Unreachable today (only `text` has a UI
+control), but reachable the instant Task 5's Filters sheet or Task 8's workflow picker writes any
+other axis onto the same state. **Two independent remedies, both required:** (1) the chip list is
+now built by reading `boardFilter` itself (`buildBoardFilterChips`, `13.442`) — one enumeration,
+not two hand-kept in sync; (2) the gate gained a THIRD, independent term,
+`boardNarrowing.shown !== boardNarrowing.total` (`shouldRenderBoardNarrowingStrip`, `13.443`) —
+because Task 8's workflow picker narrows by dropping whole GROUPS, never by setting a filter axis,
+so no enumeration of axes, however complete, could ever notice it; only a fact about the actual
+render (fewer cards shown than exist) can. `13.443` tests the gate expression directly rather than
+through a page render, since the state remedy 2 exists for cannot be constructed from this page's
+current inputs. `13.444` is the review's Minor: Ruling 10's mirror note gained a Calendar-tab arm
+alongside its existing List/Timeline coverage.
 
 - **13.435** ✅ Typing into the board's search box narrows the rendered grid AND reads an honest
   `N of M shown`: two of three fixture cards leave the DOM, the remaining one stays, and the count
@@ -4231,3 +4248,19 @@ became its first real caller — `13.440`/`13.441` are that unit test.
   order (collaborator, due date, custom field) regardless of the order the caller supplied them on
   the `FilterSpec` object, and never names a `BoardFilterSpec`-representable axis (`text`,
   `assigneeIds`) as unapplied. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.442** ✅ `buildBoardFilterChips` (review, Important finding, remedy 1): emits a labelled,
+  removable chip for EACH of the six `BoardFilterSpec` axes when set (not only `text`), resolves an
+  id through the supplied name resolver and falls back to the raw id when the resolver has none,
+  ignores an empty list axis, and each chip's `onRemove` clears exactly its own axis and no
+  other. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.443** ✅ `shouldRenderBoardNarrowingStrip` (review, Important finding, remedy 2): false with
+  nothing active and nothing hidden; true on a chip alone; true on an unapplied axis alone; true on
+  ALL three together; and — the case that would fail without remedy 2 — true when `shown !== total`
+  with NEITHER a chip NOR an unapplied axis, the exact state a group-dropping narrowing mechanism
+  (no filter axis set) produces. Tests the gate expression directly rather than through a page
+  render, per the coordinator's own instruction, since that state cannot be constructed from this
+  page's current inputs (nothing here drops a group without going through a filter axis
+  first). — (`apps/web/test/board-search-scope.test.ts`)
+- **13.444** ✅ The review's Minor: Ruling 10's mirror note (`13.439`) is exercised on the Calendar
+  tab too, not only List and Timeline — the gate is one uniform `view !== 'board'` check, so
+  divergence was unlikely, but untested. — (`apps/web/test/board-narrowing.test.tsx`)

@@ -276,6 +276,11 @@ describe('13.438 the strip is not unconditionally present', () => {
  * This note is the fix — and it must appear ONLY while a term is present
  * (never a permanent sentence on three tabs) and ONLY on the tabs where the
  * search does not apply (never on Board, where it does).
+ *
+ * Exercised on all three non-board tabs individually (List and Timeline
+ * below, Calendar in `13.444` — a Minor from the review: the gate is one
+ * uniform `view !== 'board'` check, so divergence was unlikely, but
+ * "unlikely" is not "tested").
  */
 describe('13.439 the tabs where search does not apply say so — only while a term is present', () => {
   it('shows nothing on the List tab until a search term exists, then names the limit', async () => {
@@ -328,5 +333,28 @@ describe('13.439 the tabs where search does not apply say so — only while a te
     await userEvent.clear(search);
 
     expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.444 — the Minor the review flagged: the gate is a uniform
+   * `view !== 'board'` check, so List and Timeline (above) already imply
+   * Calendar behaves the same way — but "unlikely to diverge" is not
+   * "tested", and this is the arm those two cases didn't cover.
+   */
+  it('13.444 also names the limit on the Calendar tab', async () => {
+    render(
+      <Providers services={servedBoard(threeCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Calendar' }));
+
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+
+    await userEvent.type(await searchbox(), 'board');
+
+    const note = await screen.findByTestId('search-not-applied-note');
+    expect(note).toHaveTextContent(/board only/i);
   });
 });
