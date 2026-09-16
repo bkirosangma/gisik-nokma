@@ -349,8 +349,18 @@ to the `rem` idiom `ui.css` already uses.
 
 `packages/ui/test/token-discipline.test.ts` bans literal colours and
 `packages/ui/test/tokens.test.ts:128` ("every `var(--gn-…)` in `ui.css` names a
-declared role", asserted at `:138`) requires every role referenced to exist. So any role this port needs must be **declared**, with its
-contrast pairs, in the same change that first references it.
+declared role", asserted at `:138`) requires every role referenced to exist. So
+any role this port needs must be **declared**, with its contrast obligation
+discharged in the way its kind requires (below), in the same change that first
+references it.
+
+Naming: the product does not reuse the prototype's role names. The prototype's
+`fill1`…`fill4` are `fillPrimary`…`fillQuaternary`; `label2`/`label3` are
+`textMuted`/`textSubtle`; `purple` is `violet600`/`violet300`. Per-family
+variants carry `Warm` (neo) and `Navy` (hig/minimal) in the middle —
+`tintWarmWarning` / `tintNavyWarning` — resolved per style by the maps at
+`tokens.ts:708` and `:745`. New roles follow that shape; T1 does not invent a
+second convention.
 
 The audit is T1 and its result is not pre-judged here. What is already known:
 
@@ -363,13 +373,46 @@ The audit is T1 and its result is not pre-judged here. What is already known:
   `/workspaces` port where they were deliberately not added for want of one. They
   are added here, each with its consumer named.
 
-**The contrast trap applies and the reference point is the composite.** A tint is
-a translucent wash; the obligation is against the tint **over its ground**, not
-against the tint alone. `tokens.ts:275` carries this reasoning — a fill
-"measured where it is real, composited over `surface`" — with the worked
-measurement at `:287`. Measured in **both themes × all three styles** — and for
-`tintPurple` the ground is the calendar day cell (`cardBg` in month, `fill4`
-out), which is two grounds, not one.
+**The contrast trap applies, and an earlier draft of this section got its
+mechanism backwards.** It said the new tints get `CONTRAST_PAIRS` rows measured
+on the composite. They must get the opposite:
+
+> `tokens.ts:226` and `:273`: these are ALPHA, and **no `CONTRAST_PAIRS` row may
+> name them** — `relativeLuminance` ignores alpha by documented design, so a
+> declared pair would compute the tint's own colour against a background it is
+> actually blended INTO. "A false green", in the file's own words.
+
+A tint is a translucent wash, so the obligation is against the tint **over its
+ground** — but it is discharged in `tokens.test.ts`, not in `CONTRAST_PAIRS`.
+The established idiom is `tintWarning`'s block at `tokens.test.ts:620-654`: a
+local `over(src, dst)` compositor (`:622-628`, "the compositing
+`relativeLuminance` deliberately lacks"), looped over `STYLE_NAMES × THEME_NAMES`,
+and — load-bearing — **the anti-vacuous control at `:641`**:
+
+```ts
+expect(washed, `${style}/${theme}: the tint composites to nothing`).not.toBe(surface);
+```
+
+Without that line a fully transparent tint composites to the bare surface and
+both contrast assertions pass by measuring text on a surface that already
+passed. The check could not fail for the reason it exists. **T1 copies this
+shape, including the control**; it does not write a new one.
+
+The grounds each new tint is measured against:
+
+| Role | Consumer | Ground(s) |
+|---|---|---|
+| `tintDanger` | blocked column chip (board metrics) | the column tray — `trayBg`, which is `surfaceSunken` (hig/minimal) and a neo-specific paper; **not** `surface` |
+| `tintPurple` | calendar custom-field event pill | the day cell, which is **two** grounds: `cardBg` in month, `fillQuaternary` out |
+
+`tintWarning`'s block measures one ground because its banner sits at page level,
+and its docblock says so explicitly (`tokens.test.ts:616-618`: "if it is ever
+nested inside a card, this check is measuring the wrong ground"). Neither new
+tint sits at page level, so neither may copy that single-ground assumption —
+this is the one place T1 must diverge from the idiom it otherwise follows.
+
+The foreground measured against each composite is the text the prototype puts on
+it: `danger` on the blocked chip, `violet600`/`violet300` on the event pill.
 
 ## The board that has columns but no cards (R6)
 
