@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { BoardCard, BoardView, ClaimProvenance, TicketListView } from '@gisik-nokma/app-core';
+import type {
+  BoardCard,
+  BoardView,
+  ClaimProvenance,
+  ListRow,
+  TicketListView,
+} from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -33,9 +39,12 @@ import { stubServices } from './helpers/stub-services.js';
  * an implementation that sources `M` from `list.rows.length` (which
  * `activeOnly` DOES narrow, server-side) instead of from `board.data` (which
  * it never does). `13.436` below reproduces exactly that: a board fixture
- * with three cards and a list fixture with one row, `activeOnly` turned on,
- * and an assertion that the count reads the board's three, never the list's
- * one.
+ * with three cards and a list fixture with TWO rows — nonzero, and
+ * deliberately different from three rather than zero, so a `list.rows`-sourced
+ * `M` would print a plausible "1 of 2 shown" rather than an obviously-broken
+ * "1 of 0" — `activeOnly` turned on, and a negative assertion naming that
+ * exact wrong string rather than trusting that any wrong answer looks
+ * different from the right one.
  */
 
 const PROJECT_ID = '01J9PROJECT000000000000000';
@@ -105,6 +114,44 @@ function boardOf(cards: BoardCard[]): BoardView {
   };
 }
 
+/**
+ * A `ListRow` exactly as `view-types.ts` declares it — no `as ListRow`
+ * anywhere (matching `project-calendar-timeline.test.tsx`'s own `row()`).
+ * Only used to give the LIST a row count that is real, nonzero, and
+ * DIFFERENT from the board's, so `13.436` can name the wrong number a
+ * `list.rows`-sourced count would actually produce, not merely assert some
+ * other number showed up.
+ */
+function listRow(overrides: Partial<ListRow> = {}): ListRow {
+  const base: ListRow = {
+    ticketId: 'lt_1',
+    title: 'A ticket the list can see',
+    typeId: 'task',
+    typeRank: 3,
+    parentId: null,
+    epicId: null,
+    stateId: 'doing',
+    stateName: 'Doing',
+    stateCategory: 'active',
+    stateProvenance: claim(),
+    assignee: null,
+    assignedProvenance: null,
+    dueDate: null,
+    fields: {
+      title: {
+        value: 'A ticket the list can see',
+        actorId: 'user_kiro',
+        clientTime: '2026-08-19T10:00:00.000Z',
+        serverTime: '2026-08-19T10:00:01.000Z',
+      },
+    },
+    rollup: null,
+    hasRestrictedParent: false,
+    pending: false,
+  };
+  return { ...base, ...overrides };
+}
+
 /** The shipped-server-shaped stub every case below starts from. */
 function servedBoard(cards: BoardCard[], rows: TicketListView['rows'] = []) {
   return stubServices({
@@ -143,12 +190,17 @@ describe('13.435 the board search narrows the grid and reads an honest N of M', 
 
 describe('13.436 the count is read from the board’s own data, never the list’s narrower one', () => {
   it('does not source M from list.rows when the server narrowing (“Only tickets in progress”) is on', async () => {
-    // The list fixture is narrower than the board fixture — exactly the shape
-    // `activeOnly` produces server-side against a real server (terminal
-    // tickets withheld from `getTickets`, never from `getBoard`, which cannot
-    // take a filter at all — see this file's own docblock).
+    // The list fixture carries a REAL, nonzero row count — 2 — that is
+    // DIFFERENT from the board's 3. `activeOnly`'s server narrowing produces
+    // exactly this shape against a real server (terminal tickets withheld
+    // from `getTickets`, never from `getBoard`, which cannot take a filter at
+    // all — see this file's own docblock). Two nonzero numbers, not "3 vs 0",
+    // because a wrong implementation reading `list.rows.length` would print a
+    // plausible-looking "1 of 2 shown" here, not an obviously-broken "1 of 0"
+    // — the negative assertion below names that exact wrong number rather
+    // than trusting that any failure would look different from success.
     render(
-      <Providers services={servedBoard(threeCards, [])}>
+      <Providers services={servedBoard(threeCards, [listRow({ ticketId: 'lt_1' }), listRow({ ticketId: 'lt_2' })])}>
         <ProjectPage />
       </Providers>,
     );
@@ -161,10 +213,12 @@ describe('13.436 the count is read from the board’s own data, never the list�
 
     await userEvent.type(await searchbox(), 'board');
 
-    // Honest: the board's own total is 3, unaffected by `activeOnly` — this
-    // would read "1 of 0 shown" (or throw) if `M` were ever sourced from
-    // `list.rows.length` instead of `board.data`.
+    // Honest: the board's own total is 3, unaffected by `activeOnly`.
     expect(await screen.findByText('1 of 3 shown')).toBeInTheDocument();
+    // Named, not merely absent-by-omission: this is what a `list.rows`-sourced
+    // `M` would actually print (1 match against 2 list rows), so the case
+    // rejects that specific wrong answer rather than any answer that isn't 3.
+    expect(screen.queryByText('1 of 2 shown')).not.toBeInTheDocument();
   });
 });
 
