@@ -4682,3 +4682,61 @@ happen to construct.
   strip disappears entirely — the same rule `13.438` pins for the card-level filter, proven here for the
   group-level one. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
   `apps/web/test/board-narrowing.test.tsx`)
+
+## Task 8 fix round — Ruling 20, 2026-09-16
+
+**Cases `13.472`–`13.473` minted here**, continuing directly from `13.471` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, not a naive grep — see the false-hit note in the section
+above). Two closures the coordinator required after reviewing Task 8's own report.
+
+**Ruling 20(a) — the deferred fixture, taken up on the report's own offer.** The Task 8 report verified
+the empty-picked-workflow / `isNarrowed` interaction by COMPOSITION: `isNarrowed={boardNarrowing.shown
+!== boardNarrowing.total}` (`page.tsx`) and `Board`'s own gate (`totalCards === 0 && isNarrowed !==
+true`, `board.tsx`) are both unchanged by Task 8, and case `13.467` already proves the second half while
+`13.470` already proves the picker drives the first. The coordinator's reasoning for still wanting it
+run: this session already carries two instances of a path that was reasoned about correctly and still
+hid something when it finally executed (the board scope-note JSX shipping unexercised through two tasks;
+`rule()`'s `string | undefined` sitting latent in a shared helper until one new call site used the value
+as a plain string). "Composition proves the pieces; it does not run them together." `13.472` is that run,
+mutation-witnessed: hardcoding `<Board isNarrowed={false}>` (defeating only the suppression) reddens
+`13.472` alone — every other case in the file, `13.473` included, stays green.
+
+**Ruling 20(b) — an unresolvable picked workflow falls back to `All`.** The Task 8 report's own second
+concern: if the picked workflow's group disappears from `board.data` mid-session (reassigned or detached
+elsewhere, page left open), `workflowFilter` keeps naming an id nothing in `board.data.groups` matches
+any more. Recoverable (remove the chip), but until then the page would assert a phantom as real — the
+chip's own label falls back to `group?.workflowName ?? workflowFilter`, and with no group to find that
+prints the RAW INTERNAL ID as if it were a real, chosen narrowing, on a project that may hold tickets
+(`boardNarrowing`'s own `total`) the person can no longer see any trace of. Fixed with
+`resolvedWorkflowFilter` (`page.tsx`) — a plain, unmemoized `const`, recomputed every render from
+`workflowFilter` and the CURRENT `board.data`, falling back to `'all'` when the picked id matches no
+group; every consumer that narrows or displays by workflow (`boardNarrowing`'s `keepGroup`,
+`workflowChip`, the `<select>`'s own `value`) reads THIS, never raw `workflowFilter`, except the
+`<select>`'s `onChange`, which only ever WRITES a value drawn from the current option list and is
+therefore always valid when written. `13.473` is the case, exercised through a REAL mid-session update —
+`rerender` with a new `Providers services={…}` whose `getBoard` no longer carries the picked workflow,
+keeping the SAME `ProjectPage` instance mounted so `workflowFilter`'s own state survives the change; this
+is not a simulated shortcut but the same effect-dependency path (`useLiveQuery`'s first effect keys on
+`source` identity) a real workspace-stream event drives in production, confirmed by reading
+`use-live-query.ts`'s own two effects before relying on it. Mutation-witnessed: collapsing
+`resolvedWorkflowFilter` to raw `workflowFilter` reddens `13.473` alone — all thirteen other cases in the
+file, `13.472` included, stay green.
+
+`packages/app-core/src/index.ts` also gains `EMPTY_COLUMN_COPY` in its public re-export, alongside
+`EMPTY_BOARD_COPY` — `13.472` is the first `apps/web` case that needs it, for the identical reason
+`EMPTY_BOARD_COPY`'s own docblock already gives (assert the SAME string that renders, never a re-typed
+copy of it).
+
+- **13.472** ✅ Picking a workflow whose own group holds zero cards, on a project whose OTHER workflow
+  holds real tickets: `EMPTY_BOARD_COPY` is absent (R19's remedy is the chip, not "create one"), the
+  strip reads an honest `0 of 2 shown` against the project's whole total, the removable chip names the
+  picked workflow, and the rail still draws both of the picked group's columns with their own
+  `EMPTY_COLUMN_COPY`. Mutation-witnessed: `isNarrowed={false}` reddens only this case. —
+  (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/test/board-narrowing.test.tsx`,
+  `packages/app-core/src/index.ts`)
+- **13.473** ✅ A picked workflow that drops out of `board.data` via a real mid-session re-fetch (`rerender`
+  with new `Providers services`, the SAME `ProjectPage` instance) falls back to the picker's own `'all'`
+  default — no phantom chip naming a raw internal id, no strip at all, every surviving group's cards
+  shown. Mutation-witnessed: collapsing `resolvedWorkflowFilter` to raw `workflowFilter` reddens only
+  this case. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)

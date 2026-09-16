@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY } from '@gisik-nokma/app-core';
 import type {
   BoardCard,
   BoardGroup,
@@ -446,6 +447,33 @@ const bugWorkflow: BoardGroup = {
   ],
 };
 
+/** Two columns, zero cards in either — a workflow attached to the project with nothing filed against it yet, for the Ruling 20(a) fixture below. */
+const emptyWorkflow: BoardGroup = {
+  workflowId: 'wf-empty',
+  workflowVersion: 1,
+  workflowName: 'Onboarding',
+  columns: [
+    { stateId: 'intake', name: 'Intake', category: 'open', blocked: false, cards: [] },
+    { stateId: 'review', name: 'Review', category: 'active', blocked: false, cards: [] },
+  ],
+};
+
+/** One column, one card — a THIRD workflow, distinct from both `defaultWorkflow` and `bugWorkflow`, standing in for `bugWorkflow` after it "disappears" mid-session in the Ruling 20(b) fixture below. */
+const otherWorkflow: BoardGroup = {
+  workflowId: 'wf-other',
+  workflowVersion: 1,
+  workflowName: 'Support',
+  columns: [
+    {
+      stateId: 'open',
+      name: 'Open',
+      category: 'open',
+      blocked: false,
+      cards: [card({ ticketId: 'o_1', title: 'Support lane card one' })],
+    },
+  ],
+};
+
 /** Same shipped-server-shaped stub `servedBoard` above builds, but over a caller-supplied `BoardView` rather than `boardOf`'s single fixed group — this suite's own fixtures need MULTIPLE groups, which `boardOf` cannot produce. */
 function renderProjectPage({ groups }: { groups: BoardGroup[] }) {
   const board: BoardView = { projectId: PROJECT_ID, groups };
@@ -543,6 +571,99 @@ describe('13.471 the chip and the count move together for the workflow picker to
     // With nothing narrowed at all, the whole strip disappears — the SAME
     // rule 13.438 already pins for the card-level filter, proven here for
     // the group-level one.
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ## Fix round — coordinator Ruling 20, 2026-09-16
+ *
+ * Two closures the coordinator required after reviewing Task 8: `13.472`
+ * takes up the offer the Task 8 report itself made (composition had proven
+ * the empty-picked-workflow / `isNarrowed` interaction correct by reading two
+ * unchanged expressions; the coordinator wanted it run, not only reasoned
+ * about — "composition proves the pieces; it does not run them together").
+ * `13.473` closes the report's OWN second concern (Ruling 20(b)): a picked
+ * workflow that drops out of `board.data` mid-session now falls back to
+ * `'all'` (`resolvedWorkflowFilter`, `page.tsx`) rather than narrowing to a
+ * phantom.
+ */
+
+describe('13.472 an empty picked workflow suppresses EMPTY_BOARD_COPY, not the per-column empty states', () => {
+  it('narrows to the empty group, hides the whole-board sentence, and still draws the rail', async () => {
+    renderProjectPage({ groups: [defaultWorkflow, emptyWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    await userEvent.selectOptions(await workflowSelect(), 'wf-empty');
+
+    // The strip discloses the narrowing through the SAME `shown`/`total`
+    // pair `isNarrowed` reads below — `0 of 2`, not `0 of 0`: the two
+    // DEFAULT-workflow cards are real and still counted in `total`, even
+    // though the picked group holds neither of them.
+    expect(await screen.findByText('0 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove.*Onboarding/i })).toBeInTheDocument();
+
+    // R19's whole point, exercised through REAL group-dropping data rather
+    // than composed by reading two unchanged expressions: the remedy for an
+    // empty picked workflow is the chip in the strip, not "create one" — a
+    // project that DOES hold tickets (Default's own two) must never say it
+    // has none.
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).not.toBeInTheDocument();
+
+    // The rail still draws: two per-column empty states, one per Onboarding
+    // column, proving `Board` rendered every column the surviving group
+    // declares rather than collapsing to nothing once `EMPTY_BOARD_COPY` is
+    // suppressed.
+    expect(screen.getAllByText(EMPTY_COLUMN_COPY)).toHaveLength(2);
+    expect(screen.getByRole('region', { name: 'Intake' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Review' })).toBeInTheDocument();
+  });
+});
+
+describe('13.473 an unresolvable picked workflow falls back to All, not a phantom narrowing', () => {
+  it('resets the picker to All when the picked workflow disappears from the board mid-session', async () => {
+    const { rerender } = renderProjectPage({ groups: [defaultWorkflow, bugWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    await userEvent.selectOptions(await workflowSelect(), 'wf-bug');
+    await screen.findByText('3 of 5 shown');
+
+    // A LIVE re-fetch mid-session (the workflow reassigned or detached
+    // elsewhere), not a fresh mount: `rerender` keeps the SAME `ProjectPage`
+    // instance mounted, so `workflowFilter`'s own state SURVIVES the update
+    // and still names the now-absent 'wf-bug' — exactly the shape Ruling
+    // 20(b) describes. This is not a simulation hack: `Providers` passes a
+    // NEW `services` object straight into context on every render
+    // (`value = services ?? constructed`, no memo wrapping an injected
+    // value), which changes `useLiveQuery`'s own `source` identity, which is
+    // in ITS first effect's dependency array — the exact path a real
+    // workspace-stream event drives in production. The new board keeps TWO
+    // groups (`defaultWorkflow` + `otherWorkflow`, replacing `bugWorkflow`)
+    // so the picker itself stays mounted and its own `value` is directly
+    // assertable, rather than folding this case into the single-workflow
+    // gate (`13.469`) it is not about.
+    rerender(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: PROJECT_ID, groups: [defaultWorkflow, otherWorkflow] }),
+          getAttention: async () => [],
+          getMembers: async () => [],
+          getTicketTypes: async () => [],
+          getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await screen.findByText('Support lane card one');
+    // Falls back to the picker's own resting state (R3) rather than staying
+    // pointed at a workflow that no longer exists.
+    expect(await workflowSelect()).toHaveValue('all');
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    // Not merely "some strip" — NO strip at all: the fallback is `'all'`,
+    // which drops nothing, so `shown === total` and the THIRD gate term
+    // (the one `13.470` proved fires for group-dropping) is false again too.
     expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
   });
 });

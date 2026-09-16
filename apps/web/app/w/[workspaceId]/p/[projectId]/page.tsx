@@ -284,6 +284,51 @@ function ProjectBoard() {
   const [workflowFilter, setWorkflowFilter] = useState<string>('all');
 
   /**
+   * THE RESOLVED PICKER VALUE (Ruling 20(b), coordinator, 2026-09-16) — falls
+   * back to `'all'` whenever `workflowFilter` names a workflow `board.data`
+   * no longer carries. This can only happen MID-SESSION: the picker's own
+   * `<option>`s are built from `board.data.groups` at the moment of
+   * selection (below), so every value `workflowFilter` can ever be WRITTEN
+   * to is valid when written. It stops being valid when the board's own
+   * data changes under it — a workflow reassigned or detached elsewhere
+   * while this page stays open — and `workflowFilter` itself has no way to
+   * notice on its own; it is a plain string, and a plain string cannot tell
+   * a real id from one that used to be real.
+   *
+   * NOT a reconciliation and NOT an error state — a pure fallback,
+   * recomputed fresh on every render from `workflowFilter` and the CURRENT
+   * `board.data`, never written back into `workflowFilter` itself (no
+   * effect, no `setWorkflowFilter` call here — this is a plain `const`, not
+   * a second piece of state to keep in sync with the first). Every
+   * consumer that narrows or displays by workflow reads THIS value from
+   * here down, never `workflowFilter` directly, except the `<select>`'s own
+   * `onChange`, which only ever writes a value drawn from the CURRENT
+   * `board.data.groups` and is therefore always valid at the moment it
+   * writes.
+   *
+   * Falling back beats the alternative it replaces: without this,
+   * `boardNarrowing` below already drops every card for a workflow id that
+   * matches no group (`keepGroup` is simply always false) — but
+   * `workflowChip` would still resolve its label as
+   * `group?.workflowName ?? workflowFilter`, and with no group to find that
+   * prints the RAW INTERNAL ID (`wf-bug`, not a name) as if it were a real,
+   * removable narrowing the person chose. That is worse than merely losing
+   * the selection: it asserts a workflow that is GONE as though it were
+   * still real and still picked, on a project that may hold tickets — the
+   * `boardNarrowing` fold's own `total` — the person can no longer see any
+   * trace of. Exactly the "page asserts a phantom as real" failure this
+   * whole port exists to refuse. `'all'` costs nothing to fall back to — it
+   * is the picker's own resting state, R3's own default — and it asserts
+   * nothing that isn't true.
+   */
+  const resolvedWorkflowFilter =
+    workflowFilter === 'all' || board.data === null
+      ? workflowFilter
+      : board.data.groups.some((group) => group.workflowId === workflowFilter)
+        ? workflowFilter
+        : 'all';
+
+  /**
    * ONE PASS produces the narrowed board, its shown count, and its total — per
    * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
    * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
@@ -312,13 +357,19 @@ function ProjectBoard() {
    * axis enumeration can ever name "a whole group was dropped", so the gate
    * would otherwise miss this mechanism entirely — see that function's own
    * docblock in `board-search-scope.ts`.
+   *
+   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` — see that
+   * value's own docblock immediately above (Ruling 20(b)): a picked
+   * workflow that has dropped out of `board.data` falls back to `'all'`
+   * here rather than narrowing every group to nothing on a stale id.
    */
   const boardNarrowing = useMemo(() => {
     if (board.data === null) return null;
     let total = 0;
     let shown = 0;
     const groups = board.data.groups.flatMap((group) => {
-      const keepGroup = workflowFilter === 'all' || group.workflowId === workflowFilter;
+      const keepGroup =
+        resolvedWorkflowFilter === 'all' || group.workflowId === resolvedWorkflowFilter;
       const columns = group.columns.map((column) => ({
         ...column,
         cards: column.cards.filter((card) => {
@@ -331,7 +382,7 @@ function ProjectBoard() {
       return keepGroup ? [{ ...group, columns }] : [];
     });
     return { view: { ...board.data, groups }, shown, total };
-  }, [board.data, boardFilter, workflowFilter, projectId]);
+  }, [board.data, boardFilter, resolvedWorkflowFilter, projectId]);
 
   /**
    * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
@@ -599,13 +650,24 @@ function ProjectBoard() {
    * name the one that is missing) — the same "resolve against the whole
    * set, not the narrowed remainder" rule `boardStateNames` already follows
    * for the `stateIds` chip, one section up.
+   *
+   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` (Ruling 20(b)):
+   * `workflowFilter === 'all'` alone would miss the fallback case, and
+   * `group?.workflowName ?? workflowFilter` would then print the raw,
+   * unresolvable id as this chip's own label — the exact phantom-narrowing
+   * failure `resolvedWorkflowFilter`'s own docblock names. With the
+   * fallback, `resolvedWorkflowFilter === 'all'` is true in that case, and
+   * this function returns `null` — no chip, nothing to name — before the
+   * lookup that could never have found anything runs at all.
    */
   const workflowChip = useMemo<BoardFilterChip | null>(() => {
-    if (workflowFilter === 'all') return null;
-    const group = (board.data?.groups ?? []).find((candidate) => candidate.workflowId === workflowFilter);
-    const label = `Workflow: ${group?.workflowName ?? workflowFilter}`;
+    if (resolvedWorkflowFilter === 'all') return null;
+    const group = (board.data?.groups ?? []).find(
+      (candidate) => candidate.workflowId === resolvedWorkflowFilter,
+    );
+    const label = `Workflow: ${group?.workflowName ?? resolvedWorkflowFilter}`;
     return { key: 'workflow', label, onRemove: () => setWorkflowFilter('all') };
-  }, [workflowFilter, board.data]);
+  }, [resolvedWorkflowFilter, board.data]);
 
   /**
    * THE STRIP'S FULL CHIP LIST — `activeFilterChips` plus `workflowChip`
@@ -910,12 +972,25 @@ function ProjectBoard() {
                 `ctlR`, no new token role; `ctlShadow` omitted, following
                 `.gn-button`'s own already-recorded open decision — see that
                 rule's docblock).
+
+                `value={resolvedWorkflowFilter}`, not raw `workflowFilter`
+                (Ruling 20(b)) — so the control itself VISIBLY falls back to
+                "All workflows" the moment its own picked workflow drops out
+                of `board.data`, rather than showing a `<select>` whose
+                `value` names an `<option>` that no longer exists (which a
+                browser resolves by silently selecting nothing, an even
+                quieter failure than the phantom chip that motivated the
+                fallback in the first place). `onChange` still WRITES raw
+                `workflowFilter`, never `resolvedWorkflowFilter` — every
+                value this control can write comes from `board.data.groups`
+                at the moment of selection, so it is always valid when
+                written; only the READ side ever needs to fall back.
               */}
               {board.data !== null && board.data.groups.length > 1 ? (
                 <select
                   className="gn-project__workflow-select"
                   aria-label="Workflow"
-                  value={workflowFilter}
+                  value={resolvedWorkflowFilter}
                   onChange={(event) => setWorkflowFilter(event.target.value)}
                 >
                   <option value="all">All workflows</option>

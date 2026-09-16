@@ -15,7 +15,20 @@ export {
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
 export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
-export { Board, EMPTY_BOARD_COPY, useBoard, type BoardProps } from './views/board.js';
+export {
+  Board,
+  EMPTY_BOARD_COPY,
+  // Re-exported alongside `EMPTY_BOARD_COPY` for the identical reason that
+  // constant's own docblock gives: a consumer's test should assert the SAME
+  // string this renders, not a re-typed copy of it, and a copy change should
+  // fail the assertion rather than pass a stale paraphrase. Added for
+  // board-prototype-port Task 8's fix round (Ruling 20(a)) — the first
+  // `apps/web` case to need it; `packages/app-core/test/views/board.test.tsx`
+  // already imports it directly, being in the same package.
+  EMPTY_COLUMN_COPY,
+  useBoard,
+  type BoardProps,
+} from './views/board.js';
 export {
   columnLabel,
   countRows,
