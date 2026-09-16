@@ -1,7 +1,20 @@
 import type { BoardCard, BoardColumn, FilterSpec, IdAxes } from '../view-types.js';
 import { excludedBy, narrowsTo } from './id-axes.js';
 
-/** The five id axes a `BoardCard` can answer — no collaborators (see the docblock above). */
+/**
+ * The axes a BOARD can answer, derived from `IdAxes`/`FilterSpec` with `Pick` — for BOTH halves
+ * since 2026-09-17 (exclude-mode spec §1) — so it cannot drift into a second vocabulary, the fork
+ * `matches-filter.ts`'s docblock forbids.
+ *
+ * The four that are absent are absent on purpose. A `BoardCard`
+ * (`view-types.ts:106-116`) carries no collaborators, no claimed dates and no
+ * custom fields, and `matchesFilter` fails CLOSED on each: `collaboratorIds`
+ * runs `some()` over `[]`, `dueBefore`/`dueAfter` get `null` from
+ * `claimedDueDay`, and a `fields` clause compares `null` to the wanted value.
+ * A synthesized state would therefore not narrow the board — it would EMPTY
+ * it, while the list showed matches. Making them unrepresentable turns that
+ * into a compile error instead of a wrong answer on screen.
+ */
 export type BoardIdAxes = Pick<
   IdAxes,
   'assigneeIds' | 'typeIds' | 'stateIds' | 'stateCategories' | 'projectIds'
