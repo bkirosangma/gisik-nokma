@@ -411,10 +411,10 @@ The audit is T1 and its result is not pre-judged here. What is already known:
 - `tintWarning`, `selected`, `surfaceSunken`/`surfaceRaised`,
   `fillPrimary`…`fillQuaternary` and the tray/field/chip shadow roles all landed
   during the `/workspaces` work and are reused.
-- The prototype's `tintDanger` (blocked column chip) and `tintPurple` (calendar
-  custom-field pill) **do** gain consumers in this change, unlike in the
-  `/workspaces` port where they were deliberately not added for want of one. They
-  are added here, each with its consumer named.
+- ~~The prototype's `tintDanger` (blocked column chip) and `tintPurple` (calendar
+  custom-field pill) **do** gain consumers in this change… They are added here,
+  each with its consumer named.~~ **WITHDRAWN 2026-09-16 on measurement — neither
+  tint is added.** See *Both tints were measured and neither can ship* below.
 
 **The contrast trap applies, and an earlier draft of this section got its
 mechanism backwards.** It said the new tints get `CONTRAST_PAIRS` rows measured
@@ -456,6 +456,52 @@ this is the one place T1 must diverge from the idiom it otherwise follows.
 
 The foreground measured against each composite is the text the prototype puts on
 it: `danger` on the blocked chip, `violet600`/`violet300` on the event pill.
+
+### Both tints were measured and NEITHER can ship (2026-09-16)
+
+The measurement above was performed rather than assumed, and it failed. Numbers
+below were produced twice independently — by the implementer and by the
+controller — using the same `over`/`contrastRatio` implementation
+`tokens.test.ts` already holds.
+
+**`tintDanger` + `danger` text, over the column tray, fails 4.5:1 everywhere:**
+
+| style/theme | composite | ratio |
+|---|---|---|
+| hig/minimal light | `#dec3b7` | **3.229** |
+| neo light | `#e6cdc4` | **3.562** |
+| hig/minimal dark | `#474265` | **3.331** |
+| neo dark | `#3a324a` | **4.291** |
+
+Not a palette accident: the prototype's own native red fails five of the six.
+The prototype's blocked chip is a tinted ground with same-hue text, and that
+combination is not readable at 13px in any theme this product ships.
+
+**The product does not need it.** `.gn-chip` carries tone as `.gn-chip__dot`
+(`ui.css:154`) — a non-text graphic, governed by WCAG 1.4.11's 3:1, not
+1.4.3's 4.5 — with `color: var(--gn-text)` for the label. `board.tsx:99`
+already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`.
+This chip is squarely inside *What already matches — do not churn it*.
+
+**`tintPurple` + `customMarker` fails too, and has no headroom to rescue.**
+`customMarker` on bare neo paper is **4.807** — it clears 4.5 by a hair before
+any wash is applied. An alpha sweep shows in-month needs alpha ≤ **0.047** to
+stay above 4.5 where the prototype uses 0.129, and the out-of-month ground (the
+day cell's `fillQuaternary` over `surface`) fails even at 0.071. So the
+precedented remedy — the same-hue alpha nudge `fillNavyHig3` and `fillNavyNeo3`
+used — cannot apply.
+
+The alternative considered and rejected: add a second, text-safe purple from the
+prototype's own ink (`#4C4A8F`/`#B7B4F4`, which does clear every composite). It
+would add a role to the product's colour vocabulary in order to replicate a
+decoration the product already achieves — `.gn-calendar__item--custom`
+(`ui.css:1222`) renders custom events in `customMarker` today, with a live
+`CONTRAST_PAIRS` row guaranteeing it against `surface`.
+
+**Consequence: T1 has no work left and is struck.** The blocked chip keeps
+`<Chip tone="blocked">`; the calendar's custom-field event keeps `customMarker`
+text rather than gaining a tinted pill. Both are recorded in *Stated
+divergences*. Nothing else in the port depends on either role.
 
 ## The board that has columns but no cards (R6)
 

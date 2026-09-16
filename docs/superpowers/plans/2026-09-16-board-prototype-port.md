@@ -48,8 +48,8 @@ The product does not reuse the prototype's role names. Translate with this table
 | `--onColor` | `var(--gn-text-inverted)` |
 | `--purple` | `var(--gn-custom-marker)` (already `violet600`/`violet300`) |
 | `--overlay` | `var(--gn-surface-overlay)` |
-| `--tintDanger` | `var(--gn-tint-danger)` — **new, Task 1** |
-| `--tintPurple` | `var(--gn-tint-purple)` — **new, Task 1** |
+| `--tintDanger` | **NOT PORTED** — fails 4.5:1 in all six style×theme combinations (3.229–4.291). The blocked chip keeps `<Chip tone="blocked">`, whose dot carries the tone at 3:1. See the spec's *Both tints were measured*. |
+| `--tintPurple` | **NOT PORTED** — `customMarker` on neo paper is 4.807, so no wash fits. The calendar's custom-field event keeps `customMarker` text. Same spec section. |
 
 ### Divergences already decided — do not "fix" these
 
@@ -79,7 +79,25 @@ The product does not reuse the prototype's role names. Translate with this table
 
 # Phase 1 — Tokens
 
-### Task 1: Declare `tintDanger` and `tintPurple`
+### Task 1: Declare `tintDanger` and `tintPurple` — ~~STRUCK 2026-09-16~~
+
+> **DO NOT IMPLEMENT THIS TASK.** It was dispatched, and its implementer correctly
+> refused to write a test it had measured as failing. Both roles are withdrawn:
+> `danger` on `tintDanger` fails 4.5:1 in all six style×theme combinations
+> (3.229–4.291), and `customMarker` on neo paper has 4.807 — no purple wash fits
+> above 4.5 at any alpha the out-of-month ground survives. The spec section *Both
+> tints were measured and NEITHER can ship* holds the tables and the rejected
+> alternatives. T6 keeps `<Chip tone="blocked">`; T10 keeps `customMarker` text.
+>
+> Four findings from that dispatch are worth keeping, all verified: the four hex
+> values in Step 4 were byte-accurate against the prototype; `Warm`=light and
+> `Navy`=dark holds; `13.430`/`13.431` were free (and the sweep's raw maximum is a
+> false hit — the file's own pointer prose matches the ID pattern); and Step 5's
+> "add these to every style's map" was a phantom instruction — `colorOf` falls
+> through `themes[theme]` for all three styles, so one entry per theme suffices.
+> Anyone adding a shared-value role later should read those four lines first.
+
+The original text follows, kept for the record.
 
 Only two roles are missing. `customMarker` (→ `violet600`/`violet300`) already exists with a `CONTRAST_PAIRS` row and is the calendar pill's purple text — do not add a purple text role.
 
@@ -721,10 +739,11 @@ git add -A && git commit -m "Build the Filters sheet, wired on the commit it app
 .gn-board__column-count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-board-card { padding: 0.875rem; border-radius: 0.75rem; cursor: grab; }
 .gn-board-card--pending { outline: 2px dashed var(--gn-warning); outline-offset: 2px; }
-.gn-board__blocked-chip {
-  background: var(--gn-tint-danger); color: var(--gn-danger);
-  font-size: 0.8125rem; line-height: 1.125rem;
-}
+/* NO blocked-chip rule. `board.tsx:99` already renders
+   `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip`
+   carries the tone as a coloured DOT with a readable label. The prototype's
+   tinted-ground-plus-same-hue-text version fails 4.5:1 in all six style×theme
+   combinations — see the spec's "Both tints were measured". Do not add one. */
 ```
 
 - [ ] **Step 2: Apply the classes**
@@ -907,7 +926,7 @@ Metrics: spec, List `:401-475`. Container `cardBg + cardShadow; radius cardR; ov
 
 **Ruling R4:** the prototype's legend-card treatment, the product's *working* per-field toggle. The checkboxes, field names and counts at `calendar-view.tsx:290-306` stay — "so a switched-off field still says how much it is hiding" — and `Due date` / `In transit` join as read-only rows.
 
-- [ ] **Step 1: Restyle per the Calendar metrics.** The custom-field pill uses `var(--gn-tint-purple)` + `var(--gn-custom-marker)` from Task 1.
+- [ ] **Step 1: Restyle per the Calendar metrics**, with ONE exception: the custom-field event keeps today's `.gn-calendar__item--custom` treatment — `color: var(--gn-custom-marker)` (`ui.css:1222`) — and does **not** become a tinted pill. `customMarker` on neo's paper measures 4.807, so no purple wash leaves it above 4.5; the spec's *Both tints were measured* has the sweep. The accent-ground pill for ordinary events is unaffected and is ported as specified.
 - [ ] **Step 2: Merge the legend.** Keep the `<fieldset aria-label="Claimed date fields">` and every checkbox.
 - [ ] **Step 3: Prove the toggle still toggles.** `packages/app-core/test/calendar/calendar-view.test.tsx` — a legend that became decorative would be a silent loss of function.
 - [ ] **Step 4:** Run, document (`test-cases/11-calendar-notifications.md`), commit.
