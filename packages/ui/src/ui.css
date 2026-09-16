@@ -586,6 +586,16 @@
    (0.55 — `:79-82` above): the spec gives this control its own number, kept
    rather than folded into the shared default. */
 .gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
+   no-op. `board.tsx` wraps the three mutually-exclusive move notices
+   (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
+   className="gn-board-card__notice">` so a single `ref` can drive one
+   scroll-into-view effect for all three, rather than one per kind.
+   `display: contents` keeps that wrapper invisible to `.gn-board-card__moves`'s
+   own `display: flex` layout — its children act as direct flex items exactly
+   as the three conditional siblings did before this wrapper existed, so
+   nothing about the visible layout of the arrows or the notice changes. */
+.gn-board-card__notice { display: contents; }
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 .gn-list__controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .gn-list__summary { color: var(--gn-text-muted); }

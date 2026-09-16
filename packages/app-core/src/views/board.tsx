@@ -842,6 +842,38 @@ function MoveArrows({
     };
   }, []);
 
+  /**
+   * Ruling 28 (board-prototype-port coordinator, 2026-09-16) — scrolls a
+   * notice that renders following a DROP into view, never following an
+   * arrow click. `.gn-board__rail` (`ui.css`) is `overflow-x: auto`, and the
+   * notice always renders where `MoveArrows` already renders it — under the
+   * SOURCE card, in its origin column (the coordinator's own ruling: a
+   * second rendering site nearer the drop point would be the exact
+   * "two products" fork this task exists to avoid). After a rightward drag
+   * that origin column can scroll out of view before the person reads why
+   * their card snapped back — functionally the "silent snap-back" the
+   * design spec forbids (`:270-271`) for SIGHTED users specifically:
+   * `role="alert"` already announces the notice to assistive technology
+   * regardless of scroll position, so this scroll COMPLETES the disclosure
+   * rather than being the whole of it.
+   *
+   * `lastAttemptSourceRef` is set at the very top of `attemptMove`, below,
+   * to whichever caller invoked it — the arrow `onClick` handlers pass
+   * nothing (defaulting to `'arrow'`); the registry wrapper the drop path
+   * registers passes `'drop'` explicitly. `noticeRef` is attached to the
+   * single wrapper `<div>` around all three (mutually exclusive) notice
+   * renders below, so one ref and one effect cover `refusal`,
+   * `serverRefusal` AND `transportError` alike — never a second, parallel
+   * scroll call per notice kind.
+   */
+  const noticeRef = useRef<HTMLDivElement | null>(null);
+  const lastAttemptSourceRef = useRef<'arrow' | 'drop'>('arrow');
+  useEffect(() => {
+    if (lastAttemptSourceRef.current !== 'drop') return;
+    if (refusal === null && serverRefusal === null && transportError === null) return;
+    noticeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [refusal, serverRefusal, transportError]);
+
   const previousTarget = arrowTarget(workflow, columnOrder, fromStateId, 'previous');
   const nextTarget = arrowTarget(workflow, columnOrder, fromStateId, 'next');
 
@@ -925,9 +957,23 @@ function MoveArrows({
    * live, enabled-arrow click cannot organically be that wrong target, and
    * why the branch is still real and still exercised (by the shared gate's
    * own tests, and by Task 14's drop).
+   *
+   * `source` (Ruling 28) carries NO decision-making weight whatsoever — it
+   * never touches `moveOutcome`, never changes which branch runs, never
+   * changes what is submitted. It exists purely to tell `noticeRef`'s own
+   * effect, above, whether to scroll: `'arrow'` (the default, every existing
+   * call site unchanged) never scrolls, since an arrow click cannot move the
+   * origin column out of view; `'drop'` (passed only by the registry
+   * wrapper `registerAttempt` below registers) can.
    */
-  const attemptMove = (toStateId: string): void => {
+  const attemptMove = (toStateId: string, source: 'arrow' | 'drop' = 'arrow'): void => {
+    // Set AFTER the latch check — a call the latch blocks produces no new
+    // refusal/serverRefusal/transportError, so the notice effect above
+    // never re-runs for it regardless; but recording its source anyway
+    // would still clobber the CORRECT source of an earlier, still in-flight
+    // attempt whose async result has not resolved yet.
     if (submitting) return;
+    lastAttemptSourceRef.current = source;
     setRefusal(null);
     setServerRefusal(null);
     setTransportError(null);
@@ -954,11 +1000,19 @@ function MoveArrows({
    * (unmount, or superseded by a fresher registration) is `registerAttempt`'s
    * own returned function — see its docblock in `BoardGroupWithMoves` for
    * why it is guarded rather than an unconditional delete.
+   *
+   * The registered function is a one-line wrapper, `(toStateId) =>
+   * attemptMove(toStateId, 'drop')`, NOT `attemptMove` passed bare (Ruling
+   * 28) — the ONLY difference from Task 14's original wiring, and it changes
+   * no dispatch: it exists solely so `attemptMove`'s own `lastAttemptSourceRef`
+   * write, above, can tell a drop-triggered notice from an arrow-triggered
+   * one, for the scroll-into-view effect. Every arrow `onClick` below still
+   * calls `attemptMove(target)` with no second argument — unchanged.
    */
-  useEffect(
-    () => registerAttempt(card.ticketId, attemptMove),
-    [registerAttempt, card.ticketId, attemptMove],
-  );
+  useEffect(() => {
+    const attemptFromDrop = (toStateId: string): void => attemptMove(toStateId, 'drop');
+    return registerAttempt(card.ticketId, attemptFromDrop);
+  }, [registerAttempt, card.ticketId, attemptMove]);
 
   /** Mirrors `TicketSheet.precheck` exactly — `cache` optional, absence answers `not-evaluated` rather than manufacturing `passed`. */
   const precheck = async (toStateId: string): Promise<PrecheckResult> => {
@@ -1075,30 +1129,42 @@ function MoveArrows({
       >
         ›
       </button>
-      {refusal !== null ? <MoveRefusalNotice workflow={workflow} available={refusal.available} /> : null}
-      {serverRefusal !== null && !dialogOpen ? (
-        <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
-        </p>
-      ) : null}
       {/*
-       * Ruling 27 — a distinct sentence and a distinct class from the block
-       * immediately above; never the words "Refused by the server".
-       *
-       * These two blocks are MUTUALLY EXCLUSIVE BY CONSTRUCTION, not by a
-       * guard here — every setter that sets one of `serverRefusal`/
-       * `transportError` also nulls the other (`attemptMove`, and both
-       * terminal branches of `submitDirect`/`submitFromDialog`), so they are
-       * never both non-null at once. Worth stating plainly: `getByRole(
-       * 'alert')` (singular) in this file's own tests would throw on
-       * ambiguity, not fail cleanly, if that invariant ever broke — a state
-       * bug that would read as a query bug.
+       * Ruling 28 (coordinator, 2026-09-16) — `ref={noticeRef}` on this
+       * wrapper, never on any one notice individually, is what lets ONE
+       * scroll-into-view effect (above `attemptMove`'s own definition)
+       * cover all three mutually-exclusive notices below with no per-kind
+       * duplication. `display: contents` (`ui.css`) keeps this `<div>`
+       * invisible to `.gn-board-card__moves`'s own flex layout — a plain
+       * wrapping box would otherwise become a new flex item where three
+       * conditional siblings used to be.
        */}
-      {transportError !== null && !dialogOpen ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
-          {transportError}
-        </p>
-      ) : null}
+      <div className="gn-board-card__notice" ref={noticeRef}>
+        {refusal !== null ? <MoveRefusalNotice workflow={workflow} available={refusal.available} /> : null}
+        {serverRefusal !== null && !dialogOpen ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          </p>
+        ) : null}
+        {/*
+         * Ruling 27 — a distinct sentence and a distinct class from the block
+         * immediately above; never the words "Refused by the server".
+         *
+         * These two blocks are MUTUALLY EXCLUSIVE BY CONSTRUCTION, not by a
+         * guard here — every setter that sets one of `serverRefusal`/
+         * `transportError` also nulls the other (`attemptMove`, and both
+         * terminal branches of `submitDirect`/`submitFromDialog`), so they are
+         * never both non-null at once. Worth stating plainly: `getByRole(
+         * 'alert')` (singular) in this file's own tests would throw on
+         * ambiguity, not fail cleanly, if that invariant ever broke — a state
+         * bug that would read as a query bug.
+         */}
+        {transportError !== null && !dialogOpen ? (
+          <p role="alert" className="gn-refusal gn-refusal--transport">
+            {transportError}
+          </p>
+        ) : null}
+      </div>
       <TransitionDialog
         open={dialogOpen}
         workflow={workflow}

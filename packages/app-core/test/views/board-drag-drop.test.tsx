@@ -1,10 +1,27 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { Board, DRAG_TICKET_FORMAT, type BoardMoveCapability } from '../../src/views/board.js';
 import type { BoardGroup, BoardView } from '../../src/view-types.js';
-import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
+
+/**
+ * jsdom (25.0.1, this repo's version) implements NO `scrollIntoView` at
+ * all — confirmed empirically before writing this: a bare jsdom `Element`
+ * throws `scrollIntoView is not a function` when called. Ruling 28's own
+ * effect (`board.tsx`) calls it for real on every drop that renders a
+ * notice, so every test in this file needs SOME stand-in or the refusal/
+ * dialog drop tests above would throw mid-render. A fresh `vi.fn()` per
+ * test, not one shared instance, so a call recorded in one test can never
+ * leak into the next — `13.515`, the one case that actually reads this
+ * spy's calls, would be a false positive against a stale count otherwise.
+ */
+let scrollIntoView: ReturnType<typeof vi.fn>;
+beforeEach(() => {
+  scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+});
 
 /**
  * board-prototype-port Task 14 — drag-and-drop. `board-moves-ui.test.tsx`
@@ -40,9 +57,9 @@ function errandBoard(cards?: ReturnType<typeof boardCardSeed>[]): BoardView {
   return { projectId: 'prj_1', groups: [errandGroup(cards)] };
 }
 
-function movesFor(workflow: WorkflowDef = WF_ERRAND) {
+function movesFor(workflow: WorkflowDef = WF_ERRAND, ingestScript?: IngestScript) {
   const onMoved = vi.fn();
-  const source = createFakeDataSource({ getWorkflowDef: async () => workflow });
+  const source = createFakeDataSource({ getWorkflowDef: async () => workflow }, ingestScript);
   const moves: BoardMoveCapability = {
     dataSource: source,
     workspaceId: WS,
@@ -294,16 +311,88 @@ describe('Board drag-and-drop — the affordance is exactly as honest as the cap
    * inert, because `onDropCard` itself is `null` on this path (`Board`'s
    * own `arrows={null}` / `onDropCard={null}` branch) and the column never
    * even gets an `onDrop` handler.
+   *
+   * AMENDED, Ruling 29 (coordinator, 2026-09-16). Originally asserted the
+   * literal `toHaveAttribute('draggable', 'false')` — a SPELLING of how the
+   * element fails to be draggable, not the CONTRACT the cursor rule
+   * actually depends on. `ui.css`'s `.gn-board__card-slot[draggable="true"]`
+   * selector is equally unmatched by an EXPLICIT `draggable="false"` and by
+   * the attribute being ABSENT entirely — both mean "not draggable" to a
+   * browser. The old assertion would have reddened a future refactor that
+   * switched to omitting the attribute rather than setting it `false`
+   * (e.g. spreading `{...(arrows !== null && { draggable: true })}`), even
+   * though the CSS contract would still hold — a phantom regression. Now
+   * asserts the contract directly: `element.matches('[draggable="true"]')`
+   * is the identical selector `ui.css` uses, read off the real DOM rather
+   * than one particular way of failing to satisfy it.
    */
   it('renders no draggable card at all, and a drop is inert, when the moves capability is not wired', async () => {
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
     await waitFor(() => expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument());
 
     const card = screen.getByTestId(`ticket-card-${boardCardSeed().ticketId}`);
-    expect(card).toHaveAttribute('draggable', 'false');
+    expect(card.matches('[draggable="true"]')).toBe(false);
 
     dropOnColumn('doing', fakeDataTransfer());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Board drag-and-drop — the notice scrolls into view following a drop, never following an arrow (Ruling 28)', () => {
+  /**
+   * 13.515 — Ruling 28 (coordinator, 2026-09-16). `.gn-board__rail` is
+   * `overflow-x: auto`, and the refusal notice renders where `MoveArrows`
+   * already renders it (under the SOURCE card, in its origin column — kept
+   * as the ONE rendering site, never a second one nearer the drop point,
+   * per the ruling's own instruction). A rightward drag can scroll that
+   * origin column out of view before a sighted person reads why their card
+   * snapped back. This asserts the fix directly: the wrapper `<div
+   * className="gn-board-card__notice">` around the notice receives a real
+   * `scrollIntoView({ block: 'nearest', inline: 'nearest' })` call once the
+   * refusal renders. `role="alert"` already covers assistive technology
+   * regardless of scroll position — this scroll completes the disclosure
+   * for sighted users, it is not the whole of it, and this case does not
+   * claim otherwise.
+   */
+  it('scrolls the notice into view when it renders following a drop', async () => {
+    const { moves } = movesFor();
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    const dataTransfer = fakeDataTransfer();
+    dragCard(boardCardSeed().ticketId, dataTransfer);
+    dropOnColumn('waiting', dataTransfer); // undeclared from `todo` — the refusal path
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+  });
+
+  /**
+   * 13.516 — THE PAIRED NEGATIVE: an arrow click that reaches a REAL notice
+   * must NOT scroll — "an arrow click never scrolls the origin out of view,
+   * so it needs nothing" (Ruling 28's own words). Proves the discrimination
+   * itself, not merely the drop side in isolation: `13.515` alone would
+   * still pass an implementation that scrolled on EVERY notice regardless
+   * of source. Reuses `board-moves-ui.test.tsx`'s own `13.504` fixture (a
+   * rejected `ingest`, producing a `transportError` notice) since an arrow
+   * click cannot reach the CLIENT-side `refusal` notice at all (Task 13's
+   * own, unrelated, constraint) — any real notice reached via an arrow
+   * proves the point equally well.
+   */
+  it('does not scroll when a notice renders following an arrow click', async () => {
+    const { moves } = movesFor(WF_ERRAND, async () => {
+      throw new Error('network unreachable');
+    });
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move to Doing' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });

@@ -5518,16 +5518,30 @@ whether the drop side actually reads what the drag side wrote.
   (same files)
 - **13.512** ✅ RULING 15'S OWN WORDS, proven rather than asserted in prose: "a grab cursor on an
   undraggable card is an affordance claim the product cannot honour." Mirrors `13.500`'s identical "no
-  arrows at all" proof for the same `moves` capability being absent: the card's `<li>` carries
-  `draggable="false"` when there is no `MoveArrows` instance behind it to register an `attemptMove`, and a
-  drop aimed at it anyway is still inert, since `onDropCard` itself is `null` on that path and the column
-  never receives an `onDrop` handler at all. — (same files). **The assertion is STRICTER than the CSS
-  contract it checks**: the selector `.gn-board__card-slot[draggable="true"]` is satisfied by
-  `draggable`'s ABSENCE too (an omitted attribute never matches `[draggable="true"]`, same as an explicit
-  `"false"`), while this case asserts the explicit string `'false'`. True of the current code
-  (`draggable={arrows !== null}` always renders one or the other), but a future refactor to a spread-based
-  omission (`{...(arrows !== null && { draggable: true })}`) would keep the CSS correct while reddening
-  this case for no real reason — worth knowing before treating a red `13.512` as proof of a CSS regression.
+  arrows at all" proof for the same `moves` capability being absent: the card's `<li>` is NOT matched by the
+  literal selector `ui.css` uses to grant the grab cursor when there is no `MoveArrows` instance behind it
+  to register an `attemptMove`, and a drop aimed at it anyway is still inert, since `onDropCard` itself is
+  `null` on that path and the column never receives an `onDrop` handler at all. — (same files)
+
+  **AMENDED, Ruling 29 (coordinator, 2026-09-16).** Originally asserted the literal
+  `toHaveAttribute('draggable', 'false')` — a SPELLING of how the element fails to be draggable, not the
+  CONTRACT the cursor rule depends on. `.gn-board__card-slot[draggable="true"]` is equally unmatched by an
+  EXPLICIT `draggable="false"` and by the attribute being ABSENT entirely — both read "not draggable" to a
+  browser. The old assertion would have reddened a future refactor that switched to omitting the attribute
+  instead of setting it `false` (e.g. `draggable={arrows !== null ? true : undefined}`), even though the
+  CSS contract would still hold — a phantom regression, found by the coordinator rather than caught by any
+  test. **Now asserts the contract directly**: `card.matches('[draggable="true"]')` is `false` — the
+  identical selector string `ui.css` uses, read off the real DOM via the standard `Element.matches` API,
+  rather than one particular way of failing to satisfy it.
+
+  **Mutation-witnessed both directions, not merely reasoned about.** (A) `draggable={arrows !== null}` →
+  `draggable={true}` (a REAL regression — always draggable, even with no `moves` capability): reddened
+  `13.512` and nothing else (`AssertionError: expected true to be false`). (B) `draggable={arrows !== null}`
+  → `draggable={arrows !== null ? true : undefined}` (the PHANTOM the old assertion would have flagged —
+  omits the attribute rather than setting it `false`, same CSS outcome): the AMENDED assertion stayed
+  green (`PASS (9) FAIL (0)`), confirmed by first restoring the OLD assertion text and re-running the same
+  mutation — which reddened, proving the fix actually removes the phantom rather than merely being asserted
+  to. Both mutations reverted; the 9-case file re-confirmed green afterward.
 - **13.514** ✅ THE REGISTRY MUST HOLD THE LATEST `attemptMove`, not one captured once. Every other case in
   this file drops exactly once; this drags and drops the SAME card TWICE in sequence (both times onto the
   declared, rules-free `doing` edge) and asserts BOTH submit — two `ingest` calls, `onMoved` called twice.
@@ -5536,6 +5550,55 @@ whether the drop side actually reads what the drag side wrote.
   closure frozen at first render — the shape of bug an over-eager `useCallback` memoization could introduce
   silently, either bricking the card after one move or bypassing the double-submit latch entirely, without
   touching any line this file's other six cases exercise. — (same files)
+
+## Ruling 28 — the notice scrolls into view following a drop, never following an arrow (coordinator, 2026-09-16)
+
+**The tension, named rather than resolved unilaterally.** `.gn-board__rail` (`packages/ui/src/ui.css:315`) is
+`overflow-x: auto`. The refusal/server-refusal/transport-error notices render exactly where `MoveArrows`
+already renders them for arrow clicks — under the SOURCE card, in its origin column — never a second site
+near the drop point, since a second site would be the "two products" fork this task exists to avoid. But
+after a rightward drag the origin column can scroll out of view before a sighted person reads why their
+card snapped back, which is functionally the "silent snap-back" the design spec forbids
+(`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:270-271`) — for sighted users
+specifically: `role="alert"` already announces the notice to assistive technology regardless of scroll
+position.
+
+**Fix: keep the single rendering site, scroll it into view on the drop path only.** `MoveArrows` gained a
+`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter
+(defaulting to `'arrow'` — every arrow `onClick` is unchanged); the registry wrapper `registerAttempt`
+registers now passes `'drop'` explicitly. The three notices are wrapped in one `<div
+className="gn-board-card__notice" ref={noticeRef}>` (`display: contents` in `ui.css`, so the wrapper is
+invisible to `.gn-board-card__moves`'s own flex layout — no visual change to the arrows or notice
+placement), and a `useEffect` watching `[refusal, serverRefusal, transportError]` calls
+`noticeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })` exactly when something is
+about to render AND the triggering attempt's source was `'drop'`.
+
+- **13.515** ✅ Drops a card onto an undeclared column (the refusal path, reusing `13.508`'s own setup) and
+  asserts `scrollIntoView` — a `vi.fn()` stub, since jsdom 25 implements no `scrollIntoView` at all
+  (confirmed empirically: a bare jsdom element throws `is not a function`) — was called exactly once, with
+  `{ block: 'nearest', inline: 'nearest' }`. — (`packages/app-core/src/views/board.tsx`,
+  `packages/app-core/test/views/board-drag-drop.test.tsx`)
+- **13.516** ✅ THE PAIRED NEGATIVE, proving the DISCRIMINATION itself rather than only the drop side: an
+  arrow click that reaches a real notice (`board-moves-ui.test.tsx`'s own `13.504` transport-failure
+  fixture — an arrow click can never reach the CLIENT-side `refusal` notice, Task 13's own unrelated
+  constraint, so any real notice reached via an arrow proves the point equally well) must NOT call
+  `scrollIntoView`. `13.515` alone would still pass an implementation that scrolled on every notice
+  regardless of source; this is what rules that out. — (same files)
+
+**Both mutation-witnessed.** (1) The `scrollIntoView` call itself removed: reddened exactly `13.515`
+(`AssertionError: expected "spy" to be called 1 times, but got 0 times`), `13.516` untouched (still nothing
+to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires
+regardless of source): reddened exactly `13.516` (`Number of calls: 1`, expected `0`), `13.515` untouched
+(still correctly called once on its own drop). Both reverted; the 9-case file re-confirmed green
+afterward.
+
+## Ruling 29 — `13.512` asserts the contract, not one spelling of how it fails to match (coordinator, 2026-09-16)
+
+See `13.512`'s own AMENDED bullet above for the fix and its mutation witness (both directions: the amended
+assertion still catches a real regression, `draggable={true}` unconditionally, AND stays green under the
+phantom `draggable={arrows !== null ? true : undefined}` mutation the OLD assertion would have wrongly
+reddened on — verified by literally restoring the old assertion text against that same phantom mutation and
+watching it fail, not merely reasoned about).
 
 **Every outcome-dispatch case (`13.507`–`13.509`) and the `dragover` mechanism case (`13.510`) is
 mutation-witnessed, not merely passing once.** Two mutations, each applied via a targeted `Edit`, run
