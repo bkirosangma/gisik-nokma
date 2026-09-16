@@ -398,3 +398,21 @@ describe('13.513 — the drag cursor is keyed off the real draggable attribute, 
     expect(rule('.gn-board__card-slot[draggable="true"]')).toMatch(/cursor:\s*grab/);
   });
 });
+
+/**
+ * Case 13.523 — the whole card opens the ticket (owner request, 2026-09-17;
+ * `board-card-click.test.tsx` proves the behaviour). The read-only board —
+ * no `moves`, so no `draggable="true"` and no grab cursor — still needs the
+ * card body to LOOK clickable now that it is. The bare `.gn-board__card-slot`
+ * rule carries `cursor: pointer`; the `[draggable="true"]` rule above beats
+ * it on specificity ((0,2,0) over (0,1,0)) so a draggable card keeps `grab`.
+ * Same CSS-binding shape as `13.513`; `rule()`'s regex requires `\s*{`
+ * straight after the selector text, so the two rules cannot be confused for
+ * one another.
+ */
+describe('13.523 — a card that can be opened but not dragged still shows a pointer', () => {
+  it('.gn-board__card-slot sets cursor: pointer, and the draggable rule keeps grab', () => {
+    expect(rule('.gn-board__card-slot')).toMatch(/cursor:\s*pointer/);
+    expect(rule('.gn-board__card-slot[draggable="true"]')).toMatch(/cursor:\s*grab/);
+  });
+});

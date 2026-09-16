@@ -411,42 +411,13 @@ function BoardGroupSection({
             </header>
             <ul className="gn-board__cards">
               {column.cards.map((card) => (
-                <li
+                <BoardCardSlot
                   key={card.ticketId}
-                  className="gn-board__card-slot"
-                  data-testid={`ticket-card-${card.ticketId}`}
-                  /*
-                   * Board-prototype-port Task 14. `draggable` is gated on
-                   * the SAME `arrows !== null` check the very next prop
-                   * already makes — deliberately not a second, parallel
-                   * boolean: a card whose write path is not wired (no
-                   * `moves` capability, or this group's workflow still
-                   * loading) has no `MoveArrows` instance to register an
-                   * `attemptMove` for, so a drop starting from it could
-                   * only ever land in the registry's inert no-op — and a
-                   * grab cursor promising otherwise is exactly the
-                   * affordance-that-lies shape Ruling 15 already named.
-                   * `.gn-board__card-slot[draggable="true"]` in `ui.css` is
-                   * the ONLY place `cursor: grab` is declared, keyed off
-                   * this literal attribute rather than a second class.
-                   */
-                  draggable={arrows !== null}
-                  onDragStart={
-                    arrows === null
-                      ? undefined
-                      : (event) => {
-                          event.dataTransfer.setData(DRAG_TICKET_FORMAT, card.ticketId);
-                          event.dataTransfer.effectAllowed = 'move';
-                        }
-                  }
-                >
-                  <BoardCardView
-                    card={card}
-                    stateName={column.name}
-                    onOpen={() => onOpenTicket(card.ticketId)}
-                    arrows={arrows === null ? null : arrows(card, column.stateId)}
-                  />
-                </li>
+                  card={card}
+                  stateName={column.name}
+                  onOpen={() => onOpenTicket(card.ticketId)}
+                  arrows={arrows === null ? null : arrows(card, column.stateId)}
+                />
               ))}
             </ul>
             {/*
@@ -611,6 +582,104 @@ function BoardGroupWithMoves({
       }
       onDropCard={handleDrop}
     />
+  );
+}
+
+/**
+ * Anything inside the card that is a control of its own, or belongs to the
+ * `TransitionDialog` `MoveArrows` mounts INSIDE the card (`Dialog` in
+ * `packages/ui` does not portal). A click landing on any of these is that
+ * thing's click, never the card's — see `BoardCardSlot`.
+ */
+const CARD_CLICK_BAIL_SELECTOR =
+  'button, a, input, select, textarea, label, [role="dialog"], .gn-dialog__scrim';
+
+/**
+ * The `<li>` around one card — one component per card (as `MoveArrows`
+ * already is) rather than JSX inlined in `BoardGroupSection`'s `.map()`,
+ * because it needs a ref of its own.
+ *
+ * ## The whole card opens the ticket (owner request, 2026-09-17)
+ *
+ * The title stays a real `<button>` with `onOpen` — it is the keyboard path
+ * and the accessible name, and `Card` (`packages/ui`) is documented "never
+ * itself interactive", so the listener lives HERE, on the slot, not on the
+ * card container and not in `packages/ui`. No `role="button"`/`tabindex` on
+ * this `<li>`: it already contains buttons, and nesting interactive roles is
+ * the one thing that would make the accessible tree worse than before.
+ *
+ * `onClick` bails in two cases, and both are the point:
+ *
+ * 1. **The click belongs to something else.** `CARD_CLICK_BAIL_SELECTOR`
+ *    covers the title button itself (whose own `onClick` already opened the
+ *    ticket — without this bail one click would open it TWICE), the
+ *    provenance toggle, the `‹ ›` arrows, and the `TransitionDialog`
+ *    subtree. The dialog matters most: its scrim closes the dialog on click
+ *    WITHOUT stopping propagation (`dialog.tsx`), so absent this bail,
+ *    closing the dialog by clicking outside it would open the ticket sheet
+ *    in the same gesture. `13.522` reaches that scrim through a real arrow
+ *    click and proves it.
+ *
+ * 2. **The click is the tail of a drag.** Every browser this product
+ *    targets withholds `click` after a completed native drag, so in the
+ *    field `draggedRef` is belt-and-braces; in jsdom, which drags nothing,
+ *    it is the only observable proof (`13.521`). Set on `dragstart`, cleared
+ *    on the NEXT `mousedown` — not on `dragend`, and not on a timer:
+ *    `dragend` precedes any stray `click` the same gesture could produce,
+ *    so clearing there would defeat the guard in exactly the case it exists
+ *    for, and a timer would put the test on the clock. A fresh press is the
+ *    unambiguous start of a new gesture.
+ *
+ * `draggable`/`onDragStart` are unchanged from board-prototype-port Task 14
+ * — gated on the SAME `arrows !== null` check, deliberately not a second,
+ * parallel boolean: a card whose write path is not wired (no `moves`
+ * capability, or this group's workflow still loading) has no `MoveArrows`
+ * instance to register an `attemptMove` for, so a drop starting from it
+ * could only ever land in the registry's inert no-op — and a grab cursor
+ * promising otherwise is exactly the affordance-that-lies shape Ruling 15
+ * already named. `.gn-board__card-slot[draggable="true"]` in `ui.css` is the
+ * ONLY place `cursor: grab` is declared, keyed off this literal attribute
+ * rather than a second class; the bare `.gn-board__card-slot` rule beside it
+ * carries `cursor: pointer` for the read-only path, where a card can be
+ * opened but not dragged.
+ */
+function BoardCardSlot({
+  card,
+  stateName,
+  onOpen,
+  arrows,
+}: {
+  card: BoardCardData;
+  stateName: string;
+  onOpen: () => void;
+  arrows: ReactNode;
+}) {
+  const draggedRef = useRef(false);
+  return (
+    <li
+      className="gn-board__card-slot"
+      data-testid={`ticket-card-${card.ticketId}`}
+      draggable={arrows !== null}
+      onDragStart={
+        arrows === null
+          ? undefined
+          : (event) => {
+              draggedRef.current = true;
+              event.dataTransfer.setData(DRAG_TICKET_FORMAT, card.ticketId);
+              event.dataTransfer.effectAllowed = 'move';
+            }
+      }
+      onMouseDown={() => {
+        draggedRef.current = false;
+      }}
+      onClick={(event) => {
+        if (draggedRef.current) return;
+        if ((event.target as Element).closest(CARD_CLICK_BAIL_SELECTOR) !== null) return;
+        onOpen();
+      }}
+    >
+      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} />
+    </li>
   );
 }
 

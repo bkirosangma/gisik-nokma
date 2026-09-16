@@ -748,7 +748,7 @@ git add -A && git commit -m "Build the Filters sheet, wired on the commit it app
 
 - [ ] **Step 2: Apply the classes**
 
-The rail wraps the columns; `.gn-board-card` is already on the `<Card>` at `board.tsx:650`.
+The rail wraps the columns; `.gn-board-card` is already on the `<Card>` at `board.tsx:719`.
 
 - [ ] **Step 3: Check the provenance class against the viewport specs**
 

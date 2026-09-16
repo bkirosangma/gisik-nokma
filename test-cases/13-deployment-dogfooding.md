@@ -4427,7 +4427,7 @@ its own flex column layout), the count (`.gn-board__count`'s body updated to the
 selector kept for `board.test.tsx:142`), and the card (`.gn-board-card`, 14px padding via
 `.gn-card.gn-board-card`'s source-order win over the untouched `.gn-card`, never a specificity win —
 both are `(0,1,0)`). One real behaviour change, not merely restyling: `.gn-board-card--pending`'s
-dashed in-transit outline had a rule but no wiring — `board.tsx:650` never added the modifier class —
+dashed in-transit outline had a rule but no wiring — `board.tsx:719` never added the modifier class —
 so it is wired onto `card.pending`, the same flag the existing "claim in transit" chip already reads.
 **The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:409`
 already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip--blocked
@@ -5015,7 +5015,7 @@ inline `paddingLeft` on the inner `.gn-list__title-cell` span, since `depth` is 
 uneditable one, closing the "not pixel-exact" caveat `13.475` recorded.
 
 No new token role: `--gn-text-muted` (label2) and `--gn-surface-sunken` (trayBg) on the header cell are
-the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1934-1937`); `--gn-fill-quaternary` (fill4) on
+the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1939-1942`); `--gn-fill-quaternary` (fill4) on
 the zebra row is already declared and consumed elsewhere. The two new length-only rules (`min-width:820px`
 on `.gn-list__table`, `min-width:260px` on `.gn-list__table-cell--title`) are plain literals — this file
 has no length-token axis (`radiusVariableName` names only `card`/`control`), matching how every other
@@ -5746,3 +5746,68 @@ and the code has five** (`13-deployment-dogfooding.md:5424`, above). Corrected t
 `node scripts/check-case-ids.mjs` re-run after minting `13.517`: only `13.387`/`13.413` remain as
 duplicates (pre-existing, unrelated to this fix wave, carried since before Task 3 — see the "Case-id fix"
 entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.
+
+## The whole card opens the ticket (owner request, 2026-09-17)
+
+Before this, only the title button on a board card opened the ticket sheet; the owner asked for a click
+anywhere on `.gn-board-card` to open it, "but take care that dragging the ticket does not open it". The
+listener lives on the `<li class="gn-board__card-slot">` wrapper — extracted into `BoardCardSlot`
+(`board.tsx`) so it can hold a ref — never on `Card` (`packages/ui`, documented "never itself
+interactive") and never as a `role="button"` (the card already contains buttons). The title stays a real
+`<button>`: the keyboard path and the accessible name are unchanged. Two bail-outs, both proven by
+deletion below: a click whose target sits inside a control or inside the `TransitionDialog` subtree
+(`CARD_CLICK_BAIL_SELECTOR`) is that thing's click, and a click that follows `dragstart` is the tail of a
+drag. The flag clears on the NEXT `mousedown`, not on `dragend` (which precedes any stray click the same
+gesture could produce) and not on a timer. Suite: `packages/app-core/test/views/board-card-click.test.tsx`
+(6 cases), `packages/ui/test/components.test.tsx` (`13.523`). All under Node v22.23.2.
+
+- **13.518** ✅ A click on the card body itself (`.gn-board-card`, no `moves` wired — the read-only path)
+  calls `onOpenTicket` exactly once with that ticket's id.
+- **13.519** ✅ A click on the title button still opens the ticket EXACTLY ONCE. The button's own `onClick`
+  opens it and the click then bubbles into the slot's listener; the `closest()` bail is what stops a
+  second open. Mutation M2 (bail deleted) → this case fails with 2 calls.
+- **13.520a** ✅ A click on the provenance toggle unfolds it (`aria-expanded="true"`) and does NOT open the
+  ticket. M2 → fails.
+- **13.520b** ✅ A click on a live `›` arrow submits the move (`onMoved` called) and does NOT open the
+  ticket. M2 → fails.
+- **13.521** ✅ THE GUARD THE REQUEST IS ABOUT. `mousedown` → `dragstart` (real `DataTransfer` stand-in,
+  the same one `board-drag-drop.test.tsx` documents) → `click`: swallowed, zero calls. Then a fresh
+  `mousedown` → `click`: opens once — the positive control for the first half. Mutation M1 (the
+  `draggedRef` check deleted) → first half fails; mutation M3 (the `mousedown` reset deleted) → second
+  half fails with `expected 1, got 0`. Native drag-and-drop withholds `click` after a completed drag in
+  every browser this product targets, so in the field this is belt-and-braces; in jsdom, which drags
+  nothing, it is the only observable proof.
+- **13.522** ✅ THE HAZARD THAT ONLY EXISTS BECAUSE THE DIALOG RENDERS INSIDE THE CARD: `MoveArrows`
+  mounts `TransitionDialog` under the card and `Dialog` (`packages/ui`) does not portal; its scrim closes
+  the dialog on click WITHOUT stopping propagation. Reached through a REAL arrow click on a workflow
+  whose `todo → doing` edge requires a comment (`WF_GATED`), then a click on `dialog-scrim`: the dialog
+  closes and `onOpenTicket` is NOT called. M2 → fails (the sheet would open as the dialog closed).
+- **13.523** ✅ CSS binding, `packages/ui/test/components.test.tsx`: the bare `.gn-board__card-slot` rule
+  sets `cursor: pointer` (a card that can be opened but not dragged — the read-only path — looks
+  clickable) AND `.gn-board__card-slot[draggable="true"]` still sets `cursor: grab` (`13.513`'s own
+  assertion, repeated here because the new bare rule sits immediately above it and loses on
+  specificity by design). Watched fail RED with `no rule for .gn-board__card-slot` before the rule
+  existed.
+
+Mutation results, `board-card-click.test.tsx`, each run against a scratchpad backup and restored
+byte-identical (`cmp`): M1 kills `13.521` only; M2 kills `13.519`, `13.520a`, `13.520b`, `13.522` and
+nothing else; M3 kills `13.521` only. `13.518` survives all three, as it should — it is the positive
+case none of the guards touch. Full `app-core` suite 1281/1281, `ui` 311/311, `apps/web`
+`board-narrowing` + `filters-sheet` 34/34, `app-core` typecheck clean, Node v22.23.2.
+
+Known limit, named rather than hidden: selecting text inside a card body by mouse-drag on the READ-ONLY
+board (where the slot is not `draggable`, so no `dragstart` fires) ends in a `click` and opens the ticket.
+The title is a button and the meta chips are short, so there is little to select; no guard was added for
+it because jsdom has no honest way to fail such a case.
+
+Citations displaced by this change set, re-pointed against the current tip (Ruling 30's own method —
+opened the file, never added an offset): `BoardCardSlot` and its docblock land ABOVE `BoardCardView`, so
+`<Card className={card.pending …}>` moved `board.tsx:650` → `:719` (`Features.md`, this file's Task 6
+narrative, the port plan `:751`); the bare `.gn-board__card-slot` rule and its comment add five lines to
+`ui.css`, so `.gn-timeline__weeks` moved `ui.css:1934-1937` → `:1939-1942` (this file, the Ruling 21
+narrative). Every other `ui.css` citation past `:514` was checked against HEAD and found ALREADY stale
+before this change (e.g. `ui.css:1321` cited as "sets `font-size: 1rem`" points at `cursor: pointer;`);
+left untouched — not this change's drift, and a blind `+5` would have moved wrong numbers to different
+wrong numbers. `scripts/check-case-citations.mjs` reports `13.401`/`13.476`/`13.477`/`15.26` uncited —
+all four already uncited at HEAD (`git grep` on the tests at HEAD finds none), pre-existing on this
+branch and not touched here; the six new cases are each cited by id in their test file.
