@@ -1222,13 +1222,29 @@ function ProjectBoard() {
               const narrowing = view === 'board' ? boardNarrowing : listNarrowing;
               const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
               const chips = view === 'board' ? narrowingChips : activeFilterChips;
-              // Controller ruling, Task 10 fix round 1: the scope note names
-              // the tab it is actually on, rather than always saying "the
-              // board" for List/Calendar/Timeline too. Matches `view`'s own
-              // union exactly, so a fifth tab added later is a compile error
-              // here rather than a silently-wrong noun.
-              const tabNoun =
-                view === 'board' ? 'board' : view === 'list' ? 'list' : view === 'calendar' ? 'calendar' : 'timeline';
+              // Controller ruling, Task 10 fix round 1 (amended fix round 2):
+              // the scope note names the tab it is actually on, rather than
+              // always saying "the board" for List/Calendar/Timeline too. A
+              // `Record` over `typeof view` — not a ternary chain — because a
+              // ternary falls through to its final `else` for ANY unmatched
+              // value, so a fifth `view` member added later would compile
+              // unchanged and silently inherit `'timeline'`'s noun, the exact
+              // "names the wrong place" defect this note exists to prevent.
+              // `view`'s own type is an inline union (`useState<'board' |
+              // 'list' | 'calendar' | 'timeline'>` above), not a named alias,
+              // so `typeof view` is what keys this `Record` to it — a
+              // `Record<K, V>` requires EVERY member of `K` as a property, so
+              // a tab added to that union without a matching entry here fails
+              // `typecheck`, not silently at runtime. Proven, not asserted:
+              // fix round 2 deleted the `timeline` entry and watched `tsc`
+              // reject it.
+              const TAB_NOUN: Record<typeof view, string> = {
+                board: 'board',
+                list: 'list',
+                calendar: 'calendar',
+                timeline: 'timeline',
+              };
+              const tabNoun = TAB_NOUN[view];
               if (
                 narrowing === null ||
                 !shouldRenderNarrowingStrip({
