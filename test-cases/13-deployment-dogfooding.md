@@ -4323,7 +4323,7 @@ reverted with a targeted edit (not `git checkout`), confirmed clean by re-runnin
   (every fixture card shares the one state) — the narrowing strip's three-term gate opens on a chip
   existing, independent of whether it removed anything. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.450** ✅ Pressing a Category chip narrows the board to zero cards and shows the
-  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:42-46`) holds at the
+  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:204-208`) holds at the
   limit. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.451** ✅ THE DEFERRED TASK 4 TEST. Picking a Collaborator through the real
   `openFiltersAndPickCollaborator` helper does not narrow the board (the count stays `M of M`) but
@@ -4427,9 +4427,9 @@ its own flex column layout), the count (`.gn-board__count`'s body updated to the
 selector kept for `board.test.tsx:142`), and the card (`.gn-board-card`, 14px padding via
 `.gn-card.gn-board-card`'s source-order win over the untouched `.gn-card`, never a specificity win —
 both are `(0,1,0)`). One real behaviour change, not merely restyling: `.gn-board-card--pending`'s
-dashed in-transit outline had a rule but no wiring — `board.tsx:150` never added the modifier class —
+dashed in-transit outline had a rule but no wiring — `board.tsx:639` never added the modifier class —
 so it is wired onto `card.pending`, the same flag the existing "claim in transit" chip already reads.
-**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:99`
+**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:398`
 already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip--blocked
 .gn-chip__dot` (`ui.css:155`) already carries the tone as a coloured dot against a readable
 `--gn-text` label — the tinted-ground-plus-same-hue-text version the prototype and an earlier draft of
@@ -4488,7 +4488,8 @@ not silently.
 
 **Cases `13.465`–`13.466` minted here**, continuing directly from `13.464` (verified against the real
 case list via `node scripts/check-case-ids.mjs`, not the file's own "next free" prose, per this task's
-own brief). `board.tsx:70`'s whole-board sentence (`EMPTY_BOARD_COPY`) was gated on
+own brief). `board.tsx:70` (pre-R6; that line is unrelated comment prose today, the gate it names having
+been superseded by this very ruling) — its whole-board sentence (`EMPTY_BOARD_COPY`) was gated on
 `board.groups.length === 0` — a project with a workflow attached and zero tickets in it took
 `groups.length === 1`, skipped the sentence, and drew a silent rail of empty column trays, one layer
 under the exact "loaded, refused nothing, said nothing" failure that branch was first written to catch.
@@ -4569,7 +4570,7 @@ recorded here rather than only in the component's own comment.
 **Case `13.467` minted here**, continuing directly from `13.466`. A cross-task interaction neither Task 4
 (client-side board narrowing) nor this task's own R6 caught on its own: `page.tsx:1063` hands `<Board>`
 `boardNarrowing.view`, the POST-FILTER groups, never `board.data` directly (Ruling 1, Task 4). Task 4's
-narrowing drops CARDS only — never a column or a group (`board.tsx:42-46`'s own invariant) — so pre-R6
+narrowing drops CARDS only — never a column or a group (`board.tsx:204-208`'s own invariant) — so pre-R6
 this was harmless: the old gate read `board.groups.length`, which a card filter never touches, so the
 narrowed-to-zero state could never reach it. R6's `totalCards` fold reads exactly the narrowed cards,
 so without a fix a search matching nothing rendered `EMPTY_BOARD_COPY` — "No tickets here yet — create
@@ -5014,7 +5015,7 @@ inline `paddingLeft` on the inner `.gn-list__title-cell` span, since `depth` is 
 uneditable one, closing the "not pixel-exact" caveat `13.475` recorded.
 
 No new token role: `--gn-text-muted` (label2) and `--gn-surface-sunken` (trayBg) on the header cell are
-the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1638-1641`); `--gn-fill-quaternary` (fill4) on
+the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1934-1937`); `--gn-fill-quaternary` (fill4) on
 the zebra row is already declared and consumed elsewhere. The two new length-only rules (`min-width:820px`
 on `.gn-list__table`, `min-width:260px` on `.gn-list__table-cell--title`) are plain literals — this file
 has no length-token axis (`radiusVariableName` names only `card`/`control`), matching how every other
@@ -5092,7 +5093,8 @@ duplicate list unchanged at `13.387`/`13.413` only.
 **Cases `13.486`–`13.487` minted here**, continuing directly from `13.485` (verified against the real
 case list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Task 12's own
 concern 2: `TransitionDialog` skips an already-claimed `require-field` input
-(`transition-dialog.tsx:128`/`:202`, reading `ticketFields`), but `moveOutcome` never received
+(`transition-dialog.tsx:158`/`:232`, calling the shared `fieldAlreadyClaimed` predicate —
+extracted since this ruling to `field-claims.ts:55`, see below), but `moveOutcome` never received
 `ticketFields` and always answered `needs-dialog` for any `require-field` rule — the exact fork Task 12's
 own docblock warned `transitionOptions` against, arriving from the other side: two places deriving "does
 this field still need asking" and free to disagree.
@@ -5303,7 +5305,7 @@ Task 14's drag-and-drop reuses for real, since a drop target is not filtered thi
   fire-and-forget (`onSubmit={(submission) => void submitFromDialog(submission)}`), so before this fix a
   rejected `ingest` from inside the dialog became an unhandled promise rejection — the dialog stayed open
   with nothing on screen saying it failed. Fixed with a `try/catch` around `submitFromDialog`'s body,
-  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:260-262`) rather
+  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:286-289`) rather
   than inventing a new one. Mutation-witnessed: the `try/catch` reverted to the pre-fix shape, `pnpm exec
   vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this case alone (`PASS (7) FAIL (1)`,
   timeout waiting for the dialog's own alert), the other seven cases in the file stayed green, then
@@ -5421,7 +5423,7 @@ instruction.**
   shape confirmed this directly: `PASS (29) FAIL (0)`. The test was too weak to catch the defect it was
   never written to look for — it checked that SOME message with the right substring appeared, never that
   the message avoided claiming server authority it did not have.
-- **AFTER:** the alert is captured once and checked four ways — `toHaveTextContent('We could not reach the
+- **AFTER:** the alert is captured once and checked five ways — `toHaveTextContent('We could not reach the
   server for this move')`, `toHaveTextContent('network unreachable')`, `not.toHaveTextContent('Refused by
   the server')`, `toHaveClass('gn-refusal--transport')`, `not.toHaveClass('gn-refusal--server')` — plus the
   original "arrows stay usable" assertion, unchanged. `13.505` (the `submitFromDialog` sibling) got the
@@ -5668,3 +5670,79 @@ run typecheck` and `pnpm turbo run test` both green across all 17 packages. `nod
 re-run after minting `13.507`–`13.513`: sum rose from 2047 to 2054 (+7) and union rose from 2044 to 2051
 (+7) — the same delta, so the pre-existing `13.387`/`13.413` duplicates are unchanged and no new duplicate
 was introduced.
+
+## Final whole-branch review, fix wave (2026-09-16) — Findings 1–5
+
+The whole-branch review ("I would merge this, with Findings 1 and 2 fixed first") returned five
+findings. **Case `13.517` minted here** for Finding 1, the one that changes tested behavior; Findings
+2, 4 and 5 are prose/citation corrections with no new case; Finding 3 changes an exported string
+constant (covered by existing cases that read the constant rather than a hand-typed copy of it, so no
+new case is needed there either — see `board.test.tsx`'s own docblock on why `EMPTY_COLUMN_COPY` is
+exported in the first place).
+
+- **13.517** ✅ **Finding 1 — the Filters sheet's five non-`text` axes were undisclosed on the three
+  non-board tabs.** The mirror note (Ruling 10, `13.439`/`13.444`) was gated on
+  `activeFilterChips.some((chip) => chip.key === 'text')` — accurate when `text` was the only axis with
+  a control, silently inert on `assigneeIds`/`typeIds`/`stateIds`/`stateCategories`/`projectIds` once
+  Task 5's Filters sheet reached them onto the same page-level `filter` from every tab. Open Filters on
+  List, tick an assignee, press Done: the list did not change, and nothing on screen said so — the same
+  one-axis-enumeration defect `buildBoardFilterChips` was already rewritten to stop repeating for the
+  strip eight lines above, recurring in the note eight lines below it.
+  **Fixed by widening the gate to `activeFilterChips.length > 0 || boardUnappliedAxes.length > 0`** —
+  the SAME two terms the strip's own three-term gate reads (never its third, `shown !== total`, which is
+  a fact about the BOARD's own render and meaningless on a tab the board never touches).
+  `activeFilterChips` already enumerates all six `BoardFilterSpec` axes; `boardUnappliedAxes` covers the
+  three the board itself cannot evaluate either — between them every axis `filter` can carry is covered.
+  **The sentence itself was also generalised, and deliberately does not say "the board only":** a
+  `filter` set to only a `boardUnappliedAxes` entry (`collaboratorIds`/`dueBefore`/`dueAfter`/`fields`)
+  narrows nothing on the board either, so claiming "the board only" would overclaim exactly there — the
+  new copy, "Filters set here are not applied on this tab.", names only what the page can know for
+  certain under every combination that trips the gate.
+  Drives the REAL path — the Filters sheet's own Assignee checkbox, not a `setFilter` shortcut — on the
+  List tab, and asserts the List tab's own render is untouched (the axis has no control anywhere else,
+  which is precisely why the note is the only disclosure available). **Mutation-witnessed**: reverting
+  the gate to the old `chip.key === 'text'` check reddened `13.517` alone — `13.439`/`13.444` (both
+  driven by a real search TERM, which still trips the old gate) stayed green — confirming the new case
+  discriminates rather than merely existing. Reverted with a targeted `Edit`, confirmed byte-identical by
+  SHA-256 checksum (not `git diff` — this repo has a recorded case of `git diff` reporting identical for
+  differing files). — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+
+**Finding 2 — 34 stale line-number citations swept**, all introduced by this branch's own edits shifting
+content the citations pointed at. Six in shipped source (`page.tsx:342`, `board-search-scope.ts:59`,
+`ui.css:336`/`:718`/`:1906`, `board.tsx:1043`), the rest across `Features.md`, this file, the spec and
+the plan, plus two more found in `board-narrowing.test.tsx` itself by an exhaustive repo grep that the
+review's own summary count had missed. Every citation whose target still exists in the file (just moved)
+was re-pointed to its real current line, verified by opening the file there rather than computing an
+offset. Five citations of `board.tsx:70` name a gate (`board.groups.length === 0` as the sole
+`EMPTY_BOARD_COPY` condition) that Ruling 19/R6 SUPERSEDED rather than merely moved — re-pointing those
+to a "current" line would have manufactured a second falsehood that reads as freshly checked, so they
+are marked `(pre-R6)` instead, left without a specific present-day line. One citation
+(`transition-dialog.tsx:128`) named an inline predicate later extracted to `field-claims.ts:55`
+(Ruling 25) — a cross-file re-point, not a number bump. Full table in
+`.superpowers/sdd/2026-09-16-board-prototype-port/final-fix-report.md`.
+
+**Finding 3 — `EMPTY_COLUMN_COPY`'s docblock corrected, and "yet" dropped.** The docblock justified the
+unconditional per-column copy on "the narrowing pass... runs above this component... with data this
+component was never given" — no longer true since Ruling 19 gave `Board` an `isNarrowed` signal; `Board`
+simply does not thread it down into `BoardGroupSection`. Docblock now says exactly that: the shell can
+disclose narrowing (it does, via the strip), `Board` itself now could too, but the wiring the rest of the
+way stops one level short — a deferred follow-up, not a structural impossibility. **"Yet" dropped**: `No
+tickets in this column yet.` reads, under an active filter, as asserting none were ever created — chosen
+because it reads better once the reason it might be empty is no longer "definitely none ever existed".
+No test hand-types the string (all reference the exported constant), so no case needed updating.
+
+**Finding 4 — page.tsx docblock hedged.** "Counting it [`workflowChip`] here too would not change the
+gate's answer in any case" was false for one constructible case: a workflow with its own cards picked
+while an empty SIBLING group is dropped leaves `shown === total` with the other two terms already zero,
+so the strip stays closed though the picker is non-default — counting `workflowChip` there would open it.
+The invariant the gate exists for still holds (no card is ever hidden without disclosure) and the
+`<select>` keeps showing the pick regardless, so nothing is lost; the docblock now says so instead of
+claiming a certainty that does not hold.
+
+**Finding 5 — this file's own `13.505` narrative said "checked four ways" while listing five assertions
+and the code has five** (`13-deployment-dogfooding.md:5424`, above). Corrected to "checked five ways".
+
+`node scripts/check-case-ids.mjs` re-run after minting `13.517`: only `13.387`/`13.413` remain as
+duplicates (pre-existing, unrelated to this fix wave, carried since before Task 3 — see the "Case-id fix"
+entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.

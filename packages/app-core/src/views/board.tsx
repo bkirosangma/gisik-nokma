@@ -139,16 +139,27 @@ export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
  * The text names no reason. `BoardColumn` (`view-types.ts`) carries only
  * `stateId`/`name`/`category`/`blocked`/`cards` — nothing distinguishing "this
  * state genuinely holds no tickets" from "the client-side board filter
- * (`filter/board-filter.ts`) narrowed it to zero". The narrowing pass that
- * would know the difference runs above this component, in the shell that
- * builds `boardNarrowing`, and it already discloses an active filter through
- * the `N of M shown` count and its removable chips. Re-stating that
- * disclosure here, per column, with data this component was never given,
- * would risk a second, unsynchronised copy of the same fact — so the
- * sentence says only what is true in both cases, exactly the discipline
- * `EMPTY_BOARD_COPY`'s own docblock already holds itself to.
+ * (`filter/board-filter.ts`) narrowed it to zero".
+ *
+ * CORRECTED (final whole-branch review, Finding 3, 2026-09-16): this used to
+ * say the narrowing pass "runs above this component... with data this
+ * component was never given" — no longer true. `Board` itself HAS that
+ * signal, since Ruling 19 (`isNarrowed`, `:79` above): the shell's
+ * `boardNarrowing` already discloses an active filter through the `N of M
+ * shown` count and its removable chips, and passes whether the view it
+ * handed `Board` was narrowed. What is still true is narrower than the old
+ * claim: `Board` does not thread `isNarrowed` down past itself into
+ * `BoardGroupSection` (`:314-334`), which is what actually renders this
+ * copy, once per empty column — so from THIS component's own vantage point
+ * the data remains unavailable, even though it is no longer unavailable to
+ * `Board` as a whole. Threading it the rest of the way is unscoped follow-up
+ * work, not a structural impossibility; re-stating the shell's disclosure
+ * here before that wiring exists would risk a second, unsynchronised copy of
+ * the same fact — so the sentence says only what is true whether or not a
+ * filter is active, exactly the discipline `EMPTY_BOARD_COPY`'s own docblock
+ * already holds itself to.
  */
-export const EMPTY_COLUMN_COPY = 'No tickets in this column yet.';
+export const EMPTY_COLUMN_COPY = 'No tickets in this column.';
 
 /**
  * The `dataTransfer` format a dragged card's ticket id travels under

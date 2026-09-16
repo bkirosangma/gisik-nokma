@@ -1172,7 +1172,10 @@ function ProjectBoard() {
             ) : null}
 
             {/*
-              THE MIRROR NOTE (Task 4 fix round 1, coordinator Ruling 10).
+              THE MIRROR NOTE (Task 4 fix round 1, coordinator Ruling 10;
+              WIDENED in the final whole-branch review's fix wave, Finding 1,
+              2026-09-16).
+
               `matchesBoardCard` narrows the BOARD only — `useBoard` has no
               way to be narrowed by anything else, and the spec's own search
               ruling exists precisely because "one search box would then
@@ -1182,27 +1185,47 @@ function ProjectBoard() {
               sighted person on List/Calendar/Timeline sees a search box,
               types into it, and watches nothing happen — the SAME
               asymmetry, from the other direction. This note is the fix:
-              on every tab BUT Board, when a search term is actually
-              present, say so in words, beside the existing "Only tickets
-              in progress" note (`.gn-list-filter__note`) rather than
-              replacing it.
+              on every tab BUT Board, when there is something set on
+              `filter` this tab does not apply, say so in words, beside the
+              existing "Only tickets in progress" note
+              (`.gn-list-filter__note`) rather than replacing it.
 
-              Reuses `activeFilterChips` rather than re-deriving "is a
-              search term present" a second way — the chip for `text` and
-              the fact this note fires are one question, asked once.
+              Ruling 10 gated this on `text` alone, because `text` was the
+              only axis with a control when it was written. Task 5's
+              Filters sheet then reached FIVE more axes
+              (`assigneeIds`/`typeIds`/`stateIds`/`stateCategories`/
+              `projectIds`) onto the SAME page-level `filter`, from every
+              tab — a `chip.key === 'text'` gate goes silently inert on all
+              five, the identical one-axis-enumeration defect
+              `buildBoardFilterChips` was already rewritten to stop
+              repeating for the strip above. GATED NOW on
+              `activeFilterChips.length > 0 || boardUnappliedAxes.length >
+              0` — the SAME two terms the strip's own gate reads for the
+              board (`shouldRenderBoardNarrowingStrip`'s first two), never
+              its third (`shown !== total`): that term is a fact about what
+              the BOARD rendered, meaningless on a tab the board never
+              touches. `activeFilterChips` already enumerates every
+              `BoardFilterSpec` axis (`buildBoardFilterChips`'s own
+              docblock); `boardUnappliedAxes` covers the three the board
+              itself cannot evaluate either. Between the two, every axis
+              this `filter` state can carry is covered.
 
-              GATED ON A TERM BEING PRESENT, not on the tab alone: a
-              permanent sentence on three tabs would be noise nobody reads,
-              and showing it while nothing is being searched would itself
-              be a small lie (a limit named for a filter that is not
-              active). Reuses `.gn-project__scope-note`'s own styling — no
-              new CSS rule — since this is the same KIND of fact (an axis
-              not applied here) the board's own scope note states, just
-              named on the other side of the same asymmetry.
+              THE SENTENCE NAMES ONLY WHAT IT KNOWS. It no longer says "the
+              board only" — that would overclaim for a `filter` set to only
+              a `boardUnappliedAxes` entry (`collaboratorIds`,
+              `dueBefore`/`dueAfter`, `fields`), none of which narrow the
+              board either (see `describeUnappliedBoardAxes`'s own
+              docblock). It says only that what is set is not applied on
+              THIS tab, true under every combination that trips the gate.
+
+              Still gated on something actually being set, not on the tab
+              alone (a permanent sentence on three tabs would be noise
+              nobody reads), and still never on Board itself, where at
+              least some of what is set does apply.
             */}
-            {view !== 'board' && activeFilterChips.some((chip) => chip.key === 'text') ? (
+            {view !== 'board' && (activeFilterChips.length > 0 || boardUnappliedAxes.length > 0) ? (
               <p className="gn-project__scope-note" data-testid="search-not-applied-note">
-                Search narrows the board only — nothing on this tab is filtered by it yet.
+                Filters set here are not applied on this tab.
               </p>
             ) : null}
 

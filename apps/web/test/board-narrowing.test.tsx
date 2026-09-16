@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY } from '@gisik-nokma/app-core';
@@ -268,21 +268,31 @@ describe('13.438 the strip is not unconditionally present', () => {
 });
 
 /**
- * ## The mirror note (Task 4 fix round 1, coordinator Ruling 10)
+ * ## The mirror note (Task 4 fix round 1, coordinator Ruling 10; WIDENED,
+ * final whole-branch review's fix wave, Finding 1, 2026-09-16)
  *
  * The search box sits page-level, above the tab rail, on every tab — but only
  * the BOARD path applies it (`useBoard` cannot be narrowed by anything; the
  * spec's own search ruling exists to avoid "one search box... answer[ing]
  * differently on two tabs"). A sighted person on List/Calendar/Timeline who
  * types into it would otherwise watch nothing happen with no explanation.
- * This note is the fix — and it must appear ONLY while a term is present
- * (never a permanent sentence on three tabs) and ONLY on the tabs where the
- * search does not apply (never on Board, where it does).
+ * This note is the fix — and it must appear ONLY while something is actually
+ * set on `filter` (never a permanent sentence on three tabs) and ONLY on the
+ * tabs where that something does not apply (never on Board, where at least
+ * part of it does).
  *
  * Exercised on all three non-board tabs individually (List and Timeline
  * below, Calendar in `13.444` — a Minor from the review: the gate is one
  * uniform `view !== 'board'` check, so divergence was unlikely, but
  * "unlikely" is not "tested").
+ *
+ * Finding 1: the gate was `activeFilterChips.some((chip) => chip.key ===
+ * 'text')` — inert on the FIVE other axes Task 5's Filters sheet later
+ * reached onto the same `filter` from every tab (open Filters on List, tick
+ * an assignee, press Done: the list does not change, and nothing said so).
+ * `13.517` below drives that exact path through the real sheet, on a
+ * non-board tab, and is the case that would redden if the gate reverted to
+ * the `text`-only check.
  */
 describe('13.439 the tabs where search does not apply say so — only while a term is present', () => {
   it('shows nothing on the List tab until a search term exists, then names the limit', async () => {
@@ -300,7 +310,7 @@ describe('13.439 the tabs where search does not apply say so — only while a te
     await userEvent.type(await searchbox(), 'board');
 
     const note = await screen.findByTestId('search-not-applied-note');
-    expect(note).toHaveTextContent(/board only/i);
+    expect(note).toHaveTextContent(/not applied on this tab/i);
   });
 
   it('never shows the note on the Board tab itself, even with a term present', async () => {
@@ -357,7 +367,62 @@ describe('13.439 the tabs where search does not apply say so — only while a te
     await userEvent.type(await searchbox(), 'board');
 
     const note = await screen.findByTestId('search-not-applied-note');
-    expect(note).toHaveTextContent(/board only/i);
+    expect(note).toHaveTextContent(/not applied on this tab/i);
+  });
+});
+
+/**
+ * ## Finding 1, final whole-branch review's fix wave (2026-09-16)
+ *
+ * Drives the actual Filters sheet — open it, tick a real checkbox, press
+ * Done — rather than writing `filter.assigneeIds` directly, so this proves
+ * the real user path Finding 1 named, not a shortcut approximation of it.
+ * Needs a real roster (`board-narrowing.test.tsx`'s own `servedBoard` stubs
+ * `getMembers` to `[]`), so this case builds its own services inline rather
+ * than widening the shared helper for one case.
+ */
+const ROSTER: Array<{ id: string; name: string }> = [{ id: 'u1', name: 'Uma One' }];
+
+async function openFiltersAndPickAssignee(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+  const group = within(dialog).getByRole('group', { name: 'Assignee' });
+  await userEvent.click(within(group).getByRole('checkbox', { name }));
+  await userEvent.keyboard('{Escape}');
+}
+
+describe('13.517 the mirror note also names Filters-sheet axes, not only search', () => {
+  it('shows the note on the List tab once an assignee is picked from the Filters sheet, though nothing on the list changes', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => boardOf(threeCards),
+          getAttention: async () => [],
+          getMembers: async () => ROSTER,
+          getTicketTypes: async () => [],
+          getTickets: async (): Promise<TicketListView> => ({
+            projectId: PROJECT_ID,
+            rows: [listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf' })],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+
+    // No axis set yet — a permanent sentence here would be noise nobody reads.
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+
+    await openFiltersAndPickAssignee('Uma One');
+
+    // The List tab's own render is untouched — `filter` narrows the board
+    // only, and this axis has no control anywhere else — which is precisely
+    // why the note, not a changed list, is the only disclosure available.
+    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
+    const note = await screen.findByTestId('search-not-applied-note');
+    expect(note).toHaveTextContent(/not applied on this tab/i);
   });
 });
 
