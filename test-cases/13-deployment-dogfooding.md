@@ -5944,3 +5944,7 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   exclude lists exclude nothing; unassigned work survives an assignee exclusion; include+exclude on one
   axis = must match an include and none of the excludes. Mutation (the `typeIds` exclude line deleted)
   kills the type case and the composition case.
+- **13.540** ✅ `BoardFilterSpec.exclude` is `BoardIdAxes` — `exclude.collaboratorIds` is a compile error
+  (it would silently WIDEN the board: `excludedBy(list, [])` is never out).
+- **13.541** ✅ `13.433`'s agreement corpus extended with eight exclude cases and a rejection control;
+  mutation (the `stateIds` exclude line deleted) kills the `excluded state` case.

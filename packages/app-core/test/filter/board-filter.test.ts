@@ -40,6 +40,14 @@ describe('13.433 the board predicate agrees with matchesFilter on every axis it 
     ['non-matching project', { projectIds: ['p2'] }],
     ['matching text', { text: 'board' }],
     ['non-matching text', { text: 'zzz' }],
+    ['excluded assignee', { exclude: { assigneeIds: ['u1'] } }],
+    ['excluded other assignee', { exclude: { assigneeIds: ['u2'] } }],
+    ['excluded type', { exclude: { typeIds: ['task'] } }],
+    ['excluded state', { exclude: { stateIds: ['s-doing'] } }],
+    ['excluded category', { exclude: { stateCategories: ['active'] } }],
+    ['excluded project', { exclude: { projectIds: ['p1'] } }],
+    ['included and excluded on one axis', { assigneeIds: ['u1'], exclude: { assigneeIds: ['u1'] } }],
+    ['included here, excluded elsewhere', { assigneeIds: ['u1'], exclude: { typeIds: ['bug'] } }],
   ];
 
   for (const [name, spec] of cases) {
@@ -69,5 +77,21 @@ describe('13.434 axes the board cannot evaluate are unrepresentable', () => {
     // @ts-expect-error same reason: no claimed dates reach a BoardCard.
     const spec: BoardFilterSpec = { dueBefore: '2026-01-01' };
     expect(spec).toBeDefined();
+  });
+});
+
+describe('13.540 the exclude half is unrepresentable for the axis the board cannot answer', () => {
+  it('rejects exclude.collaboratorIds at compile time — a BoardCard has no collaborators to exclude on', () => {
+    // @ts-expect-error `collaboratorIds` is not in BoardIdAxes; `excludedBy` would answer
+    // `false` (never out) and silently WIDEN the board past what the person asked for.
+    const spec: BoardFilterSpec = { exclude: { collaboratorIds: ['u9'] } };
+    expect(spec).toBeDefined();
+  });
+});
+
+/** 13.541 — the corpus's exclude cases contain a rejection, so agreement on them is not vacuous. */
+describe('13.541 the exclude corpus rejects something', () => {
+  it('at least one exclude case is a rejection on the board side', () => {
+    expect(matchesBoardCard(card, column, 'p1', { exclude: { typeIds: ['task'] } })).toBe(false);
   });
 });
