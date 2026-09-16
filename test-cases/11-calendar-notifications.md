@@ -63,7 +63,7 @@ computed "now".
 - **11.158** ✅ A workspace's own rank-1 type heads the lane in the calendar view, not just the built-in `'epic'` — (`calendar-view.test.tsx`)
 - **11.211** ✅ Ruling R4 (2026-09-16), the legend merge: the legend has exactly one checkbox per custom field — never fewer (a lost toggle) and never more (a read-only row disguised as a checkbox) — `Due date`/`In transit` render as read-only swatch-and-label rows and are provably not among the checkboxes, and both stay gated behind the SAME `model.customDateFields.length` guard 11.69 already pins, so they are never a reason to show the legend on their own — (`calendar-view.test.tsx`)
 - **11.212** ✅ Board prototype port Task 10: the calendar view restyles to the spec's Calendar metrics table (`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:349-363`) — nav/Today buttons, month title, legend card, a new weekday-head row, the day grid's tray ground with card/fill4 cells, a 24px today ring on the day number (replacing the prior whole-cell outline), and the accent-ground event pill generalised from bars-only to every non-custom item. ONE declared exception: the custom-field marker (`.gn-calendar__item--custom`) keeps its plain-text treatment and does not become a tinted pill — no `--gn-tint-purple` role exists or is added, per the spec's own measured refusal. Verified by `packages/ui/test/token-discipline.test.ts` (no colour literals) and `packages/ui/test/tokens.test.ts` (every `var(--gn-…)` referenced names an already-declared role — no new role was needed) staying green, plus `packages/ui/test/in-transit.test.ts`'s `.gn-calendar__item--pending` assertion, which this task left untouched, still passing — (`ui.css`, `calendar-view.tsx`)
-- **11.213** ✅ Board prototype port Task 10, follow-up: `customMarker` on `surface` clears 4.5 in every style/theme — a dedicated 6-combination gate (`packages/ui/test/tokens.test.ts`), added after a review pass measured a real regression the first pass shipped: `.gn-calendar__items` had silently inherited `.gn-calendar__grid`'s new `--gn-surface-sunken` tray background (nothing between the two painted an opaque ground), moving every event — including the custom-field marker's text, unchanged by Task 10's own explicit exception — off the ground its contrast was ever measured against. `customMarker` on `hig`/`minimal` LIGHT's `surfaceSunken` measured 4.310, below 4.5; `neo` was never at risk (it collapses `surface`/`surfaceSunken` to one hex). Fixed by pinning `.gn-calendar__items { background: var(--gn-surface) }` explicitly, restoring every style/theme combination to its original, already-measured ratio (`neo`/light 4.807 — the tightest, so this gate is not vacuous). jsdom paints no colour, so no rendering-based test in this repo could have caught the regression; this gate is the numeric one instead — (`packages/ui/test/tokens.test.ts`, `packages/ui/src/ui.css`)
+- **11.214** ✅ Board prototype port Task 10, RULING 24 correction (coordinator, 2026-09-16): `.gn-calendar__items` declares `background: var(--gn-surface)`, not the calendar grid's tray — the REAL gate for the follow-up round's contrast fix, reading the actual `ui.css` the same way `packages/ui/test/in-transit.test.ts`'s existing checks already do. **Replaces case 11.213, retired**: 11.213 (`packages/ui/test/tokens.test.ts`) computed `contrastRatio(customMarker, surface)` from `tokens.ts` role lookups alone, framed as new coverage on the false premise that no `CONTRAST_PAIRS` row already named that pairing — one has, since commit `e09666ce` (Plan 9, 2026-09-04), already exercised across every style/theme by the pre-existing "declared contrast pairs meet their minimums" loop. 11.213 never read `ui.css` and so could not have caught the regression it claimed to guard: deleting `.gn-calendar__items`'s `background: var(--gn-surface)` declaration left 11.213, and the whole suite, green. This case is that CSS-reading gate, proven to guard by deliberately deleting the declaration, confirming the test reddens, and restoring it byte-identical — (`packages/ui/test/in-transit.test.ts`)
 
 ## Timeline view — React component (`packages/app-core`)
 - **11.73** ✅ A bar is drawn only from a claimed pair, with the rest sitting beside the grid — never in both places at once — (`timeline-view.test.tsx`)
@@ -318,7 +318,7 @@ matching `notifications.test.ts`'s own argument against a hand-written `HttpClie
 
 ## Permanently unused id ranges
 
-Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
+Three disjoint ranges/ids will never be filled, for three different reasons. Neither is a gap
 to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) for the same pattern.
 
 - **11.9–11.17, 11.19–11.35, 11.40–11.47** — Plan 9 Task 15's own plan text reserved this range
@@ -329,18 +329,31 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 - **11.123–11.129** — a renumber gap left by Task 14's own fix/renumber round on this branch. The
   rule against renumbering existing ids (`test-cases/README.md`) means a range vacated by a
   renumber stays vacated rather than being reused by a later, unrelated case.
+- **11.213** — RETIRED, RULING 24 (coordinator review, 2026-09-16), same day it was minted. It was
+  written for a `packages/ui/test/tokens.test.ts` block that duplicated a pre-existing
+  `CONTRAST_PAIRS` row (`{ fg: 'customMarker', bg: 'surface', minimum: 4.5 }`, `tokens.ts`, live
+  since commit `e09666ce`) while its own docblock claimed the pairing was previously uncovered —
+  and, because it computed the contrast from `tokens.ts` role lookups alone, it never read `ui.css`
+  and so could not have caught the CSS regression it was written to guard (proof: deleting the
+  declaration it depended on left 11.213, and the whole suite, green). The block was deleted rather
+  than corrected in place, and the real gate — reading the actual stylesheet — landed as a NEW id,
+  **11.214**, at `packages/ui/test/in-transit.test.ts`, per the same "a vacated id stays vacated"
+  discipline the `11.123–11.129` entry above already states. `11.213` names no test in this
+  codebase as of this commit.
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.214.**  
+**New cases continue from 11.215.**  
 *(11.210 was IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
 server half 11.197–11.200, Task 6's client half 11.201–11.210 — the last two, 11.209–11.210, added on
 2026-09-15 coordinator review to close a coverage gap in `toggleKind`'s optimistic-flip-then-revert
 logic that 11.201–11.208 left unexercised). Board prototype port Task 10 (2026-09-16) then minted
-11.211–11.212 at the Calendar view section above (the R4 legend merge and the metrics restyle), and a
-same-task follow-up round minted 11.213 (the `customMarker`-on-`surface` contrast gate, after a review
-pass caught a real regression the first pass shipped) — each verified against the real sweep
-(`node scripts/check-case-ids.mjs`) before advancing this pointer, not against this prose, which the
+11.211–11.212 at the Calendar view section above (the R4 legend merge and the metrics restyle).
+`11.213`, minted the same day for a contrast gate that turned out to duplicate existing coverage
+and never actually read `ui.css`, was RETIRED same-day (Ruling 24, coordinator review) — see
+*Permanently unused id ranges* below — and its real replacement landed as `11.214`, a NEW id, per
+this file's own "a vacated id stays vacated" rule. Each advance was verified against the real sweep
+(`node scripts/check-case-ids.mjs`) before this pointer moved, not against this prose, which the
 file's own convention (below) warns is exactly the kind of line that can drift. This pointer means the
 NEXT FREE id —
 that is the convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188).
