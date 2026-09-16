@@ -1127,11 +1127,13 @@ function ProjectBoard() {
         filter={filter}
         setFilter={setFilter}
         members={members.data}
+        membersError={members.error}
         typeOptions={typeOptions}
         typesError={ticketTypes.error}
         typesPending={ticketTypes.data === null}
         boardStateOptions={boardStateOptions}
         boardLoaded={board.data !== null}
+        boardError={board.error}
       />
     </main>
   );
@@ -1168,6 +1170,8 @@ type FiltersSheetProps = {
   setFilter: (updater: (current: FilterSpec) => FilterSpec) => void;
   /** `null` while the roster has not been read — never `[]`, which would claim this workspace has no members (see `visibility-editor.tsx:242-245`'s identical rule for the same read). */
   members: Actor[] | null;
+  /** Distinct from `members === null`: PENDING and REFUSED are different facts, and a "has not loaded yet" sentence over a REAL refusal names the wrong cause — the exact defect `ProjectBoard`'s own docblock on `useSessionStatus` was written about, one component over. */
+  membersError: string | null;
   /** Already resolved by `ProjectBoard` to the same built-in-ladder-while-loading fallback `createRegion` uses — one source of truth for "what are this workspace's types", not a second. */
   typeOptions: Array<{ id: string; name: string }>;
   typesError: string | null;
@@ -1175,6 +1179,8 @@ type FiltersSheetProps = {
   typesPending: boolean;
   boardStateOptions: Array<{ id: string; name: string }>;
   boardLoaded: boolean;
+  /** Same pending-vs-refused distinction as `membersError`, for the State section. */
+  boardError: string | null;
 };
 
 /**
@@ -1222,17 +1228,26 @@ type FiltersSheetProps = {
  * their control next, not a surprise (see the scope-note copy fix in
  * `ProjectBoard`, which stopped naming a location for exactly this reason).
  *
- * ## Absence, not an invented empty list
+ * ## Absence, not an invented empty list — and PENDING is not REFUSED
  *
  * `members === null` (roster not yet read) and `!boardLoaded` (board not yet
  * read) each render a sentence saying so, never a silently empty picker —
  * the same rule `visibility-editor.tsx` already follows for its own person
- * list, restated here rather than reinvented. `typesError !== null` renders
- * a refusal sentence instead of the built-in ladder: `ProjectBoard`'s own
- * docblock on `BUILTIN_TYPE_LADDER` forbids that fallback surviving a FAILED
- * read (only a pending one), and `typeOptions` alone conflates the two, so
- * this component is handed `typesError`/`typesPending` separately rather
- * than inferring either from `typeOptions.length`.
+ * list, restated here rather than reinvented. But `.data === null` is true
+ * for BOTH a read still pending and one that REFUSED, and those are
+ * different facts calling for different sentences — the same distinction
+ * `typesError`/`typesPending` already draws for the Type section, applied
+ * here too: `membersError`/`boardError` (from `members.error`/`board.error`,
+ * `useLiveQuery`'s own error channel) are checked FIRST, ahead of the
+ * pending branch, so a genuine refusal never gets the "has not loaded yet"
+ * sentence — the same wrong-cause failure this page's own
+ * `useSessionStatus` docblock was written about, one component over.
+ * `typesError !== null` renders a refusal sentence instead of the built-in
+ * ladder for the identical reason: `ProjectBoard`'s own docblock on
+ * `BUILTIN_TYPE_LADDER` forbids that fallback surviving a FAILED read (only
+ * a pending one), and `typeOptions` alone conflates the two, so this
+ * component is handed `typesError`/`typesPending` separately rather than
+ * inferring either from `typeOptions.length`.
  *
  * ## Accessibility contract
  *
@@ -1255,11 +1270,13 @@ function FiltersSheet({
   filter,
   setFilter,
   members,
+  membersError,
   typeOptions,
   typesError,
   typesPending,
   boardStateOptions,
   boardLoaded,
+  boardError,
 }: FiltersSheetProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const headingId = useId();
@@ -1301,7 +1318,12 @@ function FiltersSheet({
   const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
     <fieldset className="gn-filters__section">
       <legend className="gn-filters__section-label">{title}</legend>
-      {members === null ? (
+      {membersError !== null ? (
+        <p className="gn-filters__pending">
+          This workspace’s roster could not be loaded, so filtering by {title.toLowerCase()} is not
+          offered.
+        </p>
+      ) : members === null ? (
         <p className="gn-filters__pending">The workspace roster has not loaded yet.</p>
       ) : members.length === 0 ? (
         <p className="gn-filters__pending">No members to choose from.</p>
@@ -1385,7 +1407,11 @@ function FiltersSheet({
 
           <fieldset className="gn-filters__section">
             <legend className="gn-filters__section-label">State</legend>
-            {!boardLoaded ? (
+            {boardError !== null ? (
+              <p className="gn-filters__pending">
+                This project’s board could not be loaded, so filtering by state is not offered.
+              </p>
+            ) : !boardLoaded ? (
               <p className="gn-filters__pending">This project’s board has not loaded yet.</p>
             ) : boardStateOptions.length > 0 ? (
               <div className="gn-filters__chip-list">

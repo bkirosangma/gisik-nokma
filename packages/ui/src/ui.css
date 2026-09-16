@@ -2789,8 +2789,22 @@
    `.gn-table`/`.gn-select`/`.gn-button`/`.gn-segmented`) is touched; the
    sheet's own buttons reuse `.gn-button`/`.gn-button--ghost`/
    `.gn-button--primary` UNCHANGED, exactly as the plan's own "Divergences
-   already decided" section requires for board controls. */
-.gn-filters__scrim { position: fixed; inset: 0; background: var(--gn-surface-overlay); }
+   already decided" section requires for board controls.
+
+   `z-index: 40` MATCHES `.gn-dialog__scrim`/`.gn-sheet__scrim` above
+   (`:227-234`) rather than inventing a second stacking scale — read
+   directly, not assumed, because jsdom (this task's whole test suite)
+   computes no paint order at all and would stay green regardless of which
+   number this carried. Without it, `position: fixed` still gives this scrim
+   its own stacking context, but at the implicit `z-index: 0` level, so it
+   would paint BELOW `TicketSheet`'s `.gn-sheet__scrim` (`z-index: 40`) were
+   both ever open at once — this page's own `TicketSheet` and this sheet are
+   reachable independently (one from a ticket link, one from the Filters
+   button), so that overlap is a real, if unlikely, state. Matching the
+   value gives the two an even footing (DOM order breaks the tie, the same
+   ambiguity the house scrims already carry between each other) rather than
+   silently favouring one. */
+.gn-filters__scrim { position: fixed; inset: 0; background: var(--gn-surface-overlay); z-index: 40; }
 .gn-filters__panel {
   position: fixed; inset-block: 0; inset-inline-end: 0;
   width: min(23.75rem, 100%);

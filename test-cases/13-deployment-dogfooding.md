@@ -4267,7 +4267,7 @@ alongside its existing List/Timeline coverage.
 
 ## Task 5 — the Filters sheet (board-prototype-port plan, 2026-09-16)
 
-**Block `13.445`–`13.456` minted here; the next free BLOCK is `13.457`.** The Filters button Task 4
+**Block `13.445`–`13.458` minted here.** The Filters button Task 4
 deliberately left unrendered ("An inert Filters button is a button that lies... I chose do not render
 it yet") gets its sheet: a `role="dialog"` side panel writing straight through to the SAME
 page-level `filter` state the search box and the removable chips already share — no draft copy, no
@@ -4343,3 +4343,25 @@ reverted with a targeted edit (not `git checkout`), confirmed clean by re-runnin
 - **13.456** ✅ The scope note's copy no longer names "the list tab" — the location clause removed
   because it names the wrong place for two of the three axes it can
   join. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Task 5 fix round 1, same session — `advisor()` review before reporting done.** One real, blocking
+gap: `13.453`/`13.455` proved the PENDING sentence for Assignee/Collaborators/State, but those two
+sections collapsed PENDING and REFUSED into one `members === null` / `!boardLoaded` check — the Type
+section already distinguished `typesError`/`typesPending` for the identical reason, and this was the
+same wrong-cause failure `page.tsx`'s own `useSessionStatus` docblock was written about, one component
+over: a real roster/board refusal would have printed "has not loaded yet" instead of naming the
+refusal. Fixed by threading `members.error`/`board.error` (`useLiveQuery`'s own error channel) into
+`FiltersSheet` as `membersError`/`boardError`, checked ahead of the pending branch in both sections —
+`13.457`/`13.458` prove BOTH halves: the refusal sentence appears, AND the pending sentence does not.
+Also fixed in the same round: `.gn-filters__scrim` had no `z-index`, so it would have painted BELOW
+`TicketSheet`'s `.gn-sheet__scrim` (`z-index: 40`) were both ever open at once — invisible to every
+test in this file, since jsdom computes no paint order at all. Matched the house scrims' own `40`
+rather than inventing a second stacking scale; no case can exercise this (jsdom's blindness to paint
+order is exactly the reason it was missed the first time), so it is recorded here as reasoned from the
+CSS rather than proven by a test.
+
+- **13.457** ✅ A FAILED roster read renders the refusal sentence in Assignee, and NOT the "has not
+  loaded yet" pending sentence — the two are checked as mutually exclusive facts, not merely the
+  refusal's presence alone. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.458** ✅ A FAILED board read renders the refusal sentence in State, and NOT the "has not loaded
+  yet" pending sentence, for the identical reason. — (`apps/web/test/filters-sheet.test.tsx`)

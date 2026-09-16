@@ -380,3 +380,58 @@ describe('13.456 the scope note no longer names a location the sheet made untrue
     expect(note).not.toHaveTextContent(/list tab/i);
   });
 });
+
+/**
+ * ## PENDING is not REFUSED — `.data === null` is true of both
+ *
+ * `13.453`/`13.455` above prove the PENDING sentence. These two prove the
+ * component does not ALSO print that same sentence over a real refusal —
+ * `advisor()` caught this as a real gap after the first review pass: `Type`
+ * already distinguished `typesError`/`typesPending` (the built-in-ladder
+ * rule forbids the fallback surviving a FAILED read), but Assignee/
+ * Collaborators and State collapsed pending and refused into one
+ * `members === null` / `!boardLoaded` check, which would have named the
+ * wrong cause — "has not loaded yet" over a read that will never load,
+ * because it already answered no. Fixed by checking `membersError`/
+ * `boardError` (from `useLiveQuery`'s own error channel) FIRST.
+ */
+describe('13.457 absence: a failed roster read refuses, never claiming it is merely pending', () => {
+  it('says the roster could not be loaded, not that it has not loaded yet', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          getMembers: () => Promise.reject(new Error('roster unavailable')),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    expect(within(group).getByText(/could not be loaded/i)).toBeInTheDocument();
+    expect(within(group).queryByText(/has not loaded yet/i)).not.toBeInTheDocument();
+    expect(within(group).queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.458 absence: a failed board read refuses, never claiming it is merely pending', () => {
+  it('says the board could not be loaded, not that it has not loaded yet', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          getBoard: () => Promise.reject(new Error('board unavailable')),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'State' });
+    expect(within(group).getByText(/could not be loaded/i)).toBeInTheDocument();
+    expect(within(group).queryByText(/has not loaded yet/i)).not.toBeInTheDocument();
+    expect(within(group).queryByRole('button')).not.toBeInTheDocument();
+  });
+});
