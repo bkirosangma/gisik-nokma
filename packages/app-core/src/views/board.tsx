@@ -631,6 +631,23 @@ const CARD_CLICK_BAIL_SELECTOR =
  *    for, and a timer would put the test on the clock. A fresh press is the
  *    unambiguous start of a new gesture.
  *
+ * 3. **The click did not land in this slot's DOM at all.** React synthetic
+ *    events bubble through the REACT tree, and `Select` (`packages/ui`)
+ *    portals its dropdown panel to `document.body` — so a click on that
+ *    panel's own padding reaches this `onClick` while `closest()`, which
+ *    walks the DOM, finds nothing there to bail on (`13.535` establishes the
+ *    portal; `13.537` the click). `event.currentTarget.contains(target)`
+ *    is the generic answer: a target that is not a DOM descendant of the
+ *    slot is not this card's click, whatever the React tree says, and it
+ *    names no library's internals. Today `Dialog`'s own `<section
+ *    role="dialog" onClick={stopPropagation}>` ALSO swallows that click on
+ *    its way up (measured: with that one line mutated away and this guard
+ *    absent, `13.537` fails; with this guard present it passes either way)
+ *    — but that line exists for the scrim's sake, in another package, and a
+ *    card's click guard should not be correct only by courtesy of it. An
+ *    OPTION click never arrives at all — react-aria's `usePress` stops it
+ *    (`13.536`, the positive control, named honestly as such).
+ *
  * `draggable`/`onDragStart` are unchanged from board-prototype-port Task 14
  * — gated on the SAME `arrows !== null` check, deliberately not a second,
  * parallel boolean: a card whose write path is not wired (no `moves`
@@ -675,6 +692,7 @@ function BoardCardSlot({
       }}
       onClick={(event) => {
         if (draggedRef.current) return;
+        if (!event.currentTarget.contains(event.target as Node)) return;
         if ((event.target as Element).closest(CARD_CLICK_BAIL_SELECTOR) !== null) return;
         onOpen();
       }}

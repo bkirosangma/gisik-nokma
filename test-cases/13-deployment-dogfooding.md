@@ -5875,7 +5875,11 @@ labels absent, the dialog on "Choose a state" with three options). Node v22.23.2
   never later — and failed 3/3 RED under `useEffect` (`expected [] to have a length of 1`), then passed
   3/3 under `useLayoutEffect`, which registers synchronously inside the commit that paints the card
   `draggable="true"`. Ruling 15 from the other side: an affordance the DOM shows is live the instant it
-  is shown. Nothing else about the registration changed.
+  is shown. Nothing else about the registration changed. The commit message's "React 19.2.8, no SSR
+  warning" is from React 19's own changelog (the `useLayoutEffect`-on-the-server warning was removed),
+  NOT measured here — vitest/jsdom is not SSR; the stronger reason no warning could fire is structural:
+  `MoveArrows` mounts only after `useLiveQuery` resolves the workflow read, which never happens during a
+  prerender.
 
 Mutations (scratchpad backups, restored byte-identical by `cmp`): M4 kills `13.527`, `13.529`, `13.530`;
 M5 kills `13.528`, `13.531`, `13.533`; M6 kills `13.529`, `13.530`, `13.532`. Gate after the last edit:
@@ -5892,3 +5896,37 @@ left alone for the same reason as the `ui.css` ones above.
 Named, not absorbed: the board path still passes `ticketFields={{}}` / `moveOutcome(…, {})`, so
 `require-field` is always treated as unmet there (`MoveArrows`'s own docblock, "the conservative reading of
 an honest absence"). `BoardCard` carries no field claims; fixing it needs data the board does not have.
+
+## The whole card opens the ticket — the portal the first pass missed (review, 2026-09-17)
+
+Advisor review of the two change sets above raised what the six cases in `board-card-click.test.tsx`
+could not see: `Select` (`packages/ui`) portals its dropdown panel to `document.body`. React synthetic
+events bubble through the REACT tree, so a click inside that panel reaches `BoardCardSlot`'s `onClick`;
+`closest()` walks the DOM, where the panel's ancestors are itself and `body`, and can match nothing in
+`CARD_CLICK_BAIL_SELECTOR`. And `13.529` had just made that dropdown the primary path for a multi-target
+move. Measured before designing anything, in three cases (same file):
+
+- **13.535** ✅ THE FACT: with the picker's dropdown open, `listbox.closest('.gn-board__card-slot')` is
+  `null`. Established rather than assumed; the next two rest on it.
+- **13.536** ✅ An OPTION click does NOT open the ticket — and not because of anything in
+  `BoardCardSlot`: react-aria's `usePress` (behind `useOption`) stops the synthetic `click`, so it never
+  arrives. Named as the positive control it is. Deleting the `contains` guard leaves it green; deleting
+  `closest()` fails it at the `›` ARROW click on the way in, never at the option.
+- **13.537** ✅ THE CLICK THAT DOES ARRIVE: `.gn-select__panel` carries `0.25rem` of padding (`ui.css`),
+  plain DOM with no press handling. A click there — the dropdown's edge, its scrollbar gutter — bubbles up
+  through the portal to the slot. First run: GREEN with no new guard, which meant something else was
+  bailing; found by reading the React tree, then PROVED by mutation: `Dialog`'s own
+  `<section role="dialog" onClick={stopPropagation}>` (`packages/ui/src/components/dialog.tsx`) sits on
+  the portal's React-parent chain and swallows the click on its way up. With that one line mutated to a
+  no-op, `13.537` fails (`onOpenTicket` called) and `13.536` still passes (react-aria). That line exists
+  for the scrim's sake, in another package; a card's click guard should not be correct only by courtesy
+  of it. Guard added — `if (!event.currentTarget.contains(event.target as Node)) return;` ahead of the
+  existing `closest()` bail — under the Dialog mutation as its RED: mutated Dialog + guard → 9/9 green;
+  Dialog restored → 9/9 green; Dialog restored + guard deleted (M7) → 9/9 green, DOCUMENTED as expected:
+  the guard's falsifier is the combined mutation, because two independent mechanisms now cover the same
+  click. It names no library internals and catches any future portal from inside the card, whether or not
+  a `Dialog` happens to sit above it in the React tree.
+
+M1/M2/M3 re-run after the guard landed: M1 kills `13.521`; M2 kills `13.519`, `13.520a`, `13.520b`,
+`13.522`, `13.536`, `13.537` (the last two at the arrow click on the way in); M3 kills `13.521` —
+`contains` subsumed none of them, since every one of those targets is DOM-contained.
