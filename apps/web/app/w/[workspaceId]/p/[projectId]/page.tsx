@@ -28,6 +28,7 @@ import {
   buildBoardFilterChips,
   describeUnappliedBoardAxes,
   shouldRenderBoardNarrowingStrip,
+  type BoardFilterChip,
 } from '../../../../../src/board-search-scope.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
@@ -264,6 +265,25 @@ function ProjectBoard() {
   );
 
   /**
+   * THE WORKFLOW PICKER'S OWN STATE (Task 8, Ruling R3) — page-level, like
+   * `filter` above, so a tab switch never resets it. Deliberately NOT folded
+   * into `filter`/`boardFilter`: those narrow at CARD granularity, and
+   * `matchesBoardCard` (`board-filter.ts`) takes a `card`/`column`/
+   * `projectId` and a `BoardFilterSpec` — no group anywhere in that
+   * signature — so a workflow axis is structurally unrepresentable there.
+   * This picker narrows at GROUP granularity instead: a different
+   * mechanism, reusing `boardNarrowing`'s shared `shown`/`total` fold below
+   * rather than the six-axis vocabulary that fold also reads.
+   *
+   * `'all'` is the sentinel for "every workflow", not `undefined` — a
+   * `<select>`'s `value` must always equal one of its own rendered
+   * `<option>` values, and `'all'` is the first and default one (R3: the
+   * resting state keeps every card shown exactly once, same as before this
+   * picker existed).
+   */
+  const [workflowFilter, setWorkflowFilter] = useState<string>('all');
+
+  /**
    * ONE PASS produces the narrowed board, its shown count, and its total — per
    * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
    * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
@@ -272,31 +292,46 @@ function ProjectBoard() {
    * handed `boardNarrowing.view`, never `board.data` directly, so the grid and
    * the count are reading the SAME computed groups.
    *
-   * Rearrangement, not a second filter: every column and group survives
-   * (`board.tsx:42-46`'s own rule — grouping must never drop a card, and this
-   * narrowing must never drop a COLUMN or a GROUP, only the cards inside one).
-   * A fully-filtered board therefore renders its columns empty rather than
-   * vanishing — the `N of M shown` count and the removable chip below are the
-   * only disclosure, which is the invariant's whole point.
+   * TWO mechanisms fold into this ONE pass as of Task 8, not one:
+   * `boardFilter` (Task 4) drops CARDS, never a column or a group —
+   * `board.tsx:42-46`'s own rule, still exactly true of that mechanism on
+   * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
+   * GROUPS, by construction, whenever a specific workflow is picked. The
+   * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so
+   * `total` still counts every card in a DROPPED group — those cards are
+   * real, and R3's whole point is that the picker is a filter, so its "of
+   * M" must name the project's whole board, never only the remainder it
+   * kept — while `shown` counts only cards that are BOTH in a kept group
+   * AND pass `matchesBoardCard`. A fully-filtered board (by either
+   * mechanism, or both at once) therefore renders its remaining columns
+   * empty, or omits a group's rail entirely, rather than vanishing — the
+   * `N of M shown` count and the removable chip(s) below are the only
+   * disclosure, which is the invariant's whole point. This is also exactly
+   * why `shouldRenderBoardNarrowingStrip`'s third term (`shown !== total`)
+   * exists independently of `activeFilterChips`/`boardUnappliedAxes`: no
+   * axis enumeration can ever name "a whole group was dropped", so the gate
+   * would otherwise miss this mechanism entirely — see that function's own
+   * docblock in `board-search-scope.ts`.
    */
   const boardNarrowing = useMemo(() => {
     if (board.data === null) return null;
     let total = 0;
     let shown = 0;
-    const groups = board.data.groups.map((group) => ({
-      ...group,
-      columns: group.columns.map((column) => {
-        const cards = column.cards.filter((card) => {
+    const groups = board.data.groups.flatMap((group) => {
+      const keepGroup = workflowFilter === 'all' || group.workflowId === workflowFilter;
+      const columns = group.columns.map((column) => ({
+        ...column,
+        cards: column.cards.filter((card) => {
           total += 1;
-          const keep = matchesBoardCard(card, column, projectId, boardFilter);
+          const keep = keepGroup && matchesBoardCard(card, column, projectId, boardFilter);
           if (keep) shown += 1;
           return keep;
-        });
-        return { ...column, cards };
-      }),
-    }));
+        }),
+      }));
+      return keepGroup ? [{ ...group, columns }] : [];
+    });
     return { view: { ...board.data, groups }, shown, total };
-  }, [board.data, boardFilter, projectId]);
+  }, [board.data, boardFilter, workflowFilter, projectId]);
 
   /**
    * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
@@ -543,6 +578,51 @@ function ProjectBoard() {
         setFilter,
       ),
     [boardFilter, nameOf, typeNameById, boardStateNames],
+  );
+
+  /**
+   * THE WORKFLOW PICKER'S OWN CHIP (Task 8) — built separately from
+   * `buildBoardFilterChips`, on purpose: that function enumerates
+   * `boardFilter`'s six fields one by one, and `workflowFilter` is not one
+   * of them (see its own declaration above) and never can be —
+   * `matchesBoardCard` has no group in its signature for a seventh axis to
+   * join. So this is a second, small builder rather than a seventh case
+   * inside `buildBoardFilterChips`, shaped identically (`BoardFilterChip`)
+   * so it can join the SAME strip at the render site below without a second
+   * chip idiom. `null` while `workflowFilter === 'all'` — the resting state
+   * discloses nothing because it has dropped nothing (R3).
+   *
+   * The label resolves the workflow's NAME from `board.data.groups` (the
+   * FULL, unfiltered group list the picker's own `<option>`s are built
+   * from below) rather than from `boardNarrowing.view.groups` (which, once
+   * a workflow is picked, contains only the surviving group and could never
+   * name the one that is missing) — the same "resolve against the whole
+   * set, not the narrowed remainder" rule `boardStateNames` already follows
+   * for the `stateIds` chip, one section up.
+   */
+  const workflowChip = useMemo<BoardFilterChip | null>(() => {
+    if (workflowFilter === 'all') return null;
+    const group = (board.data?.groups ?? []).find((candidate) => candidate.workflowId === workflowFilter);
+    const label = `Workflow: ${group?.workflowName ?? workflowFilter}`;
+    return { key: 'workflow', label, onRemove: () => setWorkflowFilter('all') };
+  }, [workflowFilter, board.data]);
+
+  /**
+   * THE STRIP'S FULL CHIP LIST — `activeFilterChips` plus `workflowChip`
+   * when one is active, merged ONLY here, at the render boundary. Every
+   * other reader of `activeFilterChips` (the gate's `chipCount` term below,
+   * and the mirror note further down that checks for the `text` chip
+   * specifically) keeps reading `activeFilterChips` alone, unmerged — the
+   * gate does not need `workflowChip` counted in `chipCount` because
+   * `shouldRenderBoardNarrowingStrip`'s independent third term
+   * (`shown !== total`) already fires for group-dropping on its own (see
+   * `boardNarrowing`'s own docblock above); double-counting it into
+   * `chipCount` too would not change the gate's answer, only obscure which
+   * term is actually doing the work.
+   */
+  const narrowingChips = useMemo(
+    () => (workflowChip !== null ? [...activeFilterChips, workflowChip] : activeFilterChips),
+    [activeFilterChips, workflowChip],
   );
 
   /**
@@ -794,6 +874,59 @@ function ProjectBoard() {
                 }}
               />
               {/*
+                THE WORKFLOW PICKER (Task 8, Ruling R3). Narrows the board to
+                one workflow's GROUP — a different granularity from every
+                control on this row, which narrow CARDS — so its state
+                (`workflowFilter`) and its fold into `boardNarrowing` are
+                declared beside `boardFilter`/`boardNarrowing` above, not
+                beside `filter`. `All workflows` is the first `<option>` and
+                `workflowFilter`'s own initial value, so the picker's resting
+                state IS the default (R3) with no extra wiring to keep them
+                in sync.
+
+                GATED ON `board.data.groups.length > 1`, not merely on
+                `board.data !== null`: a project with zero or exactly one
+                workflow offers no real choice — "All workflows" and that one
+                workflow's name would render the identical board — so the
+                control would be a picker between one thing and itself. This
+                mirrors `Board`'s OWN gate for the identical judgment one
+                level down (`board.tsx`: `board.groups.length > 1 ? <h3
+                className="gn-board__workflow">` — the workflow name itself
+                only renders once there is more than one to distinguish).
+                Deliberately reading `board.data.groups` here rather than
+                `boardNarrowing.view.groups`: the latter is ALREADY narrowed
+                by `workflowFilter`, so once a person picks a specific
+                workflow it would hold only that one surviving group and this
+                gate would compute `length > 1` as false and unmount the very
+                control that let them pick it — the picker must be judged
+                against the whole board, never against its own output.
+
+                No `.gn-select` (the multi-select combobox in
+                `packages/ui`): that component is a listbox-and-panel widget
+                with no native `<select>` underneath it, and the brief and
+                the design spec both name this control a plain `<select>` —
+                metrics table "Workflow select `:325`", its own new
+                `.gn-project__workflow-select` rule in `ui.css` (`ctlBg`/
+                `ctlR`, no new token role; `ctlShadow` omitted, following
+                `.gn-button`'s own already-recorded open decision — see that
+                rule's docblock).
+              */}
+              {board.data !== null && board.data.groups.length > 1 ? (
+                <select
+                  className="gn-project__workflow-select"
+                  aria-label="Workflow"
+                  value={workflowFilter}
+                  onChange={(event) => setWorkflowFilter(event.target.value)}
+                >
+                  <option value="all">All workflows</option>
+                  {board.data.groups.map((group) => (
+                    <option key={group.workflowId} value={group.workflowId}>
+                      {group.workflowName}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {/*
                 THE FILTERS BUTTON (Task 5). Task 4's own report left it
                 unrendered on purpose ("An inert Filters button is a button
                 that lies... I chose do not render it yet") because nothing
@@ -892,6 +1025,17 @@ function ProjectBoard() {
               for Task 8's workflow picker — that narrows by dropping whole
               GROUPS, not by setting a filter axis, so no enumeration of axes
               could ever notice it on its own.
+
+              `chipCount` below reads `activeFilterChips.length`, NOT
+              `narrowingChips.length` (the list actually rendered two lines
+              down, which also includes `workflowChip` when one is active).
+              That is not an oversight: `workflowChip` does not need to be
+              counted into this gate for the gate to fire correctly for it —
+              the third term above already does that job by construction,
+              since picking a workflow can only ever change `shown`/`total`,
+              never `activeFilterChips`. Counting it here too would not
+              change the gate's answer in any case, only make it look like
+              the wrong term was doing the work.
             */}
             {view === 'board' &&
             boardNarrowing !== null &&
@@ -905,7 +1049,7 @@ function ProjectBoard() {
                 <span className="gn-project__count" data-testid="board-narrowing-count">
                   {boardNarrowing.shown} of {boardNarrowing.total} shown
                 </span>
-                {activeFilterChips.map((chip) => (
+                {narrowingChips.map((chip) => (
                   <span
                     key={chip.key}
                     className="gn-project__filter-chip"

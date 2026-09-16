@@ -2929,6 +2929,44 @@
   cursor: pointer;
 }
 
+/* ── The workflow picker (board-prototype-port, Task 8, Ruling R3,
+   2026-09-16). One new page-local rule. Metrics: spec's Page chrome table,
+   "Workflow select `:325`" — `min-height:44px; padding:0 12px; ctlBg +
+   ctlShadow; 15px/600`. `ctlBg` → `var(--gn-fill-tertiary)` per the plan's
+   own prototype→product table (`docs/superpowers/plans/
+   2026-09-16-board-prototype-port.md`); `ctlR` → `var(--gn-radius-control)`
+   — no new token role, same discipline as every block in this file.
+
+   `ctlShadow` is DELIBERATELY OMITTED, following `.gn-button`'s own
+   already-recorded divergence (`:22-30` above, the plan's "Divergences
+   already decided"): raising a `ctlBg` control to neo's raised/inset shadow
+   is an OPEN DECISION the repo owner left to a future round, not something
+   one page's task should settle piecemeal on one control. Applying it here
+   and not on `.gn-button`'s own Filters/New ticket, three centimetres to
+   this control's right, would make this the one place in the product that
+   quietly took a side on a question everything else has left alone. The
+   metric's own colour is left unset (`color: var(--gn-text)`, matching
+   `.gn-project__search`'s input beside it) rather than `--gn-text-accent`:
+   the spec's own table gives Filters and New ticket an explicit "accent"
+   entry and gives this row none, so this control is not styled as a
+   call-to-action the way those two are. */
+.gn-project__workflow-select {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-project__workflow-select:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
 /* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
    Metrics: spec, Filters sheet `:1367-1417`; the plan's own prototype→product
    table (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`)

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   BoardCard,
+  BoardGroup,
   BoardView,
   ClaimProvenance,
   ListRow,
@@ -356,5 +357,192 @@ describe('13.439 the tabs where search does not apply say so — only while a te
 
     const note = await screen.findByTestId('search-not-applied-note');
     expect(note).toHaveTextContent(/board only/i);
+  });
+});
+
+/**
+ * ## The workflow picker (board-prototype-port Task 8, Ruling R3)
+ *
+ * Narrows by dropping a whole GROUP, never by setting an axis on `filter`/
+ * `boardFilter` — `matchesBoardCard` has no group in its signature, so no
+ * chip built by `buildBoardFilterChips` could ever name this mechanism.
+ * These cases exercise the debt Task 4 named for the mechanism that could
+ * eventually produce "narrowing with no filter axis set": before this task,
+ * nothing could ever make `boardNarrowing.shown !== boardNarrowing.total`
+ * true while `activeFilterChips` stayed empty, so `shouldRenderBoard
+ * NarrowingStrip`'s third term was verified by reading the code, not by a
+ * test that reaches it through real data. This file's own cases are that
+ * test now (`13.470` below).
+ *
+ * `defaultWorkflow`/`bugWorkflow` deliberately reuse the workflow's own
+ * NAME ("Default"/"Bug triage") on BOTH the board's group heading
+ * (`<h3 className="gn-board__workflow">`, `board.tsx`) and the picker's own
+ * `<option>` text — the picker's options are built from the same
+ * `workflowName` field the heading reads. `screen.getByText('Default')`
+ * would therefore match BOTH elements and throw on an ambiguous query; the
+ * group-heading assertions below use `getByRole('heading', { level: 3,
+ * name: … })` instead, which is also the MORE precise check (it proves the
+ * board's own group rail rendered, not merely that the string exists
+ * somewhere on the page — the option would have supplied that either way).
+ *
+ * Cards render as `<li data-testid="ticket-card-…">` inside a `<ul>`
+ * (`board.tsx`), not `role="article"` — matching the discipline the
+ * existing `packages/app-core/test/views/board.test.tsx` already uses
+ * (`getAllByRole('listitem')`), per this task's own brief ("use the query
+ * the existing `board.test.tsx` uses rather than adding a role to satisfy a
+ * test"). Verified against this exact page mount, not assumed: `AttentionStrip`
+ * (`attention-strip.tsx:72`) returns `null` outright when its `items` array
+ * is empty, which every fixture here stubs it to be, so it contributes no
+ * stray `<li>` to the count; nothing else this page mounts (`AppNav`,
+ * `FiltersSheet` closed) renders one either.
+ */
+
+/** Two columns, two cards — the workflow this project's board is attached to before Task 8 ever runs. */
+const defaultWorkflow: BoardGroup = {
+  workflowId: 'wf-default',
+  workflowVersion: 1,
+  workflowName: 'Default',
+  columns: [
+    {
+      stateId: 'todo',
+      name: 'To do',
+      category: 'open',
+      blocked: false,
+      cards: [card({ ticketId: 'd_1', title: 'Default lane card one' })],
+    },
+    {
+      stateId: 'doing',
+      name: 'Doing',
+      category: 'active',
+      blocked: false,
+      cards: [card({ ticketId: 'd_2', title: 'Default lane card two' })],
+    },
+  ],
+};
+
+/** Two columns, three cards — a second workflow attached to the same project, so the picker has something to pick between. */
+const bugWorkflow: BoardGroup = {
+  workflowId: 'wf-bug',
+  workflowVersion: 1,
+  workflowName: 'Bug triage',
+  columns: [
+    {
+      stateId: 'triage',
+      name: 'Triage',
+      category: 'open',
+      blocked: false,
+      cards: [
+        card({ ticketId: 'b_1', title: 'Bug lane card one' }),
+        card({ ticketId: 'b_2', title: 'Bug lane card two' }),
+      ],
+    },
+    {
+      stateId: 'fixing',
+      name: 'Fixing',
+      category: 'active',
+      blocked: false,
+      cards: [card({ ticketId: 'b_3', title: 'Bug lane card three' })],
+    },
+  ],
+};
+
+/** Same shipped-server-shaped stub `servedBoard` above builds, but over a caller-supplied `BoardView` rather than `boardOf`'s single fixed group — this suite's own fixtures need MULTIPLE groups, which `boardOf` cannot produce. */
+function renderProjectPage({ groups }: { groups: BoardGroup[] }) {
+  const board: BoardView = { projectId: PROJECT_ID, groups };
+  return render(
+    <Providers
+      services={stubServices({
+        getBoard: async () => board,
+        getAttention: async () => [],
+        getMembers: async () => [],
+        getTicketTypes: async () => [],
+        getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),
+      })}
+    >
+      <ProjectPage />
+    </Providers>,
+  );
+}
+
+async function workflowSelect() {
+  return screen.findByRole('combobox', { name: /workflow/i });
+}
+
+describe('13.468 the picker defaults to All workflows, and the default drops no card', () => {
+  it('renders every group with the picker at its default value', async () => {
+    renderProjectPage({ groups: [defaultWorkflow, bugWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    expect(await workflowSelect()).toHaveValue('all');
+    expect(screen.getByRole('heading', { level: 3, name: 'Default' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Bug triage' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    // The resting state has dropped nothing, so the disclosure strip this
+    // mechanism shares with the client filter (13.438's own rule) stays
+    // absent — a stray "5 of 5 shown" here would itself be the small lie
+    // 13.438 already guards against for the card filter.
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.469 the picker does not render where it offers no real choice', () => {
+  it('renders no workflow combobox for a project with exactly one workflow', async () => {
+    renderProjectPage({ groups: [defaultWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    // Mirrors `Board`'s own identical judgment one level down: the group
+    // heading (`board.groups.length > 1 ? <h3>…`) is also absent here —
+    // checked as a cross-confirmation that this fixture really does carry
+    // only one workflow, not merely trusted from the fixture's own shape.
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /workflow/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('13.470 the picker discloses through the SAME count and chip the client filter uses', () => {
+  it('narrows to the picked workflow and names what it hid', async () => {
+    renderProjectPage({ groups: [defaultWorkflow, bugWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    await userEvent.selectOptions(await workflowSelect(), 'wf-bug');
+
+    // board.tsx:42-46 — a rearrangement that drops a card is a filter
+    // wearing a grouping's name. This one is labelled as a filter (the
+    // chip) and says what it hid (the count).
+    expect(await screen.findByText('3 of 5 shown')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove.*Bug triage/i })).toBeInTheDocument();
+    // Named, not merely counted: proves the SURVIVING three are the bug
+    // workflow's own cards, discriminating "the right group survived" from
+    // "some three cards survived" — the same discipline 13.435 already
+    // applies to the card-level filter, one section up.
+    expect(screen.queryByText('Default lane card one')).not.toBeInTheDocument();
+    expect(screen.queryByText('Default lane card two')).not.toBeInTheDocument();
+    expect(screen.getByText('Bug lane card one')).toBeInTheDocument();
+    expect(screen.getByText('Bug lane card two')).toBeInTheDocument();
+    expect(screen.getByText('Bug lane card three')).toBeInTheDocument();
+    // The dropped workflow's own group heading is gone too — Board renders
+    // every group `boardNarrowing.view` hands it exactly once, and the
+    // Default group is no longer one of them.
+    expect(screen.queryByRole('heading', { level: 3, name: 'Default' })).not.toBeInTheDocument();
+  });
+});
+
+describe('13.471 the chip and the count move together for the workflow picker too', () => {
+  it('restores every group and the picker’s own default when the chip is removed', async () => {
+    renderProjectPage({ groups: [defaultWorkflow, bugWorkflow] });
+    await screen.findByText('Default lane card one');
+
+    await userEvent.selectOptions(await workflowSelect(), 'wf-bug');
+    await screen.findByText('3 of 5 shown');
+
+    await userEvent.click(screen.getByRole('button', { name: /remove.*Bug triage/i }));
+
+    await screen.findByText('Default lane card one');
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    expect(await workflowSelect()).toHaveValue('all');
+    // With nothing narrowed at all, the whole strip disappears — the SAME
+    // rule 13.438 already pins for the card-level filter, proven here for
+    // the group-level one.
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
   });
 });

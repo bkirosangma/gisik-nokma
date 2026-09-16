@@ -4613,3 +4613,72 @@ rather than assumed from the earlier report's stash-verified baseline.
   `&& isNarrowed !== true` guard reddens this case's first `it` while 13.466 and this case's other two
   `it`s stay green. — (`packages/app-core/src/views/board.tsx`, `packages/app-core/test/views/board.test.tsx`,
   `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`)
+
+## Task 8 — the workflow picker, defaulting to All workflows (Ruling R3, 2026-09-16)
+
+**Cases `13.468`–`13.471` minted here**, continuing directly from `13.467` (verified against the real
+case list via `scripts/check-case-ids.mjs`, not the file's own "next free" prose, which the script's own
+self-test proves can false-hit on a truncated id — the sweep run before this task started found `13.632`
+and `13.999` as apparent hits that were actually a truncation of `13.632866`/`13.9999`, two example ids
+inside this file's own prose about the script's regex, three sections up). The picker narrows the board
+by dropping a whole GROUP — `matchesBoardCard` (`board-filter.ts`) takes a `card`/`column`/`projectId`
+and a `BoardFilterSpec`, with no group anywhere in that signature, so no axis this file's own chip
+builder enumerates could ever name this mechanism. `boardNarrowing` (`page.tsx`, Task 4's "ONE PASS"
+fold) widens to fold BOTH mechanisms into the SAME `shown`/`total` pair rather than gaining a second,
+parallel count: `total` sums every card in every group, including ones the workflow picker drops;
+`shown` counts only cards that are both in a KEPT group and pass `matchesBoardCard`.
+`shouldRenderBoardNarrowingStrip`'s third term (`shown !== total`, `board-search-scope.ts`) was written
+for exactly this case in Task 4's own review — before this task nothing could make it true while
+`activeFilterChips` stayed empty, so the wiring was verified by reading the code, not by a test that
+reaches it through real narrowing data. `13.470` is that test, and the wiring was
+MUTATION-WITNESSED, not merely asserted: the gate's own call was temporarily changed from
+`shown: boardNarrowing.shown` to `shown: boardNarrowing.total` (defeating only the third term), `13.470`
+and `13.471` reddened while every other case in the file — including `13.468`, which does not depend on
+the gate firing — stayed green, and the change was reverted and the suite re-run clean.
+
+The picker's own chip is built separately from `buildBoardFilterChips` (which enumerates `boardFilter`'s
+six fields and cannot be extended to a seventh it structurally has no data for) and merged with
+`activeFilterChips` ONLY at the render site (`narrowingChips`, `page.tsx`) — the gate's own `chipCount`
+argument deliberately keeps reading `activeFilterChips.length` alone, since the third term already covers
+group-dropping and double-counting the workflow chip there would not change the gate's answer, only
+obscure which term does the work.
+
+**The single-workflow decision (`13.469`).** A project with exactly one workflow offers no real choice
+between "All workflows" and that one workflow's name — both render the identical board. The picker is
+gated on `board.data.groups.length > 1`, mirroring `Board`'s OWN identical judgment for its group heading
+(`board.tsx`: `board.groups.length > 1 ? <h3 className="gn-board__workflow">`). Deliberately reads
+`board.data.groups` (the full, unfiltered set), never `boardNarrowing.view.groups` — the latter is
+already narrowed BY the picker, so once a workflow is picked it holds only the one surviving group, and
+gating against it would unmount the very control that let a person pick it.
+
+**Interaction with Task 7's `isNarrowed` (Ruling 19) — checked, not assumed.** Picking a workflow whose
+own group holds zero cards makes `boardNarrowing.shown === 0` while `boardNarrowing.total > 0` (the OTHER
+workflow's cards), so `isNarrowed` is `true` and `Board`'s `EMPTY_BOARD_COPY` — "create one" — is
+suppressed exactly as it is for a card-level filter that empties the view. The per-column
+`EMPTY_COLUMN_COPY` and its own "Add a ticket" button still render (unaffected by `isNarrowed`, per
+`Board`'s own docblock), and the narrowing strip reads "0 of N shown" with the removable workflow chip.
+Judged CORRECT, matching Ruling 19's own reasoning exactly: the remedy for an empty picked workflow is
+the chip sitting in the strip, not a project-wide "create a ticket" prompt naming the wrong fix. Not
+separately case-numbered — no new branch exists to test; the SAME `isNarrowed` expression Task 7 already
+built and case `13.467` already covers is what fires here, over data this task's own fixtures did not
+happen to construct.
+
+- **13.468** ✅ The picker defaults to `'all'`, so every group renders, no card is dropped, and the
+  disclosure strip this mechanism shares with the client filter (`13.438`'s own rule) stays absent at the
+  resting state. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+- **13.469** ✅ The picker renders no `<select>` at all for a project with exactly one workflow —
+  mirroring `Board`'s own group-heading gate, cross-confirmed by asserting the heading is absent too. —
+  (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/test/board-narrowing.test.tsx`)
+- **13.470** ✅ THE DEFERRED TASK 4 TEST, by name: reaches `shouldRenderBoardNarrowingStrip`'s third term
+  through real group-dropping data. Picking a workflow narrows the board to that group's own cards, reads
+  an honest `N of M shown` against the PROJECT's whole total (not the surviving group's), and shows a
+  removable chip naming the hidden workflow — the surviving cards are asserted BY NAME, not only by
+  count, and the dropped group's own heading is asserted absent. Mutation-witnessed: hardcoding the
+  gate's `shown` argument to equal `total` reddens this case (and `13.471`) while every other case in the
+  file stays green. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+- **13.471** ✅ Removing the workflow chip restores every group, resets the picker to `'all'`, and the
+  strip disappears entirely — the same rule `13.438` pins for the card-level filter, proven here for the
+  group-level one. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
