@@ -138,18 +138,39 @@ export type BoardGroup = {
 
 export type BoardView = { projectId: string; groups: BoardGroup[] };
 
-/** Composable filters (spec §7 Search): every axis optional, all AND-combined. */
-export type FilterSpec = {
-  text?: string;
+/**
+ * The six id-shaped axes of a filter — every one a list, and an absent or
+ * empty list narrows nothing. Declared ONCE and used twice (exclude-mode
+ * spec §1, 2026-09-17): spread into `FilterSpec` as its include half, and as
+ * the type of its `exclude` half — so the two halves cannot drift into two
+ * vocabularies, the fork `matches-filter.ts`'s docblock forbids.
+ */
+export type IdAxes = {
   assigneeIds?: string[];
   collaboratorIds?: string[];
   typeIds?: string[];
   stateIds?: string[];
   stateCategories?: StateCategory[];
   projectIds?: string[];
+};
+
+/** Composable filters (spec §7 Search): every axis optional, all AND-combined. */
+export type FilterSpec = IdAxes & {
+  text?: string;
   dueBefore?: string; // claimed dates only, YYYY-MM-DD — nothing estimated
   dueAfter?: string;
   fields?: Record<string, string>;
+  /**
+   * The exclude half (exclude-mode spec §1): a ticket matching ANY listed
+   * value on an axis is dropped. Evaluated after the include half — a ticket
+   * must match one of the includes (when any are set) AND none of the
+   * excludes. The Filters sheet's cycler never leaves one id in both halves;
+   * the predicates do not need to care. `text`, the due bounds and `fields`
+   * have no exclude form. CLIENT-SIDE ONLY: the wire's `filterSpecSchema`
+   * has no negation term, and `toServerFilterSpec` refuses a non-empty
+   * exclude rather than silently dropping it (`online/mappers.ts`).
+   */
+  exclude?: IdAxes;
 };
 
 export type Grouping = 'epic' | 'status' | 'assignee' | 'type' | 'flat';

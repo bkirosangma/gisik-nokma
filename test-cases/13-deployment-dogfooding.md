@@ -5930,3 +5930,13 @@ move. Measured before designing anything, in three cases (same file):
 M1/M2/M3 re-run after the guard landed: M1 kills `13.521`; M2 kills `13.519`, `13.520a`, `13.520b`,
 `13.522`, `13.536`, `13.537` (the last two at the arrow click on the way in); M3 kills `13.521` —
 `contains` subsumed none of them, since every one of those targets is DOM-contained.
+
+## Filters: exclude mode, reaching every tab (owner request, 2026-09-17)
+
+The exclude-mode design (`docs/superpowers/specs/2026-09-17-filter-exclude-all-tabs-design.md`)
+extends filter semantics to every tab by adding an `exclude` half to `FilterSpec`, eliminating the
+need for per-tab filter variants. These eleven tasks build that capability from the vocabulary up.
+
+- **13.538** ✅ `filter/id-axes.ts` — the two base rules (`narrowsTo`/`excludedBy`) and their any-of forms,
+  plus `claimedDueDay`/`claimText` moved here unchanged; and `FilterSpec.exclude` typed as the same
+  `IdAxes` the include half spreads in (a `@ts-expect-error` proves `text` has no exclude form).
