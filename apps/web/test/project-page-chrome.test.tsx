@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '../src/providers.js';
+import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -45,6 +46,19 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+
+/**
+ * `use-workspace-name.ts`'s own docblock: "Tests share one module, so they
+ * share this. Cleared between cases." 13.431 populates the module-scoped
+ * `nameCache` for `WORKSPACE`; without this, 13.432 (run second) would paint
+ * that cached name on its OWN first render instead of starting from the
+ * pending/refused state its own name describes — the same order-dependence
+ * `app-nav.test.tsx` already guards against for the identical cache. Fixed
+ * here the same way: cleared before each case, so every one starts cold.
+ */
+beforeEach(() => {
+  clearWorkspaceNameCache();
+});
 
 describe('the project page names itself from the same read AppNav already makes', () => {
   it('13.431 renders the workspace name in the breadcrumb and the project name as the title', async () => {

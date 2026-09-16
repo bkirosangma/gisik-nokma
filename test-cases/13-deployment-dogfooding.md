@@ -4118,3 +4118,39 @@ No new token roles: Task 1 was struck, so every `var(--gn-…)` referenced above
 was already declared before this change — the same role `.gn-field__label` already reads in the same
 file. `packages/ui/test/tokens.test.ts`'s role-existence guard and `token-discipline.test.ts`'s
 no-literal-colours guard both pass unchanged.
+
+**Task 2 fix round 2 (coordinator review of fix round 1) — one Critical, one Important, one
+amendment to the coordinator's own Ruling 5.**
+
+**Critical, no new case (the existing 11.160/13.430 tab-role/class assertions and 13.431/13.432's
+own name assertions already cover the corrected markup — the defect was purely structural
+placement, not a missing behaviour).** `.gn-project__header` had been holding the breadcrumb, the
+`<h1>` AND `createRegion` as three children of one `flex; align-items: center; flex-wrap: wrap`
+row — the 34px/700 title sat vertically centred beside the 13px breadcrumb and the New-ticket
+button. The metrics table's separate "Breadcrumb 13/18" / "Title 34/41" / "Header row top margin
+24px" entries describe three STACKED children of `.gn-project`'s own column, not one line, and
+Tasks 4/5/8 would each have landed their own control on that same crowded line. Restructured:
+breadcrumb and `<h1>` are now direct children of `.gn-project`, spaced by its 14px `gap`;
+`.gn-project__header` holds only `createRegion` and keeps its own `margin-top: 1.5rem`. The ARIA
+fix (`createRegion` out of `role="tablist"`) is unchanged.
+
+**Ruling 8 (amending Ruling 5) — `.gn-project` drops its bottom padding too.** Round 1 kept it,
+reasoning `.gn-shell`'s bottom padding didn't "double as this row's tighter one" — wrong: `.gn-shell`
+already supplies 48px bottom, so the kept 24px stacked to 72px against the prototype's 24px alone,
+the same additive defect Ruling 5 removed on the horizontal axis. `.gn-workspaces`, round 1's own
+cited precedent, adds no bottom padding either. `.gn-project` now sets no `padding` property at
+all; the residual gap (20px-vs-32px sides, 48px-vs-24px bottom) is recorded in the rule's own
+comment on both axes, not closed — closing either moves `.gn-shell` for every route.
+
+**Important — 13.432 was order-dependent.** `project-page-chrome.test.tsx` never cleared
+`useWorkspaceName`'s module-scoped `nameCache`, which 13.431 (run first) populates for `WORKSPACE`.
+13.432's assertions were still correct — they would have caught a real `?? id` regression — but its
+*initial* render painted the stale cached name rather than starting cold, so the case was not
+exercising the state its own description names when run after 13.431, and could have walked a
+different path standalone or under `--shuffle`. Fixed the way `app-nav.test.tsx` already does for
+the identical cache: `clearWorkspaceNameCache()` in `beforeEach`. **Confirmed by running 13.432
+alone** (`vitest run -t 13.432`), the check that actually proves the order-dependence is gone
+rather than merely re-passing the full file in its usual order.
+
+Neither case ID changes: 13.431 and 13.432 still name the same two behaviours, now proven true
+independent of run order and with the DOM shape the metrics table actually describes.

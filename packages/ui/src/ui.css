@@ -2666,26 +2666,33 @@
    one before a filtering task exists would be inventing a number. Left in
    place rather than dropped, since the task that adds the count will need
    this exact rule back immediately. */
-.gn-project { display: flex; flex-direction: column; gap: 0.875rem; padding: 0 0 1.5rem; }
-/* NO horizontal padding (Ruling 5, fix round 1) — it stacked. `.gn-shell`
-   already carries `padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`)
-   around `<AppNav>` and everything below it, so this rule's original literal
-   `padding: 0 2rem 1.5rem` (from the brief's table, applied verbatim) added
-   32px on top of that 20px rather than replacing it — 52px total, against a
-   prototype whose own wrapper has no outer gutter at all and IS the 32px.
-   `.gn-workspaces` (`globals.css:210`) already answers this exact shape for a
-   sibling page: it sets ONLY what `.gn-shell` does not already provide (there,
-   `max-width`/`margin`/`padding-top`, no horizontal component at all), with
-   its own docblock naming the residual gap explicitly — "20px vs the
-   prototype's 24px side gutter" for that page. Followed here the same way:
-   this rule keeps its bottom padding (24px, since `.gn-shell`'s own 48px
-   bottom does not double as this row's tighter one) and drops the horizontal
-   component entirely. **Residual divergence, recorded rather than fixed: the
-   project page now sits at `.gn-shell`'s 20px side gutter, not the
-   prototype's 32px.** Closing that gap would mean moving `.gn-shell` itself,
-   which would shift every route in the product for one page's inset —
-   `.gn-workspaces`' own docblock already made and recorded this exact
-   trade-off, and this rule inherits its reasoning rather than re-deriving it. */
+.gn-project { display: flex; flex-direction: column; gap: 0.875rem; }
+/* NO padding on EITHER axis (Ruling 5, fix round 1; amended by Ruling 8, fix
+   round 2 — my own bottom-padding call in round 1 was wrong and is corrected
+   here rather than left standing). `.gn-shell` already carries
+   `padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`) around
+   `<AppNav>` and everything below it, so this rule's original literal
+   `padding: 0 2rem 1.5rem` (from the brief's table, applied verbatim) stacked
+   additively on BOTH axes rather than replacing either: 52px total left/right
+   (20px + 32px, against a prototype whose own wrapper has no outer gutter at
+   all and IS the 32px) and — round 1's uncorrected half — 72px total bottom
+   (48px + 24px, against the prototype's 24px alone).
+
+   `.gn-workspaces` (`globals.css:210`) is the precedent for BOTH corrections,
+   not only the horizontal one round 1 read it for: it sets ONLY what
+   `.gn-shell` does not already provide, which for that page is
+   `max-width`/`margin`/`padding-top` — no horizontal component, and
+   deliberately NO bottom component either, because `.gn-shell`'s own 3rem
+   already covers it. `.gn-project` now follows the same rule exactly: no
+   `padding` property at all, on either axis.
+
+   **Residual divergence, recorded rather than fixed, on BOTH axes:** the
+   project page sits at `.gn-shell`'s 20px side gutter (not the prototype's
+   32px) and its 48px bottom gutter (not the prototype's 24px). Closing either
+   would mean moving `.gn-shell` itself, which would shift every route in the
+   product for one page's inset — `.gn-workspaces`' own docblock already made
+   and recorded this exact trade-off for its own axis, and this rule inherits
+   that reasoning on both axes rather than re-deriving it. */
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }

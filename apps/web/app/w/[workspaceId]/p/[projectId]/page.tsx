@@ -518,11 +518,39 @@ function ProjectBoard() {
             </div>
 
             {/*
-              `.gn-project__header` — Task 2 of the prototype port. Produces the
-              container Task 4 (search), Task 8 (workflow `<select>`) and Task 5
-              (Filters) add their own controls to; New ticket is the one control
-              already built, so it moves in now rather than waiting for a later
-              task to relocate it.
+              BREADCRUMB AND TITLE (fix round 1, Ruling 6; restructured fix round
+              2, coordinator Critical finding) — stacked children of `.gn-project`
+              itself, NOT of `.gn-project__header`. The metrics table lists "Page
+              padding", "Header row top margin 24px", "Breadcrumb 13/18" and
+              "Title 34/41" as separate entries against a COLUMN
+              (`.gn-project { flex-direction: column; gap: 14px }`), which is three
+              stacked children, not one flex line — putting the 34px/700 heading
+              inside `.gn-project__header` (`align-items: center`, `flex-wrap:
+              wrap`) vertically centred it on the same line as the 13px breadcrumb
+              and the New-ticket button, and would have put Tasks 4/5/8's search
+              box, workflow `<select>` and Filters button on that same line too.
+
+              Each name is independently omitted — not a placeholder, not the raw
+              id — while its own hook holds `null`. Neither reserves space while
+              absent: there is no fixed-height wrapper around either, so the
+              column is exactly as tall as its present children and grows once a
+              name resolves, rather than holding blank space that a name then
+              fills. `.gn-project__summary` (the `N of M shown` line) is
+              deliberately NOT rendered here — this task has no true count to put
+              in it; see the report for that choice.
+            */}
+            {workspaceName !== null ? (
+              <p className="gn-project__breadcrumb">{workspaceName}</p>
+            ) : null}
+            {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+
+            {/*
+              `.gn-project__header` — Task 2 of the prototype port. Controls
+              ONLY: Task 4 (search), Task 8 (workflow `<select>`) and Task 5
+              (Filters) add their own controls here; New ticket is the one
+              control already built, so it moves in now rather than waiting for a
+              later task to relocate it. The breadcrumb and title moved OUT of
+              this container in fix round 2 — see the comment above.
 
               MOVED OUT OF THE TABLIST, not merely reclassed: `createRegion` used
               to render as the tablist's fifth child, a plain `<button>` (or a
@@ -533,26 +561,8 @@ function ProjectBoard() {
               directly rather than scoping from the tablist container, so the move
               changes no test's reach (`page-refusals.test.tsx`,
               `project-create-gate.test.tsx`).
-
-              BREADCRUMB AND TITLE (fix round 1, Ruling 6) render here too, each
-              independently omitted — not a placeholder, not the raw id — while its
-              own hook holds `null`. Neither reserves space while absent: there is
-              no fixed-height wrapper around either, so `.gn-project__header` is
-              exactly as tall as its present children and grows once a name
-              resolves, rather than holding blank space that a name then fills.
-              `.gn-project__summary` (the `N of M shown` line) is deliberately NOT
-              rendered here — this task has no true count to put in it; see the
-              report for that choice.
             */}
-            <div className="gn-project__header">
-              {workspaceName !== null ? (
-                <p className="gn-project__breadcrumb">{workspaceName}</p>
-              ) : null}
-              {projectName !== null ? (
-                <h1 className="gn-project__title">{projectName}</h1>
-              ) : null}
-              {createRegion}
-            </div>
+            <div className="gn-project__header">{createRegion}</div>
 
             {/*
               The segmented control (`ui.css`'s shared `.gn-segmented` /
