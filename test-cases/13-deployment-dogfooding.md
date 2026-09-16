@@ -4740,3 +4740,80 @@ copy of it).
   shown. Mutation-witnessed: collapsing `resolvedWorkflowFilter` to raw `workflowFilter` reddens only
   this case. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
   `apps/web/test/board-narrowing.test.tsx`)
+
+## Task 11: Timeline restyle — geometry only, 2026-09-16
+
+**Case `13.474` minted here**, continuing directly from `13.473` (verified against `scripts/
+check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool is `13.473`, matching the
+dispatching agent's own count — never the file's own "next free" prose, per the false-hit note two
+sections up). Pure geometry over the metrics spec's Timeline table (`:506-538`), on selectors this task
+already owns end to end (`.gn-timeline*`) — no shared-surface question of the kind Task 9 hit, since
+`TimelineView` renders its own markup rather than a shared component. No new token role: `trayBg`/
+`trayShadow` → `--gn-surface-sunken`/`--gn-shadow-sunken` (the same pair the board's own column trays,
+Task 6, already use for identical prototype vocabulary) and `fill4` → `--gn-fill-quaternary`, both
+already declared and already consumed elsewhere in `ui.css`. The bar's `accent` ground / `accentText`
+text is UNCHANGED — it already used the pair `.gn-filters__chip[aria-pressed='true']` settled during
+this port's own Filters-sheet task over the plan's literal `--onColor` → `--gn-text-inverted` mapping,
+because `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and never measures
+`textInverted` there — so nothing about the bar's colour changed here, only its box.
+
+**Two pinned literals updated, both sanctioned by the tests' own docblocks rather than loosened.**
+`test/timeline/timeline-view.test.tsx` (11.82, "the window width is the model's, stated once") pins the
+component's published `--timeline-week-columns` value by EXACT equality (two cases: the default-eight
+window and a `weeksCount:2` forward) and, separately, an EXACT substring of `ui.css` itself
+(`` `grid-template-columns: 12rem var(${published[0]});` ``) whose own comment reads *"a change to the
+width alone will redden this too, and re-reading this comment is the intended cost."* Both paid here:
+the leading (title) track widens from Plan 9's `12rem` to the spec's `230px` (`14.375rem` — this repo's
+existing rem idiom, 1rem = 16px), and the published track-list value changes from `repeat(n, 1fr)` to
+`repeat(n, minmax(0, 1fr))` — the spec's own literal for this row ("`repeat(8,minmax(0,1fr))`"), and not
+merely a spec transcription: a bare `1fr` track carries CSS Grid's implicit automatic minimum of `auto`
+(min-content), so without `minmax(0, …)` a long bar or title could still push a week column wider than
+its share and defeat `.gn-timeline__bar`'s own `overflow:hidden; text-overflow:ellipsis`. Both the
+component (`timeline-view.tsx`) and the three affected assertions in `timeline-view.test.tsx` were
+updated together; the test's own regex guard against the WRAPPED form
+(`expect(css).not.toMatch(/repeat\(\s*var\(--timeline-/)`) is unaffected — `ui.css` still never wraps the
+var in `repeat()`, only the component's own published STRING contains the function now. The `+2` column
+arithmetic the `12rem` comment protects depends on there being exactly ONE leading track, not its width,
+and that count is unchanged.
+
+**Zebra uses `:nth-of-type`, not `:nth-child`, and this was checked rather than assumed.** Each row's
+siblings inside `.gn-timeline__group` include the group's own `<h3 class="gn-timeline__group-heading">`
+ahead of the rows; `:nth-child(odd)` would count that heading as sibling #1 and shift every row's parity
+by one, so a group's FIRST row would render unshaded. Read `timeline-view.tsx` to confirm every sibling
+`<div>` inside a group is in fact a `.gn-timeline__row` (the heading is the only non-div sibling), which
+is what makes `:nth-of-type` — same-tag-name counting only — the correct fix rather than a coincidental
+one.
+
+**The two load-bearing checks named in this task's brief, both re-verified rather than assumed clean.**
+(1) `timeline-view.test.tsx:396-441`'s per-reason side-list modifier classes
+(`gn-timeline__side-entry--no-dates`/`--start-only`/`--due-only`/`--start-after-due`/`--unplaceable-day`)
+are untouched by this task — no selector renamed, no modifier collapsed — and the case they anchor
+(11.77) still passes; this task never rendered a side-list fixture at all, so nothing here could have
+reached that code. (2) `packages/app-core/test/inbox/inbox-css-binding.test.tsx` references
+`.gn-timeline__bar` in exactly three places, and reading them shows why the reference is inert to this
+task: all three are FIXTURE STRINGS inside the inbox scanner's own self-test, proving the `gn-inbox`
+prefix matcher is not fooled by a different prefix (`.gn-timeline__bar { color: blue; }` as planted CSS,
+a rendered `<span class="gn-inbox__glyph gn-timeline__bar">` as a planted DOM tree, and
+`.gn-timeline__bar[data-pending] { outline: 1px dashed red; }` as a planted attribute-selector rule) —
+none of the three reads the REAL `ui.css` or the REAL `TimelineView`. The gate is a NEGATIVE control on a
+literal string, not a binding assertion on this component; it passed before this task's edits and after,
+unchanged (`inbox-css-binding.test.tsx`'s own suite: 8/8).
+
+`tsc --noEmit` clean on `packages/app-core` and `packages/ui` (Node v22.23.2). `pnpm exec vitest run` on
+`packages/app-core` (1227/1227) and `packages/ui` (308/308); `pnpm turbo run test` at the repo root
+confirmed `apps/web`'s `test/project-calendar-timeline.test.tsx` (queries `.gn-calendar`/`.gn-timeline`/
+`.gn-board` existence — Test impact table's own instruction to re-verify, not assume) still passes
+against the rebuilt `dist/` app-core consumes. `packages/ui/test/token-discipline.test.ts` and
+`tokens.test.ts` re-run directly (not from cache): clean, no colour literal, every new `var(--gn-…)`
+declared. **No live cross-style/cross-theme visual check was performed** — the spec's own Verification
+section calls for one ("A live read of the board, list, calendar and timeline in all three styles × both
+themes") and it is named here as a gap for whoever reviews this before merge, not silently skipped.
+
+- **13.474** 🧪 The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
+  `trayShadow` header grid, `minmax(0, 1fr)` week tracks, 42px zebra rows, a 6px-radius `accent`/
+  `accentText` bar (still `0` on the clipped side only), and a `trayBg`/`trayShadow` undrawn footer.
+  Verified by the full `app-core`/`ui` suites (including the three updated pinned literals in
+  `timeline-view.test.tsx` and the untouched 11.77/`inbox-css-binding` gates) plus `tsc`; NOT verified by
+  a live render in any style or theme — manual, pending a reviewer's screen. —
+  (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
+  timeline-view.test.tsx`, `packages/ui/src/ui.css`)

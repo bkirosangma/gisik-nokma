@@ -1456,19 +1456,58 @@
   font-size: 0.85rem;
 }
 
-/* The two grids that must agree, reading ONE count. The first column is the
-   title column; week `i` is column `i + 2`, which is what the bar's computed
-   `grid-column` says too. */
+/* Board prototype port Task 11 (2026-09-16), spec Timeline `:506-538`. NO NEW
+   ROLE: `trayBg`/`trayShadow` → `--gn-surface-sunken`/`--gn-shadow-sunken`
+   (the same pair the board's own column trays already use for identical
+   prototype vocabulary — `.gn-board__column`, Task 6) and `fill4` →
+   `--gn-fill-quaternary` — both already declared, already consumed elsewhere
+   in this file. `accent`/`accentText` for the bar are UNCHANGED from Plan
+   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3224-3227`
+   above) already settled "accent ground + onColor" as
+   `background: var(--gn-accent); color: var(--gn-accent-text)` over the
+   plan's literal `--onColor` → `--gn-text-inverted` mapping, because
+   `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and
+   never measures `textInverted` there at all — this bar already used that
+   exact pair, so nothing here changes it.
+
+   The two grids that must agree, reading ONE count. The first column is the
+   title column, widened from Plan 9's 12rem to the spec's 230px (14.375rem)
+   — pinned by an EXACT substring match in
+   `test/timeline/timeline-view.test.tsx` (`grid-template-columns: 12rem
+   var(--timeline-week-columns);`, 11.82's third case), which that case's own
+   docblock sanctions changing ("a change to the width alone will redden
+   this too, and re-reading this comment is the intended cost") — updated
+   alongside this. Week `i` is column `i + 2`, which is what the bar's
+   computed `grid-column` says too; that arithmetic depends on there being
+   exactly ONE leading track, not on its width, so it is unaffected. */
 .gn-timeline__weeks,
 .gn-timeline__row {
   display: grid;
-  grid-template-columns: 12rem var(--timeline-week-columns);
+  grid-template-columns: 14.375rem var(--timeline-week-columns);
   align-items: center;
 }
-.gn-timeline__weeks { }
+/* Header grid: trayBg + trayShadow on the CONTAINER — `.gn-timeline__corner`
+   and `.gn-timeline__week` are transparent grid items sitting on top of it,
+   the same "background on the row, not the cell" shape the list's group
+   header bar (`.gn-list__section-title`, below) uses. */
+.gn-timeline__weeks {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
+/* Row: min-height 42px, zebra fill4. `:nth-of-type`, not `:nth-child` — each
+   row's siblings inside `.gn-timeline__group` include the group's own `<h3
+   class="gn-timeline__group-heading">` ahead of the rows, and `:nth-child`
+   would count that heading as sibling #1, shifting every row's parity by
+   one. `:nth-of-type` counts only same-tag-name siblings (every sibling
+   `<div>` in a group is a `.gn-timeline__row` — the heading is an `<h3>`),
+   so the first row is always odd regardless of the heading above it. */
+.gn-timeline__row { min-height: 2.625rem; }
+.gn-timeline__row:nth-of-type(odd) { background: var(--gn-fill-quaternary); }
 .gn-timeline__week {
-  padding: 0.25rem;
+  padding: 0.5625rem 0.625rem;
   font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
   color: var(--gn-text-muted);
 }
 
@@ -1485,12 +1524,13 @@
 }
 .gn-timeline__bar {
   border: none;
-  border-radius: 4px;
-  margin: 2px 0;
-  padding: 2px 0.25rem;
+  border-radius: 0.375rem;
+  margin: 0.3125rem 0.1875rem;
+  padding: 0.1875rem 0.5625rem;
   text-align: left;
   font: inherit;
   font-size: 0.75rem;
+  line-height: 1rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1504,9 +1544,9 @@
 .gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
 /* A period that continues past the window's edge. Dashed at the end it is
    clipped at, and only that end — the bar does not claim to start or finish
-   where the window happens to. */
-.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 4px 4px 0; }
-.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 4px 0 0 4px; }
+   where the window happens to. Corner radius follows the base bar's 6px. */
+.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 0.375rem 0.375rem 0; }
+.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 0.375rem 0 0 0.375rem; }
 .gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
 
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
@@ -1523,10 +1563,16 @@
    rule would cross the glyphs. */
 .gn-timeline__claim[data-pending] { outline: 1px dashed var(--gn-pending); outline-offset: 1px; }
 
+/* Undrawn footer: padding 12px 14px, trayBg + trayShadow — the same pair
+   `.gn-timeline__weeks` above uses for the identical prototype vocabulary.
+   No radius: the spec's Timeline metrics give this row none, matching the
+   list's group-header bar below. */
 .gn-timeline__side {
-  padding: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
 }
-.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.75rem; line-height: 1rem; }
 .gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__side-entry { padding: 0.15rem 0; }
 .gn-timeline__open {
