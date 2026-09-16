@@ -4323,7 +4323,7 @@ reverted with a targeted edit (not `git checkout`), confirmed clean by re-runnin
   (every fixture card shares the one state) — the narrowing strip's three-term gate opens on a chip
   existing, independent of whether it removed anything. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.450** ✅ Pressing a Category chip narrows the board to zero cards and shows the
-  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:204-208`) holds at the
+  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:216-219`) holds at the
   limit. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.451** ✅ THE DEFERRED TASK 4 TEST. Picking a Collaborator through the real
   `openFiltersAndPickCollaborator` helper does not narrow the board (the count stays `M of M`) but
@@ -4427,9 +4427,9 @@ its own flex column layout), the count (`.gn-board__count`'s body updated to the
 selector kept for `board.test.tsx:142`), and the card (`.gn-board-card`, 14px padding via
 `.gn-card.gn-board-card`'s source-order win over the untouched `.gn-card`, never a specificity win —
 both are `(0,1,0)`). One real behaviour change, not merely restyling: `.gn-board-card--pending`'s
-dashed in-transit outline had a rule but no wiring — `board.tsx:639` never added the modifier class —
+dashed in-transit outline had a rule but no wiring — `board.tsx:650` never added the modifier class —
 so it is wired onto `card.pending`, the same flag the existing "claim in transit" chip already reads.
-**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:398`
+**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:409`
 already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip--blocked
 .gn-chip__dot` (`ui.css:155`) already carries the tone as a coloured dot against a readable
 `--gn-text` label — the tinted-ground-plus-same-hue-text version the prototype and an earlier draft of
@@ -4570,7 +4570,7 @@ recorded here rather than only in the component's own comment.
 **Case `13.467` minted here**, continuing directly from `13.466`. A cross-task interaction neither Task 4
 (client-side board narrowing) nor this task's own R6 caught on its own: `page.tsx:1063` hands `<Board>`
 `boardNarrowing.view`, the POST-FILTER groups, never `board.data` directly (Ruling 1, Task 4). Task 4's
-narrowing drops CARDS only — never a column or a group (`board.tsx:204-208`'s own invariant) — so pre-R6
+narrowing drops CARDS only — never a column or a group (`board.tsx:216-219`'s own invariant) — so pre-R6
 this was harmless: the old gate read `board.groups.length`, which a card filter never touches, so the
 narrowed-to-zero state could never reach it. R6's `totalCards` fold reads exactly the narrowed cards,
 so without a fix a search matching nothing rendered `EMPTY_BOARD_COPY` — "No tickets here yet — create

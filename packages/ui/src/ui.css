@@ -333,7 +333,7 @@
   gap: 0.625rem;
 }
 /* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
-   2026-09-16) — no rule was ever added for it. `board.tsx:398` renders the
+   2026-09-16) — no rule was ever added for it. `board.tsx:409` renders the
    column name as `Chip`'s own child text, tone set from `column.blocked`/
    `column.category`; `Chip` takes no `className`, so there is no element
    this rule could attach to, and the name already renders — at the chip's

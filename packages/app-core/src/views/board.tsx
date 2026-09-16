@@ -149,7 +149,7 @@ export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
  * shown` count and its removable chips, and passes whether the view it
  * handed `Board` was narrowed. What is still true is narrower than the old
  * claim: `Board` does not thread `isNarrowed` down past itself into
- * `BoardGroupSection` (`:314-334`), which is what actually renders this
+ * `BoardGroupSection` (`:325-345`), which is what actually renders this
  * copy, once per empty column — so from THIS component's own vantage point
  * the data remains unavailable, even though it is no longer unavailable to
  * `Board` as a whole. Threading it the rest of the way is unscoped follow-up

@@ -126,7 +126,7 @@ That grep finds classes whose names *start* with a view prefix. It cannot find
 the shared component classes these views render through, and those are not inert
 anywhere:
 
-- `board.tsx:10` imports `Avatar, Button, Card, Chip`; `:639` renders
+- `board.tsx:10` imports `Avatar, Button, Card, Chip`; `:650` renders
   `<Card className="gn-board-card">`, and `card.tsx:7` composes
   `['gn-card', className]` — so today the board card **is** a `.gn-card`, with
   no `.gn-board-card` rule of its own anywhere in `ui.css`.
@@ -190,7 +190,7 @@ degrade — it empties the board:
 | `fields` | `:83-84` `claimText(state.fields[id]?.value)` | absent → null ≠ wanted → **every card dropped** |
 
 A board reading `0 of 40 shown` while the list shows forty is worse than the
-failure `board.tsx:204-208` warns about, and the disclosure invariant cannot
+failure `board.tsx:216-219` warns about, and the disclosure invariant cannot
 rescue it: the count would be telling the truth about a lie. Reuse would also
 require wrapping `card.title` in a fabricated `FieldClaim` with invented
 `actorId`, `clientTime` and `serverTime` (`entity-state.ts:6`) purely to satisfy
@@ -229,7 +229,7 @@ rather than presenting `M` as the project's total. A bare `N of M` under an
 active server narrowing would assert the project holds `M` tickets when it holds
 more, which is the `?? []` failure in a different costume.
 
-**The disclosure invariant, stated once for both mechanisms.** `board.tsx:204-208`
+**The disclosure invariant, stated once for both mechanisms.** `board.tsx:216-219`
 holds that a rearrangement which drops a card "is a filter wearing a grouping's
 name, and the ticket it dropped is gone with nothing saying so". Two things in
 this change can drop a card from view: the **client filter** (T3) and the
@@ -241,7 +241,7 @@ either mechanism is engaged, cards leave the screen.
 > both (a) the `N of M shown` count and (b) a removable chip naming what is
 > hidden. Neither half ships without the other, and neither mechanism is exempt.
 
-That pairing is what discharges `board.tsx:204-208` — not R3's default. It is one
+That pairing is what discharges `board.tsx:216-219` — not R3's default. It is one
 invariant over two features, so T3 and T4 satisfy the same requirement rather
 than each inventing its own disclosure.
 
@@ -479,7 +479,7 @@ combination is not readable at 13px in any theme this product ships.
 
 **The product does not need it.** `.gn-chip` carries tone as `.gn-chip__dot`
 (`ui.css:154`) — a non-text graphic, governed by WCAG 1.4.11's 3:1, not
-1.4.3's 4.5 — with `color: var(--gn-text)` for the label. `board.tsx:398`
+1.4.3's 4.5 — with `color: var(--gn-text)` for the label. `board.tsx:409`
 already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`.
 This chip is squarely inside *What already matches — do not churn it*.
 

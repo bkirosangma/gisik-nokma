@@ -56,7 +56,7 @@ function capitalizeWord(word: string): string {
  * `text` was the only axis with a UI control when it was written. The other
  * five could narrow the rendered board while producing no chip and no
  * unapplied-axis entry, closing the disclosure gate on cards that had, in
- * fact, been dropped — `board.tsx:204-208` exactly, unreachable only because no
+ * fact, been dropped — `board.tsx:216-219` exactly, unreachable only because no
  * control existed yet to set them. Building the chip list from `boardFilter`
  * itself, covering every one of its six fields, is what stops a future
  * control (Task 5's Filters sheet, Task 8's workflow picker) writing an axis
