@@ -3989,3 +3989,49 @@ state to recover a hint. `Workspaces` remains one click away and is the real rou
 module, so a case rendering `<AppNav workspaceId="ws_1" />` left the key behind for every case after it —
 order-dependence that shows up as a suite going red when one test is renamed. `app-nav.test.tsx` now
 clears storage and reseeds the mock session in `beforeEach`.
+
+### Round 26 — the nav stops jittering on page changes
+
+**Block `13.428`–`13.429` minted here; the next free BLOCK is `13.430`.** Owner: *"the nav bar item
+jitters on changing pages. the workspace scoped items briefly disappears and reappears. make it so that
+it is smooth and the jitter does not happen."*
+
+**The mount is the bug.** `Providers` lives in the root layout and persists across client-side
+navigation, but `AppNav` is rendered by each PAGE (`app/inbox/page.tsx:210` and fourteen siblings), so
+every navigation unmounts and remounts it. Its state therefore reset to "nothing known yet" on every page
+change: `useLastWorkspace` restarted at `unknown` and `useWorkspaceName` at `null`, so the
+workspace-scoped links vanished for the tick it took to re-read storage and re-fetch the name, then came
+back. Round 25 made this loud by putting four links behind that state; **the workspace-NAME half of it
+predates Round 25 entirely** and flickered even when navigating between two pages of the same workspace,
+where it was one item and easier to miss.
+
+Fixed by holding both answers in MODULE scope, which survives the remount, and initialising `useState`
+from them. The first load of a session still resolves asynchronously — nothing is known yet, and
+painting links from no information would be inventing state.
+
+**Two things the fix must not do, each with its own case and each mutation-witnessed:**
+
+- It must not **resurrect a workspace you have lost**. The cache is read on every remount, so an entry
+  left behind after the product learns the workspace is gone would put the name back one navigation
+  later — 13.426's defect displaced in time rather than fixed. A successful read that does not contain
+  the workspace therefore EVICTS; only a rejected read (transient) leaves the entry alone.
+- It must not **leak across viewers**. Neither cache passes through `readFor`'s user guard — the
+  remembered-workspace cache is checked before it, the name cache is keyed by workspace id alone — so
+  both are dropped when the observed user id changes. Signing out and back in as someone else is a
+  client-side navigation, which does NOT reset module state.
+
+- **13.428** ✅ After a navigation, the workspace name, My Work, Members and Settings are present in the
+  FIRST committed render, and the scope note never flashes in their place. **The case mounts twice and
+  asserts synchronously, and both are load-bearing**: every other case in this file mounts once and so
+  could not see a remount defect at all, and any `findBy*` here would wait exactly long enough to hide
+  the flicker it exists to catch. **Mutation-witnessed:** restoring either hook's cold start reddens this
+  case and nothing else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.429** ✅ A workspace that has become unreachable does not reappear on the next navigation, proving
+  the eviction above. — (`apps/web/test/app-nav.test.tsx`)
+
+**A mutation that was thrown away rather than believed.** The first attempt at witnessing 13.428 replaced
+the `useState` initialiser with `() => { status: 'unknown' }` — a block body returning `undefined`, not
+the object literal intended. It reddened 22 cases, which looks like a strong witness and is worthless:
+the code under test was malformed rather than reverted. A mutation must be the code that plausibly
+SHIPS, and a failure count far larger than expected is a reason to re-read the mutant, not to record a
+result.

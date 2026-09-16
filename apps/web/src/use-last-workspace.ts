@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { clearWorkspaceNameCache } from './use-workspace-name.js';
 
 /**
  * Follows the `gn-style` / `gn-theme` convention this shell already uses
@@ -51,12 +52,46 @@ export type LastWorkspace =
  * cannot reach, so `AppNav` gates the remembered links on that — the same
  * shared read, no second request, and no second notion of "reachable" to keep
  * in sync with the first.
+ *
+ * ## Round 26 — the answer is held OUTSIDE React, see `cache` below
  */
+
+/**
+ * MODULE-SCOPED, and this is the whole fix for the nav's jitter.
+ *
+ * `AppNav` is rendered by each PAGE (`app/inbox/page.tsx:210` and fourteen
+ * siblings), not by the root layout, so every client-side navigation unmounts
+ * and remounts it. Per-component state therefore resets to `unknown` on every
+ * page change, the workspace-scoped links vanish for the tick it takes to read
+ * storage, and then come back — which is exactly the flicker the owner saw.
+ *
+ * Holding the last answer outside React survives that remount, so the second
+ * and every later navigation starts from what is already known and paints the
+ * links on the FIRST frame. The first load of the session still resolves
+ * asynchronously, which is correct: nothing is known yet, and claiming
+ * otherwise would be inventing state.
+ *
+ * Keyed by user, for the same reason the stored record is: a cache that
+ * outlived a sign-out would hand the next person the previous one's workspace,
+ * bypassing the guard in `readFor` entirely by never reaching it.
+ */
+let cache: { userId: string; value: LastWorkspace } | null = null;
+
+/** Tests share one module, so they share this. Cleared between cases. */
+export function clearLastWorkspaceCache(): void {
+  cache = null;
+}
+
+/** The last workspace this person opened. See the docblock above `cache`. */
 export function useLastWorkspace(
   routeWorkspaceId: string | undefined,
   userId: string | null,
 ): LastWorkspace {
-  const [remembered, setRemembered] = useState<LastWorkspace>({ status: 'unknown' });
+  const [remembered, setRemembered] = useState<LastWorkspace>(() =>
+    // Only the initial value: `useState`'s initialiser runs once per mount, so
+    // this is the remount's head start and never a source of staleness after.
+    userId !== null && cache?.userId === userId ? cache.value : { status: 'unknown' },
+  );
 
   useEffect(() => {
     // Signed out, or the session has not landed: nothing is remembered FOR
@@ -66,6 +101,26 @@ export function useLastWorkspace(
       setRemembered({ status: 'none' });
       return;
     }
+
+    // THE VIEWER CHANGED. Both module caches hold what the PREVIOUS person was
+    // served, and neither is reached through `readFor`'s user guard — the
+    // remembered-workspace cache is checked before it, and the name cache is
+    // keyed by workspace id alone. So they are dropped here, at the one place
+    // in the shell that observes the identity changing.
+    //
+    // Without this, signing out and back in as someone else (a client-side
+    // navigation, which does NOT reset module state) could paint the previous
+    // viewer's workspace name for a frame — the flicker fix re-creating, in a
+    // subtler form, exactly the leak the keyed storage record prevents.
+    if (cache !== null && cache.userId !== userId) {
+      cache = null;
+      clearWorkspaceNameCache();
+    }
+
+    const remember = (value: LastWorkspace): void => {
+      cache = { userId, value };
+      setRemembered(value);
+    };
 
     // The route is authority. Opening a workspace is what makes it the last
     // one opened, so this is both the write and the answer.
@@ -80,11 +135,11 @@ export function useLastWorkspace(
         // route for this page; only the memory is lost, and a nav that refused
         // to render because it could not write a convenience would be worse.
       }
-      setRemembered({ status: 'remembered', workspaceId: routeWorkspaceId });
+      remember({ status: 'remembered', workspaceId: routeWorkspaceId });
       return;
     }
 
-    setRemembered(readFor(userId));
+    remember(readFor(userId));
   }, [routeWorkspaceId, userId]);
 
   return remembered;

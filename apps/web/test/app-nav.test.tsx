@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
@@ -62,6 +62,8 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import { AppNav } from '../src/app-nav.js';
+import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
+import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import HelpPage from '../app/help/page.js';
 import AccountPage from '../app/account/page.js';
 
@@ -114,6 +116,11 @@ function navServicesWithUnread(count: number) {
  */
 beforeEach(() => {
   window.localStorage.clear();
+  // ROUND 26: the jitter fix keeps its answers in MODULE scope, which one test
+  // file shares for its whole run — the same order-dependence `localStorage`
+  // has, one layer up. Both are cleared so every case starts cold.
+  clearLastWorkspaceCache();
+  clearWorkspaceNameCache();
   mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
 });
 
@@ -487,6 +494,87 @@ describe('13.391 the nav is contextual', () => {
     expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  /**
+   * 13.428 — THE JITTER. Owner: "the nav bar item jitters on changing pages.
+   * the workspace scoped items briefly disappears and reappears."
+   *
+   * **The mount is the bug, so the test has to mount twice.** `AppNav` is
+   * rendered by each PAGE rather than by the root layout, so a client-side
+   * navigation unmounts and remounts it; every previous case in this file
+   * mounts once and therefore could not see this. The second mount below IS
+   * the navigation, and the assertion is deliberately SYNCHRONOUS — the whole
+   * complaint is about the first frame, and any `findBy*` here would wait
+   * exactly long enough to hide the defect it is meant to catch.
+   */
+  it('13.428 paints the workspace links on the first frame after a navigation', async () => {
+    // First page: a workspace route, which is what warms what the next page needs.
+    currentPath = '/w/ws_1/my-work';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+    await screen.findByRole('link', { name: 'Convenience Corner' });
+
+    // NAVIGATE: unmount, then mount the next page's own AppNav.
+    cleanup();
+    currentPath = '/inbox';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // No `await`. These must be present in the first committed render.
+    expect(screen.getByRole('link', { name: 'Convenience Corner' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Members' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    // And the note never flashes in their place.
+    expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.429 — the jitter fix must not resurrect a workspace you have lost.
+   *
+   * The cache that removes the flicker is read by `useState` on every remount,
+   * so an entry left behind after the product learns the workspace is gone
+   * would put the name back on screen one navigation later — the fix
+   * re-introducing the defect 13.426 forbids, displaced in time.
+   */
+  it('13.429 does not re-show a workspace that has since become unreachable', async () => {
+    currentPath = '/w/ws_1/my-work';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+    await screen.findByRole('link', { name: 'Convenience Corner' });
+
+    // Removed from it: the read now SUCCEEDS and no longer contains ws_1.
+    cleanup();
+    currentPath = '/inbox';
+    render(
+      <Providers services={workspacesOf([])}>
+        <AppNav />
+      </Providers>,
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Convenience Corner' })).toBeNull(),
+    );
+
+    // One more navigation — a fresh mount, not a rerender, because that is what
+    // a page change is. The stale cache entry, if kept, reappears right here.
+    cleanup();
+    render(
+      <Providers services={workspacesOf([])}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(screen.queryByRole('link', { name: 'Convenience Corner' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
   });
 
   /**
