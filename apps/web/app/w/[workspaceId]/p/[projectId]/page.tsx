@@ -1162,6 +1162,51 @@ function withToggledId(
   return { ...filter, [key]: toggledArray(filter[key], id) };
 }
 
+/**
+ * RULING 13's own regression: "Clear all" (Ruling 12's fix) cleared a
+ * DIFFERENT six than its own docblock and both commit messages claimed —
+ * `collaboratorIds` (not a `BoardFilterSpec` axis) IN, `projectIds` (one of
+ * the six, with a working chip) OUT — because the set existed only as a
+ * hand-typed object literal inside `clearAll`, with nothing else in the file
+ * checking it against the axes it was supposed to name. Exported as ONE
+ * array so `clearAll` and `filters-sheet.test.tsx` read the SAME list rather
+ * than two independently hand-typed copies — the exact mechanism that
+ * produced the wrong six twice. The six `BoardFilterSpec` fields
+ * (`buildBoardFilterChips`'s own domain) plus `collaboratorIds` (this
+ * sheet's one board-blind axis, which discloses through the scope note
+ * rather than a chip — see `FiltersSheet`'s own docblock).
+ */
+export const FILTERS_SHEET_CLEARABLE_AXES = [
+  'text',
+  'assigneeIds',
+  'typeIds',
+  'stateIds',
+  'stateCategories',
+  'projectIds',
+  'collaboratorIds',
+] as const satisfies readonly (keyof FilterSpec)[];
+
+/**
+ * Resets every axis named in `FILTERS_SHEET_CLEARABLE_AXES` to `undefined`,
+ * leaving every other `FilterSpec` field untouched. A separate function
+ * (rather than inlined in `clearAll`) so it can be unit-tested directly
+ * against a `FilterSpec` carrying `projectIds` — a shape no control on this
+ * page can currently produce through the UI, which is exactly why Ruling
+ * 13's gap went unnoticed until the coordinator's review read the code
+ * axis-by-axis rather than trusting the docblock.
+ */
+export function clearFilterAxes(filter: FilterSpec): FilterSpec {
+  const next: FilterSpec = { ...filter };
+  for (const axis of FILTERS_SHEET_CLEARABLE_AXES) {
+    // Every `FilterSpec` field is optional, so `undefined` is a legal value
+    // for every one of them — the cast exists only because TypeScript
+    // cannot narrow an assignment made through a `keyof` union spanning
+    // fields of different types, not because this could ever be unsafe.
+    (next as Record<keyof FilterSpec, unknown>)[axis] = undefined;
+  }
+  return next;
+}
+
 type FiltersSheetProps = {
   open: boolean;
   /** The ONE close path for every exit (Escape, backdrop click, "Done") — see `ProjectBoard`'s own `closeFilters` for why a single function, not one per exit. */
@@ -1193,12 +1238,14 @@ type FiltersSheetProps = {
  * one thing the brief and `page.tsx`'s own comments repeatedly forbid — and
  * it would desync the moment someone removes a chip from the narrowing strip
  * while the sheet is closed: the strip writes `filter` directly, and a
- * buffered copy would not see it. The footer is "Clear all" (clears all six
- * `BoardFilterSpec` axes the narrowing strip's chips can represent — `text`
- * included, even though the search box is Task 4's control living outside
- * this sheet; RULING 12: the button's own label is the promise a viewer
- * reads, and "clears every axis but the one filtered elsewhere" is not what
- * "Clear all" says — does not close) and "Done" (closes only).
+ * buffered copy would not see it. The footer is "Clear all" (RULING 12: the
+ * button's own label is the promise a viewer reads, so it clears every axis
+ * the narrowing strip's chips can represent — the six `BoardFilterSpec`
+ * fields, `text` included even though the search box is Task 4's control
+ * living outside this sheet — PLUS `collaboratorIds`, which this sheet can
+ * set and which discloses through the scope note rather than a chip; see
+ * `clearAll`'s own docblock, corrected by RULING 13, for the exact set —
+ * does not close) and "Done" (closes only).
  *
  * ## Which axes get a control here, and which do not
  *
@@ -1310,35 +1357,18 @@ function FiltersSheet({
   if (!open) return null;
 
   /**
-   * RULING 12: "Clear all" clears every axis the narrowing strip's chips can
-   * represent — all SIX of `BoardFilterSpec`, `text` included — not only the
-   * five this sheet has its own controls for. The first version left `text`
-   * out on the reasoning that the search box is Task 4's control, outside
-   * this sheet; that reasoning was correct about OWNERSHIP and wrong about
-   * what the button on screen promises. A person who types a search term,
-   * opens Filters, and clicks a button labelled "Clear all" sees the text
-   * chip survive — the visible word overclaims, and an accurate docblock
-   * above an inaccurate control is still a lie to whoever is looking at the
-   * control, not the comment. Clearing `text` here keeps `activeFilterChips`
-   * (all six axes) as the ONE disclosure surface this button's label
-   * promises, rather than "all but the one axis with a control somewhere
-   * else". The search `<input>` needs no separate reset: it is a controlled
-   * component reading `value={filter.text ?? ''}` directly
+   * RULING 12, corrected by RULING 13 (the first fix cleared a DIFFERENT six
+   * than it claimed to — see `FILTERS_SHEET_CLEARABLE_AXES`'s own docblock
+   * for the exact defect). "Clear all" clears every axis in that ONE
+   * exported list — the six `BoardFilterSpec` fields plus `collaboratorIds`
+   * — read here, not re-typed, so this function and its test share a single
+   * source rather than two hand-typed copies that can silently diverge
+   * again. The search `<input>` needs no separate reset for `text`: it is a
+   * controlled component reading `value={filter.text ?? ''}` directly
    * (`ProjectBoard`'s own JSX), never local state, so clearing `filter.text`
-   * here empties it for free — checked, not assumed, and confirmed by
-   * `13.459` asserting the input's value directly, not only the chip's
-   * absence.
+   * here empties it for free — checked, not assumed, confirmed by `13.459`.
    */
-  const clearAll = () =>
-    setFilter((current) => ({
-      ...current,
-      text: undefined,
-      assigneeIds: undefined,
-      collaboratorIds: undefined,
-      typeIds: undefined,
-      stateIds: undefined,
-      stateCategories: undefined,
-    }));
+  const clearAll = () => setFilter(clearFilterAxes);
 
   const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
     <fieldset className="gn-filters__section">

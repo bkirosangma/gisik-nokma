@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { Actor, BoardCard, BoardView, ClaimProvenance } from '@gisik-nokma/app-core';
+import type { Actor, BoardCard, BoardView, ClaimProvenance, FilterSpec } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -13,13 +13,22 @@ import { stubServices } from './helpers/stub-services.js';
  * (`Providers` + `stubServices`, copied rather than imported — the
  * convention every test file in this directory already follows), same
  * `13.4xx` numbering series (`test-cases/13-deployment-dogfooding.md`), new
- * cases `13.445`–`13.456`.
+ * cases `13.445`–`13.462`.
  *
  * `13.451` is the test Task 4's own brief deferred: "names the axes the
  * board could not evaluate, beside the count and not inside it... helper
  * added in Task 5... do not stub the helper." `openFiltersAndPickCollaborator`
  * below is that helper, doing the real thing (open the sheet, click a real
  * checkbox) rather than reaching into `setFilter` directly.
+ *
+ * `13.460` is RULING 13's regression guard, and it is a UNIT test on
+ * `clearFilterAxes` rather than a UI interaction — deliberately: `projectIds`
+ * has no control anywhere on this page (see `FiltersSheet`'s own docblock on
+ * why), so there is no way to set it through the rendered UI and no way to
+ * write an end-to-end case proving "Clear all" empties it. Exercising the
+ * extracted pure function directly against a `FilterSpec` carrying
+ * `projectIds` is the only way to prove the exact set Ruling 13 named,
+ * independent of what any control on this page can currently produce.
  */
 
 const PROJECT_ID = '01J9PROJECT000000000000000';
@@ -41,7 +50,10 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+import ProjectPage, {
+  FILTERS_SHEET_CLEARABLE_AXES,
+  clearFilterAxes,
+} from '../app/w/[workspaceId]/p/[projectId]/page.js';
 
 function claim(): ClaimProvenance {
   return {
@@ -478,5 +490,117 @@ describe('13.458 absence: a failed board read refuses, never claiming it is mere
     expect(within(group).getByText(/could not be loaded/i)).toBeInTheDocument();
     expect(within(group).queryByText(/has not loaded yet/i)).not.toBeInTheDocument();
     expect(within(group).queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * RULING 13 (coordinator remediation, same session). The reviewer checked
+ * `clearAll` axis-by-axis against `BoardFilterSpec` rather than accepting
+ * Ruling 12's own "clears all six" claim, and found a DIFFERENT six: the
+ * fixed version included `collaboratorIds` (not a `BoardFilterSpec` axis,
+ * produces no chip) while OMITTING `projectIds` (one of the six, with a
+ * working chip via `buildBoardFilterChips`). Harmless only because nothing
+ * on this page sets `filter.projectIds` yet — which is exactly why it
+ * needed fixing now rather than being left for the day some future control
+ * writes it and finds "Clear all" silently does not clear it.
+ *
+ * A UNIT test, not a UI interaction: `projectIds` has no control anywhere
+ * on this page (see `FiltersSheet`'s own docblock for why), so there is no
+ * rendered checkbox or chip to drive through `userEvent`. `clearFilterAxes`
+ * is exercised directly against a `FilterSpec` literal instead — the only
+ * way to prove the exact axis this ruling was about, independent of what
+ * any control can currently produce.
+ */
+describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus collaboratorIds', () => {
+  it('lists the axes as the six BoardFilterSpec fields plus collaboratorIds, nothing else', () => {
+    // Order-independent: the SET is what Ruling 13 is about, not the sequence.
+    expect(new Set(FILTERS_SHEET_CLEARABLE_AXES)).toEqual(
+      new Set([
+        'text',
+        'assigneeIds',
+        'typeIds',
+        'stateIds',
+        'stateCategories',
+        'projectIds',
+        'collaboratorIds',
+      ]),
+    );
+  });
+
+  it('clears projectIds — the axis Ruling 13 found silently omitted — even though no UI control sets it', () => {
+    const dirty: FilterSpec = {
+      text: 'restock',
+      assigneeIds: ['u1'],
+      typeIds: ['bug'],
+      stateIds: ['doing'],
+      stateCategories: ['active'],
+      projectIds: ['p1', 'p2'],
+      collaboratorIds: ['u9'],
+      // Untouched by `clearAll` on purpose — not one of `BoardFilterSpec`'s
+      // six and not settable by this sheet either.
+      dueBefore: '2026-01-01',
+    };
+
+    const cleared = clearFilterAxes(dirty);
+
+    // HARD-CODED, not a loop over `FILTERS_SHEET_CLEARABLE_AXES` itself —
+    // looping over the very array under test would make this assertion
+    // shrink along with a mutated/wrong array and pass vacuously (measured:
+    // with `projectIds` temporarily removed from the exported array to
+    // reproduce Ruling 13's exact bug, a version of this test that looped
+    // over the array still passed, because it never checked the one field
+    // Ruling 13 was about). Each field is named explicitly so a future
+    // regression in the array cannot also hide itself from this test.
+    expect(cleared.text).toBeUndefined();
+    expect(cleared.assigneeIds).toBeUndefined();
+    expect(cleared.typeIds).toBeUndefined();
+    expect(cleared.stateIds).toBeUndefined();
+    expect(cleared.stateCategories).toBeUndefined();
+    expect(cleared.projectIds).toBeUndefined();
+    expect(cleared.collaboratorIds).toBeUndefined();
+    // The negative control: an axis outside the clearable set must survive,
+    // proving this function narrows rather than wiping the whole filter.
+    expect(cleared.dueBefore).toBe('2026-01-01');
+  });
+});
+
+/**
+ * MINOR (coordinator review). Both close paths route through the same
+ * `onClose`/`closeFilters` that `13.446` already mutation-proves for
+ * Escape, so the underlying risk is low — but neither had a passing
+ * assertion of its own, and `filters-scrim`'s testid was referenced by no
+ * test at all before this.
+ */
+describe('13.461 "Done" closes the sheet and returns focus to the Filters button', () => {
+  it('closes on click, same as Escape', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const filtersButton = screen.getByRole('button', { name: 'Filters' });
+
+    const dialog = await openFilters();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    expect(dialog).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(filtersButton);
+  });
+});
+
+describe('13.462 clicking the scrim closes the sheet', () => {
+  it('closes on a click outside the panel', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    await userEvent.click(screen.getByTestId('filters-scrim'));
+
+    expect(dialog).not.toBeInTheDocument();
   });
 });

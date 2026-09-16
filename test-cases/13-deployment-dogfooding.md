@@ -4267,7 +4267,7 @@ alongside its existing List/Timeline coverage.
 
 ## Task 5 — the Filters sheet (board-prototype-port plan, 2026-09-16)
 
-**Block `13.445`–`13.459` minted here.** The Filters button Task 4
+**Block `13.445`–`13.462` minted here.** The Filters button Task 4
 deliberately left unrendered ("An inert Filters button is a button that lies... I chose do not render
 it yet") gets its sheet: a `role="dialog"` side panel writing straight through to the SAME
 page-level `filter` state the search box and the removable chips already share — no draft copy, no
@@ -4382,3 +4382,38 @@ sufficient on its own — no separate desync between the box and the filter to f
   separate failure modes (the disclosure surface lying vs. the control itself holding stale text),
   confirming the fix covers both rather than only the chip the earlier version already
   handled. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Ruling 13 (coordinator remediation, same session) — Ruling 12's own fix cleared the WRONG six.** The
+reviewer checked `clearAll` axis-by-axis against `BoardFilterSpec` rather than accepting Ruling 12's
+"clears all six" claim, and found a DIFFERENT six than the docblock and both commit messages named:
+`collaboratorIds` **included** (not a `BoardFilterSpec` axis — produces no chip via
+`buildBoardFilterChips`, only a scope-note entry) while `projectIds` **omitted** (one of the six, WITH
+a working chip). Wrong in both directions at once, and harmless only because nothing on this page sets
+`filter.projectIds` yet — precisely why it needed fixing now: the first future control that writes
+`projectIds` would have found "Clear all" silently failing to clear it, with nothing pointing back at
+this function. **Fix:** the exact axis set — `FILTERS_SHEET_CLEARABLE_AXES`, exported once from
+`page.tsx` — is now the SINGLE source both `clearAll` (via the extracted `clearFilterAxes`) and this
+test file read, rather than two independently hand-typed literals, which is the mechanism that produced
+the wrong six twice. `13.460`'s first case pins the array's own content; its second case is a UNIT test
+against `clearFilterAxes` directly (no UI control exists for `projectIds`, so no end-to-end case is
+possible) with every field asserted by NAME rather than by looping over the array under test — the
+first draft of this case looped over `FILTERS_SHEET_CLEARABLE_AXES` to decide what to check, which
+passed vacuously when `projectIds` was mutated out of the array (the check shrank along with the
+implementation). Mutation-verified both ways: temporarily removing `projectIds` from the array failed
+BOTH of `13.460`'s cases at exactly that field, and the revert was confirmed clean via
+`grep -n MUTATION page.tsx` (zero matches) before the final suite run.
+
+**MINOR (same review) — "Done" and the scrim click were wired but untested.** Both close paths route
+through the same `onClose`/`closeFilters` `13.446` already mutation-proves for Escape, so the risk was
+low, but neither had a passing assertion, and `filters-scrim`'s own testid was referenced by no test at
+all. `13.461`/`13.462` close that gap directly.
+
+- **13.460** ✅ `FILTERS_SHEET_CLEARABLE_AXES` names exactly the six `BoardFilterSpec` fields plus
+  `collaboratorIds` (order-independent set comparison), and `clearFilterAxes` clears every one of those
+  seven fields BY NAME on a `FilterSpec` carrying `projectIds` — the axis Ruling 13 found silently
+  omitted, settable by no control on this page — while leaving an eighth axis outside the clearable set
+  (`dueBefore`) untouched as a negative control. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.461** ✅ Clicking "Done" closes the sheet and returns focus to the Filters button, the same as
+  Escape. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.462** ✅ Clicking the scrim (outside the panel) closes the
+  sheet. — (`apps/web/test/filters-sheet.test.tsx`)
