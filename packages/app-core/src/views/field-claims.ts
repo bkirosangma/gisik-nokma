@@ -15,35 +15,44 @@ import type { FieldClaim } from '@gisik-nokma/domain';
  * same fork on the exact same predicate, and the dialog and the gate that
  * opens it must never disagree about it.
  *
- * Not the rule-engine's own `evaluateRequireField`
- * (`packages/rule-engine/src/rules/require-field.ts`) — that reads the
- * ledger's `ticket.fields`, the server's authority. This reads the VIEW's
- * own `ticketFields: Record<string, FieldClaim>` (the shape `TicketSheet`/
- * `TransitionDialog` already carry), an advisory client-side read exactly
- * like `transitionOptions`'s own relationship to the engine: predicting the
- * server, never replacing it — with one KNOWN, UNRESOLVED divergence from
- * what it predicts, flagged rather than silently fixed (Ruling 25's own
- * follow-up, not yet ruled on).
+ * **Mirrors the rule-engine's own `evaluateRequireField`
+ * (`packages/rule-engine/src/rules/require-field.ts`) semantics — TRIMMED,
+ * whitespace-only counts as unset (Ruling 26).** That engine behavior is
+ * deliberate and tested: Task 9's own controller ruling,
+ * `packages/rule-engine/test/engine.test.ts`, describe block "require-field
+ * and require-evidence refuse a blank value, not only an absent one", case
+ * "refuses require-field when the field is set to a whitespace-only string".
+ * Ruling 26 exists because that fact was checked ONLY here in a docblock
+ * before it, not in the code: `moveOutcome` could answer `direct` for a
+ * ticket whose field value was `''`/`'   '`, the server would then refuse
+ * it for real, and `direct` has no refusal-display path on Tasks 13/14
+ * (arrows, drag-and-drop) — a click that fails with nothing visible. Before
+ * Ruling 25 this was contained (every `require-field` edge opened
+ * `TransitionDialog`, which has `serverRefusal` wired); Ruling 25 removed
+ * that containment, which is what made the pre-existing blank/whitespace gap
+ * urgent rather than academic.
  *
- * **A blank/whitespace-only value disagrees with the server.**
- * `evaluateRequireField` trims and treats a whitespace-only string as unset
- * — deliberate, tested, Task 9's own controller ruling
- * (`packages/rule-engine/test/engine.test.ts`, "require-field and
- * require-evidence refuse a blank value, not only an absent one"). This
- * predicate does not trim: `value: ''` or `value: '   '` reads as claimed
- * here (`!= null` is true), so `fieldAlreadyClaimed` and the server can
- * disagree on exactly that shape of ticket. Before Ruling 25 the
- * consequence was contained — any `require-field` edge always opened
- * `TransitionDialog`, which has `serverRefusal` wired, so a blank field that
- * slipped through still surfaced the server's refusal on screen. Since
- * Ruling 25, `moveOutcome` can answer `direct` for exactly this ticket
- * shape, and `direct` has no refusal-display path on Tasks 13/14 (arrows,
- * drag-and-drop) — the submit would fail against the real server with
- * NOTHING visible to the person who clicked. Not fixed here: trimming would
- * also change `TransitionDialog`'s own rendering (a blank field would start
- * showing its input and blocking Move), which is outside what Ruling 25
- * asked for and is the coordinator's call, not a silent one.
+ * **Deliberately NOT done by importing the engine's own check.**
+ * `packages/rule-engine/src/index.ts:32-39` withholds `refuse()`/`ACCEPT` —
+ * "a consumer outside this package has no business minting a `Refusal`" —
+ * and re-deriving that vocabulary here would be the same door reopened from
+ * the client side. This predicate mirrors the ENGINE'S SEMANTICS (the exact
+ * `isSet` expression `evaluateRequireField` computes), not its machinery,
+ * and stays what it always was: this reads the VIEW's own
+ * `ticketFields: Record<string, FieldClaim>` (the shape `TicketSheet`/
+ * `TransitionDialog` already carry), an advisory client-side read exactly
+ * like `transitionOptions`'s own relationship to the engine — predicting
+ * the server, never replacing it.
+ *
+ * **The agreement is PINNED, not just asserted in prose**:
+ * `test/views/field-claims.test.ts` runs this predicate and the real,
+ * exported `evaluateTransitionRules` side by side over the same value
+ * shapes (a genuine round trip against the authority, per the same
+ * reasoning `rule-engine/src/index.ts`'s own docblock gives for why a
+ * self-comparison doesn't catch a reword) — so a future change to either
+ * side's semantics that breaks the agreement reddens that test.
  */
 export function fieldAlreadyClaimed(ticketFields: Record<string, FieldClaim>, field: string): boolean {
-  return ticketFields[field]?.value != null;
+  const value = ticketFields[field]?.value;
+  return value !== undefined && value !== null && !(typeof value === 'string' && value.trim().length === 0);
 }

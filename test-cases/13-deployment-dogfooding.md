@@ -5128,3 +5128,68 @@ failed with `expected { kind: 'direct', toStateId: 'doing' }` and received `{ ki
 - **13.487** ✅ THE CONTROL 13.486 needs: the identical edge with the field UNCLAIMED still answers
   `needs-dialog` — without it, an implementation that always answered `direct` for `require-field`, or that
   accepted `ticketFields` and silently ignored it, would pass 13.486 for the wrong reason. — (same files)
+
+## Task 12, Ruling 26 — mirror the rule engine: trim, treat whitespace-only as unset
+
+**Cases `13.488`–`13.489` minted here**, continuing directly from `13.487` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Ruling 25's own
+follow-up: `fieldAlreadyClaimed` (`!= null`) disagreed with `evaluateRequireField`
+(`packages/rule-engine/src/rules/require-field.ts`), which trims and treats a whitespace-only value as
+unset — deliberate, tested, Task 9's own controller ruling
+(`packages/rule-engine/test/engine.test.ts`, describe "require-field and require-evidence refuse a blank
+value, not only an absent one", case "refuses require-field when the field is set to a whitespace-only
+string"). Before Ruling 25 the divergence was contained (every `require-field` edge opened
+`TransitionDialog`, which has `serverRefusal` wired); Ruling 25 removed that containment, so a ticket with
+`dueDate: '   '` could answer `direct` from `moveOutcome` and then fail against the real server with
+nothing visible on Tasks 13/14's arrows or drag-and-drop — the exact failure `transitionOptions`'s own
+docblock warns against.
+
+**Fixed by mirroring the engine's semantics, not by importing its machinery.**
+`packages/rule-engine/src/index.ts:32-39` deliberately withholds `refuse()`/`ACCEPT` — "a consumer outside
+this package has no business minting a `Refusal`" — so `fieldAlreadyClaimed` was NOT changed to call into
+the engine; it now computes the same `isSet` expression `evaluateRequireField` computes
+(`value !== undefined && value !== null && !(typeof value === 'string' && value.trim().length === 0)`),
+independently stated in the client's own vocabulary.
+
+**Checked for an existing test pinning the old, wrong behaviour before changing anything**: `grep -rn
+"value: ''"` and a whitespace-value grep over `packages/app-core/test` and `packages/rule-engine/test`
+found no `FieldClaim` fixture anywhere asserting a blank/whitespace value as "already claimed" or
+"satisfied" — the two incidental hits (a `<select>` option's `value: ''` in `new-ticket-dialog.test.tsx`,
+and an unrelated DOM `target: { value: '   ' }` in `saved-filters-menu.test.tsx`) are not `FieldClaim`
+fixtures. Nothing needed amending; this is a pure gap-fill, not a defect-vs-test negotiation. The full
+`packages/app-core` suite (83 files, 1249 tests, up from 82/1239 — the new file and cases, nothing lost)
+and the full `transition-dialog.test.tsx` (21/21) were re-run to confirm, not merely grepped for.
+
+**The dialog's behaviour changes, and it is a FIX, not a regression**, per the coordinator's own framing:
+today a blank-but-present field reads as claimed, the dialog does not prompt for it, the person clicks
+Move, and the server refuses them; after the trim the dialog prompts, they fill it in, and the move
+succeeds. The engine required this all along — `TransitionDialog` was the thing out of step, not the
+other way round.
+
+**The agreement is pinned by a genuine round trip against the real, exported engine**, not a
+self-comparison: `packages/app-core/test/views/field-claims.test.ts` (13.489) runs `fieldAlreadyClaimed`
+and the real `evaluateTransitionRules` (`@gisik-nokma/rule-engine`'s public dispatcher — the same one the
+server calls) side by side over nine value shapes, through a minimal stub `EngineContext`
+`evaluateRequireField` never touches (it reads only `input.ticket.fields`). Each shape states its own
+expected `direct`/`unset` verdict independently, so a bug shared by both implementations would still show
+up as a wrong comparison against that independent expectation rather than a silent agreement.
+
+**Mutation-witnessed** (`fieldAlreadyClaimed`'s trim removed, reverted to bare `!= null`; reverted after
+with a targeted `Edit`, `git diff --stat` confirmed empty). Prediction, written before running: reddens
+`13.488` and exactly the THREE whitespace/blank sub-cases of `13.489` (empty string, whitespace-only,
+mixed whitespace); the other ten `board-moves` cases and six other `field-claims` sub-cases stay green.
+Result matched exactly — 4 failed / 16 passed across the two files, the failing set precisely `13.488` plus
+those three `13.489` sub-cases.
+
+- **13.488** ✅ The SAME `require-field` edge as `13.486`/`13.487`, field set to a WHITESPACE-ONLY string
+  (`'   '`), answers `needs-dialog` — not `direct`. This is the case that motivated Ruling 26. —
+  (`packages/app-core/src/views/board-moves.ts`, `packages/app-core/src/views/field-claims.ts`,
+  `packages/app-core/test/views/board-moves.test.ts`)
+- **13.489** ✅ `fieldAlreadyClaimed` agrees with the REAL rule engine across nine value shapes (absent,
+  `null`, `''`, whitespace-only, mixed-whitespace, a real string, `0`, `false`, a real object) — a genuine
+  round trip against `evaluateTransitionRules`, not a self-comparison, so a future drift between the two
+  implementations reddens this rather than passing silently. — (`packages/app-core/src/views/
+  field-claims.ts`, `packages/app-core/test/views/field-claims.test.ts`)
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2). `node
+scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413` only.

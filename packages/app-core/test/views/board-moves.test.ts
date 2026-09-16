@@ -13,7 +13,7 @@ const REQUIRE_DUE_DATE = [
 // not a stand-in for "the ticket has no fields."
 const NO_FIELDS: Record<string, FieldClaim> = {};
 
-describe('13.478-13.487 moveOutcome — the transition gate, built over transitionOptions', () => {
+describe('13.478-13.488 moveOutcome — the transition gate, built over transitionOptions', () => {
   it('13.478 refuses an undeclared target, and names what is available', () => {
     expect(moveOutcome(WF_ERRAND, 'todo', 'done', NO_FIELDS)).toEqual({
       kind: 'refused',
@@ -128,6 +128,30 @@ describe('13.478-13.487 moveOutcome — the transition gate, built over transiti
     // answered 'direct' for require-field (or that ignored ticketFields
     // entirely) would pass 13.486 for the wrong reason.
     expect(moveOutcome(defWithFieldRule, 'todo', 'doing', NO_FIELDS)).toEqual({
+      kind: 'needs-dialog',
+      toStateId: 'doing',
+    });
+  });
+
+  it('13.488 the SAME require-field edge with the field set to WHITESPACE-ONLY still answers needs-dialog (Ruling 26)', () => {
+    // `evaluateRequireField` (`packages/rule-engine/src/rules/require-field.ts`)
+    // trims and treats a whitespace-only value as unset — deliberate, tested,
+    // Task 9's own controller ruling
+    // (`packages/rule-engine/test/engine.test.ts`, "require-field and
+    // require-evidence refuse a blank value, not only an absent one").
+    // `fieldAlreadyClaimed` mirrors that exactly (Ruling 26). Before the trim,
+    // this ticket shape answered 'direct' here — the server would then refuse
+    // the same move for real, with no refusal-display path on Tasks 13/14 to
+    // show it. This is the case that motivated Ruling 26.
+    const DUE_DATE_WHITESPACE: Record<string, FieldClaim> = {
+      dueDate: {
+        value: '   ',
+        actorId: 'user_kiro',
+        clientTime: '2026-08-18T08:05:00.000Z',
+        serverTime: '2026-08-18T08:05:01.000Z',
+      },
+    };
+    expect(moveOutcome(defWithFieldRule, 'todo', 'doing', DUE_DATE_WHITESPACE)).toEqual({
       kind: 'needs-dialog',
       toStateId: 'doing',
     });
