@@ -3612,3 +3612,77 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
+
+/* Visually hidden, NOT display:none — the text stays in the accessible name
+   (exclude-mode spec §4, 2026-09-17: the tri-state choice's ", included"/
+   ", excluded" suffix). The standard clip pattern. */
+.gn-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The tri-state choice (exclude-mode spec §4) — the ONE control shape every
+   value in the Filters sheet is now: off / include / exclude, told apart by
+   ground + glyph + strike, never colour alone. Chip metrics are
+   `.gn-filters__chip`'s own (radius 999px; 8px 12px; 13px); the row variant
+   below takes `.gn-filters__person-row`'s. `data-mode` is the only hook. */
+.gn-filters__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  cursor: pointer;
+  text-align: left;
+}
+.gn-filters__choice:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-filters__choice-glyph { flex: none; }
+.gn-filters__choice[data-mode='include'] {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+/* Exclude is a choice, not an error: the OFF ground, explicitly, and no
+   danger tone anywhere in this rule (13.551 reads exactly this body). The
+   strike is on the LABEL span, so the glyph and the hidden suffix stay
+   legible. */
+.gn-filters__choice[data-mode='exclude'] {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+}
+.gn-filters__choice[data-mode='exclude'] .gn-filters__choice-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.09em;
+}
+.gn-filters__choice[data-mode='exclude'] .gn-filters__choice-glyph { color: var(--gn-text-muted); }
+/* Person rows: the same button, the row's own metrics. */
+.gn-filters__choice--row {
+  width: 100%;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  font-size: 1.0625rem;
+  border-radius: 0.75rem;
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+}
+.gn-filters__choice--row[data-mode='include'] {
+  background: var(--gn-accent);
+  box-shadow: none;
+}
+/* The strip's exclude chip carries the same ⊘ glyph before "Not …". */
+.gn-project__filter-chip--exclude .gn-filters__choice-glyph { color: var(--gn-text-muted); }

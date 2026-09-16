@@ -5969,3 +5969,13 @@ need for per-tab filter variants. These eleven tasks build that capability from 
 - **13.549** ✅ `withCycledId` moves a value between halves through `withIdAxis`, collapses what empties,
   repairs a both-halves shape, and over a full three-click cycle never leaves a value in both halves;
   works on the `StateCategory`-typed axis. Mutation (exclude-half removal skipped) kills the repair case.
+- **13.550** ✅ `TriStateChoice` — accessible names "X" / "X, included" / "X, excluded" via `aria-label`
+  (the brief's verbatim code used a visually-hidden sibling span instead; measured RED — the accname
+  algorithm joins sibling contributions with a synthetic space, producing "Uma One , included", not the
+  exact string; `aria-label` is the only mechanism that yields an exact string, so `children` is typed
+  `string`, not `ReactNode`), `data-mode` as the only hook, SVG glyphs `aria-hidden`, no `aria-pressed`,
+  `onCycle` on click, variant class accepted.
+- **13.551** ✅ CSS binding: `.gn-visually-hidden` clips without `display:none` (kept as a declared utility
+  though `TriStateChoice` no longer consumes it for naming — this case gates the rule's text, not a call
+  site); include = accent ground + accent text; exclude strikes the label and never names `--gn-danger`;
+  the row variant keeps 2.75rem.

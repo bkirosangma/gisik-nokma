@@ -416,3 +416,33 @@ describe('13.523 — a card that can be opened but not dragged still shows a poi
     expect(rule('.gn-board__card-slot[draggable="true"]')).toMatch(/cursor:\s*grab/);
   });
 });
+
+/**
+ * Case 13.551 — exclude-mode spec §4 (2026-09-17). CSS binding for the
+ * tri-state choice and the strip's exclude chip: the three states are told
+ * apart by ground + glyph + strike, never by colour alone. Same shape as
+ * `13.513`/`13.523`: proves the rules exist with the right bodies, not that
+ * they are wired — `apps/web/test/tri-state-choice.test.tsx` proves the
+ * `data-mode` attribute these selectors key off.
+ */
+describe('13.551 — tri-state choice rules, and the visually-hidden utility', () => {
+  it('.gn-visually-hidden clips to nothing without display:none, so the text stays in the accessible name', () => {
+    const body = rule('.gn-visually-hidden');
+    expect(body).toMatch(/clip:\s*rect\(0,\s*0,\s*0,\s*0\)/);
+    expect(body).toMatch(/position:\s*absolute/);
+    expect(body).not.toMatch(/display:\s*none/);
+  });
+  it("include is the accent ground with accent text", () => {
+    const body = rule(".gn-filters__choice[data-mode='include']");
+    expect(body).toMatch(/background:\s*var\(--gn-accent\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-accent-text\)/);
+  });
+  it('exclude strikes the LABEL through and does not reach for the danger tone', () => {
+    const body = rule(".gn-filters__choice[data-mode='exclude'] .gn-filters__choice-label");
+    expect(body).toMatch(/text-decoration:\s*line-through/);
+    expect(rule(".gn-filters__choice[data-mode='exclude']")).not.toMatch(/--gn-danger/);
+  });
+  it('the row variant keeps the 44px floor', () => {
+    expect(rule('.gn-filters__choice--row')).toMatch(/min-height:\s*2\.75rem/);
+  });
+});
