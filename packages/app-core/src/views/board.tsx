@@ -902,8 +902,19 @@ function MoveArrows({
           {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
-      {/* Ruling 27 — a distinct sentence and a distinct class from the block
-          immediately above; never the words "Refused by the server". */}
+      {/*
+       * Ruling 27 — a distinct sentence and a distinct class from the block
+       * immediately above; never the words "Refused by the server".
+       *
+       * These two blocks are MUTUALLY EXCLUSIVE BY CONSTRUCTION, not by a
+       * guard here — every setter that sets one of `serverRefusal`/
+       * `transportError` also nulls the other (`attemptMove`, and both
+       * terminal branches of `submitDirect`/`submitFromDialog`), so they are
+       * never both non-null at once. Worth stating plainly: `getByRole(
+       * 'alert')` (singular) in this file's own tests would throw on
+       * ambiguity, not fail cleanly, if that invariant ever broke — a state
+       * bug that would read as a query bug.
+       */}
       {transportError !== null && !dialogOpen ? (
         <p role="alert" className="gn-refusal gn-refusal--transport">
           {transportError}
