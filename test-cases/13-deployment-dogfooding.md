@@ -5964,3 +5964,8 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   whole half) kills the only-that-axis case.
 - **13.547** ✅ `describeUnappliedBoardAxes` names collaborator for `exclude.collaboratorIds` (once);
   `describeUnappliedListAxes` names collaborator only — due dates and fields are answered by the list.
+- **13.548** ✅ `choiceMode` reads a value's half (include wins if both); `nextMode` cycles off → include →
+  exclude → off.
+- **13.549** ✅ `withCycledId` moves a value between halves through `withIdAxis`, collapses what empties,
+  repairs a both-halves shape, and over a full three-click cycle never leaves a value in both halves;
+  works on the `StateCategory`-typed axis. Mutation (exclude-half removal skipped) kills the repair case.
