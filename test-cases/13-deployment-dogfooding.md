@@ -4436,21 +4436,27 @@ already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, an
 this task's own brief called for was measured (twice, independently) at 3.229–4.291 against the 4.5:1
 WCAG floor in all six style×theme combinations and does not ship (spec, "Both tints were measured and
 NEITHER can ship"). A second, unrelated finding surfaced while confirming that: `.gn-board__column--
-blocked { border-color: var(--gn-blocked) }` has been inert since before this task — nothing on
-`.gn-board__column` declares a `border-style`, so the colour paints nothing, and `board.test.tsx`'s
+blocked`'s `border-color: var(--gn-blocked)` had been inert since before this task — nothing on
+`.gn-board__column` declared a `border-style`, so the colour painted nothing, and `board.test.tsx`'s
 "marks a blocked state visibly" case asserts only that the class string is present, never a computed
-style, so it could not have caught it. Left as-is (the ruling is that the blocked indicator needs no
-work), reported rather than fixed.
+style, so it could not have caught it.
 
-**One open item, not resolved by guessing.** The brief's own CSS block also specified
-`.gn-board__column-title` (17px/22px, 600 — spec Board `:354-399`'s separate "Column title" row). It
-has no attachment point under the header markup this and prior tasks already shipped: `Chip` takes no
-`className` prop, and the current header renders the column name AS the chip's own child text (
-`<Chip tone={…}>{column.name}</Chip>`), which the ruling above defends as-is. Restructuring the header
-to carry a separate plain-text title alongside the chip would be a rendering change this
-geometry-only task's own scope note ("if a metric seems to require changing what renders, stop and
-report") argues against making unilaterally, so it was not added — reported here as the one
-unresolved metric in the brief's Board `:354-399` block, for an owner ruling.
+**Coordinator rulings 14–16, same day, closing all three open items from this task's first pass.**
+**Ruling 14** strikes the brief's own `.gn-board__column-title` metric (17px/22px, 600) the same way
+Task 1 was struck: it has no attachment point under the header markup Tasks 3–5 already shipped
+(`Chip` takes no `className`, and the header renders the column name AS the chip's own child text),
+and a split into a separate title plus a standalone blocked chip was considered and rejected — that
+chip's tone carries CATEGORY for every column, not only blocked, so separating them would change what
+the colour means across the whole board, a semantic change outside this task's scope. **Ruling 15**
+removes the spec's own `cursor: grab` from `.gn-board-card` — shipped in the first pass with no drag
+behaviour behind it, the same "a control that lies" shape Task 4's own brief withheld the inert
+Filters button for; it moves to Task 14's commit, beside the behaviour it promises. **Ruling 16**
+removes the inert `.gn-board__column--blocked` border declaration found above — the sixth time this
+session hit the "declares a visual effect that never paints" shape the dead `.gn-view-tabs` rules were
+(Task 4); the class itself is untouched, still applied conditionally and still asserted by
+`board.test.tsx:56-61`, only the misleading declaration is gone. Confirmed to change no rendered
+pixel: nothing else in the cascade sets `border`/`border-style` on that selector either, before or
+after.
 
 - **13.463** ✅ `BoardCardView` outlines the card container itself (`.gn-board-card--pending`) while
   `card.pending` is true and not otherwise — proven in both directions on the same render/rerender

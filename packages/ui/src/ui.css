@@ -332,16 +332,31 @@
   flex-direction: column;
   gap: 0.625rem;
 }
-/* INERT, and left that way deliberately — found while confirming the blocked
-   indicator for this task, not introduced by it. No rule on `.gn-board__column`
-   or here declares a `border-style`, so this `border-color` paints nothing;
-   `board.test.tsx`'s "marks a blocked state visibly" case only asserts the
-   class STRING is present on the section, never a computed style, so it
-   cannot catch that. The task's own ruling is that the blocked indicator
-   needs no CSS work — `.gn-chip--blocked` already carries the tone as a
-   coloured dot (`ui.css:155`) with a readable label — so this line is
-   reported as a finding rather than fixed here. */
-.gn-board__column--blocked { border-color: var(--gn-blocked); }
+/* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
+   2026-09-16) — no rule was ever added for it. `board.tsx:99` renders the
+   column name as `Chip`'s own child text, tone set from `column.blocked`/
+   `column.category`; `Chip` takes no `className`, so there is no element
+   this rule could attach to, and the name already renders — at the chip's
+   own 13px, not the prototype's 17px heading — because it lives inside the
+   tone chip rather than beside it. Splitting title from chip to match the
+   prototype was considered and rejected: that chip's tone carries CATEGORY
+   for every column, not only blocked, so separating them would change what
+   the colour means across the whole board — a semantic change outside this
+   geometry-only task's scope, and outside the plan's as written. Whoever
+   next wants the prototype's separate heading has to settle what happens to
+   the category tone first. */
+/* `.gn-board__column--blocked`'s `border-color: var(--gn-blocked)` rule is
+   REMOVED, Ruling 16 (coordinator, 2026-09-16) — it was inert (no rule
+   anywhere declared a `border-style`, so the colour painted nothing; only
+   `border-color` with `border-style: none`, the UA default, renders no
+   border), which reads as "a blocked column gets a border" while none ever
+   rendered. Confirmed visually inert both before and after this removal —
+   nothing else in the cascade sets `border`/`border-style` on
+   `.gn-board__column` or this modifier, so deleting the colour changes no
+   rendered pixel, only removes a declaration that misled a reader. The
+   CLASS itself is untouched and still applied conditionally in `board.tsx`
+   (`board.test.tsx:56-61` asserts the class string, which this leaves
+   intact) — only the empty declaration is gone. */
 .gn-board__column-header {
   display: flex;
   justify-content: space-between;
@@ -357,23 +372,24 @@
    that floor, so this move cannot add one. */
 .gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
-/* Spec row "Card": cardBg, radius 12px, 14px padding, cardShadow, grab
-   cursor. Board.tsx:150 already renders `<Card className="gn-board-card">`,
-   composing to `gn-card gn-board-card` (`card.tsx:7`). This selector is bare
-   — (0,1,0), the SAME specificity as `.gn-card` above, not higher — and it
-   wins for the properties both declare (padding, border-radius) by SOURCE
-   ORDER: this rule sits later in the file than `.gn-card`'s (`ui.css:160`).
-   `.gn-card` itself is not touched, so every other `.gn-card` consumer in
-   the product keeps its 12px padding; only the board card, carrying this
-   second class, gets 14px.
+/* Spec row "Card": cardBg, radius 12px, 14px padding, cardShadow. Board.tsx:150
+   already renders `<Card className="gn-board-card">`, composing to
+   `gn-card gn-board-card` (`card.tsx:7`). This selector is bare — (0,1,0),
+   the SAME specificity as `.gn-card` above, not higher — and it wins for the
+   properties both declare (padding, border-radius) by SOURCE ORDER: this
+   rule sits later in the file than `.gn-card`'s (`ui.css:160`). `.gn-card`
+   itself is not touched, so every other `.gn-card` consumer in the product
+   keeps its 12px padding; only the board card, carrying this second class,
+   gets 14px.
 
-   `cursor: grab` ships as the spec states it even though no drag behaviour
-   is wired anywhere in this codebase yet — the same shape Task 4's own brief
-   named for an unwired control ("an inert Filters button is a button that
-   lies"). Recorded rather than silently omitted or worked around, because
-   the metric is explicit and the affordance costs one line to remove later
-   if the owner rules against shipping it ahead of the behaviour. */
-.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; cursor: grab; }
+   The spec's own `cursor: grab` is REMOVED here, Ruling 15 (coordinator,
+   2026-09-16) — it shipped in this task's first pass and was an affordance
+   CLAIM, not decoration: a pointer promising draggability eight tasks before
+   any drag behaviour exists is the same "a control that lies" shape Task 4's
+   own brief withheld the inert Filters button for, and this task's first
+   pass had not held itself to that same bar. It belongs in Task 14's commit,
+   beside the behaviour it promises, not here ahead of it. */
+.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }
 /* Spec row "Card, in transit": a dashed warning outline. `card.pending` is
    already read by `BoardCardView` (board.tsx, the "claim in transit" chip) —
    wired onto the card container's className alongside `gn-board-card` rather
