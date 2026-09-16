@@ -388,7 +388,10 @@ async function openFiltersAndPickAssignee(name: string) {
   const dialog = await screen.findByRole('dialog', { name: 'Filters' });
   const group = within(dialog).getByRole('group', { name: 'Assignee' });
   await userEvent.click(within(group).getByRole('checkbox', { name }));
-  await userEvent.keyboard('{Escape}');
+  // Finding 1's own scenario: "tick an assignee, press Done" — Done and
+  // Escape both close the sheet (`13.446`/`13.461` prove that separately),
+  // but this drives the literal path named rather than a merely-equivalent one.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
 }
 
 describe('13.517 the mirror note also names Filters-sheet axes, not only search', () => {
