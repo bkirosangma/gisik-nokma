@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
+import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
 
 /**
@@ -114,15 +115,73 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * still reachable, still unconditional on `workspaceId`, and `13.392`'s
  * "every nav target resolves to a real page.tsx" still holds — the targets moved
  * one level down, they did not stop existing.
+ *
+ * ## Round 25 — the bar is contextual on the LAST workspace, not only the route
+ *
+ * Owner: "keep the last opened workspace in local storage, and based on that,
+ * the workspace scoped navbar items should be made visible. so that just moving
+ * to a separate page (inbox, help, account, etc) does not automatically hide
+ * them."
+ *
+ * The rule at the top of this docblock — "a link renders only when its target
+ * exists" — is unchanged. What changed is where the workspace comes from: the
+ * route when it carries one, otherwise the remembered one
+ * (`use-last-workspace.ts`), which is keyed by USER so it cannot show the
+ * previous viewer's workspace to the next one.
+ *
+ * **The asymmetry below is the load-bearing part.** A ROUTED workspace renders
+ * its links immediately — standing on `/w/<id>/members` is proof the workspace
+ * is there. A REMEMBERED one renders them only once `useWorkspaceName` resolves
+ * a name for it, because a remembered id is a guess about the past and may name
+ * a workspace you have since been removed from. Rounds 22 and 23 are the
+ * precedent: the Board item was removed for offering a link that could not
+ * resolve, and a remembered workspace is the same hazard from a different
+ * direction.
  */
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const pathname = usePathname();
   // The sign-out CALL moved into `AccountMenu` with the control that used it
-  // (Round 24). `useCurrentUser` stayed, for one branch only: whether this bar
-  // shows the menu or the signed-out Help/Account fallback below.
+  // (Round 24). `useCurrentUser` stayed, for two branches: whether this bar
+  // shows the menu or the signed-out Help/Account fallback below, and which
+  // user the remembered workspace must belong to.
   const user = useCurrentUser();
-  const workspaceName = useWorkspaceName(workspaceId);
-  const noWorkspace = workspaceId === undefined;
+  const remembered = useLastWorkspace(workspaceId, user?.id ?? null);
+
+  // The workspace this bar is ABOUT, which is no longer only the one in the
+  // route (Round 25).
+  const effectiveWorkspaceId =
+    workspaceId ?? (remembered.status === "remembered" ? remembered.workspaceId : undefined);
+  const fromMemory = workspaceId === undefined && remembered.status === "remembered";
+
+  const workspaceName = useWorkspaceName(effectiveWorkspaceId);
+
+  /**
+   * **A REMEMBERED workspace must prove itself; a ROUTED one need not.**
+   *
+   * The route is authority: standing on `/w/<id>/members` means the workspace
+   * is there, and today's behaviour renders the scoped links immediately. A
+   * remembered id has no such standing — it may name a workspace you have since
+   * been removed from, or one that was deleted — and `app-nav.tsx` already
+   * holds the rule this runs into, from Rounds 22 and 23: the nav does not
+   * offer a link that cannot resolve. That is the whole reason the Board item
+   * was removed.
+   *
+   * So the proof is `workspaceName !== null`, which `useWorkspaceName` derives
+   * from `getMyWorkspaces()` — the ONE shared read this bar already makes. No
+   * second request, and no second definition of "reachable" to drift from the
+   * first.
+   */
+  const showWorkspaceItems = !fromMemory ? workspaceId !== undefined : workspaceName !== null;
+  const noWorkspace = !showWorkspaceItems;
+
+  /**
+   * Deliberately NOT `!showWorkspaceItems`. See the note's own comment below:
+   * this requires a POSITIVE "storage was read and held nothing for this
+   * person", so the sentence cannot appear during the window before storage has
+   * been read — which is every first paint, and would otherwise flash a false
+   * claim at anyone who has a remembered workspace.
+   */
+  const showScopeNote = workspaceId === undefined && remembered.status === "none";
   const current = (target: string): "page" | undefined =>
     pathname === target ? "page" : undefined;
 
@@ -146,8 +205,8 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             name arrives or if the read fails; see `useWorkspaceName` above. */}
         {!noWorkspace && workspaceName !== null ? (
           <Link
-            href={`/w/${workspaceId}`}
-            aria-current={current(`/w/${workspaceId}`)}
+            href={`/w/${effectiveWorkspaceId}`}
+            aria-current={current(`/w/${effectiveWorkspaceId}`)}
           >
             {workspaceName}
           </Link>
@@ -157,16 +216,16 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             never have worked. */}
         {!noWorkspace ? (
           <Link
-            href={`/w/${workspaceId}/my-work`}
-            aria-current={current(`/w/${workspaceId}/my-work`)}
+            href={`/w/${effectiveWorkspaceId}/my-work`}
+            aria-current={current(`/w/${effectiveWorkspaceId}/my-work`)}
           >
             My Work
           </Link>
         ) : null}
         {!noWorkspace ? (
           <Link
-            href={`/w/${workspaceId}/members`}
-            aria-current={current(`/w/${workspaceId}/members`)}
+            href={`/w/${effectiveWorkspaceId}/members`}
+            aria-current={current(`/w/${effectiveWorkspaceId}/members`)}
           >
             Members
           </Link>
@@ -180,7 +239,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             this reverts the VISIBILITY rule and keeps the destination. */}
         {!noWorkspace ? (
           <Link
-            href={`/settings?workspaceId=${workspaceId}`}
+            href={`/settings?workspaceId=${effectiveWorkspaceId}`}
             aria-current={current("/settings")}
           >
             Settings
@@ -244,8 +303,24 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             to drift: the sentence describes what picking a workspace gets you,
             and a board is one click from the workspace home's project grid. It
             would only become false if boards stopped being reachable from a
-            workspace at all. */}
-        {noWorkspace ? (
+            workspace at all.
+
+            ROUND 25 — it is gated on `showScopeNote`, NOT on `noWorkspace`, and
+            the two differ in exactly the window that matters. `noWorkspace` is
+            true before storage has been read, so gating on it would flash "No
+            workspace selected" at someone who has one, every time they open a
+            global page. The note now requires a POSITIVE `none` — storage read,
+            nothing remembered for this person.
+
+            The cost, stated rather than hidden: when a workspace IS remembered
+            but its name never resolves (you were removed from it, it was
+            deleted, or `getMyWorkspaces` refused), neither the scoped links nor
+            this note render. That is deliberate. The alternative is to clear the
+            memory when the name fails, which would throw away a valid workspace
+            on a TRANSIENT read failure — destroying state on a network blip, to
+            recover a hint. The note is a hint; `Workspaces` is still one click
+            away and is the real route out. */}
+        {showScopeNote ? (
           <span className="gn-nav__scope">
             No workspace selected — pick one to reach its board, members and settings.
           </span>

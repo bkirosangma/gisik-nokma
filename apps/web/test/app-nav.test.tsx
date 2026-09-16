@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
@@ -96,6 +96,30 @@ const NO_NAV_SERVICES = stubServices({}, { notifications: { unreadCount: async (
 /** Round 24: the inbox indicator's two states need a settable unread count. */
 function navServicesWithUnread(count: number) {
   return stubServices({}, { notifications: { unreadCount: async () => count } });
+}
+
+/**
+ * ROUND 25 — `localStorage` is SHARED ACROSS EVERY TEST IN THIS FILE, and the
+ * nav now writes to it.
+ *
+ * jsdom keeps one storage for the whole module, so a case that renders
+ * `<AppNav workspaceId="ws_1" />` leaves `gn-last-workspace` behind for every
+ * case after it — and those cases would then render workspace-scoped links they
+ * never set up, passing or failing on state their own body cannot see. That is
+ * order-dependence, which shows up as a suite that goes red when one test is
+ * renamed.
+ *
+ * Cleared before each case, so every one starts with no remembered workspace
+ * and any case that wants one says so.
+ */
+beforeEach(() => {
+  window.localStorage.clear();
+  mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+});
+
+/** A workspace already remembered for the seeded user, as Round 25 stores it. */
+function rememberWorkspace(workspaceId: string, userId = 'u_kiro'): void {
+  window.localStorage.setItem('gn-last-workspace', JSON.stringify({ userId, workspaceId }));
 }
 
 describe('AppNav — the mounts, not the components', () => {
@@ -267,8 +291,15 @@ describe('13.391 the nav is contextual', () => {
         <AppNav />
       </Providers>,
     );
+    // ROUND 25: `findByText`, not `getByText`. The note now requires a POSITIVE
+    // "storage read, nothing remembered", which lands in an effect — so it is
+    // absent on the first synchronous paint by design. Gating it on the
+    // synchronous state would flash "No workspace selected" at every viewer who
+    // HAS a remembered workspace, on every global page they open.
     expect(
-      screen.getByText('No workspace selected — pick one to reach its board, members and settings.'),
+      await screen.findByText(
+        'No workspace selected — pick one to reach its board, members and settings.',
+      ),
     ).toBeInTheDocument();
 
     currentPath = '/w/ws_1/my-work';
@@ -342,14 +373,143 @@ describe('13.391 the nav is contextual', () => {
     );
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
 
-    // And the rule itself: no workspace in the route, no Settings link at all.
+    // And the rule itself — RESTATED FOR ROUND 25. It used to read "no
+    // workspace in the ROUTE, no Settings link at all", which is exactly what
+    // the owner's remembered-workspace instruction revokes: leaving a workspace
+    // page for `/inbox` must no longer strip the scoped links. The rule is now
+    // "no workspace REACHABLE — none in the route and none remembered — no
+    // Settings link", which is the same principle over the wider input.
+    //
+    // A fresh mount, not a rerender: the point is a viewer with nothing
+    // remembered, and the component above has already resolved a name into
+    // state that a rerender would carry forward.
+    cleanup();
+    window.localStorage.clear();
     currentPath = '/workspaces';
-    rerender(
+    render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
       </Providers>,
     );
     expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  /**
+   * 13.424 — the same bar, with a workspace REMEMBERED rather than routed.
+   *
+   * This is the owner's actual instruction (Round 25) and the direct
+   * counterpart to the assertion above: the scoped links survive the move to a
+   * global page. Without this case, that assertion's "no Settings" could be
+   * satisfied by a nav that had simply stopped remembering anything.
+   */
+  it('13.424 keeps the workspace-scoped links on a global page when one is remembered', async () => {
+    rememberWorkspace('ws_1');
+    currentPath = '/inbox';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // The name resolving is what licenses the rest — see `showWorkspaceItems`.
+    expect(await screen.findByRole('link', { name: 'Convenience Corner' })).toHaveAttribute(
+      'href',
+      '/w/ws_1',
+    );
+    expect(screen.getByRole('link', { name: 'My Work' })).toHaveAttribute(
+      'href',
+      '/w/ws_1/my-work',
+    );
+    expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute(
+      'href',
+      '/w/ws_1/members',
+    );
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/settings?workspaceId=ws_1',
+    );
+    // Not current: you are on `/inbox`, not in the workspace.
+    expect(screen.getByRole('link', { name: 'My Work' })).not.toHaveAttribute('aria-current');
+    // And the note must not claim otherwise.
+    expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.425 — a workspace remembered for SOMEONE ELSE is not honoured.
+   *
+   * `localStorage` outlives a session. Sign out, hand the laptop over, and an
+   * unkeyed memory would render the previous person's workspace NAME in the
+   * next person's chrome — the defect 11.169 exists for, one surface over.
+   *
+   * The assertion is on the NAME, not merely on the links: the name is the part
+   * that leaks information about a workspace this viewer may not know exists.
+   */
+  it('13.425 ignores a workspace remembered for a different user', async () => {
+    rememberWorkspace('ws_1', 'u_someone_else');
+    currentPath = '/inbox';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // The note is the positive signal that storage was read and held nothing
+    // FOR THIS PERSON — without it this case would also pass while the read was
+    // merely slow.
+    expect(await screen.findByText(/No workspace selected/)).toBeInTheDocument();
+    expect(screen.queryByText('Convenience Corner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+  });
+
+  /**
+   * 13.426 — a remembered workspace that no longer resolves offers no links.
+   *
+   * You were removed from it, or it was deleted. `app-nav.tsx` has held since
+   * Round 22/23 that the nav does not offer a link that cannot resolve — the
+   * reason the Board item was deleted — and a remembered id is that same hazard
+   * arriving from storage instead of from a route.
+   *
+   * `workspacesOf([])` is the fixture: the read SUCCEEDS and simply does not
+   * contain ws_gone, which is what being removed looks like. A rejecting stub
+   * would prove something weaker, since a refusal also yields a null name.
+   */
+  it('13.426 offers no scoped links for a remembered workspace it cannot resolve', async () => {
+    rememberWorkspace('ws_gone');
+    currentPath = '/inbox';
+    render(
+      <Providers services={workspacesOf([])}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // The inbox link is the settled-render witness: it proves the bar painted,
+    // so "no My Work" below is a decision and not a snapshot taken too early.
+    expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  /**
+   * 13.427 — opening a workspace is what remembers it.
+   *
+   * The write is asserted through the STORAGE KEY rather than through a later
+   * render, because a later render would also pass if the value were held only
+   * in React state — which would not survive the page navigation this whole
+   * feature exists for.
+   */
+  it('13.427 records the workspace in local storage when one is opened', async () => {
+    currentPath = '/w/ws_1/my-work';
+    render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+    await screen.findByRole('link', { name: 'Convenience Corner' });
+
+    expect(JSON.parse(window.localStorage.getItem('gn-last-workspace') ?? 'null')).toEqual({
+      userId: 'u_kiro',
+      workspaceId: 'ws_1',
+    });
   });
 
   /**

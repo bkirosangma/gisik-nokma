@@ -3852,7 +3852,7 @@ Three cases moved, none minted:
 
 ### Round 24 — the account menu, and the inbox becomes an icon
 
-**Block `13.416`–`13.422` minted here; the next free BLOCK is `13.423`.** Owner, two instructions in one
+**Block `13.416`–`13.423` minted here; the next free BLOCK is `13.424`.** Owner, two instructions in one
 message: *"Current Signout button: make it into a round profile pic like thing, that opens up a context
 menu on click. signout option will be moved to the bottom of that menu. along with the help and account
 item from the nav bar"* and *"make inbox an icon. with an indicator (green dot?) if there is an unread
@@ -3910,6 +3910,13 @@ that now exists, so the ordering tripwire Round 21 bought is not lost in the mov
   both states. Asserting only "a dot appears" would pass on an implementation that dropped the number,
   which is the change this case exists to forbid. — (`apps/web/test/app-nav.test.tsx`)
 - **13.422** ✅ "1 unread notification" is singular. — (`apps/web/test/app-nav.test.tsx`)
+- **13.423** ✅ Opening the menu focuses the first item, and ArrowDown/ArrowUp walk the items, wrapping
+  at both ends. **Recorded late — the test landed in Round 24's commit while this file carried `13.423`
+  only as the next-free pointer, so for one commit the case existed in code and nowhere in the
+  catalogue.** That is the drift `Features.md`'s "same change set, never a follow-up" rule exists to
+  prevent, and it is written down rather than quietly backfilled. The case is also **13.420's
+  precondition**: until focus moved into the menu on open, "Escape returns focus to the trigger" was
+  vacuous, because focus had never left. — (`apps/web/test/app-nav.test.tsx`)
 
 **Five existing cases in `inbox-nav-link.test.tsx` were re-aimed, not weakened.** 11.152, 11.155, 11.156,
 11.169 and the load-window case all asserted the count through `UnreadBadge`'s `role="img"`, which the
@@ -3919,3 +3926,66 @@ the count when the session ends in place") still measure exactly what they alway
 BOTH the name and the dot deliberately: a dot that disappeared while the name still read "3 unread"
 would leave the previous session's count being announced to whoever is looking now, which is the defect
 that case exists for.
+
+### Round 25 — the nav remembers the last workspace you opened
+
+**Block `13.424`–`13.427` minted here; the next free BLOCK is `13.428`.** Owner: *"keep the last opened
+workspace in local storage, and based on that, the workspace scoped navbar items should be made visible.
+so that just moving to a separate page (inbox, help, account, etc) does not automatically hide them."*
+
+`use-last-workspace.ts` (NEW) holds the memory, following the `gn-style`/`gn-theme` convention already in
+this shell. `AppNav` takes the route's workspace when there is one and the remembered one otherwise.
+
+**The rule the bar has held since Round 19b is UNCHANGED: a link renders only when its target exists.**
+What changed is where the workspace comes from. That matters because a remembered id is a *guess about
+the past* — it may name a workspace you have since been removed from, or one that was deleted — so the
+two sources are NOT treated alike:
+
+- A **routed** workspace renders its links immediately. Standing on `/w/<id>/members` is proof.
+- A **remembered** one renders them only once `useWorkspaceName` resolves a name from
+  `getMyWorkspaces()`. Rounds 22 and 23 deleted the Board item for offering a link that could not
+  resolve; this is the same hazard arriving from storage instead of from a route. No second request and
+  no second definition of "reachable" — it reuses the read the bar already makes.
+
+**Two assertions in 13.391 changed, and neither was relaxed to fit the code.**
+
+1. The scope note's query moved from `getByText` to `findByText`. It is now gated on a POSITIVE "storage
+   read, nothing remembered for this person" rather than on the synchronous "no workspace", because the
+   synchronous form would flash *"No workspace selected"* at every viewer who HAS a remembered workspace,
+   on every global page they open. The sentence is one tick later and never false.
+2. "No workspace in the ROUTE, no Settings link at all" became "no workspace REACHABLE — none routed and
+   none remembered — no Settings link." The old wording is precisely what the owner's instruction
+   revokes. **13.424 is the counterpart that keeps this honest**: without it, the "no Settings" assertion
+   could be satisfied by a nav that had simply stopped remembering anything at all.
+
+**A stated cost, rather than a hidden one.** When a workspace IS remembered but its name never resolves,
+neither the scoped links nor the scope note render. The alternative — clearing the memory when the name
+fails — would destroy a valid workspace on a TRANSIENT `getMyWorkspaces` failure, throwing away real
+state to recover a hint. `Workspaces` remains one click away and is the real route out.
+
+- **13.423** ✅ (Round 24, recorded late — see that section.)
+- **13.424** ✅ On a global page (`/inbox`) with a workspace remembered and resolvable, the name, My
+  Work, Members and Settings all render with their real hrefs, none carries `aria-current`, and the
+  scope note is absent. The owner's instruction, asserted directly.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.425** ✅ A workspace remembered for a DIFFERENT user is ignored: the scope note renders and the
+  other person's workspace NAME appears nowhere. `localStorage` outlives a session, so an unkeyed memory
+  would render the previous viewer's workspace in the next viewer's chrome — the defect 11.169 exists
+  for, one surface over. The assertion is on the name, because the name is the part that leaks.
+  **Mutation-witnessed:** deleting the `storedUserId !== userId` guard reddens this case and nothing
+  else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.426** ✅ A remembered workspace that no longer resolves offers no scoped links. The fixture is a
+  SUCCESSFUL read that does not contain it (`workspacesOf([])`) — what being removed looks like — rather
+  than a rejecting stub, which would prove something weaker since a refusal also yields a null name. The
+  inbox link is asserted first as a settled-render witness, so "no My Work" is a decision and not a
+  snapshot taken too early. **Mutation-witnessed:** treating a remembered id as authoritative reddens
+  this case and nothing else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.427** ✅ Opening a workspace records `{userId, workspaceId}` under `gn-last-workspace`. Asserted
+  through the STORAGE KEY, not through a later render: a later render would also pass if the value were
+  held only in React state, which would not survive the page navigation this whole feature exists for.
+  — (`apps/web/test/app-nav.test.tsx`)
+
+**Test isolation, added here because the nav now WRITES.** jsdom keeps one `localStorage` for the whole
+module, so a case rendering `<AppNav workspaceId="ws_1" />` left the key behind for every case after it —
+order-dependence that shows up as a suite going red when one test is renamed. `app-nav.test.tsx` now
+clears storage and reseeds the mock session in `beforeEach`.
