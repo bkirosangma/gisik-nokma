@@ -4417,3 +4417,43 @@ all. `13.461`/`13.462` close that gap directly.
   Escape. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.462** ✅ Clicking the scrim (outside the panel) closes the
   sheet. — (`apps/web/test/filters-sheet.test.tsx`)
+
+## Task 6 — columns as trays, cards, and the blocked-column indicator (board-prototype-port plan, 2026-09-16)
+
+**Case `13.463` minted here.** Geometry only, per the task's own brief: the column rail
+(`.gn-board__columns` renamed `.gn-board__rail`, spec Board `:354-399`'s "Column rail" row), the
+column tray itself (`.gn-board__column` — sunken surface, sunken shadow, card radius, 18rem lane,
+its own flex column layout), the count (`.gn-board__count`'s body updated to the spec's 13px/18px,
+selector kept for `board.test.tsx:142`), and the card (`.gn-board-card`, 14px padding via
+`.gn-card.gn-board-card`'s source-order win over the untouched `.gn-card`, never a specificity win —
+both are `(0,1,0)`). One real behaviour change, not merely restyling: `.gn-board-card--pending`'s
+dashed in-transit outline had a rule but no wiring — `board.tsx:150` never added the modifier class —
+so it is wired onto `card.pending`, the same flag the existing "claim in transit" chip already reads.
+**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:99`
+already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip--blocked
+.gn-chip__dot` (`ui.css:155`) already carries the tone as a coloured dot against a readable
+`--gn-text` label — the tinted-ground-plus-same-hue-text version the prototype and an earlier draft of
+this task's own brief called for was measured (twice, independently) at 3.229–4.291 against the 4.5:1
+WCAG floor in all six style×theme combinations and does not ship (spec, "Both tints were measured and
+NEITHER can ship"). A second, unrelated finding surfaced while confirming that: `.gn-board__column--
+blocked { border-color: var(--gn-blocked) }` has been inert since before this task — nothing on
+`.gn-board__column` declares a `border-style`, so the colour paints nothing, and `board.test.tsx`'s
+"marks a blocked state visibly" case asserts only that the class string is present, never a computed
+style, so it could not have caught it. Left as-is (the ruling is that the blocked indicator needs no
+work), reported rather than fixed.
+
+**One open item, not resolved by guessing.** The brief's own CSS block also specified
+`.gn-board__column-title` (17px/22px, 600 — spec Board `:354-399`'s separate "Column title" row). It
+has no attachment point under the header markup this and prior tasks already shipped: `Chip` takes no
+`className` prop, and the current header renders the column name AS the chip's own child text (
+`<Chip tone={…}>{column.name}</Chip>`), which the ruling above defends as-is. Restructuring the header
+to carry a separate plain-text title alongside the chip would be a rendering change this
+geometry-only task's own scope note ("if a metric seems to require changing what renders, stop and
+report") argues against making unilaterally, so it was not added — reported here as the one
+unresolved metric in the brief's Board `:354-399` block, for an owner ruling.
+
+- **13.463** ✅ `BoardCardView` outlines the card container itself (`.gn-board-card--pending`) while
+  `card.pending` is true and not otherwise — proven in both directions on the same render/rerender
+  pair the neighbouring "claim in transit" chip test already uses, and mutation-checked: a
+  never-wired constant class fails the positive assertion, an always-wired one fails the negative. —
+  (`packages/app-core/test/views/board.test.tsx`)

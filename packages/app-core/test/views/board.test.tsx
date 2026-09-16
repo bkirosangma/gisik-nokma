@@ -208,6 +208,27 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     expect(screen.queryByText('claim in transit')).not.toBeInTheDocument();
   });
 
+  /**
+   * Case 13.463 (board-prototype-port Task 6, 2026-09-16). `gn-board-card--pending`
+   * carries the spec's dashed in-transit outline (`ui.css`) and has no rule of
+   * its own reason to exist unless `BoardCardView` actually adds it — this is
+   * that wiring's only test, positive AND negative in the same case (not just
+   * "renders when pending"): deleting the ternary in `board.tsx` and hard-coding
+   * `'gn-board-card'` fails the first assertion, and hard-coding the pending
+   * class onto every card fails the second — the same both-arms discipline the
+   * "claim in transit" chip test just above already holds itself to.
+   */
+  it('outlines the card container itself while a claim is in transit, and only then', () => {
+    const board = errandBoard([boardCardSeed({ pending: true })]);
+    const { rerender, container } = render(<Board board={board} onOpenTicket={() => {}} />);
+    const pendingCard = container.querySelector('.gn-board-card');
+    expect(pendingCard?.className).toContain('gn-board-card--pending');
+
+    rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    const settledCard = container.querySelector('.gn-board-card');
+    expect(settledCard?.className).not.toContain('gn-board-card--pending');
+  });
+
   it('opens the ticket on title click', async () => {
     const user = userEvent.setup();
     const onOpenTicket = vi.fn();

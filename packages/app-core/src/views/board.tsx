@@ -84,7 +84,7 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
       {board.groups.map((group) => (
         <section key={`${group.workflowId}@${group.workflowVersion}`} className="gn-board__group">
           {board.groups.length > 1 ? <h3 className="gn-board__workflow">{group.workflowName}</h3> : null}
-          <div className="gn-board__columns">
+          <div className="gn-board__rail">
             {group.columns.map((column) => (
               <section
                 key={column.stateId}
@@ -147,7 +147,7 @@ function BoardCardView({
 }) {
   const [unfolded, setUnfolded] = useState(false);
   return (
-    <Card className="gn-board-card">
+    <Card className={card.pending ? 'gn-board-card gn-board-card--pending' : 'gn-board-card'}>
       <button type="button" className="gn-board-card__title" onClick={onOpen}>
         {card.title}
       </button>
