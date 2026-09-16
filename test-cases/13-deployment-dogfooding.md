@@ -5940,3 +5940,7 @@ need for per-tab filter variants. These eleven tasks build that capability from 
 - **13.538** ✅ `filter/id-axes.ts` — the two base rules (`narrowsTo`/`excludedBy`) and their any-of forms,
   plus `claimedDueDay`/`claimText` moved here unchanged; and `FilterSpec.exclude` typed as the same
   `IdAxes` the include half spreads in (a `@ts-expect-error` proves `text` has no exclude form).
+- **13.539** ✅ `matchesFilter` honours `exclude` on all six id axes, after the include half; empty
+  exclude lists exclude nothing; unassigned work survives an assignee exclusion; include+exclude on one
+  axis = must match an include and none of the excludes. Mutation (the `typeIds` exclude line deleted)
+  kills the type case and the composition case.

@@ -118,3 +118,53 @@ describe('11.7 matchesFilter honours every axis the landed FilterSpec declares',
     expect(matchesFilter(ticket(), { assigneeIds: [], typeIds: [], stateIds: [] })).toBe(true);
   });
 });
+
+/**
+ * 13.539 — the exclude half (exclude-mode spec §1-2): a ticket matching ANY
+ * listed value on an axis is dropped, evaluated after the include half.
+ */
+describe('13.539 matchesFilter honours the exclude half on every id axis', () => {
+  it('an empty exclude object, and empty exclude lists, exclude nothing', () => {
+    expect(matchesFilter(ticket(), { exclude: {} })).toBe(true);
+    expect(matchesFilter(ticket(), { exclude: { assigneeIds: [], typeIds: [] } })).toBe(true);
+  });
+
+  it('assignee — a listed assignee is out; unassigned work is never out', () => {
+    expect(matchesFilter(ticket(), { exclude: { assigneeIds: ['user_kiro'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { assigneeIds: ['user_anselma'] } })).toBe(true);
+    expect(matchesFilter(ticket({ assigneeId: null }), { exclude: { assigneeIds: ['user_kiro'] } })).toBe(true);
+  });
+
+  it('collaborator — ANY listed collaborator on the ticket puts it out', () => {
+    expect(matchesFilter(ticket(), { exclude: { collaboratorIds: ['user_anselma'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { collaboratorIds: ['user_ghost'] } })).toBe(true);
+  });
+
+  it('type, state, state category and project', () => {
+    expect(matchesFilter(ticket(), { exclude: { typeIds: ['task'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { typeIds: ['epic'] } })).toBe(true);
+    expect(matchesFilter(ticket(), { exclude: { stateIds: ['doing'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { stateIds: ['done'] } })).toBe(true);
+    expect(matchesFilter(ticket(), { exclude: { stateCategories: ['active'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { stateCategories: ['terminal'] } })).toBe(true);
+    expect(matchesFilter(ticket(), { exclude: { projectIds: ['p1'] } })).toBe(false);
+    expect(matchesFilter(ticket(), { exclude: { projectIds: ['p2'] } })).toBe(true);
+  });
+
+  it('include AND exclude on one axis: must match an include and none of the excludes', () => {
+    // "Uma, not Raj" — the ticket is Kiro's: included by the first, so kept.
+    expect(
+      matchesFilter(ticket(), { assigneeIds: ['user_kiro'], exclude: { assigneeIds: ['user_anselma'] } }),
+    ).toBe(true);
+    // Included AND excluded (the sheet never produces this; the predicate answers anyway): out.
+    expect(
+      matchesFilter(ticket(), { assigneeIds: ['user_kiro'], exclude: { assigneeIds: ['user_kiro'] } }),
+    ).toBe(false);
+  });
+
+  it('exclude composes with the other axes — an excluded type is out even when everything else matches', () => {
+    expect(
+      matchesFilter(ticket(), { assigneeIds: ['user_kiro'], text: 'gst', exclude: { typeIds: ['task'] } }),
+    ).toBe(false);
+  });
+});
