@@ -376,11 +376,10 @@
    already renders `<Card className="gn-board-card">`, composing to
    `gn-card gn-board-card` (`card.tsx:7`). This selector is bare — (0,1,0),
    the SAME specificity as `.gn-card` above, not higher — and it wins for the
-   properties both declare (padding, border-radius) by SOURCE ORDER: this
-   rule sits later in the file than `.gn-card`'s (`ui.css:160`). `.gn-card`
-   itself is not touched, so every other `.gn-card` consumer in the product
-   keeps its 12px padding; only the board card, carrying this second class,
-   gets 14px.
+   PADDING by SOURCE ORDER: this rule sits later in the file than `.gn-card`'s
+   (`ui.css:160`). `.gn-card` itself is not touched, so every other `.gn-card`
+   consumer in the product keeps its 12px padding; only the board card,
+   carrying this second class, gets 14px.
 
    The spec's own `cursor: grab` is REMOVED here, Ruling 15 (coordinator,
    2026-09-16) — it shipped in this task's first pass and was an affordance
@@ -388,8 +387,30 @@
    any drag behaviour exists is the same "a control that lies" shape Task 4's
    own brief withheld the inert Filters button for, and this task's first
    pass had not held itself to that same bar. It belongs in Task 14's commit,
-   beside the behaviour it promises, not here ahead of it. */
-.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }
+   beside the behaviour it promises, not here ahead of it.
+
+   The spec's own literal `border-radius: 12px` is ALSO REMOVED, Ruling 17
+   (coordinator, 2026-09-16) — this is the exact defect case 13.355 already
+   fixed one surface over (`.gn-card.gn-invite`'s literal `border-radius: 12px`
+   tying `.gn-card`'s own token-driven radius). `.gn-card` resolves
+   `--gn-radius-card` to 16px under `hig`/`minimal` and 20px under `neo`
+   (`tokens.ts:798-801`); a literal here has the SAME specificity as `.gn-card`
+   and sits later in the file, so it would win for every style, pinning every
+   board card at 12px where `neo` should draw 20px — a real, visible
+   per-style divergence, not a latent one. The padding fix above is a
+   deliberate, DECLARED divergence from `.gn-card` (14px vs 12px, the spec's
+   own number, verified against every `.gn-card` consumer); this radius
+   literal was an UNDECLARED one, transcribed from the brief's own CSS block
+   without the same scrutiny the padding got. **What is genuinely lost**: the
+   prototype does draw board cards at a flatter 12px against its own 16px
+   `cardR` — a real, intentional prototype distinction — and no board-card
+   radius role is minted to preserve it. Considered and rejected: a new token
+   role to reproduce one decoration is exactly the shape 13.355 already ruled
+   against. The board card now shares every other card's corner, and `neo`
+   stays internally consistent rather than drawing one surface squarer than
+   the rest. Case 13.464 asserts the ABSENCE of a `border-radius` declaration
+   here, so a future round cannot quietly reintroduce the literal. */
+.gn-board-card { padding: 0.875rem; }
 /* Spec row "Card, in transit": a dashed warning outline. `card.pending` is
    already read by `BoardCardView` (board.tsx, the "claim in transit" chip) —
    wired onto the card container's className alongside `gn-board-card` rather

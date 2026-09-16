@@ -4458,8 +4458,28 @@ session hit the "declares a visual effect that never paints" shape the dead `.gn
 pixel: nothing else in the cascade sets `border`/`border-style` on that selector either, before or
 after.
 
+**Coordinator ruling 17, code review — the padding fix's own reasoning was not applied to the
+neighbouring property in the same rule.** `.gn-board-card`'s literal `border-radius: 0.75rem` (12px)
+carried the SAME `(0,1,0)` specificity as `.gn-card`'s own token-driven radius and sat later in the
+file, so it won on source order for every style — pinning every board card at 12px where `neo` should
+draw `.gn-card`'s `--gn-radius-card` at 20px (`tokens.ts:798-801`). This is the exact defect case
+13.355 already fixed one surface over (`.gn-card.gn-invite`'s literal radius tying `.gn-card`'s
+token); the padding line two properties over got the "does this compete with `.gn-card`'s own token"
+scrutiny (verified 12px stays the product default, only the board card takes 14px), and the radius
+line, transcribed from the brief's own CSS block, did not. **Removed, not replaced with a token —
+minting a `.gn-board-card`-specific radius role to preserve the prototype's flatter 12px corner was
+considered and rejected, the same precedent 13.355 already set: a new token role to reproduce one
+decoration.** The board card now falls through to `.gn-card`'s own radius and moves with the style
+axis like every other card; the prototype's genuine 12px-vs-16px distinction is given up, honestly,
+not silently.
+
 - **13.463** ✅ `BoardCardView` outlines the card container itself (`.gn-board-card--pending`) while
   `card.pending` is true and not otherwise — proven in both directions on the same render/rerender
   pair the neighbouring "claim in transit" chip test already uses, and mutation-checked: a
   never-wired constant class fails the positive assertion, an always-wired one fails the negative. —
   (`packages/app-core/test/views/board.test.tsx`)
+- **13.464** ✅ `.gn-board-card` declares no `border-radius` of its own (mirroring case 13.355's own
+  source-scan shape, `neo-card-radius.test.ts`) — the rule still exists and still carries its 14px
+  padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
+  token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
+  `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)

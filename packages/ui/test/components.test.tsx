@@ -306,3 +306,45 @@ describe('Select panel/option styling', () => {
     expect(rule('.gn-select__panel')).toMatch(/background:\s*var\(--gn-surface(-raised)?\)/);
   });
 });
+
+/**
+ * Case 13.464 — board-prototype-port Task 6, Ruling 17 (coordinator, 2026-09-16).
+ *
+ * `.gn-board-card`'s own literal `border-radius: 0.75rem` (12px) had the SAME
+ * specificity as `.gn-card`'s (`(0,1,0)` both) and sat later in this file, so
+ * it won on source order for EVERY style — pinning every board card at 12px
+ * where `neo` should draw `.gn-card`'s own `--gn-radius-card` token at 20px
+ * (`tokens.ts:798-801`). This is the exact shape case 13.355 already fixed
+ * one surface over (`neo-card-radius.test.ts`, `.gn-card.gn-invite`'s literal
+ * radius tying `.gn-card`'s token) — mirrored here rather than reinvented:
+ * assert the rule STILL EXISTS (it carries real padding, unlike the deleted
+ * `.gn-card.gn-invite` rule 13.355 covers), and assert its body carries no
+ * `border-radius` of its own, so the board card falls through to `.gn-card`'s
+ * token and moves with the style axis like every other card.
+ */
+describe('13.464 — the board card declares no border-radius of its own (Ruling 17)', () => {
+  it('.gn-board-card keeps its own padding rule but sets no border-radius', () => {
+    const body = rule('.gn-board-card');
+    expect(body, `.gn-board-card rule: ${body}`).toMatch(/padding:\s*0\.875rem/);
+    expect(
+      body.includes('border-radius'),
+      `.gn-board-card reintroduced a literal radius that would out-specify nothing and tie .gn-card's by source order — ${body}`,
+    ).toBe(false);
+  });
+
+  /*
+   * MUTATION WITNESS. Planting exactly the regression this case exists to
+   * catch — reintroducing a literal `border-radius` on `.gn-board-card` —
+   * must redden the assertion above.
+   */
+  it('a planted literal border-radius on .gn-board-card is caught', () => {
+    const mutated = UI_CSS.replace(
+      '.gn-board-card { padding: 0.875rem; }',
+      '.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }',
+    );
+    expect(mutated).not.toBe(UI_CSS); // the replace actually found and changed the target line
+    const m = mutated.match(/\.gn-board-card\s*\{([^}]*)\}/);
+    expect(m).not.toBeNull();
+    expect(m?.[1].includes('border-radius')).toBe(true);
+  });
+});
