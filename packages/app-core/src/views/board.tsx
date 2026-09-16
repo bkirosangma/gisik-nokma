@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
@@ -637,6 +637,33 @@ function MoveArrows({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  /**
+   * Same idiom as `useLiveQuery`'s `isCurrent()` (`use-live-query.ts:77`) and
+   * `TransitionDialog`'s own precheck effect's `cancelled` flag: an `await`
+   * inside this component can resolve after THIS card has unmounted.
+   *
+   * It is not a rare race. `moves.onMoved()` is `board.reload()` — a
+   * SUCCESSFUL move on ANY card in the board (this one or a sibling) can
+   * refetch the board and restructure which `<li>` this ticket sits under,
+   * unmounting this exact `MoveArrows` instance while ITS OWN `ingest` is
+   * still in flight (a slow network, or simply losing a race with a
+   * sibling's faster move). React 18 drops the console warning for a
+   * setState on an unmounted component, so nothing short of this guard would
+   * ever surface the bug — confirmed absent from every one of this file's
+   * tests, which run a single card in isolation.
+   *
+   * `moves.onMoved()` itself is NOT guarded here — it calls into the PARENT
+   * (`board.reload()`), which is safe to invoke regardless of whether this
+   * card is still mounted. Only the setters that touch THIS component's own
+   * state are gated.
+   */
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const previousTarget = arrowTarget(workflow, columnOrder, fromStateId, 'previous');
   const nextTarget = arrowTarget(workflow, columnOrder, fromStateId, 'next');
 
@@ -677,26 +704,34 @@ function MoveArrows({
       const results = await moves.dataSource.ingest([transition]);
       const result = results[0];
       if (result === undefined) {
-        setServerRefusal({ rule: 'no-response', reason: 'The server did not answer this move.' });
+        if (mountedRef.current) {
+          setServerRefusal({ rule: 'no-response', reason: 'The server did not answer this move.' });
+        }
         return;
       }
       if (result.status === 'committed') {
-        setServerRefusal(null);
+        // `onMoved()` reaches the PARENT and is safe regardless of whether
+        // this card is still mounted; only the local setter is gated.
+        if (mountedRef.current) setServerRefusal(null);
         moves.onMoved();
         return;
       }
-      setServerRefusal(
-        result.status === 'refused'
-          ? { rule: result.rule, reason: result.reason }
-          : { rule: result.code, reason: result.message },
-      );
+      if (mountedRef.current) {
+        setServerRefusal(
+          result.status === 'refused'
+            ? { rule: result.rule, reason: result.reason }
+            : { rule: result.code, reason: result.message },
+        );
+      }
     } catch (cause) {
-      setServerRefusal({
-        rule: 'transport',
-        reason: cause instanceof Error ? cause.message : String(cause),
-      });
+      if (mountedRef.current) {
+        setServerRefusal({
+          rule: 'transport',
+          reason: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) setSubmitting(false);
     }
   };
 
@@ -759,16 +794,22 @@ function MoveArrows({
     const results = await moves.dataSource.ingest([...fieldEvents, transition]);
     const failed = results.find((result) => result.status !== 'committed');
     if (failed === undefined) {
-      setServerRefusal(null);
-      setDialogOpen(false);
+      // Same unmount guard as `submitDirect` above — `onMoved()` reaches the
+      // parent and runs regardless; the two local setters are gated.
+      if (mountedRef.current) {
+        setServerRefusal(null);
+        setDialogOpen(false);
+      }
       moves.onMoved();
       return;
     }
-    setServerRefusal(
-      failed.status === 'refused'
-        ? { rule: failed.rule, reason: failed.reason }
-        : { rule: failed.code, reason: failed.message },
-    );
+    if (mountedRef.current) {
+      setServerRefusal(
+        failed.status === 'refused'
+          ? { rule: failed.rule, reason: failed.reason }
+          : { rule: failed.code, reason: failed.message },
+      );
+    }
   };
 
   return (
