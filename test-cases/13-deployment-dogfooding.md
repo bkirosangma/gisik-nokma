@@ -5985,7 +5985,9 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   → "Uma One, excluded" → "Uma One", `data-mode` following, no `aria-pressed`.
 - **13.553** ✅ Excluding an assignee drops that card from the board under "1 of 2 shown" with a
   "Not assignee: Uma One" chip (and no include chip); the chip's × restores both cards and the strip goes.
-  Mutation (`boardFilter.exclude` forced `undefined`) kills this and 13.554 while 13.552 stays green.
+  Mutation (`boardFilter.exclude` forced `undefined`) kills this, 13.554 AND 13.555 — the last only because
+  its own `1 of 2 shown` precondition reads the narrowed board, not because it independently exercises
+  Clear-all-clears-exclude — while 13.552 stays green (the name cycles regardless of board wiring).
 - **13.554** ✅ A type chip excludes (bug card gone, "Not type: Bug"); a category chip reaches the excluded
   state and empties the one-column board honestly ("0 of 2 shown").
 - **13.555** ✅ "Clear all" clears an exclusion through the real button, without closing the sheet;
