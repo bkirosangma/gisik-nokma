@@ -4264,3 +4264,82 @@ alongside its existing List/Timeline coverage.
 - **13.444** ✅ The review's Minor: Ruling 10's mirror note (`13.439`) is exercised on the Calendar
   tab too, not only List and Timeline — the gate is one uniform `view !== 'board'` check, so
   divergence was unlikely, but untested. — (`apps/web/test/board-narrowing.test.tsx`)
+
+## Task 5 — the Filters sheet (board-prototype-port plan, 2026-09-16)
+
+**Block `13.445`–`13.456` minted here; the next free BLOCK is `13.457`.** The Filters button Task 4
+deliberately left unrendered ("An inert Filters button is a button that lies... I chose do not render
+it yet") gets its sheet: a `role="dialog"` side panel writing straight through to the SAME
+page-level `filter` state the search box and the removable chips already share — no draft copy, no
+"Apply" button. Five of `BoardFilterSpec`'s six axes get a control (`text` already had the search
+box): Assignee and Collaborators as "person row" checkbox lists, Type and State as "category chip"
+multi-selects, and Category over the three fixed `stateCategories` values. `projectIds` gets none —
+this page is already scoped to the one project it shows, and Task 4's own report found no natural
+label source for it here. `dueBefore`/`dueAfter`/`fields` get no control either: the design spec's
+own Filters-sheet metrics name exactly two control shapes ("person row", "category chip"), and this
+task's brief curates those same two into its metrics line while dropping the spec's "Toggle" row
+entirely — the discriminating fact that no boolean/date control was meant to land here. Both remain
+unsettable anywhere in the product after this task, a named gap for whoever builds their control
+next, not a surprise.
+
+`13.451` is the test Task 4's own brief deferred to this commit by name: "names the axes the board
+could not evaluate, beside the count and not inside it... helper added in Task 5... do not stub the
+helper." `openFiltersAndPickCollaborator` in `filters-sheet.test.tsx` is that helper, doing the real
+thing — open the sheet through the Filters button, click a real checkbox — rather than reaching into
+`setFilter` directly. Because `collaboratorIds` is one of the four axes `matchesBoardCard` cannot
+evaluate at all, this is `describeUnappliedBoardAxes`'s (Task 4) first execution through the rendered
+page rather than through its own unit test; it ran clean on the first try.
+
+The scope note's trailing clause — "— set on the list tab, where a ticket carries the field", written
+before this sheet existed — is REMOVED, not re-pointed at the Filters sheet. `boardUnappliedAxes` can
+join up to three axis names in one sentence, and after this task only ONE of the three
+(`collaborator`) has a control anywhere in the product; `dueBefore`/`dueAfter`/`fields` remain
+unsettable anywhere. A single trailing clause cannot name a different true location per axis in a
+joined list, and "set in the Filters sheet" would be right for collaborator today and silently wrong
+for the other two the moment either gains a control elsewhere — the exact "names the wrong place"
+failure the task's own brief warned against. `13.456` guards the deletion.
+
+The dialog's focus contract is mutation-verified in both directions, not merely asserted once:
+`account-menu.tsx`'s own docblock warns that "Escape returns focus to the trigger" is vacuously true
+if focus never left it in the first place. `13.445` asserts focus DID leave the trigger on open
+(`document.activeElement` inside the panel, not on the button) — confirmed load-bearing by temporarily
+deleting the focus-on-open effect and watching that exact assertion fail. `13.446` asserts Escape
+returns focus to the trigger — confirmed load-bearing the same way, by temporarily deleting the
+focus-return line and watching that assertion fail with the trigger untouched. Both mutations were
+reverted with a targeted edit (not `git checkout`), confirmed clean by re-running the full suite.
+
+- **13.445** ✅ The Filters button opens a `role="dialog"` panel with `aria-modal="true"`, labelled by
+  its own `<h2>Filters</h2>` via `aria-labelledby`, and focus moves off the trigger and into the panel
+  on open. Mutation-verified: deleting the focus-on-open effect fails this exact
+  assertion. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.446** ✅ Escape closes the sheet and returns focus to the exact Filters button that opened it.
+  Mutation-verified: deleting the focus-return line fails this exact
+  assertion. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.447** ✅ Checking a person row in the Assignee section narrows the board, shows the
+  `assigneeIds` chip naming them, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.448** ✅ Pressing a Type chip (`aria-pressed` toggles true) narrows the board, shows the
+  `typeIds` chip, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.449** ✅ Pressing a State chip discloses via the `stateIds` chip even when it removes no card
+  (every fixture card shares the one state) — the narrowing strip's three-term gate opens on a chip
+  existing, independent of whether it removed anything. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.450** ✅ Pressing a Category chip narrows the board to zero cards and shows the
+  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:42-46`) holds at the
+  limit. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.451** ✅ THE DEFERRED TASK 4 TEST. Picking a Collaborator through the real
+  `openFiltersAndPickCollaborator` helper does not narrow the board (the count stays `M of M`) but
+  the scope note names "collaborator" as not applied on the board — the count reports cards the board
+  filtered, the note reports an axis it never ran, and they stay
+  separate. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.452** ✅ "Clear all" resets the sheet's own five axes (proven on Assignee) without closing the
+  sheet — a distinct action from "Done". — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.453** ✅ Absence, not an invented empty list: while the roster has not been read
+  (`getMembers` never resolving), the Assignee section states so and renders no checkboxes at
+  all. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.454** ✅ A FAILED ticket-types read renders a refusal sentence in the Type section, never
+  falling back to the built-in ladder — the built-in fallback is for a read still PENDING, never one
+  that has REFUSED. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.455** ✅ While the board has not been read, the State section states so rather than rendering
+  zero chips (which would claim the board legitimately has no states). — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.456** ✅ The scope note's copy no longer names "the list tab" — the location clause removed
+  because it names the wrong place for two of the three axes it can
+  join. — (`apps/web/test/filters-sheet.test.tsx`)

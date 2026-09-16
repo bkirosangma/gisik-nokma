@@ -1,0 +1,382 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import type { Actor, BoardCard, BoardView, ClaimProvenance } from '@gisik-nokma/app-core';
+import type { TicketTypeDef } from '@gisik-nokma/domain';
+import { Providers } from '../src/providers.js';
+import { stubServices } from './helpers/stub-services.js';
+
+/**
+ * ## The Filters sheet (board-prototype-port Task 5)
+ *
+ * This file is `board-narrowing.test.tsx`'s sibling: same harness shape
+ * (`Providers` + `stubServices`, copied rather than imported — the
+ * convention every test file in this directory already follows), same
+ * `13.4xx` numbering series (`test-cases/13-deployment-dogfooding.md`), new
+ * cases `13.445`–`13.456`.
+ *
+ * `13.451` is the test Task 4's own brief deferred: "names the axes the
+ * board could not evaluate, beside the count and not inside it... helper
+ * added in Task 5... do not stub the helper." `openFiltersAndPickCollaborator`
+ * below is that helper, doing the real thing (open the sheet, click a real
+ * checkbox) rather than reaching into `setFilter` directly.
+ */
+
+const PROJECT_ID = '01J9PROJECT000000000000000';
+const WORKSPACE_ID = '01J9WORKSPACE0000000000000';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useParams: () => ({ workspaceId: WORKSPACE_ID, projectId: PROJECT_ID }),
+  usePathname: () => `/w/${WORKSPACE_ID}/p/${PROJECT_ID}`,
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock('../src/auth-client.js', () => ({
+  authClient: {
+    useSession: () => ({
+      data: { user: { id: '01J9USER000000000000000000', name: 'Anselma Marak' } },
+    }),
+    signOut: async () => ({ data: {}, error: null }),
+  },
+}));
+
+import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+
+function claim(): ClaimProvenance {
+  return {
+    actorId: 'user_kiro',
+    actorName: 'Kiro',
+    clientTime: '2026-08-19T10:00:00.000Z',
+    serverTime: '2026-08-19T10:00:01.000Z',
+  };
+}
+
+function card(overrides: Partial<BoardCard> = {}): BoardCard {
+  return {
+    ticketId: 't_1',
+    title: 'Untitled',
+    typeId: 'task',
+    assignee: null,
+    stateProvenance: claim(),
+    cause: null,
+    rollup: null,
+    pending: false,
+    ...overrides,
+  };
+}
+
+/** Two cards in one column: one assigned to `u1`, one not — enough to prove the assignee axis actually removes a card rather than merely rendering a chip. */
+const twoCards: BoardCard[] = [
+  card({ ticketId: 't_1', title: 'Carve the new workflow', assignee: { id: 'u1', name: 'Uma One' } }),
+  card({ ticketId: 't_2', title: 'Restock the cold shelf', typeId: 'bug' }),
+];
+
+function boardOf(cards: BoardCard[]): BoardView {
+  return {
+    projectId: PROJECT_ID,
+    groups: [
+      {
+        workflowId: 'wf_1',
+        workflowVersion: 1,
+        workflowName: 'Basic',
+        columns: [
+          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards },
+        ],
+      },
+    ],
+  };
+}
+
+const ROSTER: Actor[] = [
+  { id: 'u1', name: 'Uma One' },
+  { id: 'u9', name: 'Nine Nonesuch' },
+];
+
+/** Full `TicketTypeDef` shape — `customDateFieldsByType` (`src/ticket-dates-input.ts:117`) reads `.fields` on every entry unconditionally, so an `{id, name}`-only fixture throws before the sheet is ever reached. */
+const TYPES: TicketTypeDef[] = [
+  { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_1', fields: [] },
+  { id: 'bug', name: 'Bug', icon: 'bug', rank: 3, workflowId: 'wf_1', fields: [] },
+];
+
+/** The shipped-server-shaped stub every case below starts from — same shape as `board-narrowing.test.tsx`'s `servedBoard`, with a real roster and a real type list so the sheet's person rows and type chips have something to render. */
+function servedBoard(cards: BoardCard[], overrides: Parameters<typeof stubServices>[0] = {}) {
+  return stubServices({
+    getBoard: async () => boardOf(cards),
+    getAttention: async () => [],
+    getMembers: async () => ROSTER,
+    getTicketTypes: async () => TYPES,
+    getTickets: async () => ({ projectId: PROJECT_ID, rows: [] }),
+    ...overrides,
+  });
+}
+
+async function openFilters() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+  return screen.findByRole('dialog', { name: 'Filters' });
+}
+
+/**
+ * The helper Task 4's own brief named and deferred to this commit. Real
+ * interaction, not a `setFilter` shortcut: opens the sheet through the
+ * Filters button, finds the named person's own checkbox inside the
+ * "Collaborators" group, and clicks it.
+ */
+async function openFiltersAndPickCollaborator(name: string) {
+  const dialog = await openFilters();
+  const group = within(dialog).getByRole('group', { name: 'Collaborators' });
+  await userEvent.click(within(group).getByRole('checkbox', { name }));
+}
+
+describe('13.445 the sheet is a real dialog, and focus moves into it on open', () => {
+  it('opens with role=dialog, aria-modal, labelled by its own heading, and focus inside', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const filtersButton = screen.getByRole('button', { name: 'Filters' });
+
+    const dialog = await openFilters();
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(within(dialog).getByRole('heading', { name: 'Filters' })).toBeInTheDocument();
+
+    // Focus actually LEFT the trigger — the precondition account-menu.tsx's
+    // own docblock says is what makes "Escape returns focus" a real
+    // assertion rather than a vacuous one (focus never having left).
+    expect(document.activeElement).not.toBe(filtersButton);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+});
+
+describe('13.446 Escape closes the sheet and returns focus to the Filters button', () => {
+  it('returns focus to the exact control that opened the sheet', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const filtersButton = screen.getByRole('button', { name: 'Filters' });
+
+    const dialog = await openFilters();
+    await userEvent.keyboard('{Escape}');
+
+    expect(dialog).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(filtersButton);
+  });
+});
+
+describe('13.447 picking an assignee narrows the board and discloses it', () => {
+  it('shows the assignee chip and the honest count once a person row is checked', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'Uma One' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-assigneeIds')).toHaveTextContent('Uma One');
+    expect(screen.getByText('Carve the new workflow')).toBeInTheDocument();
+    expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.448 picking a type chip narrows the board and discloses it', () => {
+  it('shows the type chip and the honest count once a type chip is pressed', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Type' });
+    const bugChip = within(group).getByRole('button', { name: 'Bug' });
+    await userEvent.click(bugChip);
+    expect(bugChip).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-typeIds')).toHaveTextContent('Bug');
+    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.queryByText('Carve the new workflow')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.449 picking a state chip narrows the board and discloses it', () => {
+  it('shows the state chip and the honest count once a state chip is pressed', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'State' });
+    // The board fixture has exactly one column, "Doing".
+    await userEvent.click(within(group).getByRole('button', { name: 'Doing' }));
+    await userEvent.keyboard('{Escape}');
+
+    // Every card sits in "Doing", so selecting it narrows nothing — but it
+    // must still disclose via the chip (the narrowing strip's own three-term
+    // gate opens on a chip existing, independent of whether it removed a
+    // card — see `shouldRenderBoardNarrowingStrip`).
+    expect(await screen.findByTestId('board-filter-chip-stateIds')).toHaveTextContent('Doing');
+    expect(screen.getByText('2 of 2 shown')).toBeInTheDocument();
+  });
+});
+
+describe('13.450 picking a category chip narrows the board and discloses it', () => {
+  it('shows the category chip and the honest count once a category chip is pressed', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Category' });
+    // The board fixture's one column is category "active"; "Terminal" excludes both cards.
+    await userEvent.click(within(group).getByRole('button', { name: 'Terminal' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByTestId('board-filter-chip-stateCategories')).toHaveTextContent('Terminal');
+    expect(screen.getByText('0 of 2 shown')).toBeInTheDocument();
+  });
+});
+
+describe('13.451 the deferred Task 4 test: collaborator is unapplied on the board, not silently ignored', () => {
+  it('names the axis the board could not evaluate, beside the count and not inside it', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    await openFiltersAndPickCollaborator('Nine Nonesuch');
+    await userEvent.keyboard('{Escape}');
+
+    const note = await screen.findByTestId('board-scope-note');
+    expect(note).toHaveTextContent(/not applied on the board/i);
+    expect(note).toHaveTextContent(/collaborator/i);
+    // The count reports cards the board filtered; the note reports an axis it
+    // never ran — collaborator cannot narrow a `BoardCard` at all
+    // (`matchesBoardCard` carries no collaborators), so both cards remain.
+    expect(screen.getByText('2 of 2 shown')).toBeInTheDocument();
+  });
+});
+
+describe('13.452 Clear all resets every axis the sheet owns, without closing', () => {
+  it('clears the assignee selection and the sheet stays open', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    const checkbox = within(group).getByRole('checkbox', { name: 'Uma One' });
+    await userEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear all' }));
+
+    expect(checkbox).not.toBeChecked();
+    // Clear all does not close the sheet — it is a distinct action from Done.
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.453 absence: the roster not yet read renders a sentence, never an invented empty list', () => {
+  it('says the roster has not loaded, rather than showing zero people to choose from', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          // Never resolves — `members.data` stays `null` for the life of this test.
+          getMembers: () => new Promise<Actor[]>(() => undefined),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    expect(within(group).getByText(/roster has not loaded/i)).toBeInTheDocument();
+    expect(within(group).queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.454 absence: a failed ticket-types read refuses, never falling back to the built-in ladder', () => {
+  it('says types could not be loaded rather than offering the four built-ins', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          getTicketTypes: () => Promise.reject(new Error('types unavailable')),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Type' });
+    expect(within(group).getByText(/could not be loaded/i)).toBeInTheDocument();
+    expect(within(group).queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.455 absence: the board not yet read renders a sentence for the State section', () => {
+  it('says the board has not loaded, rather than showing zero states', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          getBoard: () => new Promise<BoardView>(() => undefined),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    // The board never resolves, so wait on the Filters button itself, which
+    // does not depend on `board.data`.
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'State' });
+    expect(within(group).getByText(/board has not loaded/i)).toBeInTheDocument();
+  });
+});
+
+describe('13.456 the scope note no longer names a location the sheet made untrue', () => {
+  it('states the unapplied axis without pointing at "the list tab"', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    await openFiltersAndPickCollaborator('Nine Nonesuch');
+    await userEvent.keyboard('{Escape}');
+
+    const note = await screen.findByTestId('board-scope-note');
+    expect(note).not.toHaveTextContent(/list tab/i);
+  });
+});

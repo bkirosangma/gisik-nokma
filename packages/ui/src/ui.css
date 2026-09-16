@@ -2771,3 +2771,128 @@
   color: var(--gn-text-muted);
   cursor: pointer;
 }
+
+/* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
+   Metrics: spec, Filters sheet `:1367-1417`; the plan's own prototype→product
+   table (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`)
+   is what turns `cardBg`/`cardR`/`fieldBg`/`fieldShadow`/`fill4`/`overlay`
+   into the roles below — no new token role, every `var(--gn-…)` here is
+   already declared and already consumed elsewhere in this file.
+
+   The task's own brief gives the scrim/panel/header/heading/section-label/
+   footer rules VERBATIM (below, unchanged); `.gn-filters__person-row`,
+   `.gn-filters__person-list`, `.gn-filters__chip`, `.gn-filters__chip-list`,
+   `.gn-filters__section`, `.gn-filters__body` and `.gn-filters__pending` are
+   this task's own additions, translating the spec's "person row"/"category
+   chip" metrics with the same table. Page-local, new selectors — nothing on
+   the do-not-edit shared list (`.gn-card`/`.gn-chip`/`.gn-avatar`/
+   `.gn-table`/`.gn-select`/`.gn-button`/`.gn-segmented`) is touched; the
+   sheet's own buttons reuse `.gn-button`/`.gn-button--ghost`/
+   `.gn-button--primary` UNCHANGED, exactly as the plan's own "Divergences
+   already decided" section requires for board controls. */
+.gn-filters__scrim { position: fixed; inset: 0; background: var(--gn-surface-overlay); }
+.gn-filters__panel {
+  position: fixed; inset-block: 0; inset-inline-end: 0;
+  width: min(23.75rem, 100%);
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card) 0 0 var(--gn-radius-card);
+  box-shadow: -0.75rem 0 2.5rem var(--gn-shadow);
+  display: flex; flex-direction: column;
+}
+.gn-filters__header { padding: 1.25rem 1.5rem 0.75rem; }
+.gn-filters__heading { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; margin: 0; }
+.gn-filters__section-label {
+  font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600;
+  color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.0375rem;
+}
+.gn-filters__footer {
+  padding: 1rem 1.5rem; background: var(--gn-fill-quaternary);
+  display: flex; justify-content: flex-end; gap: 0.625rem;
+}
+
+/* The scrollable middle, between the fixed header and footer — `flex: 1 1
+   auto` is what lets five sections of checkboxes/chips exceed the viewport
+   height without pushing the footer off-screen; `.gn-sheet__body`
+   (components/sheet.tsx's generic panel) uses the identical `overflow-y:
+   auto` idiom for the same reason. */
+.gn-filters__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+/* `border: none; margin: 0; padding: 0;` resets the UA default fieldset box
+   (a border and inset padding neither the spec nor this task's own metrics
+   ask for) — the same reset `.gn-visibility__modes`/`.gn-visibility__people`
+   would need, had they not inherited a house rule already; this file has no
+   such rule, so it is stated here. `<legend>` gets the identical reset for
+   the same reason: browsers give it its own inset padding and a shrink-to-
+   fit box that `.gn-filters__section-label`'s metrics (a plain 13px/18px
+   uppercase line) do not describe. Deliberately NOT `display: contents` on
+   the fieldset — that rule has documented AT/browser support gaps for
+   grouping semantics, and this task has no way to verify screen-reader
+   behaviour, so the plain box (own `flex column` + a small internal `gap`)
+   is used instead, with `.gn-filters__body`'s own `gap` then spacing one
+   fieldset from the next. */
+.gn-filters__section { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-filters__section > .gn-filters__section-label { padding: 0; margin: 0; }
+
+.gn-filters__pending {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
+}
+
+/* Person row — `fieldBg + fieldShadow; radius 12px`, per the table:
+   `--fieldBg` → `fill-quaternary`, `--fieldShadow` → `shadow-sunken` (the
+   SAME pair `.gn-project__search` above already uses for the identical
+   prototype vocabulary). `0.75rem` = 12px is a plain corner radius, not a
+   colour, so it is written as a literal exactly like `.gn-chip`'s own
+   `border-radius: 999px` above — the token-discipline scan bans colour
+   literals, not lengths. */
+.gn-filters__person-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-filters__person-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  font-size: 1.0625rem;
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+  border-radius: 0.75rem;
+  cursor: pointer;
+}
+
+/* Category chip — `radius 999px; padding 8px 12px; 13px`, selected `accent`
+   ground + `onColor`. The gated pair is `{ fg: 'accentText', bg: 'accent' }`
+   (`tokens.ts` `CONTRAST_PAIRS`, measured at 4.5:1 in both themes) —
+   `.gn-button--primary`/`.gn-avatar--tint-0` already pair `--gn-accent`
+   with `--gn-accent-text` for the identical "accent ground" composition, and
+   this chip follows the SAME pair rather than the plan's literal
+   `--onColor` → `--gn-text-inverted` mapping, which names a role
+   `CONTRAST_PAIRS` never measures against `accent` at all. */
+.gn-filters__chip-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.gn-filters__chip {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+.gn-filters__chip[aria-pressed='true'] {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-filters__chip:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}

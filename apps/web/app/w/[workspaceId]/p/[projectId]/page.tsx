@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
 import {
@@ -16,11 +16,13 @@ import {
   useBoard,
   useLiveQuery,
   useTicketList,
+  type Actor,
   type BoardFilterSpec,
   type FilterSpec,
   type GroupLabels,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
+import { Avatar } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import {
   buildBoardFilterChips,
@@ -214,6 +216,23 @@ function ProjectBoard() {
    * below.
    */
   const [filter, setFilter] = useState<FilterSpec>({});
+
+  /**
+   * THE FILTERS SHEET (Task 5) — open/closed state, and the trigger's own
+   * ref so a keyboard-operable close (Escape, or the sheet's own "Done") can
+   * return focus to the exact control that opened it rather than to
+   * `document.body`. `closeFilters(returnFocus)` is the ONE close path both
+   * exits share — mirroring `account-menu.tsx`'s `close(returnFocus)`, whose
+   * own docblock is the worked example this task's brief names: a pointer
+   * click outside the sheet does not yank focus from wherever the pointer
+   * landed, but a keyboard exit always leaves focus somewhere real.
+   */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeFilters = useCallback((returnFocus: boolean) => {
+    setFiltersOpen(false);
+    if (returnFocus) filtersButtonRef.current?.focus();
+  }, []);
 
   /**
    * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
@@ -480,6 +499,17 @@ function ProjectBoard() {
     }
     return names;
   }, [board.data]);
+
+  /**
+   * The same map, as `{id, name}` pairs — the shape the Filters sheet's
+   * "State" chips iterate. Derived from `boardStateNames` itself rather than
+   * a second walk of `board.data.groups`, so the two can never enumerate a
+   * different state set.
+   */
+  const boardStateOptions = useMemo(
+    () => Array.from(boardStateNames, ([id, name]) => ({ id, name })),
+    [boardStateNames],
+  );
 
   const typeNameById = useMemo(
     () => new Map(typeOptions.map((type) => [type.id, type.name])),
@@ -763,6 +793,29 @@ function ProjectBoard() {
                   setFilter((current) => ({ ...current, text: value === '' ? undefined : value }));
                 }}
               />
+              {/*
+                THE FILTERS BUTTON (Task 5). Task 4's own report left it
+                unrendered on purpose ("An inert Filters button is a button
+                that lies... I chose do not render it yet") because nothing
+                existed yet for it to open. It opens now, wired to the SAME
+                `filter` state the search box and the removable chips already
+                share — never a second filter object. `.gn-button`/
+                `.gn-button--ghost` (unchanged, per the plan's own
+                "Divergences already decided") already renders exactly this
+                metric — `min-height:2.75rem` (44px), `padding:0 1.125rem`
+                (18px), `background:fill-tertiary`, `color:text-accent`,
+                `font-weight:600` — so no new CSS rule is needed for the
+                trigger itself.
+              */}
+              <button
+                ref={filtersButtonRef}
+                type="button"
+                className="gn-button gn-button--ghost"
+                aria-haspopup="dialog"
+                onClick={() => setFiltersOpen(true)}
+              >
+                Filters
+              </button>
               {createRegion}
             </div>
 
@@ -870,9 +923,30 @@ function ProjectBoard() {
                   </span>
                 ))}
                 {boardUnappliedAxes.length > 0 ? (
+                  /**
+                   * THE LOCATION CLAUSE — REMOVED (Task 5). Task 4 shipped
+                   * "— set on the list tab, where a ticket carries the
+                   * field", written before this sheet existed and flagged in
+                   * that task's own report for re-verification once it
+                   * landed. It is not re-pointed at the Filters sheet:
+                   * `boardUnappliedAxes` can join UP TO THREE axis names in
+                   * one sentence (collaborator, due date, custom field), and
+                   * after this task only ONE of those three — collaborator —
+                   * has a control anywhere in the product, and it lives in
+                   * the Filters sheet, not the list tab. `dueBefore`/
+                   * `dueAfter`/`fields` remain unsettable anywhere today (see
+                   * `FiltersSheet`'s own docblock). A single trailing clause
+                   * cannot name a different true location per axis in a
+                   * joined list, and "set in the Filters sheet" would be
+                   * right for collaborator today and silently wrong for the
+                   * other two the moment either gains a control elsewhere —
+                   * exactly the "names the wrong place" failure this task
+                   * was asked to avoid. Saying only what is true (the axis is
+                   * not applied here) outlives whichever surface next grows a
+                   * control for the other two.
+                   */
                   <span className="gn-project__scope-note" data-testid="board-scope-note">
-                    Not applied on the board: {boardUnappliedAxes.join(', ')} — set on the list
-                    tab, where a ticket carries the field.
+                    Not applied on the board: {boardUnappliedAxes.join(', ')}.
                   </span>
                 ) : null}
               </div>
@@ -1039,6 +1113,338 @@ function ProjectBoard() {
           onClose={closeTicket}
         />
       ) : null}
+
+      {/*
+        Rendered unconditionally on `expired` (matching `TicketSheet` just
+        above) — harmless, since the trigger that could ever set
+        `filtersOpen` true only exists inside the `!expired` branch, and the
+        component's own `if (!open) return null` gate means `expired`
+        toggling can never leave it mounted with nothing behind it.
+      */}
+      <FiltersSheet
+        open={filtersOpen}
+        onClose={closeFilters}
+        filter={filter}
+        setFilter={setFilter}
+        members={members.data}
+        typeOptions={typeOptions}
+        typesError={ticketTypes.error}
+        typesPending={ticketTypes.data === null}
+        boardStateOptions={boardStateOptions}
+        boardLoaded={board.data !== null}
+      />
     </main>
+  );
+}
+
+/** `stateCategorySchema`'s three values (`packages/domain/src/workflow.ts`), fixed and ordered — never derived from a fixture's own key order. */
+const STATE_CATEGORIES: readonly StateCategory[] = ['open', 'active', 'terminal'];
+const STATE_CATEGORY_LABELS: Record<StateCategory, string> = {
+  open: 'Open',
+  active: 'Active',
+  terminal: 'Terminal',
+};
+
+/** Toggle `value` in-or-out of an optional id list, collapsing back to `undefined` rather than `[]` — matching `buildBoardFilterChips`'s own `clear()` convention, so a fully-deselected axis is indistinguishable from one never touched. */
+function toggledArray<T>(current: T[] | undefined, value: T): T[] | undefined {
+  const existing = current ?? [];
+  const next = existing.includes(value) ? existing.filter((item) => item !== value) : [...existing, value];
+  return next.length === 0 ? undefined : next;
+}
+
+function withToggledId(
+  filter: FilterSpec,
+  key: 'assigneeIds' | 'collaboratorIds' | 'typeIds' | 'stateIds',
+  id: string,
+): FilterSpec {
+  return { ...filter, [key]: toggledArray(filter[key], id) };
+}
+
+type FiltersSheetProps = {
+  open: boolean;
+  /** The ONE close path for every exit (Escape, backdrop click, "Done") — see `ProjectBoard`'s own `closeFilters` for why a single function, not one per exit. */
+  onClose: (returnFocus: boolean) => void;
+  filter: FilterSpec;
+  setFilter: (updater: (current: FilterSpec) => FilterSpec) => void;
+  /** `null` while the roster has not been read — never `[]`, which would claim this workspace has no members (see `visibility-editor.tsx:242-245`'s identical rule for the same read). */
+  members: Actor[] | null;
+  /** Already resolved by `ProjectBoard` to the same built-in-ladder-while-loading fallback `createRegion` uses — one source of truth for "what are this workspace's types", not a second. */
+  typeOptions: Array<{ id: string; name: string }>;
+  typesError: string | null;
+  /** True while `typeOptions` is the built-in fallback rather than the workspace's own served types. */
+  typesPending: boolean;
+  boardStateOptions: Array<{ id: string; name: string }>;
+  boardLoaded: boolean;
+};
+
+/**
+ * THE FILTERS SHEET (board-prototype-port Task 5) — a side panel over the
+ * SAME page-level `filter` state the search box and the removable chips
+ * (`board-search-scope.ts`) already read and write. There is no draft copy
+ * here and no "Apply" button: every checkbox and chip writes straight
+ * through to `filter` on click, exactly like the removable chip's own
+ * `onRemove`. A draft-and-apply design would be a second filter state — the
+ * one thing the brief and `page.tsx`'s own comments repeatedly forbid — and
+ * it would desync the moment someone removes a chip from the narrowing strip
+ * while the sheet is closed: the strip writes `filter` directly, and a
+ * buffered copy would not see it. The footer is "Clear all" (clears this
+ * sheet's own five axes, does not close) and "Done" (closes only).
+ *
+ * ## Which axes get a control here, and which do not
+ *
+ * Five of `BoardFilterSpec`'s six axes get a control (`text` already has the
+ * search box built by Task 4): **Assignee** and **Collaborators** as
+ * "person row" checkbox lists (`assigneeIds`/`collaboratorIds`), **Type**
+ * and **State** as "category chip" multi-selects (`typeIds`/`stateIds`), and
+ * **Category** as the same chip idiom over the three fixed
+ * `stateCategories` values. `projectIds` gets none: this page is already
+ * scoped to the one project it is showing, Task 4's own report found no
+ * natural label source for it here ("a project-picker axis has no natural
+ * label source... the chip names a COUNT"), and the brief's own curated
+ * metrics line for this task never mentions a project control.
+ *
+ * `collaboratorIds` is deliberately included even though it is one of the
+ * four axes `BoardCard` cannot answer at all (`board-search-scope.ts`'s
+ * `describeUnappliedBoardAxes`) — Task 4's brief explicitly deferred its
+ * third Step-5 test ("names the axes the board could not evaluate... helper
+ * added in Task 5") to this commit, and this is that helper's only possible
+ * home. `dueBefore`/`dueAfter` and `fields` get no control: the design
+ * spec's own Filters-sheet metrics (`:1367-1417`) name exactly two control
+ * shapes — "person row" and "category chip" — and Task 5's brief curates
+ * those same two into its metrics line while dropping the spec's "Toggle"
+ * row entirely, which is the discriminating fact that no boolean/date
+ * control was meant to land here. Rendering an un-speced date-range input
+ * would be building a control the brief gives no shape for, and "An inert
+ * Filters button is a button that lies" cuts the other way too: a control
+ * this sheet cannot honestly justify from the brief is one it should not
+ * invent. So after this task, `dueBefore`/`dueAfter`/`fields` remain
+ * unsettable anywhere in the product — a known, named gap for whoever builds
+ * their control next, not a surprise (see the scope-note copy fix in
+ * `ProjectBoard`, which stopped naming a location for exactly this reason).
+ *
+ * ## Absence, not an invented empty list
+ *
+ * `members === null` (roster not yet read) and `!boardLoaded` (board not yet
+ * read) each render a sentence saying so, never a silently empty picker —
+ * the same rule `visibility-editor.tsx` already follows for its own person
+ * list, restated here rather than reinvented. `typesError !== null` renders
+ * a refusal sentence instead of the built-in ladder: `ProjectBoard`'s own
+ * docblock on `BUILTIN_TYPE_LADDER` forbids that fallback surviving a FAILED
+ * read (only a pending one), and `typeOptions` alone conflates the two, so
+ * this component is handed `typesError`/`typesPending` separately rather
+ * than inferring either from `typeOptions.length`.
+ *
+ * ## Accessibility contract
+ *
+ * `role="dialog"` + `aria-modal="true"`, labelled by its own `<h2>` via
+ * `aria-labelledby` (never a redundant `aria-label` naming the same text
+ * twice). Escape closes and returns focus to the Filters button
+ * (`onClose(true)`); a backdrop click closes without forcing focus
+ * (`onClose(false)`, mirroring `account-menu.tsx`'s outside-pointerdown
+ * case — the click already landed somewhere real). **Focus moves INTO the
+ * panel on open** — the first focusable descendant, mirroring
+ * `account-menu.tsx`'s own worked example and its docblock's own warning:
+ * without this, focus never leaves the trigger, and "Escape returns focus to
+ * the trigger" would be vacuously true because focus never left it. The
+ * test suite proves this is not vacuous by deleting the focus-return line
+ * and watching the case fail — see `filters-sheet.test.tsx`.
+ */
+function FiltersSheet({
+  open,
+  onClose,
+  filter,
+  setFilter,
+  members,
+  typeOptions,
+  typesError,
+  typesPending,
+  boardStateOptions,
+  boardLoaded,
+}: FiltersSheetProps) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const headingId = useId();
+
+  // Focus the first focusable descendant on open — see the docblock above
+  // for why this is load-bearing rather than cosmetic.
+  useEffect(() => {
+    if (!open) return;
+    const first = panelRef.current?.querySelector<HTMLElement>(
+      'input, button, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose(true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const clearAll = () =>
+    setFilter((current) => ({
+      ...current,
+      assigneeIds: undefined,
+      collaboratorIds: undefined,
+      typeIds: undefined,
+      stateIds: undefined,
+      stateCategories: undefined,
+    }));
+
+  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
+    <fieldset className="gn-filters__section">
+      <legend className="gn-filters__section-label">{title}</legend>
+      {members === null ? (
+        <p className="gn-filters__pending">The workspace roster has not loaded yet.</p>
+      ) : members.length === 0 ? (
+        <p className="gn-filters__pending">No members to choose from.</p>
+      ) : (
+        <div className="gn-filters__person-list">
+          {members.map((member) => (
+            <label key={member.id} className="gn-filters__person-row">
+              <input
+                type="checkbox"
+                checked={filter[key]?.includes(member.id) ?? false}
+                onChange={() => setFilter((current) => withToggledId(current, key, member.id))}
+              />
+              {/*
+                `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
+                its span (`components/avatar.tsx`), so left unhidden it
+                doubles this checkbox's accessible name to "Uma One Uma
+                One" — the label's accname concatenates every descendant's
+                text/label, and the plain `<span>` right after already
+                carries the real one. Decorative here, not a second source
+                of truth.
+              */}
+              <span aria-hidden="true">
+                <Avatar name={member.name} size="small" />
+              </span>
+              <span>{member.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+
+  return (
+    <div className="gn-filters__scrim" data-testid="filters-scrim" onClick={() => onClose(false)}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        className="gn-filters__panel"
+        data-testid="filters-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="gn-filters__header">
+          <h2 id={headingId} className="gn-filters__heading">
+            Filters
+          </h2>
+        </div>
+        <div className="gn-filters__body">
+          {personSection('Assignee', 'assigneeIds')}
+          {personSection('Collaborators', 'collaboratorIds')}
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Type</legend>
+            {typesError !== null ? (
+              <p className="gn-filters__pending">
+                This workspace’s ticket types could not be loaded, so filtering by type is not offered.
+              </p>
+            ) : (
+              <>
+                <div className="gn-filters__chip-list">
+                  {typeOptions.map((type) => {
+                    const selected = filter.typeIds?.includes(type.id) ?? false;
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        className="gn-filters__chip"
+                        aria-pressed={selected}
+                        onClick={() => setFilter((current) => withToggledId(current, 'typeIds', type.id))}
+                      >
+                        {type.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {typesPending ? <p className="gn-filters__pending">{BUILTIN_LADDER_NOTICE}</p> : null}
+              </>
+            )}
+          </fieldset>
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">State</legend>
+            {!boardLoaded ? (
+              <p className="gn-filters__pending">This project’s board has not loaded yet.</p>
+            ) : boardStateOptions.length > 0 ? (
+              <div className="gn-filters__chip-list">
+                {boardStateOptions.map((state) => {
+                  const selected = filter.stateIds?.includes(state.id) ?? false;
+                  return (
+                    <button
+                      key={state.id}
+                      type="button"
+                      className="gn-filters__chip"
+                      aria-pressed={selected}
+                      onClick={() => setFilter((current) => withToggledId(current, 'stateIds', state.id))}
+                    >
+                      {state.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </fieldset>
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Category</legend>
+            <div className="gn-filters__chip-list">
+              {STATE_CATEGORIES.map((category) => {
+                const selected = filter.stateCategories?.includes(category) ?? false;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    className="gn-filters__chip"
+                    aria-pressed={selected}
+                    onClick={() =>
+                      setFilter((current) => ({
+                        ...current,
+                        stateCategories: toggledArray(current.stateCategories, category),
+                      }))
+                    }
+                  >
+                    {STATE_CATEGORY_LABELS[category]}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        </div>
+        <div className="gn-filters__footer">
+          <button type="button" className="gn-button gn-button--ghost" onClick={clearAll}>
+            Clear all
+          </button>
+          <button
+            type="button"
+            className="gn-button gn-button--primary"
+            onClick={() => onClose(true)}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
