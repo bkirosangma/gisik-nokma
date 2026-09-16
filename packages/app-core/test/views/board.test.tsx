@@ -770,9 +770,10 @@ describe('useBoard — a project switch is a different question, and it gets ask
  * Plan 6 Task 15b, item 4. Cases 3.112–3.114
  * (`test-cases/03-foundation-ledger.md`). 3.114's second `it` is AMENDED
  * 2026-09-16 by board-prototype-port Task 7 (Ruling R6) — see that test's own
- * comment for what changed and why. Cases 13.465–13.466
+ * comment for what changed and why. Cases 13.465–13.467
  * (`test-cases/13-deployment-dogfooding.md`) cover Task 7's additions: the
- * per-column empty state and R6 itself.
+ * per-column empty state, R6 itself, and Ruling 19 (13.467, the isNarrowed
+ * fix found in Task 7's review).
  */
 describe('3.112 an empty board says words, not nothing', () => {
   const emptyBoard: BoardView = { projectId: 'prj_1', groups: [] };
@@ -941,6 +942,68 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
     expect(screen.getByText('To do')).toBeInTheDocument();
     expect(screen.getByText('Doing')).toBeInTheDocument();
     expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+});
+
+/**
+ * Board-prototype-port Task 7 fix, Ruling 19 (2026-09-16, found in review).
+ * `page.tsx` hands `Board` an ALREADY-NARROWED view (`boardNarrowing.view`) —
+ * cards dropped by the client-side board filter, never columns or groups.
+ * R6's `totalCards` fold reads exactly those narrowed cards, so without a
+ * signal distinguishing "genuinely zero tickets" from "a filter hid them
+ * all", a search matching nothing renders `EMPTY_BOARD_COPY` — "create
+ * one" — over a project that holds real tickets, contradicting the "N of M
+ * shown" strip one row above it and pointing at the wrong remedy. `isNarrowed`
+ * is the fix: `Board`'s own docblock on the prop carries the full account.
+ * Case 13.467.
+ */
+describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when cards were filtered, not absent', () => {
+  /**
+   * The SAME fixture for both arms below, deliberately: two columns, neither
+   * holding a card. On its own this is indistinguishable from R6's genuine
+   * empty-workflow case (13.466) — nothing about the `BoardView` itself says
+   * whether a filter did this. Only `isNarrowed` discriminates, so holding
+   * the fixture constant while flipping only that flag is the direct proof
+   * that the flag — and nothing else — is what changes the outcome.
+   */
+  const narrowedAwayBoard: BoardView = {
+    projectId: 'prj_1',
+    groups: [
+      {
+        workflowId: 'wf1',
+        workflowVersion: 1,
+        workflowName: 'Default',
+        columns: [
+          { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+        ],
+      },
+    ],
+  };
+
+  it('13.467 a narrowed-to-zero board suppresses EMPTY_BOARD_COPY — the rail and per-column empty states still render', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed />);
+    // The wrong-remedy sentence must NOT appear over a filtered board.
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+    // The rail is untouched by `isNarrowed` — it is not the invariant this
+    // prop protects, and the columns are still the one place a person can
+    // clear their narrowing and look again.
+    expect(screen.getByText('To do')).toBeInTheDocument();
+    expect(screen.getByText('Doing')).toBeInTheDocument();
+    // The per-column empty state is explicitly NOT changed by this ruling
+    // (coordinator: "recorded and deferred... not overruling a considered
+    // judgement mid-task") — both columns still carry it.
+    expect(screen.getAllByText(EMPTY_COLUMN_COPY)).toHaveLength(2);
+  });
+
+  it('13.467 the IDENTICAL board, not narrowed, still says the R6 sentence — proving the flag is what discriminates', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed={false} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+  });
+
+  it('13.467 CONTROL — omitting isNarrowed entirely behaves exactly like isNarrowed={false} (the default is "not narrowed")', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
 

@@ -4563,3 +4563,53 @@ recorded here rather than only in the component's own comment.
   assertion could witness before this task, and the witness above (revert to `groups.length === 0`,
   re-run) proves it: this case and the amended 3.114 test are the only two that redden. —
   (`packages/app-core/test/views/board.test.tsx`)
+
+## Task 7 fix round — Ruling 19: the R6 sentence must be gated on the board BEFORE narrowing (found in review, 2026-09-16)
+
+**Case `13.467` minted here**, continuing directly from `13.466`. A cross-task interaction neither Task 4
+(client-side board narrowing) nor this task's own R6 caught on its own: `page.tsx:1063` hands `<Board>`
+`boardNarrowing.view`, the POST-FILTER groups, never `board.data` directly (Ruling 1, Task 4). Task 4's
+narrowing drops CARDS only — never a column or a group (`board.tsx:42-46`'s own invariant) — so pre-R6
+this was harmless: the old gate read `board.groups.length`, which a card filter never touches, so the
+narrowed-to-zero state could never reach it. R6's `totalCards` fold reads exactly the narrowed cards,
+so without a fix a search matching nothing rendered `EMPTY_BOARD_COPY` — "No tickets here yet — create
+one." — over a project holding real tickets, one row beneath a strip reading "0 of 10 shown" with a
+removable chip: the page contradicting itself on one screen, and "create one" naming the wrong remedy
+(the fix is clearing the filter sitting right there, not creating a ticket).
+
+**Fix: `Board` gains an optional `isNarrowed?: boolean` prop** (`BoardProps`, following `onCreateTicket`'s
+own precedent immediately above it — a mount with nothing to say passes nothing, and `Board` behaves
+exactly as before this prop existed). `emptyBanner`'s gate becomes `totalCards === 0 && isNarrowed !==
+true`. `page.tsx` passes `isNarrowed={boardNarrowing.shown !== boardNarrowing.total}` — the SAME
+expression `shouldRenderBoardNarrowingStrip` already reads as one of its three terms, not a second
+definition of "narrowed"; since narrowing drops cards only, `shown !== total` is true exactly when real
+cards exist but were filtered away, and by construction `shown === total === 0` whenever the board is
+genuinely, unfilteredly empty — so the flag never suppresses R6's real case. `EMPTY_BOARD_COPY`'s text is
+unchanged; this changes WHEN it shows, never what it says.
+
+**Deliberately NOT changed, per the ruling itself**: the per-column `EMPTY_COLUMN_COPY` shown under a
+filter, where the column may hold hidden tickets. The reviewer judged that copy neutral (it names no
+reason, per its own docblock) and approved it deliberately in Task 7's review; not overruled mid-task,
+recorded for final review instead.
+
+**Witness, same discipline as R6's own**: committed the real work first, then reverted `emptyBanner`'s
+condition from `totalCards === 0 && isNarrowed !== true` back to `totalCards === 0` alone (a targeted
+`Edit`, never `git checkout --`) and re-ran `board.test.tsx`. Confirmed the narrowed-to-zero case (the
+first `it` below) reddens while the R6 case (13.466, not narrowed) and the "not narrowed" arms of this
+same case stay green — proving `isNarrowed` and only `isNarrowed` discriminates the two. Restored; `git
+diff --stat HEAD` empty, full suite green again.
+
+**Standing instruction now in force (coordinator, this round): every report must carry `tsc` output for
+every package touched.** `packages/ui`'s typecheck, red since `8eb40607` (Task 6 fix round 2) on two
+`noUncheckedIndexedAccess` errors in `test/components.test.tsx`, was fixed in a concurrent commit
+(`ddc42c21`, "Task 6 fix round 3") by another implementer on this same branch while this fix round was in
+progress — confirmed by re-running `tsc -p tsconfig.typecheck.json` in `packages/ui` twice, both exit 0,
+rather than assumed from the earlier report's stash-verified baseline.
+
+- **13.467** ✅ `isNarrowed` suppresses `EMPTY_BOARD_COPY` on a board narrowed to zero cards (the rail and
+  per-column empty states still render, `EMPTY_COLUMN_COPY` unaffected — the same fixture proves both:
+  `isNarrowed` true suppresses, `isNarrowed` false OR omitted on the IDENTICAL fixture still shows the
+  sentence, isolating the flag as the one variable that discriminates. Mutation-witnessed: reverting the
+  `&& isNarrowed !== true` guard reddens this case's first `it` while 13.466 and this case's other two
+  `it`s stay green. — (`packages/app-core/src/views/board.tsx`, `packages/app-core/test/views/board.test.tsx`,
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`)

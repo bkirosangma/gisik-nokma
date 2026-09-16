@@ -23,6 +23,42 @@ export type BoardProps = {
    * still on screen.
    */
   onCreateTicket?: () => void;
+  /**
+   * Whether `board` is a NARROWED view — the shell's client-side board filter
+   * (`boardNarrowing` in `page.tsx`) has dropped some of this project's real
+   * cards out of it — rather than the project's true, complete state.
+   * OPTIONAL, following `onCreateTicket`'s own precedent immediately above: a
+   * mount with nothing to say about narrowing passes nothing, and `Board`
+   * behaves exactly as it did before this prop existed (Ruling 19 treats
+   * `undefined` the same as `false`).
+   *
+   * Why it has to be a PROP rather than something `Board` derives on its own
+   * (board-prototype-port Task 7 fix, Ruling 19, 2026-09-16 — found in review,
+   * a cross-task interaction R6 and Task 4's narrowing each missed on their
+   * own). `Board` never receives the unfiltered data: `page.tsx` hands it
+   * `boardNarrowing.view`, already passed through `matchesBoardCard`. Task 4's
+   * narrowing drops CARDS only, never a column or a group, so pre-R6 this was
+   * harmless — the old gate read `board.groups.length`, which a card filter
+   * never touches, so the narrowed-to-zero state could never reach it. R6's
+   * `totalCards` fold reads the NARROWED cards, so without this prop a search
+   * matching nothing would render `EMPTY_BOARD_COPY` — "No tickets here
+   * yet — create one." — over a project that holds real tickets one row
+   * beneath a strip reading "0 of 10 shown" with a removable chip: the page
+   * contradicting itself on one screen, and "create one" pointing at exactly
+   * the wrong remedy (the fix is clearing the filter, not adding a ticket).
+   * `BoardColumn` (`view-types.ts`) carries no signal distinguishing these two
+   * cases either, which is why `EMPTY_COLUMN_COPY`'s own docblock above
+   * already gives up on a column-scoped answer — this prop is the whole-board
+   * equivalent of that same admission, made where the wrong answer is loud
+   * ("create one") rather than neutral ("no tickets in this column yet").
+   *
+   * Narrowed AND zero cards ⇒ suppress `EMPTY_BOARD_COPY`; the narrowing
+   * strip above the board is already the true statement, and the rail still
+   * draws with its per-column empty states. Not narrowed and zero cards ⇒ R6
+   * exactly as built. `EMPTY_BOARD_COPY`'s text is unchanged either way — this
+   * only changes WHEN it shows, never what it says.
+   */
+  isNarrowed?: boolean;
 };
 
 /**
@@ -65,11 +101,12 @@ export const EMPTY_COLUMN_COPY = 'No tickets in this column yet.';
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed }: BoardProps) {
   /**
-   * THE WHOLE-BOARD SENTENCE IS GATED ON ZERO CARDS, NOT ZERO GROUPS
-   * (board-prototype-port Task 7, Ruling R6, 2026-09-16 — widening Plan 6 Task
-   * 15b item 4's original `board.groups.length === 0` gate).
+   * THE WHOLE-BOARD SENTENCE IS GATED ON ZERO CARDS, NOT ZERO GROUPS — AND NOT
+   * ON A NARROWED VIEW (board-prototype-port Task 7, Ruling R6, 2026-09-16,
+   * widening Plan 6 Task 15b item 4's original `board.groups.length === 0`
+   * gate; Ruling 19, same day, adding the `isNarrowed` guard).
    *
    * `groups.length === 0` implies `totalCards === 0` — an empty `groups` array
    * folds to zero regardless of what its (nonexistent) columns would have held
@@ -86,13 +123,25 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
    * that had loaded, had refused nothing, and said nothing, one layer under
    * the case this branch was first written to catch. R6 closes it: the
    * sentence renders whenever `totalCards === 0`, regardless of `groups.length`.
+   *
+   * `&& isNarrowed !== true` (Ruling 19) is not part of the superset — it is a
+   * correction to it. `totalCards` folds `board`, which `page.tsx` hands over
+   * ALREADY narrowed (`boardNarrowing.view`, cards dropped by the client-side
+   * filter, never columns or groups). R6 as first built could not tell "this
+   * project truly has no tickets" from "a filter hid all of them", and said
+   * `EMPTY_BOARD_COPY` — "create one" — for both, which is actively wrong in
+   * the second case: the remedy is clearing the filter, sitting right there in
+   * the narrowing strip's removable chip, not creating a ticket. `isNarrowed`
+   * is `Board`'s only way to tell the two apart, since neither `BoardView` nor
+   * `BoardColumn` carries the distinction on its own — see the prop's own
+   * docblock above.
    */
   const totalCards = board.groups.reduce(
     (sum, group) => sum + group.columns.reduce((count, column) => count + column.cards.length, 0),
     0,
   );
   const emptyBanner =
-    totalCards === 0 ? (
+    totalCards === 0 && isNarrowed !== true ? (
       <>
         <p className="gn-board__empty-copy">{EMPTY_BOARD_COPY}</p>
         {onCreateTicket !== undefined ? (

@@ -1060,7 +1060,23 @@ function ProjectBoard() {
                 // groups (Ruling 1), and this is the one render site that
                 // proves it: there is no second `board.data.groups` walk
                 // anywhere on this page.
-                <Board board={boardNarrowing.view} onOpenTicket={openTicket} />
+                //
+                // `isNarrowed` (Ruling 19, board-prototype-port Task 7 fix,
+                // 2026-09-16): `shown !== total` is the SAME expression
+                // `shouldRenderBoardNarrowingStrip` above already reads as one
+                // of its three terms, not a second definition of "narrowed" —
+                // true exactly when the filter actually dropped a card, which
+                // (since narrowing drops cards only, never columns or groups)
+                // is also exactly when `total > 0` while the cards `Board`
+                // can see have been cut to `shown`. Without this, `Board`'s
+                // own R6 sentence cannot tell "this project truly has no
+                // tickets" from "a filter hid all of them" and says "create
+                // one" for both — see `Board`'s own `isNarrowed` docblock.
+                <Board
+                  board={boardNarrowing.view}
+                  onOpenTicket={openTicket}
+                  isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
+                />
               ) : (
                 <p>Loading…</p>
               )
