@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { Board, DRAG_TICKET_FORMAT, type BoardMoveCapability } from '../../src/views/board.js';
@@ -244,7 +244,67 @@ describe('Board drag-and-drop — a rules-bearing edge opens the dialog, exactly
     dragCard(boardCardSeed().ticketId, dataTransfer);
     dropOnColumn('doing', dataTransfer);
 
-    expect(await screen.findByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(dialog).toBeInTheDocument();
+    // 13.533 (owner request, 2026-09-17) — the dialog only ever offers what
+    // the gesture meant, and a drop meant THIS column: it opens already
+    // aimed at `doing`, the comment box on screen from the first paint, no
+    // pick from the select needed.
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Doing');
+    expect(within(dialog).getByLabelText('Comment (required by this transition)')).toBeInTheDocument();
+  });
+});
+
+describe('Board drag-and-drop — a card painted as draggable is droppable in the same instant', () => {
+  /**
+   * 13.534 — THE FLAKE MADE DETERMINISTIC (2026-09-17). Under load (this
+   * machine at load average 11.5 while the owner's card-click and picker
+   * work was gated), `13.507`, `13.514` and `13.515` each failed once in
+   * separate runs with the identical signature: the drop did NOTHING —
+   * `onMoved` never called, no refusal notice, the case dying at
+   * `waitFor`'s own 1000 ms (1070/1068/1025 ms measured, against ~20 ms
+   * for a pass), and no notice of any kind in the DOM dump. `13.511`
+   * documents what a drop with nothing registered does: it is silent.
+   *
+   * The mechanism: `settled()` returns the moment the arrows are IN THE DOM
+   * — `waitFor` observes that through a MutationObserver, a microtask that
+   * runs as soon as React's commit has mutated the document — while the
+   * registry `handleDrop` reads was filled by a PASSIVE effect, which React
+   * schedules as a later macrotask for a render a promise resolution
+   * triggered (the workflow read resolving). On a quiet machine that
+   * macrotask runs before the test's next line; under load it can run
+   * after the drop has already looked and found nothing.
+   *
+   * This case fires the drop from INSIDE a MutationObserver callback of its
+   * own — the same microtask slot, by construction never later than it —
+   * so it lands before any macrotask can, every run, on any machine. Under
+   * a passive `useEffect` registration it fails deterministically (watched:
+   * RED with `expected 1, got 0` on the ingest count); under
+   * `useLayoutEffect`, which runs synchronously inside the commit before
+   * the observer's microtask, it passes deterministically. The property it
+   * pins is Ruling 15's own, from the other side: a card the DOM already
+   * shows as `draggable="true"` must be droppable in that same instant —
+   * an affordance that is painted before it is wired is a control that lies
+   * for however long the gap lasts.
+   */
+  it('a drop fired in the very microtask the arrows appear in still reaches attemptMove', async () => {
+    const { source, moves, onMoved } = movesFor();
+    const { container } = render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+
+    const dataTransfer = fakeDataTransfer();
+    await new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (container.querySelector('.gn-board-card__move') === null) return;
+        observer.disconnect();
+        dragCard(boardCardSeed().ticketId, dataTransfer);
+        dropOnColumn('doing', dataTransfer);
+        resolve();
+      });
+      observer.observe(container, { childList: true, subtree: true, attributes: true });
+    });
+
+    expect(source.ingested).toHaveLength(1);
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
   });
 });
 

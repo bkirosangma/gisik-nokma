@@ -417,3 +417,60 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
   });
 });
+
+/**
+ * The two props the board's arrows need (owner request, 2026-09-17): the
+ * dialog only ever OFFERS what the gesture meant (`›` the forward list, `‹`
+ * the backward list, a drop the dropped column), and when that list has
+ * exactly one entry the arrow already chose it, so the dialog opens aimed
+ * at it rather than on "Choose a state". Both optional — `TicketSheet`'s
+ * "Move…" button passes neither and keeps the full list and the placeholder.
+ */
+describe('TransitionDialog — offerStateIds and initialToStateId', () => {
+  /**
+   * 13.527 — `offerStateIds` narrows the `<Select>` to that subset, in
+   * `transitionOptions`'s own order. From `doing` the full list is
+   * `todo, waiting, done`; offering `['waiting', 'done']` must drop `To do`
+   * — the negative is the point, a backward state must not appear in a
+   * dialog the `›` arrow opened.
+   */
+  it('offers ONLY the listed states, in declaration order, and drops the rest', async () => {
+    const user = userEvent.setup();
+    renderDialog({ offerStateIds: ['waiting', 'done'] });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Waiting on counterparty',
+      'Done',
+    ]);
+    expect(within(listbox).queryByRole('option', { name: 'To do' })).toBeNull();
+  });
+
+  /**
+   * 13.528 — `initialToStateId` opens the dialog already aimed: the trigger
+   * shows the state's NAME rather than the placeholder, and — the part that
+   * matters to a person — the rules of that edge are prompted for at once.
+   * `doing → done` requires a comment, so the comment box is on screen with
+   * no click into the select, and Move is disabled until it is filled.
+   */
+  it('opens already aimed at initialToStateId, with that edge\'s prompts visible at once', async () => {
+    const user = userEvent.setup();
+    const onSubmit = renderDialog({ initialToStateId: 'done' });
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Done');
+    expect(screen.getByRole('button', { name: /Move to/ })).not.toHaveTextContent('Choose a state');
+    expect(screen.getByLabelText('Comment (required by this transition)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'shipped');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    expect(onSubmit).toHaveBeenCalledWith({ toStateId: 'done', comment: 'shipped', fieldValues: {} });
+  });
+
+  /** 13.528b — the control: neither prop passed keeps today's behaviour, the full list and the placeholder. */
+  it('without either prop, the full list and the placeholder are unchanged', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    expect(within(await screen.findByRole('listbox')).getAllByRole('option')).toHaveLength(3);
+  });
+});

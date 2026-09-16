@@ -112,6 +112,27 @@ export type TransitionDialogProps = {
    */
   transportError: string | null;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
+  /**
+   * The dialog only ever OFFERS what the gesture meant (owner request,
+   * 2026-09-17, the board's `‹ ›` arrows): when present, the "Move to" select
+   * is narrowed to these states — in `transitionOptions`'s own order, never
+   * re-sorted — so a `›` that found two forward targets shows those two and
+   * not the backward one the wildcard also declares. Absent (as `TicketSheet`'s
+   * own "Move…" button leaves it) the full declared list is offered, exactly as
+   * before. An id here that `transitionOptions` does not declare is simply not
+   * offered: this prop can narrow the declared list, never widen it — the
+   * spec's "never an invented move" holds through it.
+   */
+  offerStateIds?: string[];
+  /**
+   * Open already aimed at this state rather than on "Choose a state" — the
+   * arrow (or the drop) resolved to exactly one target, so asking the person
+   * to pick it again from a select is a step with nothing to decide. Read
+   * once, on mount: a caller that wants a fresh aim per open mounts a fresh
+   * dialog per open (`MoveArrows` does), which is also what stops a
+   * cancelled pick surviving into the next open.
+   */
+  initialToStateId?: string | null;
 };
 
 /**
@@ -138,9 +159,13 @@ export function TransitionDialog({
   serverRefusal,
   transportError,
   uploadEvidence,
+  offerStateIds,
+  initialToStateId,
 }: TransitionDialogProps) {
-  const options = transitionOptions(workflow, fromStateId);
-  const [toStateId, setToStateId] = useState('');
+  const options = transitionOptions(workflow, fromStateId).filter(
+    (option) => offerStateIds === undefined || offerStateIds.includes(option.toStateId),
+  );
+  const [toStateId, setToStateId] = useState(initialToStateId ?? '');
   const [comment, setComment] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [evidenceAttachmentId, setEvidenceAttachmentId] = useState<string | null>(null);

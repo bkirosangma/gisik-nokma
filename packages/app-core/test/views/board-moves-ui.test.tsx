@@ -215,14 +215,16 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
    * keeps the SAME nearest-scan result (`doing` is still the only, and
    * therefore nearest, forward target from `todo`) while giving it a rule.
    *
-   * **The dialog is NOT pre-aimed at the arrow's own target — say this
-   * plainly, since it is easy to assume otherwise.** `MoveArrows` threads
-   * only `(workflow, fromStateId)` into `TransitionDialog`; the dialog's own
-   * `toStateId` starts at `''` and its `<Select>` re-derives the full option
-   * list, exactly as it does when `TicketSheet` opens it from its "Move…"
-   * button. This test picks "Doing" from that SAME dropdown a person would —
-   * it is not asserting the arrow's computed target reached the dialog,
-   * which it does not. What this test actually proves: the dialog opens
+   * **The dialog IS pre-aimed at the arrow's own target since 2026-09-17**
+   * (owner request; `13.531` below proves the aim itself, and `13.527`/
+   * `13.528` in `transition-dialog.test.tsx` prove the two props that carry
+   * it). Before that, this paragraph said the opposite — `MoveArrows`
+   * threaded only `(workflow, fromStateId)` and the dialog started on `''`
+   * — and this case picked "Doing" from the select because a person had to.
+   * The pick is KEPT here, deliberately: it now re-selects the state that is
+   * already selected, which proves the select still works over the
+   * one-entry offer list rather than being a dead control with a
+   * preselected value. What this case proves is unchanged: the dialog opens
    * against the right `(workflow, fromStateId)`, and completing it submits
    * the shipped `{to, comment}` spelling.
    */
@@ -374,3 +376,170 @@ describe('Board move arrows — the refusal path names the real alternatives', (
   });
 });
 
+
+/**
+ * A board with the one seed card in `stateId`'s column instead of `todo` —
+ * the cases below need a state with MORE than one declared target in one
+ * direction, and in `WF_ERRAND` that is `doing` (forward: `waiting`, `done`)
+ * and `done` (backward: `doing`, `todo`).
+ */
+function errandBoardWithCardIn(stateId: string): BoardView {
+  const group = errandGroup([]);
+  return {
+    projectId: 'prj_1',
+    groups: [
+      {
+        ...group,
+        columns: group.columns.map((column) =>
+          column.stateId === stateId ? { ...column, cards: [boardCardSeed()] } : column,
+        ),
+      },
+    ],
+  };
+}
+
+describe('Board move arrows — several declared targets one way open a picker (owner request, 2026-09-17)', () => {
+  /**
+   * 13.529 — from `doing`, `›` has TWO declared forward targets (`waiting`
+   * nearer, `done` further). Before this, the arrow silently took the
+   * nearer one and `done` was unreachable by arrow at all. Now: the arrow's
+   * own name says there is a choice; the click opens the dialog on "Choose
+   * a state"; the select offers EXACTLY the forward pair and NOT `To do`
+   * (declared from `doing` via the wildcard, but backward — the negative
+   * that proves "only what the gesture meant"); picking the rules-free one
+   * and pressing Move submits the shipped `{to}` payload through the same
+   * `submitFromDialog` the gated path uses, with no field events.
+   */
+  it('› with two forward targets opens the dialog offering only those, and a pick submits', async () => {
+    const user = userEvent.setup();
+    const { source, moves, onMoved } = movesFor();
+    render(<Board board={errandBoardWithCardIn('doing')} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    const next = screen.getByRole('button', {
+      name: 'Move to next state — Waiting on counterparty or Done',
+    });
+    expect(next).toBeEnabled();
+    await user.click(next);
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
+
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Waiting on counterparty',
+      'Done',
+    ]);
+    expect(within(listbox).queryByRole('option', { name: 'To do' })).toBeNull();
+
+    await user.click(within(listbox).getByRole('option', { name: 'Waiting on counterparty' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
+    expect(source.ingested).toHaveLength(1);
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.transitioned');
+    expect(batch[0]!.payload).toEqual({ to: 'waiting' });
+  });
+
+  /**
+   * 13.530 — `‹` gets the mirror treatment, on a def built so the negative
+   * can actually fail. From `WF_ERRAND`'s `done` every declared target is
+   * backward, so "the picker offers only the backward ones" would pass even
+   * if the offer were ignored — measured: mutation M4 (offer ignored) left
+   * the first draft of this case green. This def gives `waiting` one
+   * forward edge (`waiting → done`) beside its two backward ones (`doing`
+   * exact, `todo` wildcard): the `‹` picker must offer `Doing` and `To do`
+   * and NOT `Done`, which `transitionOptions` DOES declare from `waiting`.
+   * M4 now kills this case.
+   */
+  it('‹ with two backward targets opens the dialog offering only those, never the forward one also declared', async () => {
+    const user = userEvent.setup();
+    const bothWays: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: [...WF_ERRAND.transitions, { from: 'waiting', to: 'done', rules: [] }],
+    };
+    const { moves } = movesFor({}, bothWays);
+    render(<Board board={errandBoardWithCardIn('waiting')} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to previous state — Doing or To do' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(
+      within(listbox)
+        .getAllByRole('option')
+        .map((option) => option.textContent)
+        .sort(),
+    ).toEqual(['Doing', 'To do']);
+    expect(within(listbox).queryByRole('option', { name: 'Done' })).toBeNull();
+  });
+
+  /**
+   * 13.531 — ONE forward target that carries a rule: the dialog opens
+   * ALREADY AIMED at it. `13.501` reaches the same dialog and then picks
+   * "Doing" from the select as a person had to; this case proves that pick
+   * is no longer needed — the trigger already reads "Doing" and the comment
+   * box is on screen from the first paint. The single-target arrow keeps
+   * its plain "Move to Doing" name (no "or", nothing to choose).
+   */
+  it('one gated forward target opens the dialog already aimed, comment box visible with no pick', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'todo' && transition.to === 'doing'
+          ? { ...transition, rules: [{ kind: 'require-comment' }] }
+          : transition,
+      ),
+    };
+    const { source, moves } = movesFor({}, gated);
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Doing');
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).not.toHaveTextContent(
+      'Choose a state',
+    );
+    const comment = within(dialog).getByLabelText('Comment (required by this transition)');
+    await user.type(comment, 'starting');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toEqual({ to: 'doing', comment: { text: 'starting' } });
+  });
+
+  /**
+   * 13.532 — a closed-and-reopened dialog does not remember its last pick.
+   * Before this, `TransitionDialog` stayed mounted while closed and its
+   * `toStateId` state survived, so cancelling after choosing "Done" and
+   * clicking `›` again reopened ON "Done". Now the dialog mounts fresh per
+   * open (`MoveArrows` renders it only while its `dialog` state is
+   * non-null), so the second open is back on "Choose a state".
+   */
+  it('cancelling a pick and reopening starts over on "Choose a state"', async () => {
+    const user = userEvent.setup();
+    const { moves } = movesFor();
+    render(<Board board={errandBoardWithCardIn('doing')} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    const next = screen.getByRole('button', {
+      name: 'Move to next state — Waiting on counterparty or Done',
+    });
+    await user.click(next);
+    let dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Done');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull();
+
+    await user.click(next);
+    dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
+  });
+});

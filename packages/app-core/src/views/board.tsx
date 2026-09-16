@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type DragEvent,
@@ -18,7 +19,7 @@ import type {
   BoardGroup,
   BoardView as BoardViewData,
 } from '../view-types.js';
-import { arrowTarget } from './board-arrows.js';
+import { arrowTargets } from './board-arrows.js';
 import { moveOutcome } from './board-moves.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
@@ -185,7 +186,7 @@ export const DRAG_TICKET_FORMAT = 'text/plain';
  * `attemptMove` here on every render (`MoveArrows`'s own `registerAttempt`
  * effect), and the column's drop handler looks it up by ticket id and calls
  * it — the identical function an arrow click calls, with the identical
- * state (`refusal`/`serverRefusal`/`transportError`/`dialogOpen`) rendering
+ * state (`refusal`/`serverRefusal`/`transportError`/`dialog`) rendering
  * in the identical place, under that same card. A drop and an arrow can
  * therefore never disagree: they are one code path, reached from two input
  * events.
@@ -806,14 +807,14 @@ export function MoveRefusalNotice({
  * (`board-moves.ts`), Task 12's pure gate, and never re-derives its
  * three-way decision: refused / direct / needs-dialog.
  *
- * ## Where each arrow's TARGET comes from
+ * ## Where each arrow's TARGETS come from
  *
- * `arrowTarget` (`board-arrows.ts`) resolves the nearest DECLARED target in
- * each direction, walking `columnOrder` outward from `fromStateId` — never
- * the literal adjacent column. See that module's own docblock for the full
- * argument and the canonical `todo -> done` example. A consequence worth
- * being explicit about: because both this component's arrow targets AND
- * `moveOutcome`'s own `refused` check read `transitionOptions` off the
+ * `arrowTargets` (`board-arrows.ts`) lists every DECLARED target in each
+ * direction, nearest first, walking `columnOrder` outward from `fromStateId`
+ * — never the literal adjacent column. See that module's own docblock for
+ * the full argument and the canonical `todo -> done` example. A consequence
+ * worth being explicit about: because both this component's arrow targets
+ * AND `moveOutcome`'s own `refused` check read `transitionOptions` off the
  * identical `(workflow, fromStateId)`, a target this component ever
  * actually SUBMITS is, by construction, always a declared edge — clicking an
  * ENABLED arrow cannot itself land on `moveOutcome`'s `refused` branch in
@@ -822,12 +823,36 @@ export function MoveRefusalNotice({
  * (see `columnOrder`'s docblock on `arrowTarget` for the "unavailable, not
  * merely absent" rendering choice below), and it is what Task 14's
  * drag-and-drop reuses this exact same decision point for — a drop's target
- * comes from wherever the pointer lands, which `arrowTarget`'s scan never
+ * comes from wherever the pointer lands, which `arrowTargets`'s scan never
  * filters. `board-arrows.test.ts` and the refusal-copy test below prove the
  * mechanism (the scan itself, and what renders when `moveOutcome` refuses)
  * directly, the same way `board-moves.test.ts` already proves `moveOutcome`
  * itself — proving a branch works is not the same claim as proving a live
  * click reaches it, and this docblock does not conflate the two.
+ *
+ * ## One target moves; several ask (owner request, 2026-09-17)
+ *
+ * Task 13 shipped the arrows on `arrowTarget` — the NEAREST declared target
+ * — so a state with two declared targets one way (`WF_ERRAND`'s `doing`
+ * forward: `waiting`, then `done`) silently took the nearer and left the
+ * further unreachable by arrow at all. Now each arrow reads the whole
+ * directional list: exactly one entry → `attemptMove(target)`, the Task 13
+ * path unchanged (`direct` submits, `needs-dialog` opens the dialog); more
+ * than one → the dialog opens as a PICKER, and its own `aria-label` says so
+ * ("Move to next state — Waiting on counterparty or Done"). Nothing else
+ * changes: the picker submits through the same `submitFromDialog` the gated
+ * path uses, and `moveOutcome` is not asked a second time — the dialog
+ * itself prompts for the chosen edge's rules, exactly as it always has.
+ *
+ * **The dialog only ever offers what the gesture meant.** `›` offers the
+ * forward list, `‹` the backward list, a drop offers the dropped column —
+ * `TransitionDialog`'s `offerStateIds`. When that list has exactly one
+ * entry it is preselected (`initialToStateId`), so a gated single target
+ * opens on its comment box, not on "Choose a state". `dialog` state below
+ * carries both halves and is `null` while closed; the dialog is mounted only
+ * while it is non-null, so every open is a fresh mount reading a fresh aim —
+ * which is also what stops a cancelled pick surviving into the next open
+ * (`13.532`).
  *
  * ## `ticketFields: {}` — the conservative reading of an honest absence
  *
@@ -848,8 +873,8 @@ export function MoveRefusalNotice({
  *
  * ## Unavailable, not absent
  *
- * Both arrows always render, one per direction. `arrowTarget` returning
- * `null` disables (not removes) that button — `opacity:0.4;
+ * Both arrows always render, one per direction. `arrowTargets` returning
+ * `[]` disables (not removes) that button — `opacity:0.4;
  * cursor:not-allowed` per the metrics table's own "Move button, unavailable"
  * row. The design spec's "an arrow is absent where the workflow declares no
  * move that way" is true of the MOVE, not the DOM node: a fixed pair of
@@ -892,7 +917,7 @@ function MoveArrows({
    * own submit path, for the same reason.
    */
   const [transportError, setTransportError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialog, setDialog] = useState<{ offer: string[]; preselect: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   /**
@@ -954,8 +979,8 @@ function MoveArrows({
     noticeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [refusal, serverRefusal, transportError]);
 
-  const previousTarget = arrowTarget(workflow, columnOrder, fromStateId, 'previous');
-  const nextTarget = arrowTarget(workflow, columnOrder, fromStateId, 'next');
+  const previousTargets = arrowTargets(workflow, columnOrder, fromStateId, 'previous');
+  const nextTargets = arrowTargets(workflow, columnOrder, fromStateId, 'next');
 
   const make = makeSubmittedFactory({ actorId: moves.currentUserId, origin: 'web' });
 
@@ -1066,7 +1091,37 @@ function MoveArrows({
       void submitDirect(outcome.toStateId);
       return;
     }
-    setDialogOpen(true);
+    // The gesture meant exactly this one state: offer it alone, already aimed.
+    setDialog({ offer: [outcome.toStateId], preselect: outcome.toStateId });
+  };
+
+  /**
+   * An arrow's own click: one declared target that way moves (or opens the
+   * dialog aimed at it) through `attemptMove`, the Task 13 path; several
+   * open the dialog as a picker over exactly those. Never `moveOutcome` for
+   * the picker — nothing has been chosen yet for it to judge.
+   */
+  const arrowClick = (targets: string[]): void => {
+    if (submitting) return;
+    if (targets.length === 1) {
+      attemptMove(targets[0]!);
+      return;
+    }
+    if (targets.length > 1) {
+      lastAttemptSourceRef.current = 'arrow';
+      setRefusal(null);
+      setServerRefusal(null);
+      setTransportError(null);
+      setDialog({ offer: targets, preselect: null });
+    }
+  };
+
+  /** "Move to Doing" for one target; "Move to next state — Doing or Done" for a choice; the "unavailable" sentence for none. */
+  const arrowLabel = (direction: 'previous' | 'next', targets: string[]): string => {
+    if (targets.length === 0) return `Move to ${direction} state — unavailable`;
+    if (targets.length === 1) return `Move to ${stateNameOf(workflow, targets[0]!)}`;
+    const names = targets.map((stateId) => stateNameOf(workflow, stateId));
+    return `Move to ${direction} state — ${names.join(' or ')}`;
   };
 
   /**
@@ -1086,10 +1141,26 @@ function MoveArrows({
    * 28) — the ONLY difference from Task 14's original wiring, and it changes
    * no dispatch: it exists solely so `attemptMove`'s own `lastAttemptSourceRef`
    * write, above, can tell a drop-triggered notice from an arrow-triggered
-   * one, for the scroll-into-view effect. Every arrow `onClick` below still
-   * calls `attemptMove(target)` with no second argument — unchanged.
+   * one, for the scroll-into-view effect. Every arrow `onClick` below
+   * reaches `attemptMove(target)` through `arrowClick` with no second
+   * argument — unchanged.
+   *
+   * **`useLayoutEffect`, not `useEffect` (2026-09-17, case `13.534`).** A
+   * passive effect is a macrotask React schedules AFTER the commit that
+   * painted this card `draggable="true"`; a layout effect runs synchronously
+   * INSIDE that commit. With the passive form there was a window — the
+   * DOM already showing a draggable card, the registry not yet holding its
+   * handler — in which a drop was `handleDrop`'s silent no-op. Invisible to
+   * a person (a drag takes longer than the window) but real to a test that
+   * fires the drop the instant the arrows appear: three drag-drop cases
+   * flaked exactly that way under load, and `13.534` fires the drop from a
+   * MutationObserver callback (the same microtask slot `waitFor` observes
+   * from) to reproduce it deterministically. Ruling 15's own principle from
+   * the other side: an affordance the DOM shows must be live the instant it
+   * is shown. Nothing else about the registration changes — same wrapper,
+   * same deps, same guarded cleanup.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const attemptFromDrop = (toStateId: string): void => attemptMove(toStateId, 'drop');
     return registerAttempt(card.ticketId, attemptFromDrop);
   }, [registerAttempt, card.ticketId, attemptMove]);
@@ -1120,7 +1191,7 @@ function MoveArrows({
    * stay open with nothing on screen saying why, the same user-visible
    * symptom `13.504` fixed for the arrows, just behind the dialog instead.
    * `TransitionDialog` already renders `serverRefusal` internally through its
-   * own `serverRefusal` prop (`transition-dialog.tsx:286-289`); Ruling 27
+   * own `serverRefusal` prop (`transition-dialog.tsx:311-314`); Ruling 27
    * (board-prototype-port, 2026-09-16) added the sibling `transportError` prop
    * for exactly the case this `catch` reaches — a dropped connection is not a
    * refusal, so it renders through that separate prop, its own sentence, its
@@ -1155,7 +1226,7 @@ function MoveArrows({
         if (mountedRef.current) {
           setServerRefusal(null);
           setTransportError(null);
-          setDialogOpen(false);
+          setDialog(null);
         }
         moves.onMoved();
         return;
@@ -1182,30 +1253,18 @@ function MoveArrows({
       <button
         type="button"
         className="gn-board-card__move"
-        disabled={previousTarget === null || submitting}
-        aria-label={
-          previousTarget === null
-            ? 'Move to previous state — unavailable'
-            : `Move to ${stateNameOf(workflow, previousTarget)}`
-        }
-        onClick={() => {
-          if (previousTarget !== null) attemptMove(previousTarget);
-        }}
+        disabled={previousTargets.length === 0 || submitting}
+        aria-label={arrowLabel('previous', previousTargets)}
+        onClick={() => arrowClick(previousTargets)}
       >
         ‹
       </button>
       <button
         type="button"
         className="gn-board-card__move"
-        disabled={nextTarget === null || submitting}
-        aria-label={
-          nextTarget === null
-            ? 'Move to next state — unavailable'
-            : `Move to ${stateNameOf(workflow, nextTarget)}`
-        }
-        onClick={() => {
-          if (nextTarget !== null) attemptMove(nextTarget);
-        }}
+        disabled={nextTargets.length === 0 || submitting}
+        aria-label={arrowLabel('next', nextTargets)}
+        onClick={() => arrowClick(nextTargets)}
       >
         ›
       </button>
@@ -1221,7 +1280,7 @@ function MoveArrows({
        */}
       <div className="gn-board-card__notice" ref={noticeRef}>
         {refusal !== null ? <MoveRefusalNotice workflow={workflow} available={refusal.available} /> : null}
-        {serverRefusal !== null && !dialogOpen ? (
+        {serverRefusal !== null && dialog === null ? (
           <p role="alert" className="gn-refusal gn-refusal--server">
             {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
           </p>
@@ -1239,28 +1298,32 @@ function MoveArrows({
          * ambiguity, not fail cleanly, if that invariant ever broke — a state
          * bug that would read as a query bug.
          */}
-        {transportError !== null && !dialogOpen ? (
+        {transportError !== null && dialog === null ? (
           <p role="alert" className="gn-refusal gn-refusal--transport">
             {transportError}
           </p>
         ) : null}
       </div>
-      <TransitionDialog
-        open={dialogOpen}
-        workflow={workflow}
-        fromStateId={fromStateId}
-        ticketFields={{}}
-        onClose={() => {
-          setDialogOpen(false);
-          setServerRefusal(null);
-          setTransportError(null);
-        }}
-        onSubmit={(submission) => void submitFromDialog(submission)}
-        precheck={precheck}
-        serverRefusal={serverRefusal}
-        transportError={transportError}
-        uploadEvidence={moves.uploadEvidence}
-      />
+      {dialog !== null ? (
+        <TransitionDialog
+          open
+          workflow={workflow}
+          fromStateId={fromStateId}
+          ticketFields={{}}
+          offerStateIds={dialog.offer}
+          initialToStateId={dialog.preselect}
+          onClose={() => {
+            setDialog(null);
+            setServerRefusal(null);
+            setTransportError(null);
+          }}
+          onSubmit={(submission) => void submitFromDialog(submission)}
+          precheck={precheck}
+          serverRefusal={serverRefusal}
+          transportError={transportError}
+          uploadEvidence={moves.uploadEvidence}
+        />
+      ) : null}
     </div>
   );
 }

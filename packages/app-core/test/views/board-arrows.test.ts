@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
-import { arrowTarget } from '../../src/views/board-arrows.js';
+import { arrowTarget, arrowTargets } from '../../src/views/board-arrows.js';
 import { WF_ERRAND } from '../helpers/seed.js';
 
 /**
@@ -87,5 +87,45 @@ describe('arrowTarget — declared edges, not column order', () => {
   /** 13.497 — a column this def does not recognise has nothing to scan from. */
   it('returns null when fromStateId is not in columnOrder at all', () => {
     expect(arrowTarget(WF_ERRAND, ERRAND_COLUMN_ORDER, 'nowhere', 'next')).toBeNull();
+  });
+});
+
+/**
+ * The DIRECTIONAL LIST (owner request, 2026-09-17: "if multiple paths exist
+ * for the column, on clicking next, it should open up a modal to select
+ * which"). `arrowTargets` is the same scan `arrowTarget` always ran — the
+ * singular is now defined as the plural's head — so there is still ONE
+ * author of "what is declared that way", never a second walk that could
+ * disagree with the first.
+ */
+describe('arrowTargets — every declared target in that direction, nearest first', () => {
+  /**
+   * 13.524 — from `doing`, BOTH forward declared targets, in column order:
+   * `waiting` (nearer) then `done`. And the singular still answers the
+   * nearest — `13.492`'s own assertion, restated as the plural's head so a
+   * divergence between the two would fail here by name.
+   */
+  it('lists both forward targets from doing, nearest first, and the singular is the head', () => {
+    expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'doing', 'next')).toEqual(['waiting', 'done']);
+    expect(arrowTarget(WF_ERRAND, ERRAND_COLUMN_ORDER, 'doing', 'next')).toBe(
+      arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'doing', 'next')[0],
+    );
+  });
+
+  /**
+   * 13.525 — backward from `done`: `waiting` sits between but is NOT
+   * declared from `done`, so it is skipped (`13.494`'s skip, in list form);
+   * `doing` (exact edge) is nearer than `todo` (wildcard edge), so that is
+   * the order.
+   */
+  it('lists backward targets from done, skipping the undeclared column and including the wildcard', () => {
+    expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'done', 'previous')).toEqual(['doing', 'todo']);
+  });
+
+  /** 13.526 — the two empty answers: nothing declared that way, and a column the def does not know. */
+  it('answers an empty list where the singular answers null', () => {
+    expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'todo', 'previous')).toEqual([]);
+    expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'done', 'next')).toEqual([]);
+    expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'nowhere', 'next')).toEqual([]);
   });
 });

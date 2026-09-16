@@ -50,6 +50,14 @@ export type ArrowDirection = 'previous' | 'next';
  * rendered under one of its own group's columns — but a scan with no home
  * column has nothing to walk from) or when nothing in that direction is
  * declared reachable.
+ *
+ * **Defined as `arrowTargets(...)[0]`, not as its own scan** (owner request,
+ * 2026-09-17 — "if multiple paths exist for the column, on clicking next, it
+ * should open up a modal to select which"). `MoveArrows` now reads the whole
+ * directional list to decide between moving and asking; the singular is kept
+ * for every caller and test that only ever wanted the nearest, and defining
+ * it as the plural's head is what guarantees the two can never disagree
+ * about which state is nearest — one walk, one author.
  */
 export function arrowTarget(
   def: WorkflowDef,
@@ -57,10 +65,27 @@ export function arrowTarget(
   fromStateId: string,
   direction: ArrowDirection,
 ): string | null {
+  return arrowTargets(def, columnOrder, fromStateId, direction)[0] ?? null;
+}
+
+/**
+ * EVERY state the arrow could reach that way, nearest first — the same
+ * outward walk `arrowTarget` always ran, kept in full rather than stopped at
+ * the first hit. Empty where the singular answers `null`. `MoveArrows` opens
+ * the picker dialog when this has more than one entry, offering exactly this
+ * list (`TransitionDialog`'s `offerStateIds`), and moves — or opens the
+ * dialog already aimed — when it has exactly one.
+ */
+export function arrowTargets(
+  def: WorkflowDef,
+  columnOrder: string[],
+  fromStateId: string,
+  direction: ArrowDirection,
+): string[] {
   const index = columnOrder.indexOf(fromStateId);
-  if (index === -1) return null;
+  if (index === -1) return [];
   const declared = new Set(transitionOptions(def, fromStateId).map((option) => option.toStateId));
   const scanRange =
     direction === 'next' ? columnOrder.slice(index + 1) : columnOrder.slice(0, index).reverse();
-  return scanRange.find((stateId) => declared.has(stateId)) ?? null;
+  return scanRange.filter((stateId) => declared.has(stateId));
 }

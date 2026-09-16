@@ -5093,7 +5093,7 @@ duplicate list unchanged at `13.387`/`13.413` only.
 **Cases `13.486`–`13.487` minted here**, continuing directly from `13.485` (verified against the real
 case list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Task 12's own
 concern 2: `TransitionDialog` skips an already-claimed `require-field` input
-(`transition-dialog.tsx:158`/`:232`, calling the shared `fieldAlreadyClaimed` predicate —
+(`transition-dialog.tsx:183`/`:257`, calling the shared `fieldAlreadyClaimed` predicate —
 extracted since this ruling to `field-claims.ts:55`, see below), but `moveOutcome` never received
 `ticketFields` and always answered `needs-dialog` for any `require-field` rule — the exact fork Task 12's
 own docblock warned `transitionOptions` against, arriving from the other side: two places deriving "does
@@ -5305,7 +5305,7 @@ Task 14's drag-and-drop reuses for real, since a drop target is not filtered thi
   fire-and-forget (`onSubmit={(submission) => void submitFromDialog(submission)}`), so before this fix a
   rejected `ingest` from inside the dialog became an unhandled promise rejection — the dialog stayed open
   with nothing on screen saying it failed. Fixed with a `try/catch` around `submitFromDialog`'s body,
-  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:286-289`) rather
+  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:311-314`) rather
   than inventing a new one. Mutation-witnessed: the `try/catch` reverted to the pre-fix shape, `pnpm exec
   vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this case alone (`PASS (7) FAIL (1)`,
   timeout waiting for the dialog's own alert), the other seven cases in the file stayed green, then
@@ -5811,3 +5811,84 @@ left untouched — not this change's drift, and a blind `+5` would have moved wr
 wrong numbers. `scripts/check-case-citations.mjs` reports `13.401`/`13.476`/`13.477`/`15.26` uncited —
 all four already uncited at HEAD (`git grep` on the tests at HEAD finds none), pre-existing on this
 branch and not touched here; the six new cases are each cited by id in their test file.
+
+## Move arrows: one declared target moves, several ask (owner request, 2026-09-17)
+
+Owner's words: "The next button: this needs care, as the ticket may be able to move to different columns.
+If multiple paths exist for the column, on clicking next, it should open up a modal to select which. Also
+this modal will be used if any comments/attachments required rules are there on the workflow." Rulings
+taken in the brainstorm: `›` offers forward targets only, `‹` backward only (symmetric); a single target
+that carries a rule opens the dialog ALREADY AIMED at it. Task 13 shipped the arrows on `arrowTarget` —
+the NEAREST declared target — so `WF_ERRAND`'s `doing` (forward: `waiting`, then `done`) silently took
+`waiting` and `done` was unreachable by arrow at all. Now `arrowTargets` (the same walk, kept in full;
+the singular is defined as its head) drives each arrow: one entry → `attemptMove`, unchanged; several →
+`TransitionDialog` as a picker over exactly those (`offerStateIds`), aimed when one (`initialToStateId`).
+`MoveArrows` mounts the dialog only while its `dialog` state is non-null — a fresh mount per open.
+Suites: `board-arrows.test.ts`, `transition-dialog.test.tsx`, `board-moves-ui.test.tsx`,
+`board-drag-drop.test.tsx`. Every case watched RED first (the plural "is not a function", the picker
+labels absent, the dialog on "Choose a state" with three options). Node v22.23.2 throughout.
+
+- **13.524** ✅ `arrowTargets(WF_ERRAND, order, 'doing', 'next')` is `['waiting', 'done']` — nearest
+  first — and `arrowTarget(...)` equals its head, asserted as `toBe(arrowTargets(...)[0])` so a second walk
+  that disagreed would fail here by name.
+- **13.525** ✅ Backward from `done`: `['doing', 'todo']` — `waiting` between them is NOT declared from
+  `done` and is skipped (`13.494`'s skip, in list form); the wildcard `* → todo` is included, after the
+  nearer exact edge.
+- **13.526** ✅ `[]` wherever the singular answered `null`: nothing declared that way (`todo` previous,
+  `done` next) and a column the def does not know.
+- **13.527** ✅ `TransitionDialog` with `offerStateIds: ['waiting', 'done']` from `doing` offers EXACTLY
+  `Waiting on counterparty, Done` in declaration order; `To do` (declared via the wildcard, but not
+  offered) is absent. Mutation M4 (the filter replaced by `() => true`) → fails.
+- **13.528** ✅ `initialToStateId: 'done'` opens with the trigger reading `Done` (not "Choose a state"),
+  the comment box already on screen, Move disabled until it is filled; filling and pressing Move hands
+  back `{ toStateId: 'done', comment: 'shipped', fieldValues: {} }`. M5 (`useState('')`) → fails.
+- **13.528b** ✅ The control: neither prop → placeholder and all three options, exactly as before.
+- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state —
+  Waiting on counterparty or Done"; the click opens the dialog on "Choose a state"; the select lists
+  exactly `[Waiting on counterparty, Done]` and NOT `To do`; picking the rules-free one and pressing Move
+  ingests ONE `ticket.transitioned` with the shipped `{ to: 'waiting' }` and calls `onMoved`. M4 → fails
+  (`To do` appears); M6 (several targets take the nearest, Task 13's behaviour restored) → fails (no dialog,
+  a direct submit instead).
+- **13.530** ✅ `‹` MIRRORED — on a def built so the negative can fail. From `WF_ERRAND`'s `done` every
+  declared target is backward, so "offers only the backward ones" passed under M4 in the first draft of
+  this case (measured; a check that could not fail). Rebuilt on `WF_ERRAND` + `waiting → done`, card in
+  `waiting`: `‹` reads "Move to previous state — Doing or To do", the picker offers `Doing`/`To do` and
+  NOT `Done`, which `transitionOptions` does declare from `waiting`. M4 → fails; M6 → fails.
+- **13.531** ✅ ONE gated forward target (`todo → doing` with `require-comment`, `13.501`'s idiom): the
+  arrow keeps its plain name "Move to Doing"; the dialog opens with the trigger reading `Doing` and the
+  comment box visible with NO pick; typing and Move ingests `{ to: 'doing', comment: { text } }`. M5 →
+  fails. `13.501`'s docblock, which said the dialog was NOT pre-aimed, is corrected; its re-pick of "Doing"
+  is kept deliberately — it now proves the select is live over a one-entry offer, not a dead control.
+- **13.532** ✅ A cancelled pick does not survive into the next open: pick `Done`, Cancel, click `›`
+  again → "Choose a state". Before, the dialog stayed mounted while closed and its `toStateId` state
+  survived. M6 → fails (the second `›` never opens a dialog).
+- **13.533** ✅ (in `13.509`'s own case) A DROP on the gated `doing` column opens the dialog aimed at
+  `doing`, comment box on screen — "what the gesture meant" for the drop path. M5 → fails.
+- **13.534** ✅ THE FLAKE MADE DETERMINISTIC. While gating this work on a machine at load average 11.5,
+  `13.507`, `13.514` and `13.515` each failed once, in separate runs, with one signature: the drop did
+  NOTHING — no `onMoved`, no notice of any kind in the DOM dump, the case dying at `waitFor`'s 1000 ms
+  (1070/1068/1025 ms measured against ~20 ms for a pass). Mechanism: `settled()` returns when the arrows
+  are IN THE DOM (a MutationObserver microtask), while the drop registry was filled by a PASSIVE effect
+  React schedules as a later macrotask for a render a promise resolution triggered; under load the drop
+  could look before the effect ran, and `13.511` documents that a drop with nothing registered is silent.
+  This case fires the drop from INSIDE a MutationObserver callback of its own — the same microtask slot,
+  never later — and failed 3/3 RED under `useEffect` (`expected [] to have a length of 1`), then passed
+  3/3 under `useLayoutEffect`, which registers synchronously inside the commit that paints the card
+  `draggable="true"`. Ruling 15 from the other side: an affordance the DOM shows is live the instant it
+  is shown. Nothing else about the registration changed.
+
+Mutations (scratchpad backups, restored byte-identical by `cmp`): M4 kills `13.527`, `13.529`, `13.530`;
+M5 kills `13.528`, `13.531`, `13.533`; M6 kills `13.529`, `13.530`, `13.532`. Gate after the last edit:
+`app-core` 1292/1292 twice in a row, `ui` 311/311, `apps/web` 364/364 (the whole suite), both typechecks
+clean, Node v22.23.2.
+
+Citations displaced and re-pointed against the tip: `TransitionDialogProps` gained two documented props
+(+21 lines) and the component two lines of destructuring and two of filtering, so `transition-dialog.tsx:158`
+→ `:183` and `:232` → `:257` (Task 12 narrative, above), `:286-289` → `:311-314` (Task 13 narrative and
+`board.tsx`'s own `submitFromDialog` docblock). `board-moves.ts:67`'s wrapped `transition-dialog.tsx: 241-248`
+(the restrict-to notice) was ALREADY stale at HEAD — that notice sat at `:271` before this change — and is
+left alone for the same reason as the `ui.css` ones above.
+
+Named, not absorbed: the board path still passes `ticketFields={{}}` / `moveOutcome(…, {})`, so
+`require-field` is always treated as unmet there (`MoveArrows`'s own docblock, "the conservative reading of
+an honest absence"). `BoardCard` carries no field claims; fixing it needs data the board does not have.
