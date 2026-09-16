@@ -4483,3 +4483,83 @@ not silently.
   padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
   token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
   `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)
+
+## Task 7 — the per-column empty state and Ruling R6 (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.465`–`13.466` minted here**, continuing directly from `13.464` (verified against the real
+case list via `node scripts/check-case-ids.mjs`, not the file's own "next free" prose, per this task's
+own brief). `board.tsx:70`'s whole-board sentence (`EMPTY_BOARD_COPY`) was gated on
+`board.groups.length === 0` — a project with a workflow attached and zero tickets in it took
+`groups.length === 1`, skipped the sentence, and drew a silent rail of empty column trays, one layer
+under the exact "loaded, refused nothing, said nothing" failure that branch was first written to catch.
+**Ruling R6** (owner, spec review pass, "go with your recommendation" — the one ruling in this port that
+went the recommended way rather than the owner's own free-text alternative) widens the gate to
+`board.tsx`'s new `totalCards` fold: the sentence renders whenever the board holds zero cards in TOTAL,
+not only when it holds zero GROUPS. `groups.length === 0` implies `totalCards === 0`, so this is a strict
+**superset** — the pre-existing `EMPTY_BOARD_COPY` assertions (3.112, 3.113, and 3.114's CONTROL
+sub-case) pass UNMODIFIED, run and confirmed rather than assumed (`packages/app-core` suite, 1224/1224
+green, Node v22.23.2). One pre-existing test's own assertion contradicted the new behaviour by
+construction rather than by defect — **3.114's second `it`**
+(`test-cases/03-foundation-ledger.md:100`, "a group whose columns are all empty is NOT an empty board")
+used a single-group, single-empty-column fixture and asserted `EMPTY_BOARD_COPY` absent; that fixture IS
+the R6 case in miniature, so its assertion was now the opposite of correct and is AMENDED, not left
+standing — see its own updated comment in `board.test.tsx` for the before/after. The rail's own presence
+claim in that test (`getByRole('region', ...)`) is untouched and still passes.
+
+**The witness (Step 6 of this task's own brief).** Reverted `emptyBanner`'s gate from `totalCards === 0`
+back to the old `board.groups.length === 0` (a one-line, targeted `Edit`, never `git checkout --`, and
+only after the real work below was committed) and re-ran `test/views/board.test.tsx`: **exactly two
+tests reddened** — `13.466` (below) and the amended 3.114 test, both of which depend on the widened
+gate by construction — while every other test, INCLUDING the three pre-existing `EMPTY_BOARD_COPY`
+assertions, stayed green. Restored immediately after, confirmed clean, no second commit needed since the
+mutation was never committed. Two reddening rather than the brief's literal "the new test alone" is the
+correct count here: the brief's wording assumed only one new test would exist, and this task additionally
+corrects a second, pre-existing test whose own assertion the ruling falsifies — both are R6-dependent by
+the same construction, so both flip together.
+
+**The per-column empty state** (spec Board `:354-399`, "Empty column"/"Empty icon"/"Empty copy"/"Empty
+action" rows; markup verified against `design-system/interactive/desktop.dc.html:387-394`, the ONLY
+place in the repo giving the icon itself — a plain "+" glyph, `stroke="currentColor"`, `aria-hidden`) is
+a DIFFERENT granularity from R6's sentence and both may render together: `.gn-board__column-empty`
+(fill4 → `--gn-fill-quaternary`, radius → the TOKEN `--gn-radius-card` rather than the prototype's
+literal 12px — a new card-like rule takes the token, the same rule case 13.464 just above already
+established for `.gn-board-card`'s own radius), a 34px `.gn-board__column-empty-icon` circle replicating
+`.gn-chip`'s own three-branch chipBg/chipShadow treatment on a new selector (never editing the shared,
+do-not-edit `.gn-chip`), and `EMPTY_COLUMN_COPY` — a new exported constant, deliberately NOT a
+re-spelling of `EMPTY_BOARD_COPY` (`"No tickets in this column yet."` against `"No tickets here
+yet — create one."`), because both can render on the same screen under R6 and a `getByText` query on
+either must still resolve to exactly one element. The action button reuses `@gisik-nokma/ui`'s `Button`
+component UNCHANGED (`.gn-button`, ghost variant) rather than inventing a `ctlBg`/`ctlShadow` CSS
+treatment: `ui.css:22-30`'s own docblock already records the prototype's raised neo control shadow as an
+OPEN DECISION deliberately left to the repo owner, and this port's own plan settles it for every board
+control — "Board controls use `.gn-button` unchanged"
+(`docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`) — so this task does not reopen it.
+Labelled "Add a ticket" rather than repeating the whole-board button's "Create a ticket": both reuse the
+SAME unscoped `onCreateTicket` handler (`BoardProps` carries no per-column target, and adding one is
+outside this task), so identical wording on every button rendered when a board is both globally and
+per-column empty (R6) would be indistinguishable by accessible role and name alike; the different wording
+does not claim the created ticket lands in that specific column.
+
+**The filtered-to-zero column, considered and decided against a second copy.** `BoardColumn`
+(`view-types.ts:119-125`) carries `stateId`/`name`/`category`/`blocked`/`cards` and nothing else — no
+signal distinguishing a column that genuinely holds no tickets from one the client-side board filter
+(`filter/board-filter.ts`, Task 3) narrowed to zero. The narrowing pass that WOULD know the difference
+runs above `Board`, in the shell computing `boardNarrowing`, and it already discloses an active filter
+through the `N of M shown` count and its removable chips (spec, "The count must not lie"). Writing a
+second, column-scoped disclosure here — with data this component was never given — would risk an
+unsynchronised second copy of the same fact, so `EMPTY_COLUMN_COPY` says only what is true in both cases,
+the same discipline `EMPTY_BOARD_COPY`'s own docblock already holds itself to. No new prop, no new field
+on `BoardColumn`, and no second sentence were added; this is a decision, not an oversight, and it is
+recorded here rather than only in the component's own comment.
+
+- **13.465** ✅ The per-column empty state: an empty column renders `EMPTY_COLUMN_COPY` and its icon; a
+  column holding a card does not (`errandBoard()`'s three empty columns vs. `Doing`, scoped with
+  `within` so a false positive from an unscoped `getByText` cannot pass). Both arms of the optional
+  "Add a ticket" action are tested — present and wired to `onCreateTicket` when the shell hands one down,
+  absent (words only) when it does not — the same both-arms discipline `emptyBanner`'s own docblock
+  already holds itself to. — (`packages/app-core/test/views/board.test.tsx`)
+- **13.466** ✅ RULING R6 ITSELF: one group, every column empty — `EMPTY_BOARD_COPY` renders AND both
+  columns' names render, proving the rail survives beside the sentence. This is the case no existing
+  assertion could witness before this task, and the witness above (revert to `groups.length === 0`,
+  re-run) proves it: this case and the amended 3.114 test are the only two that redden. —
+  (`packages/app-core/test/views/board.test.tsx`)

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Avatar, Card, Chip } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatStateProvenance } from '../provenance.js';
 import type { BoardCard as BoardCardData, BoardView as BoardViewData } from '../view-types.js';
@@ -35,6 +35,27 @@ export type BoardProps = {
 export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
 
 /**
+ * The words a single COLUMN says when it holds no cards of its own — a
+ * different granularity from `EMPTY_BOARD_COPY` above (board-prototype-port
+ * Task 7, R6). Deliberately not a re-spelling of it: both can render on the
+ * same screen at once (R6, below), and a `getByText(EMPTY_BOARD_COPY)` query
+ * must still resolve to exactly one element when they do.
+ *
+ * The text names no reason. `BoardColumn` (`view-types.ts`) carries only
+ * `stateId`/`name`/`category`/`blocked`/`cards` — nothing distinguishing "this
+ * state genuinely holds no tickets" from "the client-side board filter
+ * (`filter/board-filter.ts`) narrowed it to zero". The narrowing pass that
+ * would know the difference runs above this component, in the shell that
+ * builds `boardNarrowing`, and it already discloses an active filter through
+ * the `N of M shown` count and its removable chips. Re-stating that
+ * disclosure here, per column, with data this component was never given,
+ * would risk a second, unsynchronised copy of the same fact — so the
+ * sentence says only what is true in both cases, exactly the discipline
+ * `EMPTY_BOARD_COPY`'s own docblock already holds itself to.
+ */
+export const EMPTY_COLUMN_COPY = 'No tickets in this column yet.';
+
+/**
  * Columns are exactly the attached workflow's states — empty ones render too,
  * and a project mixing workflows gets one group per workflow, because merging
  * column sets would invent columns no definition declares (spec §7).
@@ -45,6 +66,43 @@ export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
 export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
+  /**
+   * THE WHOLE-BOARD SENTENCE IS GATED ON ZERO CARDS, NOT ZERO GROUPS
+   * (board-prototype-port Task 7, Ruling R6, 2026-09-16 — widening Plan 6 Task
+   * 15b item 4's original `board.groups.length === 0` gate).
+   *
+   * `groups.length === 0` implies `totalCards === 0` — an empty `groups` array
+   * folds to zero regardless of what its (nonexistent) columns would have held
+   * — so gating on the total is a strict SUPERSET of the old gate, never a
+   * replacement of its meaning: the zero-groups case below still takes this
+   * branch, for the exact reason it always did, and `EMPTY_BOARD_COPY` is
+   * unchanged.
+   *
+   * What the superset ADDS: a project with a workflow attached and zero
+   * tickets in it — `groups.length === 1`, every column empty — used to skip
+   * the sentence and draw a silent rail of empty column trays. Columns are
+   * exactly the attached workflow's states (`:38` below) and empty ones render
+   * too, so nothing on screen ever said "no tickets" for that project; a page
+   * that had loaded, had refused nothing, and said nothing, one layer under
+   * the case this branch was first written to catch. R6 closes it: the
+   * sentence renders whenever `totalCards === 0`, regardless of `groups.length`.
+   */
+  const totalCards = board.groups.reduce(
+    (sum, group) => sum + group.columns.reduce((count, column) => count + column.cards.length, 0),
+    0,
+  );
+  const emptyBanner =
+    totalCards === 0 ? (
+      <>
+        <p className="gn-board__empty-copy">{EMPTY_BOARD_COPY}</p>
+        {onCreateTicket !== undefined ? (
+          <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
+            Create a ticket
+          </button>
+        ) : null}
+      </>
+    ) : null;
+
   /**
    * ZERO GROUPS IS A SENTENCE, NOT AN EMPTY DIV (Plan 6 Task 15b, item 4).
    *
@@ -66,21 +124,17 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
    * no work in it" from "this viewer sees none of it", and the sentence is
    * written to be true of both: it reports what is on this screen and makes no
    * claim about the project.
+   *
+   * This is the ONLY case with no rail — there are no columns to draw. R6's new
+   * case (`groups.length > 0`, `totalCards === 0`) renders `emptyBanner` ABOVE
+   * a rail that still draws every column, below.
    */
   if (board.groups.length === 0) {
-    return (
-      <div className="gn-board gn-board--empty">
-        <p className="gn-board__empty-copy">{EMPTY_BOARD_COPY}</p>
-        {onCreateTicket !== undefined ? (
-          <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
-            Create a ticket
-          </button>
-        ) : null}
-      </div>
-    );
+    return <div className="gn-board gn-board--empty">{emptyBanner}</div>;
   }
   return (
     <div className="gn-board">
+      {emptyBanner}
       {board.groups.map((group) => (
         <section key={`${group.workflowId}@${group.workflowVersion}`} className="gn-board__group">
           {board.groups.length > 1 ? <h3 className="gn-board__workflow">{group.workflowName}</h3> : null}
@@ -114,6 +168,56 @@ export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
                     </li>
                   ))}
                 </ul>
+                {/*
+                 * The PER-COLUMN empty state (board-prototype-port Task 7,
+                 * spec Board `:354-399`'s "Empty column"/"Empty icon"/"Empty
+                 * copy"/"Empty action" rows) — a different granularity from
+                 * `emptyBanner` above: this renders for one empty column
+                 * inside a board that is not itself empty (siblings hold
+                 * cards), and both may render together when the whole board
+                 * is empty too (R6).
+                 *
+                 * The icon is decorative only (`aria-hidden`, `currentColor`
+                 * stroke resolving from `.gn-board__column-empty-icon`'s own
+                 * `color` — the established idiom, see
+                 * `inbox/icons.tsx`'s `NotificationIcon`) and carries no
+                 * information text does not already say.
+                 *
+                 * The action reuses `onCreateTicket` UNSCOPED — the same
+                 * handler `emptyBanner`'s button already calls, with no
+                 * column argument, because `BoardProps` carries none to
+                 * pass and adding one is outside this task. Labelled "Add a
+                 * ticket" rather than repeating `emptyBanner`'s "Create a
+                 * ticket" for two reasons: it matches the prototype's own
+                 * per-column copy, and a board can render both an
+                 * `emptyBanner` button and one of these per empty column at
+                 * once (R6) — an identical accessible name on every one of
+                 * them would be indistinguishable by role and name alike.
+                 * Different wording does NOT claim the created ticket lands
+                 * in THIS column; the handler has no way to place it there,
+                 * and that is unchanged by this task.
+                 */}
+                {column.cards.length === 0 ? (
+                  <div className="gn-board__column-empty">
+                    <span className="gn-board__column-empty-icon" aria-hidden="true">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <path d="M12 5.5v13M5.5 12h13" />
+                      </svg>
+                    </span>
+                    <p className="gn-board__column-empty-copy">{EMPTY_COLUMN_COPY}</p>
+                    {onCreateTicket !== undefined ? (
+                      <Button onClick={onCreateTicket}>Add a ticket</Button>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
             ))}
           </div>

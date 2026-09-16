@@ -372,6 +372,71 @@
    that floor, so this move cannot add one. */
 .gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+/* Board prototype port Task 7 (2026-09-16), spec Board `:354-399`, "Empty
+   column"/"Empty icon"/"Empty copy"/"Empty action" rows — the PER-COLUMN
+   empty state, a different granularity from `.gn-board__empty-*` above (the
+   whole-board sentence, R6, `board.tsx`'s `emptyBanner`): this renders inside
+   a column that has no cards of its own, whether or not the board as a whole
+   is empty.
+
+   fill4 → `--gn-fill-quaternary` (the same role `.gn-project__narrowing`/
+   `.gn-filters__footer` already consume for "fill4"). cardR → the TOKEN
+   `--gn-radius-card`, never the prototype's literal 12px — a new card-like
+   rule takes the token, the same rule `.gn-board-card`'s own radius history
+   (case 13.464, Ruling 17) already established, so this rule cannot repeat
+   the defect that one fixed. */
+.gn-board__column-empty {
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-card);
+  padding: 1.375rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+/* Empty icon: 34px chipBg + chipShadow circle. Replicates `.gn-chip`'s own
+   three-branch chipBg/chipShadow treatment (`:109-150` above — base
+   `fill-tertiary`; `minimal` flat/transparent; `neo` carved with
+   `surface-raised` + `shadow-sunken-compact`) on this NEW selector rather
+   than editing the shared `.gn-chip` (do-not-edit list) — no role here is
+   new, every one is already declared and already consumed elsewhere in this
+   file. A circle on a SQUARE box is `border-radius: 50%`, `.gn-avatar`'s own
+   idiom (`:167-175` above), not `.gn-chip`'s pill `999px` — this box is
+   34x34, not a text-width pill. `color` carries `--gn-text-muted` for the
+   inline glyph's `stroke="currentColor"` (`board.tsx`), the same
+   currentColor-from-an-ancestor idiom `inbox/icons.tsx`'s `NotificationIcon`
+   already uses, rather than an unreachable `var()` on an SVG presentation
+   attribute. */
+.gn-board__column-empty-icon {
+  width: 2.125rem;
+  height: 2.125rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-style="minimal"] .gn-board__column-empty-icon { background: transparent; }
+[data-style="neo"] .gn-board__column-empty-icon {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-sunken-compact);
+}
+.gn-board__column-empty-copy { font-size: 0.9375rem; line-height: 1.25rem; margin: 0; color: var(--gn-text-muted); }
+/* Empty action: NO rule of its own. `board.tsx` renders it as `<Button>`
+   (`@gisik-nokma/ui`, unmodified) rather than a bespoke `ctlBg`/`ctlShadow`
+   selector — `ctlShadow` (the prototype's raised neo control shadow) is the
+   SAME open decision `.gn-button`'s own docblock (`:22-30` above) already
+   records as deliberately left to the repo owner, and this port's own plan
+   settled it for every board control: "`.gn-button` does not gain neo's
+   raised `--ctlShadow`... Board controls use `.gn-button` unchanged"
+   (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`). Ghost
+   `.gn-button` already gives `fillTertiary` background, `textAccent` label
+   at 600 weight and the 44px floor (`min-height: 2.75rem`) this metric asks
+   for — the one thing it does not add is the shadow, unchanged from every
+   other control in the product. */
 /* Spec row "Card": cardBg, radius 12px, 14px padding, cardShadow. Board.tsx:150
    already renders `<Card className="gn-board-card">`, composing to
    `gn-card gn-board-card` (`card.tsx:7`). This selector is bare — (0,1,0),
