@@ -654,6 +654,46 @@ describe('tintWarning composites legibly on every surface it can reach', () => {
 });
 
 /**
+ * `customMarker` on `surface` — case **11.213** (test-cases/
+ * 11-calendar-notifications.md), minted by the board-prototype-port plan's
+ * Task 10 (2026-09-16). Pins the role PAIRING the task's own measurement
+ * relied on: the brief's "`customMarker` on neo's paper is 4.807" is a
+ * one-time number, taken by hand, with nothing in the suite behind it before
+ * this block — a later change to any surface primitive, or to which surface
+ * role `.gn-calendar__item--custom`'s text actually renders on, could
+ * silently drop it below 4.5 again and every existing test would stay green
+ * (jsdom paints no colour, so nothing here can see a contrast regression by
+ * rendering).
+ *
+ * `neo`/light is the tight one at 4.807 — real margin to lose, so this
+ * assertion is not vacuous the way a check with headroom to spare would be.
+ * `hig`/`minimal` LIGHT was measured DURING this task's own follow-up round
+ * at 4.310 against `surfaceSunken` specifically (`.gn-calendar__items` had
+ * briefly inherited the calendar grid's new tray background before being
+ * pinned back to `surface`) — this block checks the role the fix restores,
+ * `surface`, which is what every `CONTRAST_PAIRS`-style declared pair in
+ * this file checks: the semantic role, not whichever ground a particular
+ * component happens to render on today. `ui.css`'s own comment on
+ * `.gn-calendar__items` states the same obligation from the CSS side; this
+ * is the numeric gate that would catch it drifting.
+ *
+ * No `CONTRAST_PAIRS` row names this pairing (`customMarker` on `surface`)
+ * — it could, since both are opaque, unlike the alpha tints above — but
+ * adding a permanent row there is a larger change than this task's own
+ * scope; the loop here is deliberately narrow.
+ */
+describe('customMarker reads on surface in every style and theme (11.213)', () => {
+  for (const style of STYLE_NAMES) {
+    for (const theme of THEME_NAMES) {
+      it(`${style}/${theme}: customMarker on surface clears 4.5`, () => {
+        const ratio = contrastRatio(colorOf(theme, 'customMarker', style), colorOf(theme, 'surface', style));
+        expect(ratio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+/**
  * `.gn-chip` (hig/minimal) — `text` on `fillTertiary`, composited. Case
  * 13.404 (test-cases/13-deployment-dogfooding.md), minted by the
  * workspaces-prototype-port plan's Task 10 — left uncased when this block
