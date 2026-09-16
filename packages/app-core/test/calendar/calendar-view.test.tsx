@@ -443,6 +443,67 @@ describe('11.69 the legend is the readability affordance, and hiding is visibly 
   });
 });
 
+/**
+ * 11.211 — Ruling R4 (2026-09-16), the legend merge: the prototype's
+ * legend-CARD visual treatment, the product's own WORKING per-field toggle.
+ * `Due date` and `In transit` join as read-only rows; every existing
+ * checkbox, field name and count stays exactly as 11.69 already proves.
+ *
+ * This case exists because a legend that quietly became decorative would be
+ * a silent loss of function — restyling a control is not supposed to be able
+ * to turn it into a picture of a control. The checkbox-COUNT assertion below
+ * is the anti-vacuous control: it reddens if a real toggle were dropped
+ * (fewer checkboxes than custom fields) AND if a read-only row shipped as a
+ * checkbox, even a disabled one (more checkboxes than custom fields) —
+ * either shape a "reduced to a static swatch" regression could take. 11.69's
+ * own first case already proves the ONE real checkbox present there still
+ * toggles; this case is the one that would catch either miscount.
+ */
+describe('11.211 the R4 legend merge — the prototype\'s card, the product\'s working toggle', () => {
+  it('the legend has exactly one checkbox per custom field, and Due date/In transit are not among them', () => {
+    const fields = [
+      { id: 'filed-on', name: 'Filed on' },
+      { id: 'inspected-on', name: 'Inspected on' },
+    ];
+    renderCalendar([
+      ticket(
+        {
+          fields: {
+            title: claimField('Both'),
+            'filed-on': claimField('2026-08-11'),
+            'inspected-on': claimField('2026-08-12'),
+          },
+        },
+        [],
+        fields,
+      ),
+    ]);
+    const legend = screen.getByRole('group', { name: 'Claimed date fields' });
+    expect(within(legend).getAllByRole('checkbox')).toHaveLength(fields.length);
+    expect(within(legend).getByText('Due date')).toBeInTheDocument();
+    expect(within(legend).getByText('In transit')).toBeInTheDocument();
+    expect(within(legend).queryByRole('checkbox', { name: /Due date/ })).toBeNull();
+    expect(within(legend).queryByRole('checkbox', { name: /In transit/ })).toBeNull();
+  });
+
+  /**
+   * The read-only rows are not a reason to show the legend on their own —
+   * they carry no information a hidden field's row doesn't already carry
+   * better (a live count) — so the SAME guard 11.69's own third case proves
+   * (`model.customDateFields.length > 0`) must cover them too. Without this
+   * case, making the legend unconditional purely to show two static rows
+   * would pass every other test in this file.
+   */
+  it('Due date and In transit render only when the legend itself does — never on their own', () => {
+    renderCalendar([
+      ticket({ fields: { title: claimField('Plain'), dueDate: claimField({ date: '2026-08-28' }) } }),
+    ]);
+    expect(screen.queryByRole('group', { name: 'Claimed date fields' })).toBeNull();
+    expect(screen.queryByText('Due date')).toBeNull();
+    expect(screen.queryByText('In transit')).toBeNull();
+  });
+});
+
 describe('11.70 a day that is not a day is never placed on a day that is', () => {
   /**
    * `IST_DAY_REGEX` is a SHAPE check, so `2026-02-30` is a storable claim, and
