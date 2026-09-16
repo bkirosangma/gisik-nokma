@@ -351,20 +351,18 @@ dot is the visible signal and **the count moves into the link's accessible name*
 notifications"`; a bare `"Inbox"` at zero). `UnreadBadge` itself is untouched and still renders the
 number on `/inbox`, so its own cases are unaffected.
 
-- **11.152** ✅ Same claim, read off the link's accessible name instead of the badge's `role="img"`,
-  plus the dot's presence. — (`apps/web/test/inbox-nav-link.test.tsx`)
-- **11.153** ✅ Unchanged in substance; the "no badge drawn" half now reads as a bare `"Inbox"` name and
-  an absent dot. An absence still claims nothing, which was always the point.
-- **11.155** ✅ Same cadence claim, count read from the accessible name.
-- **11.156** ✅ **Still measures exactly what it did**: the count after a FAILED refresh. A reset to 0
-  would now drop the dot and rename the link to a bare `"Inbox"` — telling the reader there is nothing
-  waiting, on the strength of a request that failed — so the case asserts both.
-- **11.169** ✅ Clears the count when the session ends in place. **Asserts BOTH the name and the dot,
-  deliberately:** a dot that vanished while the name still read "3 unread" would leave the previous
-  session's count being announced to whoever is looking now, which is the exact defect this case exists
-  for, and a dot-only assertion would pass on it.
-- **11.185** ✅ Its three closed link sets each lost `/help` and `/account`, which are now menu items —
-  an `<a role="menuitem">` carries the menuitem role, not `link`, so `getAllByRole('link')` cannot see
-  them by design even with the menu open. Their reachability is pinned separately at **13.417**, which
-  is what keeps this shortening honest: a shorter expected list is also what deleting the links would
-  produce.
+Case **11.152** now makes the same claim, read off the link's accessible name instead of the badge's
+`role="img"`, plus the dot's presence — (`apps/web/test/inbox-nav-link.test.tsx`). Case **11.153** is
+unchanged in substance; the "no badge drawn" half now reads as a bare `"Inbox"` name and an absent dot —
+an absence still claims nothing, which was always the point. Case **11.155** makes the same cadence
+claim, with the count read from the accessible name. Case **11.156** still measures exactly what it did:
+the count after a FAILED refresh. A reset to 0 would now drop the dot and rename the link to a bare
+`"Inbox"` — telling the reader there is nothing waiting, on the strength of a request that failed — so
+the case asserts both. Case **11.169** clears the count when the session ends in place, and asserts BOTH
+the name and the dot deliberately: a dot that vanished while the name still read "3 unread" would leave
+the previous session's count being announced to whoever is looking now, which is the exact defect this
+case exists for, and a dot-only assertion would pass on it. Case **11.185**'s three closed link sets each
+lost `/help` and `/account`, which are now menu items — an `<a role="menuitem">` carries the menuitem
+role, not `link`, so `getAllByRole('link')` cannot see them by design even with the menu open. Their
+reachability is pinned separately at **13.417**, which is what keeps this shortening honest: a shorter
+expected list is also what deleting the links would produce.

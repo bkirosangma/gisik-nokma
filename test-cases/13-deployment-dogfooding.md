@@ -3827,28 +3827,26 @@ the current page in every state it could reach, and `aria-current` resolved to `
 appeared.** No regression made it useless; it had no useful state. The Round 22 options remain the only
 ways it could return, and both still need a decision nobody has taken.
 
-Three cases moved, none minted:
-
-- **11.185** ✅ Its third arm — "WITH a workspace AND a project" — **kept, with its job changed**: it
-  used to prove a project in the route ADDS Board, and now proves a project in the route adds NOTHING.
-  Its expected array is now deliberately identical to the second arm's, because the two nav shapes have
-  collapsed into one. That is not a redundant arm: the nav still reads `usePathname()`, so a board route
-  remains a distinct input, and a future project-conditional link would redden this arm while leaving
-  the second green — which is what would name the fault. Two explicit negatives were added beside the
-  array (`not.toContain('/w/ws_1/p/p_1')`, and no link named `Board`) so a failure says what came back
-  rather than only that an array grew. The arm's own docblock, which used to describe the Board mutation
-  witness, was rewritten rather than left describing a link that no longer exists.
-- **13.392** ✅ `/w/ws_1/p/p_1` left the route table. The case checks routes the nav RENDERS, and the
-  board route is no longer one — it still exists and is still reached from the workspace home's project
-  cards. The table is bidirectional (rendered hrefs are subtracted from it), so a stale row would have
-  failed loudly as "nav does not render it" rather than rotting quietly.
-- **13.391** ✅ Untouched and still green, but **re-verified rather than assumed**: its scope note says
-  "pick one to reach its board, members and settings", and this round removed the bar's only Board link.
-  The sentence describes what picking a workspace GETS you, not what the bar renders — a board is one
-  click from the workspace home's project grid — so it stays true. It would become false only if boards
-  stopped being reachable from a workspace at all. This was checked because the case was made green one
-  round earlier on precisely that sentence's accuracy, and a claim that was true when written is exactly
-  the kind that goes stale without anyone looking.
+Three cases moved, none minted. Case **11.185**'s third arm — "WITH a workspace AND a project" — was
+kept, with its job changed: it used to prove a project in the route ADDS Board, and now proves a project
+in the route adds NOTHING. Its expected array is now deliberately identical to the second arm's, because
+the two nav shapes have collapsed into one. That is not a redundant arm: the nav still reads
+`usePathname()`, so a board route remains a distinct input, and a future project-conditional link would
+redden this arm while leaving the second green — which is what would name the fault. Two explicit
+negatives were added beside the array (`not.toContain('/w/ws_1/p/p_1')`, and no link named `Board`) so a
+failure says what came back rather than only that an array grew. The arm's own docblock, which used to
+describe the Board mutation witness, was rewritten rather than left describing a link that no longer
+exists. Case **13.392** lost `/w/ws_1/p/p_1` from the route table. The case checks routes the nav
+RENDERS, and the board route is no longer one — it still exists and is still reached from the workspace
+home's project cards. The table is bidirectional (rendered hrefs are subtracted from it), so a stale row
+would have failed loudly as "nav does not render it" rather than rotting quietly. Case **13.391** is
+untouched and still green, but was re-verified rather than assumed: its scope note says "pick one to
+reach its board, members and settings", and this round removed the bar's only Board link. The sentence
+describes what picking a workspace GETS you, not what the bar renders — a board is one click from the
+workspace home's project grid — so it stays true. It would become false only if boards stopped being
+reachable from a workspace at all. This was checked because the case was made green one round earlier on
+precisely that sentence's accuracy, and a claim that was true when written is exactly the kind that goes
+stale without anyone looking.
 
 ### Round 24 — the account menu, and the inbox becomes an icon
 
@@ -3885,9 +3883,9 @@ merely present.
 **13.414 is SUPERSEDED, and its subject is gone rather than its claim being false.** Help is no longer a
 link in this bar, so "renders Inbox immediately before Help" is not wrong — it is unaskable. It is
 replaced by 13.416, which pins the same KIND of claim (adjacency in the bar's tail) at the arrangement
-that now exists, so the ordering tripwire Round 21 bought is not lost in the move.
+that now exists, so the ordering tripwire Round 21 bought is not lost in the move. Case **13.414** is
+superseded by Round 24 — not renumbered, not reused.
 
-- **13.414** 🚫 SUPERSEDED by Round 24 — see above. Not renumbered, not reused.
 - **13.416** ✅ The inbox icon renders immediately left of the account-menu trigger, asserted over
   `compareDocumentPosition` plus sibling adjacency so an element inserted between them fails.
   — (`apps/web/test/app-nav.test.tsx`)
@@ -3963,7 +3961,8 @@ neither the scoped links nor the scope note render. The alternative — clearing
 fails — would destroy a valid workspace on a TRANSIENT `getMyWorkspaces` failure, throwing away real
 state to recover a hint. `Workspaces` remains one click away and is the real route out.
 
-- **13.423** ✅ (Round 24, recorded late — see that section.)
+Case **13.423** belongs in this list too, recorded late in Round 24 — see that section.
+
 - **13.424** ✅ On a global page (`/inbox`) with a workspace remembered and resolvable, the name, My
   Work, Members and Settings all render with their real hrefs, none carries `aria-current`, and the
   scope note is absent. The owner's instruction, asserted directly.
