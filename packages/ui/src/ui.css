@@ -603,6 +603,73 @@
   border-radius: var(--gn-radius-card);
   overflow: auto;
 }
+/* Ruling 21 (coordinator, 2026-09-16) — the five List metrics the Task 9
+   report deferred, now reachable through `Table`'s new optional class
+   hooks (`packages/ui/src/components/table.tsx`: `className`,
+   `headerClassName`, `rowClassName`, `TableColumn.cellClassName`, all
+   composed additively alongside `gn-table*`, never replacing it — the same
+   shape `Card` already uses for `className`). Every selector below is
+   `.gn-list-*`; none names `.gn-table`/`.gn-table__header`/
+   `.gn-table__cell`/`.gn-table__row`, so `.gn-table`'s own rule (`:284-288`
+   above) is unedited and unreferenced.
+
+   "Table": `min-width:820px` (51.25rem) — a plain length, not a colour or a
+   radius, so it is a literal like every other spacing/size value in this
+   file (there is no length-token axis here; `radiusVariableName` names only
+   `card`/`control`). Lands on `.gn-list__table`, appended to `.gn-table` on
+   the `<table>` itself via `className`. */
+.gn-list__table { min-width: 51.25rem; }
+/* "Header cell": `13px/18px; 600; label2; trayBg; padding 11px 16px;
+   nowrap`. `label2` → `--gn-text-muted`, `trayBg` → `--gn-surface-sunken` —
+   both already declared, both already paired for identical prototype
+   vocabulary elsewhere in this file (`.gn-timeline__weeks`, `:1638-1641`
+   below). Uniform across every column — `ticket-list.tsx` applies this
+   class to the title header AND every mapped data header alike, since the
+   metric does not vary by column. */
+.gn-list__table-header {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  background: var(--gn-surface-sunken);
+  padding: 0.6875rem 1rem;
+  white-space: nowrap;
+}
+/* "Zebra": odd rows `fill4` → `--gn-fill-quaternary`, already declared and
+   consumed elsewhere. `:nth-child`, not `:nth-of-type` as Task 11's
+   `.gn-timeline__row` needed — checked, not assumed identical: `Table`'s
+   `<tbody>` (`table.tsx`) contains ONLY `<tr>` siblings (one per row, no
+   heading or other element mixed in, unlike the timeline's `<h3>`-then-rows
+   `<section>`), so the two selectors would select the same set here; either
+   is correct and `:nth-child` is the simpler of the two where nothing forces
+   the distinction. */
+.gn-list__table-row:nth-child(odd) { background: var(--gn-fill-quaternary); }
+/* "Data cell": `padding 12px 16px; 15px; nowrap`. Wins over
+   `.gn-table__cell`'s own `padding: 0.45rem 0.6rem` by the SAME
+   equal-specificity/later-source-order technique `.gn-board-card` already
+   uses against `.gn-card` (both single-class selectors, `(0,1,0)`; this one
+   sits later in the file) — not `!important`, not extra specificity, the
+   established idiom. Applied to every column EXCEPT the title column, which
+   gets `--title` below instead because its own metric differs (a
+   `min-width` and a depth-dependent left edge the data columns don't have). */
+.gn-list__table-cell--data {
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+/* Title cell's own `min-width:260px` (16.25rem) and its static
+   top/right/bottom padding third of `12px 16px 12px calc(16px +
+   depth*22px)`. Left padding is deliberately `0` here — the depth-dependent
+   term lives on the inner `.gn-list__title-cell` span as a per-row inline
+   style (`ticket-list.tsx`, since `depth` is a fact about one ROW and this
+   class is declared once per COLUMN) — so the two together, TD then span,
+   add up to the metric's exact total rather than the report's earlier
+   "layered on an uneditable base, not pixel-exact" caveat, which this
+   closes. */
+.gn-list__table-cell--title {
+  padding: 0.75rem 1rem 0.75rem 0;
+  min-width: 16.25rem;
+}
 .gn-attention {
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;

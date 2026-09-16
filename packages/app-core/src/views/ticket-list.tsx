@@ -293,21 +293,37 @@ export function TicketList({
  * outside, so `.gn-table__scroll`/`.gn-table` (both on the do-not-edit list,
  * `.gn-table` by name) render exactly as they do for every other consumer.
  *
- * The "Table: min-width:820px", "Header cell", "Zebra" and "Data cell" rows
- * are NOT implemented here. Each is reachable only by putting a class on an
- * element `Table` renders itself (`<table>`, `<th>`, `<td>`, `<tr>`), none of
- * which accepts one today — confirmed by reading `table.tsx`, which has no
- * `className`/per-column class prop, unlike `Card` (`card.tsx:7`,
- * `['gn-card', className].filter(Boolean).join(' ')`) which is exactly the
- * shape that would fix this. Recorded as a ruling request in this task's
- * report rather than built on this task's own authority — the port's global
- * constraints name this precise trap for Task 9 by number: "if a list
- * metric seems reachable only by editing `.gn-table`, stop and report rather
- * than editing." The depth-based indentation below is the one exception:
- * it is a `paddingLeft` inline style ADDED ON TOP OF `.gn-table__cell`'s own
- * uneditable padding (as it already was before this task, just with the
- * wrong formula), not a replacement of it, so it does not touch the cell's
- * shared padding at all.
+ * ## Ruling 21 (coordinator, 2026-09-16) — the five deferred metrics, now landed
+ *
+ * The task's own report deferred "Table: min-width:820px", "Header cell",
+ * "Zebra", "Data cell" and the title cell's own "min-width:260px" — each was
+ * reachable only through an element `Table` renders itself, and `Table` had
+ * no class hook. The coordinator approved extending `Table` with optional
+ * `className`/`headerClassName`/`rowClassName`/`TableColumn.cellClassName`
+ * (`table.tsx`, composed the way `Card` already composes its own), so every
+ * new rule these five metrics need lands on a `.gn-list-*` selector here,
+ * never on `.gn-table`/`.gn-table__header`/`.gn-table__cell`/`.gn-table__row`
+ * themselves.
+ *
+ * `gn-list__table-header` on every column (title and data alike — the
+ * metric is uniform across the row) gives "Header cell". `gn-list__table`
+ * on `<Table>` gives "Table". `gn-list__table-row` on `<Table>` gives
+ * "Zebra". `gn-list__table-cell--data` on every non-title column gives
+ * "Data cell". `gn-list__table-cell--title` on the title column ALONE
+ * — distinct from `--data` because its metric differs (`min-width:260px`,
+ * and a depth-dependent LEFT edge the other columns don't have) — gives the
+ * title cell's static top/right/bottom padding and its own `min-width`; the
+ * one part that still cannot live there is the DEPTH-dependent portion of
+ * the left padding, since `depth` is a fact about one ROW, not the column,
+ * and `cellClassName` is declared once per column. That stays exactly where
+ * it already was: a `paddingLeft` inline style on the inner
+ * `.gn-list__title-cell` span. Because `--title` now zeroes the `<td>`'s own
+ * left padding (the SAME equal-specificity/later-source-order technique
+ * `.gn-board-card` already uses against `.gn-card`), the span's inline style
+ * is now the CELL's entire left edge rather than an addition on top of an
+ * uneditable base — so the rendered padding is pixel-exact against the
+ * metric's `calc(16px + depth*22px)` for the first time, closing the
+ * Task 9 report's own "not pixel-exact" caveat.
  */
 function ListTable({
   nodes,
@@ -326,18 +342,19 @@ function ListTable({
     {
       id: 'title',
       header: 'Title',
+      headerClassName: 'gn-list__table-header',
+      cellClassName: 'gn-list__table-cell--title',
       cell: (node) => (
         <span
           className="gn-list__title-cell"
           data-testid={`ticket-card-${node.row.ticketId}`}
           // Spec List `:401-475`, "Title cell": `padding:12px 16px 12px
-          // calc(16px + depth*22px)`. The depth term is computed here
-          // (plain arithmetic, not a CSS calc()) because depth is a number
-          // known only at render time. This ADDS to `.gn-table__cell`'s own
-          // shared padding rather than replacing it — see this function's
-          // docblock — so the rendered offset is not pixel-exact against
-          // the metric; it is the exact indentation FORMULA the metric
-          // gives, layered on top of a base this task cannot zero out.
+          // calc(16px + depth*22px)`. The top/right/bottom thirds now live
+          // on the `<td>` itself (`.gn-list__table-cell--title`, this
+          // function's docblock) — only the DEPTH-dependent left offset
+          // stays here, since depth is a per-ROW fact `cellClassName`
+          // (declared once per COLUMN) cannot express. Plain arithmetic,
+          // not a CSS calc(): depth is a number known only at render time.
           style={{ paddingLeft: `${16 + node.depth * 22}px` }}
         >
           {node.hasChildren ? (
@@ -369,12 +386,20 @@ function ListTable({
     ...columns.map((id) => ({
       id,
       header: columnLabel(id),
+      headerClassName: 'gn-list__table-header',
+      cellClassName: 'gn-list__table-cell--data',
       cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} />,
     })),
   ];
   return (
     <div className="gn-list__table-wrap">
-      <Table columns={tableColumns} rows={nodes} rowKey={(node) => node.row.ticketId} />
+      <Table
+        columns={tableColumns}
+        rows={nodes}
+        rowKey={(node) => node.row.ticketId}
+        className="gn-list__table"
+        rowClassName="gn-list__table-row"
+      />
     </div>
   );
 }

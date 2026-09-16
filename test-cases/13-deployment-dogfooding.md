@@ -4913,11 +4913,71 @@ rebuilt `dist/` app-core consumes. `tsc --noEmit` clean on `packages/app-core` a
 v22.23.2). **No live cross-style/cross-theme visual check was performed**, the same open item Task 11
 carries — named here rather than silently skipped.
 
-- **13.475** 🟡 The list restyles PARTIALLY to the prototype's metrics: the container frame, the
-  Group-by/Columns picker pill and its 18px tick boxes, the collapse caret's 22px tap target, the title
-  button's 17px/22px, and the title cell's corrected depth formula are landed; the table's own min-width,
-  header cell, zebra, and data-cell padding are NOT — each reachable only through the shared `Table`
-  component's own `<table>`/`<th>`/`<td>`/`<tr>`, which has no class hook today, and a ruling request
-  (extend `Table` the way `Card` already is) is recorded rather than acted on. Group-by/Columns wiring
-  re-verified unchanged (`list-prefs-wiring.test.tsx`, 2/2). Not verified by a live render in any style or
-  theme. — (`packages/app-core/src/views/ticket-list.tsx`, `packages/ui/src/ui.css`)
+- **13.475** 🟡 The list restyled PARTIALLY to the prototype's metrics as of Task 9's own commit: the
+  container frame, the Group-by/Columns picker pill and its 18px tick boxes, the collapse caret's 22px
+  tap target, the title button's 17px/22px, and the title cell's corrected depth formula landed; the
+  table's own min-width, header cell, zebra, and data-cell padding did not — each reachable only through
+  the shared `Table` component's own `<table>`/`<th>`/`<td>`/`<tr>`, which had no class hook, and a ruling
+  request (extend `Table` the way `Card` already is) was recorded rather than acted on. Group-by/Columns
+  wiring re-verified unchanged (`list-prefs-wiring.test.tsx`, 2/2). **The ruling request was approved
+  (Ruling 21) and the remaining five metrics landed — see `13.476` immediately below.** Still not
+  verified by a live render in any style or theme. — (`packages/app-core/src/views/ticket-list.tsx`,
+  `packages/ui/src/ui.css`)
+
+## Ruling 21 (coordinator, 2026-09-16) — `Table` gains class hooks, the five deferred List metrics land
+
+**Case `13.476` minted here**, continuing directly from `13.475` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, run again after this section's own addition). The coordinator
+verified the report's premise independently before ruling — `Table` has exactly one PRODUCTION consumer
+repo-wide (`ticket-list.tsx`) plus its own test (`packages/ui/test/components.test.tsx`) — and approved
+extending `Table` (`packages/ui/src/components/table.tsx`) with four optional props: `className` on
+`<table>`, `headerClassName` on `TableColumn` (applied to every `<th>`), `rowClassName` on `<Table>`
+(applied to every `<tr>`), and `cellClassName` on `TableColumn` (applied to that column's `<td>`s). All
+four compose the way `card.tsx:7` already composes `Card`'s own `className` —
+`[own, extra].filter(Boolean).join(' ')`, appending to `gn-table*` rather than replacing it — so a caller
+passing nothing (every consumer before this change, and `Table`'s own existing test, which passes none of
+the four) gets byte-identical output. Confirmed, not assumed: `components.test.tsx`'s `Table` describe
+block (renders headers/cells, asserts a row click fires) re-run unmodified and green.
+
+`ticket-list.tsx`'s `ListTable` now passes `className="gn-list__table"` and `rowClassName="gn-list__table-row"`
+to `<Table>`, and `headerClassName: 'gn-list__table-header'` plus a per-column `cellClassName`
+(`gn-list__table-cell--title` on the title column, `gn-list__table-cell--data` on every other) on each
+`TableColumn`. Every new `ui.css` rule these add is a plain `.gn-list-*` selector — none names
+`.gn-table`/`.gn-table__header`/`.gn-table__cell`/`.gn-table__row` — so those four rules (`ui.css:284-288`
+and neighbours) are unedited, confirmed by grepping the full diff for any added/removed line that BEGINS
+with one of the seven shared do-not-edit selectors (`.gn-card`, `.gn-chip`, `.gn-avatar`, `.gn-table`,
+`.gn-select`, `.gn-button`, `.gn-segmented`): zero matches. `.gn-list__table-cell--data`/`--title` win
+over `.gn-table__cell`'s own shared `padding: 0.45rem 0.6rem` by the SAME equal-specificity/
+later-source-order technique `.gn-board-card` already uses against `.gn-card` (both single-class rules,
+`(0,1,0)`, this one later in the file) — not `!important`, not extra specificity.
+
+**The title cell's padding is pixel-exact for the first time.** `.gn-list__table-cell--title` zeroes the
+`<td>`'s own left padding and supplies the metric's static top/right/bottom third (`12px 16px 12px`); the
+DEPTH-dependent left term (`calc(16px + depth*22px)`) stays exactly where it already was — a per-row
+inline `paddingLeft` on the inner `.gn-list__title-cell` span, since `depth` is a fact about one ROW and
+`cellClassName` is declared once per COLUMN — but now composes against a zeroed base instead of an
+uneditable one, closing the "not pixel-exact" caveat `13.475` recorded.
+
+No new token role: `--gn-text-muted` (label2) and `--gn-surface-sunken` (trayBg) on the header cell are
+the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1638-1641`); `--gn-fill-quaternary` (fill4) on
+the zebra row is already declared and consumed elsewhere. The two new length-only rules (`min-width:820px`
+on `.gn-list__table`, `min-width:260px` on `.gn-list__table-cell--title`) are plain literals — this file
+has no length-token axis (`radiusVariableName` names only `card`/`control`), matching how every other
+spacing/size value in `ui.css` is written.
+
+Full `packages/ui` (308/308) and `packages/app-core` (1227/1227) suites green; `packages/ui/test/
+token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean. `tsc --noEmit` clean on
+both packages (Node v22.23.2). `pnpm turbo run test` at the repo root: `apps/desktop` (3/3),
+`apps/web` (363/363) — both rebuilt against the changed `packages/ui`/`packages/app-core` — green;
+`apps/server` failed on two DB-dependent tests unrelated to this change (a different pair failed than in
+the prior two runs, consistent with a pre-existing environmental flake, not a regression this change
+introduced).
+
+- **13.476** ✅ The five metrics `13.475` deferred now land through `Table`'s new optional class hooks:
+  `.gn-list__table` (min-width:820px), `.gn-list__table-header` (13px/18px/600/label2/trayBg/padding/
+  nowrap, uniform across every column), `.gn-list__table-row:nth-child(odd)` (fill4 zebra), `.gn-list__
+  table-cell--data` (12px 16px padding/15px/nowrap), and `.gn-list__table-cell--title` (min-width:260px
+  plus the pixel-exact static padding third). `Table`'s own test (`components.test.tsx`) and the seven
+  shared do-not-edit selectors confirmed unedited by a full-diff grep. Not verified by a live render in
+  any style or theme. — (`packages/ui/src/components/table.tsx`, `packages/ui/src/ui.css`,
+  `packages/app-core/src/views/ticket-list.tsx`)
