@@ -1607,7 +1607,7 @@
    prototype vocabulary — `.gn-board__column`, Task 6) and `fill4` →
    `--gn-fill-quaternary` — both already declared, already consumed elsewhere
    in this file. `accent`/`accentText` for the bar are UNCHANGED from Plan
-   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3224-3227`
+   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3306-3309`
    above) already settled "accent ground + onColor" as
    `background: var(--gn-accent); color: var(--gn-accent-text)` over the
    plan's literal `--onColor` → `--gn-text-inverted` mapping, because
@@ -1661,7 +1661,22 @@
   padding: 0.5rem 0.25rem 0.15rem;
   font-size: 0.9rem;
 }
-.gn-timeline__title { padding: 0.25rem; min-width: 0; }
+/* Ruling 22 (coordinator, 2026-09-16) — "Row title": `padding 6px 12px;
+   15px/20px; ellipsis; nowrap`, the spec Timeline table's fourth row
+   (`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:372`),
+   dropped from the plan's own condensed prose and so absent from this
+   task's brief — landed directly from the spec, not the brief, per the
+   plan's own rule that where the two disagree the spec wins. `min-width: 0`
+   is kept (not a metric, but load-bearing for `.gn-timeline__title-text`'s
+   ellipsis to truncate inside a grid item rather than push the column
+   wide); ellipsis/nowrap themselves already live on that child, unchanged
+   here. */
+.gn-timeline__title {
+  padding: 0.375rem 0.75rem;
+  min-width: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
 .gn-timeline__title-text {
   overflow: hidden;
   text-overflow: ellipsis;

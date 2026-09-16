@@ -4827,9 +4827,64 @@ themes") and it is named here as a gap for whoever reviews this before merge, no
   pixel. `🧪` is not used because that marker means a hand reproduction was actually performed
   (this file's own legend), and no live render, in any style or theme, was — corrected from an initial
   `🧪` marking that overstated what had been checked. Marked `🟡` pending that render, matching `13.475`'s
-  own honesty about what a suite-and-`tsc` pass does and does not prove for a pure restyle. —
-  (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
+  own honesty about what a suite-and-`tsc` pass does and does not prove for a pure restyle. **This bullet
+  as originally written was also incomplete against the SPEC, not merely unverified by eye: the spec's
+  Timeline table's "Row title" row was missing from what shipped, because the plan's own condensed prose
+  had dropped it before it ever reached this task's brief — see Ruling 22, `13.477`, immediately below.**
+  — (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
   timeline-view.test.tsx`, `packages/ui/src/ui.css`)
+
+## Ruling 22 (coordinator, 2026-09-16) — the plan dropped a Timeline row; the spec still had it
+
+**Case `13.477` minted here**, continuing directly from `13.476` (verified against
+`scripts/check-case-ids.mjs`'s real sweep). The spec's Timeline metrics table
+(`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:365-376`) has EIGHT rows; the plan's
+own Task 11 section condensed that table into a single prose sentence naming only six, dropping "Header
+cell" (implemented anyway, from the spec directly) and "Row title" (not implemented — nothing named it).
+`task-brief` extracts the task section verbatim, so the loss was inherited silently: `grep "Row title"`
+returns zero hits in the plan and zero in the Task 11 brief, against one in the spec. The coordinator
+verified this directly before ruling, rather than taking the report's "every metric in its brief" framing
+as sufficient — true of the brief, not of the spec the plan itself says wins on disagreement.
+
+**The missing row:** `| Row title | padding 6px 12px; 15px/20px; ellipsis; nowrap |`. Landed on
+`.gn-timeline__title` — previously `padding: 0.25rem; min-width: 0;` (4px all round, no type at all) —
+now `padding: 0.375rem 0.75rem; min-width: 0; font-size: 0.9375rem; line-height: 1.25rem;`. `min-width: 0`
+is kept though it names no metric: it is load-bearing for `.gn-timeline__title-text`'s own
+`overflow:hidden; text-overflow:ellipsis; white-space:nowrap` (unchanged, already correct before this
+ruling) to truncate inside a grid item rather than push the column wide. No token role involved — both
+new values are plain length/type literals, matching how every other spacing/size value in this file is
+written.
+
+**Checked row by row against the CURRENT tree, not assumed clean from memory, per the coordinator's own
+ask ("tell me if anything else is missing").** All other seven Timeline metric rows read directly against
+`packages/ui/src/ui.css` after Ruling 22's own edit: Header grid (`.gn-timeline__weeks`), Header cell
+(`.gn-timeline__week`), Row (`.gn-timeline__row`), Bar (`.gn-timeline__bar`), Bar-clipped
+(`[data-clipped-start]`/`[data-clipped-end]`), Undrawn footer (`.gn-timeline__side`), and Undrawn copy
+(`.gn-timeline__side-copy`) all match their spec row exactly. Nothing else is missing.
+
+**Not a finding, explicitly cleared by the coordinator and left alone:** `.gn-timeline__bar`'s
+`border-radius: 0.375rem` (6px) is a literal, not a token — `RADIUS_ROLES` is only `card` (16/20px) and
+`control` (8/14px), neither near 6px, so this is a literal-to-literal change from the pre-existing 4px,
+not a Ruling-17-shaped token→literal regression.
+
+**A stale self-citation was also fixed in this commit, unrelated to the missing row:** a comment at
+`ui.css` (immediately above `.gn-timeline__weeks,` `.gn-timeline__row`) cited
+`` `.gn-filters__chip[aria-pressed='true']` `` at `:3224-3227` — correct when Ruling 21's own commit was
+written, but Ruling 21's ~67-line insertion earlier in the same file moved the real rule to `:3306-3309`.
+Re-grepped and corrected.
+
+Full `packages/ui` (308/308) and `packages/app-core` (1227/1227) suites green; `packages/ui/test/
+token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean. `tsc --noEmit` clean on
+both packages (Node v22.23.2). `pnpm turbo run test` at the repo root, run on the true final tree rather
+than a pre-Ruling-21 snapshot: **all 17 tasks green, `apps/server` included (149/149)** — the `apps/server`
+failures earlier this session (a different pair each of three prior runs) are now confirmed as
+environmental flakes rather than anything this work touched, since the identical suite is clean here with
+no `apps/server` changes at all.
+
+- **13.477** ✅ The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
+  row, dropped by the plan before reaching this task's brief) lands on `.gn-timeline__title`. All eight
+  Timeline spec rows re-checked row by row against the shipped CSS and confirmed matching. Not verified
+  by a live render in any style or theme. — (`packages/ui/src/ui.css`)
 
 ## Task 9: List restyle — geometry only, ONE ruling deferred, 2026-09-16
 
