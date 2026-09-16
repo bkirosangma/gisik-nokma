@@ -5992,5 +5992,15 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   state and empties the one-column board honestly ("0 of 2 shown").
 - **13.555** ✅ "Clear all" clears an exclusion through the real button, without closing the sheet;
   `13.460` extended: `FILTERS_SHEET_CLEARABLE_AXES` names `exclude` and `clearFilterAxes` resets it.
+- **13.556a** ✅ (Task 9 fix round 1, coordinator Important finding) An EXCLUDED collaborator — the one
+  axis `boardFilter.exclude` cannot carry at all — is disclosed ONLY by the scope note
+  (`describeUnappliedBoardAxes` → `collaboratorsSet` reading `filter.exclude?.collaboratorIds`), never by
+  a chip in either direction, and narrows nothing (both cards stay, "2 of 2 shown"). Two clicks (off →
+  included → excluded) show the note naming "collaborator"; a third (excluded → off) clears it. Mutation
+  (`filter.exclude` dropped from `boardUnappliedAxes`'s deps in `page.tsx`) kills the THIRD click's
+  assertion specifically — that transition is the one where `filter.collaboratorIds` itself does not
+  change (`undefined` on both sides), so it cannot ride along on a co-occurring change to a still-watched
+  dependency the way the first two clicks do; the stale note ("Not applied on the board: collaborator.")
+  survives instead of clearing.
 - `13.447`/`13.448`/`13.451`/`13.452`/`13.460` updated for the control change (checkbox → button;
   `aria-pressed` → `data-mode`).

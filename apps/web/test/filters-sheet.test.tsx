@@ -748,3 +748,57 @@ describe('13.555 Clear all clears an exclusion', () => {
     expect(screen.queryByText('1 of 2 shown')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 13.556a — Task 9 fix round 1 (coordinator, Important finding). `boardFilter.exclude`
+ * deliberately omits `collaboratorIds` (`BoardIdAxes` has no such field —
+ * `board-filter.ts`'s own docblock), so an EXCLUDED collaborator narrows nothing and
+ * earns no chip in EITHER direction — the only disclosure left for this half is the
+ * scope note, driven by `describeUnappliedBoardAxes` → `collaboratorsSet`, which reads
+ * `filter.exclude?.collaboratorIds` (`board-search-scope.ts`). `boardUnappliedAxes`'s
+ * `filter.exclude` dependency (`page.tsx`) is exactly what keeps that note in sync with
+ * this half; this case is its only exercise in the suite. The THIRD click (excluded →
+ * off) is the one transition where `filter.collaboratorIds` itself does not change
+ * (it is `undefined` on both sides of that step — only `filter.exclude` collapses) —
+ * so it is the one assertion a missing `filter.exclude` dependency cannot survive by
+ * riding along on a co-occurring change to `filter.collaboratorIds`, unlike the first
+ * two clicks, which also touch the top-level `collaboratorIds` field and would recompute
+ * regardless. Reads as the RED case for the mutation this task's own report names.
+ */
+describe('13.556a an excluded collaborator is disclosed by the scope note, not silently ignored', () => {
+  it('two clicks (off → included → excluded) show the note and narrow nothing; a third clears it', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    let dialog = await openFilters();
+    let group = within(dialog).getByRole('group', { name: 'Collaborators' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Nine Nonesuch' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Nine Nonesuch, included' }));
+    await userEvent.keyboard('{Escape}');
+
+    const note = await screen.findByTestId('board-scope-note');
+    expect(note).toHaveTextContent(/collaborator/i);
+    // Neither direction of this axis has a chip — `BoardFilterSpec`/its `exclude`
+    // half cannot carry `collaboratorIds` at all, so no key for it exists to render.
+    expect(screen.queryByTestId('board-filter-chip-exclude.collaboratorIds')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('board-filter-chip-collaboratorIds')).not.toBeInTheDocument();
+    expect(screen.getByTestId('board-narrowing')).toBeInTheDocument();
+    // The board did not narrow — collaborator cannot narrow a `BoardCard` at all,
+    // excluded or not — both cards remain, under the honest "2 of 2 shown" count.
+    expect(screen.getByText('2 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.getByText('Carve the new workflow')).toBeInTheDocument();
+
+    dialog = await openFilters();
+    group = within(dialog).getByRole('group', { name: 'Collaborators' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Nine Nonesuch, excluded' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByTestId('board-scope-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
