@@ -315,9 +315,13 @@ describe('Select panel/option styling', () => {
  * it won on source order for EVERY style — pinning every board card at 12px
  * where `neo` should draw `.gn-card`'s own `--gn-radius-card` token at 20px
  * (`tokens.ts:798-801`). This is the exact shape case 13.355 already fixed
- * one surface over (`neo-card-radius.test.ts`, `.gn-card.gn-invite`'s literal
- * radius tying `.gn-card`'s token) — mirrored here rather than reinvented:
- * assert the rule STILL EXISTS (it carries real padding, unlike the deleted
+ * one surface over (`apps/web/test/neo-card-radius.test.ts`, `.gn-card.gn-invite`'s
+ * literal radius tying `.gn-card`'s token) — same SHAPE of guard, mirrored
+ * here rather than reinvented, but a different FILE under test: 13.355 scans
+ * `apps/web/app/globals.css` because that is where `.gn-card.gn-invite` lives;
+ * `.gn-board-card` is a `ui.css` selector, so this case scans `ui.css` via
+ * this file's own `rule()` helper, not `globals.css`. Assert the rule STILL
+ * EXISTS (it carries real padding, unlike the deleted
  * `.gn-card.gn-invite` rule 13.355 covers), and assert its body carries no
  * `border-radius` of its own, so the board card falls through to `.gn-card`'s
  * token and moves with the style axis like every other card.
@@ -342,7 +346,10 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
       '.gn-board-card { padding: 0.875rem; }',
       '.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }',
     );
-    expect(mutated).not.toBe(UI_CSS); // the replace actually found and changed the target line
+    expect(
+      mutated,
+      'the clean baseline line was not found in ui.css — has .gn-board-card changed?',
+    ).not.toBe(UI_CSS);
     const m = mutated.match(/\.gn-board-card\s*\{([^}]*)\}/);
     expect(m).not.toBeNull();
     expect(m?.[1].includes('border-radius')).toBe(true);
