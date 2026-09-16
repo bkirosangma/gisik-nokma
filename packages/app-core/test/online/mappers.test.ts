@@ -773,6 +773,21 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
     );
     expect(() => toServerFilterSpec({ fields })).toThrow(/at most 10 field clauses/);
   });
+
+  /** 13.544 — the wire has no negation term (exclude-mode spec §2); a dropped exclusion would answer a different question under the user's label. */
+  it('13.544 THROWS on a non-empty exclude, naming the key and the axes', () => {
+    expect(() =>
+      toServerFilterSpec({ exclude: { assigneeIds: [ANSELMA], typeIds: ['bug'] } }),
+    ).toThrow(UnexpressibleFilterError);
+    expect(() => toServerFilterSpec({ exclude: { typeIds: ['bug'] } })).toThrow(
+      /filter key exclude .*no negation term.*typeIds/,
+    );
+  });
+
+  it('13.544 does NOT throw on an empty exclude object or on empty exclude lists — they exclude nothing', () => {
+    expect(toServerFilterSpec({ text: 'gst', exclude: {} })).toEqual({ text: 'gst' });
+    expect(toServerFilterSpec({ text: 'gst', exclude: { typeIds: [] } })).toEqual({ text: 'gst' });
+  });
 });
 
 /**

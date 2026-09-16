@@ -5953,3 +5953,5 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   excluded), field clauses (string, number-as-text, mismatch, unknown) and the exclude half — with a
   rejection control. Mutations: `dueAfter` line → its case fails; `projectIds` exclude line → its case fails.
 - **13.543** ✅ `ListFilterSpec` rejects `collaboratorIds` in both halves at compile time.
+- **13.544** ✅ `toServerFilterSpec` throws `UnexpressibleFilterError('exclude', …)` naming the axes on any
+  non-empty exclude; an empty object or empty lists pass through unrefused.

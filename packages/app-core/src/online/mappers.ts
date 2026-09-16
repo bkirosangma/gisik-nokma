@@ -17,6 +17,7 @@ import type {
   ContestedClaim,
   FilterSpec,
   Grouping,
+  IdAxes,
   ListColumnId,
   ListRow,
   MyWorkView,
@@ -835,6 +836,22 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
  */
 export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> {
   const spec: Record<string, unknown> = {};
+
+  // Exclude-mode spec §2 (2026-09-17): `filterSpecSchema` has no negation term,
+  // so an exclude half cannot be sent. Refused, not dropped — the identical
+  // reasoning as the plural refusal below. Empty lists and an empty object
+  // exclude nothing and are not refused.
+  const exclude = filter.exclude ?? {};
+  const excludedAxes = (Object.keys(exclude) as (keyof IdAxes)[]).filter(
+    (axis) => (exclude[axis]?.length ?? 0) > 0,
+  );
+  if (excludedAxes.length > 0) {
+    throw new UnexpressibleFilterError(
+      'exclude',
+      `filterSpecSchema has no negation term, and this filter excludes on ${excludedAxes.join(', ')}`,
+    );
+  }
+
   const singular = (key: string, values: string[] | undefined, serverKey: string): void => {
     if (values === undefined || values.length === 0) return;
     if (values.length > 1) {
