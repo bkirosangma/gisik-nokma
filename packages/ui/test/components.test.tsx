@@ -161,10 +161,23 @@ describe('SegmentedControl (13.288)', () => {
 // `test/helpers/colour-scan.ts`'s identical note). Resolving the path after
 // converting `import.meta.url` on its own avoids the rewrite.
 const UI_CSS = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui.css'), 'utf8');
-const rule = (selector: string) => {
+const rule = (selector: string): string => {
   const m = UI_CSS.match(new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
   if (!m) throw new Error(`no rule for ${selector}`);
-  return m[1];
+  const body = m[1];
+  // `RegExpMatchArray` is typed as `Array<string>`, not a tuple, so
+  // `noUncheckedIndexedAccess` (this repo's own tsconfig) types `m[1]` as
+  // `string | undefined` regardless of the regex's own single capture group
+  // — TS has no way to know the group index exists from the pattern alone.
+  // At RUNTIME `body` is always defined once `m` itself is non-null (the
+  // pattern's one group, `([^}]*)`, matches at minimum the empty string), so
+  // this can never actually throw against real CSS — but it is what turns
+  // the return type into a real `string` rather than `string | undefined`,
+  // so every call site (this one included) gets a genuine "selector vanished"
+  // failure instead of an undefined-dereference two lines away. A `!`/`as
+  // string` here would silence the compiler without that guarantee.
+  if (body === undefined) throw new Error(`no rule body captured for ${selector}`);
+  return body;
 };
 
 describe('R1(c) at the component layer', () => {
@@ -351,7 +364,19 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
       'the clean baseline line was not found in ui.css — has .gn-board-card changed?',
     ).not.toBe(UI_CSS);
     const m = mutated.match(/\.gn-board-card\s*\{([^}]*)\}/);
-    expect(m).not.toBeNull();
-    expect(m?.[1].includes('border-radius')).toBe(true);
+    // Real narrowing, not a vitest assertion followed by an unguarded access:
+    // `expect(m).not.toBeNull()` does not narrow `m`'s TYPE for TypeScript
+    // (control-flow narrowing only follows `if`/`throw`, not a matcher call),
+    // so the line below it would still see `m: RegExpMatchArray | null` and
+    // `m[1]: string | undefined` under this repo's `noUncheckedIndexedAccess`
+    // — exactly the shape that produced TS2532 here originally. Throwing (not
+    // `!`/`as string`) makes both the type AND the failure mode honest: a
+    // mutation that stops matching fails loudly at this line, naming what
+    // broke, rather than satisfying the compiler while leaving a later
+    // undefined-dereference for the wrong line to report.
+    if (!m) throw new Error('planted literal mutation did not produce a matchable .gn-board-card rule');
+    const body = m[1];
+    if (body === undefined) throw new Error('matched .gn-board-card rule captured no body');
+    expect(body.includes('border-radius')).toBe(true);
   });
 });
