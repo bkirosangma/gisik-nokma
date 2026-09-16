@@ -213,6 +213,53 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
     expect(batch[0]!.type).toBe('ticket.transitioned');
     expect(batch[0]!.payload).toEqual({ to: 'doing', comment: { text: 'picking this up now' } });
   });
+
+  /**
+   * 13.505 — the identical transport-failure fix `13.504` proved for the
+   * arrows' own `submitDirect`, now proved for the dialog's `submitFromDialog`.
+   * Found in a third-opinion review: `TransitionDialog`'s `onSubmit` prop is
+   * `void`-typed and `MoveArrows`' own call site is fire-and-forget
+   * (`onSubmit={(submission) => void submitFromDialog(submission)}`), so
+   * before this fix a rejected `ingest` here became an unhandled promise
+   * rejection — the dialog would stay open with nothing on screen saying it
+   * failed. Reuses the same gated-edge setup as the test above so the dialog
+   * opens and reaches its own `ingest` call; the `ingestScript` throws
+   * instead of resolving. Asserts the SAME two facts `13.504` asserts for the
+   * arrows: something is on screen naming the failure, and the control that
+   * triggers it is usable again — here, that the dialog's own alert appears
+   * (via its existing `serverRefusal` prop, `transition-dialog.tsx:260-262`)
+   * and the dialog stays OPEN rather than silently vanishing or bricking.
+   */
+  it('a rejected ingest from the dialog is shown, not swallowed as an unhandled rejection', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'todo' && transition.to === 'doing'
+          ? { ...transition, rules: [{ kind: 'require-comment' }] }
+          : transition,
+      ),
+    };
+    const { moves } = movesFor({}, gated, async () => {
+      throw new Error('network unreachable');
+    });
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.type(
+      within(dialog).getByLabelText('Comment (required by this transition)'),
+      'picking this up now',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toBeInTheDocument());
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('network unreachable');
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+  });
 });
 
 describe('Board move arrows — the refusal path names the real alternatives', () => {

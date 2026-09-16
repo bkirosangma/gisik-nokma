@@ -5203,7 +5203,7 @@ scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `1
 
 ## Task 13 — move arrows: refusal and its positive control (board-prototype-port plan, 2026-09-16)
 
-**Cases `13.490`–`13.504` minted here**, continuing directly from `13.489` (verified against the real case
+**Cases `13.490`–`13.505` minted here**, continuing directly from `13.489` (verified against the real case
 list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool was
 `13.489` — never the file's own "next free BLOCK" prose, an already-recorded false hit). Phase 6, Board
 writes: per-card `‹ ›` move arrows, the first WRITE path in this port. `arrowTarget`
@@ -5250,7 +5250,7 @@ Result matched exactly: 6 passed / 2 failed, the failing set precisely `13.494` 
 - **13.497** ✅ A `fromStateId` absent from `columnOrder` entirely has no column to scan from and answers
   `null` in both directions. — (same files)
 
-**`board-moves-ui.test.tsx` — 7 cases (`13.498`–`13.504`), the component-level wiring: `Board`'s `moves`
+**`board-moves-ui.test.tsx` — 8 cases (`13.498`–`13.505`), the component-level wiring: `Board`'s `moves`
 capability, `MoveArrows`, and `MoveRefusalNotice`.**
 
 **Why the refusal path is proven at the `moveOutcome`/`refusalCopy`/`MoveRefusalNotice` seam, not through a
@@ -5297,11 +5297,38 @@ Task 14's drag-and-drop reuses for real, since a drop target is not filtered thi
   case alone (`Unable to find role="alert"`, and the DOM dump shows both arrows `disabled=""`) — the other
   six cases in the file stayed green, then reverted with a targeted `Edit`. — (`packages/app-core/src/
   views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.505** ✅ THE SAME transport-failure fix `13.504` proved for `submitDirect`, now proved for
+  `submitFromDialog`: found in a THIRD review round, requested before declaring the `13.504` follow-up
+  done. `TransitionDialog`'s `onSubmit` prop is `void`-typed and `MoveArrows`' own call site is
+  fire-and-forget (`onSubmit={(submission) => void submitFromDialog(submission)}`), so before this fix a
+  rejected `ingest` from inside the dialog became an unhandled promise rejection — the dialog stayed open
+  with nothing on screen saying it failed. Fixed with a `try/catch` around `submitFromDialog`'s body,
+  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:260-262`) rather
+  than inventing a new one. Mutation-witnessed: the `try/catch` reverted to the pre-fix shape, `pnpm exec
+  vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this case alone (`PASS (7) FAIL (1)`,
+  timeout waiting for the dialog's own alert), the other seven cases in the file stayed green, then
+  reverted with a targeted `Edit` and re-confirmed `PASS (8) FAIL (0)`. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+
+**A separate, related fix carries NO case number, and that absence is deliberate, not an oversight.**
+The `try/catch/finally` `13.504` added made every local `setState` call in both `submitDirect` and
+`submitFromDialog` run unconditionally after an `await` — including on a card that has unmounted in the
+meantime, which is not rare: a successful move on ANY card (this one or a sibling) calls `moves.onMoved()`
+→ `board.reload()`, which can restructure the board and unmount a DIFFERENT card whose own slower `ingest`
+is still in flight. Found in a second-opinion review (the same one that led to `13.505`), fixed with a
+`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s
+`isCurrent()` and `TransitionDialog`'s own precheck `cancelled` flag already use — while leaving
+`moves.onMoved()` itself unguarded (it reaches the parent and is safe regardless of this component's mount
+state). **React 18 drops the console warning for a setState on an unmounted component, so no assertion in
+jsdom/RTL can observe the difference the guard makes** — confirmed true of both cited precedents as well,
+neither of which carries a dedicated test for this either. Rather than write a test that only LOOKS like it
+exercises the race (and would pass identically with or without the guard), this fix is documented instead
+of witnessed — the honest alternative to a check that cannot fail. `packages/app-core/src/views/board.tsx`.
 
 `tsc -p tsconfig.typecheck.json` clean on `packages/app-core`; `tsc -p tsconfig.json --noEmit && tsc -p
 tsconfig.e2e.json --noEmit` (the package's own `typecheck` script) clean on `apps/web`. Node `v22.23.2`.
-Full `packages/app-core` suite: 87 files, 1264 tests, green (up from 83/1249 before this task — the two
-new files' 15 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
+Full `packages/app-core` suite: 87 files, 1265 tests, green (up from 83/1249 before this task — the two
+new files' 16 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
 `page.tsx` — whether any of those 363 tests exercise the project page's board tab with a signed-in session
 was not individually traced; the claim made here is only the measured one, that the full suite stayed
 green with the wiring in place, not a claim about which tests do or do not reach the new code path.
@@ -5330,5 +5357,17 @@ file, and the task report rather than left standing. `.gn-board-card__move--prev
 dropped from the arrow buttons' `className` — empty class hooks with no corresponding `ui.css` rule, the
 exact shape this repo has already removed once (`481ad12c`).
 
-`node scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413`
-only.
+**A THIRD review round, requested before declaring the `13.504` follow-up done, found two more real
+issues** — `13.505` above (the `submitFromDialog` transport-failure fix, code changed and
+mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see
+above for why). Two further points from that same round were left as documented judgment calls rather
+than code changes: `submitFromDialog` still carries no `try/catch` of its OWN distinct from the transport
+fix already applied (moot — the fix IS the catch); and the client-invented `rule: 'transport'`/
+`rule: 'no-response'` values render through the identical `Refused by the server — ${rule}: ${reason}`
+sentence a REAL server refusal uses, which a viewer cannot distinguish from an actual server answer —
+changing that sentence now would redden the `13.504` mutation-witnessed assertion that the alert text
+contains `'network unreachable'`, so it was left as a coordinator-level decision rather than changed
+unilaterally.
+
+`node scripts/check-case-ids.mjs` re-run after minting `13.505`: duplicate list unchanged at
+`13.387`/`13.413` only.

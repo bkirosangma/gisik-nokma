@@ -770,7 +770,23 @@ function MoveArrows({
     return precheckEvent(candidate, moves.cache);
   };
 
-  /** Mirrors `TicketSheet.submitTransition` exactly — field claims first, the transition last, one ordered batch, the shipped payload spelling. */
+  /**
+   * Mirrors `TicketSheet.submitTransition`'s ORDERING exactly — field claims
+   * first, the transition last, one ordered batch, the shipped payload
+   * spelling — but deliberately NOT its unguarded shape.
+   * `TicketSheet.submitTransition` lets a rejected `ingest` become an
+   * unhandled promise rejection; this function does not, for the identical
+   * reason `submitDirect`'s own `try/catch` exists (case `13.504`):
+   * `TransitionDialog`'s `onSubmit` prop is `void`-typed and this
+   * component's own call site (`onSubmit={(submission) =>
+   * void submitFromDialog(submission)}`) is fire-and-forget, so nothing else
+   * in the tree would ever see a transport failure here — the dialog would
+   * stay open with nothing on screen saying why, the same user-visible
+   * symptom `13.504` fixed for the arrows, just behind the dialog instead.
+   * `TransitionDialog` already renders `serverRefusal` internally through
+   * its own `serverRefusal` prop (`transition-dialog.tsx:260-262`, the
+   * identical sentence), so this costs one `catch`, not a new display path.
+   */
   const submitFromDialog = async (submission: TransitionSubmission): Promise<void> => {
     const fieldEvents = Object.entries(submission.fieldValues).map(([fieldId, value]) =>
       make({
@@ -791,24 +807,33 @@ function MoveArrows({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
-    const results = await moves.dataSource.ingest([...fieldEvents, transition]);
-    const failed = results.find((result) => result.status !== 'committed');
-    if (failed === undefined) {
-      // Same unmount guard as `submitDirect` above — `onMoved()` reaches the
-      // parent and runs regardless; the two local setters are gated.
-      if (mountedRef.current) {
-        setServerRefusal(null);
-        setDialogOpen(false);
+    try {
+      const results = await moves.dataSource.ingest([...fieldEvents, transition]);
+      const failed = results.find((result) => result.status !== 'committed');
+      if (failed === undefined) {
+        // Same unmount guard as `submitDirect` above — `onMoved()` reaches the
+        // parent and runs regardless; the two local setters are gated.
+        if (mountedRef.current) {
+          setServerRefusal(null);
+          setDialogOpen(false);
+        }
+        moves.onMoved();
+        return;
       }
-      moves.onMoved();
-      return;
-    }
-    if (mountedRef.current) {
-      setServerRefusal(
-        failed.status === 'refused'
-          ? { rule: failed.rule, reason: failed.reason }
-          : { rule: failed.code, reason: failed.message },
-      );
+      if (mountedRef.current) {
+        setServerRefusal(
+          failed.status === 'refused'
+            ? { rule: failed.rule, reason: failed.reason }
+            : { rule: failed.code, reason: failed.message },
+        );
+      }
+    } catch (cause) {
+      if (mountedRef.current) {
+        setServerRefusal({
+          rule: 'transport',
+          reason: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
     }
   };
 
