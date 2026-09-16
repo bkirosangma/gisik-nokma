@@ -17,12 +17,32 @@ import type { FieldClaim } from '@gisik-nokma/domain';
  *
  * Not the rule-engine's own `evaluateRequireField`
  * (`packages/rule-engine/src/rules/require-field.ts`) — that reads the
- * ledger's `ticket.fields`, the server's authority, and additionally treats
- * an empty/whitespace string as unset. This reads the VIEW's own
- * `ticketFields: Record<string, FieldClaim>` (the shape `TicketSheet`/
+ * ledger's `ticket.fields`, the server's authority. This reads the VIEW's
+ * own `ticketFields: Record<string, FieldClaim>` (the shape `TicketSheet`/
  * `TransitionDialog` already carry), an advisory client-side read exactly
  * like `transitionOptions`'s own relationship to the engine: predicting the
- * server, never replacing it.
+ * server, never replacing it — with one KNOWN, UNRESOLVED divergence from
+ * what it predicts, flagged rather than silently fixed (Ruling 25's own
+ * follow-up, not yet ruled on).
+ *
+ * **A blank/whitespace-only value disagrees with the server.**
+ * `evaluateRequireField` trims and treats a whitespace-only string as unset
+ * — deliberate, tested, Task 9's own controller ruling
+ * (`packages/rule-engine/test/engine.test.ts`, "require-field and
+ * require-evidence refuse a blank value, not only an absent one"). This
+ * predicate does not trim: `value: ''` or `value: '   '` reads as claimed
+ * here (`!= null` is true), so `fieldAlreadyClaimed` and the server can
+ * disagree on exactly that shape of ticket. Before Ruling 25 the
+ * consequence was contained — any `require-field` edge always opened
+ * `TransitionDialog`, which has `serverRefusal` wired, so a blank field that
+ * slipped through still surfaced the server's refusal on screen. Since
+ * Ruling 25, `moveOutcome` can answer `direct` for exactly this ticket
+ * shape, and `direct` has no refusal-display path on Tasks 13/14 (arrows,
+ * drag-and-drop) — the submit would fail against the real server with
+ * NOTHING visible to the person who clicked. Not fixed here: trimming would
+ * also change `TransitionDialog`'s own rendering (a blank field would start
+ * showing its input and blocking Move), which is outside what Ruling 25
+ * asked for and is the coordinator's call, not a silent one.
  */
 export function fieldAlreadyClaimed(ticketFields: Record<string, FieldClaim>, field: string): boolean {
   return ticketFields[field]?.value != null;
