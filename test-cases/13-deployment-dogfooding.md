@@ -4817,3 +4817,94 @@ themes") and it is named here as a gap for whoever reviews this before merge, no
   a live render in any style or theme — manual, pending a reviewer's screen. —
   (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
   timeline-view.test.tsx`, `packages/ui/src/ui.css`)
+
+## Task 9: List restyle — geometry only, ONE ruling deferred, 2026-09-16
+
+**Case `13.475` minted here**, continuing directly from `13.474` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, run again after Task 11's own addition — not the file's own
+"next free" prose, per the false-hit note recorded three sections up). Landed on `.gn-list-*` selectors
+only, per the task's own Step 1 ("`.gn-table` and `.gn-select` are shared surfaces — do not edit them"):
+a new `.gn-list__table-wrap` wraps `<Table>` (`ticket-list.tsx`'s `ListTable`, `@gisik-nokma/ui`'s shared
+component) FROM THE OUTSIDE, giving the metrics table's "Container" row (`cardBg + cardShadow; radius
+cardR; overflow:auto`) without adding or changing any rule `Table` itself renders through
+(`.gn-table__scroll`, `.gn-table`). `cardBg`/`cardShadow`/`cardR` → `--gn-surface-raised`/
+`--gn-shadow-raised`/`--gn-radius-card` — not a new triple, but the SAME three roles the shared `.gn-card`
+rule (`ui.css:160-165`, unedited) already pairs, confirmed by reading it rather than assumed. The
+Group-by/Columns picker's `<summary>` becomes a pill (`min-height:36px; padding:0 12px; radius 999px;
+cardBg + cardShadow; 13px`), its `999px` a plain corner-radius literal — lengths are not what
+`token-discipline.test.ts` bans, and `radiusVariableName` names only `card`/`control` roles, so a pill
+radius has never been tokenised anywhere in this file, `.gn-chip`'s own identical literal included
+(`ui.css:113`). Its checkboxes are sized to the metric's 18px tick box via `accent-color: var(--gn-accent)`
+— the FIRST use of that property in `ui.css`, checked by grep before writing the justifying comment, not
+assumed. The collapse caret (`.gn-list__collapse`) gets a real `min-width`/`min-height: 22px` tap target
+around its glyph (previously sized only to the glyph's own intrinsic box); the title button
+(`.gn-list__open`) goes to 17px/22px.
+
+**The depth-based title indentation's FORMULA changes; its TOTAL does not become pixel-exact, and this
+distinction is the whole reason Task 9 could not simply "restyle the title cell."** The metric reads
+`padding:12px 16px 12px calc(16px + depth*22px)`, applying to the `<td>` (`.gn-table__cell`) itself. This
+task cannot zero out that shared cell's own `padding: 0.45rem 0.6rem` (the do-not-edit rule again), so the
+depth term is applied where it already lived — a `paddingLeft` INLINE STYLE on the inner
+`.gn-list__title-cell` span, ADDED ON TOP OF the cell's own padding rather than replacing it — with its
+FORMULA corrected from the old, ungrounded `depth * 1.1rem` to the metric's own `16 + depth * 22` (in px,
+computed in JS since `depth` is a render-time number, not a CSS `calc()`). The rendered offset is
+therefore the metric's indentation LOGIC, layered on a base this task cannot remove — not the metric's
+exact total. Recorded rather than left implicit, so a reviewer measuring pixels against the metrics table
+does not read this as a shipped miss.
+
+**DECLARED DIVERGENCE, not a match: "Group header row."** The metric (`padding 11px 16px; trayBg +
+trayShadow`) is applied to `.gn-list__section-title`, the existing per-group `<h3>` that sits OUTSIDE the
+table — the closest restyle available without rebuilding the grouping shape this task's own brief holds
+fixed ("Keep the Group-by / Columns wiring untouched... this is a restyle, not a rewiring"). The prototype
+draws this as a `<tr>` spanning the table's own columns; this product's architecture already renders one
+grouping's rows as a SEPARATE `<table>` per section (`apps/web/test/list-prefs-wiring.test.tsx` proves the
+wiring this shape depends on), so there is no in-table row to restyle. `trayBg`/`trayShadow` →
+`--gn-surface-sunken`/`--gn-shadow-sunken`, the same pair Task 11's `.gn-timeline__weeks` uses for
+identical prototype vocabulary — cited forward at the time it was written, confirmed still true by
+re-reading `ui.css` after both tasks landed.
+
+**FIVE metrics NOT implemented — a stop-and-report, not a silent gap, and named by the task's own brief
+before this task started.** "Table: min-width:820px", "Header cell" (13px/18px/600/label2/trayBg/padding/
+nowrap), "Zebra" (odd rows `fill4`), "Data cell" (padding/15px/nowrap), and the title cell's own
+`min-width:260px` are each reachable only by putting a class on an element `Table` (`@gisik-nokma/ui`)
+renders ITSELF — `<table>`, `<th>`, `<td>`, `<tr>` — confirmed by reading `table.tsx`: no `className` prop
+on the root, no per-column class hook on `TableColumn`, unlike `Card` (`card.tsx:7`,
+`['gn-card', className].filter(Boolean).join(' ')`), which is exactly the shape that would fix this. Two
+alternatives were considered and both rejected on this task's own authority: (1) a descendant-scoped
+override such as `.gn-list__table-wrap .gn-table__header {…}` still NAMES `.gn-table__header` in a
+selector `grep '\.gn-table'` would find, which is precisely what the shared-surface doctrine exists to
+keep out of reach from outside the component; (2) inventing a way to zero the shared cell's padding and
+restate it on an inner wrapper (as was done for the title cell's indentation ALONE) cannot reach `<table>`'s
+own `min-width` or `<tr>`'s own zebra at all, since neither has an inner wrapper this task controls. **A
+ruling request, recorded here rather than landed:** extend `Table`'s props the same way `Card` already is
+— optional `className` on `<table>`, `headerClassName`, `rowClassName`, `TableColumn.cellClassName` — so
+every rule these five metrics need could be written on a `.gn-list-*` selector alone, with `.gn-table`'s
+own rule untouched for `Table`'s one other repo-wide consumer today: none (`<Table` greps to exactly the
+one call site in `ticket-list.tsx`, confirmed before writing this). Not built on this task's own
+authority: the port's own global constraints name this precise trap for Task 9 by number ("if a list
+metric seems reachable only by editing `.gn-table`, stop and report rather than editing"), and eight
+implementers on this plan have been right to stop and report before this task.
+
+**The visible result is a mixed one — a finished frame around an unfinished interior — and this is
+recorded so a screenshot is not mistaken for the whole job.** A rounded, shadowed card now surrounds a
+header row, zebra pattern, and data cells that still render at `Table`'s original, unrestyled metrics.
+
+`apps/web/test/list-prefs-wiring.test.tsx` — the Group-by/Columns wiring this task was told to leave
+alone — re-run unchanged, both before and after, 2/2. `packages/app-core/test/views/ticket-list.test.tsx`
+37/37. Full `packages/app-core` (1227/1227) and `packages/ui` (308/308) suites green;
+`packages/ui/test/token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean, no
+colour literal, every `var(--gn-…)` this task added (`--gn-surface-raised`, `--gn-shadow-raised`,
+`--gn-radius-card`, `--gn-surface-sunken`, `--gn-shadow-sunken`, `--gn-accent`) already declared in
+`TOKEN_ROLES`/`radiusVariableName`. `pnpm turbo run test` at the repo root: `apps/web` 363/363 against the
+rebuilt `dist/` app-core consumes. `tsc --noEmit` clean on `packages/app-core` and `packages/ui` (Node
+v22.23.2). **No live cross-style/cross-theme visual check was performed**, the same open item Task 11
+carries — named here rather than silently skipped.
+
+- **13.475** 🟡 The list restyles PARTIALLY to the prototype's metrics: the container frame, the
+  Group-by/Columns picker pill and its 18px tick boxes, the collapse caret's 22px tap target, the title
+  button's 17px/22px, and the title cell's corrected depth formula are landed; the table's own min-width,
+  header cell, zebra, and data-cell padding are NOT — each reachable only through the shared `Table`
+  component's own `<table>`/`<th>`/`<td>`/`<tr>`, which has no class hook today, and a ruling request
+  (extend `Table` the way `Card` already is) is recorded rather than acted on. Group-by/Columns wiring
+  re-verified unchanged (`list-prefs-wiring.test.tsx`, 2/2). Not verified by a live render in any style or
+  theme. — (`packages/app-core/src/views/ticket-list.tsx`, `packages/ui/src/ui.css`)

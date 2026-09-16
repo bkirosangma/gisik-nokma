@@ -508,9 +508,58 @@
 .gn-list__summary { color: var(--gn-text-muted); }
 .gn-list__origin { color: var(--gn-text-muted); font-size: 0.8rem; font-style: italic; }
 .gn-list__control { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--gn-text-muted); }
-.gn-list__columns-picker summary { cursor: pointer; color: var(--gn-text-muted); }
-.gn-list__column-option { display: block; padding: 0.15rem 0.5rem; }
-.gn-list__section-title { margin: 0 0 0.4rem; font-size: 0.95rem; color: var(--gn-text-muted); }
+/* Board prototype port Task 9 (2026-09-16), spec List `:401-475`, "Column
+   toggle" row: `min-height:36px; padding:0 12px; radius 999px; cardBg +
+   cardShadow; 13px`. `cardBg`/`cardShadow` → `--gn-surface-raised`/
+   `--gn-shadow-raised`, the SAME pair `.gn-list__table-wrap` below uses for
+   the identical prototype vocabulary — already declared, already consumed
+   elsewhere in this file. `999px` is a plain corner radius, not a colour,
+   written as a literal exactly like `.gn-chip`'s own `border-radius: 999px`
+   (`:113` above) — the token-discipline scan bans colour literals, not
+   lengths, and `radiusVariableName` only names `card`/`control` roles, so a
+   pill radius has never been a token in this file. */
+.gn-list__columns-picker summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--gn-text-muted);
+}
+.gn-list__column-option { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.5rem; }
+/* The metric's "18px tick box" — the checkbox itself, not the row around
+   it. `accent-color` recolours the native control's own check mark/fill from
+   the declared `accent` role (`TOKEN_ROLES`, `tokens.ts`) rather than
+   replacing the input with a custom-drawn box this task's brief does not
+   ask for — this is the first `accent-color` declaration in this file,
+   not a reuse of an existing one. */
+.gn-list__column-option input[type='checkbox'] {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--gn-accent);
+}
+/* "Group header row": `padding 11px 16px; trayBg + trayShadow` — the same
+   pair `.gn-timeline__weeks` uses for identical prototype vocabulary
+   (`--gn-surface-sunken`/`--gn-shadow-sunken`). DECLARED DIVERGENCE, not a
+   match: the prototype draws this as a `<tr>` spanning the table's columns;
+   this product's architecture already renders one grouping's rows as a
+   SEPARATE `<table>` per section with an `<h3>` above it (Group-by wiring
+   this task does not touch), so the bar sits outside the table rather than
+   inside it. Visually the closest restyle available without rebuilding the
+   grouping shape Task 9's own brief holds fixed ("Keep the Group-by /
+   Columns wiring untouched... this is a restyle, not a rewiring"). */
+.gn-list__section-title {
+  margin: 0 0 0.4rem;
+  padding: 0.6875rem 1rem;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+  font-size: 0.95rem;
+  color: var(--gn-text-muted);
+}
 .gn-list__title-cell { display: inline-flex; align-items: center; gap: 0.3rem; }
 .gn-list__collapse,
 .gn-list__open {
@@ -522,9 +571,38 @@
   padding: 0;
   text-align: left;
 }
-.gn-list__collapse { color: var(--gn-text-muted); }
+/* "Caret": min-width/min-height 22px — a real tap target around the glyph,
+   not the glyph's own intrinsic box. */
+.gn-list__collapse {
+  color: var(--gn-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.375rem;
+  min-height: 1.375rem;
+}
+/* "Title button": 17px/22px. */
+.gn-list__open { font-size: 1.0625rem; line-height: 1.375rem; }
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
+/* Board prototype port Task 9 (2026-09-16), spec List `:401-475`,
+   "Container": `cardBg + cardShadow; radius cardR; overflow:auto`. Wraps
+   `<Table>` (`@gisik-nokma/ui`) FROM THE OUTSIDE — `ticket-list.tsx`'s
+   `ListTable` — rather than styling anything `Table` renders itself: the
+   component's own root is `.gn-table__scroll` and its own `<table>` is
+   `.gn-table`, both on the do-not-edit list (`.gn-table` by name), and this
+   selector never appears in the same rule as either. `cardBg`/`cardShadow`/
+   `cardR` → `--gn-surface-raised`/`--gn-shadow-raised`/`--gn-radius-card`,
+   all already declared and already consumed elsewhere in this file — all
+   three together, identically, on the shared `.gn-card` rule itself
+   (`:160-165` above, unedited by this task) that every card in the product,
+   `.gn-board-card` included, renders through. */
+.gn-list__table-wrap {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border-radius: var(--gn-radius-card);
+  overflow: auto;
+}
 .gn-attention {
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;

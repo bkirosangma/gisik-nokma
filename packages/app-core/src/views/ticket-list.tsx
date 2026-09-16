@@ -284,6 +284,30 @@ export function TicketList({
  * the day the table grows a sticky header or a scroll shadow this surface would
  * silently not get it. The indentation, the collapse toggle and the
  * restricted-parent marker all fit in the first column's `cell`.
+ *
+ * ## Board prototype port Task 9 (2026-09-16), spec List `:401-475`
+ *
+ * `.gn-list__table-wrap` gives the metrics table's "Container" row —
+ * `cardBg + cardShadow; radius cardR; overflow:auto` — WITHOUT touching
+ * `Table`'s own shared output: it wraps the `<Table>` element from the
+ * outside, so `.gn-table__scroll`/`.gn-table` (both on the do-not-edit list,
+ * `.gn-table` by name) render exactly as they do for every other consumer.
+ *
+ * The "Table: min-width:820px", "Header cell", "Zebra" and "Data cell" rows
+ * are NOT implemented here. Each is reachable only by putting a class on an
+ * element `Table` renders itself (`<table>`, `<th>`, `<td>`, `<tr>`), none of
+ * which accepts one today — confirmed by reading `table.tsx`, which has no
+ * `className`/per-column class prop, unlike `Card` (`card.tsx:7`,
+ * `['gn-card', className].filter(Boolean).join(' ')`) which is exactly the
+ * shape that would fix this. Recorded as a ruling request in this task's
+ * report rather than built on this task's own authority — the port's global
+ * constraints name this precise trap for Task 9 by number: "if a list
+ * metric seems reachable only by editing `.gn-table`, stop and report rather
+ * than editing." The depth-based indentation below is the one exception:
+ * it is a `paddingLeft` inline style ADDED ON TOP OF `.gn-table__cell`'s own
+ * uneditable padding (as it already was before this task, just with the
+ * wrong formula), not a replacement of it, so it does not touch the cell's
+ * shared padding at all.
  */
 function ListTable({
   nodes,
@@ -306,7 +330,15 @@ function ListTable({
         <span
           className="gn-list__title-cell"
           data-testid={`ticket-card-${node.row.ticketId}`}
-          style={{ paddingLeft: `${node.depth * 1.1}rem` }}
+          // Spec List `:401-475`, "Title cell": `padding:12px 16px 12px
+          // calc(16px + depth*22px)`. The depth term is computed here
+          // (plain arithmetic, not a CSS calc()) because depth is a number
+          // known only at render time. This ADDS to `.gn-table__cell`'s own
+          // shared padding rather than replacing it — see this function's
+          // docblock — so the rendered offset is not pixel-exact against
+          // the metric; it is the exact indentation FORMULA the metric
+          // gives, layered on top of a base this task cannot zero out.
+          style={{ paddingLeft: `${16 + node.depth * 22}px` }}
         >
           {node.hasChildren ? (
             <button
@@ -340,7 +372,11 @@ function ListTable({
       cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} />,
     })),
   ];
-  return <Table columns={tableColumns} rows={nodes} rowKey={(node) => node.row.ticketId} />;
+  return (
+    <div className="gn-list__table-wrap">
+      <Table columns={tableColumns} rows={nodes} rowKey={(node) => node.row.ticketId} />
+    </div>
+  );
 }
 
 function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
