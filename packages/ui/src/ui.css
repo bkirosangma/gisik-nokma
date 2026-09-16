@@ -2661,11 +2661,16 @@
    coordinator Ruling 6) — they were declared unconsumed in the original Task
    2 commit; that gap is closed.
 
-   `.gn-project__summary` (the `N of M shown` line) is STILL DECLARED,
-   STILL UNCONSUMED: this task has no true count to put in it, and rendering
-   one before a filtering task exists would be inventing a number. Left in
-   place rather than dropped, since the task that adds the count will need
-   this exact rule back immediately. */
+   `.gn-project__summary` — DELETED (Task 4, 2026-09-16). Declared unconsumed
+   since Task 2 on the coordinator's own say-so ("the task that adds the count
+   will need this exact rule back immediately"), which was sanction to leave
+   it, not a promise it would be the rule that count used. It was not: the
+   count Task 4 built lives in `.gn-project__count`, below, at its own metrics
+   (13px/18px, matching `.gn-project__scope-note` beside it) inside the new
+   `.gn-project__narrowing` strip — a sibling of this block, not a reuse of
+   this rule. A declared-unconsumed rule does not get to become permanent
+   once the task it was waiting for has landed; see `page.tsx`'s own comment
+   at the (now consumed) breadcrumb/title block for the same accounting. */
 .gn-project { display: flex; flex-direction: column; gap: 0.875rem; }
 /* NO padding on EITHER axis (Ruling 5, fix round 1; amended by Ruling 8, fix
    round 2 — my own bottom-padding call in round 1 was wrong and is corrected
@@ -2696,4 +2701,73 @@
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
-.gn-project__summary { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
+
+/* ── Board client narrowing (board-prototype-port, Task 4, 2026-09-16).
+   Step 1's four rules, verbatim (`.gn-project__narrowing`/`__count`/
+   `__scope-note`/`__search`), every `var(--gn-…)` one already declared in
+   `tokens.ts` — no new role, same discipline as the block above:
+     `--gn-fill-quaternary`  → `fillQuaternary` role (tokens.ts:599 etc.)
+     `--gn-radius-control`   → `radius.control` (tokens.ts:794)
+     `--gn-shadow-sunken`    → `sunken` shadow role (tokens.ts:936), already
+                                consumed three times elsewhere in this file
+     `--gn-text` / `--gn-text-muted` → already consumed throughout this file
+
+   `.gn-project__filter-chip`/`__filter-chip-remove` are NOT in the brief's
+   Step 1 — the brief gives no chip CSS at all, and the disclosure invariant
+   (`page.tsx`'s own comment on the strip) needs one. `Chip`
+   (`components/chip.tsx`) cannot serve: it is a dismiss-less `<span>` and
+   `.gn-chip` is on the do-not-edit shared-selector list, so adding a remove
+   button to it would be editing a product-wide surface to grow one page's
+   feature. These two are page-local, new selectors — no shared rule touched
+   — built from the same verified-role list above rather than inventing a
+   sixth. */
+.gn-project__narrowing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.5rem 0.75rem;
+}
+.gn-project__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__scope-note { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__search {
+  min-height: 2.75rem;
+  min-width: 12.5rem;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 1.0625rem;
+}
+.gn-project__filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+/* `font: inherit` is declared HERE rather than left to a global element
+   selector — `apps/web/app/globals.css`'s own `button { font: inherit; }`
+   does not reach `apps/desktop`, which loads only this file
+   (`main.tsx:6`), and this class ships to both. Every other unclassed
+   button in this file makes the same choice (`.gn-board-card__title`,
+   `.gn-board__empty-create`, 37 more) — a convention, not a one-off. */
+.gn-project__filter-chip-remove {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: 1;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}

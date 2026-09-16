@@ -4175,3 +4175,30 @@ alike, the compile-time case proves the narrowing is real rather than merely doc
   widening `BoardFilterSpec` from the `Pick` to bare `FilterSpec` and confirming `tsc` then reports
   both directives as unused (`TS2578`), proving the narrowing is what rejects the two axes rather than
   a typo the compiler happened not to catch. — (`packages/app-core/test/filter/board-filter.test.ts`)
+
+## Task 4 — the board's search box, count, chip, and scope note (board-prototype-port plan, 2026-09-16)
+
+**Block `13.435`–`13.438` minted here; the next free BLOCK is `13.439`.** `matchesBoardCard` (Task 3)
+had no caller. This task adds one: a page-level search box narrows the board through it, an
+`N of M shown` count and a removable chip are derived from the SAME pass that narrows the render
+(coordinator Ruling 1 — never a second count), and a scope note names the axes a `BoardFilterSpec`
+cannot answer. `13.436` replaces the brief's own Step 5 second test, which asked for a case the
+architecture cannot produce — `getBoard(projectId: string)` (`data-source.ts:134`) takes no filter
+argument, so the board's own total is never narrowed by the server-side "Only tickets in progress"
+toggle, and the brief's literal assertion ("a bare `M` would claim the project holds more than it
+does") is false of the board's `M` specifically. The real, reachable version of that hazard — `M`
+accidentally sourced from the LIST's own (narrower) row count instead of the board's — is what
+`13.436` actually witnesses.
+
+- **13.435** ✅ Typing into the board's search box narrows the rendered grid AND reads an honest
+  `N of M shown`: two of three fixture cards leave the DOM, the remaining one stays, and the count
+  names both numbers correctly. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.436** ✅ The count is read from `board.data`, never from `list.rows.length` — a board fixture
+  of three cards against a list fixture of zero rows, with the "Only tickets in progress" toggle on,
+  still reads the board's own total (three) once the search box narrows it to one. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.437** ✅ The chip and the count move together: removing the one active filter chip clears the
+  search box, restores every card, AND removes the count with it — no stale "M of M" survives an
+  empty filter, because the strip they share is one conditional block, not two independently gated
+  elements. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.438** ✅ The `.gn-project__narrowing` strip does not render at all while no filter is active —
+  the count is not an unconditional fixture of the board tab. — (`apps/web/test/board-narrowing.test.tsx`)

@@ -68,9 +68,14 @@ a { color: var(--gn-text-accent); }
    measured. **That description is now history rather than the tree:** those
    tabs were unclassed `<button role="tab">` inside `.gn-view-tabs`, and the HIG
    sign-in restyle replaced them with `SegmentedControl`, whose
-   `.gn-segmented__item` sets its own `font: inherit`. `.gn-view-tabs` survives
-   only on the project page. The rule below still earns its place there and on
-   every other unclassed control; only its `/sign-in` example has moved on.
+   `.gn-segmented__item` sets its own `font: inherit`. **UPDATE (board-
+   prototype-port Task 4, 2026-09-16): `.gn-view-tabs` survives NOWHERE now —
+   the project page's own tab rail moved onto the same shared `.gn-segmented`
+   (Task 2 of that port), so the sentence this replaces ("survives only on the
+   project page") stopped being true the moment that landed and stayed wrong
+   in this file until now. Its rules (formerly here and at the former
+   `.gn-view-tabs button, .gn-view-tabs [role='tab']` block) are deleted.**
+   The rule below still earns its place on every remaining unclassed control.
    Unstyled controls on surfaces NEITHER sweep visits (calendar, timeline,
    contest banner, the workflow-builder inspectors, editor chrome) change too
    and are not measurable by this instrument. Enumerating the absence rather
@@ -1241,8 +1246,6 @@ input, textarea, select { font-family: inherit; }
 .gn-settings__sidebar-item--disabled { color: var(--gn-text-muted); }
 .gn-settings__content { flex: 1 1 20rem; min-width: 0; }
 
-.gn-view-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
-
 /* ── Two founding-form class families (Round 19b, owner feedback item 3). ───
    Until now both forms shared `.gn-founding`, a raised card. The owner's
    reference draws them differently and item 3's own words — "shouldn't be
@@ -1379,20 +1382,16 @@ input, textarea, select { font-family: inherit; }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
 
-/* 2.75rem = 44px, the floor this product already uses for standalone controls
-   (the 404's recovery links, the MCP code input). Measured at 390px before
-   this: `55x21` on the sign-in method tabs — six of that page's six
-   tap-target offenders, and the same class carries the board's view tabs, which
-   the pre-launch review measured at `52x21`. One rule, both surfaces.
-
-   `flex-wrap` above for the reason `.gn-nav` carries it: three 44px tabs and a
-   gap do not always share a line at 390px, and without wrapping the last one
-   leaves the viewport rather than the row growing. */
-.gn-view-tabs button,
-.gn-view-tabs [role='tab'] {
-  min-height: 2.75rem;
-  padding-inline: 0.75rem;
-}
+/* `.gn-view-tabs button, .gn-view-tabs [role='tab'] { min-height: 2.75rem;
+   padding-inline: 0.75rem; }` — DELETED (board-prototype-port Task 4,
+   coordinator Ruling 7). It carried the 44px tap-target floor for the
+   sign-in method tabs and the project page's own view tabs, both since
+   moved onto `.gn-segmented__item`, which declares its own
+   `min-height: 2.75rem` (`packages/ui/src/ui.css`) — the guarantee this rule
+   existed for is not lost, it is declared on the selector that now exists.
+   `.gn-view-tabs` itself has no remaining consumer anywhere in this product
+   (verified: every surviving mention of the class in the whole repo is
+   prose inside a comment, never a JSX className or a CSS selector). */
 
 /* `flex-wrap: wrap` is load-bearing, not tidiness — HISTORY, not the current
    shape. The last child WAS `Sign out {user.name}`, so this row's width

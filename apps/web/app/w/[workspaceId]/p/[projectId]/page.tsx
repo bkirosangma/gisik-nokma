@@ -11,10 +11,13 @@ import {
   TicketList,
   TicketSheet,
   TimelineView,
+  matchesBoardCard,
   useAttention,
   useBoard,
   useLiveQuery,
   useTicketList,
+  type BoardFilterSpec,
+  type FilterSpec,
   type GroupLabels,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
@@ -183,6 +186,117 @@ function ProjectBoard() {
   const board = useBoard(dataSource, workspaceId, projectId);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
   const attention = useAttention(dataSource, workspaceId);
+
+  /**
+   * THE CLIENT NARROWING (board-prototype-port Task 4): one `FilterSpec`-shaped
+   * state above the tabs, so a tab switch never resets what a person typed.
+   *
+   * Typed `FilterSpec`, not `BoardFilterSpec` — a deliberate widening of the
+   * brief's own wording ("BoardFilterSpec-shaped state"). If this state were
+   * literally `BoardFilterSpec`, the four axes it omits
+   * (`collaboratorIds`/`dueBefore`/`dueAfter`/`fields`) would be
+   * UNREPRESENTABLE here, and `boardUnappliedAxes` below — the scope note Step
+   * 4 requires — would be dead code with nothing it could ever report. Task 5's
+   * Filters sheet sets those four axes on this SAME state; only the BOARD path
+   * (`boardFilter` below) narrows down to `BoardFilterSpec` before it reaches
+   * `matchesBoardCard`, exactly as the brief's closing sentence says: "only the
+   * board path narrows to `BoardFilterSpec`."
+   *
+   * Only `text` has a control in this task (the search box). The other five
+   * `BoardFilterSpec` axes and the four board-blind ones are set by Task 5's
+   * Filters sheet and Task 8's workflow picker onto this identical piece of
+   * state — not a second filter object, per the disclosure invariant note
+   * below.
+   */
+  const [filter, setFilter] = useState<FilterSpec>({});
+
+  /**
+   * ONE PASS produces the narrowed board, its shown count, and its total — per
+   * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
+   * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
+   * server-side and the board never does) could disagree with what actually
+   * renders; a single fold cannot disagree with itself. `<Board>` below is
+   * handed `boardNarrowing.view`, never `board.data` directly, so the grid and
+   * the count are reading the SAME computed groups.
+   *
+   * Rearrangement, not a second filter: every column and group survives
+   * (`board.tsx:42-46`'s own rule — grouping must never drop a card, and this
+   * narrowing must never drop a COLUMN or a GROUP, only the cards inside one).
+   * A fully-filtered board therefore renders its columns empty rather than
+   * vanishing — the `N of M shown` count and the removable chip below are the
+   * only disclosure, which is the invariant's whole point.
+   */
+  const boardNarrowing = useMemo(() => {
+    if (board.data === null) return null;
+    const boardFilter: BoardFilterSpec = {
+      text: filter.text,
+      assigneeIds: filter.assigneeIds,
+      typeIds: filter.typeIds,
+      stateIds: filter.stateIds,
+      stateCategories: filter.stateCategories,
+      projectIds: filter.projectIds,
+    };
+    let total = 0;
+    let shown = 0;
+    const groups = board.data.groups.map((group) => ({
+      ...group,
+      columns: group.columns.map((column) => {
+        const cards = column.cards.filter((card) => {
+          total += 1;
+          const keep = matchesBoardCard(card, column, projectId, boardFilter);
+          if (keep) shown += 1;
+          return keep;
+        });
+        return { ...column, cards };
+      }),
+    }));
+    return { view: { ...board.data, groups }, shown, total };
+  }, [board.data, filter, projectId]);
+
+  /**
+   * THE REMOVABLE CHIP HALF of the disclosure invariant. One entry per
+   * user-set axis that narrows the BOARD, each carrying its own removal — the
+   * shared shape Task 8's workflow picker adds its own entry to, rather than
+   * inventing a second chip mechanism. Only `text` has a control today.
+   */
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string; onRemove: () => void }[] = [];
+    const text = filter.text?.trim();
+    if (text !== undefined && text !== '') {
+      chips.push({
+        key: 'text',
+        label: `Search: "${text}"`,
+        onRemove: () => setFilter((current) => ({ ...current, text: undefined })),
+      });
+    }
+    return chips;
+  }, [filter.text]);
+
+  /**
+   * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
+   * cannot answer at all — `matchesBoardCard`'s own docblock names why
+   * (`collaboratorIds` has no equivalent field, `dueBefore`/`dueAfter` have no
+   * claimed date, `fields` has no custom-field claim on a board card). This is
+   * SEPARATE from `activeFilterChips` above and from the count: the count
+   * reports cards the board filtered, this reports axes the board never
+   * evaluated, and merging the two would put a number on a filter that never
+   * ran (spec's own words). Always computed from `filter` directly — never
+   * from `boardFilter` inside the memo above, which by construction cannot
+   * carry these four axes at all.
+   */
+  const boardUnappliedAxes = useMemo(() => {
+    const axes: string[] = [];
+    if (filter.collaboratorIds !== undefined && filter.collaboratorIds.length > 0) {
+      axes.push('collaborator');
+    }
+    if (filter.dueBefore !== undefined || filter.dueAfter !== undefined) {
+      axes.push('due date');
+    }
+    if (filter.fields !== undefined && Object.keys(filter.fields).length > 0) {
+      axes.push('custom field');
+    }
+    return axes;
+  }, [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields]);
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
    *
@@ -535,9 +649,17 @@ function ProjectBoard() {
               absent: there is no fixed-height wrapper around either, so the
               column is exactly as tall as its present children and grows once a
               name resolves, rather than holding blank space that a name then
-              fills. `.gn-project__summary` (the `N of M shown` line) is
-              deliberately NOT rendered here — this task has no true count to put
-              in it; see the report for that choice.
+              fills.
+
+              `.gn-project__summary` — DELETED (Task 4). It was declared here
+              unconsumed since Task 2, on the coordinator's own say-so, pending
+              this task's count. The count that actually shipped is
+              `.gn-project__count`, inside the `.gn-project__narrowing` strip
+              below the tab rail — a different rule, at different metrics, next
+              to the chip and the scope note it may never render without. A
+              rule declared for "the task that adds the count" does not get to
+              survive unconsumed once that task has run; see `ui.css` for the
+              deletion.
             */}
             {workspaceName !== null ? (
               <p className="gn-project__breadcrumb">{workspaceName}</p>
@@ -561,8 +683,33 @@ function ProjectBoard() {
               directly rather than scoping from the tablist container, so the move
               changes no test's reach (`page-refusals.test.tsx`,
               `project-create-gate.test.tsx`).
+
+              SEARCH BOX (Task 4) renders here, ABOVE THE TABS, because `filter`
+              is page-level state that a tab switch must not reset (Step 2). Its
+              `aria-label` says "board" on purpose: today it narrows ONLY the
+              Board tab (Ruling 1 scopes T4 to the board path; Calendar and
+              Timeline already accept a `filter` prop of their own — confirmed by
+              reading `calendar-view.tsx`/`timeline-view.tsx` — but wiring it is
+              explicitly out of this task, since narrowing those tabs with no
+              count and no chip would itself violate the disclosure invariant
+              this task exists to satisfy). A generic, unlabelled "Search" here
+              would be a control implying a reach it does not have; naming the
+              scope in the accessible name is the fix that costs nothing else.
             */}
-            <div className="gn-project__header">{createRegion}</div>
+            <div className="gn-project__header">
+              <input
+                type="search"
+                className="gn-project__search"
+                aria-label="Search the board"
+                placeholder="Search the board"
+                value={filter.text ?? ''}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  setFilter((current) => ({ ...current, text: value === '' ? undefined : value }));
+                }}
+              />
+              {createRegion}
+            </div>
 
             {/*
               The segmented control (`ui.css`'s shared `.gn-segmented` /
@@ -575,10 +722,14 @@ function ProjectBoard() {
               modifier class, rather than two `view === 'x'` comparisons that would
               have to be kept in agreement by hand.
 
-              `.gn-view-tabs` survives nowhere else in the product after this
-              (`apps/web/app/globals.css`'s own docblock already said so — "survives
-              only on the project page"); its now-dead rules are left in place,
-              out of this task's file scope, and reported rather than deleted.
+              `.gn-view-tabs` NO LONGER EXISTS ANYWHERE IN THE PRODUCT as of this
+              commit (Task 4, coordinator Ruling 7) — `globals.css`'s own dead
+              rules (`:1244`, `:1391-1392`) and the docblock sentence claiming
+              they "survive… only on the project page" are both removed there;
+              that claim stopped being true the moment THIS page moved onto
+              `.gn-segmented` (Task 2), and a stale rule is one thing but a
+              comment misstating the file it sits in is the thing this repo
+              punishes hardest.
             */}
             <div className="gn-segmented" role="tablist">
               {(
@@ -604,6 +755,56 @@ function ProjectBoard() {
                 );
               })}
             </div>
+
+            {/*
+              THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's
+              workflow picker also feeds). Board-tab-only: the count and the
+              scope note are both facts about the BOARD's own narrowing, and
+              showing them on a tab they say nothing about would be its own
+              small lie.
+
+              Gated on having something to disclose, not merely on `view ===
+              'board'` — with no active axis at all, `activeFilterChips` and
+              `boardUnappliedAxes` are both empty and the strip renders
+              nothing, so a person who has touched no control never sees an
+              empty bar. The moment either becomes non-empty, the count comes
+              along with it (it lives inside the SAME conditional block as the
+              chips and the note), which is what keeps the invariant — count
+              and chip, always together — true by construction rather than by
+              two authors remembering to agree.
+            */}
+            {view === 'board' &&
+            boardNarrowing !== null &&
+            (activeFilterChips.length > 0 || boardUnappliedAxes.length > 0) ? (
+              <div className="gn-project__narrowing" data-testid="board-narrowing">
+                <span className="gn-project__count" data-testid="board-narrowing-count">
+                  {boardNarrowing.shown} of {boardNarrowing.total} shown
+                </span>
+                {activeFilterChips.map((chip) => (
+                  <span
+                    key={chip.key}
+                    className="gn-project__filter-chip"
+                    data-testid={`board-filter-chip-${chip.key}`}
+                  >
+                    {chip.label}
+                    <button
+                      type="button"
+                      className="gn-project__filter-chip-remove"
+                      onClick={chip.onRemove}
+                      aria-label={`Remove filter — ${chip.label}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {boardUnappliedAxes.length > 0 ? (
+                  <span className="gn-project__scope-note" data-testid="board-scope-note">
+                    Not applied on the board: {boardUnappliedAxes.join(', ')} — set on the list
+                    tab, where a ticket carries the field.
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
 
             {view === 'calendar' ? (
               // The calendar and the timeline read the SAME list as the List
@@ -672,8 +873,13 @@ function ProjectBoard() {
             ) : view === 'board' ? (
               board.error !== null ? (
                 <ShellRefusal what="The board" message={board.error} />
-              ) : board.data !== null ? (
-                <Board board={board.data} onOpenTicket={openTicket} />
+              ) : boardNarrowing !== null ? (
+                // `boardNarrowing.view`, never `board.data` — the grid and the
+                // `N of M shown` count above must read the SAME narrowed
+                // groups (Ruling 1), and this is the one render site that
+                // proves it: there is no second `board.data.groups` walk
+                // anywhere on this page.
+                <Board board={boardNarrowing.view} onOpenTicket={openTicket} />
               ) : (
                 <p>Loading…</p>
               )
