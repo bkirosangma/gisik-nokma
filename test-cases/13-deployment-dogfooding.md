@@ -5086,3 +5086,45 @@ the actual run: `13.485` is a refusal too, off `todo → todo`) — while the fi
 `tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2, `pnpm exec vitest run
 test/views/board-moves.test.ts`: 8/8 green). `node scripts/check-case-ids.mjs` re-run after minting:
 duplicate list unchanged at `13.387`/`13.413` only.
+
+## Task 12, Ruling 25 — `moveOutcome` must not answer differently from the dialog it opens
+
+**Cases `13.486`–`13.487` minted here**, continuing directly from `13.485` (verified against the real
+case list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Task 12's own
+concern 2: `TransitionDialog` skips an already-claimed `require-field` input
+(`transition-dialog.tsx:128`/`:202`, reading `ticketFields`), but `moveOutcome` never received
+`ticketFields` and always answered `needs-dialog` for any `require-field` rule — the exact fork Task 12's
+own docblock warned `transitionOptions` against, arriving from the other side: two places deriving "does
+this field still need asking" and free to disagree.
+
+**Fixed by extraction, not by a third re-derivation.** `fieldAlreadyClaimed(ticketFields, field)`
+(`packages/app-core/src/views/field-claims.ts`, new) is the ONE predicate now read by both
+`TransitionDialog` (its `missingFields` filter and its required-field render gate) and `moveOutcome`
+(its `unmet` filter). `moveOutcome` gained a fourth parameter, `ticketFields: Record<string, FieldClaim>`;
+a declared edge is `direct` only once every `require-field` rule on it reads satisfied through that
+predicate, and `needs-dialog` otherwise. `require-comment`/`require-evidence` are unaffected — neither has
+an "already satisfied" reading before a submission exists, so either still always answers `needs-dialog`.
+`restrict-to`/`require-different-user`-only edges still always answer `needs-dialog` too — recorded this
+time as a DELIBERATE choice (Ruling 25), considered and rejected routing to `direct`, not the same shape
+of gap `require-field` was.
+
+**Regression proof, not just new coverage.** The full `transition-dialog.test.tsx` suite (21/21) was
+re-run after refactoring the dialog onto the shared predicate — unchanged and green, confirming the
+extraction changed nothing about the dialog's own behaviour, only where the check lives. The full
+`packages/app-core` suite (82 files, 1239 tests) was re-run too: green.
+
+**Mutation-witnessed** (`board-moves.ts`'s `unmet` filter edited to treat every `require-field` rule as
+always unmet — `ticketFields` read but not applied — re-run, then reverted with a targeted `Edit`,
+`git diff --stat` confirmed empty after). Prediction, written before running: reddens `13.486` alone;
+`13.487` and all eight `13.478`–`13.485` cases stay green. Result matched exactly — 9/10 green, `13.486`
+failed with `expected { kind: 'direct', toStateId: 'doing' }` and received `{ kind: 'needs-dialog', toStateId:
+'doing' }`.
+
+- **13.486** ✅ A `require-field` edge whose field the ticket ALREADY carries a value for (mirroring
+  `transition-dialog.test.tsx`'s own "a required field the ticket ALREADY carries is not re-asked" scenario
+  one layer up, same field name and claim shape) answers `direct`, not `needs-dialog`. — (`packages/
+  app-core/src/views/board-moves.ts`, `packages/app-core/src/views/field-claims.ts`,
+  `packages/app-core/test/views/board-moves.test.ts`)
+- **13.487** ✅ THE CONTROL 13.486 needs: the identical edge with the field UNCLAIMED still answers
+  `needs-dialog` — without it, an implementation that always answered `direct` for `require-field`, or that
+  accepted `ticketFields` and silently ignored it, would pass 13.486 for the wrong reason. — (same files)

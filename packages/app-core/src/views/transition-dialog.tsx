@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FieldClaim, WorkflowDef } from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 import type { PrecheckResult } from '../precheck.js';
+import { fieldAlreadyClaimed } from './field-claims.js';
 
 type TransitionRules = WorkflowDef['transitions'][number]['rules'];
 
@@ -124,8 +125,11 @@ export function TransitionDialog({
   const needsComment = rules.some((rule) => rule.kind === 'require-comment');
   const needsEvidence = rules.some((rule) => rule.kind === 'require-evidence');
   const requiredFields = rules.flatMap((rule) => (rule.kind === 'require-field' ? [rule.field] : []));
+  // `fieldAlreadyClaimed` (`field-claims.ts`) is the SAME predicate
+  // `moveOutcome`'s gate reads (Task 12, Ruling 25) — extracted so the two
+  // never derive "is this field already satisfied" two different ways.
   const missingFields = requiredFields.filter(
-    (field) => ticketFields[field]?.value == null && (fieldValues[field] ?? '') === '',
+    (field) => !fieldAlreadyClaimed(ticketFields, field) && (fieldValues[field] ?? '') === '',
   );
 
   // The same ref idiom `useLiveQuery` uses, and for the same reason: `precheck`
@@ -199,7 +203,7 @@ export function TransitionDialog({
       ) : null}
 
       {requiredFields.map((field) =>
-        ticketFields[field]?.value != null ? null : (
+        fieldAlreadyClaimed(ticketFields, field) ? null : (
           <label key={field} className="gn-transition__field">
             {`${field} (required before this transition)`}
             <input

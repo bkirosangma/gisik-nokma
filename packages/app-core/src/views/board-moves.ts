@@ -1,4 +1,5 @@
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import type { FieldClaim, WorkflowDef } from '@gisik-nokma/domain';
+import { fieldAlreadyClaimed } from './field-claims.js';
 import { transitionOptions } from './transition-dialog.js';
 
 /**
@@ -34,37 +35,55 @@ export type MoveOutcome =
  * already excludes) → `refused`, carrying every OTHER move that state
  * really offers, so the caller can name them rather than just saying no.
  *
- * A declared edge with `rules.length === 0` → `direct`: submit it as-is.
- * Any rules at all → `needs-dialog`.
+ * A declared edge whose rules are all already MET, given `ticketFields` →
+ * `direct`: submit it as-is. Any rule still unmet → `needs-dialog`.
  *
- * **`rules.length === 0` is the plain reading, not the complement of
- * "demands input."** Two rule kinds — `restrict-to` and
- * `require-different-user` — are SERVER-DECIDED: `TransitionDialog` renders
- * only an advisory notice for them (`transition-dialog.tsx:241-248`) and
- * they contribute nothing to its own `blocked` computation
- * (`transition-dialog.tsx:160-164`). An edge carrying only one of those
- * still routes here to `needs-dialog` and opens a dialog that prompts for
- * zero fields. That is deliberate: this three-outcome signature has no
- * fourth case to give that combination its own name, and erring toward the
- * dialog's "the server decides" notice is safer than a `direct` submit the
- * server may then refuse with no explanation anywhere on screen.
+ * **`require-field` is checked against `ticketFields`, the same way
+ * `TransitionDialog` checks it (Ruling 25).** `fieldAlreadyClaimed`
+ * (`field-claims.ts`) is the ONE shared predicate both this gate and the
+ * dialog read — `TransitionDialog` was refactored onto it in the same
+ * change that added `ticketFields` here, so the two provably never derive
+ * "is this field already satisfied" two different ways. An edge whose only
+ * rule is `require-field` on a field the ticket already carries a value for
+ * is `direct` — opening a dialog with nothing left to fill in would be the
+ * exact fork this module exists to avoid, arriving from the other side (the
+ * gate disagreeing with the dialog it opens, rather than with the engine).
  *
- * **A second gap, left for the caller on purpose.** `require-field` only
- * truly needs a dialog when the ticket does not already hold that field's
- * value — `TransitionDialog` itself skips the input for a field already
- * claimed (`transition-dialog.tsx:201-213`). `moveOutcome` never receives
- * `ticketFields`, so it cannot make that refinement; it answers
- * `needs-dialog` for any `require-field` rule, correct but conservative.
- * Task 13/14 callers that want the sharper answer must add that check
- * themselves, against the ticket they actually have.
+ * **`require-comment` and `require-evidence` are always unmet here.**
+ * Neither has an "already satisfied" reading before a submission exists — a
+ * transition's comment or evidence attachment is supplied AT the moment of
+ * submitting, never held in advance on the ticket — so any edge carrying
+ * either always answers `needs-dialog`, regardless of `ticketFields`.
+ *
+ * **`restrict-to` and `require-different-user` always answer `needs-dialog`
+ * too — a DELIBERATE decision (Ruling 25), not an oversight.** Both are
+ * SERVER-DECIDED: this client cannot evaluate a roles/membership check or an
+ * "actor must differ" check, so it can never certify either satisfied.
+ * Routing such an edge to `direct` would mean submitting blind, and the
+ * server's refusal then needs a display path — Tasks 13/14 (arrows,
+ * drag-and-drop) were never scoped to carry `serverRefusal` the way
+ * `TicketSheet`/`TransitionDialog` do. `TransitionDialog` itself renders
+ * only an advisory notice for these two kinds (`transition-dialog.tsx:
+ * 241-248`) and they contribute nothing to ITS OWN `blocked` computation, so
+ * the dialog `needs-dialog` opens here shows that notice and a Move button
+ * with nothing else to fill in. Mildly redundant, never wrong — considered
+ * and rejected routing these to `direct` for exactly the reason above.
  */
-export function moveOutcome(def: WorkflowDef, fromStateId: string, toStateId: string): MoveOutcome {
+export function moveOutcome(
+  def: WorkflowDef,
+  fromStateId: string,
+  toStateId: string,
+  ticketFields: Record<string, FieldClaim>,
+): MoveOutcome {
   const options = transitionOptions(def, fromStateId);
   const selected = options.find((option) => option.toStateId === toStateId);
   if (selected === undefined) {
     return { kind: 'refused', available: options.map((option) => option.toStateId) };
   }
-  return selected.rules.length === 0
+  const unmet = selected.rules.filter((rule) =>
+    rule.kind === 'require-field' ? !fieldAlreadyClaimed(ticketFields, rule.field) : true,
+  );
+  return unmet.length === 0
     ? { kind: 'direct', toStateId }
     : { kind: 'needs-dialog', toStateId };
 }
