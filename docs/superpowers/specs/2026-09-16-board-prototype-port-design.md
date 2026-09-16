@@ -112,6 +112,31 @@ three of them are viewport specs — any change to it must be checked against th
 The four view components are exported from `packages/app-core/src/index.ts` but
 mounted **only** by the board page. Nothing else in the repo imports them.
 
+### The `gn-*view*` grep has a hole, and it is the shared components
+
+That grep finds classes whose names *start* with a view prefix. It cannot find
+the shared component classes these views render through, and those are not inert
+anywhere:
+
+- `board.tsx:2` imports `Avatar, Card, Chip`; `:150` renders
+  `<Card className="gn-board-card">`, and `card.tsx:7` composes
+  `['gn-card', className]` — so today the board card **is** a `.gn-card`, with
+  no `.gn-board-card` rule of its own anywhere in `ui.css`.
+- `ticket-list.tsx:2` imports `Avatar, Chip, Select, Table`.
+
+`.gn-card` is `padding: 0.75rem` (12px); the prototype's board card is 14px
+(Metrics, board table). **That 2px cannot be taken out of `.gn-card`** — it would
+move every card in the product, desktop included.
+
+**The rule for this port:** view styling lands on the view-scoped selector
+(`.gn-board-card`, `.gn-list-*`, …), never by editing `.gn-card`, `.gn-chip`,
+`.gn-avatar`, `.gn-table` or `.gn-select`. Those are shared surfaces. If a
+prototype metric turns out to be reachable *only* through a shared rule, that
+edit stops being part of the port and gets justified individually as a component
+improvement, the way the `/workspaces` spec handled its shared-surface edits.
+`.gn-chip` is the case that already went the right way: it matches the prototype
+exactly (see "What already matches"), so nothing needs to be done to it.
+
 ## The two systems this page gains
 
 ### Narrowing is two layers, and the UI must say which
@@ -152,6 +177,22 @@ When the server narrowing is on, `M` is *itself* narrowed — so the strip says 
 rather than presenting `M` as the project's total. A bare `N of M` under an
 active server narrowing would assert the project holds `M` tickets when it holds
 more, which is the `?? []` failure in a different costume.
+
+**The disclosure invariant, stated once for both mechanisms.** `board.tsx:42-46`
+holds that a rearrangement which drops a card "is a filter wearing a grouping's
+name, and the ticket it dropped is gone with nothing saying so". Two things in
+this change can drop a card from view: the **client filter** (T3) and the
+**workflow picker** (T4). Ruling R3 keeps the picker's *resting* state total by
+defaulting it to `All workflows`, but a default is not a guarantee — the moment
+either mechanism is engaged, cards leave the screen.
+
+> **Invariant:** no mechanism that removes cards from view may render without
+> both (a) the `N of M shown` count and (b) a removable chip naming what is
+> hidden. Neither half ships without the other, and neither mechanism is exempt.
+
+That pairing is what discharges `board.tsx:42-46` — not R3's default. It is one
+invariant over two features, so T3 and T4 satisfy the same requirement rather
+than each inventing its own disclosure.
 
 **Search is client-side, and this is a decision rather than an omission.**
 `filterSpecSchema` does carry a `text` axis, so a wire search is expressible. It
@@ -322,6 +363,40 @@ measurement at `:287`. Measured in **both themes × all three styles** — and f
 `tintPurple` the ground is the calendar day cell (`cardBg` in month, `fill4`
 out), which is two grounds, not one.
 
+## One open question for the owner: the board that has columns but no cards
+
+The per-column empty card (prototype, board metrics) and `EMPTY_BOARD_COPY` were
+described in this spec as covering different granularities, so no existing test
+changes meaning. Measuring the third case shows that framing is incomplete.
+
+`board.tsx:70` is the only site that renders `EMPTY_BOARD_COPY`, and its
+condition is `board.groups.length === 0`. Columns are exactly the attached
+workflow's states, and empty ones render (`:38`). There is **no per-group or
+per-column empty branch today** — grep finds none. So a project that *has* a
+workflow attached and *zero* tickets takes `groups.length === 1`, skips the
+pinned sentence entirely, and draws a rail of empty column trays.
+
+After T4 that becomes a rail of six empty-state cards, still with no whole-board
+sentence. `board.tsx:70`'s own docblock says an empty board must say something
+because "a page that had loaded, had refused nothing, and said nothing" cannot be
+told from one still painting. Six empty column cards may re-create exactly that
+failure one layer down.
+
+**Recommendation — extend the condition, keep the rail.** Show the pinned
+sentence and its create button *above* a rail that still renders, whenever the
+board holds zero cards in total rather than only when it holds zero groups. The
+rail is worth keeping in that state because it is the one place the attached
+workflow's states are visible. `groups.length === 0` implies `totalCards === 0`,
+so this is a strict superset and the existing assertion on the pinned copy stays
+green and unmodified; `EMPTY_BOARD_COPY`'s text does not change.
+
+**The alternative** is to leave the condition alone and let the per-column cards
+carry it — fewer moving parts, and the rail is arguably self-explanatory to
+someone who just attached the workflow.
+
+This is a product call, not a mechanical one. T4 is written against the
+recommendation; a ruling the other way changes T4 only.
+
 ## Tasks
 
 ### T0 — Read the prototype's style blocks
@@ -348,8 +423,11 @@ Filters button is a button that lies.
 
 ### T4 — Board view
 Columns as trays, cards, per-column empty state, and the workflow picker with
-`All workflows` defaulted (R3). The picker's narrowing shows its count and a
-removable chip naming what is hidden.
+`All workflows` defaulted (R3). The picker satisfies the **disclosure invariant**
+above — the same one T3 satisfies, not a second one. Card styling lands on
+`.gn-board-card`; `.gn-card` is not touched (Blast radius). Includes the
+zero-cards-with-columns behaviour per the open question above, written against
+the recommendation there.
 
 ### T5 — List, Calendar, Timeline
 Restyle per the metrics tables. The calendar legend is the R4 merge. The
@@ -357,7 +435,11 @@ timeline's undrawn list keeps its per-reason modifier classes.
 
 ### T6 — Board writes
 Drag-and-drop and the arrows, through the four-step gate above. The refusal path
-is built first, because it is the one a wrong target hits.
+is built first, because it is the one a wrong target hits — **and it ships with a
+positive control in the same change**: a drop onto a declared, rules-free edge
+that actually transitions the ticket. A refusal that fires on everything is
+indistinguishable from a refusal that works, and only the successful drop tells
+the two apart.
 
 ### T7 — Docs
 `Features.md` and the owning `test-cases/` files, in the same change set —
