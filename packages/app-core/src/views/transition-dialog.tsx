@@ -86,6 +86,31 @@ export type TransitionDialogProps = {
   precheck: (toStateId: string) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
+  /**
+   * The opposite of an answer — Ruling 27 (board-prototype-port, 2026-09-16).
+   * `serverRefusal` above is documented, in this exact file, as "the
+   * authority's answer, shown VERBATIM". A dropped connection or an empty
+   * `ingest` response is not an answer at all: nobody adjudicated, so there is
+   * no verdict to carry verbatim. Before this ruling, `MoveArrows` (`board.tsx`)
+   * built `{ rule: 'transport', … }`/`{ rule: 'no-response', … }` objects by
+   * hand and fed them into `serverRefusal` — never through this package's own
+   * `refuse()` (deliberately unexported, `rule-engine/src/index.ts:32-41`, for
+   * exactly this reason: "a consumer outside this package has no business
+   * minting a `Refusal`"), but arriving at the identical forbidden result
+   * through a different door: a plain client-built object, shaped like a
+   * refusal, rendered through the identical "Refused by the server — …"
+   * sentence a REAL refusal uses. A reader could not tell "the server said no"
+   * from "we never heard back", and the two call for opposite next actions —
+   * fix the thing the server objected to, versus retry.
+   *
+   * This prop carries a PLAIN SENTENCE, never a `{ rule, reason }` pair, so it
+   * cannot accidentally be mistaken for a `Refusal`-shaped value at the type
+   * level either. Rendered in its own alert, its own CSS class
+   * (`gn-refusal--transport`, reusing the `warning` tone `.gn-refusal--preview`
+   * already uses — amber, not the danger-red `--server` wears), and never
+   * alongside the words "Refused by the server".
+   */
+  transportError: string | null;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
 };
 
@@ -111,6 +136,7 @@ export function TransitionDialog({
   onSubmit,
   precheck,
   serverRefusal,
+  transportError,
   uploadEvidence,
 }: TransitionDialogProps) {
   const options = transitionOptions(workflow, fromStateId);
@@ -260,6 +286,14 @@ export function TransitionDialog({
       {serverRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+        </p>
+      ) : null}
+
+      {/* Ruling 27 — never the same sentence, never the same class, never a
+          `{rule, reason}` pair: see this prop's own docblock above. */}
+      {transportError !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--transport">
+          {transportError}
         </p>
       ) : null}
 

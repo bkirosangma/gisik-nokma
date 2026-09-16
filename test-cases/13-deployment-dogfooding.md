@@ -5371,3 +5371,89 @@ unilaterally.
 
 `node scripts/check-case-ids.mjs` re-run after minting `13.505`: duplicate list unchanged at
 `13.387`/`13.413` only.
+
+## Ruling 27 (coordinator, 2026-09-16) — the client was minting refusals
+
+The coordinator's own review of Task 13's four commits found what the third review round above (concern 5
+in the task report) treated as a documented, deliberately-unfixed judgment call was actually a real
+violation of `rule-engine/src/index.ts:32-41`'s own stated door: "`refuse()` and `ACCEPT`... stay internal…
+a consumer outside this package has no business minting a `Refusal`, and exporting them would hand every
+client a way to fabricate a verdict that looks engine-made". `board.tsx` never imported `refuse()` — it
+built `{ rule: 'no-response'|'transport', reason }` objects by hand instead, and fed them into
+`serverRefusal`, the SAME channel `TransitionDialog`'s own docblock calls "the authority's answer, shown
+VERBATIM whenever present." Neither `no-response` nor `transport` exists in `REFUSAL_RULES`
+(`rule-engine/src/refusal-rules.ts:9-25`, fifteen real entries). A dropped connection or an empty `ingest`
+response rendered through the identical `Refused by the server — ${rule}: ${reason}` sentence a real
+refusal uses — indistinguishable from an actual server verdict, and calling for the opposite next action
+(retry, not "fix the thing the server objected to").
+
+**The fix: a wholly separate channel, never a `{rule, reason}` pair.** `MoveArrows` (`board.tsx`) gained a
+new `transportError: string | null` state, kept SEPARATE from `serverRefusal` rather than merged into it
+with a `kind` tag — `serverRefusal` now carries ONLY what `moveOutcome`'s gate or a real `IngestResult`
+actually said; `transportError` carries a plain sentence for the two cases where nobody adjudicated at all.
+`TransitionDialog` (`transition-dialog.tsx`) gained the identical `transportError: string | null` prop
+(now REQUIRED, matching `serverRefusal`'s own required shape — every caller must consciously pass `null`
+rather than silently defaulting), rendered in its own `<p role="alert" className="gn-refusal
+gn-refusal--transport">`, never alongside "Refused by the server". `ui.css` gained `.gn-refusal--transport`,
+reusing the `warning` role `.gn-refusal--preview` already uses (amber, not `--server`'s danger-red) — the
+same "not the authority speaking" register, a different reason. `ticket-sheet.tsx`'s own
+`TransitionDialog` mount passes `transportError={null}`, with a comment explaining why: `TicketSheet.
+submitTransition` stays unguarded (an unhandled promise rejection on a transport failure, the existing,
+untouched precedent `board.tsx`'s own docblocks already cite) — it never fabricated a refusal either, it
+just never caught the rejection at all, so there is nothing to pass but `null`. No import of `refuse()`/
+`ACCEPT` anywhere — the fix stays on the "never mint a verdict" side of the door the ruling quotes, not a
+smaller violation of it.
+
+**Wording:** the "silence" case (`results[0] === undefined`) keeps its exact original sentence, moved to
+the new channel — `"The server did not answer this move."` The "transport failure" case (a rejected
+`ingest`) is new — `` `We could not reach the server for this move — ${message}` ``.
+
+**On `13.504`: amended, and the amendment is quoted, not just described, per the coordinator's own
+instruction.**
+
+- **BEFORE:** `expect(screen.getByRole('alert')).toHaveTextContent('network unreachable')` — one substring
+  check.
+- **Measured, not assumed, that this did NOT organically redden under Ruling 27's fix** (the coordinator
+  expected it would): the new sentence — `"We could not reach the server for this move — network
+  unreachable"` — still CONTAINS the substring `'network unreachable'`, so the old assertion passed under
+  BOTH the defective rendering and the fixed one. Running the full affected suite (`board-moves-ui.
+  test.tsx` + `transition-dialog.test.tsx`) against the fix with the assertion still in its pre-amendment
+  shape confirmed this directly: `PASS (29) FAIL (0)`. The test was too weak to catch the defect it was
+  never written to look for — it checked that SOME message with the right substring appeared, never that
+  the message avoided claiming server authority it did not have.
+- **AFTER:** the alert is captured once and checked four ways — `toHaveTextContent('We could not reach the
+  server for this move')`, `toHaveTextContent('network unreachable')`, `not.toHaveTextContent('Refused by
+  the server')`, `toHaveClass('gn-refusal--transport')`, `not.toHaveClass('gn-refusal--server')` — plus the
+  original "arrows stay usable" assertion, unchanged. `13.505` (the `submitFromDialog` sibling) got the
+  identical amendment for the identical reason, quoted the same way in its own docblock.
+- **Mutation witness, run against the fix itself rather than assumed correct:** `board.tsx`,
+  `transition-dialog.tsx`, and `ticket-sheet.tsx` reverted in place to their exact pre-Ruling-27 content
+  (`git show f5041052:<path>`, the last commit before this ruling), the two affected test files re-run.
+  Result: `PASS (27) FAIL (3)` — exactly the three cases touched by this ruling (amended `13.504`, the new
+  `13.506` below, amended `13.505`) and nothing else. The failure text is the ruling's own defect, produced
+  by the actual reverted code rather than described secondhand: `13.504` and `13.505` both failed with
+  `Received: "Refused by the server — transport: network unreachable"`; the new case failed with `Received:
+  "Refused by the server — no-response: The server did not answer this move."` — direct proof the
+  pre-ruling code fabricated BOTH `rule: 'transport'` and `rule: 'no-response'`, not only the one the
+  coordinator's file:line citations named first. Files restored byte-identical afterward (`diff` against a
+  pre-revert backup of each, confirmed clean) and the full suite re-confirmed green.
+
+- **13.506** ✅ (new, no prior coverage existed of this path in this file) — `submitDirect`'s "silence"
+  case: `ingest` answers with an empty array, so `results[0]` is `undefined` and nobody adjudicated. Same
+  channel, same distinguishing assertions as amended `13.504`, checked against `"The server did not answer
+  this move."` instead of the transport sentence. — (`packages/app-core/src/views/board.tsx`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`)
+
+**Case IDs `13.506` minted here**, continuing from `13.505` (verified against `scripts/check-case-ids.mjs`'s
+real sweep, not this file's own prose). `packages/app-core/test/views/transition-dialog.test.tsx`'s shared
+`renderDialog` helper gained a `transportError={null}` default (the prop is now required on
+`TransitionDialogProps`) — no new case minted there: `13.505`'s amended assertions already exercise
+`TransitionDialog`'s own `transportError` rendering through the real dialog (`within(dialog).getByRole(
+'alert')`), so a second, isolated unit test of the identical render branch would be a redundant guard
+rather than new coverage — the exact shape this repo's own case-review discipline warns against minting
+for its own sake.
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node `v22.23.2`). Full `packages/app-core`
+suite: 85 files, 1266 tests, green (up from 1265 — the one new case, nothing lost). `node
+scripts/check-case-ids.mjs` re-run after minting `13.506`: duplicate list unchanged at `13.387`/`13.413`
+only.

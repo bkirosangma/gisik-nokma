@@ -419,6 +419,14 @@ export function TicketSheet({
           onSubmit={(submission) => void submitTransition(submission)}
           precheck={precheck}
           serverRefusal={serverRefusal}
+          // `submitTransition` above stays unguarded (see its own docblock
+          // precedent, cited by `board.tsx`'s `submitDirect`/`submitFromDialog`)
+          // — a rejected `ingest` here is an unhandled promise rejection, not a
+          // state this component tracks, so there is nothing to pass but `null`.
+          // Not Ruling 27's scope: that ruling is about a fabricated `{rule,
+          // reason}` pair standing in for a real refusal, which this file never
+          // did — it just never caught the rejection at all.
+          transportError={null}
           uploadEvidence={uploadEvidence}
         />
       ) : null}

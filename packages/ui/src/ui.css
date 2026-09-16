@@ -839,6 +839,11 @@
    16% grey; tone comes from the left rule, which is a fill, not a border. */
 .gn-refusal--preview { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 .gn-refusal--server  { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger);  color: var(--gn-text); }
+/* Ruling 27 (board-prototype-port, 2026-09-16): a dropped connection or an
+   empty ingest response is not a verdict, so it never wears `--server`'s
+   danger-red rule. Shares `--preview`'s tone instead (`--gn-warning`, amber) —
+   the same "this is not the authority speaking" register, a different reason. */
+.gn-refusal--transport { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 
 .gn-attachments { list-style: none; margin: 0.8rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-attachment { display: flex; flex-direction: column; gap: 0.1rem; }

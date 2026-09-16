@@ -634,6 +634,22 @@ function MoveArrows({
 }) {
   const [refusal, setRefusal] = useState<{ available: string[] } | null>(null);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  /**
+   * Ruling 27 (board-prototype-port, 2026-09-16) — kept SEPARATE from
+   * `serverRefusal` on purpose, not merged into it with an extra `kind` tag.
+   * `serverRefusal` carries only what the engine actually said (a real
+   * `{rule, reason}` pair, `refuse()`'s own shape, never minted by this
+   * component); this carries a PLAIN SENTENCE for the two cases where nobody
+   * adjudicated at all — `ingest` rejected (a transport failure) or answered
+   * with no result for this event (`results[0] === undefined`). Before this
+   * ruling both were dressed as a `{rule: 'transport'|'no-response', reason}`
+   * pair and fed into `serverRefusal`, rendering through the identical
+   * "Refused by the server — …" sentence a real refusal uses — a dropped
+   * connection reading as though the server adjudicated the move and declined
+   * it. `TransitionDialog` gained the identical `transportError` prop for its
+   * own submit path, for the same reason.
+   */
+  const [transportError, setTransportError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -704,19 +720,25 @@ function MoveArrows({
       const results = await moves.dataSource.ingest([transition]);
       const result = results[0];
       if (result === undefined) {
+        // Ruling 27: silence, not a refusal — `transportError`, never
+        // `serverRefusal`, and never a hand-built `{rule, reason}` pair.
         if (mountedRef.current) {
-          setServerRefusal({ rule: 'no-response', reason: 'The server did not answer this move.' });
+          setTransportError('The server did not answer this move.');
         }
         return;
       }
       if (result.status === 'committed') {
         // `onMoved()` reaches the PARENT and is safe regardless of whether
         // this card is still mounted; only the local setter is gated.
-        if (mountedRef.current) setServerRefusal(null);
+        if (mountedRef.current) {
+          setServerRefusal(null);
+          setTransportError(null);
+        }
         moves.onMoved();
         return;
       }
       if (mountedRef.current) {
+        setTransportError(null);
         setServerRefusal(
           result.status === 'refused'
             ? { rule: result.rule, reason: result.reason }
@@ -724,11 +746,11 @@ function MoveArrows({
         );
       }
     } catch (cause) {
+      // Ruling 27: a transport failure is not a refusal either — same
+      // `transportError` channel, own sentence, never `serverRefusal`.
       if (mountedRef.current) {
-        setServerRefusal({
-          rule: 'transport',
-          reason: cause instanceof Error ? cause.message : String(cause),
-        });
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setTransportError(`We could not reach the server for this move — ${message}`);
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -746,6 +768,7 @@ function MoveArrows({
     if (submitting) return;
     setRefusal(null);
     setServerRefusal(null);
+    setTransportError(null);
     const outcome = moveOutcome(workflow, fromStateId, toStateId, {});
     if (outcome.kind === 'refused') {
       setRefusal({ available: outcome.available });
@@ -783,9 +806,12 @@ function MoveArrows({
    * in the tree would ever see a transport failure here — the dialog would
    * stay open with nothing on screen saying why, the same user-visible
    * symptom `13.504` fixed for the arrows, just behind the dialog instead.
-   * `TransitionDialog` already renders `serverRefusal` internally through
-   * its own `serverRefusal` prop (`transition-dialog.tsx:260-262`, the
-   * identical sentence), so this costs one `catch`, not a new display path.
+   * `TransitionDialog` already renders `serverRefusal` internally through its
+   * own `serverRefusal` prop (`transition-dialog.tsx:260-262`); Ruling 27
+   * (board-prototype-port, 2026-09-16) added the sibling `transportError` prop
+   * for exactly the case this `catch` reaches — a dropped connection is not a
+   * refusal, so it renders through that separate prop, its own sentence, its
+   * own CSS class, never dressed as the server's own verdict.
    */
   const submitFromDialog = async (submission: TransitionSubmission): Promise<void> => {
     const fieldEvents = Object.entries(submission.fieldValues).map(([fieldId, value]) =>
@@ -815,12 +841,14 @@ function MoveArrows({
         // parent and runs regardless; the two local setters are gated.
         if (mountedRef.current) {
           setServerRefusal(null);
+          setTransportError(null);
           setDialogOpen(false);
         }
         moves.onMoved();
         return;
       }
       if (mountedRef.current) {
+        setTransportError(null);
         setServerRefusal(
           failed.status === 'refused'
             ? { rule: failed.rule, reason: failed.reason }
@@ -828,11 +856,10 @@ function MoveArrows({
         );
       }
     } catch (cause) {
+      // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
       if (mountedRef.current) {
-        setServerRefusal({
-          rule: 'transport',
-          reason: cause instanceof Error ? cause.message : String(cause),
-        });
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setTransportError(`We could not reach the server for this move — ${message}`);
       }
     }
   };
@@ -875,6 +902,13 @@ function MoveArrows({
           {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
+      {/* Ruling 27 — a distinct sentence and a distinct class from the block
+          immediately above; never the words "Refused by the server". */}
+      {transportError !== null && !dialogOpen ? (
+        <p role="alert" className="gn-refusal gn-refusal--transport">
+          {transportError}
+        </p>
+      ) : null}
       <TransitionDialog
         open={dialogOpen}
         workflow={workflow}
@@ -883,10 +917,12 @@ function MoveArrows({
         onClose={() => {
           setDialogOpen(false);
           setServerRefusal(null);
+          setTransportError(null);
         }}
         onSubmit={(submission) => void submitFromDialog(submission)}
         precheck={precheck}
         serverRefusal={serverRefusal}
+        transportError={transportError}
         uploadEvidence={moves.uploadEvidence}
       />
     </div>

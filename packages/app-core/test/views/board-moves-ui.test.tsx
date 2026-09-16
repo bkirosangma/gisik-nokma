@@ -122,13 +122,29 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
    * `await`, so a rejection left both arrows `disabled` forever with nothing
    * on screen explaining why. Fixed with a `try/catch/finally`: `finally`
    * always resets `submitting`, and `catch` renders something rather than
-   * letting the rejection become an unhandled promise rejection. This test
-   * is the proof, not the fix's own reasoning: an `ingestScript` that throws
-   * simulates the transport failure, and the assertions are exactly the two
-   * facts a bricked card would violate — the arrows are usable again, and a
-   * message is on screen.
+   * letting the rejection become an unhandled promise rejection.
+   *
+   * **AMENDED for Ruling 27** (board-prototype-port, 2026-09-16; coordinator
+   * review, not caught by this task on its own). Quoting exactly what this
+   * case asserted BEFORE the amendment and what it asserts NOW, since a
+   * rewritten assertion in a diff says less than the two versions side by
+   * side:
+   *
+   * - BEFORE: `expect(screen.getByRole('alert')).toHaveTextContent('network
+   *   unreachable')` — one substring check. It PASSED under the pre-Ruling-27
+   *   code, which rendered "Refused by the server — transport: network
+   *   unreachable" (a transport failure dressed as the server's own verdict —
+   *   exactly Ruling 27's defect), because that sentence also contains the
+   *   substring "network unreachable". Measured, not assumed: running this
+   *   suite against the pre-amendment source left this case GREEN
+   *   (`PASS (29) FAIL (0)` across this file and `transition-dialog.test.tsx`
+   *   together) — the assertion never caught the defect because it never
+   *   checked for the words the defect actually produced.
+   * - NOW: asserts the corrected sentence IS present, the refusal-shaped
+   *   sentence and class are ABSENT, and the two original facts (arrows
+   *   usable again, something on screen) still hold.
    */
-  it('a rejected ingest does not brick the card — arrows stay usable and something is on screen', async () => {
+  it('a rejected ingest does not brick the card, and the message never claims to be the server\'s own verdict', async () => {
     const user = userEvent.setup();
     const { moves } = movesFor({}, WF_ERRAND, async () => {
       throw new Error('network unreachable');
@@ -139,10 +155,44 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
     await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    expect(screen.getByRole('alert')).toHaveTextContent('network unreachable');
-    // The bug this guards: `submitting` left `true` forever disables BOTH
-    // arrows permanently. Both must be usable again once the rejection
-    // settles — "next" specifically, since that is the one just clicked.
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('We could not reach the server for this move');
+    expect(alert).toHaveTextContent('network unreachable');
+    // Ruling 27's own words: a dropped connection must never render through
+    // the same sentence, or the same class, a real server refusal uses.
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
+    // The bug this case originally guarded: `submitting` left `true` forever
+    // disables BOTH arrows permanently. Both must be usable again once the
+    // rejection settles — "next" specifically, since that is the one just
+    // clicked.
+    expect(screen.getByRole('button', { name: 'Move to Doing' })).not.toBeDisabled();
+  });
+
+  /**
+   * 13.506 — the SIBLING case Ruling 27 also names and this file had zero
+   * coverage of before now: `results[0] === undefined` (`ingest` answers with
+   * no result at all for this event — "silence", the ruling's own word, as
+   * against `13.504`'s "a transport failure"). Both used to funnel into the
+   * identical fabricated `{rule: 'no-response'|'transport', reason}` pair;
+   * both now render through the same `transportError` channel with their own
+   * sentences, neither ever claiming to be the server's own verdict.
+   */
+  it('an ingest that answers with no result for this event is silence, not a refusal', async () => {
+    const user = userEvent.setup();
+    const { moves } = movesFor({}, WF_ERRAND, async () => []);
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('The server did not answer this move.');
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
     expect(screen.getByRole('button', { name: 'Move to Doing' })).not.toBeDisabled();
   });
 
@@ -224,13 +274,25 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
    * rejection — the dialog would stay open with nothing on screen saying it
    * failed. Reuses the same gated-edge setup as the test above so the dialog
    * opens and reaches its own `ingest` call; the `ingestScript` throws
-   * instead of resolving. Asserts the SAME two facts `13.504` asserts for the
-   * arrows: something is on screen naming the failure, and the control that
-   * triggers it is usable again — here, that the dialog's own alert appears
-   * (via its existing `serverRefusal` prop, `transition-dialog.tsx:260-262`)
-   * and the dialog stays OPEN rather than silently vanishing or bricking.
+   * instead of resolving.
+   *
+   * **AMENDED for Ruling 27** (board-prototype-port, 2026-09-16), the SAME
+   * amendment `13.504` got and for the identical reason — quoting before and
+   * after:
+   *
+   * - BEFORE: `expect(within(dialog).getByRole('alert')).toHaveTextContent(
+   *   'network unreachable')` — passed under the pre-Ruling-27 code, which
+   *   routed this failure through `TransitionDialog`'s `serverRefusal` prop
+   *   and rendered "Refused by the server — transport: network unreachable".
+   *   Measured, not assumed: this case also stayed GREEN against the
+   *   pre-amendment source (see `13.504`'s own note; same suite run,
+   *   `PASS (29) FAIL (0)`).
+   * - NOW: the alert is read off `TransitionDialog`'s NEW `transportError`
+   *   prop (`transition-dialog.tsx`) instead, asserted to carry the corrected
+   *   sentence, the `gn-refusal--transport` class, and neither the
+   *   refusal-shaped sentence nor its class.
    */
-  it('a rejected ingest from the dialog is shown, not swallowed as an unhandled rejection', async () => {
+  it('a rejected ingest from the dialog is shown, and never claims to be the server\'s own verdict', async () => {
     const user = userEvent.setup();
     const gated: WorkflowDef = {
       ...WF_ERRAND,
@@ -257,7 +319,12 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
     await user.click(within(dialog).getByRole('button', { name: 'Move' }));
 
     await waitFor(() => expect(within(dialog).getByRole('alert')).toBeInTheDocument());
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('network unreachable');
+    const alert = within(dialog).getByRole('alert');
+    expect(alert).toHaveTextContent('We could not reach the server for this move');
+    expect(alert).toHaveTextContent('network unreachable');
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
     expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
   });
 });

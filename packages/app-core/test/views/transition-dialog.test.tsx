@@ -156,6 +156,7 @@ function renderDialog(overrides: Partial<TransitionDialogProps> = {}) {
       onSubmit={onSubmit}
       precheck={async () => ({ kind: 'passed' })}
       serverRefusal={null}
+      transportError={null}
       {...overrides}
     />,
   );
