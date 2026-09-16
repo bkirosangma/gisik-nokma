@@ -2647,3 +2647,23 @@
   margin: 0;
   color: var(--gn-text-muted);
 }
+
+/* ── Project page chrome (board-prototype-port, Task 2, 2026-09-16). Metrics
+   from the spec's Page chrome table (`docs/superpowers/specs/2026-09-16-board-
+   prototype-port-design.md`, itself `desktop.dc.html:314-352`). No new token
+   roles — Task 1 of this port was STRUCK, so every `var(--gn-…)` below is one
+   already declared in `tokens.ts` (`--gn-text-muted` is `.gn-field__label`'s
+   own role a few hundred lines up in this same file).
+
+   `.gn-project__breadcrumb`, `.gn-project__title` and `.gn-project__summary`
+   are DECLARED HERE, UNCONSUMED: this page reads no project name anywhere
+   (`BoardView` is `{projectId, groups}`, and `DataSourceQuery` has no
+   `getProject`/`getProjects` method — only `getMyWorkspaces` carries project
+   names, on the workspace-home page, not here), and no task in this port's
+   plan wires one. Recorded rather than guessed at; a future task supplies the
+   read before these three rules render anything. */
+.gn-project { display: flex; flex-direction: column; gap: 0.875rem; padding: 0 2rem 1.5rem; }
+.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+.gn-project__summary { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }

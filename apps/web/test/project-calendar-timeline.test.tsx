@@ -130,7 +130,15 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
 }
 
 /**
- * Scoped to `.gn-view-tabs`, not a bare `screen.findAllByRole('tab')`.
+ * Scoped to `.gn-segmented`, not a bare `screen.findAllByRole('tab')`.
+ *
+ * RENAMED (board-prototype-port Task 2, 2026-09-16): the container was
+ * `.gn-view-tabs` until this task restyled it onto the shared
+ * `.gn-segmented`/`.gn-segmented__item` classes — same `role="tablist"`, same
+ * four `role="tab"` children, only the class changed. `.gn-view-tabs` no
+ * longer exists anywhere in this page's markup (see `page.tsx`'s own
+ * docblock on the change), so a selector still pointed at it would have
+ * thrown on a null container rather than reporting a readable failure.
  *
  * STALE AS OF the owner's `StyleToggle` move (2026-09-09): the second,
  * unrelated `role="tablist"` this scoping originally guarded against
@@ -151,7 +159,7 @@ async function viewTabs(): Promise<HTMLElement[]> {
   // `tab` that happen to share a label — a screen reader can, from the role
   // each carries.
   await screen.findByRole('tab', { name: 'Board' });
-  const container = document.querySelector('.gn-view-tabs') as HTMLElement;
+  const container = document.querySelector('.gn-segmented') as HTMLElement;
   return within(container).getAllByRole('tab');
 }
 
@@ -178,6 +186,32 @@ describe('the project page mounts four views over one list read', () => {
       'false',
       'true',
     ]);
+  });
+
+  /**
+   * 13.430 — the tab rail is the SHARED segmented control, not a page-local
+   * lookalike. `viewTabs()` already scopes by `.gn-segmented` (Task 2 of the
+   * board-prototype-port renamed the container from `.gn-view-tabs`), so a
+   * class-name typo or a reverted rename would already null out `container`
+   * and throw before this case's own assertions run — this case adds the one
+   * thing that check does not: that exactly the SELECTED tab, and only it,
+   * carries `.gn-segmented__item--on`, driven from the same `view === tab`
+   * expression that sets `aria-selected` (`page.tsx`), rather than two
+   * comparisons that could drift apart.
+   */
+  it('13.430 the selected tab, and only it, carries gn-segmented__item--on', async () => {
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    const onFlags = (tabs: HTMLElement[]) =>
+      tabs.map((tab) => tab.classList.contains('gn-segmented__item--on'));
+
+    expect(onFlags(await viewTabs())).toEqual([true, false, false, false]);
+
+    await openTab('Calendar');
+    expect(onFlags(await viewTabs())).toEqual([false, false, true, false]);
   });
 
   /**

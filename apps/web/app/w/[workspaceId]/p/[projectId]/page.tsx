@@ -456,7 +456,7 @@ function ProjectBoard() {
           // event: four panels would describe four.
           <ExpiredSessionNotice />
         ) : (
-          <>
+          <div className="gn-project">
             {/* `?? []` would render no strip at all, which reads as "nothing needs
                 attention" — see `src/shell-refusal.tsx`. */}
             {attention.error !== null ? (
@@ -505,40 +505,64 @@ function ProjectBoard() {
               ) : null}
             </div>
 
-            <div className="gn-view-tabs" role="tablist">
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'board'}
-                onClick={() => setView('board')}
-              >
-                Board
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'list'}
-                onClick={() => setView('list')}
-              >
-                List
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'calendar'}
-                onClick={() => setView('calendar')}
-              >
-                Calendar
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'timeline'}
-                onClick={() => setView('timeline')}
-              >
-                Timeline
-              </button>
-              {createRegion}
+            {/*
+              `.gn-project__header` — Task 2 of the prototype port. Produces the
+              container Task 4 (search), Task 8 (workflow `<select>`) and Task 5
+              (Filters) add their own controls to; New ticket is the one control
+              already built, so it moves in now rather than waiting for a later
+              task to relocate it.
+
+              MOVED OUT OF THE TABLIST, not merely reclassed: `createRegion` used
+              to render as the tablist's fifth child, a plain `<button>` (or a
+              `<p role="status">`) sitting inside a `role="tablist"` alongside four
+              `role="tab"` children — an ARIA violation `.gn-segmented`'s 2px-gap
+              flex track would only have made more visible. Every assertion this
+              page's tests make against `New ticket` queries `screen`/`within(dialog)`
+              directly rather than scoping from the tablist container, so the move
+              changes no test's reach (`page-refusals.test.tsx`,
+              `project-create-gate.test.tsx`).
+            */}
+            <div className="gn-project__header">{createRegion}</div>
+
+            {/*
+              The segmented control (`ui.css`'s shared `.gn-segmented` /
+              `.gn-segmented__item` / `.gn-segmented__item--on`), replacing the
+              page-local `.gn-view-tabs`. Same roles, same handlers — a restyle,
+              not a rebuild: `role="tablist"`/`role="tab"`/`aria-selected` are
+              unchanged, and each button still drives `setView` directly.
+
+              One boolean per tab feeds BOTH `aria-selected` and the `--on`
+              modifier class, rather than two `view === 'x'` comparisons that would
+              have to be kept in agreement by hand.
+
+              `.gn-view-tabs` survives nowhere else in the product after this
+              (`apps/web/app/globals.css`'s own docblock already said so — "survives
+              only on the project page"); its now-dead rules are left in place,
+              out of this task's file scope, and reported rather than deleted.
+            */}
+            <div className="gn-segmented" role="tablist">
+              {(
+                [
+                  ['board', 'Board'],
+                  ['list', 'List'],
+                  ['calendar', 'Calendar'],
+                  ['timeline', 'Timeline'],
+                ] as const
+              ).map(([tab, label]) => {
+                const selected = view === tab;
+                return (
+                  <button
+                    key={tab}
+                    role="tab"
+                    type="button"
+                    aria-selected={selected}
+                    className={`gn-segmented__item${selected ? ' gn-segmented__item--on' : ''}`}
+                    onClick={() => setView(tab)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
             {view === 'calendar' ? (
@@ -640,7 +664,7 @@ function ProjectBoard() {
             ) : (
               <p>Loading…</p>
             )}
-          </>
+          </div>
         )}
       </div>
 

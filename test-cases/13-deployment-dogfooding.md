@@ -4035,3 +4035,48 @@ the object literal intended. It reddened 22 cases, which looks like a strong wit
 the code under test was malformed rather than reverted. A mutation must be the code that plausibly
 SHIPS, and a failure count far larger than expected is a reason to re-read the mutant, not to record a
 result.
+
+### Round 27 — the project/board page's desktop-prototype-port begins: page chrome (`/w/[workspaceId]/p/[projectId]`)
+
+**Block `13.430` minted here; the next free BLOCK is `13.431`.** Task 2 of
+`docs/superpowers/plans/2026-09-16-board-prototype-port.md` (Task 1 was STRUCK — see the plan's
+Progress log — so this is the port's first landed code). Restyles the page's existing chrome rather
+than rebuilding it: `role="tablist"`/`role="tab"`/`aria-selected` are unchanged throughout.
+
+**The tab rail becomes the shared segmented control.** The container's class moves from the
+page-local `.gn-view-tabs` to `.gn-segmented`, and each tab button gains `.gn-segmented__item` plus
+`.gn-segmented__item--on` when selected — the same classes `/sign-in`, `/account` and `/help` already
+share (`packages/ui/src/ui.css`). `.gn-view-tabs` now survives nowhere in the product;
+`apps/web/app/globals.css`'s own docblock had already recorded it as surviving "only on the project
+page", and its three now-dead rules are left in place rather than deleted — out of this task's file
+scope (`page.tsx` and `ui.css` only) and reported rather than silently removed.
+
+**The New-ticket control moves out of the tablist into a new `.gn-project__header` row.** It used to
+render as the tablist's fifth child — a plain `<button>` (or a `<p role="status">` while gated) sitting
+inside a `role="tablist"` beside four `role="tab"` children, an ARIA defect the 2px-gap segmented track
+would only have made more visible. `.gn-project__header` is the container Task 4 (search), Task 5
+(Filters) and Task 8 (the workflow `<select>`) add their own controls to; New ticket is the one already
+built, so it moves in now. No test scopes a `New ticket` query from the tablist container — both
+`page-refusals.test.tsx` and `project-create-gate.test.tsx` query `screen` (or `within(dialog)`)
+directly — so the move changes no test's reach.
+
+**`.gn-project`, `.gn-project__breadcrumb`, `.gn-project__title` and `.gn-project__summary` are
+declared in `ui.css` per the spec's Page-chrome metrics table, and are UNCONSUMED here.** This page
+reads no project name anywhere: `BoardView` is `{projectId, groups}` (`view-types.ts:139`), and
+`DataSourceQuery` has thirteen methods, none named `getProject`/`getProjects` — only
+`getMyWorkspaces()` carries project names, and only on the workspace-home page
+(`apps/web/app/w/[workspaceId]/page.tsx`), not here. Grepped across every task in the port's plan:
+no task ever references `.gn-project__breadcrumb`/`__title`/`__summary` outside this one CSS-declaring
+step. Recorded rather than guessed at — a future task (not yet in this plan) owes the read before
+these three rules render anything real; `.gn-project` itself IS consumed, as the page's own content
+wrapper (`padding`/`column`/`gap`, nested inside the existing `.gn-shell__main`, not merged onto it —
+the two files' rules would otherwise cascade-order against each other).
+
+- **13.430** ✅ The selected tab, and only it, carries `gn-segmented__item--on`, driven from the same
+  boolean that sets `aria-selected` rather than two comparisons kept in agreement by hand.
+  — (`apps/web/test/project-calendar-timeline.test.tsx`)
+
+No new token roles: Task 1 was struck, so every `var(--gn-…)` referenced above (`--gn-text-muted`)
+was already declared before this change — the same role `.gn-field__label` already reads in the same
+file. `packages/ui/test/tokens.test.ts`'s role-existence guard and `token-discipline.test.ts`'s
+no-literal-colours guard both pass unchanged.
