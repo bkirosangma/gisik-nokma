@@ -12,6 +12,7 @@ import {
   TicketSheet,
   TimelineView,
   matchesBoardCard,
+  matchesListRow,
   useAttention,
   useBoard,
   useLiveQuery,
@@ -20,6 +21,7 @@ import {
   type BoardFilterSpec,
   type FilterSpec,
   type GroupLabels,
+  type ListFilterSpec,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { Avatar } from '@gisik-nokma/ui';
@@ -27,11 +29,13 @@ import { AppNav } from '../../../../../src/app-nav.js';
 import {
   buildFilterChips,
   describeUnappliedBoardAxes,
+  describeUnappliedListAxes,
   shouldRenderNarrowingStrip,
   type BoardFilterChip,
 } from '../../../../../src/board-search-scope.js';
 import { choiceMode, withCycledId } from '../../../../../src/filter-cycle.js';
-import { TriStateChoice } from '../../../../../src/tri-state-choice.js';
+import { listNarrowingWord } from '../../../../../src/list-narrowing-word.js';
+import { ChoiceGlyph, TriStateChoice } from '../../../../../src/tri-state-choice.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
 import {
@@ -420,6 +424,59 @@ function ProjectBoard() {
     () => describeUnappliedBoardAxes(filter),
     [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields, filter.exclude],
   );
+
+  /**
+   * THE LIST'S OWN ENUMERATION of `ListFilterSpec` axes from `filter`
+   * (exclude-mode spec §3) — beside `boardFilter`'s, the same "one object
+   * literal per view to update" discipline. `collaboratorIds` dropped from
+   * both halves (`ListFilterSpec` cannot carry it; `listUnappliedAxes` below
+   * discloses it); the due bounds and `fields` INCLUDED, because a list row
+   * can answer them even though no control sets them yet.
+   */
+  const listFilterSpec: ListFilterSpec = useMemo(
+    () => ({
+      text: filter.text,
+      assigneeIds: filter.assigneeIds,
+      typeIds: filter.typeIds,
+      stateIds: filter.stateIds,
+      stateCategories: filter.stateCategories,
+      projectIds: filter.projectIds,
+      dueBefore: filter.dueBefore,
+      dueAfter: filter.dueAfter,
+      fields: filter.fields,
+      exclude:
+        filter.exclude === undefined
+          ? undefined
+          : {
+              assigneeIds: filter.exclude.assigneeIds,
+              typeIds: filter.exclude.typeIds,
+              stateIds: filter.exclude.stateIds,
+              stateCategories: filter.exclude.stateCategories,
+              projectIds: filter.exclude.projectIds,
+            },
+    }),
+    [filter],
+  );
+
+  /**
+   * THE LIST NARROWING (exclude-mode spec §3): `list.rows` through
+   * `matchesListRow` ONCE, and List, Calendar and Timeline all read
+   * `listNarrowing.rows`. `null` while the list has not answered — the three
+   * arms below already gate on `list.rows !== null`, and this mirrors it.
+   * `parentCandidates` and `labels.epicTitle` keep reading `list.rows`
+   * UNnarrowed on purpose: a parent picker that hid tickets because of a view
+   * filter would be the "page asserts they do not exist" failure this shell
+   * refuses, and an epic the filter dropped must still name itself above its
+   * surviving children.
+   */
+  const listNarrowing = useMemo(() => {
+    if (list.rows === null) return null;
+    const rows = list.rows.filter((row) => matchesListRow(row, projectId, listFilterSpec));
+    return { rows, shown: rows.length, total: list.rows.length };
+  }, [list.rows, listFilterSpec, projectId]);
+
+  const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
+
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
    *
@@ -538,24 +595,31 @@ function ProjectBoard() {
   );
 
   /**
-   * `list.rows === null ? [] : …` and NOT `list.rows ?? []`, for the reason the
-   * `parentCandidates` note below gives at length: the two spellings agree here
-   * only because the arms that render these inputs are gated on `list.rows !==
-   * null` themselves. The gate is the guarantee; this expression never carries
-   * an empty array into a view.
+   * `listNarrowing === null ? [] : …` and NOT `list.rows ?? []`, for the
+   * reason the `parentCandidates` note below gives at length: the two
+   * spellings agree here only because the arms that render these inputs are
+   * gated on `list.rows !== null` themselves. The gate is the guarantee; this
+   * expression never carries an empty array into a view.
+   *
+   * Reads `listNarrowing.rows`, not `list.rows`, since 2026-09-17
+   * (exclude-mode spec §3): the Calendar and Timeline tabs draw from the SAME
+   * narrowed rows the List tab's own count and strip report, rather than the
+   * complete unnarrowed set — the whole point of the filter reaching every
+   * tab. `listNarrowing` is non-null exactly when `list.rows` is (see its own
+   * docblock above), so this mirrors the old gate precisely.
    */
   const dateInputs = useMemo<TicketDatesInput[]>(
     () =>
-      list.rows === null
+      listNarrowing === null
         ? []
-        : list.rows.map((row) =>
+        : listNarrowing.rows.map((row) =>
             toTicketDatesInput(
               row,
               { workspaceId, projectId },
               dateFieldsByType.get(row.typeId) ?? [],
             ),
           ),
-    [list.rows, workspaceId, projectId, dateFieldsByType],
+    [listNarrowing, workspaceId, projectId, dateFieldsByType],
   );
 
   /**
@@ -1140,123 +1204,82 @@ function ProjectBoard() {
               non-default pick regardless of whether the strip renders
               beside it, so nothing is lost; but the old sentence claimed
               more certainty than that.
+
+              PER TAB since 2026-09-17 (exclude-mode spec §3): Board reads
+              `boardNarrowing`/`boardUnappliedAxes` and the picker's chip; the
+              other three read `listNarrowing`/`listUnappliedAxes` and the
+              filter chips alone — the workflow picker narrows groups the
+              board renders and is meaningless elsewhere. One strip, rendered
+              once with per-tab inputs, never two.
             */}
-            {view === 'board' &&
-            boardNarrowing !== null &&
-            shouldRenderNarrowingStrip({
-              chipCount: activeFilterChips.length,
-              unappliedAxisCount: boardUnappliedAxes.length,
-              shown: boardNarrowing.shown,
-              total: boardNarrowing.total,
-            }) ? (
-              <div className="gn-project__narrowing" data-testid="board-narrowing">
-                <span className="gn-project__count" data-testid="board-narrowing-count">
-                  {boardNarrowing.shown} of {boardNarrowing.total} shown
-                </span>
-                {narrowingChips.map((chip) => (
-                  <span
-                    key={chip.key}
-                    className="gn-project__filter-chip"
-                    data-testid={`board-filter-chip-${chip.key}`}
-                  >
-                    {chip.label}
-                    <button
-                      type="button"
-                      className="gn-project__filter-chip-remove"
-                      onClick={chip.onRemove}
-                      aria-label={`Remove filter — ${chip.label}`}
+            {(() => {
+              const narrowing = view === 'board' ? boardNarrowing : listNarrowing;
+              const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
+              const chips = view === 'board' ? narrowingChips : activeFilterChips;
+              if (
+                narrowing === null ||
+                !shouldRenderNarrowingStrip({
+                  chipCount: activeFilterChips.length,
+                  unappliedAxisCount: unapplied.length,
+                  shown: narrowing.shown,
+                  total: narrowing.total,
+                })
+              ) {
+                return null;
+              }
+              return (
+                <div className="gn-project__narrowing" data-testid="board-narrowing">
+                  <span className="gn-project__count" data-testid="board-narrowing-count">
+                    {narrowing.shown} of {narrowing.total} shown
+                  </span>
+                  {chips.map((chip) => (
+                    <span
+                      key={chip.key}
+                      className={chip.mode === 'exclude' ? 'gn-project__filter-chip gn-project__filter-chip--exclude' : 'gn-project__filter-chip'}
+                      data-testid={`board-filter-chip-${chip.key}`}
                     >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                {boardUnappliedAxes.length > 0 ? (
-                  /**
-                   * THE LOCATION CLAUSE — REMOVED (Task 5). Task 4 shipped
-                   * "— set on the list tab, where a ticket carries the
-                   * field", written before this sheet existed and flagged in
-                   * that task's own report for re-verification once it
-                   * landed. It is not re-pointed at the Filters sheet:
-                   * `boardUnappliedAxes` can join UP TO THREE axis names in
-                   * one sentence (collaborator, due date, custom field), and
-                   * after this task only ONE of those three — collaborator —
-                   * has a control anywhere in the product, and it lives in
-                   * the Filters sheet, not the list tab. `dueBefore`/
-                   * `dueAfter`/`fields` remain unsettable anywhere today (see
-                   * `FiltersSheet`'s own docblock). A single trailing clause
-                   * cannot name a different true location per axis in a
-                   * joined list, and "set in the Filters sheet" would be
-                   * right for collaborator today and silently wrong for the
-                   * other two the moment either gains a control elsewhere —
-                   * exactly the "names the wrong place" failure this task
-                   * was asked to avoid. Saying only what is true (the axis is
-                   * not applied here) outlives whichever surface next grows a
-                   * control for the other two.
-                   */
-                  <span className="gn-project__scope-note" data-testid="board-scope-note">
-                    Not applied on the board: {boardUnappliedAxes.join(', ')}.
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/*
-              THE MIRROR NOTE (Task 4 fix round 1, coordinator Ruling 10;
-              WIDENED in the final whole-branch review's fix wave, Finding 1,
-              2026-09-16).
-
-              `matchesBoardCard` narrows the BOARD only — `useBoard` has no
-              way to be narrowed by anything else, and the spec's own search
-              ruling exists precisely because "one search box would then
-              answer differently on two tabs of one page" if it silently
-              filtered one and not the others. The `aria-label` on the
-              search box discloses this to a screen-reader user, but a
-              sighted person on List/Calendar/Timeline sees a search box,
-              types into it, and watches nothing happen — the SAME
-              asymmetry, from the other direction. This note is the fix:
-              on every tab BUT Board, when there is something set on
-              `filter` this tab does not apply, say so in words, beside the
-              existing "Only tickets in progress" note
-              (`.gn-list-filter__note`) rather than replacing it.
-
-              Ruling 10 gated this on `text` alone, because `text` was the
-              only axis with a control when it was written. Task 5's
-              Filters sheet then reached FIVE more axes
-              (`assigneeIds`/`typeIds`/`stateIds`/`stateCategories`/
-              `projectIds`) onto the SAME page-level `filter`, from every
-              tab — a `chip.key === 'text'` gate goes silently inert on all
-              five, the identical one-axis-enumeration defect
-              `buildFilterChips` was already rewritten to stop
-              repeating for the strip above. GATED NOW on
-              `activeFilterChips.length > 0 || boardUnappliedAxes.length >
-              0` — the SAME two terms the strip's own gate reads for the
-              board (`shouldRenderNarrowingStrip`'s first two), never
-              its third (`shown !== total`): that term is a fact about what
-              the BOARD rendered, meaningless on a tab the board never
-              touches. `activeFilterChips` already enumerates every
-              `BoardFilterSpec` axis (`buildFilterChips`'s own
-              docblock); `boardUnappliedAxes` covers the three the board
-              itself cannot evaluate either. Between the two, every axis
-              this `filter` state can carry is covered.
-
-              THE SENTENCE NAMES ONLY WHAT IT KNOWS. It no longer says "the
-              board only" — that would overclaim for a `filter` set to only
-              a `boardUnappliedAxes` entry (`collaboratorIds`,
-              `dueBefore`/`dueAfter`, `fields`), none of which narrow the
-              board either (see `describeUnappliedBoardAxes`'s own
-              docblock). It says only that what is set is not applied on
-              THIS tab, true under every combination that trips the gate.
-
-              Still gated on something actually being set, not on the tab
-              alone (a permanent sentence on three tabs would be noise
-              nobody reads), and still never on Board itself, where at
-              least some of what is set does apply.
-            */}
-            {view !== 'board' && (activeFilterChips.length > 0 || boardUnappliedAxes.length > 0) ? (
-              <p className="gn-project__scope-note" data-testid="search-not-applied-note">
-                Filters set here are not applied on this tab.
-              </p>
-            ) : null}
+                      {chip.mode === 'exclude' ? <ChoiceGlyph mode="exclude" /> : null}
+                      {chip.label}
+                      <button
+                        type="button"
+                        className="gn-project__filter-chip-remove"
+                        onClick={chip.onRemove}
+                        aria-label={`Remove filter — ${chip.label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {unapplied.length > 0 ? (
+                    /**
+                     * THE LOCATION CLAUSE — REMOVED (Task 5). Task 4 shipped
+                     * "— set on the list tab, where a ticket carries the
+                     * field", written before this sheet existed and flagged in
+                     * that task's own report for re-verification once it
+                     * landed. It is not re-pointed at the Filters sheet:
+                     * `boardUnappliedAxes` can join UP TO THREE axis names in
+                     * one sentence (collaborator, due date, custom field), and
+                     * after this task only ONE of those three — collaborator —
+                     * has a control anywhere in the product, and it lives in
+                     * the Filters sheet, not the list tab. `dueBefore`/
+                     * `dueAfter`/`fields` remain unsettable anywhere today (see
+                     * `FiltersSheet`'s own docblock). A single trailing clause
+                     * cannot name a different true location per axis in a
+                     * joined list, and "set in the Filters sheet" would be
+                     * right for collaborator today and silently wrong for the
+                     * other two the moment either gains a control elsewhere —
+                     * exactly the "names the wrong place" failure this task
+                     * was asked to avoid. Saying only what is true (the axis is
+                     * not applied here) outlives whichever surface next grows a
+                     * control for the other two.
+                     */
+                    <span className="gn-project__scope-note" data-testid="board-scope-note">
+                      Not applied on the board: {unapplied.join(', ')}.
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
 
             {view === 'calendar' ? (
               // The calendar and the timeline read the SAME list as the List
@@ -1387,13 +1410,31 @@ function ProjectBoard() {
               )
             ) : list.error !== null ? (
               <ShellRefusal what="The ticket list" message={list.error} />
-            ) : list.rows !== null ? (
+            ) : list.rows !== null && listNarrowing !== null ? (
               <TicketList
-                // The words, not a flag: the summary has to say WHICH narrowing,
-                // and `undefined` here is what makes the unnarrowed count still
-                // read as the project's own.
-                {...(activeOnly ? { narrowing: 'tickets in progress' } : {})}
-                rows={list.rows}
+                // THE WORDS, not a flag (exclude-mode spec §3, since
+                // 2026-09-17): the summary has to say WHICH narrowing is in
+                // force, now that TWO can be at once — the server-side
+                // "active only" toggle and the client-side filter that
+                // reaches this tab as of this task. `listNarrowingWord` names
+                // either, both (joined), or neither; `undefined` is what
+                // makes the unnarrowed count still read as the project's
+                // own. `listNarrowing.shown !== listNarrowing.total` is the
+                // same "did the filter actually hide something" fact
+                // `shouldRenderNarrowingStrip`'s third term reads above —
+                // included here too because `listUnappliedAxes`/
+                // `activeFilterChips` alone would miss the ONE list-only
+                // mechanism that can narrow with neither: a `dueBefore`/
+                // `dueAfter`/`fields` clause set with no chip and no
+                // unapplied-axis entry (both are BOARD-shaped enumerations).
+                {...(() => {
+                  const word = listNarrowingWord(
+                    activeOnly,
+                    activeFilterChips.length > 0 || listUnappliedAxes.length > 0 || listNarrowing.shown !== listNarrowing.total,
+                  );
+                  return word === undefined ? {} : { narrowing: word };
+                })()}
+                rows={listNarrowing.rows}
                 // `''` while the session resolves or when signed out, and here
                 // that is harmless and deliberate: this prop drives only the
                 // *Recently assigned* pin, so an unknown viewer pins nothing.

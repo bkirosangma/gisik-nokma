@@ -6004,3 +6004,28 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   survives instead of clearing.
 - `13.447`/`13.448`/`13.451`/`13.452`/`13.460` updated for the control change (checkbox → button;
   `aria-pressed` → `data-mode`).
+- **13.556** ✅ `listNarrowingWord`: undefined / "tickets in progress" / "your filters" / both joined.
+- **13.557** ✅ The search box narrows the List tab: the non-matching row drops, the strip shows the LIST's
+  own count ("1 of 2 shown", never the board's 3), the text chip is there, the old mirror note's testid
+  is absent, and `TicketList`'s summary reads "narrowed to your filters". Mutation (`rows={list.rows}`)
+  kills it via its row-absence assertion; the same mutation also killed 13.517 and 13.560, which assert
+  row absence too.
+- **13.558** ✅ Calendar and Timeline draw from the same narrowed rows ("1 of 2 shown" on each; no mirror
+  note). The strip's own count is `listNarrowing`'s alone and cannot distinguish a correct `dateInputs`
+  from a stale one, so the real proof is a title check on the Timeline tab (left active after the loop):
+  a due-only fixture ticket lands in `TicketList`'s Timeline cousin's own `sideList` ("Undated or partially
+  dated"), which renders `entry.title` regardless of a missing `startDate` — Calendar's own due-only
+  marker does not render the ticket's title at all, so Timeline is the tab that can prove this. The
+  fixture needs `fields.dueDate`/`fields.title` as real `FieldClaim`s (`fieldClaim()`), not the top-level
+  `ListRow.dueDate` convenience field alone — `dateClaimOf`/`titleOf` read `row.fields` verbatim and never
+  look at it. Mutation (`dateInputs` from `list.rows`) kills it.
+- **13.559** ✅ Clearing the term restores the row and removes the strip on the List tab.
+- `13.517` FLIPPED 2026-09-17 (see its own bullet above): an assignee picked in the sheet now NARROWS the
+  list (the row assigned to someone else drops) and discloses through the strip; the note it asserted is
+  gone along with the mechanism it disclosed.
+- **13.560** ✅ An EXCLUDED assignee drops the row assigned to them on the List tab, "Not assignee" chip shown.
+- **13.561** ✅ The create dialog's parent picker still offers a ticket the filter dropped — `parentCandidates`
+  reads the unnarrowed rows. Passes unchanged before this task's implementation lands (`parentCandidates`
+  already read unnarrowed `list.rows`) — a regression guard against a future narrowing reaching it, not a
+  TDD RED/GREEN case for this task's own code.
+- `13.439`/`13.444` retired (their subject — the mirror note — no longer exists); their numbers stay unused.

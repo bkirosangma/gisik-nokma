@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { FieldClaim, TicketTypeDef } from '@gisik-nokma/domain';
 import { EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY } from '@gisik-nokma/app-core';
 import type {
   BoardCard,
@@ -11,7 +12,7 @@ import type {
   TicketListView,
 } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
-import { stubServices } from './helpers/stub-services.js';
+import { EMPTY_PREFERENCES, stubServices } from './helpers/stub-services.js';
 
 /**
  * ## The client-side board narrowing (board-prototype-port Task 4)
@@ -114,6 +115,24 @@ function boardOf(cards: BoardCard[]): BoardView {
       },
     ],
   };
+}
+
+/**
+ * A `FieldClaim`, reusing `claim()`'s fixed actor/instant. `dateClaimOf`
+ * (`ticket-dates.ts`) reads a `startDate`/`dueDate` claim's `value` as
+ * `{ date }`; `titleOf` reads a `title` claim's `value` as a bare string.
+ * Needed because `toTicketDatesInput` maps `row.fields` VERBATIM into what
+ * `dateClaimOf` reads — `ListRow.dueDate` (the List tab's own display field,
+ * set by overriding `listRow()` directly) is a SEPARATE field `dateClaimOf`
+ * never looks at, so a fixture wanting a ticket to render on Calendar or
+ * Timeline must set `fields.dueDate` (and, since `titleOf` reads
+ * `fields.title` and not the top-level `ListRow.title`, `fields.title` too
+ * when a case cares what title those two views show — `13.558` is the first
+ * case here that does).
+ */
+function fieldClaim(value: unknown): FieldClaim {
+  const c = claim();
+  return { value, actorId: c.actorId, clientTime: c.clientTime, serverTime: c.serverTime };
 }
 
 /**
@@ -294,80 +313,104 @@ describe('13.438 the strip is not unconditionally present', () => {
  * non-board tab, and is the case that would redden if the gate reverted to
  * the `text`-only check.
  */
-describe('13.439 the tabs where search does not apply say so — only while a term is present', () => {
-  it('shows nothing on the List tab until a search term exists, then names the limit', async () => {
+/**
+ * 13.557 — the search box reaches the List tab (exclude-mode spec §3). The
+ * mirror note that used to apologise for the opposite is GONE — asserted by
+ * its old testid being absent even with a term present.
+ */
+describe('13.557 the search narrows the List tab, and the note that said otherwise is gone', () => {
+  it('a term drops the non-matching row, shows the strip with the LIST\'s own count, and no mirror note', async () => {
     render(
-      <Providers services={servedBoard(threeCards)}>
+      <Providers
+        services={servedBoard(threeCards, [
+          listRow({ ticketId: 'lt_1', title: 'Ship the board' }),
+          listRow({ ticketId: 'lt_2', title: 'Restock the cold shelf' }),
+        ])}
+      >
         <ProjectPage />
       </Providers>,
     );
     await screen.findByText('Restock the cold shelf');
     await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
-
-    // No term yet — a permanent sentence here would be noise nobody reads.
-    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+    await screen.findByText('Ship the board');
 
     await userEvent.type(await searchbox(), 'board');
 
-    const note = await screen.findByTestId('search-not-applied-note');
-    expect(note).toHaveTextContent(/not applied on this tab/i);
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument(); // the list has 2, the board 3
+    expect(screen.queryByText('1 of 3 shown')).not.toBeInTheDocument();
+    expect(screen.getByText('Ship the board')).toBeInTheDocument();
+    expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-text')).toHaveTextContent('Search: "board"');
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+    expect(screen.getByTestId('list-narrowing')).toHaveTextContent('narrowed to your filters');
   });
 
-  it('never shows the note on the Board tab itself, even with a term present', async () => {
+  it('13.558 the Calendar and Timeline tabs draw from the same narrowed rows', async () => {
+    // `fields.dueDate`, not the top-level `ListRow.dueDate` the brief's own
+    // snippet set — `dateClaimOf` reads `row.fields` verbatim (see
+    // `fieldClaim`'s own docblock above), so a fixture setting only the
+    // top-level field renders NOTHING on either view, which would make every
+    // assertion below pass or fail for the wrong reason.
     render(
-      <Providers services={servedBoard(threeCards)}>
+      <Providers
+        services={servedBoard(threeCards, [
+          listRow({
+            ticketId: 'lt_1',
+            title: 'Ship the board',
+            fields: { title: fieldClaim('Ship the board'), dueDate: fieldClaim({ date: '2026-09-18' }) },
+          }),
+          listRow({
+            ticketId: 'lt_2',
+            title: 'Restock the cold shelf',
+            fields: { title: fieldClaim('Restock the cold shelf'), dueDate: fieldClaim({ date: '2026-09-18' }) },
+          }),
+        ])}
+      >
         <ProjectPage />
       </Providers>,
     );
     await screen.findByText('Restock the cold shelf');
-
     await userEvent.type(await searchbox(), 'board');
-    await screen.findByText('1 of 3 shown');
 
-    // The search DOES apply here — naming a limit that isn't real would be
-    // its own small lie.
-    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+    // The strip's own count ("1 of 2 shown") is `listNarrowing`'s alone — it
+    // says nothing about `dateInputs`, the SEPARATE memo `CalendarView`/
+    // `TimelineView` actually read their tickets from, so this loop alone
+    // cannot tell a correct `dateInputs` from a stale, unnarrowed one.
+    for (const tab of ['Calendar', 'Timeline']) {
+      await userEvent.click(await screen.findByRole('tab', { name: tab }));
+      expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+    }
+
+    // The loop above leaves Timeline active. A due-only ticket (no
+    // `startDate`) lands in `TimelineView`'s own `sideList` — "Undated or
+    // partially dated" — never the main dated grid (`timeline-model.ts`'s
+    // `classify`), but `sideList` entries render `entry.title` regardless
+    // (`timeline-view.tsx:317-321`), so this is a real discriminator: it
+    // reads whichever rows `dateInputs` actually carried. `CalendarView` has
+    // no equivalent for a due-only marker — it renders only a date label,
+    // never the ticket's title (`calendar-view.tsx:465-477`) — so Timeline is
+    // the one tab that can prove this without a `startDate` too.
+    expect(await screen.findByText('Ship the board')).toBeInTheDocument();
+    expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
   });
 
-  it('disappears again once the search term is cleared', async () => {
+  it('13.559 clearing the term restores the row and removes the strip on the List tab', async () => {
     render(
-      <Providers services={servedBoard(threeCards)}>
+      <Providers services={servedBoard(threeCards, [listRow({ ticketId: 'lt_1', title: 'Ship the board' }), listRow({ ticketId: 'lt_2', title: 'Restock the cold shelf' })])}>
         <ProjectPage />
       </Providers>,
     );
     await screen.findByText('Restock the cold shelf');
-    await userEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
     const search = await searchbox();
-
     await userEvent.type(search, 'board');
-    await screen.findByTestId('search-not-applied-note');
+    await screen.findByText('1 of 2 shown');
 
     await userEvent.clear(search);
 
-    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
-  });
-
-  /**
-   * 13.444 — the Minor the review flagged: the gate is a uniform
-   * `view !== 'board'` check, so List and Timeline (above) already imply
-   * Calendar behaves the same way — but "unlikely to diverge" is not
-   * "tested", and this is the arm those two cases didn't cover.
-   */
-  it('13.444 also names the limit on the Calendar tab', async () => {
-    render(
-      <Providers services={servedBoard(threeCards)}>
-        <ProjectPage />
-      </Providers>,
-    );
-    await screen.findByText('Restock the cold shelf');
-    await userEvent.click(await screen.findByRole('tab', { name: 'Calendar' }));
-
-    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
-
-    await userEvent.type(await searchbox(), 'board');
-
-    const note = await screen.findByTestId('search-not-applied-note');
-    expect(note).toHaveTextContent(/not applied on this tab/i);
+    expect(await screen.findByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
   });
 });
 
@@ -383,6 +426,18 @@ describe('13.439 the tabs where search does not apply say so — only while a te
  */
 const ROSTER: Array<{ id: string; name: string }> = [{ id: 'u1', name: 'Uma One' }];
 
+/**
+ * Full `TicketTypeDef` shape (controller's resolution of 13.561's
+ * conditional) — `customDateFieldsByType` (`src/ticket-dates-input.ts`) reads
+ * `.fields` on every entry unconditionally, so an `{id, name}`-only fixture
+ * throws before the create dialog's parent picker is ever reached. Same
+ * shape as `filters-sheet.test.tsx`'s own `TYPES`.
+ */
+const TYPES: TicketTypeDef[] = [
+  { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_1', fields: [] },
+  { id: 'bug', name: 'Bug', icon: 'bug', rank: 3, workflowId: 'wf_1', fields: [] },
+];
+
 async function openFiltersAndPickAssignee(name: string) {
   await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
   const dialog = await screen.findByRole('dialog', { name: 'Filters' });
@@ -394,8 +449,8 @@ async function openFiltersAndPickAssignee(name: string) {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
 }
 
-describe('13.517 the mirror note also names Filters-sheet axes, not only search', () => {
-  it('shows the note on the List tab once an assignee is picked from the Filters sheet, though nothing on the list changes', async () => {
+describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet narrows the List tab', () => {
+  it('drops the row assigned to someone else and discloses through the strip, not a note', async () => {
     render(
       <Providers
         services={stubServices({
@@ -405,7 +460,10 @@ describe('13.517 the mirror note also names Filters-sheet axes, not only search'
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
             projectId: PROJECT_ID,
-            rows: [listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf' })],
+            rows: [
+              listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf', assignee: { id: 'u1', name: 'Uma One' } }),
+              listRow({ ticketId: 'lt_2', title: 'A ticket nobody owns' }),
+            ],
           }),
         })}
       >
@@ -414,18 +472,85 @@ describe('13.517 the mirror note also names Filters-sheet axes, not only search'
     );
     await screen.findByText('Restock the cold shelf');
     await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
-
-    // No axis set yet — a permanent sentence here would be noise nobody reads.
-    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+    await screen.findByText('A ticket nobody owns');
 
     await openFiltersAndPickAssignee('Uma One');
 
-    // The List tab's own render is untouched — `filter` narrows the board
-    // only, and this axis has no control anywhere else — which is precisely
-    // why the note, not a changed list, is the only disclosure available.
-    expect(screen.getByText('Restock the cold shelf')).toBeInTheDocument();
-    const note = await screen.findByTestId('search-not-applied-note');
-    expect(note).toHaveTextContent(/not applied on this tab/i);
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-assigneeIds')).toHaveTextContent('Uma One');
+    expect(screen.queryByText('A ticket nobody owns')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('search-not-applied-note')).not.toBeInTheDocument();
+  });
+
+  it('13.560 an EXCLUDED assignee drops the row assigned to them instead', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => boardOf(threeCards),
+          getAttention: async () => [],
+          getMembers: async () => ROSTER,
+          getTicketTypes: async () => [],
+          getTickets: async (): Promise<TicketListView> => ({
+            projectId: PROJECT_ID,
+            rows: [
+              listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf', assignee: { id: 'u1', name: 'Uma One' } }),
+              listRow({ ticketId: 'lt_2', title: 'A ticket nobody owns' }),
+            ],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    await screen.findByText('A ticket nobody owns');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    const group = within(dialog).getByRole('group', { name: 'Assignee' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Uma One, included' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-exclude.assigneeIds')).toHaveTextContent('Not assignee: Uma One');
+    expect(screen.getByText('A ticket nobody owns')).toBeInTheDocument();
+    expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
+  });
+
+  it('13.561 the create dialog\'s parent picker still offers the filtered-out ticket', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => boardOf(threeCards),
+          getAttention: async () => [],
+          getMembers: async () => ROSTER,
+          getTicketTypes: async () => TYPES,
+          getPreferences: async () => EMPTY_PREFERENCES,
+          getTickets: async (): Promise<TicketListView> => ({
+            projectId: PROJECT_ID,
+            rows: [
+              listRow({ ticketId: 'lt_1', title: 'Restock the cold shelf', assignee: { id: 'u1', name: 'Uma One' } }),
+              listRow({ ticketId: 'lt_2', title: 'A ticket nobody owns' }),
+            ],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await openFiltersAndPickAssignee('Uma One');
+    // `threeCards` carries no assignee at all, so the BOARD narrows to none — the
+    // pick is real and the list rows (one of which IS Uma's) are what the picker reads.
+    await screen.findByText('0 of 3 shown');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Parent' }));
+    const options = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toContain('A ticket nobody owns');
+    await userEvent.keyboard('{Escape}');
   });
 });
 
