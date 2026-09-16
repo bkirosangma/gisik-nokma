@@ -1547,8 +1547,14 @@ After the final `.gn-filters__chip:focus-visible { … }` rule:
   background: var(--gn-accent);
   color: var(--gn-accent-text);
 }
-/* Exclude is a choice, not an error: no danger tone. The strike is on the
-   LABEL span, so the glyph and the hidden suffix stay legible. */
+/* Exclude is a choice, not an error: the OFF ground, explicitly, and no
+   danger tone anywhere in this rule (13.551 reads exactly this body). The
+   strike is on the LABEL span, so the glyph and the hidden suffix stay
+   legible. */
+.gn-filters__choice[data-mode='exclude'] {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+}
 .gn-filters__choice[data-mode='exclude'] .gn-filters__choice-label {
   text-decoration: line-through;
   text-decoration-thickness: 0.09em;
@@ -2096,7 +2102,9 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
     );
     await screen.findByText('Restock the cold shelf');
     await openFiltersAndPickAssignee('Uma One');
-    await screen.findByText('1 of 3 shown');
+    // `threeCards` carries no assignee at all, so the BOARD narrows to none — the
+    // pick is real and the list rows (one of which IS Uma's) are what the picker reads.
+    await screen.findByText('0 of 3 shown');
 
     await userEvent.click(await screen.findByRole('button', { name: 'New ticket' }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Parent' }));
