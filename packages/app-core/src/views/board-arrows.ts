@@ -29,8 +29,12 @@ export type ArrowDirection = 'previous' | 'next';
  * `(def, fromStateId)`, so a target this function returns is, by
  * construction, always a member of `moveOutcome`'s own `options`. The
  * `refused` outcome stays reachable — and load-bearing — for Task 14's
- * drag-and-drop, whose drop target is NOT filtered this way; see that task's
- * own module for the shared "attempt a move" handler both routes call.
+ * drag-and-drop, whose drop target is NOT filtered this way. Task 14 ships
+ * no second module and no second decision point for it: a column's drop
+ * handler looks up the dragged card's own `attemptMove` — the exact closure
+ * `MoveArrows` (`board.tsx`) already built for its own arrow clicks — in a
+ * small per-card registry, and calls it. One function, invoked from two
+ * input events, never two functions that could disagree.
  *
  * `columnOrder` is expected to be `group.columns.map(c => c.stateId)` —
  * provably the SAME sequence as `def.states`, for the identical pinned

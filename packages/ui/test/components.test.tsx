@@ -380,3 +380,21 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
     expect(body.includes('border-radius')).toBe(true);
   });
 });
+
+/**
+ * Case 13.513 — board-prototype-port Task 14, 2026-09-16. The spec's Board
+ * metrics table "Card" row names `cursor:grab`; this task adds it beside the
+ * drag-and-drop behaviour that makes it true (Ruling 15, cited at length in
+ * `ui.css`'s own comment immediately above this selector). A CSS-binding
+ * gate, the same shape `inbox-css-binding.test.tsx` already uses for
+ * `gn-timeline__bar`: this only proves the RULE exists with the right body,
+ * never that the class is wired onto anything real — `board-drag-drop.test.tsx`'s
+ * own `13.512` is what proves `draggable="true"` (and therefore this
+ * selector's match) tracks the `moves` capability rather than being always
+ * on or always off.
+ */
+describe('13.513 — the drag cursor is keyed off the real draggable attribute, not a second class', () => {
+  it('.gn-board__card-slot[draggable="true"] sets cursor: grab', () => {
+    expect(rule('.gn-board__card-slot[draggable="true"]')).toMatch(/cursor:\s*grab/);
+  });
+});

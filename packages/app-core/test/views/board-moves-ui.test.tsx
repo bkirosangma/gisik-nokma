@@ -342,6 +342,14 @@ describe('Board move arrows — the refusal path names the real alternatives', (
    * is therefore the honest seam to test refusal RENDERING at, exercising
    * the real gate and the real renderer without contriving an impossible
    * click. `board-moves.test.ts` already proves `moveOutcome` itself.
+   *
+   * This is still true only of an ARROW click — it is not a claim that the
+   * refused branch is unreachable through the UI at all. Task 14's
+   * drag-and-drop reaches it organically (a card can be dropped on ANY
+   * column, including one no declared edge reaches), and
+   * `board-drag-drop.test.tsx`'s own `13.508` proves the identical
+   * `moveOutcome`/`refusalCopy`/`MoveRefusalNotice` pipeline end to end,
+   * through a real `dragstart`/`drop` sequence rather than at this seam.
    */
   it('names the REAL available moves by NAME, not merely appearing', () => {
     const outcome = moveOutcome(WF_ERRAND, 'todo', 'waiting', {});

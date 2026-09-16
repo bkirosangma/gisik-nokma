@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MutableRefObject,
+  type ReactNode,
+} from 'react';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
@@ -144,6 +151,53 @@ export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
 export const EMPTY_COLUMN_COPY = 'No tickets in this column yet.';
 
 /**
+ * The `dataTransfer` format a dragged card's ticket id travels under
+ * (board-prototype-port Task 14, 2026-09-16). Exported for the same reason
+ * `EMPTY_BOARD_COPY` above is: a test that hand-types `'text/plain'` on both
+ * the `dragStart` and `drop` sides is one edit away from two spellings of
+ * the same fact. Plain `'text/plain'` rather than a bespoke MIME-ish
+ * string — every browser accepts it with no allowlist to maintain, and this
+ * payload genuinely is nothing more than the ticket id as text.
+ */
+export const DRAG_TICKET_FORMAT = 'text/plain';
+
+/**
+ * Ticket id → the exact `attemptMove` closure that card's own `MoveArrows`
+ * instance built for its `‹ ›` buttons (board-prototype-port Task 14).
+ *
+ * **This is the whole drop mechanism, and it is deliberately not a second
+ * decision point.** A drop's target (`toStateId`) comes from whichever
+ * column it lands on — `BoardGroupWithMoves`'s own `handleDrop`, below —
+ * and needs somewhere to submit through. Rather than re-deriving
+ * `moveOutcome`/refusal/dialog/transport-error handling a second time for
+ * drops, the dragged card's OWN `MoveArrows` registers its real
+ * `attemptMove` here on every render (`MoveArrows`'s own `registerAttempt`
+ * effect), and the column's drop handler looks it up by ticket id and calls
+ * it — the identical function an arrow click calls, with the identical
+ * state (`refusal`/`serverRefusal`/`transportError`/`dialogOpen`) rendering
+ * in the identical place, under that same card. A drop and an arrow can
+ * therefore never disagree: they are one code path, reached from two input
+ * events.
+ *
+ * Held by `Board`, not by each `BoardGroupWithMoves`, so a drag that starts
+ * in one workflow group and ends on a column belonging to a DIFFERENT group
+ * (a mixed-workflow board, `groupCount > 1`) still finds the dragged card's
+ * real registration — `attemptMove`'s own closure already carries that
+ * card's TRUE workflow and `fromStateId`, so `moveOutcome` there correctly
+ * names the alternatives from the ticket's OWN workflow rather than doing
+ * nothing, which would be exactly the "drag failed for no reason" the
+ * design spec's writes section forbids (a silent snap-back).
+ *
+ * A ticket id the registry has never seen (a stray `drop` with no real
+ * `dragstart` behind it, or a card whose `MoveArrows` never mounted) is a
+ * silent, inert no-op — `Map.get` on a missing key answers `undefined`, and
+ * `handleDrop` does nothing further. There is no card to attach a refusal
+ * to in that case, so this is the one outcome this feature does not
+ * narrate; it is inert rather than wrong.
+ */
+type MoveRegistry = Map<string, (toStateId: string) => void>;
+
+/**
  * Columns are exactly the attached workflow's states — empty ones render too,
  * and a project mixing workflows gets one group per workflow, because merging
  * column sets would invent columns no definition declares (spec §7).
@@ -154,6 +208,18 @@ export const EMPTY_COLUMN_COPY = 'No tickets in this column yet.';
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
 export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }: BoardProps) {
+  /**
+   * The shared drop registry (`MoveRegistry`'s own docblock above) —
+   * created HERE, unconditionally, before any early return, because React's
+   * Rule of Hooks requires every hook to run in the same order on every
+   * render; gating this behind `moves !== undefined` would make the hook
+   * itself conditional the moment a single mount ever toggled that prop.
+   * Unused (never read, never written) on the `moves === undefined`
+   * read-only path — a harmless empty `Map` sitting behind a ref nobody
+   * reaches — the same shape `moves` itself is on that path.
+   */
+  const moveRegistryRef = useRef<MoveRegistry>(new Map());
+
   /**
    * THE WHOLE-BOARD SENTENCE IS GATED ON ZERO CARDS, NOT ZERO GROUPS — AND NOT
    * ON A NARROWED VIEW (board-prototype-port Task 7, Ruling R6, 2026-09-16,
@@ -253,6 +319,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             moves={moves}
+            moveRegistry={moveRegistryRef}
           />
         ) : (
           <BoardGroupSection
@@ -262,6 +329,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             arrows={null}
+            onDropCard={null}
           />
         );
       })}
@@ -284,12 +352,23 @@ function BoardGroupSection({
   onOpenTicket,
   onCreateTicket,
   arrows,
+  onDropCard,
 }: {
   group: BoardGroup;
   groupCount: number;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: () => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
+  /**
+   * Board-prototype-port Task 14. `null` on the plain, `moves`-less path —
+   * the SAME "capability absent, not a dead stub" precedent `arrows` itself
+   * already sets immediately above. Non-null, a column becomes a real drop
+   * target: `BoardGroupSection` itself stays hook-free (`BoardGroupSection`
+   * vs. `BoardGroupWithMoves`'s own docblock) and knows nothing about
+   * `moveOutcome` or the registry — it only has somewhere to hand the event
+   * and a `toStateId`, mirroring exactly how it already treats `arrows`.
+   */
+  onDropCard: ((event: DragEvent<HTMLElement>, toStateId: string) => void) | null;
 }) {
   return (
     <section className="gn-board__group">
@@ -304,6 +383,16 @@ function BoardGroupSection({
             className={
               column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column'
             }
+            /*
+             * Board-prototype-port Task 14. `preventDefault()` on
+             * `dragOver` is not decoration — a browser's DEFAULT action for
+             * `dragover` is to DISALLOW dropping, so without this call
+             * `onDrop` below never fires at all, for any target. Only
+             * wired when `onDropCard` is non-null, the same gate `onDrop`
+             * itself uses immediately below.
+             */
+            onDragOver={onDropCard === null ? undefined : (event) => event.preventDefault()}
+            onDrop={onDropCard === null ? undefined : (event) => onDropCard(event, column.stateId)}
           >
             <header className="gn-board__column-header">
               <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
@@ -315,6 +404,30 @@ function BoardGroupSection({
                   key={card.ticketId}
                   className="gn-board__card-slot"
                   data-testid={`ticket-card-${card.ticketId}`}
+                  /*
+                   * Board-prototype-port Task 14. `draggable` is gated on
+                   * the SAME `arrows !== null` check the very next prop
+                   * already makes — deliberately not a second, parallel
+                   * boolean: a card whose write path is not wired (no
+                   * `moves` capability, or this group's workflow still
+                   * loading) has no `MoveArrows` instance to register an
+                   * `attemptMove` for, so a drop starting from it could
+                   * only ever land in the registry's inert no-op — and a
+                   * grab cursor promising otherwise is exactly the
+                   * affordance-that-lies shape Ruling 15 already named.
+                   * `.gn-board__card-slot[draggable="true"]` in `ui.css` is
+                   * the ONLY place `cursor: grab` is declared, keyed off
+                   * this literal attribute rather than a second class.
+                   */
+                  draggable={arrows !== null}
+                  onDragStart={
+                    arrows === null
+                      ? undefined
+                      : (event) => {
+                          event.dataTransfer.setData(DRAG_TICKET_FORMAT, card.ticketId);
+                          event.dataTransfer.effectAllowed = 'move';
+                        }
+                  }
                 >
                   <BoardCardView
                     card={card}
@@ -405,12 +518,15 @@ function BoardGroupWithMoves({
   onOpenTicket,
   onCreateTicket,
   moves,
+  moveRegistry,
 }: {
   group: BoardGroup;
   groupCount: number;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: () => void;
   moves: BoardMoveCapability;
+  /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
+  moveRegistry: MutableRefObject<MoveRegistry>;
 }) {
   const workflowKey = `${group.workflowId}@${group.workflowVersion}`;
   const workflow = useLiveQuery(moves.dataSource, moves.workspaceId, workflowKey, () =>
@@ -421,6 +537,47 @@ function BoardGroupWithMoves({
   // so this is the rendered column list, not a second derivation from `def`.
   const columnOrder = group.columns.map((column) => column.stateId);
   const workflowDef = workflow.data;
+
+  /**
+   * Registers ONE card's real `attemptMove` (board-prototype-port Task 14) —
+   * called from `MoveArrows`'s own effect, never from here directly, so this
+   * stays a plain setter with no opinion about WHEN a card registers.
+   * Returns the cleanup `MoveArrows` runs on unmount / re-render; guarded
+   * against clobbering a NEWER registration with a stale cleanup
+   * (`current.get(ticketId) === attempt`) in case React ever runs an old
+   * effect's cleanup after a newer effect's setup for the same ticket id —
+   * StrictMode's synthetic double-invoke is exactly this shape.
+   */
+  const registerAttempt = (ticketId: string, attempt: (toStateId: string) => void): (() => void) => {
+    moveRegistry.current.set(ticketId, attempt);
+    return () => {
+      if (moveRegistry.current.get(ticketId) === attempt) {
+        moveRegistry.current.delete(ticketId);
+      }
+    };
+  };
+
+  /**
+   * A column's whole drop contract (board-prototype-port Task 14): read the
+   * dragged ticket id off `event.dataTransfer` (set by the card's own
+   * `onDragStart`, above, on the `<li>` render), look up that ticket's real
+   * `attemptMove` in the shared registry, and call it with THIS column's
+   * `stateId` — the identical function, and the identical `moveOutcome`
+   * dispatch, an arrow click on that same card would have called. `null`
+   * while `workflowDef` has not resolved, mirroring `arrows` immediately
+   * below: no `MoveArrows` has mounted yet to register anything, so a drop
+   * here could only ever find an empty registry.
+   */
+  const handleDrop =
+    workflowDef === null
+      ? null
+      : (event: DragEvent<HTMLElement>, toStateId: string) => {
+          event.preventDefault();
+          const ticketId = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
+          const attempt = moveRegistry.current.get(ticketId);
+          if (attempt !== undefined) attempt(toStateId);
+        };
+
   return (
     <BoardGroupSection
       group={group}
@@ -437,9 +594,11 @@ function BoardGroupWithMoves({
                 fromStateId={fromStateId}
                 columnOrder={columnOrder}
                 moves={moves}
+                registerAttempt={registerAttempt}
               />
             )
       }
+      onDropCard={handleDrop}
     />
   );
 }
@@ -625,12 +784,15 @@ function MoveArrows({
   fromStateId,
   columnOrder,
   moves,
+  registerAttempt,
 }: {
   card: BoardCardData;
   workflow: WorkflowDef;
   fromStateId: string;
   columnOrder: string[];
   moves: BoardMoveCapability;
+  /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock above `Board`. */
+  registerAttempt: (ticketId: string, attempt: (toStateId: string) => void) => () => void;
 }) {
   const [refusal, setRefusal] = useState<{ available: string[] } | null>(null);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
@@ -780,6 +942,23 @@ function MoveArrows({
     }
     setDialogOpen(true);
   };
+
+  /**
+   * Publishes THIS card's real `attemptMove` into the shared drop registry
+   * (board-prototype-port Task 14) on every render. `attemptMove` is a
+   * fresh closure each render — it reads `submitting`/`fromStateId`/
+   * `workflow` from this render's own scope, exactly like `submitDirect`
+   * above — so a `useEffect` naming it in the dependency array re-registers
+   * on every render regardless; writing the array out explicitly rather
+   * than omitting it says so, rather than leaving it implicit. Cleanup
+   * (unmount, or superseded by a fresher registration) is `registerAttempt`'s
+   * own returned function — see its docblock in `BoardGroupWithMoves` for
+   * why it is guarded rather than an unconditional delete.
+   */
+  useEffect(
+    () => registerAttempt(card.ticketId, attemptMove),
+    [registerAttempt, card.ticketId, attemptMove],
+  );
 
   /** Mirrors `TicketSheet.precheck` exactly — `cache` optional, absence answers `not-evaluated` rather than manufacturing `passed`. */
   const precheck = async (toStateId: string): Promise<PrecheckResult> => {

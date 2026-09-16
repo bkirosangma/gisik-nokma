@@ -481,6 +481,37 @@
    wired onto the card container's className alongside `gn-board-card` rather
    than left as a rule with nothing to attach to. */
 .gn-board-card--pending { outline: 2px dashed var(--gn-warning); outline-offset: 2px; }
+/* Spec row "Card": `cursor:grab` (board-prototype-port Task 14, 2026-09-16) —
+   Ruling 15 removed this from `.gn-board-card` itself (comment above,
+   `:449-455`) because nothing could be dragged yet; it belongs here now,
+   beside the behaviour that makes it true. Deliberately NOT declared on
+   `.gn-board-card` — two independent reasons, either alone would justify a
+   different selector:
+   (1) `.gn-board-card` renders on the READ-ONLY path too (`Board`'s own
+       `moves` prop is optional — session loading, signed out, or no move
+       capability wired at all), where the card genuinely cannot be
+       dragged; a cursor promising otherwise is the exact "control that
+       lies" shape Ruling 15 already named. `draggable` is set on the
+       `<li class="gn-board__card-slot">` wrapper (`board.tsx`), gated on
+       the SAME `arrows !== null` check that gates the move arrows
+       themselves — so this selector, keyed off the real `draggable="true"`
+       ATTRIBUTE rather than a second, parallel boolean class, can never
+       show a grab cursor on a card that is not actually draggable.
+   (2) `packages/ui/test/components.test.tsx` case 13.464 scans this file
+       for the literal substring `.gn-board-card {` (its own `rule()`
+       helper, a plain regex with no selector parser) to assert that
+       rule's body carries no `border-radius`. Any new rule whose SELECTOR
+       TEXT happened to end in `.gn-board-card {` — even a compound one
+       like `.foo .gn-board-card { … }` — would satisfy that same regex and
+       get matched INSTEAD of the real rule, silently breaking a case this
+       task never touched. `.gn-board__card-slot` contains no
+       `.gn-board-card` substring at all (`__card-slot`, not `-card`), so
+       it cannot collide.
+   `cursor: grab` is not repeated on `.gn-board-card__title`, `__provenance`
+   or `__move` below — each already sets its own `cursor: pointer`, which
+   continues to win for those buttons by specificity; only the card's
+   plain background area inherits `grab` from the `<li>`. */
+.gn-board__card-slot[draggable="true"] { cursor: grab; }
 .gn-board-card__title {
   font: inherit;
   font-weight: 600;

@@ -5457,3 +5457,137 @@ for its own sake.
 suite: 85 files, 1266 tests, green (up from 1265 — the one new case, nothing lost). `node
 scripts/check-case-ids.mjs` re-run after minting `13.506`: duplicate list unchanged at `13.387`/`13.413`
 only.
+
+## Task 14 — drag-and-drop, the plan's final task (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.507`–`13.513` minted here**, continuing directly from `13.506` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep, not this file's own prose). Dragging a card from one
+board column and dropping it on another — the SAME `moveOutcome` gate Task 13's arrows already route
+through, never a second one: a drop's target comes from whichever column it lands on, and the dragged
+card's own `MoveArrows` instance (`views/board.tsx`) registers its real `attemptMove` closure into a
+shared per-board registry (`MoveRegistry`) keyed by ticket id, on every render; the target column's drop
+handler looks it up and calls it — the identical function an arrow click on that card would call. This
+ships **no second module and no second decision point** — `views/board-arrows.ts`'s own forward reference
+to "that task's own module" is corrected in place (this task's own commit) to describe the registry
+instead, since no second module exists.
+
+**`board-drag-drop.test.tsx` — 6 cases (`13.507`–`13.512`), a sibling file to `board-moves-ui.test.tsx`,
+the same convention that file's own docblock set for itself relative to `board.test.tsx`.** Every test
+drives the board through a REAL `fireEvent.dragStart` → (`dragover` where relevant) → `fireEvent.drop`
+sequence, never calling anything drag-specific directly — the whole point of this task is that a drop and
+an arrow reach `moveOutcome` through the exact same code, provable only by reaching it the way a person
+actually would. `DataTransfer`/`DragEvent` are unimplemented in this repo's jsdom (25.0.1 — confirmed
+empirically: `new window.DataTransfer()` throws `is not a constructor`); `@testing-library/dom`'s own
+`events.js` documents the identical gap and attaches whatever plain object is passed as `dataTransfer`
+directly onto the fired event with no validation, so each test builds a hand-rolled `DataTransfer`
+stand-in (`setData`/`getData` over a `Map`, format-aware — never answering the same value for every
+format), cast `as unknown as DataTransfer`, mirroring the established `ClipboardEvent`/`clipboardData`
+precedent already in this codebase (`packages/editor/test/drive-never-inline.test.ts`). ONE instance is
+passed to both the `dragStart` and the `drop` fire calls in every test, never two — a real browser hands
+one `DataTransfer` object to every event in a single drag gesture, and two fakes would prove nothing about
+whether the drop side actually reads what the drag side wrote.
+
+- **13.507** ✅ THE POSITIVE CONTROL the brief demands, mirroring `13.498`'s role for the arrows: dragging
+  the card in `todo` and dropping it on `doing` (a declared, rules-free edge) submits the SHIPPED `{to:
+  'doing'}` `ticket.transitioned` payload with the right actor/origin, calls `onMoved`, and renders no
+  alert. — (`packages/app-core/src/views/board.tsx`, `packages/app-core/test/views/board-drag-drop.test.tsx`)
+- **13.508** ✅ THE CASE AN ARROW CANNOT ORGANICALLY REACH: dropping the `todo` card on `waiting` (`todo`'s
+  only declared target in `WF_ERRAND` is `doing` — proven by `moveOutcome`'s own suite and reused verbatim
+  by `13.502`) refuses, and the rendered alert NAMES "Doing" rather than merely appearing; nothing is
+  ingested. The first END-TO-END exercise of the refusal pipeline this port has — `13.502` proves the same
+  pipeline only at the pure-gate seam, because an arrow's own target is always declared by construction. —
+  (same files)
+- **13.509** ✅ THE THIRD OUTCOME the design spec's own Test impact section names for this task alongside
+  the positive control and the refusal above ("a drop on a rules-bearing edge opening the dialog"):
+  dropping on a `todo -> doing` edge regated with `require-comment` (`13.501`'s own gated-edge fixture,
+  reused verbatim) opens `TransitionDialog`, aimed at the right `(workflow, fromStateId)`. Does not
+  re-prove `submitFromDialog`'s own mechanics — `13.501`/`13.504`/`13.505` already do, over the identical
+  function this drop reaches; this case's whole job is the DISPATCH, not what happens after. — (same files)
+- **13.510** ✅ THE MECHANISM every outcome case above is blind to: `fireEvent.drop` in a test dispatches
+  straight to React's listener regardless of what `dragover` did, so a suite built only from `13.507`–
+  `13.509` could pass in full against an implementation where a real browser's default action (disallow
+  dropping) would silently defeat every drop. Pinned directly — `fireEvent.dragOver(column, {
+  dataTransfer })` returns `false`, the `dispatchEvent` return value exactly when something called
+  `preventDefault()` on a cancelable event (`dragover`'s own default `cancelable: true`,
+  `@testing-library/dom`'s event map) — not inferred from any drop succeeding. — (same files)
+- **13.511** ✅ A `drop` with no real `dragstart` behind it (an empty `DataTransfer`, `getData` answering
+  `''`) is a SILENT, INERT no-op, not a thrown error and not a refusal: `''` is not a ticket id the
+  registry has ever seen, so `Map.get` answers `undefined` and the drop handler does nothing further — no
+  ingest, no alert, no dialog. Distinguishes "the gate ran and refused" from "the handler found nothing to
+  act on", the one outcome `MoveRegistry`'s own docblock names as the case this feature does not narrate. —
+  (same files)
+- **13.512** ✅ RULING 15'S OWN WORDS, proven rather than asserted in prose: "a grab cursor on an
+  undraggable card is an affordance claim the product cannot honour." Mirrors `13.500`'s identical "no
+  arrows at all" proof for the same `moves` capability being absent: the card's `<li>` carries
+  `draggable="false"` when there is no `MoveArrows` instance behind it to register an `attemptMove`, and a
+  drop aimed at it anyway is still inert, since `onDropCard` itself is `null` on that path and the column
+  never receives an `onDrop` handler at all. — (same files)
+
+**Every outcome-dispatch case (`13.507`–`13.509`) and the `dragover` mechanism case (`13.510`) is
+mutation-witnessed, not merely passing once.** Two mutations, each applied via a targeted `Edit`, run
+against the 6-case file, then reverted via a second targeted `Edit` restoring the exact original text
+(confirmed by re-reading the diff, not assumed):
+
+1. `handleDrop`'s `if (attempt !== undefined) attempt(toStateId);` changed to `if (false && attempt !==
+   undefined) attempt(toStateId);` — predicted to redden exactly the three cases that depend on
+   `attemptMove` actually firing. Result: `PASS (3) FAIL (3)`, the failing set exactly `13.507`/`13.508`/
+   `13.509`, the other three (`13.510`–`13.512`, none of which depends on the registry call firing)
+   untouched.
+2. `onDragOver`'s handler changed from `(event) => event.preventDefault()` to a no-op `(_event) => {}` —
+   predicted to redden exactly `13.510`. Result: `PASS (5) FAIL (1)`, the sole failure `13.510` with
+   `AssertionError: expected true to be false`.
+
+Both mutations reverted; the full 6-case file, plus the full 76-case pre-existing board suite
+(`board-moves-ui.test.tsx`, `board.test.tsx`, `board-arrows.test.ts`, `board-moves.test.ts`), re-confirmed
+green afterward (`PASS (82) FAIL (0)`).
+
+**`packages/ui/test/components.test.tsx` — 1 case (`13.513`), a CSS-binding gate, the same shape
+`inbox-css-binding.test.tsx` already uses for `gn-timeline__bar`.**
+
+- **13.513** ✅ `.gn-board__card-slot[draggable="true"]` sets `cursor: grab` in `ui.css`. Proves only that
+  the RULE exists with the right body — `13.512` above is what proves `draggable="true"` (and therefore
+  this selector's match) actually tracks the `moves` capability rather than being always on or always off.
+  — (`packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`)
+
+**Why `cursor: grab` is NOT declared on `.gn-board-card` itself** (Ruling 15's own instruction was to add
+it "beside the behaviour that makes it true", not where the spec's literal metrics table puts it) — two
+independent reasons, either alone sufficient: (1) `.gn-board-card` still renders on the READ-ONLY path
+(`moves` capability absent — session loading, signed out, or no capability wired at all), where the card
+genuinely cannot be dragged, and a grab cursor there would be the exact "control that lies" shape Ruling
+15 already named; `13.512` is the case that would have caught the alternative. (2) Case `13.464`'s own
+`rule()` helper (`packages/ui/test/components.test.tsx`) matches the FIRST literal substring
+`.gn-board-card {` it finds via a plain regex with no selector parser — any new rule whose selector text
+happened to end in that exact substring, even a compound one like `.foo .gn-board-card { … }`, would
+silently hijack `13.464`'s match and break a case this task never touched. `.gn-board__card-slot` contains
+no `.gn-board-card` substring at all (`__card-slot`, not `-card`), so it cannot collide — checked by
+inspection of the regex (`packages/ui/test/components.test.tsx`'s own `rule()`), not merely assumed safe.
+
+**Two decisions recorded here rather than left for a reviewer to find, per the task's own instruction to
+surface a stated decision rather than let it be discovered:**
+
+- **Same-column drop.** Dropping a card back onto the column it is already in is refused like any other
+  undeclared target — `transitionOptions` already excludes `toStateId === fromStateId`
+  (`board-moves.ts`'s own docblock), so `moveOutcome` treats a same-column drop identically to any other
+  wrong target, with no special case. Consistent with the plan's own "same four outcomes" instruction; not
+  separately tested, since it is the same code path `13.508` already exercises for a different
+  `toStateId`.
+- **Where the refusal renders.** `MoveRefusalNotice` renders where `MoveArrows` already renders it — under
+  the SOURCE card, in its origin column — never a second site near the drop point. Adding a second
+  rendering site would be exactly the fork ("two products") this task exists to avoid, even though the
+  rail is `overflow-x: auto` and the origin column can in principle be scrolled out of view by the time the
+  drag lands elsewhere. Left as-is, named rather than silently accepted.
+
+**Keyboard reachability — proven unaffected, not merely assumed.** `board-moves-ui.test.tsx` (the arrows'
+own 8-case suite, `13.498`–`13.505`) runs UNCHANGED and stays green — this task edited no assertion, no
+`aria-label`, no `disabled` logic in that file (confirmed: `PASS (9) FAIL (0)` on that file alone,
+unmodified). `draggable` is a plain HTML attribute; it adds no tabstop, no ARIA role, and no accessible-name
+change, so the `‹ ›` arrows remain the complete keyboard path they were before this task — drag-and-drop is
+a pure addition, never a replacement.
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` AND `packages/ui` (Node `v22.23.2`). Full
+`packages/app-core` suite: 1272 tests green; full `packages/ui` suite: 310 tests green; full `apps/web`
+suite: 363 tests green (`tsc` clean there too — `tsconfig.json` and `tsconfig.e2e.json` both). `pnpm turbo
+run typecheck` and `pnpm turbo run test` both green across all 17 packages. `node scripts/check-case-ids.mjs`
+re-run after minting `13.507`–`13.513`: sum rose from 2047 to 2054 (+7) and union rose from 2044 to 2051
+(+7) — the same delta, so the pre-existing `13.387`/`13.413` duplicates are unchanged and no new duplicate
+was introduced.
