@@ -4267,7 +4267,7 @@ alongside its existing List/Timeline coverage.
 
 ## Task 5 — the Filters sheet (board-prototype-port plan, 2026-09-16)
 
-**Block `13.445`–`13.458` minted here.** The Filters button Task 4
+**Block `13.445`–`13.459` minted here.** The Filters button Task 4
 deliberately left unrendered ("An inert Filters button is a button that lies... I chose do not render
 it yet") gets its sheet: a `role="dialog"` side panel writing straight through to the SAME
 page-level `filter` state the search box and the removable chips already share — no draft copy, no
@@ -4365,3 +4365,20 @@ CSS rather than proven by a test.
   refusal's presence alone. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.458** ✅ A FAILED board read renders the refusal sentence in State, and NOT the "has not loaded
   yet" pending sentence, for the identical reason. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Ruling 12 (coordinator remediation, same session) — "Clear all" was not true.** `clearAll` cleared
+the sheet's own five axes and deliberately left `text` alone, on the reasoning that the search box is
+Task 4's control, living outside this sheet — a correct fact about ownership and a wrong answer about
+what the button ON SCREEN promises. A person who types a search term, opens Filters, and clicks a
+button labelled "Clear all" would have watched the text chip survive: an accurate docblock above an
+inaccurate control is still a lie to whoever is looking at the control. **Fix: `clearAll` now clears
+all SIX `BoardFilterSpec` axes the narrowing strip's chips can represent — `text` included** — keeping
+`activeFilterChips` as the one disclosure surface the button's label actually promises. Checked, not
+assumed, before writing the fix: the search `<input>` (`ProjectBoard`'s own JSX) is
+`value={filter.text ?? ''}`, a CONTROLLED component with no local state, so clearing `filter.text` was
+sufficient on its own — no separate desync between the box and the filter to fix.
+
+- **13.459** ✅ "Clear all" removes the text chip AND empties the search box — the two are asserted as
+  separate failure modes (the disclosure surface lying vs. the control itself holding stale text),
+  confirming the fix covers both rather than only the chip the earlier version already
+  handled. — (`apps/web/test/filters-sheet.test.tsx`)

@@ -304,6 +304,51 @@ describe('13.452 Clear all resets every axis the sheet owns, without closing', (
   });
 });
 
+/**
+ * RULING 12 (coordinator remediation, same session). The first version of
+ * `clearAll` cleared the sheet's own five axes only, leaving `text` alone on
+ * the reasoning that the search box is Task 4's control, outside this sheet.
+ * That reasoning was correct about ownership and wrong about what the
+ * button ON SCREEN promises: a person who types a search term, opens
+ * Filters, and clicks a button labelled "Clear all" would have watched the
+ * text chip survive — an accurate docblock above an inaccurate control is
+ * still a lie to whoever is looking at the control, not the comment.
+ *
+ * Two failure shapes, asserted separately, because they are not the same
+ * bug: the CHIP surviving (the disclosure surface lying about what is still
+ * filtering) and the INPUT still showing the typed text (the control lying
+ * about what it holds) are independent — a fix that only clears `filter`
+ * and never checks the input's own rendering could pass the first
+ * assertion while failing the second if the search box ever grew local
+ * state. Checked directly before writing the fix: `ProjectBoard`'s search
+ * `<input>` is `value={filter.text ?? ''}`, a CONTROLLED component with no
+ * local state of its own, so clearing `filter.text` was sufficient — no
+ * separate desync to fix, confirmed here rather than assumed.
+ */
+describe('13.459 Clear all clears the search term too, not only the five axes the sheet has controls for', () => {
+  it('removes the text chip AND empties the search box', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    const search = await screen.findByRole('searchbox');
+
+    await userEvent.type(search, 'restock');
+    expect(await screen.findByTestId('board-filter-chip-text')).toHaveTextContent('restock');
+    expect(search).toHaveValue('restock');
+
+    const dialog = await openFilters();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear all' }));
+
+    // The chip is gone — the disclosure surface no longer claims a search is active.
+    expect(screen.queryByTestId('board-filter-chip-text')).not.toBeInTheDocument();
+    // The box is empty — the control itself no longer shows text that is not filtering anything.
+    expect(search).toHaveValue('');
+  });
+});
+
 describe('13.453 absence: the roster not yet read renders a sentence, never an invented empty list', () => {
   it('says the roster has not loaded, rather than showing zero people to choose from', async () => {
     render(

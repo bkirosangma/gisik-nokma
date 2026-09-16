@@ -1193,8 +1193,12 @@ type FiltersSheetProps = {
  * one thing the brief and `page.tsx`'s own comments repeatedly forbid — and
  * it would desync the moment someone removes a chip from the narrowing strip
  * while the sheet is closed: the strip writes `filter` directly, and a
- * buffered copy would not see it. The footer is "Clear all" (clears this
- * sheet's own five axes, does not close) and "Done" (closes only).
+ * buffered copy would not see it. The footer is "Clear all" (clears all six
+ * `BoardFilterSpec` axes the narrowing strip's chips can represent — `text`
+ * included, even though the search box is Task 4's control living outside
+ * this sheet; RULING 12: the button's own label is the promise a viewer
+ * reads, and "clears every axis but the one filtered elsewhere" is not what
+ * "Clear all" says — does not close) and "Done" (closes only).
  *
  * ## Which axes get a control here, and which do not
  *
@@ -1305,9 +1309,30 @@ function FiltersSheet({
 
   if (!open) return null;
 
+  /**
+   * RULING 12: "Clear all" clears every axis the narrowing strip's chips can
+   * represent — all SIX of `BoardFilterSpec`, `text` included — not only the
+   * five this sheet has its own controls for. The first version left `text`
+   * out on the reasoning that the search box is Task 4's control, outside
+   * this sheet; that reasoning was correct about OWNERSHIP and wrong about
+   * what the button on screen promises. A person who types a search term,
+   * opens Filters, and clicks a button labelled "Clear all" sees the text
+   * chip survive — the visible word overclaims, and an accurate docblock
+   * above an inaccurate control is still a lie to whoever is looking at the
+   * control, not the comment. Clearing `text` here keeps `activeFilterChips`
+   * (all six axes) as the ONE disclosure surface this button's label
+   * promises, rather than "all but the one axis with a control somewhere
+   * else". The search `<input>` needs no separate reset: it is a controlled
+   * component reading `value={filter.text ?? ''}` directly
+   * (`ProjectBoard`'s own JSX), never local state, so clearing `filter.text`
+   * here empties it for free — checked, not assumed, and confirmed by
+   * `13.459` asserting the input's value directly, not only the chip's
+   * absence.
+   */
   const clearAll = () =>
     setFilter((current) => ({
       ...current,
+      text: undefined,
       assigneeIds: undefined,
       collaboratorIds: undefined,
       typeIds: undefined,
