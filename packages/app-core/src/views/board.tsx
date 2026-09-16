@@ -1051,7 +1051,7 @@ function MoveArrows({
    * stay open with nothing on screen saying why, the same user-visible
    * symptom `13.504` fixed for the arrows, just behind the dialog instead.
    * `TransitionDialog` already renders `serverRefusal` internally through its
-   * own `serverRefusal` prop (`transition-dialog.tsx:260-262`); Ruling 27
+   * own `serverRefusal` prop (`transition-dialog.tsx:286-289`); Ruling 27
    * (board-prototype-port, 2026-09-16) added the sibling `transportError` prop
    * for exactly the case this `catch` reaches — a dropped connection is not a
    * refusal, so it renders through that separate prop, its own sentence, its

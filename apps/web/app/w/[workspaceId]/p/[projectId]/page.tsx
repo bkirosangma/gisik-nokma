@@ -339,7 +339,7 @@ function ProjectBoard() {
    *
    * TWO mechanisms fold into this ONE pass as of Task 8, not one:
    * `boardFilter` (Task 4) drops CARDS, never a column or a group —
-   * `board.tsx:42-46`'s own rule, still exactly true of that mechanism on
+   * `board.tsx:204-208`'s own rule, still exactly true of that mechanism on
    * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
    * GROUPS, by construction, whenever a specific workflow is picked. The
    * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so
@@ -1105,12 +1105,25 @@ function ProjectBoard() {
               `narrowingChips.length` (the list actually rendered two lines
               down, which also includes `workflowChip` when one is active).
               That is not an oversight: `workflowChip` does not need to be
-              counted into this gate for the gate to fire correctly for it —
-              the third term above already does that job by construction,
-              since picking a workflow can only ever change `shown`/`total`,
-              never `activeFilterChips`. Counting it here too would not
-              change the gate's answer in any case, only make it look like
-              the wrong term was doing the work.
+              counted into this gate for the gate to fire correctly WHENEVER
+              A CARD IS ACTUALLY HIDDEN — the third term above already does
+              that job by construction, since picking a workflow can only
+              ever change `shown`/`total`, never `activeFilterChips`.
+
+              HEDGED (final whole-branch review, Finding 4, 2026-09-16): this
+              used to claim counting `workflowChip` in here "would not change
+              the gate's answer in any case" — false for one constructible
+              case. Pick a workflow that keeps its own cards while an empty
+              SIBLING group is dropped: `shown === total` (nothing is
+              actually hidden) and the other two terms are already zero, so
+              the strip stays closed even though the picker itself is
+              non-default. Counting `workflowChip` here WOULD open the strip
+              in that case. The invariant this gate exists for still holds
+              either way — no card is ever hidden without the strip
+              disclosing it — and the `<select>` keeps showing the
+              non-default pick regardless of whether the strip renders
+              beside it, so nothing is lost; but the old sentence claimed
+              more certainty than that.
             */}
             {view === 'board' &&
             boardNarrowing !== null &&

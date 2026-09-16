@@ -739,7 +739,7 @@ git add -A && git commit -m "Build the Filters sheet, wired on the commit it app
 .gn-board__column-count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-board-card { padding: 0.875rem; border-radius: 0.75rem; cursor: grab; }
 .gn-board-card--pending { outline: 2px dashed var(--gn-warning); outline-offset: 2px; }
-/* NO blocked-chip rule. `board.tsx:99` already renders
+/* NO blocked-chip rule. `board.tsx:398` already renders
    `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip`
    carries the tone as a coloured DOT with a readable label. The prototype's
    tinted-ground-plus-same-hue-text version fails 4.5:1 in all six style×theme
@@ -748,7 +748,7 @@ git add -A && git commit -m "Build the Filters sheet, wired on the commit it app
 
 - [ ] **Step 2: Apply the classes**
 
-The rail wraps the columns; `.gn-board-card` is already on the `<Card>` at `board.tsx:150`.
+The rail wraps the columns; `.gn-board-card` is already on the `<Card>` at `board.tsx:639`.
 
 - [ ] **Step 3: Check the provenance class against the viewport specs**
 
@@ -866,7 +866,7 @@ A `<select>` in the header row (`.gn-button`-adjacent styling per the chrome met
 
 - [ ] **Step 2: Satisfy the disclosure invariant — do not invent a second one**
 
-When a specific workflow is picked, reuse Task 4's count and chip. `board.tsx:42-46` holds that a rearrangement which drops a card "is a filter wearing a grouping's name". The picker **is** a filter, is labelled as one, and discloses through the same mechanism the client filter uses.
+When a specific workflow is picked, reuse Task 4's count and chip. `board.tsx:204-208` holds that a rearrangement which drops a card "is a filter wearing a grouping's name". The picker **is** a filter, is labelled as one, and discloses through the same mechanism the client filter uses.
 
 - [ ] **Step 3: Write the tests**
 
@@ -884,7 +884,7 @@ it('discloses through the same count and chip the client filter uses', async () 
   renderProjectPage({ groups: [defaultWorkflow, bugWorkflow] });
   await userEvent.selectOptions(screen.getByRole('combobox', { name: /workflow/i }), 'wf-bug');
 
-  // board.tsx:42-46 — a rearrangement that drops a card is a filter wearing a
+  // board.tsx:204-208 — a rearrangement that drops a card is a filter wearing a
   // grouping's name. This one is labelled as a filter and says what it hid.
   expect(screen.getByText(/3 of 5 shown/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /remove.*Bug triage/i })).toBeInTheDocument();

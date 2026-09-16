@@ -333,7 +333,7 @@
   gap: 0.625rem;
 }
 /* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
-   2026-09-16) — no rule was ever added for it. `board.tsx:99` renders the
+   2026-09-16) — no rule was ever added for it. `board.tsx:398` renders the
    column name as `Chip`'s own child text, tone set from `column.blocked`/
    `column.category`; `Chip` takes no `className`, so there is no element
    this rule could attach to, and the name already renders — at the chip's
@@ -715,7 +715,7 @@
 /* "Header cell": `13px/18px; 600; label2; trayBg; padding 11px 16px;
    nowrap`. `label2` → `--gn-text-muted`, `trayBg` → `--gn-surface-sunken` —
    both already declared, both already paired for identical prototype
-   vocabulary elsewhere in this file (`.gn-timeline__weeks`, `:1638-1641`
+   vocabulary elsewhere in this file (`.gn-timeline__weeks`, `:1934-1937`
    below). Uniform across every column — `ticket-list.tsx` applies this
    class to the title header AND every mapped data header alike, since the
    metric does not vary by column. */
@@ -1903,8 +1903,8 @@
    prototype vocabulary — `.gn-board__column`, Task 6) and `fill4` →
    `--gn-fill-quaternary` — both already declared, already consumed elsewhere
    in this file. `accent`/`accentText` for the bar are UNCHANGED from Plan
-   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3306-3309`
-   above) already settled "accent ground + onColor" as
+   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3602-3605`
+   below) already settled "accent ground + onColor" as
    `background: var(--gn-accent); color: var(--gn-accent-text)` over the
    plan's literal `--onColor` → `--gn-text-inverted` mapping, because
    `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and

@@ -19,7 +19,7 @@ import { stubServices } from './helpers/stub-services.js';
  * `matchesBoardCard`/`BoardFilterSpec` (Task 3, `13.433`/`13.434`) is a pure
  * predicate with no caller. This file exercises the CALLER: `page.tsx`'s
  * search box, the `N of M shown` count, the removable chip, and the rule that
- * neither renders without the other (`board.tsx:42-46`'s disclosure
+ * neither renders without the other (`board.tsx:204-208`'s disclosure
  * invariant, restated in the spec at line 240).
  *
  * ## Test 2 is NOT the brief's literal text, and here is the primary source why
@@ -599,7 +599,7 @@ describe('13.470 the picker discloses through the SAME count and chip the client
 
     await userEvent.selectOptions(await workflowSelect(), 'wf-bug');
 
-    // board.tsx:42-46 — a rearrangement that drops a card is a filter
+    // board.tsx:204-208 — a rearrangement that drops a card is a filter
     // wearing a grouping's name. This one is labelled as a filter (the
     // chip) and says what it hid (the count).
     expect(await screen.findByText('3 of 5 shown')).toBeInTheDocument();
