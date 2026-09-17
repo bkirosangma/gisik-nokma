@@ -24,10 +24,18 @@ pair or a cited product line.
 every quoted fragment below are tied to the recorded artefact, not merely to whatever the working tree
 held. All 25 block ranges in the delta table were re-derived from these two blobs, not from the checkout.
 
-**Citation convention.** Prototype citations are written `desktop.dc.html@<blob-sha12>:<line>`, never
-bare, so they survive the next refresh. Resolve one with
-`git show 6d7b67c0a52c > /tmp/new.dc.html` (or `c9f852a2c243` for the old file). Task and product
+**Citation convention — and a flaw in it, stated up front.** The *delta table* and the six-block quotes
+use the fully-qualified form `desktop.dc.html@<blob-sha12>:<line>`, which survives the next refresh.
+Resolve one with `git show 6d7b67c0a52c > /tmp/new.dc.html` (or `c9f852a2c243` for the old file). Product
 citations are `path:line` at the branch tip.
+
+**But the per-screen sections below also use a bare `:NNN`, and that is ambiguous** — it may mean the
+prototype line, or a product file named earlier in the same sentence. An earlier draft of this paragraph
+claimed prototype citations were "never bare", which was simply untrue of the sections that follow. The
+ambiguity is a real defect: it defeats mechanical checking on the prototype side, and the independent
+reviewer measured a **~45% drift rate** in those bare citations (16 of ~35 sampled, off by 1–10 lines
+each — all since corrected). **Treat quoted fragments as authoritative and line numbers as a search
+starting point.** See *What was verified* below.
 
 ---
 
@@ -93,7 +101,7 @@ spelling. The newer runtime:
 | raw element | `<table>` | `<sc-raw-table>` |
 | event attribute | `onClick` | `sc-camel-on-click` |
 | named entity | `&mdash;`, `&rsaquo;`, `&uarr;`, `&middot;`, `&rsquo;` | `—`, `›`, `↑`, `·`, `’` |
-| void element | `<input … />` | `<input … >` |
+| void element | `<input … />` | `<input …>` — **the space goes too** |
 | boolean attribute | `data-dc-script` | `data-dc-script=""` |
 
 The fifth row was found last, while checking that a component *outside* the 25 blocks (the `hasToast`
@@ -104,6 +112,18 @@ with it normalised**: re-running with all five rewrites gives `isSignIn` 2, `isW
 
 Every block was extracted whole (opening `<sc-if>` to its matching `</sc-if>` at equal indent), the five
 rewrites above were undone **on both sides**, and the normalised texts were diffed.
+
+> **A trap in this very table, caught by the independent reviewer, and worth more than the error it
+> corrects.** The first published version of the void-element row read `<input … />` → `<input … >` —
+> dropping the slash but *keeping the space*. **The new export never emits that form.** Measured on the
+> raw bytes: the old file contains ` />` 18 times, the new file **0** times — the space and the slash both
+> go (`…17px" />` → `…17px">`). This document's *results* were never wrong, because the code that
+> produced them used the correct rule (`\s*/>` → `>`); only the *instructions* were. But **a reader
+> re-running the method exactly as this table states it gets eleven changed blocks, not six** — six
+> spurious extras, each a single residual space, and nothing about them distinguishes them from real
+> churn except reading them. The gap between what a method *did* and what it *says it did* is invisible
+> from the results, which is why the reviewer's re-derivation — not this document's own arithmetic — is
+> what found it.
 
 **Completeness — nothing was left unexamined.** A per-block diff can only speak for the blocks it was
 given, and the 25-screen framing is itself a choice, so the whole file was also diffed once and every
@@ -127,11 +147,19 @@ that was too weak would show churn in them — so the control moves in both dire
 undid only the two tag/attribute rewrites and reported **16 blocks "CHANGED at equal size"**, which is
 the Part 0b table's own count. Inspecting them showed every one differing *only* in named entities and
 the self-closing slash: `Nothing was deleted &mdash; this filter…` → `Nothing was deleted — this
-filter…`, `&lsaquo;` → `‹`, `&rsaquo;` → `›`, `<input … />` → `<input … >`. Undo those two as well and
+filter…`, `&lsaquo;` → `‹`, `&rsaquo;` → `›`, `<input … />` → `<input …>`. Undo those two as well and
 **14 of the 16 collapse to identical**; the real count is **six**. Cross-checked the hard way: under the
-*least* tolerant normalisation (tag + attribute rewrites only, no entity tolerance) the four largest
-"changed" blocks — `isSettingsShell`, `isMcpTokens`, `isBuilder`, `isTypeEditor` — show 22, 4, 4 and 12
-changed lines, and **every single one is an entity or a self-closing slash**. Not one is a content change.
+*least* tolerant normalisation (tag + attribute rewrites only, no entity tolerance) four of the blocks
+Part 0b flagged but this document finds unchanged — `isSettingsShell`, `isMcpTokens`, `isBuilder`,
+`isTypeEditor` — show 22, 4, 4 and 12 changed lines, and **every single one is an entity or a
+self-closing slash**. Not one is a content change.
+
+*(Those four are not the four **largest** residuals under that normaliser, and an earlier draft of this
+sentence said they were — the independent reviewer caught the wording. The largest are
+`isSettingsShell` 22 and **`isWork` 20**, then `isTypeEditor` 12 and **`isSignIn` 6`**. `isWork` and
+`isSignIn` are two of the six genuinely-changed blocks, so drawing the "it is all mechanical" demonstration
+from them would be circular — which is why the four above are the ones named. The supporting claim, that
+each residual is an entity or a self-closing slash, holds for all four.)*
 
 > **Credit where it is due, because the framing matters.** The Part 0b table
 > (`docs/lanes/executor-state.md:216`, "Prototype delta 2026-09-18") did not claim sixteen screens need
@@ -345,6 +373,46 @@ in the product.
 
 ---
 
+## What was verified, by what, and where it is still weak
+
+**Verified mechanically.** Every `path:line` product citation (222 of them) is resolved by a script that
+opens the file and fails on a missing file, an out-of-range line, or a blank line. It caught
+`packages/ui/src/style-toggle.tsx` — the toggles live at `apps/web/src/` — and 40 ambiguous short forms
+(`page.tsx:1202`, in a repo with 24 `page.tsx` files). All 222 resolve; zero ambiguous.
+
+**Verified by an independent reviewer**, which was asked to falsify this document rather than check it. It
+extracted all 25 blocks from the raw blobs with its own tooling, derived the rewrite inventory from the
+bytes rather than from this document, and reproduced the six-block result **and this document's own
+intermediate arithmetic** (16 at equal size → 14 collapse → six) exactly, with a mutation control proving
+its normaliser was not blanket-collapsing. It also re-derived five randomly-chosen screens and found no
+unsupported claim among them. Its verdict: the central claim is safe to act on.
+
+**It found three real defects, all corrected above rather than argued with:**
+
+1. **The rewrite table stated a rule the export never emits.** Row 4 said `<input … />` → `<input … >`
+   (space kept). The new export contains ` />` **zero** times — the space goes too. This document's
+   results were never wrong, because the code used the correct rule; **the instructions were**, and
+   anyone re-running the method as written gets **eleven** changed blocks instead of six. That gap
+   between what a method did and what it says it did is invisible from its results.
+2. **"The four largest" was not the four largest** — `isWork` (20) and `isSignIn` (6) outrank two of the
+   four named. The supporting claim was true; the ranking was not.
+3. **Prototype-side line citations had drifted — 16 of ~35 sampled, ~45%, by 1–10 lines each.** They
+   named the right element and gave a line a few rows early, typically the block's opening tag. **Every
+   drifted citation's underlying claim was substantively true** — the reviewer checked each against the
+   source — so no verdict changed, but the citations were a bad map. All 16 are corrected above to lines
+   that now land on the element named.
+
+**Where this is still weak, stated plainly.** The reviewer's drift finding exposes a gap this document
+cannot close by itself: **the product-side resolver never covered prototype-side citations**, and an
+attempt to add one produced 240 false positives — it cannot tell a bare `:NNN` meaning "the prototype"
+from a bare `:NNN` meaning "the product file named earlier in the sentence". That ambiguity is real and
+it is this document's own style. So: **treat the quoted fragments as authoritative and the line numbers
+as a starting point to search from.** The fragments are exact, greppable, and were checked; the numbers
+carry a measured drift rate that correction has reduced but cannot be shown to be zero. Fixing the
+citation style is the first thing a next pass on this document should do.
+
+---
+
 ## Per screen: block → route → product gap → verdict
 
 *(sections are assembled in the delta table's block order; batch A covers blocks 2, 3, 4, 23, 24 and batch B blocks 1, 5, 6, 7, 8)*
@@ -360,7 +428,7 @@ in the product.
 - *structure:* `matches` — the product renders the same four paths from the same asset: `apps/web/app/sign-in/page.tsx:462` (`<img src="/google-mark.svg" alt="" width={18} height={18} />`). The product **cannot adopt the inline form in place**: `apps/web/app` is a scanned root (`packages/ui/test/helpers/colour-scan.ts:CLIENT_SOURCE_ROOTS`) and the asset's own docblock records the measurement — `findColourLiterals(..., 'script')` reports `["#4285F4"]` for the exact string `<path fill="#4285F4" …/>` (`apps/web/public/google-mark.svg:7-12`, restated at `apps/web/app/sign-in/page.tsx:135-138`).
 - *strings:* `matches` for the hint — `apps/web/app/sign-in/page.tsx:377` renders identical text to `desktop.dc.html@6d7b67c0a52c:158` (*"We'll email you a link that signs you in. It expires in 15 minutes."*). Identical **as rendered**, not byte-for-byte as source: the product writes the apostrophe `&rsquo;`, the prototype the literal `’`.
 - *tokens:* `matches` by translation — `--brand`/`--onColor` → `--gn-brand`/`--gn-text-inverted` (`packages/ui/src/ui.css:3587-3588`); `--cardBg`/`--cardR`/`--cardShadow` → `--gn-surface-raised`/`--gn-radius-card`/`--gn-shadow-raised` (`packages/ui/src/ui.css:160-165`); `min-width:56px;min-height:44px` → `min-width: 3.5rem; min-height: 2.75rem` (`apps/web/app/globals.css:1831`). Apple's mark matches shape-for-shape: `apps/web/app/sign-in/page.tsx:147` `viewBox="0 0 24 24" fill="currentColor"` = `desktop.dc.html@6d7b67c0a52c:168`.
-- Standing **pre-refresh** divergences, not caused by this refresh: no `linkSent` success block (prototype `:137-147`) — the product renders one line, `Check your inbox — the link signs you in.` (`apps/web/app/sign-in/page.tsx:373`); no "Open the link"/"Use a different address" (0 hits); the error is a card-foot `role="alert"` (`:484-488`) not an inline field line (prototype `:155-157`); the product adds a full phone form (`:303-351`) where the prototype's Phone tab only fires `phoneRefused` (`:128`); the product adds a passkey button (`:429`).
+- Standing **pre-refresh** divergences, not caused by this refresh: no `linkSent` success block (prototype `:137-147`) — the product renders one line, `Check your inbox — the link signs you in.` (`apps/web/app/sign-in/page.tsx:373`); no "Open the link"/"Use a different address" (0 hits); the error is a card-foot `role="alert"` (`:484-488`) not an inline field line (prototype `:155-157`); the product adds a full phone form (`:303-351`) where the prototype's Phone tab only fires `phoneRefused` (`:133`); the product adds a passkey button (`:429`).
 **Port verdict.** `none` — the refresh's only delta is a mark the product already draws identically from the same asset. Nothing here is portable.
 
 ### `isWorkspaces` — `desktop.dc.html@6d7b67c0a52c:180-235`
@@ -395,8 +463,8 @@ in the product.
 **Product route(s) + files.** `/mcp/authorize` → `apps/web/app/mcp/authorize/page.tsx:206` (boundary) + `:67` (`AuthorizeScreen`).
 **Prototype delta (old→new).** `none — identical after normalising the bundler form rewrites`.
 **Product gap (new prototype → product).**
-- *structure:* the two tiles and the `↔` glyph (`:1801-1805`) are absent — the product is a heading plus one `Card` (`apps/web/app/mcp/authorize/page.tsx:114-197`). The scope list (`:1815-1825`) has no counterpart (`mcpScopes` = 0 hits). The prototype **displays** the code with a `New code` button (`:1828-1833`); the product **asks the person to type** it (`:154-178`). The prototype has a `Deny` button (`:1837`); the product has no deny path at all. The prototype's revoke footer link (`:1839`) has no counterpart — revoke is a separate route (`apps/web/app/mcp/tokens/page.tsx:4`) and this page links to nothing. The product has three branches the prototype does not draw: `loading`, `signed-out`, `approved` (`:118-139`).
-- *strings:* `Let Claude Desktop use Gisik Nokma?` (`desktop.dc.html@6d7b67c0a52c:1808`) vs `Connect an assistant` (`apps/web/app/mcp/authorize/page.tsx:115`); `It will act as Anjali Kharkongor in Meghalaya Rollout.` (`:1809`) vs `An assistant that acts as <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions.` (`:147-152`). The product's per-code refusals (`:94-106`) have no prototype analogue.
+- *structure:* the two tiles and the `↔` glyph (`:1801-1805`) are absent — the product is a heading plus one `Card` (`apps/web/app/mcp/authorize/page.tsx:114-197`). The scope list (`:1815-1825`) has no counterpart (`mcpScopes` = 0 hits). The prototype **displays** the code with a `New code` button (`:1828-1833`); the product **asks the person to type** it (`:154-178`). The prototype has a `Deny` button (`:1836`); the product has no deny path at all. The prototype's revoke footer link (`:1839`) has no counterpart — revoke is a separate route (`apps/web/app/mcp/tokens/page.tsx:4`) and this page links to nothing. The product has three branches the prototype does not draw: `loading`, `signed-out`, `approved` (`:118-139`).
+- *strings:* `Let Claude Desktop use Gisik Nokma?` (`desktop.dc.html@6d7b67c0a52c:1809`) vs `Connect an assistant` (`apps/web/app/mcp/authorize/page.tsx:115`); `It will act as Anjali Kharkongor in Meghalaya Rollout.` (`:1810`) vs `An assistant that acts as <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions.` (`:147-152`). The product's per-code refusals (`:94-106`) have no prototype analogue.
 - *tokens:* `matches` for the consent surface — `--trayBg` maps to the product's chosen `--gn-surface-sunken`, argued at `apps/web/app/mcp/authorize/page.tsx:37-42`; the code field's monospace/spacing maps to `.gn-mcp-authorize__input` (`apps/web/app/globals.css:2140`).
 - **WIRE GAP:** the device-code mint returns exactly `{deviceCode, userCode, verificationUri, expiresInSec, pollIntervalSec}` (`apps/server/src/routes/mcp-device.ts:65-74`) — no scopes, no client name, no workspace, and no way for the approving page to read the grant's `userCode`. The registered routes are `code` (`:60`), `approve` (`:78`) and `token` (`:105`); **there is no deny route**, so the prototype's Deny button is unsatisfiable on this wire.
 **Port verdict.** `wire-gap` — scopes, client identity, the displayed code and deny all need server contract changes before any of this block can be drawn.
@@ -470,7 +538,7 @@ in the product.
 ### `isInviteAdmin` — `desktop.dc.html@6d7b67c0a52c:722-796`
 **Product route(s) + files.** Same route and file — `apps/web/app/w/[workspaceId]/members/page.tsx:202-210` (`MintForm` `:236-350`, `PendingList` `:361-387`). Not a route of its own, matching the prototype's nesting (block closes `:796`, `isMembers` `:798`).
 **Prototype delta (old→new).** Not a delta — a **new block**. The old export has no `isInviteAdmin` at all; its panel sat unconditionally inside `isMembers` at OLD `:709-780`. Gate at NEW `:722`; the same panel body reappears one level deeper at NEW `:723-795`. Data: NEW `:3056` `isInviteAdmin: myRoleIsAdmin`, NEW `:3057` `inviteAdminOnly: myRoleIsAdmin ? "" : "Only a workspace owner or admin can see or manage this workspace's invitations."` — both new (OLD `:2885` has only `inviteHeading`).
-**Product gap (new prototype → product).** Structure broadly matches on different strings and classes. Heading: NEW `:747` `Invite someone` vs `members/page.tsx:277` `Invite somebody`. Empty state: NEW `:741` `No invitations are outstanding.` matches verbatim `members/page.tsx:369`. `Withdraw`: NEW `:736` vs `:382` — matches. Expiry/`meta` line: the prototype's two arms (data `:3098`) match verbatim at `members/page.tsx:379-380`, but the product renders `formatDateTime(row.expiresAt)` rather than the prototype's pre-formatted string (one clock, IST). Channel and role pickers match; guest hides the project field in both (prototype `inviteTakesProjects` `:765` vs `members/page.tsx:311`). The product adds a withdraw-refusal path, a minted-link card and `COPY_IT_NOW` (`:22`, `:328`). **No wire gap for this block** — every field it reads is on `PendingInvite`/`MintedInvite` (`packages/app-core/src/online/invites.ts`). The gate is a **ruling, not a gap**: the product asks the door's 403 instead of reading a role (`members/page.tsx:28-54`).
+**Product gap (new prototype → product).** Structure broadly matches on different strings and classes. Heading: NEW `:747` `Invite someone` vs `members/page.tsx:277` `Invite somebody`. Empty state: NEW `:741` `No invitations are outstanding.` matches verbatim `members/page.tsx:369`. `Withdraw`: NEW `:736` vs `:382` — matches. Expiry/`meta` line: the prototype's two arms (data `:3098`) match verbatim at `members/page.tsx:379-380`, but the product renders `formatDateTime(row.expiresAt)` rather than the prototype's pre-formatted string (one clock, IST). Channel and role pickers match; guest hides the project field in both (prototype `inviteTakesProjects` `:766` vs `members/page.tsx:311`). The product adds a withdraw-refusal path, a minted-link card and `COPY_IT_NOW` (`:22`, `:328`). **No wire gap for this block** — every field it reads is on `PendingInvite`/`MintedInvite` (`packages/app-core/src/online/invites.ts`). The gate is a **ruling, not a gap**: the product asks the door's 403 instead of reading a role (`members/page.tsx:28-54`).
 **Port verdict.** `held` — the owner hold names `isInviteAdmin` explicitly, the panel already exists, and the delta is the *gate*, which `members/page.tsx:33-35` says cannot be sourced on this branch.
 
 ### `isAccount` — `desktop.dc.html@6d7b67c0a52c:1486-1566`
@@ -515,10 +583,10 @@ in the product.
 **Product route(s) + files.** `/w/[workspaceId]/my-work` → `apps/web/app/w/[workspaceId]/my-work/page.tsx:48-80` (`AttentionStrip` `:67`, `MyWork` `:73`); `packages/app-core/src/views/my-work.tsx:60`; `packages/app-core/src/views/attention-strip.tsx:71`; types `packages/app-core/src/view-types.ts:262-280, 348-368`; CSS `packages/ui/src/ui.css:1061-1120`.
 **Prototype delta (old→new).** `none`.
 **Product gap (new prototype → product).**
-- *structure:* prototype attention banner is a `--tintWarning` card with a warning-stroke SVG, a visible **"Needs your attention"** heading and a chip-with-dot per item (`:558-576`); the product's `AttentionStrip` is a flat `<aside>` with a `--gn-pending` left border on `surface-raised`, **no heading and no icon** (`packages/app-core/src/views/attention-strip.tsx:74-96`, `ui.css:1061-1066`), its accessible name being `aria-label="Needs attention"` (`:74`) — near-wording, not the visible string. The flat headingless shape is a **pre-existing ruling** argued at `packages/app-core/src/views/attention-strip.tsx:37-70`.
-- *structure:* prototype body is a two-card grid (`repeat(auto-fit,minmax(320px,1fr))`, `:585`) with an uppercase group eyebrow and a per-group `"Nothing here."` (`:596-599`); product is four fixed flex-column sections, each a `role="region"` with an `<h3 class="gn-my-work__heading">` (`packages/app-core/src/views/my-work.tsx:63-113`) — **pre-existing and ruled** (`packages/app-core/src/views/my-work.tsx:28-58`).
+- *structure:* prototype attention banner is a `--tintWarning` card with a warning-stroke SVG, a visible **"Needs your attention"** heading and a chip-with-dot per item (`:562-576`; `:558` is the `{{ myWorkSummary }}` subtitle); the product's `AttentionStrip` is a flat `<aside>` with a `--gn-pending` left border on `surface-raised`, **no heading and no icon** (`packages/app-core/src/views/attention-strip.tsx:74-96`, `ui.css:1061-1066`), its accessible name being `aria-label="Needs attention"` (`:74`) — near-wording, not the visible string. The flat headingless shape is a **pre-existing ruling** argued at `packages/app-core/src/views/attention-strip.tsx:37-70`.
+- *structure:* prototype body is a two-card grid (`repeat(auto-fit,minmax(320px,1fr))`, `:579`) with an uppercase group eyebrow and a per-group `"Nothing here."` (`:592`); product is four fixed flex-column sections, each a `role="region"` with an `<h3 class="gn-my-work__heading">` (`packages/app-core/src/views/my-work.tsx:63-113`) — **pre-existing and ruled** (`packages/app-core/src/views/my-work.tsx:28-58`).
 - *strings:* prototype h1 `"My work"` (`:557`) vs product `"My Work"` (`my-work/page.tsx:51`); the prototype's `{{ myWorkSummary }}` subtitle (`:558`) has no product counterpart. The product's per-section empties are specific sentences (`packages/app-core/src/views/my-work.tsx:66, 77, 88, 107`).
-- *tokens:* `matches` — h1 `34px/41px/700/-0.4px` (`:557`) vs `.gn-page-title` (`apps/web/app/globals.css:127-133`); eyebrow `--label2` → `--gn-text-muted` (`ui.css:1100`). *delta* — eyebrow: prototype `13px/18px` uppercase `letter-spacing:0.6px` (`:588`) vs product `0.95rem`, no casing or tracking (`ui.css:1100`). *delta* — the warning wash exists as a token (`--gn-tint-warning`, `packages/ui/src/tokens.ts:269`, consumed `globals.css:1314`) but the strip does not use it.
+- *tokens:* `matches` — h1 `34px/41px/700/-0.4px` (`:557`) vs `.gn-page-title` (`apps/web/app/globals.css:127-133`); eyebrow `--label2` → `--gn-text-muted` (`ui.css:1100`). *delta* — eyebrow: prototype `13px/18px` uppercase `letter-spacing:0.6px` (`:582`) vs product `0.95rem`, no casing or tracking (`ui.css:1100`). *delta* — the warning wash exists as a token (`--gn-tint-warning`, `packages/ui/src/tokens.ts:269`, consumed `globals.css:1314`) but the strip does not use it.
 - **No wire gap** — `MyWorkView` carries `assigned`/`inTransit`/`contested`/`shared` as `WorkItem[]` (`packages/app-core/src/view-types.ts:348-368`) and each `WorkItem` carries `title`, `stateName`, `stateCategory`, `stateProvenance`, `dueDate` (`:262-280`), covering the prototype's `t.title`/`t.state`/`t.due`. The prototype's group names (data `:2986-2991`) are computed client-side from the same rows — a grouping the product deliberately does not do (`packages/app-core/src/views/my-work.tsx:16-27`).
 **Port verdict.** `none` — refresh-unchanged, and each axis differs along a line the product documents and defends. The only unruled gap is the missing summary line, derivable client-side.
 
@@ -530,7 +598,7 @@ in the product.
 - *structure:* prototype rows carry a per-row **time** and a **"Mark read"/"Mark unread"** toggle (`:623-637`); product rows are one `<button>` with icon, headline, body, unread dot — no time, no toggle (`packages/app-core/src/inbox/inbox-view.tsx:66-109`), marking read as a side effect of opening (`:75-82`).
 - *structure:* prototype zebra-stripes rows (data `:3013`) and pads `14px 18px`; product rows have no zebra and pad `0.5rem` (`ui.css:2375-2387`).
 - *strings:* prototype's empty arm is filter-specific — `"Nothing unread"`/`"No mentions"` plus the fixed `"Nothing was deleted — this filter just has no matches."` (`:641-645`); the product's empty is the loaded-and-empty state with an unrelated sentence (`EMPTY_INBOX_COPY`, `inbox/page.tsx:24`, rendered `:226-229`).
-- *tokens:* `matches` — h1 vs `.gn-page-title` (`globals.css:127-133`); headline `17px/22px` and body `15px/20px --label2` with ellipsis (`:623-625`) vs `.gn-inbox__headline` (`ui.css:2401`) and `.gn-inbox__body` (`:2403-2411`); unread dot 9px `var(--accent)` (`:637`) vs `.gn-inbox__dot` 8px `var(--gn-accent)` (`ui.css:2414-2419`).
+- *tokens:* `matches` — h1 vs `.gn-page-title` (`globals.css:127-133`); headline `17px/22px` and body `15px/20px --label2` with ellipsis (`:631-632`) vs `.gn-inbox__headline` (`ui.css:2401`) and `.gn-inbox__body` (`:2403-2411`); unread dot 9px `var(--accent)` (`:637`) vs `.gn-inbox__dot` 8px `var(--gn-accent)` (`ui.css:2414-2419`).
 - **WIRE GAP — tabs:** `NotificationsGateway.list(cursor?)` takes no filter (`packages/app-core/src/inbox/gateway.ts:49`) and the route accepts only `cursor, limit, workspaceId, mutedKinds` (`apps/server/src/routes/notifications.ts:77`) — no `read` or `kind`. **WIRE GAP — bulk:** the gateway has only `markRead(id)` (`packages/app-core/src/inbox/gateway.ts:53`) and the server only `POST /v1/me/notifications/:id/read` (`routes/notifications.ts:90-100`). *Not* gaps: `n.time` is carried (`Notification.createdAt`, `packages/domain/src/notifications.ts:134`) and `n.readLabel`/`toggleRead` is served (`packages/app-core/src/inbox/gateway.ts:52`).
 **Port verdict.** `wire-gap` — filter tabs and bulk mark-read are each a route the server does not have; the rest (time, per-row toggle, zebra) is render-only and S-sized on its own.
 
@@ -549,10 +617,10 @@ in the product.
 **Product route(s) + files.** `apps/web/app/settings/page.tsx:262-270` (`tab=ticket-types`) and `/w/[workspaceId]/settings/ticket-types` → `apps/web/app/w/[workspaceId]/settings/ticket-types/page.tsx:24-30`; screen `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:9`; CSS `packages/ui/src/ui.css:1584-1670`.
 **Prototype delta (old→new).** `none`.
 **Product gap (new prototype → product).**
-- *structure:* the prototype row opens with a **34px `chipBg`/`chipShadow` tile holding the rank number** (`:825`) and ends with **↑/↓ reorder buttons** (`aria-label="Move up"/"Move down"`, `disabled` at the ends, `:830-831`) plus an explicit **"Edit"** button (`:832`). The product row leads with `<TypeIcon>` instead of the rank tile (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:71-73`) and has **no reorder controls and no Edit button** — the whole row is one `<button aria-label={\`Edit ${type.name}\`}>` (`:64-70`). Row-as-door is a **pre-existing owner ruling**, quoted at `ui.css:1603-1611`.
+- *structure:* the prototype row opens with a **34px `chipBg`/`chipShadow` tile holding the rank number** (`:828`) and ends with **↑/↓ reorder buttons** (`aria-label="Move up"/"Move down"`, `disabled` at the ends, `:833-834`) plus an explicit **"Edit"** button (`:835`). The product row leads with `<TypeIcon>` instead of the rank tile (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:71-73`) and has **no reorder controls and no Edit button** — the whole row is one `<button aria-label={\`Edit ${type.name}\`}>` (`:64-70`). Row-as-door is a **pre-existing owner ruling**, quoted at `ui.css:1603-1611`.
 - *structure:* rank is edited today as a **number field inside the editor**, not by list reordering (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:230-240`, `aria-label="Hierarchy rank"`).
-- *strings:* `"New type"` (`:822`) vs `"New ticket type"` (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:56`); h2 `"Ticket types"` at `20px/25px` (`:820`) vs `.ticket-type-list__title` at `1rem` (`ui.css:1590`); summary `"N types. Rank orders them in every picker."` (data `:3150`) vs `"N types, ordered by hierarchy rank — the lowest rank sits at the project root."` (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:50-52`); meta `"N fields · <workflow> · N tickets[ · N restricted field]"` (data `:3151-3155`) vs `rank N · N fields · <workflow name>` (`:77-89`).
-- *tokens:* `matches` — badge `--chipBg`/`--chipShadow`/`--label2` radius 999px at `12px/16px` (data `:3155`) vs `.ticket-type-list__badge` (`ui.css:1643-1649`, neo shadow `:1669-1672`); primary action `--accent` + `--onColor` + `--ctlShadow` + 44px (`:822`) vs `.gn-button--primary` (`ui.css:71-74`) with `min-height: 2.75rem` (`:17-21`). *delta* — row surface: `cardBg` card with zebra `fill4` rows at `padding:14px 18px` (data `:3156`) vs `.ticket-type-list__row` `--gn-surface-sunken` at `0.6rem 0.75rem`, no zebra (`ui.css:1603-1621`).
+- *strings:* `"New type"` (`:823`) vs `"New ticket type"` (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:56`); h2 `"Ticket types"` at `20px/25px` (`:820`) vs `.ticket-type-list__title` at `1rem` (`ui.css:1590`); summary `"N types. Rank orders them in every picker."` (data `:3150`) vs `"N types, ordered by hierarchy rank — the lowest rank sits at the project root."` (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:50-52`); meta `"N fields · <workflow> · N tickets[ · N restricted field]"` (data `:3151-3155`) vs `rank N · N fields · <workflow name>` (`:77-89`).
+- *tokens:* `matches` — badge `--chipBg`/`--chipShadow`/`--label2` radius 999px at `12px/16px` (data `:3158`) vs `.ticket-type-list__badge` (`ui.css:1643-1649`, neo shadow `:1669-1672`); primary action `--accent` + `--onColor` + `--ctlShadow` + 44px (`:822`) vs `.gn-button--primary` (`ui.css:71-74`) with `min-height: 2.75rem` (`:17-21`). *delta* — row surface: `cardBg` card with zebra `fill4` rows at `padding:14px 18px` (data `:3159`) vs `.ticket-type-list__row` `--gn-surface-sunken` at `0.6rem 0.75rem`, no zebra (`ui.css:1603-1621`).
 - **WIRE GAP — reorder:** `WorkflowAuthoringGateway` (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) declares no rank/reorder operation and no reorder route exists in `apps/server/src/routes/builder-reads.ts` (zero hits). **WIRE GAP — the "Draft" badge:** `TicketTypeDef` is `{id,name,icon,rank,workflowId,fields}` with no draft flag (`packages/domain/src/ticket-types.ts:27-51`). **WIRE GAP — the "N tickets" segment:** the only population call is `getTypeWorkflowPopulation(workspaceId, typeId, workflowId)` — pinned to ONE workflow (`packages/app-core/src/workflow-builder/gateway.ts:77-85`) — and `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:17-23` records that no `countTicketsOfType` exists and the pinned count would be wrong here.
 **Port verdict.** `wire-gap` — both genuinely-absent affordances and the third badge state need server surface that does not exist.
 
@@ -561,7 +629,7 @@ in the product.
 **Prototype delta (old→new).** `none`.
 **Product gap (new prototype → product).**
 - *structure:* the prototype renders a **grid of cards** (`repeat(auto-fit,minmax(320px,1fr))`, `:849`), each with name, status badge, a row of **per-state chips each carrying a 4px category colour bar**, a meta line and **two** actions (`:850-865`). The product renders a flat `<ul>` of `<li class="workflow-list__row">` with name, `v{version}`, `"{n} states"` and a single "Open" button (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:51-66`) — no card, no badge, no state chips, no second action. The product adds an empty arm the prototype lacks (`"No workflows published yet."`, `:49`), a failure arm (`:33`) and a loading arm (`:35`).
-- *strings:* the prototype header has a subtitle — `"Publishing records a version. Nothing already recorded is rewritten."` (`:846`); the product's `<header>` is the title and the action button alone (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:39-46`) and **that sentence appears nowhere in the product**. The button `"New workflow"` (`:847`) `matches` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:43`).
+- *strings:* the prototype header has a subtitle — `"Publishing records a version. Nothing already recorded is rewritten."` (`:845`); the product's `<header>` is the title and the action button alone (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:39-46`) and **that sentence appears nowhere in the product**. The button `"New workflow"` (`:847`) `matches` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:43`).
 - *tokens:* the primary action renders a bare `<button>` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:42-44`) — no class — so it resolves to the UA default plus the element-level rule at `apps/web/app/globals.css:45-50` rather than `.gn-button--primary` (`ui.css:71-74`). The entire card vocabulary the prototype uses (`cardBg`, `cardShadow`, `cardR`, `trayBg`/`trayShadow` on chips, the 4px category bars, the `12px/16px` badge with `--tintSuccess`/`--tintWarning`) is unrepresented.
 - **`workflow-list__*` HAS NO CSS AT ALL — swept with a control.** Every `*.css` in the repo contains exactly one `workflow-list` occurrence, and it is a **comment** listing `.workflow-list__new` among *"unclassed-control offenders"* (`apps/web/app/globals.css:44`); there are **zero rules**. Control: the same search finds **31** `.ticket-type-list__` rules in `packages/ui/src/ui.css` — so the instrument reaches CSS rules, and this family is absent from them. **This is the second of three such families found in this audit** — the others are `gn-members*` (`isMembers`) and the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group (see `isBuilder`). The workflows screen also renders its primary action as a bare `<button>` with no class at all (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:42-44`).
 - **WIRE GAP — the badge:** `PublishedWorkflowDef` is `{id,version,name,initialStateId,states,transitions,stateMapping?}` (`packages/domain/src/workflow.ts:83-116`) — no status. `"Published"` is derivable (the list serves only published defs) but `"Superseded"` and the builder's `"Draft · N issues"` (data `:3176-3183`) are not on this read. **WIRE GAP — the second action:** `"Duplicate"`, `"Discard draft"` and `"View history"` (data `:3174-3188`) have no gateway method (`packages/app-core/src/workflow-builder/gateway.ts:56-94`). *Not* a gap: the state chips and `"N states · N transitions"` are derivable — `WorkflowState` carries `category` (`packages/domain/src/workflow.ts:83-90`; `workflowStateSchema` `:6-14`) and `transitions` is on the def.
