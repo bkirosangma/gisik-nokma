@@ -1029,3 +1029,437 @@ describe('13.596 emptyCopy renders only when a caller passes one, over a zero-ro
     expect(screen.queryByTestId('list-empty')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 13.659–13.670 — the List tab's controls row, column-picker tray and table,
+ * restyled to the prototype's `isListView` block
+ * (`design-system/interactive/desktop.dc.html:405-479`) and its row builders
+ * (`:2839-2930`).
+ *
+ * WHAT THESE CASES CAN AND CANNOT SEE. They are jsdom cases and this package's
+ * vitest config loads no stylesheet, so every assertion below is about the
+ * MARKUP the restyle renders — which classes exist, which state each control
+ * reports, which sentence each cell composes — and never about a colour, a
+ * radius or a pixel. A case here that claimed to measure a shadow would be
+ * measuring jsdom.
+ *
+ * THE VISUAL HALF, stated as measured rather than as hoped. An earlier draft of
+ * this paragraph said the visual metrics were held by
+ * `packages/ui/test/components.test.tsx` and `apps/web/e2e-viewport/`, and that
+ * was FALSE: neither suite names a single `.gn-list__*` selector. Every `it` in
+ * the ui file names another block, and the viewport sweeps never open this tab
+ * at all (the project page defaults to the board). The claim was load-bearing —
+ * it sat above `.gn-list__columns-tray[hidden] { display: none }`, a rule that
+ * could have been deleted with every suite in the repo green while the tray
+ * stopped closing in a browser. What actually holds the declarations this
+ * restyle depends on is `./ticket-list-css-binding.test.tsx` (13.671), which
+ * reads them out of `ui.css` beside the classes this component really renders.
+ *
+ * THE RESIDUAL GAP, named rather than papered over: nothing measures the
+ * COMPUTED result for this tab in a browser. There is no viewport sweep, no
+ * screenshot diff, and the type-scale and tap-target ratchets do not visit it,
+ * so a declaration that is present and then overridden, or one whose token
+ * resolves to a colour nobody wanted, is invisible to every suite here. 13.671
+ * narrows this to "the declaration exists and says the right thing"; it does not
+ * close it.
+ *
+ * The five chips, the five grouping keys and the `Group by` accessible name are
+ * the three HARD CONSTRAINTS of this task that are also the three things a
+ * restyle can silently take away: a tray rewritten as a `<details>`, a picker
+ * rebuilt on a new component, five keys quietly grown to six. Each has its own
+ * case, and 13.659's negative assertion (`workflow` is ABSENT) is the half that
+ * a `toEqual` over five names cannot make on its own.
+ */
+
+/** A due date claimed by Kiro, and the closed twin of it (13.666). */
+const DUE_CLAIMED: ListRow = listRowSeed({
+  ticketId: 'due_open',
+  title: 'File the return',
+  dueDate: { date: '2026-08-30', claim: claim({ actorId: 'me', actorName: 'Kiro' }) },
+});
+const DUE_CLOSED: ListRow = listRowSeed({
+  ticketId: 'due_closed',
+  title: 'Filed the return',
+  dueDate: { date: '2026-08-30', claim: claim({ actorId: 'me', actorName: 'Kiro' }) },
+  closed: { actorId: 'me', at: '2026-09-17T09:00:00.000Z' },
+});
+
+describe('13.659 Group by keeps its accessible name and exactly its five keys', () => {
+  it('the control is a button named `Group by`, and its panel offers epic/status/assignee/type/flat — and no sixth key', async () => {
+    const user = userEvent.setup();
+    render(<ControlledList />);
+    // MEASURED, and worth recording because it looks like a defect and is not
+    // one this task may fix: the trigger's COMPUTED name is `epic Group by`,
+    // not `Group by`. React Aria writes `aria-labelledby` (value id, then label
+    // id) as well as the `aria-label` it was handed, and the computed name
+    // prefers `aria-labelledby`. That composition predates this restyle — the
+    // `Select` and its props are untouched here, and every pre-existing case in
+    // this file queries `/Group by/` for the same reason. What this restyle is
+    // required to PRESERVE is the attribute, so the attribute is what is
+    // asserted verbatim below; the computed name is asserted as containing it.
+    const trigger = screen.getByRole('button', { name: /Group by/ });
+    expect(trigger).toHaveAttribute('aria-label', 'Group by');
+    await user.click(trigger);
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option')).toHaveLength(5);
+    for (const key of ['epic', 'status', 'assignee', 'type', 'flat']) {
+      expect(within(listbox).getByRole('option', { name: key })).toBeInTheDocument();
+    }
+    // The prototype's own list carries `workflow` in this slot
+    // (`desktop.dc.html:410`). This product's wire has no workflow field on
+    // `ListRow`, so the key is held, not transcribed — and a length check
+    // alone would pass if someone swapped `flat` out for `workflow`.
+    expect(within(listbox).queryByRole('option', { name: 'workflow' })).not.toBeInTheDocument();
+  });
+});
+
+describe('13.660 the tray renders five chips, each with its own accessible name and checked state', () => {
+  it('five checkboxes, named for their columns, checked exactly where the preferences say', async () => {
+    const user = userEvent.setup();
+    render(<ControlledList initial={chose(['status', 'assignee'], 'flat')} />);
+    // Opened first, and not as a convenience: a `hidden` subtree is excluded
+    // from the accessible tree, so `getAllByRole` over a closed tray answers
+    // ZERO while five chips sit in the DOM — a zero that would read as "the
+    // chips are gone". `getAllByLabelText` below is the closed-tray arm.
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    const tray = screen.getByTestId('list-columns-tray');
+    expect(within(tray).getAllByRole('checkbox')).toHaveLength(5);
+    for (const [name, checked] of [
+      ['Status', true],
+      ['Assignee', true],
+      ['Due date', false],
+      ['Type', false],
+      ['Progress', false],
+    ] as const) {
+      const chip = within(tray).getByRole('checkbox', { name });
+      if (checked) expect(chip, name).toBeChecked();
+      else expect(chip, name).not.toBeChecked();
+    }
+  });
+
+  it('CONTROL: the same query answers both ways, and the chips are MOUNTED while the tray is closed', () => {
+    // Two jobs, and the first is the one that makes the case above evidence:
+    // an `unchecked` assertion is only worth something if the same read can
+    // come back `checked`. Both arms are measured in one run.
+    const all = render(
+      <ControlledList initial={chose(['status', 'assignee', 'dueDate', 'type', 'progress'], 'flat')} />,
+    );
+    const allTray = all.getByTestId('list-columns-tray');
+    const allChips = [...allTray.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(allChips).toHaveLength(5);
+    expect(allChips.every((chip) => chip.checked)).toBe(true);
+    // The closed-tray arm, read straight off the DOM because the accessible
+    // tree excludes a `hidden` subtree: this is the property the tray's
+    // `hidden`-rather-than-conditional rendering exists for, and
+    // `getByLabelText` is the query four pre-existing cases in this file use
+    // to reach a chip on a List whose tray was never opened.
+    expect(allTray).toHaveAttribute('hidden');
+    expect(within(allTray).getByLabelText('Type')).toBeChecked();
+    all.unmount();
+
+    render(<ControlledList initial={chose([], 'flat')} />);
+    const noneChips = [
+      ...screen.getByTestId('list-columns-tray').querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    ];
+    expect(noneChips).toHaveLength(5);
+    expect(noneChips.some((chip) => chip.checked)).toBe(false);
+    expect(screen.getByLabelText('Type')).not.toBeChecked();
+  });
+});
+
+describe('13.661 the Columns toggle opens and closes the tray it names', () => {
+  it('starts closed with `aria-expanded="false"` and the tray hidden, then flips both on click', async () => {
+    const user = userEvent.setup();
+    render(<ControlledList />);
+    const toggle = screen.getByRole('button', { name: 'Columns' });
+    const tray = screen.getByTestId('list-columns-tray');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // The tray is in the DOCUMENT while closed (four existing cases in this
+    // file query its checkboxes by label text without ever opening it), so
+    // "closed" is `hidden` and not absence — which is why this asserts the
+    // attribute rather than `queryByTestId(...)` being null.
+    expect(tray).toHaveAttribute('hidden');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(tray).not.toHaveAttribute('hidden');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(tray).toHaveAttribute('hidden');
+  });
+});
+
+describe('13.662 the group header band names its group and counts its own rows', () => {
+  it('each grouping axis renders its own word, its own section title, and a singular/plural count', () => {
+    // ROWS, by axis, under `labels` above: epic → `No epic` holds epicA and t5;
+    // status → `To do` holds epicA and t3, `Doing` holds t2 alone; assignee →
+    // t2 is Kiro's and the other three are unassigned, so `Unassigned` holds
+    // THREE, not four; and type → epicA is the `epic` type while t2/t3/t5 are
+    // the seed's `task`, so `task` holds three. Both counts were MEASURED, not
+    // reasoned: the first version of these two lines said four each and the run
+    // answered `assignee · 3 tickets` then `type · 3 tickets`.
+    const expected: [Grouping, string, string, string][] = [
+      ['epic', 'No epic', 'epic · 2 tickets', 'Registrations'],
+      ['status', 'To do', 'state · 2 tickets', 'Doing'],
+      ['assignee', 'Unassigned', 'assignee · 3 tickets', 'Kiro'],
+      ['type', 'task', 'type · 3 tickets', 'epic'],
+    ];
+    for (const [grouping, title, meta, alsoTitle] of expected) {
+      const view = render(<ControlledList initial={chose([], grouping)} />);
+      const band = (label: string): Element => {
+        const region = view.getByRole('region', { name: label });
+        const found = region.querySelector('.gn-list__section-title');
+        if (found === null) throw new Error(`no band over ${label}`);
+        return found;
+      };
+      const first = band(title);
+      expect(first.querySelector('.gn-list__section-name'), grouping).toHaveTextContent(title);
+      expect(first.querySelector('.gn-list__section-meta'), grouping).toHaveTextContent(meta);
+      // The second half of the epic/status arms: more than one band per axis,
+      // each carrying its OWN title — a band that hardcoded the first group's
+      // name would pass everything above and fail here.
+      const second = band(alsoTitle);
+      expect(second.querySelector('.gn-list__section-name'), grouping).toHaveTextContent(alsoTitle);
+      view.unmount();
+    }
+  });
+
+  it('the singular form is real — a one-row section says `1 ticket`', () => {
+    // `Doing` holds exactly one row above, so the plural branch cannot pass for
+    // it. Separated from the loop so the failure names the plurality rather
+    // than the axis.
+    render(<ControlledList initial={chose([], 'status')} />);
+    const region = screen.getByRole('region', { name: 'Doing' });
+    const band = region.querySelector('.gn-list__section-title');
+    if (band === null) throw new Error('no band over Doing');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('state · 1 ticket');
+  });
+
+  it('the flat grouping renders no band at all — there is no group to name', () => {
+    render(<ControlledList initial={chose([], 'flat')} />);
+    expect(screen.queryByText(/^state · /)).not.toBeInTheDocument();
+    expect(document.querySelector('.gn-list__section-meta')).toBeNull();
+  });
+
+  it('a COLLAPSED subtree does not shrink the band — the count is the section, not the screen', async () => {
+    // THE CASE THAT MAKES `section.rows.length` FALSIFIABLE. Every other count
+    // assertion in this file renders a section whose rows and whose visible nodes
+    // are the same set, so `nodes.length` (the POST-`visibleNodes` list) passes
+    // them all — measured: swapping the two in `ticket-list.tsx` compiled and
+    // left the whole suite green. For a collapsed parent the two genuinely differ,
+    // and this is the only arrangement in the fixture where they can: `epic`
+    // grouping puts t2 and its child t3 in the same `Registrations` section (under
+    // `status` they land in different sections and never nest; under `flat` there
+    // is no band to read), so collapsing t2 hides t3 from the TABLE while the
+    // section's own membership is untouched.
+    const user = userEvent.setup();
+    render(<ControlledList initial={chose([], 'epic')} />);
+    const region = screen.getByRole('region', { name: 'Registrations' });
+    const band = region.querySelector('.gn-list__section-title');
+    if (band === null) throw new Error('no band over Registrations');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 tickets');
+
+    await user.click(within(region).getByRole('button', { name: 'Collapse DLT registration' }));
+
+    // The CONTROL: the collapse really hid a node, or the assertion below would
+    // read `2 tickets` off a table that still holds two rows and prove nothing
+    // about which number the band reads.
+    expect(within(region).queryByTestId('ticket-card-t3')).toBeNull();
+    expect(within(region).getByTestId('ticket-card-t2')).not.toBeNull();
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 tickets');
+    // The band answers for its section the way the summary answers for the
+    // project: a count that shrank when a row was collapsed would be a count of
+    // the user's scroll position. And the row's own state agrees with the table:
+    // the same control now offers to expand, and draws the collapsed glyph.
+    expect(within(region).getByRole('button', { name: 'Expand DLT registration' })).toHaveTextContent(
+      '▸',
+    );
+  });
+});
+
+describe('13.663 the title cell indents by depth, from the row’s own numbers', () => {
+  it('epic 16px, child 38px, grandchild 60px — the prototype’s `16 + depth*22`', () => {
+    render(<ControlledList initial={chose([], 'flat')} />);
+    // Scoped to the sections, never the document: t2 is assigned to
+    // `currentUserId` and therefore renders a SECOND time in *Recently
+    // assigned*, at depth 0 — so a document-wide `getByTestId('ticket-card-t2')`
+    // is ambiguous and the pin's copy would answer 16px for a row whose section
+    // copy is at 38px. The pin is a flat surface by design; this case is about
+    // the section's indentation.
+    const section = screen.getByRole('region', { name: 'All tickets' });
+    const left = (ticketId: string): string => {
+      const cell = within(section).getByTestId(`ticket-card-${ticketId}`);
+      return (cell as HTMLElement).style.paddingLeft;
+    };
+    // ROWS nests epicA → t2 → t3, so the three rows are depths 0, 1, 2.
+    expect(left('epicA')).toBe('16px');
+    expect(left('t2')).toBe('38px');
+    expect(left('t3')).toBe('60px');
+    // Three DISTINCT values is the property; a cell that ignored depth would
+    // make the three equal and this case would still pass a single assertion.
+    expect(new Set([left('epicA'), left('t2'), left('t3')]).size).toBe(3);
+  });
+
+  it('a leaf reserves the caret’s column, so depth and not hasChildren sets the left edge', () => {
+    render(<ControlledList initial={chose([], 'flat')} />);
+    // t3 is a leaf at depth 2 and t2 a parent at depth 1: their indentation
+    // must differ by exactly one step, which only holds if the missing caret is
+    // SPACED OUT rather than collapsed. Scoped to the sections for the same
+    // reason as the case above — the pin renders a second t2.
+    const section = screen.getByRole('region', { name: 'All tickets' });
+    const leaf = within(section).getByTestId('ticket-card-t3');
+    const parent = within(section).getByTestId('ticket-card-t2');
+    expect(leaf.querySelector('.gn-list__caret-spacer')).not.toBeNull();
+    expect(parent.querySelector('.gn-list__collapse')).not.toBeNull();
+    expect(leaf.querySelector('.gn-list__collapse')).toBeNull();
+  });
+});
+
+describe('13.664 the status pill renders the state’s name and its category dot', () => {
+  it('shows `Doing` inside a chip carrying the active category’s own modifier, and `Done` under terminal’s', () => {
+    render(<ControlledList initial={chose(['status'], 'flat')} />);
+    // Scoped to the sections: t2 is pinned a second time above, and that copy
+    // carries the pin's own row, not the section's.
+    const section = screen.getByRole('region', { name: 'All tickets' });
+    const chipNamed = (ticketId: string, name: string): Element => {
+      const row = within(section).getByTestId(`ticket-card-${ticketId}`).closest('tr');
+      if (row === null) throw new Error(`no <tr> for ${ticketId}`);
+      const chip = within(row).getByText(name).closest('.gn-chip');
+      if (chip === null) throw new Error(`${name} is not inside a chip`);
+      return chip;
+    };
+    // The dot is `Chip`'s own, `aria-hidden` and coloured per tone: the tone
+    // class is what makes it the STATE's category rather than a generic bullet.
+    const active = chipNamed('t2', 'Doing');
+    expect(active.className).toContain('gn-chip--active');
+    expect(active.querySelector('.gn-chip__dot')).not.toBeNull();
+    // TWO categories, so the modifier is measured as tracking the row's state
+    // and not as one class this view hardcodes for every chip it renders.
+    const terminal = chipNamed('t5', 'Done');
+    expect(terminal.className).toContain('gn-chip--terminal');
+    expect(terminal.className).not.toContain('gn-chip--active');
+    expect(terminal.querySelector('.gn-chip__dot')).not.toBeNull();
+  });
+});
+
+describe('13.665 a due date is rendered as a claim, with its claimant', () => {
+  it('reads `30 Aug 2026 — Kiro’s claim`', () => {
+    render(<ControlledList rows={[DUE_CLAIMED]} initial={chose(['dueDate'], 'flat')} />);
+    const row = screen.getByTestId('ticket-card-due_open').closest('tr');
+    if (row === null) throw new Error('no <tr> for due_open');
+    expect(within(row).getByText("30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+  });
+});
+
+describe('13.666 a closed ticket’s due cell reads its closure, still attributed', () => {
+  it('reads `Closed 17 Sep 2026 — Kiro’s claim`', () => {
+    render(<ControlledList rows={[DUE_CLOSED]} initial={chose(['dueDate'], 'flat')} />);
+    const row = screen.getByTestId('ticket-card-due_closed').closest('tr');
+    if (row === null) throw new Error('no <tr> for due_closed');
+    expect(within(row).getByText("Closed 17 Sep 2026 — Kiro's claim")).toBeInTheDocument();
+    // The date's own claimant outlives the closure: `closed.actorId` is `me`
+    // here too, so a cell that switched to the CLOSER would pass by accident.
+    // This asserts the sentence's SHAPE instead, which is the part that would
+    // change if the attribution source were swapped.
+    expect(within(row).queryByText(/^17 Sep 2026/)).not.toBeInTheDocument();
+  });
+});
+
+describe('13.667 an unclaimed due date is named, never blank', () => {
+  it('reads `No date claimed`, and not a dash', () => {
+    render(<ControlledList rows={[OPEN_ROW]} initial={chose(['dueDate'], 'flat')} />);
+    const row = screen.getByTestId('ticket-card-ra_open').closest('tr');
+    if (row === null) throw new Error('no <tr> for ra_open');
+    expect(within(row).getByText('No date claimed')).toBeInTheDocument();
+    expect(within(row).queryByText('—')).not.toBeInTheDocument();
+  });
+});
+
+describe('13.668 progress reads `N of M done`, and its absence is a dash', () => {
+  it('a rolled-up row states both counts and any restricted note', () => {
+    const rolled = listRowSeed({
+      ticketId: 'rolled',
+      title: 'Has children',
+      rollup: { terminalChildren: 3, totalChildren: 8, restrictedCount: 0 },
+    });
+    const partial = listRowSeed({
+      ticketId: 'partial',
+      title: 'Has hidden children',
+      rollup: { terminalChildren: 4, totalChildren: 8, restrictedCount: 2 },
+    });
+    render(<ControlledList rows={[rolled, partial]} initial={chose(['progress'], 'flat')} />);
+    const rolledRow = screen.getByTestId('ticket-card-rolled').closest('tr');
+    const partialRow = screen.getByTestId('ticket-card-partial').closest('tr');
+    if (rolledRow === null || partialRow === null) throw new Error('rows not found');
+    expect(within(rolledRow).getByText('3 of 8 done')).toBeInTheDocument();
+    expect(within(partialRow).getByText('4 of 8 done · 2 restricted')).toBeInTheDocument();
+  });
+
+  it('a row with no rollup renders the dash, not `0 of 0 done`', () => {
+    render(<ControlledList rows={[OPEN_ROW]} initial={chose(['progress'], 'flat')} />);
+    const row = screen.getByTestId('ticket-card-ra_open').closest('tr');
+    if (row === null) throw new Error('no <tr> for ra_open');
+    expect(within(row).getByText('—')).toBeInTheDocument();
+    expect(within(row).queryByText(/done/)).not.toBeInTheDocument();
+  });
+});
+
+describe('13.669 the controls row, tray and table render under all three styles', () => {
+  it('hig, minimal and neo each render the same DOM — the style is carried by CSS alone', () => {
+    // `data-style` lands on the document element (`apps/web`'s style toggle
+    // sets it there), so this is the same switch the app flips. What is
+    // measured is the property that makes "all three styles render" a
+    // statement rather than a hope: NOTHING in `packages/app-core/src` reads
+    // `data-style` — verified, not assumed — so the three renders must be
+    // byte-identical, and a future `style === 'neo' ? … : …` branch in this
+    // view would have to show up here as a difference.
+    const markup: string[] = [];
+    for (const style of ['hig', 'minimal', 'neo']) {
+      document.documentElement.setAttribute('data-style', style);
+      const view = render(<ControlledList initial={chose(['status', 'assignee'], 'status')} />);
+      expect(screen.getByRole('button', { name: /Group by/ }), style).toHaveAttribute(
+        'aria-label',
+        'Group by',
+      );
+      expect(screen.getByRole('button', { name: 'Columns' }), style).toBeInTheDocument();
+      // Read off the DOM, not the accessible tree: the tray mounts closed, so a
+      // role query answers zero here for the reason 13.660 records.
+      expect(
+        screen.getByTestId('list-columns-tray').querySelectorAll('input[type="checkbox"]'),
+        style,
+      ).toHaveLength(5);
+      expect(screen.getByTestId('list-summary'), style).toHaveTextContent('4 tickets · 1 done');
+      expect(view.container.querySelector('.gn-list__section-title'), style).not.toBeNull();
+      expect(view.container.querySelector('.gn-list__table-wrap'), style).not.toBeNull();
+      // React Aria derives its ids from `useId`, whose counter advances per
+      // React ROOT, so three renders in one process carry different id tokens
+      // and a raw comparison would be measuring React's id counter rather than
+      // this view. The mask is narrow — only `react-aria-*` tokens — which is
+      // what makes the equality asserted below a PROOF rather than a hope: if
+      // any other difference existed between two styles' renders, it would
+      // survive the mask and redden here.
+      markup.push(view.container.innerHTML.replace(/react-aria-[\w-]+/g, 'ID'));
+      view.unmount();
+    }
+    document.documentElement.removeAttribute('data-style');
+    expect(markup[1]).toBe(markup[0]);
+    expect(markup[2]).toBe(markup[0]);
+  });
+});
+
+describe('13.670 the title’s weight is a fact about the row, not about the class', () => {
+  it('epic 600, a child 400, an unparented non-epic 500', () => {
+    render(<ControlledList initial={chose([], 'flat')} />);
+    const weight = (ticketId: string): string => {
+      const cell = screen.getByTestId(`ticket-card-${ticketId}`);
+      const button = cell.querySelector('.gn-list__open') as HTMLElement | null;
+      if (button === null) throw new Error(`no title button for ${ticketId}`);
+      return button.style.fontWeight;
+    };
+    // ROWS: epicA is the rank-1 type (the prototype's `isEpicT`), t3 hangs
+    // under t2 (depth 2), t5 is a root of an ordinary type (rank 3, depth 0).
+    expect(weight('epicA')).toBe('600');
+    expect(weight('t3')).toBe('400');
+    expect(weight('t5')).toBe('500');
+    expect(new Set([weight('epicA'), weight('t3'), weight('t5')]).size).toBe(3);
+  });
+});

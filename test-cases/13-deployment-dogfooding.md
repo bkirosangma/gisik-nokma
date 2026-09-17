@@ -7480,3 +7480,138 @@ proof is a comparison, so the case is written as one.
   (`design-system/tools/unpack-bundle.mjs`, `design-system/interactive/PROVENANCE.md`,
   `design-system/interactive/desktop.dc.html`, `design-system/interactive/support.js`,
   `design-system/MASTER.md`)
+
+
+**Block 13.659–13.671 — the List tab restyled to the desktop prototype, 2026-09-18.** ✅ for the thirteen
+cases below, which live in `packages/app-core/test/views/ticket-list.test.tsx` and
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx`, and are green at the tip
+(the package suite reads `1454 passed`, exit 0). **The block carries one scope statement rather than one
+doubt:** this package vitest config loads no stylesheet, so every assertion is about the MARKUP a restyle
+renders — which classes exist, which state each control reports, which sentence each cell composes — and
+never about a colour, a radius or a pixel; a case here that claimed to measure a shadow would be measuring
+jsdom. **The claim that used to sit here — that the visual half was held by `packages/ui/test/components.test.tsx`
+and `apps/web/e2e-viewport/` — was FALSE and is retracted: neither suite names a single `.gn-list__*`
+selector (every `it` in the ui file names another block; the viewport sweeps never open this tab, because
+the project page defaults to the board).** It was a load-bearing falsehood: it sat above
+`.gn-list__columns-tray[hidden] { display: none }`, which could have been deleted with every suite green
+while the tray stopped closing in a browser. What holds the declarations this restyle depends on is now
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx` (13.671). **The residual gap is named, not
+papered over:** nothing measures the COMPUTED result for this tab in a browser — no viewport sweep, no
+screenshot diff — so a declaration that is present and then overridden, or a token that resolves to the
+wrong colour, is invisible to every suite in this repo. **Citations name the
+2026-09-18 prototype (`design-system/interactive/desktop.dc.html`, 4,050 lines, 320,109 B, sha256
+`2cda054b…`), whose `isListView` block is `:405-479`** — the same file 13.658 unpacks, and the reason
+these numbers are not 13.658-era numbers: the 2026-09-18 refresh moved every line (the offset is not
+constant: 176→180, 477→481, 1827→1905, 2584→2779), so every citation here was re-measured against the new
+file rather than shifted by a delta.
+
+- ✅ **13.659 — `Group by` keeps its accessible name and exactly its five keys.** The chip tray and the
+  picker are the two things a restyle silently rewrites, so the picker is asserted twice over: the
+  `aria-label` attribute verbatim (`Group by`) and the panel offering `epic/status/assignee/type/flat`
+  and **no sixth key** — the negative half is the one a `toEqual` over five names cannot make, because it
+  is the half that catches a key quietly grown to six. Measured and recorded, not "fixed": the COMPUTED
+  accessible name is `epic Group by`, since React Aria composes `aria-labelledby` from the value and the
+  label and that wins over the explicit `aria-label`. Pre-existing, and the constraint pins the attribute.
+  (`packages/app-core/src/views/ticket-list.tsx`)
+
+- ✅ **13.660 — the tray renders five chips, each with its own accessible name and checked state.**
+  `Status/Assignee/Due date/Type/Progress` as five real checkboxes, checked exactly where the preferences
+  say, so "five chips" is a count of CONTROLS and not of decorated spans. The CONTROL arm asserts both
+  answers in one run — including that the chips are MOUNTED while the tray is closed, which is what the
+  `hidden` attribute (rather than a `{open ? … : null}` conditional) buys and what an existing case in
+  this file depends on. A `hidden` subtree is out of the accessible tree, so the closed-tray arm reads the
+  DOM directly and says so.
+
+- ✅ **13.661 — the Columns toggle opens and closes the tray it names.** `aria-expanded` false → true →
+  false across a click, with the tray’s `hidden` attribute flipping in step — the state the old
+  `<details>`/`<summary>` disclosure reported structurally and that a plain button has to state itself.
+
+- ✅ **13.662 — the group header band names its group and counts its own rows.** Each of the four axes
+  renders its own word (`epic`, `state`, `assignee`, `type`) beside its own section title and a count of
+  that section’s own rows; the singular (`state · 1 ticket`) and the flat case (no band at all — there is
+  no group to name) are cases in their own right, because a band that renders under `flat` would be naming
+  nothing. Counts were MEASURED, not inferred from the fixture list: `assignee · 3 tickets` (not 4) and
+  `type · 3 tickets` (not 4), the assigned row and the epic row being the two that move. **A fifth arm is
+  the one that makes the count FALSIFIABLE:** every other arm renders a section whose rows and whose
+  visible nodes are the SAME set, so `nodes.length` (the post-`visibleNodes` list) passes them all —
+  measured: swapping the two in `ticket-list.tsx` compiled and left the whole suite green. The collapsed
+  arm collapses a parent under `epic` grouping and asserts the band still reads `epic · 2 tickets` while
+  the table shows one row; it is the only fixture arrangement where the two numbers differ (`status` puts
+  the parent and child in different sections so they never nest, and `flat` has no band), and the same
+  mutation now reddens exactly that case with `epic · 1 ticket`. **A DECLARED DIVERGENCE rides with it:**
+  the prototype counts a group’s CHILDREN (`const n = g.items.length`, `:2920`, held separately from
+  `g.epic` at `:2904`), so for the same two rendered rows it prints `1 ticket` where this prints
+  `2 tickets` — because here the epic IS a row (`list-model.ts`, `nestRows`) and the band answers for its
+  section the way the summary answers for the project. An earlier revision of this bullet cited a
+  prototype expression that does not exist; the measured behaviour is what is recorded now.
+
+- ✅ **13.663 — the title cell indents by depth, from the row’s own numbers.** `16 + depth*22`:
+  epic 16px, child 38px, grandchild 60px, three distinct values, scoped to the List region because an
+  assigned row also renders in the *Recently assigned* pin at depth 0. A second arm holds the leaf case:
+  the left edge is set by DEPTH and not by `hasChildren`, so a leaf reserves the caret’s column rather
+  than sliding 22px left of its siblings.
+
+- ✅ **13.664 — the status pill renders the state’s name and its category dot.** `Doing` inside a chip
+  carrying the active category’s own modifier and a real `.gn-chip__dot`, and `Done` under terminal’s
+  — with the dot asserted present in one case and the modifier asserted ABSENT in the other, so the two
+  arms cannot both pass on the same markup.
+
+- ✅ **13.665 — a due date is rendered as a claim, with its claimant.** `30 Aug 2026 — Kiro’s claim` —
+  the date plus who asserted it, which is the fact the column is about. (The prototype’s relative
+  labels — `Overdue by N days`, `Due today`, `Due tomorrow`, `Due <weekday>` — are NOT reproduced: they
+  need a clock, no view in `app-core` reads one, `TicketList` has no `today` prop, and the prototype
+  itself pins `new Date("2026-09-08T00:00:00Z")`. Filed rather than faked.)
+
+- ✅ **13.666 — a closed ticket’s due cell reads its closure, still attributed.** `Closed 17 Sep 2026 —
+  Kiro’s claim`, plus the negative that the bare due date does NOT also appear: the swap is a
+  replacement, not an addition. The closure travels as its own claim (`ListRow.closed`), which is what
+  makes the prototype’s `"Closed " + (t.closed || nice)` exact here instead of a formatting accident.
+
+- ✅ **13.667 — an unclaimed due date is named, never blank.** `No date claimed`, and no dash — a dash
+  beside an attributed-claims column reads as "we looked and found nothing", which is a claim about the
+  record this view cannot make.
+
+- ✅ **13.668 — progress reads `N of M done`, and its absence is a dash.** `3 of 8 done` and
+  `4 of 8 done · 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
+  silently dropped), and a row with no rollup rendering `—` — asserted together with the absence of
+  `/done/`, so the empty arm cannot pass on a `0 of 0 done` that would be a claim about nothing.
+
+- ✅ **13.669 — the controls row, tray and table render under all three styles.** `hig`, `minimal` and
+  `neo` each render the controls row, the tray, the summary, the band and the table, and then their
+  `innerHTML` strings are compared with exactly one mask (`react-aria-*` → `ID`). The narrow mask is what
+  makes the equality a proof: React Aria’s `useId` tokens advance per React root, so the raw strings
+  differ on that alone and a broader normalisation would have hidden a real difference. No file in
+  `packages/app-core/src` reads `data-style`; the style is carried by CSS alone, and this case is the
+  product-side half of that claim.
+
+- ✅ **13.670 — the title’s weight is a fact about the row, not about the class.** epic 600, a child 400,
+  an unparented non-epic 500 — three distinct values, so a class-level weight cannot satisfy the case.
+  The prototype computes it per row (`isEpicT(t) ? "600" : depth ? "400" : "500"`), which is why it
+  renders as an inline style rather than in `.gn-list__open`.
+
+- ✅ **13.671 — the List’s classes, the attributes its selectors key on, and the four declarations this
+  restyle turns on, read out of `ui.css` rather than assumed.** Declared in
+  `packages/app-core/test/views/ticket-list-css-binding.test.tsx`, which exists because the block
+  docblock above used to claim the visual half was "held by `packages/ui/test/components.test.tsx` and
+  `apps/web/e2e-viewport/`" — **measured, that was false: neither suite names a single `.gn-list__*`
+  selector.** The false claim sat above `.gn-list__columns-tray[hidden] { display: none }`, a rule that
+  could have been deleted with every suite in the repo green while the tray stopped closing in a browser,
+  since the component closes the tray with the `hidden` ATTRIBUTE and `display: flex` outranks the UA
+  sheet. Five arms, each a pair of facts rather than one: (a) the class SET EQUALITY in both directions,
+  with the five known-inert hooks NAMED (`__empty`, `__narrowing`, `__pinned`, `__section`,
+  `__section-name`) so a new class with no rule cannot hide; (b) `display: flex` beside `[hidden] display:
+  none`, read as one shape so a missing rule reads as `null` rather than as an absent assertion, plus the
+  rendered `hidden` attribute the selector needs; (c) the spacer and the caret at the same width
+  (`1.375rem`, the prototype’s 22px — a relative assertion with an absolute one beside it); (d) the
+  transparent real checkbox beside the `:focus-visible` ring on the box that follows it, plus the
+  focusability and sibling order that make the rule paintable at all; (e) every `[attribute]` in a
+  `.gn-list*` selector checked against the attributes the component writes. **Four mutation witnesses:**
+  renaming the `[hidden]` selector reddens (a)+(b), changing the spacer width reddens (c), renaming the
+  focus rule reddens (a)+(d), and renaming a class in `ticket-list.tsx` reddens (a) — with `ui.css`
+  restored to its pre-mutation SHA-256 after each. **The residual gap is named, not papered over:** this
+  is declaration-level, so nothing here measures a COMPUTED result for this tab in a browser — there is no
+  viewport sweep, no screenshot diff, and a declaration that is present and then overridden is invisible
+  to every suite in the repo.
+
+(`packages/app-core/src/views/ticket-list.tsx`, `packages/app-core/test/views/ticket-list.test.tsx`,
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx`, `packages/ui/src/ui.css`, `Features.md`)

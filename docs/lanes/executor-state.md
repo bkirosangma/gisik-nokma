@@ -138,6 +138,46 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > file's; the offset from the old file is **not constant** (176→180, 477→481, 1827→1905, 2584→2779), so
 > every existing `desktop.dc.html:<line>` citation must be re-measured, never shifted by a delta.
 >
+> ## Part 1 status — gate GREEN, review done, fixes landed, second gate in flight
+>
+> The reviewer returned **no Critical and three Important**, all now fixed and re-verified:
+>
+> 1. **A false coverage claim, hiding a rule no suite could fail on.** The test docblock and the
+>    catalogue both asserted the visual metrics were "held by `packages/ui/test/components.test.tsx`
+>    (declaration-level) and `apps/web/e2e-viewport/` (computed style)". **Neither names a single
+>    `.gn-list__*` selector** — measured with a working control (`.gn-board-card` appears 14× in
+>    `packages/ui/test`, `.gn-list` 0×; `e2e-viewport` never opens the List tab). So
+>    `.gn-list__columns-tray[hidden] { display: none }` could be deleted with every suite green while
+>    the tray stays permanently open in a browser — the exact hazard the rule's own comment names.
+>    Claim retracted in both places, and **case 13.671** (new file `ticket-list-css-binding.test.tsx`)
+>    now holds it with five paired arms and four mutation witnesses.
+> 2. **An unconstrained assertion and a fabricated citation.** 13.662's "counts its own rows" survived
+>    `section.rows.length` → `nodes.length`, and its comment cited a prototype expression that does not
+>    exist (`const n = g.items.length` is the real one, `desktop.dc.html:2920`). Fixed with a collapsed
+>    arm that reddens on exactly that mutation, and the **divergence is now declared** rather than
+>    asserted away: this model counts the epic row, the prototype draws it as the header, so the same
+>    two rendered rows read `1 ticket` there and `2 tickets` here.
+> 3. **The five chips had lost their visible focus ring** — the real checkbox went to `opacity: 0` and
+>    nothing in `ui.css` targeted its focus, against 43 `:focus-visible` rules elsewhere. Rule added at
+>    `ui.css:870`, mutation-witnessed.
+>
+> **An instrument trap worth carrying:** `grep -n "…" file | wc -l` returned **1** where the true count
+> was **0**, because this machine's Bash hook proxies `grep` and `wc` counted the proxy's own summary
+> header. A COUNT taken through the proxy is not a count of matches. It nearly made a true review
+> finding look false.
+>
+> `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 tasks, exit 0**, 1m35s.
+> Per package: domain 486, ui 315, rule-engine 306, editor 178, sync-client 90, **app-core 1442**, desktop
+> 9, mobile 29, web 430, mcp-server 44, **server 1534 passed / 5 skipped**. **The `--concurrency=2` is not
+> decoration: the SAME tree at turbo's default concurrency went RED** on `test/seed/seed-dev.test.ts >
+> lands, and a re-run is a no-op` with a bare `Test timed out in 30000ms` — and that test passes in
+> isolation in **1.8 s**. A load-induced timeout, proven by the isolated run, not assumed.
+> **The Node is proven from inside the run, not from the launcher:** turbo's failure line named
+> `node/v24.11.1/bin/pnpm`, which is the LAUNCHER's path and not the interpreter's (the trap the
+> coordination doc records). What settles it is case **6.128**, which asserts the worker Node satisfies
+> the root `package.json`'s `engines` range (`>=22.0.0 <23`) from inside a vitest worker — it is in
+> `server`'s 150 green files, so the workers ran under Node 22.
+>
 > Case-id block **13.658–13.670** is now the live range: **13.658 is the refresh witness** (the dispatch
 > reserves one of the block for it) and the List work takes **13.659–13.670**. The original allocation
 > 13.658–13.669 was re-measured free at this tip (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`);

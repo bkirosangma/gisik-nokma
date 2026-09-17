@@ -650,43 +650,235 @@
    nothing about the visible layout of the arrows or the notice changes. */
 .gn-board-card__notice { display: contents; }
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
-.gn-list__controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.gn-list__summary { color: var(--gn-text-muted); }
+/* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
+   align-items:center;flex-wrap:wrap`. */
+.gn-list__controls { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; }
+/* The count sentence (`:407`): `font-size:15px;line-height:20px;margin:0;
+   color:var(--label2)`. It is a `<span>` in this component (`ticket-list.tsx`)
+   rather than the prototype's `<p>`, so the `margin:0` has nothing to undo and
+   is not transcribed. Its WORDING is untouched — see
+   `ticket-list.tsx`'s own note on which halves appear, and 12.384. */
+.gn-list__summary {
+  color: var(--gn-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
 .gn-list__origin { color: var(--gn-text-muted); font-size: 0.8rem; font-style: italic; }
-.gn-list__control { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--gn-text-muted); }
-/* Board prototype port Task 9 (2026-09-16), spec List `:401-475`, "Column
-   toggle" row: `min-height:36px; padding:0 12px; radius 999px; cardBg +
-   cardShadow; 13px`. `cardBg`/`cardShadow` → `--gn-surface-raised`/
-   `--gn-shadow-raised`, the SAME pair `.gn-list__table-wrap` below uses for
-   the identical prototype vocabulary — already declared, already consumed
-   elsewhere in this file. `999px` is a plain corner radius, not a colour,
-   written as a literal exactly like `.gn-chip`'s own `border-radius: 999px`
-   (`:113` above) — the token-discipline scan bans colour literals, not
-   lengths, and `radiusVariableName` only names `card`/`control` roles, so a
-   pill radius has never been a token in this file. */
-.gn-list__columns-picker summary {
+/* "Group by" label (`:408`): `display:flex;gap:8px;align-items:center;
+   font-size:15px;color:var(--label2)`. */
+.gn-list__control {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.9375rem;
+}
+/* The `Group by` trigger, and the ONE rule in this restyle that is scoped
+   rather than declared. The shared `Select` renders its single-select trigger
+   as `button.gn-select__trigger.gn-field__input` (`packages/ui/src/select/
+   select.tsx:254`), so the prototype's own three metric values
+   (`desktop.dc.html:409`: `min-height:36px;padding:0 10px;font-size:15px;
+   font-weight:600`) can only be reached by overriding the shared field class
+   in place. Scoping to `.gn-list__control` is what keeps that override from
+   becoming a second, quieter definition of what a field looks like: every
+   other `.gn-field__input` in the product is untouched.
+
+   TWO DELIBERATE OMISSIONS, both of them already-recorded decisions this rule
+   is not allowed to reopen:
+
+   - `border: none` is NOT taken, even though the prototype says so. OWNER
+     RULING 2026-09-09 (Task 14 amendment rule (a), recorded on the `neo`
+     override of `.gn-field__input` further down) keeps the `hig`/`minimal`
+     border — 13.291/13.339 pin it, and `SHADOWS.hig/minimal.sunken` are both
+     `[]`, so a borderless hig/minimal field would have no boundary at all.
+     This control IS a `.gn-field__input`, so the ruling reaches it.
+
+   - `box-shadow: var(--ctlShadow)` is NOT taken. `ctlShadow` is a
+     product-wide OPEN DECISION the repo owner left to a future round
+     (`.gn-button:22-30`, `.gn-project__workflow-select:3713-3720`,
+     `.gn-board-card__move:557-561`): raising a `ctlBg` control to neo's raised
+     shadow is not something one task settles on one control. It is left out
+     here for the same reason those three leave it out, not because the
+     prototype omitted it.
+
+   `min-height` also DIVERGES from the prototype's `36px` and stays at the
+   shared rule's `2.75rem` (44px) — the same tap-target floor
+   `.gn-board-card__move` already raised 32/36px to, for the same measured
+   reason. The trigger's own metric line is omitted entirely rather than
+   restated at 44px, so it keeps inheriting whatever that floor becomes. */
+.gn-list__control .gn-select__trigger {
+  padding: 0 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+/* ── The Columns toggle, the tray, and its chips (spec List `:405-479`,
+   `:416` and `:2795`, `:2796`).
+
+   A RESTYLE of Task 9's own `details/summary` disclosure, so what changed is
+   worth stating: the control was a `summary` carrying `cardBg`+`cardShadow`
+   at 13px in the muted tone, and the prototype's own toggle
+   (`desktop.dc.html:413`) is `background:transparent; color:var(--label);
+   font-size:15px; font-weight:600; gap:7px; border-radius:var(--ctlR)` with a
+   `▸`/`▾` caret in front of the word. Transparent is not a lost affordance
+   here: the word "Columns" plus a caret is the whole control, which is what
+   the prototype draws. `ctlR` → `--gn-radius-control`, the established
+   mapping (`.gn-project__workflow-select:3710`).
+
+   `min-height` stays 2.25rem (36px), which is ALREADY the prototype's own
+   number for this control (`:413`) — Task 9 shipped it at exactly that, and
+   nothing here raises it, because a control that was at 36px before this
+   restyle and is at 36px after is not a tap-target regression this task
+   introduced. (`/my-work`'s recorded offender count is what the tap ratchet
+   watches; this control is on the board.) */
+.gn-list__columns-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* The caret is DRAWN, never typed. It is a `::after` pseudo-element, so it
+   contributes no text node — which keeps the toggle's accessible name exactly
+   "Columns" for a screen reader, and keeps it out of the type-scale sweep
+   (`apps/web/e2e-viewport/type-scale.ts` measures direct text nodes only).
+   SIZE, measured rather than assumed: the prototype's toggle (`:413`) carries
+   `font-size:15px` and draws `{{ columnsCaret }}` inside it, so this glyph is
+   the button's own 0.9375rem inherited and nothing here is under the 12px
+   floor. The prototype's 11px caret is the ROW caret (`:446`) and its raise to
+   12px is recorded at `.gn-list__collapse` below — not here. */
+.gn-list__columns-caret::after { content: '▸'; }
+.gn-list__columns-toggle[aria-expanded='true'] .gn-list__columns-caret::after { content: '▾'; }
+/* "Chip tray" (`:416`): `display:flex;gap:8px;flex-wrap:wrap;
+   background:var(--fill4);border-radius:var(--ctlR);padding:10px 12px`.
+   `fill4` → `--gn-fill-quaternary`, already the established mapping for this
+   exact prototype variable (`.gn-list__table-row:nth-child(odd)` below, the
+   timeline's own week columns). */
+.gn-list__columns-tray {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.625rem 0.75rem;
+}
+/* `display: flex` above outranks the UA sheet's own `hidden` rule (an author
+   rule beats the UA sheet at equal specificity), so the attribute the component
+   closes the tray with needs saying again here. Without this rule the tray is
+   permanently open and `hidden` is decorative — a check that cannot fail.
+   It has a witness now: `packages/app-core/test/views/ticket-list-css-binding
+   .test.tsx` (13.671) reads BOTH halves out of this file, so deleting the
+   declaration below reddens by name rather than leaving the tray open in a
+   browser with every suite green. */
+.gn-list__columns-tray[hidden] { display: none; }
+/* "Column chip" (`:2796`): `display:inline-flex;align-items:center;gap:8px;
+   min-height:36px;padding:0 12px;border:none;border-radius:999px;
+   background:var(--cardBg);box-shadow:var(--cardShadow);color:var(--label);
+   font-size:13px;font-weight:500`. `cardBg`/`cardShadow` →
+   `--gn-surface-raised`/`--gn-shadow-raised`, the same pair
+   `.gn-list__table-wrap` below and Task 9's own toggle already resolve this
+   identical vocabulary to — NOT the open `ctlShadow` question, which is about
+   `ctlBg` controls and is left alone above.
+
+   A `<label>`, not the prototype's `<button>`: the chip wraps a real checkbox
+   (see `ticket-list.tsx`), and a label is the element that makes the whole
+   chip activate it. `cursor: pointer` is what carries the button's affordance
+   across.
+
+   `999px` is a plain corner radius, written as a literal exactly like
+   `.gn-chip`'s own `border-radius: 999px` (`:113` above) — the
+   token-discipline scan bans colour literals, not lengths, and
+   `radiusVariableName` names only `card`/`control` roles.
+
+   `position: relative` is here for the input below, which is absolutely
+   positioned and must not resolve its containing block against the page. */
+.gn-list__column-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   min-height: 2.25rem;
   padding: 0 0.75rem;
   border-radius: 999px;
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text);
   font-size: 0.8125rem;
+  font-weight: 500;
   cursor: pointer;
-  color: var(--gn-text-muted);
 }
-.gn-list__column-option { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.5rem; }
-/* The metric's "18px tick box" — the checkbox itself, not the row around
-   it. `accent-color` recolours the native control's own check mark/fill from
-   the declared `accent` role (`TOKEN_ROLES`, `tokens.ts`) rather than
-   replacing the input with a custom-drawn box this task's brief does not
-   ask for — this is the first `accent-color` declaration in this file,
-   not a reuse of an existing one. */
-.gn-list__column-option input[type='checkbox'] {
+/* The prototype's box (`:2795`), `18px` square at `5px` radius, with the tick
+   as a `::after` rather than a character — see the caret's own note above for
+   the 12px floor this avoids, and `ticket-list.tsx` for why the tick is not in
+   the DOM. The box is the input's NEXT SIBLING and the two rules below are
+   keyed on `:checked +`, so the checked state is carried entirely by CSS: no
+   second copy of "is this column shown" exists in JS for the two to disagree
+   about. */
+.gn-list__column-box {
   width: 1.125rem;
   height: 1.125rem;
-  accent-color: var(--gn-accent);
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: var(--gn-fill-tertiary);
+}
+.gn-list__column-box::after {
+  content: '✓';
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: transparent;
+}
+/* The REAL checkbox, moved out of flow and made transparent rather than
+   replaced. It keeps three things a hand-drawn box would have to reimplement:
+   `getByLabelText` resolves to it (four cases in `ticket-list.test.tsx` query
+   these toggles by label text), it carries a real `checked` state, and
+   `disabled={!prefsEditable}` needs an element that has a disabled state.
+
+   Deliberately WITHOUT `pointer-events: none`, which the usual
+   visually-hidden recipe carries: `user-event` refuses to click an element
+   whose computed `pointer-events` is `none`, so adding it would break
+   `ticket-list.test.tsx`'s own `await user.click(screen.getByLabelText('Type'))`
+   — the click that proves which half of the preferences a column touch
+   transfers authority over. */
+.gn-list__column-option input[type='checkbox'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+/* KEYBOARD FOCUS, and it has to be said HERE: the input above is real but
+   `opacity: 0`, which erases the UA's own focus ring, and before this rule
+   nothing in this file targeted its focus at all — so the five chips were
+   focusable and SILENT. The outline goes on the BOX rather than on the input,
+   because the box is what a person sees; it is the input's next sibling, the
+   same pair the two `:checked +` rules below already key on.
+   `:focus-visible`, not `:focus`: clicking a `<label>` focuses the input too,
+   and a ring drawn around a chip somebody just clicked with a mouse is noise
+   the platform does not draw either.
+   Pinned by `test/views/ticket-list-css-binding.test.tsx` (13.671), which fails
+   if this rule is deleted. */
+.gn-list__column-option input[type='checkbox']:focus-visible + .gn-list__column-box {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Checked: `background:var(--accent);color:var(--onColor)` (`:2795`).
+   `onColor` → `--gn-text-inverted`, the prototype's `--onColor` mapping this
+   file already records (`:3548`). */
+.gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box {
+  background: var(--gn-accent);
+}
+.gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
+  color: var(--gn-text-inverted);
 }
 /* "Group header row": `padding 11px 16px; trayBg + trayShadow` — the same
    pair `.gn-timeline__weeks` uses for identical prototype vocabulary
@@ -699,14 +891,41 @@
    grouping shape Task 9's own brief holds fixed ("Keep the Group-by /
    Columns wiring untouched... this is a restyle, not a rewiring"). */
 .gn-list__section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
   margin: 0 0 0.4rem;
   padding: 0.6875rem 1rem;
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--gn-text);
+}
+/* The title's trailing sentence (`:438`): `font-size:12px;line-height:16px;
+   color:var(--label2)`. `font-weight: 400` is not decoration — the band above
+   is now `600`, and the prototype's own meta span sits in a container with no
+   weight of its own, so without this line the sentence inherits the title's
+   weight and reads as a subtitle shouted as loudly as its heading. */
+.gn-list__section-meta {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
   color: var(--gn-text-muted);
 }
-.gn-list__title-cell { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* "Title cell" row (`:444`): `display:flex;align-items:baseline;gap:6px;
+   min-width:0`. `baseline`, not `center` — the caret is a glyph whose box is
+   taller than the title's line box, and centring it lifts the title off the
+   line every other cell on the row sits on. `min-width: 0` is what lets a long
+   title ellipsise instead of pushing the row's columns out. */
+.gn-list__title-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  min-width: 0;
+}
 .gn-list__collapse,
 .gn-list__open {
   font: inherit;
@@ -718,7 +937,12 @@
   text-align: left;
 }
 /* "Caret": min-width/min-height 22px — a real tap target around the glyph,
-   not the glyph's own intrinsic box. */
+   not the glyph's own intrinsic box. `font-size` is the prototype's `11px`
+   (`:446`) RAISED to 12px, and the raise is the cheap half of a trade the
+   drawn glyphs below do not get: this caret is a typed character with a real
+   text node, and `apps/web/e2e-viewport/type-scale.ts` flags any measured
+   element under 12px on every route, so 11px here would put an offender on the
+   List the moment a section has rows. One pixel of glyph beats a red ratchet. */
 .gn-list__collapse {
   color: var(--gn-text-muted);
   display: inline-flex;
@@ -726,12 +950,30 @@
   justify-content: center;
   min-width: 1.375rem;
   min-height: 1.375rem;
+  font-size: 0.75rem;
 }
+/* "noCaret" spacer (`:449`): `width:22px; flex:none`. An empty span, not a
+   character — it reserves the caret's column so a leaf's title starts at the
+   same x as its parent's, which is the ONLY thing making the depth indentation
+   readable as a hierarchy rather than as ragged left edges. The width here and
+   `.gn-list__collapse`'s `min-width` below are ONE fact in two rules, and a
+   binding test holds the pair: `ticket-list-css-binding.test.tsx` (13.671)
+   asserts both lengths and their equality, so changing either one alone
+   reddens rather than quietly shearing every leaf off its parent's left edge. */
+.gn-list__caret-spacer { width: 1.375rem; flex: none; }
 /* "Title button": 17px/22px. */
 .gn-list__open { font-size: 1.0625rem; line-height: 1.375rem; }
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
-/* Board prototype port Task 9 (2026-09-16), spec List `:401-475`,
+/* The due cell's own tone (`:2854`): `di.late ? var(--danger) : var(--label2)`.
+   Muted here, and the `late` arm is deliberately NOT transcribed: `late` is
+   computed against `self.dueInfo(t)`, which needs today's date, and no
+   app-core view reads a clock (the same reason the relative labels "Overdue by
+   N days" / "Due today" / "Due tomorrow" are not reproduced — see the report).
+   A danger tone with no clock behind it would paint every past date the same
+   colour as every future one. */
+.gn-list__due { color: var(--gn-text-muted); }
+/* Board prototype port Task 9 (2026-09-16), spec List `:405-479`,
    "Container": `cardBg + cardShadow; radius cardR; overflow:auto`. Wraps
    `<Table>` (`@gisik-nokma/ui`) FROM THE OUTSIDE — `ticket-list.tsx`'s
    `ListTable` — rather than styling anything `Table` renders itself: the
@@ -1659,8 +1901,9 @@
 
 /* "Legend" row: `cardBg + cardShadow; radius ctlR; padding 7px 14px; gap
    16px`. `cardBg`/`cardShadow` → `--gn-surface-raised`/`--gn-shadow-raised`,
-   the same pair `.gn-list__columns-picker summary` already uses for the
-   identical prototype vocabulary; `ctlR` → `--gn-radius-control` (the
+   the same pair `.gn-list__table-wrap` (`:980`) and the List's column chips
+   (`.gn-list__column-option`, `:796`) already use for the identical prototype
+   vocabulary; `ctlR` → `--gn-radius-control` (the
    PILL-shaped legend card takes the smaller control radius, not `cardR`,
    exactly as the spec table names it — not a typo carried over). */
 .gn-calendar__legend {
