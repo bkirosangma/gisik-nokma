@@ -1924,19 +1924,26 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // shadow composes against, so it is the token this control actually depends
   // on now.
   // The LIGHT arm's value: this project sets no `colorScheme`, so the run is
-  // light and `#ede4db` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
+  // light and `#f1eae3` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
   // as the literal the way the `fillTertiary` assertion it replaces was — and
   // worth naming, because the first draft asserted the DARK hex (`#141a2e`)
   // from memory and reddened on all three viewports. It is also exactly the
   // reference's own `--segOnBg` for neo light, which is the cross-check that
   // this is the right token rather than merely a passing one.
+  //
+  // 2026-09-18 (Step 2c-1, T5): this literal moved `#ede4db` -> `#f1eae3` with
+  // `neoPaper`. The cross-check it rests on is what makes the move safe to
+  // make here: the refreshed export's own `--segOnBg` for neo light is
+  // `#F1EAE3` too, so the two are still byte-for-byte equal and the assertion
+  // still names the same property. Had only one side moved, this would be a
+  // real regression rather than a re-pin.
   const surfaceSunken = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-sunken').trim(),
   );
   expect(
     surfaceSunken,
     'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
-  ).toBe('#ede4db');
+  ).toBe('#f1eae3');
 
   // ── And the track really carries no fill of its own, which is the owner's
   // change rather than an absence that was always there.

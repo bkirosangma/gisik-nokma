@@ -2531,7 +2531,7 @@ design reference (`design-system/interactive/desktop.dc.html`'s signin screen an
 `body[data-style="neo"]` token blocks) on eight points; this round closes all eight. **The largest single
 finding widens the change beyond `/sign-in` itself:** `tokens.ts` already declared `{ fg: 'accent',
 bg: 'surface'/'surfaceRaised', minimum: 4.5 }`, and the owner's neo-round accent hexes
-(`#3A6DB0`/`#7FA9E4`) measure 4.19–4.30 as TEXT on those same backgrounds — below that floor, though
+(the light one, `#7FA9E4` in dark) measured 4.19–4.30 as TEXT on those same backgrounds — below that floor, though
 comfortably above it as a FILL (5.25+ against `accentText`). A new role, `textAccent` — the
 `text`/`textMuted`/`textInverted` family, and explicitly NOT `accentText` (its opposite: colour ON an
 accent-filled surface, not accent-hued text ON a neutral one) — carries the guarantee instead, derived to
@@ -3454,8 +3454,8 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   *THE BACKGROUND MOVED TOO, and only because a failing assertion forced the value to be looked up
   rather than assumed. The first draft kept the base rule's `var(--gn-surface-raised)`, reasoning that
   `neo` collapses its surfaces anyway. It does not collapse them in LIGHT: `surfaceRaised` is `#fbf7f3`
-  there against `surfaceSunken`'s `#ede4db`, so the pressed segment sat a shade too high in exactly the
-  theme this suite runs in. The reference settles it — its own `--segOnBg` under `neo` is `#EDE4DB`
+  there against `surfaceSunken`'s `#f1eae3`, so the pressed segment sat a shade too high in exactly the
+  theme this suite runs in. The reference settles it — its own `--segOnBg` under `neo` is `#F1EAE3`
   light and `#1B2340` dark, which are byte-for-byte
   `colorOf('light'|'dark', 'surfaceSunken', 'neo')`. So the neo override carries
   `background: var(--gn-surface-sunken)` as well as the shadow: sunken ground, sunken shadow, the same
@@ -7413,7 +7413,7 @@ on this machine, at the head of this change's PR — readings, not guarantees.
   a suspiciously short log read is evidence about the READER, not about the container.
   (`docker-compose.hot.yml`, `docs/runbook.md`)
 - 🧪 **13.656 — a PACKAGE edit reaches the web through `dist`, and the package watcher can silently stop.**
-  `packages/ui/src/tokens.ts`: `blue600` `#3a6db0` → `#abcdef`. The web container's own
+  `packages/ui/src/tokens.ts`: `blue600` `#33629f` → `#abcdef`. The web container's own
   `packages/ui/dist/tokens.js` gained the new hex, and the SERVED HTML carried it **4 times** with the old hex
   at **0** — `themeStylesheet()` reads the palette through `dist`, so a token edit is visible on :3001 without
   a rebuild. Compile **6.7 s** after the write (20:19:21 → 20:19:27.7). **The revert is the finding:** the

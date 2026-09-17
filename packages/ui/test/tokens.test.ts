@@ -756,21 +756,43 @@ describe('the chip label composites legibly on fillTertiary, over every ground i
  */
 describe('textAccent — Round 2d (2026-09-09)', () => {
   /**
-   * 13.360 — the retired accent hex measured, both directions. The neo-round
-   * accent (`#3A6DB0`/`#7FA9E4`) is legible as a FILL (`accentText` on
-   * `accent`, below) but NOT as text on a neutral surface — this pins the
-   * actual regression the rest of Round 2d exists to close, so a future
-   * reader can see the number rather than take the split on faith.
+   * 13.360 — the accent hex measured, both directions.
+   *
+   * **REWRITTEN 2026-09-18 (Step 2c-1, T1), because T1 made half of this case
+   * FALSE and the honest thing is to record the new fact rather than re-tune
+   * the assertion until it goes quiet.** Round 2d's premise was that the accent
+   * (`#3A6DB0`) is legible as a FILL but never as text on a light surface
+   * (4.19–4.30). T1 moved `blue600` to the refreshed export's `#33629F`, which
+   * is DARKER, and that premise now holds only in part:
+   *
+   * | light accent on | before | after |
+   * |---|---|---|
+   * | `surface` (`warmPaper`) | 4.30 | **5.07** — now clears |
+   * | `surfaceRaised` (`warmRaised`) | 4.93 | **5.81** — now clears |
+   * | `surfaceSunken` (`warmSunken`) | — | **4.42 — still fails** |
+   * | `surface` in `neo` light | 4.30 | **5.20** |
+   *
+   * So the case asserts the surviving half: `accent` clears the plain and
+   * raised light surfaces but STILL fails the sunken one. **The `textAccent`
+   * split is unchanged and still justified** — `textAccent` remains the role
+   * that carries the 4.5 guarantee on all three surfaces (4.76–5.60 light),
+   * and a role that clears two backgrounds and fails the third is exactly the
+   * shape that must not be relied on for text. What changed is the reason a
+   * reader should give; pinning 4.42 as well as 5.07 keeps both halves visible.
    *
    * Mutation: reverting `blue600`/`blue300` to the pre-Round-2d hexes
-   * (`#0040dd`/`#409cff`) would flip this case's own assertions (both would
-   * then clear 4.5) without touching `textAccent` at all — the two roles are
-   * independent primitives now, which is the property this pins.
+   * (`#0040dd`/`#409cff`) still flips the light assertions — `#0040dd` clears
+   * 4.5 on every light surface including the sunken one — without touching
+   * `textAccent` at all. The two roles are independent primitives, which is the
+   * property this pins.
    */
-  it("13.360 the retired accent hex does not clear 4.5 as text on a bare surface, in either theme", () => {
-    expect(primitives.blue600).toBe('#3a6db0');
+  it("13.360 the accent hex clears 4.5 as text on the light plain and raised surfaces since T1, and still fails the sunken one", () => {
+    expect(primitives.blue600).toBe('#33629f');
     expect(primitives.blue300).toBe('#7fa9e4');
-    expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surface'))).toBeLessThan(4.5);
+    // T1's own consequence, both directions, on the three light surfaces.
+    expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surface'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surfaceRaised'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('light', 'accent'), colorOf('light', 'surfaceSunken'))).toBeLessThan(4.5);
     expect(contrastRatio(colorOf('dark', 'accent'), colorOf('dark', 'surface'))).toBeGreaterThanOrEqual(4.5);
     // Dark clears bare surface/raised (see `textAccentDark`'s own docblock)
     // AND, since 2026-09-10, the neo sunken surface too — `neoNavySunken`
