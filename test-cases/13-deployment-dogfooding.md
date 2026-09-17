@@ -7165,3 +7165,45 @@ un-hedge now.
   dropped) mapped to `doing` (active, survives) refuses, naming both
   states; mapped to `archived` (the OTHER terminal survivor) accepts —
   (`packages/rule-engine/test/engine.test.ts`)
+
+**Final fix wave, round 2 (2026-09-17) — opus re-review findings N1 and N2.**
+
+- **13.611** ✅ Ruling 56(a), Finding N1 of the opus re-review (2026-09-17) —
+  closed ⇒ terminal's FOURTH door: 53(iii)'s loop only walks
+  `stateMapping`, owed for a DROPPED state, but a state that KEEPS its id
+  owes no mapping at all — and `foldTicketToWorkflowVersion`
+  (`ticket-state.ts:359`) recomputes a ticket's `stateCategory` from the
+  new definition regardless, so an author flipping a SURVIVING terminal
+  state's category to active or open (the builder's category select
+  carries no published-state lock, only a permission gate,
+  `state-node.tsx:41-42`) reaches the identical `closed_at IS NOT NULL`
+  beside a non-terminal `state_category` that (iii) exists to forbid, with
+  `validateWorkflowDef` seeing nothing wrong (some OTHER state is still
+  terminal). Fix: a second loop over `payload.states`, refusing
+  `REFUSAL_RULES.workflowStateMapping` (the SAME id as 53(iii) — chosen
+  because `workflowStructure` refusals come only from
+  `validateWorkflowDef(payload)` alone, which never sees `latest` and so
+  could never name a "before" to compare against, while this check is
+  inherently a two-version comparison over the identical invariant) when a
+  state present in both `latest.states` and `payload.states` has category
+  `terminal` in `latest` and something else in `payload`. New fixture
+  `wf_two_terminal`'s `done` KEPT but demoted terminal → active (no drop,
+  no mapping) refuses with the reason verbatim; kept and unchanged
+  accepts — the positive control proving the gate reads categories, not
+  merely "did anything change" —
+  (`packages/rule-engine/test/engine.test.ts`)
+- **13.612** ✅ Ruling 56(b), Finding N2 of the opus re-review (2026-09-17) —
+  the bulk rebind route's `stateMap` accepted a caller-supplied `backlog`
+  KEY and silently overrode it (`toStateIdFor` always answers
+  `BACKLOG_STATE_ID` for a parked row regardless of what the map names for
+  it, Ruling 52(a)) — the unrefused mirror of naming `backlog` as a VALUE,
+  which `migration.unknown-target-state` already catches. The dialog can
+  never send such a key (`stateMap` is built from `fromWorkflow.states`
+  only), but a hand-built request can. Fix: a new rule
+  `migration.backlog-not-mappable`, checked right after `stateMap` is
+  built — before any workspace lookup, since the question needs nothing
+  but the caller's own body — with the reason "\"backlog\" cannot be a key
+  in the map: parked tickets carry across as parked automatically and need
+  no entry." A request naming `backlog` as a key refuses with that reason
+  verbatim and appends nothing —
+  (`apps/server/test/routes/builder-reads.test.ts`)

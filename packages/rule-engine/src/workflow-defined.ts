@@ -131,5 +131,44 @@ export async function evaluateWorkflowDefined(
     }
   }
 
+  // Ruling 56(a), N1 (opus re-review, final fix wave round 2, 2026-09-17):
+  // the fourth door into the same breach. 53(iii) above only walks
+  // `stateMapping`, which is owed for a DROPPED state — but a state that
+  // KEEPS its id owes no mapping at all, dropped or not, and
+  // `foldTicketToWorkflowVersion` (`ticket-state.ts:359`) recomputes a
+  // ticket's `stateCategory` from THIS version's definition regardless: a
+  // closed ticket sitting in a surviving state rides the fold with
+  // `closed` intact while its category silently follows whatever this
+  // publish now says that state id means. So an author who flips a
+  // surviving state's category from `terminal` to anything else — the
+  // builder's category select carries no published-state lock, only a
+  // permission gate (`state-node.tsx:41-42`) — reaches the identical
+  // `closed_at IS NOT NULL` beside a non-terminal `state_category` that
+  // (iii) exists to forbid, without dropping the state and without
+  // `validateWorkflowDef` objecting (a surviving terminal state renamed to
+  // active is invisible to the "no terminal state" check as long as some
+  // OTHER state is still terminal). `REFUSAL_RULES.workflowStateMapping`
+  // rather than `workflowStructure` is deliberate: `workflowStructure` is
+  // reserved for what `validateWorkflowDef` finds looking at `payload`
+  // ALONE (duplicate ids, unreachable states, no terminal state at all) —
+  // it takes no `latest` and could not name a "before" to compare against.
+  // This check, like (iii) immediately above it, is inherently a
+  // two-version comparison over the exact same invariant, so it reads
+  // more honestly as the mapping rule's own id: "this republish did not
+  // honour what closed ⇒ terminal requires of it" is one sentence whether
+  // the state was dropped and mis-mapped or kept and demoted, and every
+  // consumer that already knows how to handle a `workflow-state-mapping`
+  // refusal needs no new branch to handle this one too.
+  for (const newState of payload.states) {
+    const oldState = latest.states.find((state) => state.id === newState.id);
+    if (oldState !== undefined && oldState.category === 'terminal' && newState.category !== 'terminal') {
+      return {
+        refused: true,
+        rule: REFUSAL_RULES.workflowStateMapping,
+        reason: `Version ${payload.version} changes state "${newState.id}" from terminal to ${newState.category}; closed tickets must stay in a terminal state, so a terminal state may not be demoted while it keeps its id — drop it and map it, or reopen the tickets in it first.`,
+      };
+    }
+  }
+
   return { refused: false };
 }

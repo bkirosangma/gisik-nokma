@@ -818,6 +818,39 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     );
     expect(gst[0]).toEqual({ workflow_id: 'wf-second', state_id: 'waiting' });
   });
+
+  /**
+   * 13.612 — Ruling 56(b), N2 (opus re-review, final fix wave round 2,
+   * 2026-09-17): the mirror of `migration.unknown-target-state` — that rule
+   * catches `backlog` named as a stateMap VALUE (`{ todo: 'backlog' }`);
+   * this catches it named as a KEY (`{ backlog: 'todo' }`), which the
+   * dialog itself can never send (`stateMap` is built from
+   * `fromWorkflow.states` only, and backlog is never one of those) but a
+   * hand-built request can. Before this fix the key was silently read and
+   * then ignored — `toStateIdFor` always answers `BACKLOG_STATE_ID` for a
+   * parked row regardless of what the map says for it. Fires before any
+   * workspace lookup (it needs nothing but the caller's own body), so the
+   * `fromWorkflowId`/`toWorkflowId`/`typeId` below need not even resolve
+   * for the assertion to hold — real ones are used anyway so the case
+   * reads as an admin's actual mistake rather than an edge case invented
+   * for the test.
+   */
+  it('13.612 refuses migration.backlog-not-mappable when the caller names "backlog" as a stateMap KEY, and appends nothing', async () => {
+    const before = await ledgerRows();
+    const response = await migrate('owner', 'task', {
+      fromWorkflowId: 'wf-second',
+      toWorkflowId: 'wf-errands',
+      stateMap: { backlog: 'todo', todo: 'todo' },
+    });
+    expect(response.statusCode).toBe(422);
+    const body = response.json() as { status: string; rule: string; reason: string };
+    expect(body.status).toBe('refused');
+    expect(body.rule).toBe('migration.backlog-not-mappable');
+    expect(body.reason).toBe(
+      '"backlog" cannot be a key in the map: parked tickets carry across as parked automatically and need no entry.',
+    );
+    expect(await ledgerRows()).toBe(before);
+  });
 });
 
 describe('GET /v1/workspaces/:workspaceId/members — the roster after a revocation', () => {

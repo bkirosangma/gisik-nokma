@@ -456,6 +456,16 @@ export const MIGRATION_RULES = {
    * not have to be built and refused one row at a time.
    */
   closedToNonTerminal: 'migration.closed-to-non-terminal',
+  /**
+   * N2 (opus re-review, final fix wave round 2, 2026-09-17): a `stateMap`
+   * KEY of `backlog` — the mirror mistake of naming it as a VALUE, which
+   * `unknownTargetState` already refuses. Backlog is never one of
+   * `fromWorkflow.states`, so the dialog can never have built such a key;
+   * a hand-built request that does is silently overridden without this
+   * refusal (`toStateIdFor` always sends `BACKLOG_STATE_ID` for a parked
+   * row, Ruling 52(a), regardless of what the map says for it).
+   */
+  backlogNotMappable: 'migration.backlog-not-mappable',
 } as const;
 
 export function registerBuilderReadRoutes(
@@ -722,6 +732,27 @@ export function registerBuilderReadRoutes(
       // case 7.88, which reddens on the indexed form.
       const stateMap = new Map(Object.entries(parsed.data.stateMap));
 
+      // Ruling 56(b), N2 (opus re-review, final fix wave round 2,
+      // 2026-09-17): a caller-supplied KEY of `backlog` — the mirror of
+      // naming it as a target (`{ todo: 'backlog' }`, refused loudly below
+      // by `unknownTargetState` since backlog is never in `target.states`).
+      // The dialog can never send this key (`stateMap` is built from
+      // `fromWorkflow.states` only, and backlog is never one of those —
+      // spec §1.1), so a hand-built request naming it was previously read
+      // and then silently ignored: `toStateIdFor` always answers
+      // `BACKLOG_STATE_ID` for a parked row (Ruling 52(a)) regardless of
+      // what the map says for it, so an admin who believed they were
+      // choosing a destination for parked tickets had that belief acted on
+      // by nobody. Answered here, before any workspace lookup, because it
+      // needs nothing but the caller's own body to judge.
+      if (stateMap.has(BACKLOG_STATE_ID)) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.backlogNotMappable,
+          `"backlog" cannot be a key in the map: parked tickets carry across as parked automatically and need no entry.`,
+        );
+      }
+
       // Three actor-supplied ids, all three resolved against the workspace the
       // door just approved. `proj_workflows` is keyed `(workflow_id, version)`
       // GLOBALLY (ruling P14), so an unscoped destination lookup would let an
@@ -815,10 +846,23 @@ export function registerBuilderReadRoutes(
       // `checkTicketWorkflowRebound` would give one event at a time, and this
       // route's whole contract (case 7.45) is that a refusal appends nothing.
       // A parked row's destination (`BACKLOG_STATE_ID`) is category `open`,
-      // never terminal, but a closed ticket can never actually BE parked
-      // (closing requires a terminal state, §2), so this can only fire on a
-      // genuinely declared-state target — the category map covers both
-      // shapes uniformly rather than special-casing one.
+      // never terminal — reachable in principle, only ever unreachable
+      // because every path that could leave a CLOSED ticket sitting in
+      // `backlog` is itself gated elsewhere, named here rather than
+      // asserted flat (hedged 2026-09-17, re-review nit; the four gates
+      // named again by Ruling 56(a)'s own §2.4 paragraph): closing FROM
+      // backlog refuses `close-requires-terminal` (backlog is `open`, never
+      // terminal); transitioning a closed ticket, Send-to-backlog included,
+      // refuses `closed-ticket`; rebinding a closed ticket onto backlog
+      // refuses under 53(i) above (`stateCategoryOf` reads backlog's
+      // category as `open`, so `'open' !== 'terminal'`); and a republish
+      // never drops or maps backlog at all (`foldStateIdForward` returns
+      // early for it) while a category-flip republish (Ruling 56(a)) moves
+      // a declared state's CATEGORY, never its `stateId` — it cannot turn a
+      // declared state INTO backlog either. So this fires only on a
+      // genuinely declared-state target today, by those four gates holding
+      // rather than by anything this route itself enforces — the category
+      // map covers both shapes uniformly rather than special-casing one.
       const closedToNonTerminal = tickets.filter((row) => {
         if (row.closed_at === null) return false;
         const toStateId = toStateIdFor(row);

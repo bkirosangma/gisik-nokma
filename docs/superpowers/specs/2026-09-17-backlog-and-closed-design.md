@@ -203,9 +203,10 @@ true, a retry with a different target sends the transition ALONE — resending
 `not-closed` and mask the real answer. The reopen stands either way; only
 the transition is retried.
 
-**§2.4 addition (2026-09-17, see Amendments — Ruling 53):** closed ⇒
-terminal must survive every path that changes a ticket's workflow or state
-mapping, not only an ordinary transition. `checkTicketWorkflowRebound`
+**§2.4 addition (2026-09-17, see Amendments — Ruling 53; extended 2026-09-17,
+see Amendments — Ruling 56):** closed ⇒ terminal must survive every path
+that changes a ticket's workflow or state mapping, not only an ordinary
+transition. FOUR gates hold it, not three: `checkTicketWorkflowRebound`
 (`packages/rule-engine/src/checks/workflow-rebind.ts`) refuses
 `ticket.workflow_rebound` for a closed ticket when the target state's
 category is not terminal (`REFUSAL_RULES.closedTicket`, reason "This ticket
@@ -213,14 +214,23 @@ is closed; a migration may only move it to a terminal state."); the
 corresponding pre-flight in the bulk rebind route
 (`apps/server/src/routes/builder-reads.ts`) refuses the whole request before
 any event is built when a closed row's mapped target is non-terminal
-(`migration.closed-to-non-terminal`); and `workflow.defined`'s republish
-check (`packages/rule-engine/src/workflow-defined.ts`) refuses a
-`stateMapping` that sends a dropped TERMINAL state to a non-terminal
-survivor in the new version, for the same reason. All three exist because
-`foldTicketToWorkflowVersion` and the rebind fold both spread `...state`, so
-a closed ticket's `closed` claim rides along unconditionally while `stateId`
-moves — a mapping is the one kind of move `ticket.closed`/`ticket.reopened`
-never gate, because neither event is emitted when a mapping does it.
+(`migration.closed-to-non-terminal`); `workflow.defined`'s republish check
+(`packages/rule-engine/src/workflow-defined.ts`) refuses a `stateMapping`
+that sends a dropped TERMINAL state to a non-terminal survivor in the new
+version; and the SAME republish check also refuses a version that KEEPS a
+state's id but changes its category from `terminal` to anything else — no
+`stateMapping` entry is owed for a state that is not dropped, but
+`foldTicketToWorkflowVersion` recomputes a ticket's `stateCategory` from the
+new definition regardless of whether the id was ever mapped, so a closed
+ticket sitting in a surviving state would otherwise follow the demotion
+silently (Ruling 56(a), Finding N1 of the opus re-review: the builder's
+category select carries no published-state lock, only a permission gate).
+All four exist because `foldTicketToWorkflowVersion` and the rebind fold
+both spread `...state`, so a closed ticket's `closed` claim rides along
+unconditionally while `stateId` (or, for the fourth gate, the meaning of a
+`stateId` the ticket already occupies) moves — a mapping or a category edit
+is the kind of move `ticket.closed`/`ticket.reopened` never gate, because
+neither event is emitted when either one does it.
 
 ## 3. Server
 
@@ -556,8 +566,11 @@ one of the sentences requiring a body rewrite, not only an additive
 amendment), §1.3/§5.4's creation-path sentences naming MCP as a second
 producer (Ruling 51, Finding 4, final whole-branch review fix wave B,
 2026-09-17), and §2.4's new closed-⇒-terminal-across-migrations paragraph
-(Ruling 53, Finding 5, same review, same wave). Every other ruling here is
-additive and did not require a body rewrite.
+(Ruling 53, Finding 5, same review, same wave; extended for a fourth gate
+by Ruling 56, Finding N1 of the opus re-review, round 2, same day — still
+the one paragraph, so the count of rewritten sentences is unchanged by the
+extension). Every other ruling here is additive and did not require a body
+rewrite.
 
 1. **Wildcard edges never resolve FROM backlog (Task 1 ruling).** §1.1's
    `universalTransitions` gives every workflow `backlog → def.initialStateId`
@@ -888,6 +901,47 @@ additive and did not require a body rewrite.
     `packages/rule-engine/src/workflow-defined.ts`, cases 13.608 (i), 13.609
     (ii), 13.610 (iii).
 
+28. **Amendment — Ruling 56(a) (Finding N1 of the opus re-review, final fix
+    wave round 2, 2026-09-17): a FOURTH door into the same breach — a
+    surviving state's category demoted out of terminal, owing no
+    `stateMapping` entry at all.** Item 27's "three gates" was true at the
+    time it was written and is not true after this ruling: `workflow.defined`
+    gains a second, independent check beside 53(iii)'s — for every state
+    present in BOTH `latest.states` and `payload.states` (never dropped),
+    if its category in `latest` is `terminal` and in `payload` is not,
+    refuse. The rule id is `REFUSAL_RULES.workflowStateMapping`, the SAME
+    id 53(iii) uses, not `workflowStructure` — chosen because
+    `workflowStructure` refusals come from `validateWorkflowDef(payload)`
+    alone, which never looks at `latest` and so could never name a "before"
+    to compare against, while this check (like 53(iii)) is inherently a
+    two-version comparison over the identical invariant; one rule id for
+    "this republish breaks closed ⇒ terminal", whether the break came from
+    a drop-and-mis-map or a keep-and-demote, costs every existing consumer
+    of `workflow-state-mapping` nothing to also handle this. Cost if wrong,
+    named because it is BROADER than 53(iii)'s: this gate fires on every
+    terminal→non-terminal demotion of a surviving state in any workflow,
+    occupied or not, where 53(iii) fires only on a drop paired with a
+    non-terminal remap. An author who wants to demote a terminal state must
+    instead drop it, map it terminal→terminal, and move tickets by hand
+    afterward. Where it lives: `packages/rule-engine/src/workflow-defined.ts`,
+    beside the 53(iii) loop; case **13.611** (new fixture `wf_two_terminal`'s
+    `done` kept but demoted to active, refused; kept and unchanged,
+    accepted).
+
+29. **Amendment — Ruling 56(b) (Finding N2 of the opus re-review, same
+    wave): a `stateMap` KEY of `backlog` is refused, not silently
+    overridden.** The bulk rebind route already refuses `backlog` named as
+    a stateMap VALUE (`migration.unknown-target-state`, since backlog is
+    never in `target.states`); naming it as a KEY was the unrefused mirror
+    — the dialog can never send one (`stateMap` is built from
+    `fromWorkflow.states` only), but a hand-built request could, and
+    `toStateIdFor` silently ignored it (a parked row always resolves to
+    `BACKLOG_STATE_ID` regardless of what the map names for it, Ruling
+    52(a)). New rule `migration.backlog-not-mappable`, answered right after
+    `stateMap` is built — before any workspace lookup, since the question
+    needs nothing but the caller's own body. Where it lives:
+    `apps/server/src/routes/builder-reads.ts`; case **13.612**.
+
 ### Follow-ons named during execution
 
 Named here and cross-referenced from §9 rather than duplicated into its
@@ -938,3 +992,8 @@ with the file:line it would touch.
   13.588b/c actually discriminate, added in the same task's later fix
   rounds. Recorded so a future reader does not treat 13.588a alone as
   proof of the `finally` placement. `packages/app-core/test/views/ticket-sheet.test.tsx`.
+- **`ListRow.closed` carries `actorId` only, so the List's Closed chip
+  names the closer by id** (Finding 8, final whole-branch review,
+  2026-09-17); the fix is in `apps/server/src/read/list-cards.ts` (resolve
+  `closed_by` through the same actor-name path `stateProvenance` uses)
+  plus the wire type and `mapClosed` — Ruling 55.
