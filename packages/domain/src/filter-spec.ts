@@ -124,6 +124,15 @@ export const filterSpecSchema = z
     stateId: noNul(z.string().min(1).max(200)).optional(),
     stateCategory: stateCategorySchema.optional(),
     blocked: z.boolean().optional(),
+    /**
+     * The closed flag (backlog/closed spec §3.2, 2026-09-17): `true` = closed
+     * only, `false` = not closed, absent = all. A single value, so the
+     * client's `toServerFilterSpec` can send it as is — unlike `stateCategory`
+     * or `stateId`, there is no list of closed-ness to choose among, only the
+     * one boolean the compiler turns into `t.closed_at IS [NOT] NULL`
+     * (`apps/server/src/read/compile-filter.ts`).
+     */
+    closed: z.boolean().optional(),
     text: searchTermSchema.optional(),
     /**
      * A due bound is a day claim in the shape the STORED claim carries, and the

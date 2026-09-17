@@ -8,6 +8,15 @@
  * would be a boundary with nothing to keep out.
  */
 export { HELP_CONTENT } from './content.generated.js';
+export {
+  HELP_DOCUMENT_LABELS,
+  HELP_GROUPS,
+  helpGroupTitle,
+  helpNav,
+  helpNextSection,
+  type HelpGroup,
+  type HelpNavGroup,
+} from './groups.js';
 export { HelpBrowser } from './help-browser.js';
 export {
   blockSpans,

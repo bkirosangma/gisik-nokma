@@ -18,7 +18,16 @@
   min-height: 2.75rem;
   font: inherit;
   border-radius: var(--gn-radius-control);
-  padding: 0.4rem 0.85rem;
+  padding: 0 1.125rem;
+  /* OPEN DECISION (whole-branch review, Important 4): the prototype's `.btn`
+     also carries the raised neumorphic `--ctlShadow` under `neo`
+     (`desktop.dc.html:62`, `:214-215`, `:227`). The spec named it for this
+     rule; the plan dropped it with no recorded reason, and this fix wave
+     deliberately does NOT add it — applying a raised control shadow to every
+     button in the product and in `apps/desktop` is a product-wide visual
+     decision for the repo owner to make, not something a fix wave should
+     decide on the review's behalf. Either implement it or record the
+     refusal; nothing has done either yet. */
   /* R1(c): no boundary. The affordance is fill + an accent-coloured semibold
      label — three signals replacing one hairline, and it is what the design
      specifies (`.btn { border:none; background: fill3; color: accent;
@@ -52,6 +61,7 @@
   background: var(--gn-fill-tertiary);
   color: var(--gn-text-accent);
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
 }
 .gn-button:focus-visible {
@@ -71,21 +81,73 @@
   cursor: not-allowed;
 }
 
+/* hig's chip shares `surface-raised` with the card it sits on, which made
+   every chip on every card invisible under hig — a real defect, found while
+   porting the workspace card. `fill-tertiary` fixes hig (and is minimal's
+   base too, overridden to `transparent` below). Metrics follow the
+   prototype (`desktop.dc.html:362` for 13px/18px and the 9px dot; `:24` for
+   hig's 4px/10px pad).
+
+   Fix round 1 (task-3-report.md, findings 1-2): the brief ported only the
+   PROTOTYPE'S PADDING per style and missed that `--chipBg` is ALSO
+   per-style there (`desktop.dc.html:50` minimal, `:58-59`/`:71` neo) — so
+   minimal shipped a visible pill with no horizontal padding (glyphs against
+   the edge), and neo shipped flat instead of carved-in. Under `neo`,
+   sharing `surface-raised` with the card is CORRECT, not the same defect as
+   hig: neo's boundary comes from an inset shadow, never from a colour
+   difference (see `.ticket-type-list__row`'s own docblock for the same "neo
+   has one flat hex per surface role, depth is shadow-only" fact), so the
+   flat-fill instinct that fixes hig is exactly wrong for neo.
+
+   Owner round 3 (2026-09-16): that inset shadow was `shadow-sunken` — the
+   SAME 4px/4px/9px treatment `.gn-field__input`/`.ticket-type-list__row` use
+   — and it read as too much shadow for a badge-sized element ("too much
+   shadow for a small badge"). The prototype agrees: `--chipShadow`
+   (`desktop.dc.html:59` light, `:71` dark) is its own smaller 2px/2px/4px
+   step, never the 4px/9px `--fieldShadow`/`--trayShadow` use. Now carved with
+   `shadow-sunken-compact` instead — see that role's docblock in `tokens.ts`. */
 .gn-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.375rem;
   border-radius: 999px;
-  padding: 0.1rem 0.6rem;
-  font-size: 0.8rem;
-  background: var(--gn-surface-raised);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  background: var(--gn-fill-tertiary);
   color: var(--gn-text);
 }
 .gn-chip__dot {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.5625rem;
+  height: 0.5625rem;
   border-radius: 50%;
   background: var(--gn-text-muted);
+}
+/* The prototype gives the chip a different pad per style
+   (`desktop.dc.html:50` minimal, `:58` neo). Written as style-scoped rules
+   rather than a custom property: `tokens.test.ts:119` requires every
+   `var(--gn-…)` in this file to name a declared role, and while its regex
+   happens not to match the fallback form `var(--gn-chip-pad, …)`, passing a
+   check by a regex subtlety is not passing it. Direct rules are also how
+   this file already does per-style overrides. */
+[data-style="minimal"] .gn-chip { background: transparent; padding: 0.25rem 0; }
+/* Neumorphic idiom, ported from the prototype's neo block (`:58-59` light,
+   `:71` dark): `--chipBg` equals `--cardBg` there, plus an inset
+   `--chipShadow` — no fill contrast at all, boundary carved by the shadow.
+   `surface-raised` matches the card's own background exactly (`.gn-card`
+   above), and `--gn-shadow-sunken-compact` is non-empty under neo (unlike
+   hig/minimal, whose sunken-compact role is `[]` in `tokens.ts` — the reason
+   THOSE two styles need a fill instead).
+
+   Owner round 3 (2026-09-16): this was `--gn-shadow-sunken` (the
+   4px/4px/9px field/tray treatment) — too much shadow for a badge this
+   small. `--gn-shadow-sunken-compact` is the prototype's own smaller
+   2px/2px/4px `--chipShadow` step; see `tokens.ts`'s `sunken-compact`
+   docblock for the primitive-reuse accounting. */
+[data-style="neo"] .gn-chip {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-sunken-compact);
+  padding: 0.3125rem 0.75rem;
 }
 .gn-chip--open .gn-chip__dot { background: var(--gn-category-open); }
 .gn-chip--active .gn-chip__dot { background: var(--gn-category-active); }
@@ -125,6 +187,33 @@
    `border-radius: 50%` loses to this at equal specificity because this rule is
    declared after it. */
 .gn-avatar--large { width: 3.5rem; height: 3.5rem; font-size: 1.4rem; border-radius: 0.875rem; }
+/* The workspace card's monogram: 44px, rounded square, per the prototype
+   (`desktop.dc.html:2547`). `--large` (3.5rem, 0.875rem radius) is the
+   precedent that a non-circular avatar already belongs in this set, so this
+   adds a size rather than an exception. The prototype's per-workspace brand
+   hexes are deliberately NOT adopted — a monogram is read text and owes
+   4.5:1, which is what the four contrast-paired tints guarantee.
+
+   `flex: none` is in the prototype's own `avatarStyle` string
+   (`desktop.dc.html:2547`) and was dropped in the port (whole-branch review,
+   Important 3). Without it: this element is a flex item of
+   `.gn-workspace-card__head` (`flex-wrap: nowrap`, `apps/web/app/globals.css`),
+   and a flex item with a definite `width` gets an automatic minimum size of
+   `min(width, content min-width)` — here `min(44px, ~22px of two glyphs at
+   17px)`. `.gn-workspace-card__titles` beside it declares `min-width: 0`
+   specifically so it can shrink first, but the titles column's BASE size is
+   still the name's max-content width, so a long enough name pulls space from
+   every flex sibling in proportion to base size — including this one — and
+   the 44px rounded square compresses toward ~22px wide while staying 44px
+   tall: a rectangle where the prototype draws a square. `flex: none` removes
+   this element from that negotiation entirely, matching the prototype. */
+.gn-avatar--workspace {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.6875rem;
+  font-size: 1.0625rem;
+  flex: none;
+}
 /* The four tints. Each is a fill/text PAIR `CONTRAST_PAIRS` already holds to
    4.5:1 in every theme and style, because a monogram is read text and not a
    decorative dot — see `components/avatar.tsx` for why the palette is these
@@ -191,6 +280,15 @@
 .gn-dialog__body,
 .gn-sheet__body { padding: 1rem 1.1rem; overflow-y: auto; }
 
+/* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
+   wraps a `Chip` (tone `terminal`) rather than restyling it, so its colour
+   comes from `.gn-chip--terminal` alone — this rule is layout only, nothing
+   to add to the token scan. The note beside the disabled Move… button is
+   TEXT, never a `title=` tooltip (spec §5.3), and carries the one token this
+   sentence needs. */
+.gn-sheet__closed-badge { display: inline-flex; align-items: center; }
+.gn-sheet__closed-note { color: var(--gn-text-muted); font-size: 0.8125rem; }
+
 .gn-table__scroll { overflow-x: auto; }
 .gn-table {
   border-collapse: collapse;
@@ -218,23 +316,216 @@
 
 .gn-board { display: flex; flex-direction: column; gap: 1.5rem; }
 .gn-board__workflow { color: var(--gn-text-muted); margin: 0 0 0.5rem; }
-.gn-board__columns { display: flex; gap: 0.9rem; overflow-x: auto; align-items: flex-start; }
+/* Board prototype port Task 6 (2026-09-16), spec Board `:354-399`, "Column
+   rail" row. Renamed from `.gn-board__columns` — grep confirmed the only
+   referents anywhere in the repo were this file and board.tsx itself
+   (nothing under apps/web/test, packages/app-core/test or packages/ui/test
+   names `.gn-board__columns`), so the rename is not a breaking one. */
+.gn-board__rail { display: flex; gap: 0.875rem; align-items: flex-start; overflow-x: auto; padding-bottom: 0.5rem; }
+/* Same spec row, "Column": trayBg (surfaceSunken) + trayShadow (the sunken
+   inset, matching `.gn-field__input`/`.ticket-type-list__row`'s own
+   `--gn-shadow-sunken` under neo), radius cardR, 12px padding, a fixed
+   288px/18rem lane. `display: flex; flex-direction: column; gap: 0.625rem`
+   is new here too (10px, the spec's own "gap 10px") — it is what lays the
+   header out above the card list with a controlled gap instead of the
+   header's own margin doing that job alone; see that rule's own comment for
+   why its margin-bottom was removed once this gap existed. */
 .gn-board__column {
   background: var(--gn-surface-sunken);
-  border-radius: 10px;
-  padding: 0.6rem;
-  min-width: 16rem;
-  flex: 0 0 16rem;
+  box-shadow: var(--gn-shadow-sunken);
+  border-radius: var(--gn-radius-card);
+  padding: 0.75rem;
+  min-width: 18rem;
+  flex: 0 0 18rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
 }
-.gn-board__column--blocked { border-color: var(--gn-blocked); }
+/* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
+   2026-09-16) — no rule was ever added for it. `board.tsx:409` renders the
+   column name as `Chip`'s own child text, tone set from `column.blocked`/
+   `column.category`; `Chip` takes no `className`, so there is no element
+   this rule could attach to, and the name already renders — at the chip's
+   own 13px, not the prototype's 17px heading — because it lives inside the
+   tone chip rather than beside it. Splitting title from chip to match the
+   prototype was considered and rejected: that chip's tone carries CATEGORY
+   for every column, not only blocked, so separating them would change what
+   the colour means across the whole board — a semantic change outside this
+   geometry-only task's scope, and outside the plan's as written. Whoever
+   next wants the prototype's separate heading has to settle what happens to
+   the category tone first. */
+/* `.gn-board__column--blocked`'s `border-color: var(--gn-blocked)` rule is
+   REMOVED, Ruling 16 (coordinator, 2026-09-16) — it was inert (no rule
+   anywhere declared a `border-style`, so the colour painted nothing; only
+   `border-color` with `border-style: none`, the UA default, renders no
+   border), which reads as "a blocked column gets a border" while none ever
+   rendered. Confirmed visually inert both before and after this removal —
+   nothing else in the cascade sets `border`/`border-style` on
+   `.gn-board__column` or this modifier, so deleting the colour changes no
+   rendered pixel, only removes a declaration that misled a reader. The
+   CLASS itself is untouched and still applied conditionally in `board.tsx`
+   (`board.test.tsx:56-61` asserts the class string, which this leaves
+   intact) — only the empty declaration is gone. */
 .gn-board__column-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.6rem;
 }
-.gn-board__count { color: var(--gn-text-muted); font-size: 0.8rem; }
+/* Same spec row, "Count": 13px/18px, label2 (textMuted). Selector kept as
+   `.gn-board__count`, not renamed to the spec's own "column-count" wording —
+   `board.test.tsx:142` (`badgeTotal`) queries `.gn-board__count` directly, so
+   renaming it would need a test change this geometry-only task does not
+   make. 0.8rem (12.8px) to 0.8125rem (13px) is a size INCREASE, and both
+   values already clear `LABEL_FLOOR_PX` (12px, `apps/web/e2e-viewport/
+   type-scale.ts:113`) — the ratchet those specs hold counts offenders BELOW
+   that floor, so this move cannot add one. */
+.gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+/* Board prototype port Task 7 (2026-09-16), spec Board `:354-399`, "Empty
+   column"/"Empty icon"/"Empty copy"/"Empty action" rows — the PER-COLUMN
+   empty state, a different granularity from `.gn-board__empty-*` above (the
+   whole-board sentence, R6, `board.tsx`'s `emptyBanner`): this renders inside
+   a column that has no cards of its own, whether or not the board as a whole
+   is empty.
+
+   fill4 → `--gn-fill-quaternary` (the same role `.gn-project__narrowing`/
+   `.gn-filters__footer` already consume for "fill4"). cardR → the TOKEN
+   `--gn-radius-card`, never the prototype's literal 12px — a new card-like
+   rule takes the token, the same rule `.gn-board-card`'s own radius history
+   (case 13.464, Ruling 17) already established, so this rule cannot repeat
+   the defect that one fixed. */
+.gn-board__column-empty {
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-card);
+  padding: 1.375rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+/* Empty icon: 34px chipBg + chipShadow circle. Replicates `.gn-chip`'s own
+   three-branch chipBg/chipShadow treatment (`:109-150` above — base
+   `fill-tertiary`; `minimal` flat/transparent; `neo` carved with
+   `surface-raised` + `shadow-sunken-compact`) on this NEW selector rather
+   than editing the shared `.gn-chip` (do-not-edit list) — no role here is
+   new, every one is already declared and already consumed elsewhere in this
+   file. A circle on a SQUARE box is `border-radius: 50%`, `.gn-avatar`'s own
+   idiom (`:167-175` above), not `.gn-chip`'s pill `999px` — this box is
+   34x34, not a text-width pill. `color` carries `--gn-text-muted` for the
+   inline glyph's `stroke="currentColor"` (`board.tsx`), the same
+   currentColor-from-an-ancestor idiom `inbox/icons.tsx`'s `NotificationIcon`
+   already uses, rather than an unreachable `var()` on an SVG presentation
+   attribute. */
+.gn-board__column-empty-icon {
+  width: 2.125rem;
+  height: 2.125rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-style="minimal"] .gn-board__column-empty-icon { background: transparent; }
+[data-style="neo"] .gn-board__column-empty-icon {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-sunken-compact);
+}
+.gn-board__column-empty-copy { font-size: 0.9375rem; line-height: 1.25rem; margin: 0; color: var(--gn-text-muted); }
+/* Empty action: NO rule of its own. `board.tsx` renders it as `<Button>`
+   (`@gisik-nokma/ui`, unmodified) rather than a bespoke `ctlBg`/`ctlShadow`
+   selector — `ctlShadow` (the prototype's raised neo control shadow) is the
+   SAME open decision `.gn-button`'s own docblock (`:22-30` above) already
+   records as deliberately left to the repo owner, and this port's own plan
+   settled it for every board control: "`.gn-button` does not gain neo's
+   raised `--ctlShadow`... Board controls use `.gn-button` unchanged"
+   (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`). Ghost
+   `.gn-button` already gives `fillTertiary` background, `textAccent` label
+   at 600 weight and the 44px floor (`min-height: 2.75rem`) this metric asks
+   for — the one thing it does not add is the shadow, unchanged from every
+   other control in the product. */
+/* Spec row "Card": cardBg, radius 12px, 14px padding, cardShadow. Board.tsx:150
+   already renders `<Card className="gn-board-card">`, composing to
+   `gn-card gn-board-card` (`card.tsx:7`). This selector is bare — (0,1,0),
+   the SAME specificity as `.gn-card` above, not higher — and it wins for the
+   PADDING by SOURCE ORDER: this rule sits later in the file than `.gn-card`'s
+   (`ui.css:160`). `.gn-card` itself is not touched, so every other `.gn-card`
+   consumer in the product keeps its 12px padding; only the board card,
+   carrying this second class, gets 14px.
+
+   The spec's own `cursor: grab` is REMOVED here, Ruling 15 (coordinator,
+   2026-09-16) — it shipped in this task's first pass and was an affordance
+   CLAIM, not decoration: a pointer promising draggability eight tasks before
+   any drag behaviour exists is the same "a control that lies" shape Task 4's
+   own brief withheld the inert Filters button for, and this task's first
+   pass had not held itself to that same bar. It belongs in Task 14's commit,
+   beside the behaviour it promises, not here ahead of it.
+
+   The spec's own literal `border-radius: 12px` is ALSO REMOVED, Ruling 17
+   (coordinator, 2026-09-16) — this is the exact defect case 13.355 already
+   fixed one surface over (`.gn-card.gn-invite`'s literal `border-radius: 12px`
+   tying `.gn-card`'s own token-driven radius). `.gn-card` resolves
+   `--gn-radius-card` to 16px under `hig`/`minimal` and 20px under `neo`
+   (`tokens.ts:798-801`); a literal here has the SAME specificity as `.gn-card`
+   and sits later in the file, so it would win for every style, pinning every
+   board card at 12px where `neo` should draw 20px — a real, visible
+   per-style divergence, not a latent one. The padding fix above is a
+   deliberate, DECLARED divergence from `.gn-card` (14px vs 12px, the spec's
+   own number, verified against every `.gn-card` consumer); this radius
+   literal was an UNDECLARED one, transcribed from the brief's own CSS block
+   without the same scrutiny the padding got. **What is genuinely lost**: the
+   prototype does draw board cards at a flatter 12px against its own 16px
+   `cardR` — a real, intentional prototype distinction — and no board-card
+   radius role is minted to preserve it. Considered and rejected: a new token
+   role to reproduce one decoration is exactly the shape 13.355 already ruled
+   against. The board card now shares every other card's corner, and `neo`
+   stays internally consistent rather than drawing one surface squarer than
+   the rest. Case 13.464 asserts the ABSENCE of a `border-radius` declaration
+   here, so a future round cannot quietly reintroduce the literal. */
+.gn-board-card { padding: 0.875rem; }
+/* Spec row "Card, in transit": a dashed warning outline. `card.pending` is
+   already read by `BoardCardView` (board.tsx, the "claim in transit" chip) —
+   wired onto the card container's className alongside `gn-board-card` rather
+   than left as a rule with nothing to attach to. */
+.gn-board-card--pending { outline: 2px dashed var(--gn-warning); outline-offset: 2px; }
+/* Spec row "Card": `cursor:grab` (board-prototype-port Task 14, 2026-09-16) —
+   Ruling 15 removed this from `.gn-board-card` itself (comment above,
+   `:449-455`) because nothing could be dragged yet; it belongs here now,
+   beside the behaviour that makes it true. Deliberately NOT declared on
+   `.gn-board-card` — two independent reasons, either alone would justify a
+   different selector:
+   (1) `.gn-board-card` renders on the READ-ONLY path too (`Board`'s own
+       `moves` prop is optional — session loading, signed out, or no move
+       capability wired at all), where the card genuinely cannot be
+       dragged; a cursor promising otherwise is the exact "control that
+       lies" shape Ruling 15 already named. `draggable` is set on the
+       `<li class="gn-board__card-slot">` wrapper (`board.tsx`), gated on
+       the SAME `arrows !== null` check that gates the move arrows
+       themselves — so this selector, keyed off the real `draggable="true"`
+       ATTRIBUTE rather than a second, parallel boolean class, can never
+       show a grab cursor on a card that is not actually draggable.
+   (2) `packages/ui/test/components.test.tsx` case 13.464 scans this file
+       for the literal substring `.gn-board-card {` (its own `rule()`
+       helper, a plain regex with no selector parser) to assert that
+       rule's body carries no `border-radius`. Any new rule whose SELECTOR
+       TEXT happened to end in `.gn-board-card {` — even a compound one
+       like `.foo .gn-board-card { … }` — would satisfy that same regex and
+       get matched INSTEAD of the real rule, silently breaking a case this
+       task never touched. `.gn-board__card-slot` contains no
+       `.gn-board-card` substring at all (`__card-slot`, not `-card`), so
+       it cannot collide.
+   `cursor: grab` is not repeated on `.gn-board-card__title`, `__provenance`
+   or `__move` below — each already sets its own `cursor: pointer`, which
+   continues to win for those buttons by specificity; only the card's
+   plain background area inherits `grab` from the `<li>`.
+   The bare rule (2026-09-17, the whole card opens the ticket — `BoardCardSlot`
+   in `board.tsx`, case 13.523): a card that can be opened but not dragged
+   (the read-only path) shows `pointer`; the `[draggable="true"]` rule beneath
+   it beats it on specificity, so a draggable card keeps `grab`. */
+.gn-board__card-slot { cursor: pointer; }
+.gn-board__card-slot[draggable="true"] { cursor: grab; }
 .gn-board-card__title {
   font: inherit;
   font-weight: 600;
@@ -257,15 +548,384 @@
   padding: 0.2rem 0 0;
   text-align: left;
 }
+/* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
+   button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
+   15px/600`. `ctlBg` → `--gn-fill-tertiary`, `accent` (as TEXT) → `--gn-text-
+   accent` — the same two roles `.gn-button`, `.gn-calendar__nav` and
+   `.gn-project__workflow-select` already resolve this identical prototype
+   pairing to, each citing the reason at length in its own docblock.
+   `ctlShadow` is DELIBERATELY OMITTED, the SAME already-recorded, product-
+   wide open decision every one of those three rules already states
+   (`.gn-button`'s own docblock, `:22-30` above; the board port's own plan,
+   `docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`: "Board
+   controls use `.gn-button` unchanged").
+
+   `min-height`/`min-width` DIVERGE from the spec's own `32px`/`36px` —
+   DELIBERATELY, the SAME kind of divergence the board port's own plan
+   already made once, for the tab rail (`:56`: "Tab height is 2.75rem, not
+   the prototype's 40px... `ui.css:2424-2430` records why 40px was wrong: it
+   fails the 44px tap-target floor (WCAG 2.5.5) and reddens `/sign-in` on all
+   three viewports"). `apps/web/e2e-viewport/tap-targets.ts` sweeps every
+   `button` on every real page against that same 44px floor with no per-
+   component exemption, and this repo already has one measured casualty at
+   40px — a 32×36 control would fail the identical gate the moment `Board`'s
+   arrows are reachable in a real e2e run, which they are as of this task
+   (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` wires `moves`).
+   The metric's own VISUAL treatment — `ctlBg`, accent text, 15px/600 — is
+   kept exactly as specified; only the tap target is raised, matching the
+   tab rail's own precedent rather than inventing a new rule for this one
+   control. */
+.gn-board-card__moves { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.gn-board-card__move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px, not the prototype's 32px — see the rule block's own comment */
+  min-width: 2.75rem; /* 44px, not the prototype's 36px — see the rule block's own comment */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-board-card__move:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+/* Spec row "Move button, unavailable": `opacity:0.4; cursor:not-allowed` —
+   this component's OWN metric, not `.gn-button`'s generic `:disabled` rule
+   (0.55 — `:79-82` above): the spec gives this control its own number, kept
+   rather than folded into the shared default. */
+.gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Backlog/closed spec §5.2 (2026-09-17) — the terminal-column Close button,
+   beside the two arrows in the same `.gn-board-card__moves` flex row.
+   Reuses `.gn-board-card__move`'s own metrics verbatim (height, radius,
+   background/text tokens, font, focus ring, `:disabled` treatment) rather
+   than inventing a second control's worth of numbers — the only real
+   difference is horizontal `padding` in place of a fixed `min-width`,
+   since this button carries the word "Close" rather than one glyph.
+   Task 10 (backlog/closed spec §5.4, 2026-09-17) — `.gn-row-action`, an ALIAS
+   of `.gn-board-card__close` with byte-identical declarations, declared as its
+   own selector rather than reused by name. The Backlog tab's per-row Start
+   button (`apps/web/src/backlog-start-button.tsx`) sits in a `TicketList`
+   table row, not a board card, and `.gn-board-card__close` names a component
+   this button is not part of — applying that class to it would be true only
+   of the METRICS, not of the DOM it actually sits in. Kept as one rule body
+   (not a copy) so the two can never drift: any future change to this
+   word-sized button's own numbers changes both consumers at once. */
+.gn-board-card__close,
+.gn-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px — same tap-target floor as `.gn-board-card__move` */
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-board-card__close:focus-visible,
+.gn-row-action:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-board-card__close:disabled,
+.gn-row-action:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
+   no-op. `board.tsx` wraps the three mutually-exclusive move notices
+   (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
+   className="gn-board-card__notice">` so a single `ref` can drive one
+   scroll-into-view effect for all three, rather than one per kind.
+   `display: contents` keeps that wrapper invisible to `.gn-board-card__moves`'s
+   own `display: flex` layout — its children act as direct flex items exactly
+   as the three conditional siblings did before this wrapper existed, so
+   nothing about the visible layout of the arrows or the notice changes. */
+.gn-board-card__notice { display: contents; }
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
-.gn-list__controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.gn-list__summary { color: var(--gn-text-muted); }
+/* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
+   align-items:center;flex-wrap:wrap`. */
+.gn-list__controls { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; }
+/* The count sentence (`:407`): `font-size:15px;line-height:20px;margin:0;
+   color:var(--label2)`. It is a `<span>` in this component (`ticket-list.tsx`)
+   rather than the prototype's `<p>`, so the `margin:0` has nothing to undo and
+   is not transcribed. Its WORDING is untouched — see
+   `ticket-list.tsx`'s own note on which halves appear, and 12.384. */
+.gn-list__summary {
+  color: var(--gn-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
 .gn-list__origin { color: var(--gn-text-muted); font-size: 0.8rem; font-style: italic; }
-.gn-list__control { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--gn-text-muted); }
-.gn-list__columns-picker summary { cursor: pointer; color: var(--gn-text-muted); }
-.gn-list__column-option { display: block; padding: 0.15rem 0.5rem; }
-.gn-list__section-title { margin: 0 0 0.4rem; font-size: 0.95rem; color: var(--gn-text-muted); }
-.gn-list__title-cell { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* "Group by" label (`:408`): `display:flex;gap:8px;align-items:center;
+   font-size:15px;color:var(--label2)`. */
+.gn-list__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.9375rem;
+}
+/* The `Group by` trigger, and the ONE rule in this restyle that is scoped
+   rather than declared. The shared `Select` renders its single-select trigger
+   as `button.gn-select__trigger.gn-field__input` (`packages/ui/src/select/
+   select.tsx:254`), so the prototype's own three metric values
+   (`desktop.dc.html:409`: `min-height:36px;padding:0 10px;font-size:15px;
+   font-weight:600`) can only be reached by overriding the shared field class
+   in place. Scoping to `.gn-list__control` is what keeps that override from
+   becoming a second, quieter definition of what a field looks like: every
+   other `.gn-field__input` in the product is untouched.
+
+   TWO DELIBERATE OMISSIONS, both of them already-recorded decisions this rule
+   is not allowed to reopen:
+
+   - `border: none` is NOT taken, even though the prototype says so. OWNER
+     RULING 2026-09-09 (Task 14 amendment rule (a), recorded on the `neo`
+     override of `.gn-field__input` further down) keeps the `hig`/`minimal`
+     border — 13.291/13.339 pin it, and `SHADOWS.hig/minimal.sunken` are both
+     `[]`, so a borderless hig/minimal field would have no boundary at all.
+     This control IS a `.gn-field__input`, so the ruling reaches it.
+
+   - `box-shadow: var(--ctlShadow)` is NOT taken. `ctlShadow` is a
+     product-wide OPEN DECISION the repo owner left to a future round
+     (`.gn-button:22-30`, `.gn-project__workflow-select:3713-3720`,
+     `.gn-board-card__move:557-561`): raising a `ctlBg` control to neo's raised
+     shadow is not something one task settles on one control. It is left out
+     here for the same reason those three leave it out, not because the
+     prototype omitted it.
+
+   `min-height` also DIVERGES from the prototype's `36px` and stays at the
+   shared rule's `2.75rem` (44px) — the same tap-target floor
+   `.gn-board-card__move` already raised 32/36px to, for the same measured
+   reason. The trigger's own metric line is omitted entirely rather than
+   restated at 44px, so it keeps inheriting whatever that floor becomes. */
+.gn-list__control .gn-select__trigger {
+  padding: 0 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+/* ── The Columns toggle, the tray, and its chips (spec List `:405-479`,
+   `:416` and `:2795`, `:2796`).
+
+   A RESTYLE of Task 9's own `details/summary` disclosure, so what changed is
+   worth stating: the control was a `summary` carrying `cardBg`+`cardShadow`
+   at 13px in the muted tone, and the prototype's own toggle
+   (`desktop.dc.html:413`) is `background:transparent; color:var(--label);
+   font-size:15px; font-weight:600; gap:7px; border-radius:var(--ctlR)` with a
+   `▸`/`▾` caret in front of the word. Transparent is not a lost affordance
+   here: the word "Columns" plus a caret is the whole control, which is what
+   the prototype draws. `ctlR` → `--gn-radius-control`, the established
+   mapping (`.gn-project__workflow-select:3710`).
+
+   `min-height` stays 2.25rem (36px), which is ALREADY the prototype's own
+   number for this control (`:413`) — Task 9 shipped it at exactly that, and
+   nothing here raises it, because a control that was at 36px before this
+   restyle and is at 36px after is not a tap-target regression this task
+   introduced. (`/my-work`'s recorded offender count is what the tap ratchet
+   watches; this control is on the board.) */
+.gn-list__columns-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* The caret is DRAWN, never typed. It is a `::after` pseudo-element, so it
+   contributes no text node — which keeps the toggle's accessible name exactly
+   "Columns" for a screen reader, and keeps it out of the type-scale sweep
+   (`apps/web/e2e-viewport/type-scale.ts` measures direct text nodes only).
+   SIZE, measured rather than assumed: the prototype's toggle (`:413`) carries
+   `font-size:15px` and draws `{{ columnsCaret }}` inside it, so this glyph is
+   the button's own 0.9375rem inherited and nothing here is under the 12px
+   floor. The prototype's 11px caret is the ROW caret (`:446`) and its raise to
+   12px is recorded at `.gn-list__collapse` below — not here. */
+.gn-list__columns-caret::after { content: '▸'; }
+.gn-list__columns-toggle[aria-expanded='true'] .gn-list__columns-caret::after { content: '▾'; }
+/* "Chip tray" (`:416`): `display:flex;gap:8px;flex-wrap:wrap;
+   background:var(--fill4);border-radius:var(--ctlR);padding:10px 12px`.
+   `fill4` → `--gn-fill-quaternary`, already the established mapping for this
+   exact prototype variable (`.gn-list__table-row:nth-child(odd)` below, the
+   timeline's own week columns). */
+.gn-list__columns-tray {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.625rem 0.75rem;
+}
+/* `display: flex` above outranks the UA sheet's own `hidden` rule (an author
+   rule beats the UA sheet at equal specificity), so the attribute the component
+   closes the tray with needs saying again here. Without this rule the tray is
+   permanently open and `hidden` is decorative — a check that cannot fail.
+   It has a witness now: `packages/app-core/test/views/ticket-list-css-binding
+   .test.tsx` (13.671) reads BOTH halves out of this file, so deleting the
+   declaration below reddens by name rather than leaving the tray open in a
+   browser with every suite green. */
+.gn-list__columns-tray[hidden] { display: none; }
+/* "Column chip" (`:2796`): `display:inline-flex;align-items:center;gap:8px;
+   min-height:36px;padding:0 12px;border:none;border-radius:999px;
+   background:var(--cardBg);box-shadow:var(--cardShadow);color:var(--label);
+   font-size:13px;font-weight:500`. `cardBg`/`cardShadow` →
+   `--gn-surface-raised`/`--gn-shadow-raised`, the same pair
+   `.gn-list__table-wrap` below and Task 9's own toggle already resolve this
+   identical vocabulary to — NOT the open `ctlShadow` question, which is about
+   `ctlBg` controls and is left alone above.
+
+   A `<label>`, not the prototype's `<button>`: the chip wraps a real checkbox
+   (see `ticket-list.tsx`), and a label is the element that makes the whole
+   chip activate it. `cursor: pointer` is what carries the button's affordance
+   across.
+
+   `999px` is a plain corner radius, written as a literal exactly like
+   `.gn-chip`'s own `border-radius: 999px` (`:113` above) — the
+   token-discipline scan bans colour literals, not lengths, and
+   `radiusVariableName` names only `card`/`control` roles.
+
+   `position: relative` is here for the input below, which is absolutely
+   positioned and must not resolve its containing block against the page. */
+.gn-list__column-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+/* The prototype's box (`:2795`), `18px` square at `5px` radius, with the tick
+   as a `::after` rather than a character — see the caret's own note above for
+   the 12px floor this avoids, and `ticket-list.tsx` for why the tick is not in
+   the DOM. The box is the input's NEXT SIBLING and the two rules below are
+   keyed on `:checked +`, so the checked state is carried entirely by CSS: no
+   second copy of "is this column shown" exists in JS for the two to disagree
+   about. */
+.gn-list__column-box {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: var(--gn-fill-tertiary);
+}
+.gn-list__column-box::after {
+  content: '✓';
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: transparent;
+}
+/* The REAL checkbox, moved out of flow and made transparent rather than
+   replaced. It keeps three things a hand-drawn box would have to reimplement:
+   `getByLabelText` resolves to it (four cases in `ticket-list.test.tsx` query
+   these toggles by label text), it carries a real `checked` state, and
+   `disabled={!prefsEditable}` needs an element that has a disabled state.
+
+   Deliberately WITHOUT `pointer-events: none`, which the usual
+   visually-hidden recipe carries: `user-event` refuses to click an element
+   whose computed `pointer-events` is `none`, so adding it would break
+   `ticket-list.test.tsx`'s own `await user.click(screen.getByLabelText('Type'))`
+   — the click that proves which half of the preferences a column touch
+   transfers authority over. */
+.gn-list__column-option input[type='checkbox'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+/* KEYBOARD FOCUS, and it has to be said HERE: the input above is real but
+   `opacity: 0`, which erases the UA's own focus ring, and before this rule
+   nothing in this file targeted its focus at all — so the five chips were
+   focusable and SILENT. The outline goes on the BOX rather than on the input,
+   because the box is what a person sees; it is the input's next sibling, the
+   same pair the two `:checked +` rules below already key on.
+   `:focus-visible`, not `:focus`: clicking a `<label>` focuses the input too,
+   and a ring drawn around a chip somebody just clicked with a mouse is noise
+   the platform does not draw either.
+   Pinned by `test/views/ticket-list-css-binding.test.tsx` (13.671), which fails
+   if this rule is deleted. */
+.gn-list__column-option input[type='checkbox']:focus-visible + .gn-list__column-box {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Checked: `background:var(--accent);color:var(--onColor)` (`:2795`).
+   `onColor` → `--gn-text-inverted`, the prototype's `--onColor` mapping this
+   file already records (`:3548`). */
+.gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box {
+  background: var(--gn-accent);
+}
+.gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
+  color: var(--gn-text-inverted);
+}
+/* "Group header row": `padding 11px 16px; trayBg + trayShadow` — the same
+   pair `.gn-timeline__weeks` uses for identical prototype vocabulary
+   (`--gn-surface-sunken`/`--gn-shadow-sunken`). DECLARED DIVERGENCE, not a
+   match: the prototype draws this as a `<tr>` spanning the table's columns;
+   this product's architecture already renders one grouping's rows as a
+   SEPARATE `<table>` per section with an `<h3>` above it (Group-by wiring
+   this task does not touch), so the bar sits outside the table rather than
+   inside it. Visually the closest restyle available without rebuilding the
+   grouping shape Task 9's own brief holds fixed ("Keep the Group-by /
+   Columns wiring untouched... this is a restyle, not a rewiring"). */
+.gn-list__section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.4rem;
+  padding: 0.6875rem 1rem;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--gn-text);
+}
+/* The title's trailing sentence (`:438`): `font-size:12px;line-height:16px;
+   color:var(--label2)`. `font-weight: 400` is not decoration — the band above
+   is now `600`, and the prototype's own meta span sits in a container with no
+   weight of its own, so without this line the sentence inherits the title's
+   weight and reads as a subtitle shouted as loudly as its heading. */
+.gn-list__section-meta {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+  color: var(--gn-text-muted);
+}
+/* "Title cell" row (`:444`): `display:flex;align-items:baseline;gap:6px;
+   min-width:0`. `baseline`, not `center` — the caret is a glyph whose box is
+   taller than the title's line box, and centring it lifts the title off the
+   line every other cell on the row sits on. `min-width: 0` is what lets a long
+   title ellipsise instead of pushing the row's columns out. */
+.gn-list__title-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  min-width: 0;
+}
 .gn-list__collapse,
 .gn-list__open {
   font: inherit;
@@ -276,9 +936,128 @@
   padding: 0;
   text-align: left;
 }
-.gn-list__collapse { color: var(--gn-text-muted); }
+/* "Caret": min-width/min-height 22px — a real tap target around the glyph,
+   not the glyph's own intrinsic box. `font-size` is the prototype's `11px`
+   (`:446`) RAISED to 12px, and the raise is the cheap half of a trade the
+   drawn glyphs below do not get: this caret is a typed character with a real
+   text node, and `apps/web/e2e-viewport/type-scale.ts` flags any measured
+   element under 12px on every route, so 11px here would put an offender on the
+   List the moment a section has rows. One pixel of glyph beats a red ratchet. */
+.gn-list__collapse {
+  color: var(--gn-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.375rem;
+  min-height: 1.375rem;
+  font-size: 0.75rem;
+}
+/* "noCaret" spacer (`:449`): `width:22px; flex:none`. An empty span, not a
+   character — it reserves the caret's column so a leaf's title starts at the
+   same x as its parent's, which is the ONLY thing making the depth indentation
+   readable as a hierarchy rather than as ragged left edges. The width here and
+   `.gn-list__collapse`'s `min-width` below are ONE fact in two rules, and a
+   binding test holds the pair: `ticket-list-css-binding.test.tsx` (13.671)
+   asserts both lengths and their equality, so changing either one alone
+   reddens rather than quietly shearing every leaf off its parent's left edge. */
+.gn-list__caret-spacer { width: 1.375rem; flex: none; }
+/* "Title button": 17px/22px. */
+.gn-list__open { font-size: 1.0625rem; line-height: 1.375rem; }
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
+/* The due cell's own tone (`:2854`): `di.late ? var(--danger) : var(--label2)`.
+   Muted here, and the `late` arm is deliberately NOT transcribed: `late` is
+   computed against `self.dueInfo(t)`, which needs today's date, and no
+   app-core view reads a clock (the same reason the relative labels "Overdue by
+   N days" / "Due today" / "Due tomorrow" are not reproduced — see the report).
+   A danger tone with no clock behind it would paint every past date the same
+   colour as every future one. */
+.gn-list__due { color: var(--gn-text-muted); }
+/* Board prototype port Task 9 (2026-09-16), spec List `:405-479`,
+   "Container": `cardBg + cardShadow; radius cardR; overflow:auto`. Wraps
+   `<Table>` (`@gisik-nokma/ui`) FROM THE OUTSIDE — `ticket-list.tsx`'s
+   `ListTable` — rather than styling anything `Table` renders itself: the
+   component's own root is `.gn-table__scroll` and its own `<table>` is
+   `.gn-table`, both on the do-not-edit list (`.gn-table` by name), and this
+   selector never appears in the same rule as either. `cardBg`/`cardShadow`/
+   `cardR` → `--gn-surface-raised`/`--gn-shadow-raised`/`--gn-radius-card`,
+   all already declared and already consumed elsewhere in this file — all
+   three together, identically, on the shared `.gn-card` rule itself
+   (`:160-165` above, unedited by this task) that every card in the product,
+   `.gn-board-card` included, renders through. */
+.gn-list__table-wrap {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border-radius: var(--gn-radius-card);
+  overflow: auto;
+}
+/* Ruling 21 (coordinator, 2026-09-16) — the five List metrics the Task 9
+   report deferred, now reachable through `Table`'s new optional class
+   hooks (`packages/ui/src/components/table.tsx`: `className`,
+   `headerClassName`, `rowClassName`, `TableColumn.cellClassName`, all
+   composed additively alongside `gn-table*`, never replacing it — the same
+   shape `Card` already uses for `className`). Every selector below is
+   `.gn-list-*`; none names `.gn-table`/`.gn-table__header`/
+   `.gn-table__cell`/`.gn-table__row`, so `.gn-table`'s own rule (`:284-288`
+   above) is unedited and unreferenced.
+
+   "Table": `min-width:820px` (51.25rem) — a plain length, not a colour or a
+   radius, so it is a literal like every other spacing/size value in this
+   file (there is no length-token axis here; `radiusVariableName` names only
+   `card`/`control`). Lands on `.gn-list__table`, appended to `.gn-table` on
+   the `<table>` itself via `className`. */
+.gn-list__table { min-width: 51.25rem; }
+/* "Header cell": `13px/18px; 600; label2; trayBg; padding 11px 16px;
+   nowrap`. `label2` → `--gn-text-muted`, `trayBg` → `--gn-surface-sunken` —
+   both already declared, both already paired for identical prototype
+   vocabulary elsewhere in this file (`.gn-timeline__weeks`, `:1934-1937`
+   below). Uniform across every column — `ticket-list.tsx` applies this
+   class to the title header AND every mapped data header alike, since the
+   metric does not vary by column. */
+.gn-list__table-header {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  background: var(--gn-surface-sunken);
+  padding: 0.6875rem 1rem;
+  white-space: nowrap;
+}
+/* "Zebra": odd rows `fill4` → `--gn-fill-quaternary`, already declared and
+   consumed elsewhere. `:nth-child`, not `:nth-of-type` as Task 11's
+   `.gn-timeline__row` needed — checked, not assumed identical: `Table`'s
+   `<tbody>` (`table.tsx`) contains ONLY `<tr>` siblings (one per row, no
+   heading or other element mixed in, unlike the timeline's `<h3>`-then-rows
+   `<section>`), so the two selectors would select the same set here; either
+   is correct and `:nth-child` is the simpler of the two where nothing forces
+   the distinction. */
+.gn-list__table-row:nth-child(odd) { background: var(--gn-fill-quaternary); }
+/* "Data cell": `padding 12px 16px; 15px; nowrap`. Wins over
+   `.gn-table__cell`'s own `padding: 0.45rem 0.6rem` by the SAME
+   equal-specificity/later-source-order technique `.gn-board-card` already
+   uses against `.gn-card` (both single-class selectors, `(0,1,0)`; this one
+   sits later in the file) — not `!important`, not extra specificity, the
+   established idiom. Applied to every column EXCEPT the title column, which
+   gets `--title` below instead because its own metric differs (a
+   `min-width` and a depth-dependent left edge the data columns don't have). */
+.gn-list__table-cell--data {
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+/* Title cell's own `min-width:260px` (16.25rem) and its static
+   top/right/bottom padding third of `12px 16px 12px calc(16px +
+   depth*22px)`. Left padding is deliberately `0` here — the depth-dependent
+   term lives on the inner `.gn-list__title-cell` span as a per-row inline
+   style (`ticket-list.tsx`, since `depth` is a fact about one ROW and this
+   class is declared once per COLUMN) — so the two together, TD then span,
+   add up to the metric's exact total rather than the report's earlier
+   "layered on an uneditable base, not pixel-exact" caveat, which this
+   closes. */
+.gn-list__table-cell--title {
+  padding: 0.75rem 1rem 0.75rem 0;
+  min-width: 16.25rem;
+}
 .gn-attention {
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;
@@ -396,6 +1175,11 @@
    16% grey; tone comes from the left rule, which is a fill, not a border. */
 .gn-refusal--preview { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 .gn-refusal--server  { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger);  color: var(--gn-text); }
+/* Ruling 27 (board-prototype-port, 2026-09-16): a dropped connection or an
+   empty ingest response is not a verdict, so it never wears `--server`'s
+   danger-red rule. Shares `--preview`'s tone instead (`--gn-warning`, amber) —
+   the same "this is not the authority speaking" register, a different reason. */
+.gn-refusal--transport { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 
 .gn-attachments { list-style: none; margin: 0.8rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-attachment { display: flex; flex-direction: column; gap: 0.1rem; }
@@ -606,6 +1390,15 @@
   width: 2rem;
   height: 2rem;
   padding: 0;
+  /* A real 1.5px transparent border, not the browser's default button chrome
+     `border-color` alone would otherwise recolour: with no `border-style`/
+     `-width` declared here, `.icon-picker__choice--selected` setting only
+     `border-color` rendered the UA's own default button border (visibly
+     rectangular, off-palette) instead of a deliberate accent ring. Reserving
+     the width on every choice, selected or not, is also what keeps the
+     selected icon from growing by the border's width and shifting its
+     neighbours. */
+  border: 1.5px solid transparent;
   border-radius: 6px;
   background: var(--gn-surface);
   color: var(--gn-text-muted);
@@ -619,37 +1412,284 @@
 
 .fields-editor { display: flex; flex-direction: column; gap: 0.5rem; }
 .fields-editor__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.fields-editor__row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem; }
+.fields-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-sunken);
+}
+/* Same gap as `.ticket-type-list__row` (see its own docblock): `neo` gives
+   `surfaceSunken` no colour of its own, so without this the row was
+   indistinguishable from the raised card around it. */
+[data-style="neo"] .fields-editor__row {
+  box-shadow: var(--gn-shadow-sunken);
+}
+/* Sizing only — the box itself (border, radius, fill, focus ring) is
+   `.gn-field__input`'s, shared with every other field on this screen rather
+   than re-declared per row. Each control carries BOTH classes; these two
+   are never compounded onto `.gn-field__input` in the selector itself —
+   `components.test.tsx`'s `rule()` helper finds the FIRST `{selector} {`
+   text match in this file, so a selector merely ENDING in `.gn-field__input`
+   (`input.gn-field__input`, declared above the real base rule) would shadow
+   13.291/13.339's own lookup and make them read this rule's body instead. */
+.fields-editor__name { flex: 1 1 10rem; min-width: 8rem; }
+.fields-editor__type { flex: 0 1 9rem; }
+.fields-editor__options {
+  flex: 1 1 100%;
+  min-height: 3.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  resize: vertical;
+}
 .fields-editor__add { align-self: flex-start; }
 
-.ticket-type-list { display: flex; flex-direction: column; gap: 0.6rem; }
-.ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
-.ticket-type-list__header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.ticket-type-list__title { margin: 0; font-size: 1rem; }
-.ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
-.ticket-type-list__row {
+.gn-select__trigger {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-select__trigger:disabled { cursor: not-allowed; }
+
+.gn-select__trigger--searchable {
+  cursor: text;
+}
+.gn-select__trigger--searchable input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  font: inherit;
+  color: inherit;
+}
+.gn-select__trigger--searchable input:focus { outline: none; }
+
+/* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
+   horizontally without this — the base `.gn-select__trigger` has no `flex-wrap` since the
+   single-select/non-multiple triggers only ever hold one item. Same shape as the ticket-type
+   list row's own overflow fix elsewhere in this file (also a wrapping flex row of variable-width
+   content), described here without repeating its selector-plus-braces text verbatim: doing that
+   would hand `components.test.tsx`'s `rule()` helper a second, earlier "rule" to match against
+   that selector before the real one, since `rule()` does a raw brace-matching scan with no
+   awareness of comments — the exact footgun this file's OWN nearby doc-comment on
+   `.fields-editor__options` already warns about for a different selector. */
+.gn-select__trigger--multiple { flex-wrap: wrap; }
+
+/* Resets UA button chrome so this reads as part of the trigger box rather than a separate
+   control — same reset shape already used above for `.gn-select__trigger--searchable input`
+   (border/background/font/color), applied to a `<button>` instead of an `<input>` because a
+   `<button>` can't nest inside the chip-remove `<button>`s' sibling `<input>` the searchable
+   variant uses instead. `flex: 1` lets it absorb the remaining row width after the chips (or
+   collapse to nothing when every option is already chipped and there's no placeholder to show),
+   matching the searchable input's own `flex: 1`. */
+.gn-select__trigger-open {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gn-select__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: var(--gn-surface);
+  font-size: 0.85em;
+}
+.gn-select__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gn-border);
+  cursor: pointer;
+}
+
+.gn-select__panel {
+  position: absolute;
+  z-index: 30;
+  min-width: 12rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
+[data-style="neo"] .gn-select__panel {
+  /* Currently redundant with the base rule above, which already carries
+     `box-shadow: var(--gn-shadow-raised)` (unlike `.ticket-type-list__row`/
+     `.fields-editor__row`, whose BASE rules have no shadow at all — there
+     the neo override is the only place the shadow exists, not the case
+     here). Kept as an explicit anchor rather than removed: neo gives
+     surface/surfaceRaised/surfaceSunken no colour of its own, so the panel's
+     entire visual separation from the page depends on this shadow value
+     staying present — a future edit to the base rule that dropped or
+     changed it would need this line to still say so, and the test above
+     pins this selector existing for that reason. */
+  box-shadow: var(--gn-shadow-raised);
+}
+
+.gn-select__list { list-style: none; margin: 0; padding: 0; }
+
+.gn-select__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  background: var(--gn-surface);
+  border-radius: var(--gn-radius-control);
+  cursor: pointer;
 }
+.gn-select__option-icon { flex: none; display: flex; }
+.gn-select__option-text { display: flex; flex-direction: column; flex: 1; }
+.gn-select__option-description { font-size: 0.85em; color: var(--gn-text-muted); }
+.gn-select__option[data-focused] {
+  /* Reuses the exact pattern already established at
+     .icon-picker__choice:focus-visible — focusRing verified as a 2px
+     OUTLINE (see CONTRAST_PAIRS' focusRing-on-surface entry, minimum 3),
+     not as a background fill. `--gn-fill-tertiary` is the alpha
+     fill-hierarchy tier already used for row hover
+     (.gn-table__row--clickable:hover, .ticket-type-list__row:hover) —
+     reused here rather than inventing a new hover treatment.
+     No literal curly braces in this comment: components.test.tsx's
+     rule() helper captures everything up to the first closing brace
+     it finds, so a brace pair here would truncate the captured rule
+     body before the real declarations. */
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: -2px;
+  background: var(--gn-fill-tertiary);
+}
+.gn-select__option-label { flex: 1; }
+
+.ticket-type-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
+/* `wrap`, the same measured reason `.gn-mcp-tokens__row` carries it: at 390px
+   the heading column and the New-type button do not share a line. */
+.ticket-type-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.ticket-type-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
+.ticket-type-list__title { margin: 0; font-size: 1rem; }
+.ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+.ticket-type-list__card { padding: 0.5rem; }
+.ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+/* The row IS the door now (owner: "remove [Edit] and open on just clicking
+   the entire card/row"), the same shape `.gn-workspace-card__door` already
+   established for the workspace card — one interactive element wrapping the
+   whole row rather than a trailing action button, which is also why this is
+   a real `<button>` and not a `<div onClick>`: keyboard and screen-reader
+   reachability come from the element, not from CSS. `width: 100%` and
+   `text-align: left` undo the browser's own button centring/intrinsic-width
+   defaults; `font: inherit`/`color: inherit` undo its own type styling —
+   none of that was needed on the `<li>` this replaces. */
+.ticket-type-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--gn-surface-sunken);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ticket-type-list__row:hover { background: var(--gn-fill-tertiary); }
+.ticket-type-list__row:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* `neo` collapses `surface`/`surfaceRaised`/`surfaceSunken` to the SAME flat
+   hex (`neoPaper`, `tokens.ts`) — depth under this style comes ENTIRELY from
+   the shadow, never from a colour difference the way `hig`/`minimal`'s three
+   distinct `warm*` tones give it for free. Left at `background` alone, this
+   row was IDENTICAL to `.ticket-type-list__card` behind it under `neo` — no
+   shadow, no colour difference, so the row that is supposed to read as
+   pressed-in instead read as nothing at all (owner: "the text boxes...
+   colours seem to be too bright... the feel of the neumorphic elements is
+   greatly diminished"). Same pair `.ticket-type-list__badge` and `.gn-field__
+   input` already wire in for exactly this reason. */
+[data-style="neo"] .ticket-type-list__row {
+  box-shadow: var(--gn-shadow-sunken);
+}
+.ticket-type-list__icon { display: inline-flex; color: var(--gn-text-muted); flex: none; }
+.ticket-type-list__info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; min-width: 0; }
 .ticket-type-list__name { font-weight: 600; font-size: 0.9rem; }
+/* Right-aligned by ordinary flex flow — `.ticket-type-list__info` above is
+   `flex: 1 1 12rem` and grows to fill the row, so this, declared after it,
+   lands at the row's trailing edge with no positioning of its own (owner:
+   "put it on the right side"). */
 .ticket-type-list__badge {
   /* 0.75rem, not 0.7rem — 11.2px, under the floor. The badge is the only thing
      distinguishing one ticket type row from another at a glance. */
+  flex: none;
   font-size: 0.75rem;
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
+  background: var(--gn-fill-tertiary);
   color: var(--gn-text-muted);
 }
-.ticket-type-list__rank,
-.ticket-type-list__fields { font-size: 0.75rem; color: var(--gn-text-muted); }
-.ticket-type-list__fields { margin-right: auto; }
+/* Depressed/pressed-in look (owner: "with a depressed UI") — the same
+   neumorphic idiom `[data-style="neo"] .gn-field__input` and `[data-style=
+   "neo"] .gn-nav a[aria-current='page']` already wire in: swap the flat fill
+   for `--gn-surface-sunken` and let a sunken shadow do the work. `hig`/
+   `minimal` render `--gn-shadow-sunken-compact` as `none` (their `SHADOWS`
+   entries are empty), so the badge stays the flat chip above under those
+   styles without needing its own guard beyond this selector already being
+   scoped to `neo`.
 
-.ticket-type-editor { display: flex; flex-direction: column; gap: 0.6rem; }
+   Owner round 3 correction (2026-09-16, "the shadows of the sunken badges…
+   too much shadow for a small badge"): this WAS `--gn-shadow-sunken`, the
+   same 4px/4px/9px treatment `.gn-field__input`/`.ticket-type-list__row`
+   use — too heavy for an 0.75rem-text, 0.1rem/0.5rem-pad badge. This is
+   literally the `.gn-chip` fix (`ui.css:133-150`) applied to the second
+   element the owner's plural "badges" named; see `tokens.ts`'s
+   `sunken-compact` docblock for the primitive-reuse accounting. */
+[data-style="neo"] .ticket-type-list__badge {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact);
+}
+.ticket-type-list__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
+.ticket-type-list__rank,
+.ticket-type-list__fields,
+.ticket-type-list__workflow,
+.ticket-type-list__meta-sep { font-size: 0.75rem; color: var(--gn-text-muted); }
+
+.ticket-type-editor { display: flex; flex-direction: column; gap: 0.9rem; }
 .ticket-type-editor__loading { margin: 0; color: var(--gn-text-muted); }
+.ticket-type-editor__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1rem; align-items: start; }
+.ticket-type-editor__main,
+.ticket-type-editor__aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+.ticket-type-editor__card { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-editor__fields-title,
+.ticket-type-editor__aside-title { margin: 0; font-size: 0.9rem; }
+/* Stacks below the two-column canvas's own floor (`40rem` here is a page
+   breakpoint choice, not that measurement) — a fixed 18rem aside would
+   otherwise squeeze the form column on a phone. */
+@media (max-width: 40rem) {
+  .ticket-type-editor__layout { grid-template-columns: minmax(0, 1fr); }
+}
 .ticket-type-editor__name,
 .ticket-type-editor__rank,
 .ticket-type-editor__workflow { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
@@ -790,21 +1830,67 @@
   gap: 0.5rem;
   padding: 0.5rem;
 }
+/* Board prototype port Task 10 (2026-09-16), spec Calendar `:477-504`, "Nav
+   button" row: `min-height:36px; padding:0 12px; ctlBg + ctlShadow; accent`.
+   `ctlBg` → `--gn-fill-tertiary`, `accent` (as TEXT) → `--gn-text-accent` —
+   never bare `--gn-accent`, which measures 4.19-4.30 as text on a light
+   surface (`.gn-button`'s own docblock, above). `ctlShadow` is DELIBERATELY
+   OMITTED, the same already-recorded product-wide divergence
+   `.gn-project__workflow-select`'s own docblock states elsewhere in this
+   file: raising a `ctlBg` control to neo's raised shadow is an open decision
+   left to the repo owner, not a call one page's task makes piecemeal.
+   `inline-flex` + centring is what makes `min-height` do anything, the same
+   reason `.gn-button`'s own rule needs it. */
 .gn-calendar__nav {
-  border-radius: 6px;
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem; /* 36px */
+  padding: 0 0.75rem; /* 12px */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
   font: inherit;
-  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+/* "Today" row: `min-height:36px; padding:0 14px; transparent; accent;
+   15px/600` — a DIFFERENT ground from the arrow buttons beside it (own class,
+   not a `.gn-calendar__nav` reuse), joined into the focus-visible group below
+   so the keyboard ring is not silently dropped from a reachable control. */
+.gn-calendar__today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem; /* 36px */
+  padding: 0 0.875rem; /* 14px */
+  border: none;
+  background: transparent;
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
   cursor: pointer;
 }
 .gn-calendar__nav:focus-visible,
+.gn-calendar__today:focus-visible,
 .gn-calendar__fold:focus-visible,
 .gn-calendar__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-.gn-calendar__month { margin: 0; font-size: 1rem; }
+/* "Month title": `20px/25px; 600; min-width:190px; centred`. DOM order is
+   UNCHANGED (the heading still follows the three buttons) — no metric asks
+   for a reorder, and `text-align: center` inside a 190px-floor box satisfies
+   "centred" without one. */
+.gn-calendar__month {
+  margin: 0;
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.5625rem; /* 25px */
+  font-weight: 600;
+  min-width: 11.875rem; /* 190px */
+  text-align: center;
+}
 
 .gn-calendar__empty {
   margin: 0;
@@ -813,39 +1899,177 @@
   font-size: 0.85rem;
 }
 
+/* "Legend" row: `cardBg + cardShadow; radius ctlR; padding 7px 14px; gap
+   16px`. `cardBg`/`cardShadow` → `--gn-surface-raised`/`--gn-shadow-raised`,
+   the same pair `.gn-list__table-wrap` (`:980`) and the List's column chips
+   (`.gn-list__column-option`, `:796`) already use for the identical prototype
+   vocabulary; `ctlR` → `--gn-radius-control` (the
+   PILL-shaped legend card takes the smaller control radius, not `cardR`,
+   exactly as the spec table names it — not a typo carried over). */
 .gn-calendar__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1rem; /* 16px */
   margin: 0 0.5rem 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: 6px;
+  padding: 0.4375rem 0.875rem; /* 7px 14px */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
 }
+/* "Legend label": `12px/16px`. Colour is left unset (inherits `--gn-text`
+   from `.gn-calendar`) — the metric names no colour for the label text
+   itself, only for the swatch beside it; the row's own PREVIOUS `color:
+   var(--gn-custom-marker)` (tinting the whole row, checkbox included) is
+   REMOVED here, replaced by the dedicated swatch below carrying that colour
+   alone, per Ruling R4's legend-card merge. */
 .gn-calendar__legend-row {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.8rem;
-  color: var(--gn-custom-marker);
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem; /* 16px */
+}
+/* "Legend swatch": `14x9px; radius 3px`. Both are plain lengths, not
+   colours — `radiusVariableName` (`tokens.ts`) names only `card`/`control`,
+   so a 3px corner has no token to reach for and is a literal by necessity,
+   the same reasoning `.gn-chip`'s own `border-radius: 999px` documents. The
+   colour is per-row: `--custom` (the toggleable fields, `--gn-custom-marker`
+   — the pre-existing default, kept as the base rule) and two new modifiers
+   for R4's read-only rows. */
+.gn-calendar__legend-swatch {
+  width: 0.875rem; /* 14px */
+  height: 0.5625rem; /* 9px */
+  border-radius: 0.1875rem; /* 3px */
+  background: var(--gn-custom-marker);
+  flex: none;
+}
+/* "Due date": the built-in markers/bars share the `accent` role (`tokens.ts`
+   `customMarker` docblock: "the today ring and a bar are `accent`... a
+   built-in marker's glyph is `accent` too") — a solid swatch matches the
+   event pill's own accent-filled ground below. */
+.gn-calendar__legend-swatch--accent { background: var(--gn-accent); }
+/* "In transit": a claim in transit is drawn as a DASHED `pending` outline,
+   never a different hue (`.gn-calendar__item--pending` below, and this rule's
+   own docblock there) — the swatch echoes that exact treatment rather than a
+   solid fill, which would show a colour the grid itself never paints. */
+.gn-calendar__legend-swatch--pending {
+  background: transparent;
+  border: 1px dashed var(--gn-pending);
 }
 
+/* Board prototype port Task 10, "Grid" row — see the component's own comment
+   (`calendar-view.tsx`, above the `.gn-calendar__grid` wrapper) for the
+   7-cols/gap-1px DECLARED DIVERGENCE this rule and `.gn-calendar__days` below
+   split between them. `trayBg + trayShadow` → `--gn-surface-sunken`/
+   `--gn-shadow-sunken`, the same pair `.gn-board__column` already uses for
+   identical prototype vocabulary; `radius cardR` → `--gn-radius-card`.
+   `flex-direction: column` + `gap: 1px` is what turns the weekday head and
+   each week section into hairline-separated rows on the tray ground showing
+   through the 1px gap — the same idiom `padding: 1px` + `gap: 1px` gives the
+   day cells below. */
+.gn-calendar__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+  min-height: 26.25rem; /* 420px */
+}
+/* "Weekday head": `trayBg; padding 9px 10px; 12px/16px; 600; label2;
+   uppercase; 0.5px`. `label2` → `--gn-text-muted`. `trayBg` matches the
+   `.gn-calendar__grid` ground it sits on exactly, so this row paints no
+   hairline against its own wrapper — only the day cells below do, where
+   `cardBg`/`fill4` differ from the tray. */
+.gn-calendar__weekday-head {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--gn-surface-sunken);
+}
+.gn-calendar__weekday {
+  padding: 0.5625rem 0.625rem; /* 9px 10px */
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem; /* 16px */
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03125rem; /* 0.5px */
+}
+
+/* "Grid" row's own "7 cols; gap 1px" tracks, for the day-number cells —
+   `.gn-calendar__weekday-head` above carries the identical column template
+   so the two rows stay aligned. */
 .gn-calendar__days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
 }
+/* "Day cell": `cardBg` in month / `fill4` out; `padding 7px 8px; gap 4px`.
+   `cardBg` → `--gn-surface-raised` (in month, the base rule); `fill4` →
+   `--gn-fill-quaternary` (`--outside`, below). `display: flex; flex-direction:
+   column` makes the `gap` real — with only the number span inside today, the
+   gap governs nothing yet, and is kept live rather than decorative for
+   whatever a future round adds under the number (the prototype draws event
+   pills inside this same cell; this architecture does not, see the grid
+   wrapper's own comment). */
 .gn-calendar__day {
-  padding: 0.25rem;
-  min-height: 2rem;
-  font-size: 0.8rem;
-  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem; /* 4px */
+  padding: 0.4375rem 0.5rem; /* 7px 8px */
+  background: var(--gn-surface-raised);
 }
-/* The ring, and it is drawn from a PROP: `today` never comes from a clock. */
-.gn-calendar__day--today {
-  outline: 2px solid var(--gn-accent);
-  outline-offset: -2px;
+.gn-calendar__day--outside {
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text-muted);
 }
-.gn-calendar__day--outside { color: var(--gn-text-muted); }
+/* "Day number": `13px/18px; 600`. */
+.gn-calendar__day-number {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.125rem; /* 18px */
+  font-weight: 600;
+}
+/* "Today ring `:495`": `24px` circle, `accent` ground, `onColor`. REPLACES
+   the previous whole-cell outline (`outline: 2px solid var(--gn-accent)` on
+   `.gn-calendar__day--today`, removed below it used to sit) — the two are the
+   same signal and stacking both would say "today" twice. `onColor` →
+   `--gn-accent-text`, the SAME pair `.gn-timeline__bar` and
+   `.gn-filters__chip[aria-pressed='true']` already use for "accent ground +
+   onColor" (`CONTRAST_PAIRS` measures `accentText` on `accent`, never
+   `textInverted` there — see `.gn-timeline__bar`'s own docblock above).
+   `aria-current`/`data-today`/`data-day` stay on the OUTER cell div
+   (`calendar-view.tsx`), unmoved by
+   this — `calendar-view.test.tsx` 11.64 queries those attributes, not this
+   class. */
+.gn-calendar__day-number--today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem; /* 24px */
+  height: 1.5rem; /* 24px */
+  border-radius: 50%;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
 
+/* `background: var(--gn-surface)` is DELIBERATE, not a default this rule
+   happened to skip. Without it, this row inherits `.gn-calendar__grid`'s new
+   `--gn-surface-sunken` tray (nothing between them paints an opaque ground of
+   its own), and `.gn-calendar__item--custom`'s text colour — UNCHANGED by
+   this task, per its one exception — was only ever measured against
+   `--gn-surface`: "`customMarker` on neo's paper is 4.807" (task brief).
+   Measured before shipping, not assumed: `customMarker` on `--gn-surface-
+   sunken` is 4.310 on `hig`/`minimal` LIGHT — a real regression BELOW 4.5,
+   because `warmSunken` (`#e4d8cc`) is close enough to the marker's violet hue
+   to erode the margin that already had "by a hair" written about it,
+   `warmPaper`'s own extra distance was the entire margin. `neo` collapses
+   `surface`/`surfaceSunken` to one hex so it was never at risk. Pinning this
+   row back to `--gn-surface` keeps every item — marker, bar and custom alike
+   — on the exact ground its contrast was last measured against, regardless
+   of which day cell it happens to be drawn under. */
 .gn-calendar__items {
   list-style: none;
   margin: 0;
@@ -853,28 +2077,43 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+  background: var(--gn-surface);
 }
+/* "Event pill": `radius 6px; padding 2px 7px; 12px/16px; accent ground;
+   onColor`. ONE exception, task-10-brief's own: the custom-field marker
+   (`--custom`, below) keeps today's plain-text treatment and does NOT become
+   a tinted pill — `customMarker` measures 4.807 on neo's paper, but every
+   alpha sweep of a purple wash fails somewhere (in-month needs ≤0.047 where
+   the prototype uses 0.129; out-of-month fails even at 0.071 — no
+   `--gn-tint-purple` role exists or is added here). Every OTHER item — every
+   marker AND every bar — gets this ground uniformly now: previously only
+   `--bar` carried `accent`/`accentText` while a plain marker stayed
+   transparent with only its glyph coloured; the brief's "the accent-ground
+   pill for ordinary events... is ported as specified" reads the singular
+   spec row as covering both shapes, so `--bar`'s own now-redundant override
+   is removed below rather than kept as a duplicate. */
 .gn-calendar__item {
   width: 100%;
   text-align: left;
   border: none;
-  border-radius: 4px;
-  padding: 2px 0.25rem;
+  border-radius: 0.375rem; /* 6px, same conversion `.gn-timeline__bar` uses */
+  padding: 0.125rem 0.4375rem; /* 2px 7px */
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem; /* 16px */
   cursor: pointer;
-  background: transparent;
-  color: var(--gn-text);
-}
-.gn-calendar__item--bar {
   background: var(--gn-accent);
   color: var(--gn-accent-text);
 }
-/* Left on `accent`, Round 2d audit: `aria-hidden="true"` decorative glyph
-   (`calendar-view.tsx:373` — "the glyph carries the colour, the label
-   carries the meaning"), not text — 3:1, and `accent` clears it. */
-.gn-calendar__glyph { color: var(--gn-accent); margin-right: 0.2rem; }
-.gn-calendar__item--custom { color: var(--gn-custom-marker); }
+/* The glyph now sits ON the accent-filled pill (it did not before this
+   task), so it takes `accentText` to read against that ground — bare
+   `accent` here would be accent-on-accent, unreadable. The custom-item
+   override two rules down is untouched: that item is NOT a pill, so its
+   glyph keeps the custom-marker colour it always had. */
+.gn-calendar__glyph { color: var(--gn-accent-text); margin-right: 0.2rem; }
+/* UNCHANGED per this task's one exception: `color: var(--gn-custom-marker)`
+   only, no background — see the "Event pill" comment above. */
+.gn-calendar__item--custom { color: var(--gn-custom-marker); background: transparent; }
 .gn-calendar__item--custom .gn-calendar__glyph { color: var(--gn-custom-marker); }
 /* In transit: outlined, never a different hue — a claim on its way to the
    server is the same claim, and recolouring it would say it means something
@@ -954,19 +2193,58 @@
   font-size: 0.85rem;
 }
 
-/* The two grids that must agree, reading ONE count. The first column is the
-   title column; week `i` is column `i + 2`, which is what the bar's computed
-   `grid-column` says too. */
+/* Board prototype port Task 11 (2026-09-16), spec Timeline `:506-538`. NO NEW
+   ROLE: `trayBg`/`trayShadow` → `--gn-surface-sunken`/`--gn-shadow-sunken`
+   (the same pair the board's own column trays already use for identical
+   prototype vocabulary — `.gn-board__column`, Task 6) and `fill4` →
+   `--gn-fill-quaternary` — both already declared, already consumed elsewhere
+   in this file. `accent`/`accentText` for the bar are UNCHANGED from Plan
+   9's own landing: `.gn-filters__chip[aria-pressed='true']` (`:3602-3605`
+   below) already settled "accent ground + onColor" as
+   `background: var(--gn-accent); color: var(--gn-accent-text)` over the
+   plan's literal `--onColor` → `--gn-text-inverted` mapping, because
+   `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and
+   never measures `textInverted` there at all — this bar already used that
+   exact pair, so nothing here changes it.
+
+   The two grids that must agree, reading ONE count. The first column is the
+   title column, widened from Plan 9's 12rem to the spec's 230px (14.375rem)
+   — pinned by an EXACT substring match in
+   `test/timeline/timeline-view.test.tsx` (`grid-template-columns: 12rem
+   var(--timeline-week-columns);`, 11.82's third case), which that case's own
+   docblock sanctions changing ("a change to the width alone will redden
+   this too, and re-reading this comment is the intended cost") — updated
+   alongside this. Week `i` is column `i + 2`, which is what the bar's
+   computed `grid-column` says too; that arithmetic depends on there being
+   exactly ONE leading track, not on its width, so it is unaffected. */
 .gn-timeline__weeks,
 .gn-timeline__row {
   display: grid;
-  grid-template-columns: 12rem var(--timeline-week-columns);
+  grid-template-columns: 14.375rem var(--timeline-week-columns);
   align-items: center;
 }
-.gn-timeline__weeks { }
+/* Header grid: trayBg + trayShadow on the CONTAINER — `.gn-timeline__corner`
+   and `.gn-timeline__week` are transparent grid items sitting on top of it,
+   the same "background on the row, not the cell" shape the list's group
+   header bar (`.gn-list__section-title`, below) uses. */
+.gn-timeline__weeks {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
+/* Row: min-height 42px, zebra fill4. `:nth-of-type`, not `:nth-child` — each
+   row's siblings inside `.gn-timeline__group` include the group's own `<h3
+   class="gn-timeline__group-heading">` ahead of the rows, and `:nth-child`
+   would count that heading as sibling #1, shifting every row's parity by
+   one. `:nth-of-type` counts only same-tag-name siblings (every sibling
+   `<div>` in a group is a `.gn-timeline__row` — the heading is an `<h3>`),
+   so the first row is always odd regardless of the heading above it. */
+.gn-timeline__row { min-height: 2.625rem; }
+.gn-timeline__row:nth-of-type(odd) { background: var(--gn-fill-quaternary); }
 .gn-timeline__week {
-  padding: 0.25rem;
+  padding: 0.5625rem 0.625rem;
   font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
   color: var(--gn-text-muted);
 }
 
@@ -975,7 +2253,22 @@
   padding: 0.5rem 0.25rem 0.15rem;
   font-size: 0.9rem;
 }
-.gn-timeline__title { padding: 0.25rem; min-width: 0; }
+/* Ruling 22 (coordinator, 2026-09-16) — "Row title": `padding 6px 12px;
+   15px/20px; ellipsis; nowrap`, the spec Timeline table's fourth row
+   (`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:372`),
+   dropped from the plan's own condensed prose and so absent from this
+   task's brief — landed directly from the spec, not the brief, per the
+   plan's own rule that where the two disagree the spec wins. `min-width: 0`
+   is kept (not a metric, but load-bearing for `.gn-timeline__title-text`'s
+   ellipsis to truncate inside a grid item rather than push the column
+   wide); ellipsis/nowrap themselves already live on that child, unchanged
+   here. */
+.gn-timeline__title {
+  padding: 0.375rem 0.75rem;
+  min-width: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
 .gn-timeline__title-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -983,12 +2276,13 @@
 }
 .gn-timeline__bar {
   border: none;
-  border-radius: 4px;
-  margin: 2px 0;
-  padding: 2px 0.25rem;
+  border-radius: 0.375rem;
+  margin: 0.3125rem 0.1875rem;
+  padding: 0.1875rem 0.5625rem;
   text-align: left;
   font: inherit;
   font-size: 0.75rem;
+  line-height: 1rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1002,9 +2296,9 @@
 .gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
 /* A period that continues past the window's edge. Dashed at the end it is
    clipped at, and only that end — the bar does not claim to start or finish
-   where the window happens to. */
-.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 4px 4px 0; }
-.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 4px 0 0 4px; }
+   where the window happens to. Corner radius follows the base bar's 6px. */
+.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 0.375rem 0.375rem 0; }
+.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 0.375rem 0 0 0.375rem; }
 .gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
 
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
@@ -1021,10 +2315,16 @@
    rule would cross the glyphs. */
 .gn-timeline__claim[data-pending] { outline: 1px dashed var(--gn-pending); outline-offset: 1px; }
 
+/* Undrawn footer: padding 12px 14px, trayBg + trayShadow — the same pair
+   `.gn-timeline__weeks` above uses for the identical prototype vocabulary.
+   No radius: the spec's Timeline metrics give this row none, matching the
+   list's group-header bar below. */
 .gn-timeline__side {
-  padding: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
 }
-.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.75rem; line-height: 1rem; }
 .gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__side-entry { padding: 0.15rem 0; }
 .gn-timeline__open {
@@ -1317,31 +2617,222 @@
    stylesheet both of those apps already load, rather than in either app. Two
    copies of this block would be two help screens that drift apart. */
 
-.gn-help { max-width: 72ch; margin: 0 auto; padding: 1.5rem 0 4rem; }
+/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the 72ch reading
+   column; it is now the two-column shell, and `.gn-help__column` inside it
+   carries the 72ch. Recorded because the old name did not change: a reader of
+   a diff elsewhere in the tree would otherwise assume it still centres text.
 
-.gn-help__search { display: block; margin-bottom: 1.5rem; }
-.gn-help__search-label { display: block; margin-bottom: 0.35rem; font-weight: 600; }
+   The reference's own shape (`Gisik Nokma Desktop`, the Help screen): an
+   `aside` of 274px, then `flex:1` remaining space with the reading column
+   CENTRED inside it — hence three elements rather than two, since a column
+   with `max-width` in a flex row sits against the sidebar instead of centring.
+
+   `padding: 0` and `gap: 0` as of 2026-09-15, REPLACING `0 0 4rem` and
+   `0 1.5rem`. The reference puts both on the centring wrapper instead
+   (`padding: 0 32px 32px` on the `flex:1` div, no gap on the row), so the
+   gutter between the sidebar and the text is the main pane's own left
+   padding rather than a flex gap, and the page's bottom inset is paid once
+   there. The top inset still belongs to the two columns separately (the
+   sidebar's own 1.75rem, the column's 1.75rem), because they do not start at
+   the same line — the sidebar's tabs sit level with the `h1`.
+
+   The entrance animation is the reference's own (`animation:gnFade .25s
+   ease` on this element), and it is the only animation in this stylesheet —
+   hence the keyframes living here rather than in a shared block. Guarded
+   with everything else at the foot of this section for readers who asked
+   for less motion. */
+@keyframes gnFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/*
+
+   BOTH APPS GET THIS. `apps/desktop` mounts the same component
+   (`apps/desktop/src/app.tsx:100,108`) and loads only this stylesheet, so a
+   rule here is the desktop layout too. There, `.gn-help` is a child of an
+   unstyled `.app-shell` — `app-shell` has no CSS anywhere in the repo — so the
+   shell spans the whole window, which is what the reference draws. The
+   sidebar's own horizontal padding is what keeps it off the window edge; the
+   web shell's `.gn-shell` padding adds to it there. */
+.gn-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;   /* load-bearing: `stretch` would defeat the sticky sidebar */
+  gap: 0;
+  padding: 0;
+  animation: gnFade 250ms ease;
+}
+/* Mirrors the reference's `flex:1; display:flex; justify-content:center;
+   padding:0 32px 32px`. The `min-width: 0` is what lets a wide table inside
+   `.gn-help__table-scroll` scroll in its own box instead of stretching this
+   column past the viewport.
+
+   `box-sizing: border-box` for the reason `.gn-help__sidebar` states at
+   length: `flex-basis` is a CONTENT width under `content-box`, so without
+   this the 2rem of side padding is ADDED to the 24rem basis and the pane's
+   minimum grows by 4rem — in `apps/desktop`, which loads only this
+   stylesheet and has no border-box reset of its own. The web app's
+   `globals.css` reset would have hidden it there. */
+.gn-help__main {
+  flex: 1 1 24rem;
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 2rem 2rem;
+}
+/* `display: flex` with `gap: 20px`, from the reference, REPLACING per-element
+   bottom margins (search 24px, results 32px). One number for the rhythm
+   between the title group, the search box, the results tray and the document
+   instead of three that had drifted apart.
+
+   The sections INSIDE the document keep their own 2.5rem, untouched by this
+   gap: `DocumentView` renders one `article.gn-help__doc`, so the document is
+   a single flex child here however many sections it holds. That margin is
+   ours rather than the reference's — it draws one section at a time and has
+   no section-to-section gap to copy. */
+.gn-help__column {
+  width: 100%;
+  max-width: 72ch;
+  padding-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+/* The title and the search box are ONE group in the reference (`gap:14px`),
+   set closer than the 20px rhythm around them. A wrapper rather than a
+   margin on the `h1`, because the column is a flex container now and a
+   bottom margin there would ADD to the gap instead of replacing it. */
+.gn-help__intro { display: flex; flex-direction: column; gap: 0.875rem; }
+
+/* The page title, added 2026-09-15 — `/help` previously rendered no `h1` at
+   all. The prototype's own values: 34px/41px, 700, −0.4px tracking, and 14px
+   to the search label below it (the reference groups the two with `gap:14px`).
+   In rem because this file is rem-based throughout.
+
+   THE TRACKING IS DERIVED, NOT GUESSED, and the first cut of this rule got it
+   wrong: −0.025em measured −0.85px live, over twice the reference's −0.4px.
+   −0.4px ÷ 34px = −0.0118em, which is the value below — em rather than px so
+   it scales if the root size changes. `.gn-page-header__title` nearby uses
+   −0.02em at the same visual size; that is the house's own rounder number,
+   and it is NOT adopted here only because matching the reference is this
+   change's whole purpose. The difference is about 1px across the word
+   "Help". */
+.gn-help__title {
+  /* The 14px that used to live here is now `.gn-help__intro`'s `gap` — same
+     distance, but it survives the column becoming a flex container. */
+  margin: 0;
+  font-size: 2.125rem;
+  line-height: 2.5625rem;
+  font-weight: 700;
+  letter-spacing: -0.0118em;
+}
+
+/* The reference's own `label`: a flex column with `gap:8px`, not a block with
+   a margin under the caption. The outer margin is gone with it — the column's
+   `gap` is the rhythm now. */
+.gn-help__search { display: flex; flex-direction: column; gap: 0.5rem; }
+/* 17px/22px/600, from the reference. It had the weight but not the size: it
+   was inheriting 16px, which is the same gap the body text below had. */
+.gn-help__search-label { font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; }
+/* ── THE FIELD IS A WELL, NOT A CARD, and this is a correction rather than a
+   preference. It read `--gn-surface-raised` (`#fbf7f3`), which is LIGHTER
+   than the page it sits on (`#efe7df`) — so an input the eye should read as
+   recessed was drawn standing proud of the surface, with a sunken shadow over
+   it saying the opposite. The reference uses its `--fieldBg`, which is the
+   `fill4` role: a faint dark tint laid OVER the surface, which is what
+   `--gn-fill-quaternary` is here.
+
+   IT MATTERS MOST WHERE THE SHADOW SAYS LEAST. Under `neo` light all three
+   surface roles collapse to one hex (`neoPaper`), so the old rule was merely
+   invisible there; under `minimal` BOTH shadow roles resolve to `none`
+   (`tokens.ts`'s `SHADOWS` table), which left the hex as the only cue — and
+   it pointed the wrong way. A translucent fill is never `none` in any style,
+   so the well now reads in all six combinations.
+
+   `--gn-text` on a quaternary fill is not a declared `CONTRAST_PAIRS` row and
+   cannot be: the fills are ALPHA, and that array's own note says a row naming
+   one would compute the fill's colour against a background it is blended INTO
+   — a false green. It is measured where it is real, by
+   `apps/web/e2e-stack/helpers/non-text-contrast.ts`, which composites. The
+   direction is favourable in both themes besides: the tint darkens a light
+   ground under near-black ink and lightens a dark one under near-white.
+
+   17px, from the reference, and still clear of the 16px below which iOS zooms
+   the page on focus. `--gn-radius-control` is KEPT over the reference's
+   literal `10px` — 8px here, 14px under `neo` — because a length literal
+   would desync this one field from every other control in ruling #386's
+   radius scale to buy 2px. */
+/* ── THE UA's OWN BORDER WAS SHOWING, 2026-09-15 (owner: "the gn-help-search
+   has a border on the right and bottom sides. i want it to be like the rest of
+   the input boxes").
+
+   This rule never declared `border`, so an `<input>` kept Chrome's default
+   `2px inset` — measured on the live page as `2px inset rgb(118, 118, 118)`.
+   An `inset` border style paints its right and bottom edges LIGHT and its top
+   and left DARK, which is the asymmetric rim that was visible, and it is not a
+   colour any token chose. Exactly the trap `.gn-help__group-toggle` already
+   carries a note about one control over ("the UA's `2px outset` otherwise
+   draws a box round it"): the defect is a MISSING declaration, so no grep for
+   a wrong value could ever have found it.
+
+   The treatment is now `.gn-field__input`'s, verbatim, which is what "like the
+   rest of the input boxes" names — bordered on `hig`/`minimal`, and the pure
+   neumorphic well under `neo` (13.339's owner ruling, and the `[data-style]`
+   rule below). Only size, padding and the reference's 17px type stay local to
+   this field. */
 .gn-help__search-input {
   width: 100%;
   min-height: 2.75rem;            /* 44px — the minimum touch target */
-  padding: 0 0.75rem;
-  font-size: 1rem;                /* never below 16px: iOS zooms the page otherwise */
+  padding: 0 0.875rem;
+  font-size: 1.0625rem;
   color: var(--gn-text);
-  background: var(--gn-surface-raised);
-  border-radius: 0.4rem;
+  border: 1px solid var(--gn-border);
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+}
+[data-style="neo"] .gn-help__search-input {
+  border: none;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
 }
 .gn-help__search-input:focus-visible,
-.gn-help__tab:focus-visible,
-.gn-help__toc-link:focus-visible,
+.gn-help__toggle:focus-visible,
+.gn-help__group-toggle:focus-visible,
+.gn-help__nav-link:focus-visible,
+.gn-help__pager-link:focus-visible,
 .gn-help__result-title:focus-visible,
 .gn-help__link:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
 
-.gn-help__results { margin-bottom: 2rem; padding: 0.9rem 1rem; border-radius: 0.4rem; background: var(--gn-surface-sunken); }
-.gn-help__results-count { margin: 0 0 0.6rem; font-weight: 600; }
-.gn-help__results-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
+/* ── A TRAY, NOT A RAISED CARD — the same inversion the search field had, and
+   found in the same pass. The reference draws this on its `--trayBg` (its
+   `sunken` role) with `--trayShadow`; this rule had it on `--gn-surface-raised`
+   with a real `0 1px 3px` drop shadow, i.e. lifted off the page rather than
+   set into it. Search results are a temporary overlay on the document, which
+   is the thing a tray says and a floating card does not.
+
+   `--gn-shadow-sunken` and not a literal `none`: it resolves to `none` under
+   `hig` and `minimal` (matching the reference's own value there) and to a real
+   inset under `neo` — which is exactly the style that needs it, since `neo`
+   light collapses surface and sunken to one hex and the shadow is then the
+   only thing drawing the tray at all.
+
+   `--gn-radius-card` is kept over the reference's `12px`, for the reason
+   `.gn-help__search-input` states about `--gn-radius-control`. The reference
+   itself uses its own `--cardR` token here, not a literal. */
+.gn-help__results {
+  padding: 1rem 1.125rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
+/* 17/22/600 with NO bottom margin — the 12px to the list below is the list's
+   own `margin-top` in the reference, which is where it stays. */
+.gn-help__results-count { margin: 0; font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; }
+.gn-help__results-list { margin: 0.75rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.875rem; }
 .gn-help__result { display: flex; flex-direction: column; gap: 0.15rem; }
 /* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
    This is a search-result LINK TITLE on `.gn-help__results`' own
@@ -1351,82 +2842,539 @@
    two backgrounds the declared `CONTRAST_PAIRS` rows name. */
 .gn-help__result-title { color: var(--gn-text-accent); text-decoration: none; font-weight: 600; }
 .gn-help__result-title:hover { text-decoration: underline; }
-.gn-help__result-where { font-size: 0.9rem; color: var(--gn-text-muted); }
-.gn-help__result-excerpt { color: var(--gn-text-muted); }
+/* 13/18 and 15/20 from the reference — the two lines under a result title are
+   deliberately SMALLER than the 17px body, not the same size. Both keep
+   `textMuted` rather than moving to `textSubtle`: the reference's own strings
+   say `--label2` here, and these are read as content, not as furniture. */
+.gn-help__result-where { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-help__result-excerpt { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-muted); }
 
-.gn-help__none { margin-bottom: 2rem; padding: 0.9rem 1rem; border-left: 3px solid var(--gn-warning); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
+/* The empty state is THE SAME TRAY as the results it replaces, centred — the
+   reference draws one card for both answers, which is what makes "no matches"
+   read as a result rather than as an error. It was a left-aligned callout with
+   a 3px `--gn-warning` rule down its side; nothing here is a warning. Nothing
+   failed, and the copy (kept as shipped) says so at length: the search DID run
+   and found a real absence. */
+.gn-help__none {
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
 
-.gn-help__tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.gn-help__tab {
-  min-height: 2.75rem; padding: 0 1rem; cursor: pointer;
+/* The document tabs, now the first thing in the sidebar rather than a row above
+   the search box. STACKED, which the reference does not do — its two segments
+   sit side by side — and the reason is the copy rule, not taste: the shipped
+   labels are the documents' own titles ("Gisik Nokma — instruction manual", 31
+   characters), the reference's are two words, and "keep shipped wording where
+   it's merely different" settles which one moves. Two 31-character labels do
+   not fit side by side in 274px, so the layout gives way instead of the words.
+   `text-align: left` for the same reason — a centred three-line label reads as
+   a paragraph, not a control. */
+/* ── `.gn-help__tabs` / `.gn-help__tab` ARE GONE, and this note is here because
+   two `test-cases/` records and `docs/pre-launch-checklist.md` still name them.
+
+   The document switch is now the shared `SegmentedControl` (`.gn-segmented`,
+   below in this file), on the owner's 2026-09-15 instruction to build it like
+   the reference — which retires the local pair entirely. `.gn-segmented` is the
+   reference's own treatment measured against its inline styles: a 2px tray,
+   `flex: 1` segments, the selected one on `surfaceRaised` + `shadowRaised`.
+
+   What was lost with them, weighed rather than waved past. Both deleted rules
+   were deliberate I2 fixes, for a defect that DOES NOT TRANSFER: `:hover` used
+   `--gn-fill-secondary` and `[aria-pressed='true']` added `--gn-text-accent`,
+   both because under `minimal` BOTH shadow roles resolve to `none`, so a
+   shadow-only cue marked nothing in 4 of 6 style×theme combinations.
+   `.gn-segmented__item--on` marks selection with `surfaceRaised` — a real
+   background change in every style, not a shadow — so the hole those fixes
+   filled is not open here. It has no `:hover` rule at all, which is a genuine
+   difference and the reference's own behaviour.
+
+   `.gn-help__toggle` below is the ONE surviving user, and it was never a tab.
+   RENAMED rather than left alone: `apps/desktop/src/app.tsx` borrowed
+   `.gn-help__tab` for its "Manual & FAQ" / "Back" button, and a class named
+   for document tabs that styles only a desktop toggle is the drift this file's
+   comments exist to prevent. */
+
+/* `border: none` is a FIX carried over from the class this was renamed out of,
+   and it was already missing: measured live, the button rendered `2px outset
+   rgb(0, 0, 0)` — the UA default — because the rule never reset it and nothing
+   in either stylesheet resets `button` globally (`globals.css:60` sets only
+   `font: inherit`). Every other control in this file says `border: none`
+   explicitly; this one did not, and under `neo` dark a black border on a
+   near-black ground is exactly the kind of defect that survives being looked
+   at. `text-align: left` is dropped with the rename — it existed to keep a
+   31-character wrapped tab label readable, and this button's label is two
+   words. */
+.gn-help__toggle {
+  min-height: 2.75rem; padding: 0.5rem 0.75rem; cursor: pointer;
+  border: none;
   color: var(--gn-text); background: var(--gn-surface-raised);
-  font-size: 1rem; transition: background-color 200ms ease, border-color 200ms ease;
+  font-size: 1rem; line-height: 1.3;
+  transition: background-color 200ms ease;
+  border-radius: var(--gn-radius-control);
 }
-.gn-help__tab:hover { background: var(--gn-surface-sunken); }
-/* The selected document is marked by BORDER as well as background: colour alone
-   is not an indicator, and `aria-pressed` carries it to assistive tech. */
-.gn-help__tab[aria-pressed='true'] { border-color: var(--gn-accent); background: var(--gn-surface-sunken); font-weight: 600; }
+/* Kept from the old `.gn-help__tab:hover` and for its original reason: under
+   `hig` and `minimal`, `--gn-shadow-sunken` resolves to `none` (`tokens.ts`'s
+   `SHADOWS` table — only `neo` has a real sunken shadow), so a hover cue that
+   was ONLY a shadow was a no-op in 4 of 6 style×theme combinations.
+   `--gn-fill-secondary` is a real, distinct token in every style (a translucent
+   fill over the surface, never `none` — the same token `.gn-refusal` uses), so
+   this is a genuine background change everywhere; the sunken shadow layers on
+   top where the style has a real one (neo). */
+.gn-help__toggle:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
 
-.gn-help__toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 2rem; padding-bottom: 1rem; }
-/* 1rem, not 0.95: measured at 15.2px in a real browser, under the 16px floor for
-   body text on a phone — and these are the only navigation links on the page. */
-/* `inline-flex` + `min-height: 1.5rem` = WCAG 2.5.8's 24px floor. Measured at
-   390px before this: `179x23` — wide, and missing the floor by ONE pixel, which
-   is what ten of this page's tap-target offenders were. An inline `<a>` ignores
-   `min-height` entirely, so the display change is the load-bearing half.
+/* ── The topic sidebar ────────────────────────────────────────────────────────
+   REPLACES `.gn-help__toc`, a wrapped row of every section link that stood
+   above the document. That rule was flattened onto the older reference's own
+   treatment two commits ago; the sidebar SUPERSEDES both the card it started as
+   and the flat row it became, and the earlier reasoning is not wrong so much as
+   moot — this is the same index, grouped, always visible, and it marks where
+   the reader is. Two indexes on one page would be one too many.
 
-   24px and not 44px, deliberately: the TOC is a dense wrapped list, and 2.5.5's
-   enhanced floor would make nineteen entries 836px tall on a phone. Standalone
-   controls (`.gn-view-tabs button`, the 404's recovery links, the MCP code
-   input) use 44px; in-list links use 24px. */
-/* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
-   `.gn-help` (the ancestor) sets no background of its own, so this renders on
-   the ambient `body { background: var(--gn-surface) }`. */
-.gn-help__toc-link {
-  display: inline-flex;
+   `position: sticky` is the whole point of the change. The reference is a
+   fixed-height desktop canvas whose `aside` scrolls independently; a web page
+   scrolls as one document, and sticky is that behaviour's translation — the nav
+   stays put while 224 entries go past it. It needs `align-items: flex-start` on
+   `.gn-help` (stated there) and a `max-height` here, since five open groups are
+   taller than a short viewport.
+
+   Geometry from the reference: 274px wide, `gap: 18px`, an inset right-edge
+   hairline in its `fill4` role, and `28px 16px 32px 32px` of padding.
+
+   THE PADDING IS NOW THE REFERENCE'S OWN, asymmetric, 2026-09-15. It was
+   1rem on both sides, on the reasoning that the reference "assumes a
+   full-window canvas with no outer inset" while this renders inside
+   `.gn-shell`'s own inset on web — a value "defensible in both rather than
+   correct in one". The owner asked for the reference's styling, which settles
+   it, and the shell's inset turns out to be 1.25rem (`globals.css:62`), not
+   the 2rem that reasoning implicitly leaned on. The width is unchanged and
+   `border-box`, so this moves 16px from the text's left edge to its right:
+   the content column inside the aside goes from 242px to the reference's
+   226px. */
+.gn-help__sidebar {
+  flex: 0 0 17rem;
+  /* MEASURED, not precautionary: this rendered 306px wide in `apps/desktop`
+     and 274px in `apps/web`, because `flex-basis` is a CONTENT width under
+     `content-box` and the 1rem side padding is then added to it. The web app
+     has a `box-sizing: border-box` reset in its own `globals.css`; THIS
+     stylesheet has none, and desktop loads only this one — so a rule here
+     means two different widths in the two apps that share it unless it says
+     which. Every other new rule in this block was checked the same way; this
+     is the one that differed. */
+  box-sizing: border-box;
+  position: sticky;
+  /* Inset rather than flush (owner, 2026-09-15). `top: 0` pinned the pane
+     against the viewport edge the moment it stuck; the 1.5rem leaves air, and
+     `max-height` gives the same 1.5rem back at the bottom so a long topic list
+     still scrolls inside its own box rather than past the fold.
+
+     `--app-nav-offset` clears the app bar, which became sticky later the same
+     day. Without it this pane sticks 1.5rem from the VIEWPORT top and spends
+     the rest of the page underneath a 4.35rem bar — its first topic group
+     permanently hidden. The variable is deliberately not a `--gn-` token: it
+     is one shell's layout fact, published by `apps/web/app/globals.css`, and
+     `apps/desktop` renders no nav at all. Hence the `0px` fallback, which is
+     what that app resolves and which reproduces this rule's previous
+     behaviour there exactly. */
+  top: calc(var(--app-nav-offset, 0px) + 1.5rem);
+  max-height: calc(100vh - var(--app-nav-offset, 0px) - 3rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  /* The right inset holds the content off the hairline; the other three are the
+     page's own and are NOT the guide's (which sets `padding-right` alone and
+     would butt this pane against the window edge). */
+  padding: 1.75rem 0.9rem 2rem 2rem;
+  /* `border`, not `fill-quaternary`: a declared 3:1 role rather than an alpha
+     fill, so the divider is a stated contrast guarantee instead of a tint that
+     happens to read. */
+  box-shadow: inset -1px 0 0 var(--gn-border);
+}
+.gn-help__nav { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* The `TOPICS` label. Uppercased in CSS, not in the markup, so the accessible
+   name a screen reader announces is the sentence-case word — and so the string
+   `aria-labelledby` points at stays readable in the DOM.
+   ── OWNER DIRECTION, 2026-09-15: "lets move the styling towards the guide."
+   The reference's 13px/0.5px-tracking (0.5 ÷ 13 = 0.0385em) gives way to the
+   guide's 0.78rem/0.04em, and `--label3` gives way to `--label2` here.
+
+   WHAT THAT COSTS, STATED BECAUSE IT IS A REVERSAL AND NOT A REFINEMENT. The
+   reference runs three text weights where this file had two, and `textSubtle`
+   was added the same day to carry the third on FURNITURE — this eyebrow, the
+   group counts, the caret, the section eyebrow, the pager's `Next`. The guide
+   knows only two, so THREE of those five sites come back to `textMuted` and
+   the remaining two (`.gn-help__section-eyebrow`, `.gn-help__pager-label`) do
+   not: they sit in the document column, which the guide never covers. The
+   sidebar's labels therefore read at the same weight as its links again —
+   the exact thing the third step was introduced to separate. The role is NOT
+   orphaned and needs no token change; see `tokens.ts`'s `textSubtleLight` for
+   the derivation that still stands behind the two surviving sites.
+
+   The gain is real and is why this is safe to take: `textMuted` on
+   `surfaceSunken` is a DECLARED `CONTRAST_PAIRS` row (`tokens.ts:893`),
+   machine-verified in both themes. The composite it replaces — `textSubtle`
+   over an alpha `fill-quaternary` hover — could not be declared at all, and
+   was carried by a hand measurement recorded in case 15.26. */
+.gn-help__eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gn-text-muted);
+}
+
+.gn-help__groups { display: flex; flex-direction: column; gap: 0.375rem; }
+.gn-help__group { display: flex; flex-direction: column; gap: 0.125rem; }
+
+/* The group disclosure. 36px from the reference — above WCAG 2.5.8's 24px floor
+   for an in-list control, below the 44px this file gives STANDALONE controls.
+
+   15px, from the reference, REPLACING a 1rem this rule shipped with. That 1rem
+   was reasoned from the old `.gn-help__toc-link` comment ("under the 16px floor
+   for body text on a phone"), and the reasoning had two holes: the floor this
+   repo actually ENFORCES is 12px (`apps/web/e2e-viewport/type-scale.ts` derives
+   it from the product's own scale and says so at length), and the reference's
+   own 15px was reachable all along — it is a computed binding, but the builder
+   that computes it is in the prototype's source and I had not read it. The
+   owner's instruction to match the reference's text styling settles it; 15px
+   clears the enforced floor with 3px to spare. */
+.gn-help__group-toggle {
+  display: flex;
   align-items: center;
-  min-height: 1.5rem;
-  color: var(--gn-text-accent);
-  text-decoration: none;
-  font-size: 1rem;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  cursor: pointer;
+  border: none;                    /* the UA's `2px outset` otherwise draws a box round it */
+  background: transparent;
+  color: var(--gn-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: left;
+  border-radius: var(--gn-radius-control);
 }
-.gn-help__toc-link:hover { text-decoration: underline; }
+/* `surface-sunken`, not the alpha `fill-quaternary` (owner, 2026-09-15). The
+   solid token is what lets every ink composited over this hover be a DECLARED
+   pair — `CONTRAST_PAIRS` forbids naming an alpha fill, so the previous hover
+   ground could only ever be checked by hand. */
+.gn-help__group-toggle:hover { background: var(--gn-surface-sunken); }
+.gn-help__group-title { flex: 1; }
+/* 0.8rem = 12.8px, the guide's. It clears the 12px floor
+   `apps/web/e2e-viewport/type-scale.ts` derives from this product's own scale
+   rather than sitting exactly on it, as the reference's 12px did. */
+.gn-help__group-count {
+  font-size: 0.8rem;
+  line-height: 1rem;
+  font-weight: 500;
+  color: var(--gn-text-muted);       /* `--label2` — see `.gn-help__eyebrow` */
+}
+/* The caret rotates rather than swapping glyph, so one chevron serves both
+   states and there is nothing to keep in sync. Guarded, like every other
+   transition in this file, for readers who asked for less motion. */
+.gn-help__caret { display: flex; flex: none; color: var(--gn-text-muted); transition: transform 150ms ease; }
+.gn-help__group-toggle[aria-expanded='true'] .gn-help__caret { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .gn-help__caret { transition: none; }
+}
 
+/* The left inset lines the child links up under the group title rather than
+   under its caret — the reference's 19px, rounded to the guide's 1.1rem. The
+   vertical padding is the guide's own, giving the run a little air inside an
+   expanded group. */
+.gn-help__group-items {
+  margin: 0;
+  padding: 0.15rem 0 0.35rem 1.1rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+/* ── The section rows, REWRITTEN 2026-09-15 against the reference's rendered
+   sidebar (owner screenshot) and its own style builder, which reads:
+
+     display:flex; align-items:center; gap:8px; min-height:34px; padding:0 10px;
+     border-radius:8px; font-size:15px; line-height:20px;
+     active   → background:var(--accent); color:var(--onColor); font-weight:600
+     inactive → color:var(--label2); font-weight:400
+     hover    → inactive: background:var(--fill4); active: nothing
+
+   WHAT THIS REPLACES, AND WHY IT WAS WRONG. Every row used to be
+   `--gn-text-accent` at 1rem with an underline on hover — i.e. every row was
+   painted as a link. Against the reference that is the actual defect the owner
+   pointed at: "only the active section is in a depressed style". Twenty-one
+   accent-blue rows compete for attention and none of them wins, so the ONE row
+   that means "you are here" had nothing left to distinguish it but a
+   translucent wash. Inactive rows are now plain muted text and carry no
+   decoration at all; the active row is the only filled thing in the sidebar.
+
+   `--gn-accent` + `--gn-accent-text` is the reference's `--accent`/`--onColor`
+   in this repo's own roles, and it is a DECLARED pair — `{ fg: 'accentText',
+   bg: 'accent', minimum: 4.5 }` (`tokens.ts:721`), the same pairing
+   `.gn-avatar--tint-0` and `.state-mapping-dialog__confirm` already use. The
+   previous `--gn-text-accent` on `--gn-fill-tertiary` was a translucent fill
+   with an accent-hued TEXT over it, which is the opposite composition and the
+   one Round 2d split those two role names apart to keep distinct.
+
+   `box-shadow: var(--gn-shadow-sunken)` WAS here — an addition beyond the
+   reference's string, for the DEPRESSED look the owner asked for — and is
+   dropped 2026-09-15 with the move toward the guide, which fills the row and
+   stops there. It only ever rendered under `neo` (`hig` and `minimal` resolve
+   that token to `none`), so this removes a cue one style of three ever showed
+   and leaves the fill plus 600 weight carrying the state in all of them.
+
+   `text-decoration` is gone in both states — these are rows in a navigation
+   list, not links in running prose, so 1.4.1 is not in play and the hover fill
+   is the affordance. */
+/* ── MOVED TO THE GUIDE'S BOX, 2026-09-15 (owner: "lets move the styling
+   towards the guide"). `display: block` with symmetric padding replaces
+   `flex` + a 34px `min-height`: several of these rows WRAP (the longest runs
+   to three lines), and a centred flex line box was never what made them read —
+   normal flow plus padding is, and it is the guide's own rule.
+
+   The height floor goes with it. 0.4rem × 2 plus a 1.35 line box on 15px text
+   is ~33px for a single-line row against the 34px that was there, so WCAG
+   2.5.8's 24px floor for an in-list control still clears with 9px to spare;
+   the tap-target sweep is the check, and it is read after this change rather
+   than assumed.
+
+   `--gn-text`, not `--gn-text-muted`: this is the half of the reversal worth
+   naming twice. The muted ink existed so that ONE row — the active one — was
+   the only thing in the sidebar carrying weight. Full ink on all of them is
+   what the guide specifies and what was asked for; the active row keeps the
+   accent fill and 600 weight, so it is still distinguished, just less starkly.
+   `text` on `surface` and on `surfaceSunken` (the new hover) are both declared
+   `CONTRAST_PAIRS` rows, so this composite is machine-checked in both themes. */
+.gn-help__nav-link {
+  display: block;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--gn-radius-control);
+  color: var(--gn-text);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  font-weight: 400;
+}
+.gn-help__nav-link:hover { background: var(--gn-surface-sunken); }
+/* The SELECTOR is `location`, not `page`. `.gn-settings__sidebar
+   a[aria-current='page']` next door links real routes; these link places inside
+   this page, which is the distinction ARIA draws between the two values, and
+   `page` here would tell a screen reader the reader had navigated away. */
+.gn-help__nav-link[aria-current='location'] {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  font-weight: 600;
+}
+/* The reference gives the active row no hover change at all. Stated rather than
+   left to inheritance: without it the rule above loses to `:hover` on specificity
+   ties in some orders, and the active row would flash to a quaternary fill — the
+   exact "hover makes it disappear" collision this file already fixed once on the
+   old help tabs. */
+.gn-help__nav-link[aria-current='location']:hover { background: var(--gn-accent); }
+
+/* Stacked below ~768px. Stated as a rule rather than left to `flex-wrap`: with
+   only the wrap, a 274px sidebar on a 390px phone keeps its width and leaves a
+   dead 76px column beside it, and `/help` is reachable signed out, so a phone
+   is a real entry point here and not an edge case. The hairline moves from the
+   right edge to the bottom one because it is now a divider between rows, and
+   the sticky behaviour is dropped: a full-width sticky block would cover the
+   document it is meant to navigate. */
+@media (max-width: 47.9375rem) {
+  .gn-help__sidebar {
+    flex-basis: 100%;
+    position: static;
+    max-height: none;
+    /* Explicit, not left to the `auto` above: with no `max-height` it would
+       never scroll anyway, but an `auto` box is still a scroll container, and
+       the guide states `visible` here for that reason. */
+    overflow-y: visible;
+    padding: 1.75rem 0 1.25rem;
+    box-shadow: inset 0 -1px 0 var(--gn-border);
+  }
+  /* The 2rem of side padding goes with the sidebar: stacked, this pane spans
+     the viewport, and the shell's own inset (0.75rem on a phone,
+     `globals.css:65`) is the one that should hold the text off the edge. On
+     desktop, where there is no shell, edge-to-edge at 390px is the reference's
+     own behaviour for a window that narrow. */
+  .gn-help__main { flex-basis: 100%; padding: 0 0 2rem; }
+  .gn-help__column { padding-top: 1.25rem; }
+}
+
+/* ── EVERY ANCHOR IN THIS DOCUMENT LANDS CLEAR OF THE APP BAR.
+   Both of these carry the ids the sidebar's topic links and the search
+   results point at (`${document.id}-${entry.id}`), so a fragment navigation
+   scrolls one of them to the top of the viewport — which, since the bar became
+   sticky, is UNDERNEATH it. Measured before this rule existed: clicking
+   "§4 — Getting your people in" put its heading at `top: 0.04px` against a
+   69.6px bar, i.e. the heading you asked for was the one thing you could not
+   see. `scroll-margin-top` moves the scroll's resting place, not the element,
+   so nothing about the layout shifts.
+
+   Same `--app-nav-offset` with the same `0px` fallback as the sidebar above:
+   in `apps/desktop`, which has no bar, this resolves to a 1rem breathing gap,
+   which is an improvement there rather than a no-op. */
+.gn-help__section,
+.gn-help__entry {
+  scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
+}
 .gn-help__section { margin-bottom: 2.5rem; }
-.gn-help__h2 { margin: 0 0 0.75rem; font-size: 1.3rem; line-height: 1.3; }
+/* The section eyebrow — `MANUAL · GETTING STARTED`. 13px/18px/600 with 0.4px
+   tracking (0.4 ÷ 13 = 0.0308em) and 6px to the `h2`, all from the reference.
+   Uppercased in CSS for the same reason as `.gn-help__eyebrow`: the DOM keeps
+   the readable string. */
+.gn-help__section-eyebrow {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.0308em;
+  text-transform: uppercase;
+  color: var(--gn-text-subtle);      /* `--label3`, as `.gn-help__eyebrow` */
+}
+/* 22px/28px/600, from the reference. It was 1.3rem (20.8px) with an inherited
+   700 from the UA; the eyebrow above and this heading are one unit there, so
+   they are measured off the same block. */
+/* THE 0.75rem HERE IS THE REFERENCE'S 12px, arrived at from the other side,
+   and it is deliberately NOT the `margin: 0` its own `h2` carries. The
+   reference runs a TOP-margin rhythm — `h2` at 0, then each body paragraph
+   with `margin: 12px 0 0` (first) / `14px 0 0` (rest) — so the rendered gap
+   between the heading and the first paragraph is 12px, which is what this
+   bottom margin already produces. Taking the `0` literally while this file
+   keeps a bottom-margin rhythm would have closed that gap to nothing.
+
+   The rhythm is not converted wholesale because this document has types the
+   reference has none of — `h3`, lists, tables, code — and a top-margin
+   rhythm would need every one of them to agree or they double up. Same
+   pixels, one convention. */
+.gn-help__h2 { margin: 0 0 0.75rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; }
 .gn-help__entry { margin-bottom: 1.75rem; }
-.gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.05rem; line-height: 1.35; }
-.gn-help__p { margin: 0 0 0.75rem; }
-.gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.gn-help__quote { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-left: 3px solid var(--gn-accent); border-radius: 0.4rem; background: var(--gn-surface-sunken); }
-.gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-size: 0.92em; }
+/* ── 17px/22px IS THE BODY SIZE, from the reference, replacing an inherited
+   16px/1.45. It is set PER ELEMENT and must stay that way: this file is
+   rem-based, `rem` is root-relative, and a `font-size` on `.gn-help__column`
+   would scale nothing inside it. Every rule below that carries running text
+   carries the pair.
+
+   The two search-result lines are the exception and are SMALLER on purpose
+   (13px and 15px) — see `.gn-help__result-where`. */
+.gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.0625rem; line-height: 1.375rem; }
+/* `text-wrap: pretty` is the reference's own, on every paragraph. It costs
+   nothing where unsupported and stops the short last line — this column is
+   72ch of prose, which is exactly where a one-word orphan shows. */
+.gn-help__p { margin: 0 0 0.875rem; font-size: 1.0625rem; line-height: 1.375rem; text-wrap: pretty; }
+.gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.0625rem; line-height: 1.375rem; }
+/* A TRAY CARD, not a ruled aside — the reference draws a quote as the same
+   `--trayBg`/`--trayShadow` box it uses for the search results, with no rule
+   down its side at all. The `3px solid var(--gn-accent)` border is gone with
+   the change: an accent bar is emphasis, and a pulled quote in a manual is an
+   aside, which is the opposite. 14px/16px padding and 16px of air above and
+   below are the reference's own. */
+.gn-help__quote {
+  margin: 1rem 0;
+  padding: 0.875rem 1rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  text-wrap: pretty;
+}
+/* `font-family` is the reference's own `ui-monospace, Menlo, monospace`, and
+   until it was named here this `<code>` fell through to whatever monospace the
+   browser happened to default to — the same "no rule set a font" defect the
+   body stack had, one element down. `0.92em` stays: the size contrast is
+   deliberate and is why `type-scale.ts` skips `code`/`kbd`/`pre` descendants
+   rather than measuring them against the label floor. */
+.gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-family: var(--gn-font-mono); font-size: 0.92em; }
 /* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
    Inline documentation link text, on the same ambient `--gn-surface` as
    `.gn-help__toc-link` above. */
 .gn-help__link { color: var(--gn-text-accent); }
 
+/* The `Next` pager at the foot of each section. The reference puts a hairline
+   above it and pays for the space with `padding-top` on the children (4px on
+   the row, 16px on each child); one 1.25rem on the row is the same 20px with
+   one declaration instead of three. `box-shadow: inset` and not `border-top`
+   because a border would change the box's own height, and because the
+   hairline's colour is the same `fill4` role the sidebar's divider uses. */
+.gn-help__pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0;
+  padding-top: 1.25rem;
+  box-shadow: inset 0 1px 0 var(--gn-fill-quaternary);
+}
+/* `--label3` here too — "Next" is the furniture beside the link, not the
+   thing being read. The link itself keeps `textAccent`. */
+.gn-help__pager-label { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-subtle); }
+/* `min-height: 1.5rem` for WCAG 2.5.8's 24px floor, as with the sidebar links —
+   one standalone-looking link per section, but it sits in running text rather
+   than on its own, so the 24px in-list floor is the applicable one. */
+.gn-help__pager-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  color: var(--gn-text-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gn-help__pager-link:hover { text-decoration: underline; }
+
 /* Wide content scrolls INSIDE its own box; the page never scrolls sideways. */
 .gn-help__table-scroll { overflow-x: auto; margin: 0 0 1rem; }
 .gn-help__table { border-collapse: collapse; width: 100%; }
-.gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+/* 17px like the rest of the body. The table has no counterpart in the
+   reference, so this is the body rule applied consistently rather than a
+   measured value — and it is safe to widen because `.gn-help__table-scroll`
+   above gives the table its own horizontal scroll box. */
+.gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; font-size: 1.0625rem; line-height: 1.375rem; }
 .gn-help__table th { background: var(--gn-surface-sunken); }
 
+/* `.gn-help__h2` is the LAST rule in this query, and it is now load-bearing for
+   more than itself. `.gn-help__tabs { flex-direction: column }` stood beside it
+   and was one of the two discriminators `apps/web/e2e-viewport/responsive.spec.ts`
+   reads to prove the 40rem breakpoint fired at all. That selector is gone, and
+   the spec guards its assertion with `if (… !== null)` — so leaving it pointed
+   at a deleted class would have turned a passing check into a SKIPPED one, with
+   nothing red to say so. The spec now reads this font-size instead; if you
+   remove this line, replace the discriminator in the same change. */
 @media (max-width: 40rem) {
-  .gn-help__tabs { flex-direction: column; }
   .gn-help__h2 { font-size: 1.15rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gn-help__tab { transition: none; }
+  .gn-help__toggle { transition: none; }
+  /* The entrance fade. `none` and not a shortened duration: this one is a
+     whole-page opacity ramp, which is the kind a reader who asked for less
+     motion asked about. */
+  .gn-help { animation: none; }
 }
 
-/* ── Segmented control (HIG method/view picker). Fill track, raised segment.
-   Replaces `.gn-view-tabs`. No border anywhere (R1(c)). ───────────────── */
+/* ── Segmented control (HIG method/view picker). Replaces `.gn-view-tabs`.
+   No border anywhere (R1(c)).
+
+   NO TRACK FILL as of 2026-09-15 (owner: "the background also needs to be
+   removed from the tablist"). It was `var(--gn-fill-tertiary)`. With the
+   selected segment now PRESSED under `neo` (below), the track had become the
+   second of two competing grounds — the well is read against the page itself,
+   not against a tint laid over it, which is what the reference's own neo
+   values compose against. The unselected segment is therefore bare page and
+   carries no fill of its own, which is the "normal" half of the owner's
+   description. Geometry (`gap`/`padding`/radius) stays: it is what keeps the
+   two segments apart now that no fill does. */
 .gn-segmented {
   display: flex;
   gap: 2px;
   padding: 2px;
   border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
 }
 /* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
    the 44px floor this repo's own tap-target ratchet enforces (WCAG 2.5.5, and
@@ -1453,7 +3401,65 @@
 .gn-segmented__item--on {
   background: var(--gn-surface-raised);
   font-weight: 600;
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-selected);
+}
+/* ── OWNER, 2026-09-15: "in the prototype it was sunken style. i want it to
+   follow that." Under `neo` the SELECTED segment is PRESSED, not lifted.
+
+   The reference does not have one treatment for this control, it has five, and
+   they split on the style axis — read off `--segOnShadow` in
+   `design-system/interactive/desktop.dc.html`:
+
+     hig light  0 3px 8px rgba(39,58,99,.16), 0 3px 1px rgba(39,58,99,.06)
+     hig dark   0 3px 8px rgba(6,10,22,.66)
+     minimal    none
+     neo light  inset 3px 3px 6px rgba(176,152,132,.55), inset -3px -3px 6px rgba(255,255,255,.95)
+     neo dark   inset 3px 3px 6px rgba(0,0,0,.55),       inset -3px -3px 6px rgba(255,255,255,.05)
+
+   OWNER ROUND 5 (2026-09-16): a dedicated `selected` shadow role now carries
+   all five values directly (`packages/ui/src/tokens.ts`'s `SHADOWS` table),
+   which is why the base rule above reads `var(--gn-shadow-selected)` rather
+   than `var(--gn-shadow-raised)` and no `[data-style="neo"]` override for
+   `box-shadow` exists below any more. The two-role approximation this
+   replaced (`raised` for `hig`/`minimal`, `sunken` for `neo`) happened to
+   read right for `hig`/`minimal` — `raised` resolves to `none` under
+   `minimal`, matching the reference exactly — but `neo`'s own geometry
+   (3px/3px/6px) never matched `sunken`'s (4px/4px/9px); a dedicated role was
+   the honest fix rather than a third borrowed scale position. See
+   `ShadowRole`'s own docblock in `tokens.ts` for why `selected` is named for
+   the STATE (the chosen item in a group) and not for a scale position or for
+   this component.
+
+   This is the SHARED control, so it moves everywhere `SegmentedControl` is
+   used — the sign-in method picker, `/account`'s appearance rows, `/help`'s
+   Manual/FAQ switch and the ticket-type editor — which is the point: the
+   reference defines the component once. */
+[data-style="neo"] .gn-segmented__item--on {
+  /* `surfaceSunken`, not the base rule's `surfaceRaised` — CONFIRMED against
+     the reference rather than reasoned from the word "sunken". Its own
+     `--segOnBg` under `neo` is `#EDE4DB` light and `#1B2340` dark, and those
+     are byte-for-byte this product's `surfaceSunken` in the same two arms
+     (`colorOf('light'|'dark', 'surfaceSunken', 'neo')`). The base rule's
+     `surfaceRaised` differs from it in LIGHT (`#fbf7f3`), so keeping it would
+     have left the pressed segment sitting a shade too high in exactly the
+     theme this suite runs in. Same pairing `.gn-field__input` and
+     `.gn-help__search-input` take under `neo`: sunken ground, sunken shadow.
+
+     NO `box-shadow` OVERRIDE HERE as of owner round 5 (2026-09-16): the base
+     rule's `var(--gn-shadow-selected)` already resolves to `neo`'s own inset
+     geometry directly (see the block comment above `.gn-segmented__item--on`),
+     so the `box-shadow: var(--gn-shadow-sunken)` line this override used to
+     carry became redundant and was removed. `background` stays overridden —
+     a shadow role carries no background of its own, so nothing about the new
+     role makes this line redundant too. (Note, not a further change: under
+     `neo` today `surfaceRaised` and `surfaceSunken` are themselves
+     byte-identical in both themes — `neoPaper` light, `neoNavy` dark — so
+     this override currently repaints the same colour the base rule would
+     have anyway. Kept rather than removed: that identity is an artifact of
+     `neo`'s current palette, not a guarantee `STYLE_COLOR_OVERRIDES` states,
+     and this line is what stays correct if a future palette edit separates
+     them again.) */
+  background: var(--gn-surface-sunken);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -1467,21 +3473,35 @@
 .gn-field {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.4375rem;
 }
 .gn-field__label {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
   color: var(--gn-text-muted);
 }
+/* Metrics (padding, font-size) follow the prototype
+   (`desktop.dc.html:223`/`:225`), same task-3 port as `.gn-chip`/`.gn-button`
+   above. `border: 1px solid var(--gn-border)` is DELIBERATELY UNCHANGED,
+   despite the port brief calling for `border: none` here: 13.291/13.339
+   (components.test.tsx) pin the base rule keeping its border — an
+   owner-ruled, contrast-measured decision (2026-09-09) that only the
+   `[data-style="neo"] .gn-field__input` override below goes borderless.
+   Confirmed empirically before deviating: `SHADOWS.hig.sunken` and
+   `SHADOWS.minimal.sunken` are both `[]` (`tokens.ts`), so a borderless base
+   rule would leave hig/minimal fields with no boundary at all — the exact
+   gap 13.291's title names. The brief's own "second edge" justification is
+   scoped to neo, where the border is already gone via the override below, so
+   keeping it here costs the brief nothing it was actually after. */
 .gn-field__input {
   min-height: 2.75rem;
-  padding: 0 0.85rem;
+  padding: 0 0.875rem;
   border: 1px solid var(--gn-border);
   border-radius: var(--gn-radius-control);
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 .gn-field__input::placeholder {
   color: var(--gn-text-muted);
@@ -1489,6 +3509,17 @@
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
+}
+/* Had no rule at all before this: a disabled `.gn-field__input` (a built-in
+   ticket type's locked rank, a read-only field row) fell back to nothing but
+   the browser's own disabled treatment on top of this class's background —
+   inconsistent across browsers and never actually muted next to the plain
+   sunken/muted look every other disabled control on this product (`.gn-
+   button:disabled`) already carries. */
+.gn-field__input:disabled {
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+  cursor: not-allowed;
 }
 /* ── OWNER RULING 2026-09-09 (Task 14 AMENDMENT rule (a)): under `neo` the
    empty input takes the PURE NEO look — sunken, no border — even though the
@@ -1571,3 +3602,366 @@
   margin: 0;
   color: var(--gn-text-muted);
 }
+
+/* ── Project page chrome (board-prototype-port, Task 2, 2026-09-16; fix round
+   1, 2026-09-16). Metrics from the spec's Page chrome table (`docs/
+   superpowers/specs/2026-09-16-board-prototype-port-design.md`, itself
+   `desktop.dc.html:314-352`). No new token roles — Task 1 of this port was
+   STRUCK, so every `var(--gn-…)` below is one already declared in
+   `tokens.ts` (`--gn-text-muted` is `.gn-field__label`'s own role a few
+   hundred lines up in this same file).
+
+   `.gn-project__breadcrumb` and `.gn-project__title` are now CONSUMED
+   (`use-workspace-name.ts` / `use-project-name.ts`, wired in `page.tsx` per
+   coordinator Ruling 6) — they were declared unconsumed in the original Task
+   2 commit; that gap is closed.
+
+   `.gn-project__summary` — DELETED (Task 4, 2026-09-16). Declared unconsumed
+   since Task 2 on the coordinator's own say-so ("the task that adds the count
+   will need this exact rule back immediately"), which was sanction to leave
+   it, not a promise it would be the rule that count used. It was not: the
+   count Task 4 built lives in `.gn-project__count`, below, at its own metrics
+   (13px/18px, matching `.gn-project__scope-note` beside it) inside the new
+   `.gn-project__narrowing` strip — a sibling of this block, not a reuse of
+   this rule. A declared-unconsumed rule does not get to become permanent
+   once the task it was waiting for has landed; see `page.tsx`'s own comment
+   at the (now consumed) breadcrumb/title block for the same accounting. */
+.gn-project { display: flex; flex-direction: column; gap: 0.875rem; }
+/* NO padding on EITHER axis (Ruling 5, fix round 1; amended by Ruling 8, fix
+   round 2 — my own bottom-padding call in round 1 was wrong and is corrected
+   here rather than left standing). `.gn-shell` already carries
+   `padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`) around
+   `<AppNav>` and everything below it, so this rule's original literal
+   `padding: 0 2rem 1.5rem` (from the brief's table, applied verbatim) stacked
+   additively on BOTH axes rather than replacing either: 52px total left/right
+   (20px + 32px, against a prototype whose own wrapper has no outer gutter at
+   all and IS the 32px) and — round 1's uncorrected half — 72px total bottom
+   (48px + 24px, against the prototype's 24px alone).
+
+   `.gn-workspaces` (`globals.css:210`) is the precedent for BOTH corrections,
+   not only the horizontal one round 1 read it for: it sets ONLY what
+   `.gn-shell` does not already provide, which for that page is
+   `max-width`/`margin`/`padding-top` — no horizontal component, and
+   deliberately NO bottom component either, because `.gn-shell`'s own 3rem
+   already covers it. `.gn-project` now follows the same rule exactly: no
+   `padding` property at all, on either axis.
+
+   **Residual divergence, recorded rather than fixed, on BOTH axes:** the
+   project page sits at `.gn-shell`'s 20px side gutter (not the prototype's
+   32px) and its 48px bottom gutter (not the prototype's 24px). Closing either
+   would mean moving `.gn-shell` itself, which would shift every route in the
+   product for one page's inset — `.gn-workspaces`' own docblock already made
+   and recorded this exact trade-off for its own axis, and this rule inherits
+   that reasoning on both axes rather than re-deriving it. */
+.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+
+/* ── Board client narrowing (board-prototype-port, Task 4, 2026-09-16).
+   Step 1's four rules, verbatim (`.gn-project__narrowing`/`__count`/
+   `__scope-note`/`__search`), every `var(--gn-…)` one already declared in
+   `tokens.ts` — no new role, same discipline as the block above:
+     `--gn-fill-quaternary`  → `fillQuaternary` role (tokens.ts:599 etc.)
+     `--gn-radius-control`   → `radius.control` (tokens.ts:794)
+     `--gn-shadow-sunken`    → `sunken` shadow role (tokens.ts:936), already
+                                consumed three times elsewhere in this file
+     `--gn-text` / `--gn-text-muted` → already consumed throughout this file
+
+   `.gn-project__filter-chip`/`__filter-chip-remove` are NOT in the brief's
+   Step 1 — the brief gives no chip CSS at all, and the disclosure invariant
+   (`page.tsx`'s own comment on the strip) needs one. `Chip`
+   (`components/chip.tsx`) cannot serve: it is a dismiss-less `<span>` and
+   `.gn-chip` is on the do-not-edit shared-selector list, so adding a remove
+   button to it would be editing a product-wide surface to grow one page's
+   feature. These two are page-local, new selectors — no shared rule touched
+   — built from the same verified-role list above rather than inventing a
+   sixth. */
+.gn-project__narrowing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.5rem 0.75rem;
+}
+.gn-project__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__scope-note { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-project__search {
+  min-height: 2.75rem;
+  min-width: 12.5rem;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 1.0625rem;
+}
+.gn-project__filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+/* `font: inherit` is declared HERE rather than left to a global element
+   selector — `apps/web/app/globals.css`'s own `button { font: inherit; }`
+   does not reach `apps/desktop`, which loads only this file
+   (`main.tsx:6`), and this class ships to both. Every other unclassed
+   button in this file makes the same choice (`.gn-board-card__title`,
+   `.gn-board__empty-create`, 37 more) — a convention, not a one-off. */
+.gn-project__filter-chip-remove {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: 1;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+
+/* ── The workflow picker (board-prototype-port, Task 8, Ruling R3,
+   2026-09-16). One new page-local rule. Metrics: spec's Page chrome table,
+   "Workflow select `:325`" — `min-height:44px; padding:0 12px; ctlBg +
+   ctlShadow; 15px/600`. `ctlBg` → `var(--gn-fill-tertiary)` per the plan's
+   own prototype→product table (`docs/superpowers/plans/
+   2026-09-16-board-prototype-port.md`); `ctlR` → `var(--gn-radius-control)`
+   — no new token role, same discipline as every block in this file.
+
+   `ctlShadow` is DELIBERATELY OMITTED, following `.gn-button`'s own
+   already-recorded divergence (`:22-30` above, the plan's "Divergences
+   already decided"): raising a `ctlBg` control to neo's raised/inset shadow
+   is an OPEN DECISION the repo owner left to a future round, not something
+   one page's task should settle piecemeal on one control. Applying it here
+   and not on `.gn-button`'s own Filters/New ticket, three centimetres to
+   this control's right, would make this the one place in the product that
+   quietly took a side on a question everything else has left alone. The
+   metric's own colour is left unset (`color: var(--gn-text)`, matching
+   `.gn-project__search`'s input beside it) rather than `--gn-text-accent`:
+   the spec's own table gives Filters and New ticket an explicit "accent"
+   entry and gives this row none, so this control is not styled as a
+   call-to-action the way those two are. */
+.gn-project__workflow-select {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-project__workflow-select:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
+   Metrics: spec, Filters sheet `:1367-1417`; the plan's own prototype→product
+   table (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`)
+   is what turns `cardBg`/`cardR`/`fieldBg`/`fieldShadow`/`fill4`/`overlay`
+   into the roles below — no new token role, every `var(--gn-…)` here is
+   already declared and already consumed elsewhere in this file.
+
+   The task's own brief gives the scrim/panel/header/heading/section-label/
+   footer rules VERBATIM (below, unchanged); `.gn-filters__person-row`,
+   `.gn-filters__person-list`, `.gn-filters__chip`, `.gn-filters__chip-list`,
+   `.gn-filters__section`, `.gn-filters__body` and `.gn-filters__pending` are
+   this task's own additions, translating the spec's "person row"/"category
+   chip" metrics with the same table. Page-local, new selectors — nothing on
+   the do-not-edit shared list (`.gn-card`/`.gn-chip`/`.gn-avatar`/
+   `.gn-table`/`.gn-select`/`.gn-button`/`.gn-segmented`) is touched; the
+   sheet's own buttons reuse `.gn-button`/`.gn-button--ghost`/
+   `.gn-button--primary` UNCHANGED, exactly as the plan's own "Divergences
+   already decided" section requires for board controls.
+
+   `z-index: 40` MATCHES `.gn-dialog__scrim`/`.gn-sheet__scrim` above
+   (`:227-234`) rather than inventing a second stacking scale — read
+   directly, not assumed, because jsdom (this task's whole test suite)
+   computes no paint order at all and would stay green regardless of which
+   number this carried. Without it, `position: fixed` still gives this scrim
+   its own stacking context, but at the implicit `z-index: 0` level, so it
+   would paint BELOW `TicketSheet`'s `.gn-sheet__scrim` (`z-index: 40`) were
+   both ever open at once — this page's own `TicketSheet` and this sheet are
+   reachable independently (one from a ticket link, one from the Filters
+   button), so that overlap is a real, if unlikely, state. Matching the
+   value gives the two an even footing (DOM order breaks the tie, the same
+   ambiguity the house scrims already carry between each other) rather than
+   silently favouring one. */
+.gn-filters__scrim { position: fixed; inset: 0; background: var(--gn-surface-overlay); z-index: 40; }
+.gn-filters__panel {
+  position: fixed; inset-block: 0; inset-inline-end: 0;
+  width: min(23.75rem, 100%);
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card) 0 0 var(--gn-radius-card);
+  box-shadow: -0.75rem 0 2.5rem var(--gn-shadow);
+  display: flex; flex-direction: column;
+}
+.gn-filters__header { padding: 1.25rem 1.5rem 0.75rem; }
+.gn-filters__heading { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; margin: 0; }
+.gn-filters__section-label {
+  font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600;
+  color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.0375rem;
+}
+.gn-filters__footer {
+  padding: 1rem 1.5rem; background: var(--gn-fill-quaternary);
+  display: flex; justify-content: flex-end; gap: 0.625rem;
+}
+
+/* The scrollable middle, between the fixed header and footer — `flex: 1 1
+   auto` is what lets five sections of checkboxes/chips exceed the viewport
+   height without pushing the footer off-screen; `.gn-sheet__body`
+   (components/sheet.tsx's generic panel) uses the identical `overflow-y:
+   auto` idiom for the same reason. */
+.gn-filters__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+/* `border: none; margin: 0; padding: 0;` resets the UA default fieldset box
+   (a border and inset padding neither the spec nor this task's own metrics
+   ask for) — the same reset `.gn-visibility__modes`/`.gn-visibility__people`
+   would need, had they not inherited a house rule already; this file has no
+   such rule, so it is stated here. `<legend>` gets the identical reset for
+   the same reason: browsers give it its own inset padding and a shrink-to-
+   fit box that `.gn-filters__section-label`'s metrics (a plain 13px/18px
+   uppercase line) do not describe. Deliberately NOT `display: contents` on
+   the fieldset — that rule has documented AT/browser support gaps for
+   grouping semantics, and this task has no way to verify screen-reader
+   behaviour, so the plain box (own `flex column` + a small internal `gap`)
+   is used instead, with `.gn-filters__body`'s own `gap` then spacing one
+   fieldset from the next. */
+.gn-filters__section { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-filters__section > .gn-filters__section-label { padding: 0; margin: 0; }
+
+.gn-filters__pending {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
+}
+
+/* Person row — `fieldBg + fieldShadow; radius 12px`, per the table:
+   `--fieldBg` → `fill-quaternary`, `--fieldShadow` → `shadow-sunken` (the
+   SAME pair `.gn-project__search` above already uses for the identical
+   prototype vocabulary). `0.75rem` = 12px is a plain corner radius, not a
+   colour, so it is written as a literal exactly like `.gn-chip`'s own
+   `border-radius: 999px` above — the token-discipline scan bans colour
+   literals, not lengths. */
+.gn-filters__person-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-filters__person-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  font-size: 1.0625rem;
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+  border-radius: 0.75rem;
+  cursor: pointer;
+}
+
+/* Category chip — `radius 999px; padding 8px 12px; 13px`, selected `accent`
+   ground + `onColor`. The gated pair is `{ fg: 'accentText', bg: 'accent' }`
+   (`tokens.ts` `CONTRAST_PAIRS`, measured at 4.5:1 in both themes) —
+   `.gn-button--primary`/`.gn-avatar--tint-0` already pair `--gn-accent`
+   with `--gn-accent-text` for the identical "accent ground" composition, and
+   this chip follows the SAME pair rather than the plan's literal
+   `--onColor` → `--gn-text-inverted` mapping, which names a role
+   `CONTRAST_PAIRS` never measures against `accent` at all. */
+.gn-filters__chip-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.gn-filters__chip {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+.gn-filters__chip[aria-pressed='true'] {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-filters__chip:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* The tri-state choice (exclude-mode spec §4) — the ONE control shape every
+   value in the Filters sheet is now: off / include / exclude, told apart by
+   ground + glyph + strike, never colour alone. Chip metrics are
+   `.gn-filters__chip`'s own (radius 999px; 8px 12px; 13px); the row variant
+   below takes `.gn-filters__person-row`'s. `data-mode` is the only hook. */
+.gn-filters__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  cursor: pointer;
+  text-align: left;
+}
+.gn-filters__choice:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-filters__choice-glyph { flex: none; }
+.gn-filters__choice[data-mode='include'] {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+/* Exclude is a choice, not an error: the OFF ground, explicitly, and no
+   danger tone anywhere in this rule (13.551 reads exactly this body). The
+   strike is on the LABEL span, so the glyph stays legible. */
+.gn-filters__choice[data-mode='exclude'] {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+}
+.gn-filters__choice[data-mode='exclude'] .gn-filters__choice-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.09em;
+}
+.gn-filters__choice[data-mode='exclude'] .gn-filters__choice-glyph { color: var(--gn-text-muted); }
+/* Person rows: the same button, the row's own metrics. */
+.gn-filters__choice--row {
+  width: 100%;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  font-size: 1.0625rem;
+  border-radius: 0.75rem;
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-sunken);
+}
+.gn-filters__choice--row[data-mode='include'] {
+  background: var(--gn-accent);
+  box-shadow: none;
+}
+/* Exclude keeps the ROW's own ground (spec §4's table: off and exclude share a
+   ground) — without this, the chip-level exclude rule above wins on specificity
+   and an excluded row shifts one alpha step from an off row. */
+.gn-filters__choice--row[data-mode='exclude'] { background: var(--gn-fill-quaternary); }
+/* The strip's exclude chip carries the same ⊘ glyph before "Not …". */
+.gn-project__filter-chip--exclude .gn-filters__choice-glyph { color: var(--gn-text-muted); }

@@ -198,7 +198,18 @@ export function TimelineView(props: TimelineViewProps) {
     ],
   );
 
-  const layout = { '--timeline-week-columns': `repeat(${model.weeks.length}, 1fr)` } as CSSProperties;
+  /* Board prototype port Task 11 (2026-09-16), spec Timeline `:506-538`,
+     "Header grid" row: `minmax(0, 1fr)` per week track, not a bare `1fr` —
+     CSS Grid's implicit automatic minimum is `auto` (min-content) on a plain
+     `1fr` track, so a long bar or title text can still push a week column
+     wider than its share and defeat `.gn-timeline__bar`'s own
+     `overflow:hidden; text-overflow:ellipsis`. `minmax(0, …)` is what lets a
+     track actually shrink below its content's intrinsic size. Pinned by
+     exact equality in `test/timeline/timeline-view.test.tsx` (11.82: the
+     default-eight and the `weeksCount:2` cases), updated alongside this. */
+  const layout = {
+    '--timeline-week-columns': `repeat(${model.weeks.length}, minmax(0, 1fr))`,
+  } as CSSProperties;
 
   return (
     <div className="gn-timeline" style={layout}>

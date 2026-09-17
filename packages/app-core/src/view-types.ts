@@ -138,18 +138,46 @@ export type BoardGroup = {
 
 export type BoardView = { projectId: string; groups: BoardGroup[] };
 
-/** Composable filters (spec §7 Search): every axis optional, all AND-combined. */
-export type FilterSpec = {
-  text?: string;
+/**
+ * The six id-shaped axes of a filter — every one a list, and an absent or
+ * empty list narrows nothing. Declared ONCE and used twice (exclude-mode
+ * spec §1, 2026-09-17): spread into `FilterSpec` as its include half, and as
+ * the type of its `exclude` half — so the two halves cannot drift into two
+ * vocabularies, the fork `matches-filter.ts`'s docblock forbids.
+ */
+export type IdAxes = {
   assigneeIds?: string[];
   collaboratorIds?: string[];
   typeIds?: string[];
   stateIds?: string[];
   stateCategories?: StateCategory[];
   projectIds?: string[];
+};
+
+/** Composable filters (spec §7 Search): every axis optional, all AND-combined. */
+export type FilterSpec = IdAxes & {
+  text?: string;
   dueBefore?: string; // claimed dates only, YYYY-MM-DD — nothing estimated
   dueAfter?: string;
   fields?: Record<string, string>;
+  /**
+   * `true` closed only, `false` not closed, absent all (backlog/closed spec
+   * §4, 2026-09-17) — NOT an id axis: a single boolean has no include/exclude
+   * halves, unlike everything in `IdAxes`, so it carries no matching key under
+   * `exclude` below.
+   */
+  closed?: boolean;
+  /**
+   * The exclude half (exclude-mode spec §1): a ticket matching ANY listed
+   * value on an axis is dropped. Evaluated after the include half — a ticket
+   * must match one of the includes (when any are set) AND none of the
+   * excludes. The Filters sheet's cycler never leaves one id in both halves;
+   * the predicates do not need to care. `text`, the due bounds and `fields`
+   * have no exclude form. CLIENT-SIDE ONLY: the wire's `filterSpecSchema`
+   * has no negation term, and `toServerFilterSpec` refuses a non-empty
+   * exclude rather than silently dropping it (`online/mappers.ts`).
+   */
+  exclude?: IdAxes;
 };
 
 export type Grouping = 'epic' | 'status' | 'assignee' | 'type' | 'flat';
@@ -190,6 +218,16 @@ export type ListRow = {
    * transit for it.
    */
   pending: boolean;
+  /**
+   * REQUIRED here — the row is assembled by one mapper — while the domain
+   * `TicketState.closed?` keeps it optional, because 441 fixtures predate the
+   * flag and have no legacy literal to spare (backlog/closed spec §1.2,
+   * 2026-09-17). Every producer of a row is this task's own code (the online
+   * mapper, the replica), so there is no such debt here; a reader spells
+   * `state.closed ?? null` at the boundary rather than inheriting the
+   * optionality onto this type. `null` means never closed, or reopened.
+   */
+  closed: { actorId: string; at: string } | null;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };

@@ -318,25 +318,50 @@ export default function WorkspaceHomePage() {
 }
 
 /**
- * One project row: its name, the counts this caller may be told, an explicit
- * door to its board, and — for an admin — the one control that retires it or
- * brings it back.
+ * One project, as its own raised card in the reference's grid: the name, the
+ * counts this caller may be told, and — for an admin — the one control that
+ * retires it or brings it back.
  *
- * ## "Open board" replaces the name-as-link (Round 19b)
+ * ## THE CARD'S BODY IS THE DOOR (Round 20, owner ruling), replacing Round
+ * ## 19b's separate "Open board" button
  *
- * The reference draws the project's name as plain text and "Open board" as
- * its own accent-fill button — not the name doubling as the door. Two links to
- * one target is the failure this avoids: 13.387's "assert the exact set"
- * discipline only means something if a row offers ONE way to each destination.
+ * Round 19b drew the name as plain text and "Open board" as its own button,
+ * reasoning that two links to one target breaks 13.387's "assert the exact
+ * set" discipline. The owner has now ruled the other way, for the reason
+ * `/workspaces`' Round 19c card already follows: the informational body is one
+ * `<Link>` and there is no second door beside it. That discipline is KEPT, not
+ * abandoned — "Open board" is REMOVED rather than left alongside the new door,
+ * because a card that was both a link and held an "Open board" button would be
+ * the exact two-doors-to-one-target failure 19b named, arrived at from the
+ * other side.
  *
- * **"Open board" for an archived project too, labelled the same as a live
- * one's.** Archiving is a workspace decision, not a permission (Task 16), and
- * the board underneath stays writable — the prototype's "Open read-only"
- * would be a false claim about this product's own rule, so it is not
- * transcribed. Archive/Restore reads the SAME `isAdmin` value 13.388's server
- * gate answers independently; this function does not derive a second opinion.
+ * ## Archive/Restore leaves the ANCHOR, not the card
+ *
+ * An `<a>` may not contain a `<button>`, so the admin control cannot live
+ * inside the door. It sits as the door's SIBLING inside the same `<Card>`,
+ * which is also where the prototype puts it (its own card nests an open-button
+ * and an actions row as siblings). `/workspaces` could make its card clickable
+ * edge to edge only because Round 19c had removed every control from it; this
+ * card still has one, so the door covers the body and the actions strip below
+ * it is not part of the link. That difference is the honest one: the click
+ * target is exactly the region that navigates.
+ *
+ * ## The accessible name carries ARCHIVED, because `aria-label` hides the chip
+ *
+ * `aria-label` overrides everything inside the anchor, so the "Archived" chip —
+ * visible text for a sighted reader — would otherwise be invisible to assistive
+ * tech for every non-admin, who gets no Archive/Restore button to infer it
+ * from. The name says so explicitly rather than leaving the state unannounced.
+ *
+ * **The label a live and an archived project get is otherwise the same, and
+ * there is still no "read-only".** Archiving is a workspace decision, not a
+ * permission (Task 16), and the board underneath stays writable — the
+ * prototype's "Open read-only" would be a false claim about this product's own
+ * rule, so it is not transcribed. Archive/Restore reads the SAME `isAdmin`
+ * value 13.388's server gate answers independently; this function does not
+ * derive a second opinion.
  */
-function ProjectRow({
+function ProjectCard({
   workspaceId,
   project,
   countsWithheld,
@@ -352,62 +377,109 @@ function ProjectRow({
   onArchive: (project: ProjectRef) => void;
 }) {
   return (
-    <li className="gn-workspace-home__project" data-testid={`project-row-${project.id}`}>
-      <div className="gn-workspace-home__project-head">
-        <span className="gn-workspace-home__project-name">{project.name}</span>
-        {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
-      </div>
-      <div className="gn-workspace-home__project-chips">
-        {/* The SAME gate the role sentence reads, and the SAME rule the card on
-            `/workspaces` keeps: `null` is WITHHELD and it is not `0`. A `?? 0`
-            on either line would turn "we did not count this for you" into
-            "there is nothing here", which is the claim the server declined to
-            make by omitting the key. */}
-        {countsWithheld || project.ticketCount === null ? null : (
-          <span className="gn-workspace-home__count">
-            {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
-          </span>
-        )}
-        {countsWithheld || project.blockedCount === null || project.blockedCount === 0 ? null : (
-          <Chip tone="blocked">{`${project.blockedCount} blocked`}</Chip>
-        )}
-      </div>
-      <div className="gn-workspace-home__project-actions">
+    <li data-testid={`project-row-${project.id}`}>
+      <Card
+        className={
+          project.archived ? 'gn-project-card gn-project-card--archived' : 'gn-project-card'
+        }
+      >
         <Link
           href={`/w/${workspaceId}/p/${project.id}`}
-          className="gn-button gn-button--primary"
+          aria-label={project.archived ? `${project.name}, archived` : project.name}
+          className="gn-project-card__door"
         >
-          Open board
+          <span className="gn-project-card__head">
+            <span className="gn-project-card__name">{project.name}</span>
+            {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
+          </span>
+          <span className="gn-project-card__chips">
+            {/* The SAME gate the role sentence reads, and the SAME rule the card
+                on `/workspaces` keeps: `null` is WITHHELD and it is not `0`. A
+                `?? 0` on either line would turn "we did not count this for you"
+                into "there is nothing here", which is the claim the server
+                declined to make by omitting the key. */}
+            {countsWithheld || project.ticketCount === null ? null : (
+              <span className="gn-workspace-home__count">
+                {`${project.ticketCount} ${project.ticketCount === 1 ? 'ticket' : 'tickets'}`}
+              </span>
+            )}
+            {countsWithheld || project.blockedCount === null || project.blockedCount === 0 ? null : (
+              <Chip tone="blocked">{`${project.blockedCount} blocked`}</Chip>
+            )}
+          </span>
         </Link>
         {isAdmin ? (
-          <Button
-            type="button"
-            disabled={busy}
-            // The accessible name carries the PROJECT, so a list of projects does
-            // not present a column of identically-named buttons — the rule the
-            // archived disclosure and the invitation actions already keep.
-            aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
-            onClick={() => onArchive(project)}
-          >
-            {project.archived ? 'Restore' : 'Archive'}
-          </Button>
+          <div className="gn-project-card__actions">
+            <Button
+              type="button"
+              disabled={busy}
+              // The accessible name carries the PROJECT, so a grid of projects
+              // does not present a column of identically-named buttons — the
+              // rule the archived disclosure and the invitation actions already
+              // keep.
+              aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
+              onClick={() => onArchive(project)}
+            >
+              {project.archived ? 'Restore' : 'Archive'}
+            </Button>
+          </div>
         ) : null}
-      </div>
+      </Card>
     </li>
   );
 }
 
 /**
- * The five doors out of this page.
+ * The four doors out of this page — five until Round 21 moved MCP tokens to
+ * `/account` (owner: "this should not be scoped to a workspace").
  *
- * **Four are workspace-scoped and the fifth is NOT**, and that asymmetry is the
- * whole reason these are five literal strings rather than a mapped prefix:
- * `/mcp/tokens` is a GLOBAL route (`app/mcp/tokens/page.tsx` takes no
- * `workspaceId` and reads none), so a uniform `/w/${workspaceId}/…` builder
- * would emit `/w/<id>/mcp/tokens`, which resolves to nothing — and a test that
- * built its expectations the same way would agree with the bug. Case 13.387
- * asserts the five paths as literals for exactly that reason. TARGETS are
- * unchanged by Round 19b.
+ * **Two are workspace-scoped path segments and two are not**, and that
+ * asymmetry is the whole reason these are four literal strings rather than a
+ * mapped prefix: Ticket types and Workflows both target
+ * `/settings?workspaceId=<id>&tab=…`, where the workspace rides as a QUERY
+ * PARAM, so a uniform `/w/${workspaceId}/…` builder would emit
+ * `/w/<id>/settings?…`, which resolves to nothing — and a test that built its
+ * expectations the same way would agree with the bug. Case 13.387 asserts the
+ * four paths as literals for exactly that reason.
+ *
+ * **The asymmetry has now survived two rounds of churn in both directions** —
+ * Round 21 removed `/mcp/tokens`, the most obvious non-`/w/` door, and Round 22
+ * made Workflows a second one — which is why the literals stay rather than
+ * being folded into a builder each time the set looks briefly uniform.
+ *
+ * **Ticket types became a non-`/w/<id>/…` door in Round 19b** (owner feedback,
+ * 2026-09-09: "the ticket type edit is opening in a separate route... repoint
+ * it") — the SECOND such door then, and the only one since Round 21 sent
+ * `/mcp/tokens` to `/account`. It used to point at
+ * `/w/<id>/settings/ticket-types` — the bare, sidebar-less list page whose own
+ * Edit button opened the ticket-type editor as a THIRD route, the exact
+ * defect fixed on `/settings` itself (`app/settings/page.tsx`'s own
+ * docblock). Fixing the editor there and leaving this link pointed at the
+ * page it bypasses would leave the identical bug reachable a second way, so
+ * it now targets `/settings?workspaceId=<id>&tab=ticket-types` — the real
+ * shell, sidebar and inlined editor included. (The page header carried a
+ * `Settings` button with the same stale href, repointed in the same round;
+ * Round 21 removed that button outright — see the header's own comment — so
+ * this link is now the only Ticket-types door on the page.)
+ * **Workflows was repointed the same way in Round 22** (owner: "clicking
+ * workflows from the project screen opens up a separate page. it should open
+ * up the workflows tab in the settings page"), so all three workspace-scoped
+ * sections now open inside a shell rather than on a bare page.
+ *
+ * Round 19e had left it alone on the reasoning that repointing it "would just
+ * be cosmetic, and was not asked for": unlike ticket types, whose bare list
+ * page's Edit button opened the EDITOR as a third route, Workflows' own editor
+ * (the BUILDER) was never inlined into `/settings` either, so moving the list
+ * closed no editor-left-the-shell gap. **That reasoning was about which DEFECT
+ * the move fixed, and the owner has now asked for the move on its own merits —
+ * the bare `/w/<id>/settings/workflows` page has no sidebar, so following this
+ * card dropped you out of the settings shell and left you with no way back to
+ * Ticket types except the browser's Back button.** The asymmetry it described
+ * is unchanged and still stands: the builder still opens as its own full-width
+ * route from inside the tab, which is what the prototype does too.
+ *
+ * The bare route still resolves, and `authoring-routes.test.tsx` (10.65–10.70)
+ * still drives it — nothing that already linked there breaks.
  *
  * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
  * transcribed, not invented, except the one place the prototype's copy
@@ -480,7 +552,7 @@ function WorkspaceLinks({
         </span>
       </Link>
       <Link
-        href={`/w/${workspaceId}/settings/ticket-types`}
+        href={`/settings?workspaceId=${workspaceId}&tab=ticket-types`}
         className="gn-workspace-home__link"
         aria-label="Ticket types"
         aria-describedby="gn-link-note-ticket-types"
@@ -491,7 +563,7 @@ function WorkspaceLinks({
         </span>
       </Link>
       <Link
-        href={`/w/${workspaceId}/settings/workflows`}
+        href={`/settings?workspaceId=${workspaceId}&tab=workflows`}
         className="gn-workspace-home__link"
         aria-label="Workflows"
         aria-describedby="gn-link-note-workflows"
@@ -501,20 +573,15 @@ function WorkspaceLinks({
           States, transitions and published versions.
         </span>
       </Link>
-      {/* Global, deliberately: an MCP token belongs to a person rather than to a
-          workspace. It is listed here because this is where somebody goes
-          looking for it, not because this page owns it. */}
-      <Link
-        href="/mcp/tokens"
-        className="gn-workspace-home__link"
-        aria-label="MCP tokens"
-        aria-describedby="gn-link-note-mcp-tokens"
-      >
-        <span className="gn-workspace-home__link-label">MCP tokens</span>
-        <span className="gn-workspace-home__link-note" id="gn-link-note-mcp-tokens">
-          Let an assistant act as you, with your permissions.
-        </span>
-      </Link>
+      {/* MCP tokens is NOT here (Round 21, owner: "move MCP tokens to the
+          account page. as this should not be scoped to a workspace"). Round 19b
+          listed it precisely because it was global — "this is where somebody
+          goes looking for it" — and that reasoning is what the owner overruled:
+          a global credential listed among four workspace sections reads as a
+          workspace's own, and the card gave no hint otherwise. It now lives on
+          `/account`, beside the sessions and passkeys it belongs with, and this
+          nav holds only `/w/<id>/…` destinations plus the one `/settings` tab
+          that is workspace-scoped by its query param. */}
     </nav>
   );
 }
@@ -536,6 +603,28 @@ function WorkspaceHome({
   const isAdmin = mayAdminister(workspace.role);
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
+  /**
+   * The ONE list the grid renders, LIVE FIRST AND ARCHIVED LAST (Round 21,
+   * owner: "always sort the archived projects to the end").
+   *
+   * Round 20 built this as a single `filter(p => showArchived || !p.archived)`
+   * over `workspace.projects` and argued FOR the served order: concatenating
+   * would sink an archived project to the end regardless of where the server
+   * put it, so a project would move twice on one click — in, and down. The
+   * owner has ruled the other way, and the cost is ACCEPTED rather than
+   * forgotten: disclosure is a MODE CHANGE, not an insertion, and in the
+   * disclosed mode the order is live-then-archived. A reader who opens the
+   * disclosure is asking "what else is here", and the answer groups the
+   * retired work at the end instead of interleaving it through the grid at
+   * positions only the server's ordering explains.
+   *
+   * `live` and `archived` are the same two arrays the meta line and the toggle
+   * already read (`live.length` is "N active projects", `archived.length` gates
+   * the control), so the grid cannot disagree with either about which projects
+   * are which — one partition, three consumers. Within each group the served
+   * order is preserved; it is only the two GROUPS that are ordered here.
+   */
+  const shown = showArchived ? [...live, ...archived] : live;
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
@@ -566,87 +655,87 @@ function WorkspaceHome({
         <Avatar size="large" name={workspace.name} tint={workspace.id} />
         <div className="gn-workspace-home__header-titles">
           <h1 className="gn-page-title">{workspace.name}</h1>
-          <p className="gn-workspace-list__role">{meta}</p>
+          {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
+              a dedicated class, not a structural selector — see that class's
+              rule in globals.css for why. */}
+          <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{meta}</p>
         </div>
-        <div className="gn-workspace-home__header-actions">
-          <Link href={`/w/${workspace.id}/members`} className="gn-button">
-            Members
-          </Link>
-          <Link href={`/w/${workspace.id}/settings/ticket-types`} className="gn-button">
-            Settings
-          </Link>
-        </div>
+        {/* NO Members/Settings buttons here (Round 21, owner: "remove the
+            members and settings button, not the nav bar item, but the buttons
+            on the right side of the workspace viewport"). Both destinations
+            remain reachable and neither is orphaned: Members is one of the
+            section cards below AND a nav item once a workspace is open, and
+            Settings is the nav's own workspace-scoped item (Round 21 item 6).
+            The header is now the monogram and the titles, nothing else. */}
       </div>
 
-      <WorkspaceLinks
-        workspaceId={workspace.id}
-        memberCount={workspace.memberCount}
-        countsWithheld={viewer.countsWithheld}
-      />
+      {/* Round 20: the heading and its toggle sit in a BARE row above the grid,
+          not inside a card. The reference has no container around the projects
+          section at all — each project is its own card, so an outer one would
+          be a card holding cards. */}
+      <div className="gn-workspace-home__projects-heading">
+        <h2 className="gn-workspace-home__heading">Projects</h2>
+        {/* Marked AND hidden, both — the `/workspaces` card's precedent. Per
+            Task 18/19's own ruling the control renders only when there is
+            something behind it: the prototype's "0 archived · show" is not
+            adopted — a control that reveals nothing lies about the shape of the
+            data.
 
-      <Card>
-        <div className="gn-workspace-home__projects-heading">
-          <h2 className="gn-workspace-home__heading">Projects</h2>
-          {/* Marked AND hidden, both — the `/workspaces` card's precedent. The
-              toggle sits at THIS ROW's end (Round 19b, transcribing the
-              reference's layout) and, per Task 18/19's own ruling, renders only
-              when there is something behind it: the prototype's "0 archived ·
-              show" is not adopted — a control that reveals nothing lies about
-              the shape of the data. */}
-          {archived.length > 0 ? (
-            <Button
-              type="button"
-              aria-expanded={showArchived}
-              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
-              onClick={onToggleArchived}
-            >
-              {`${showArchived ? 'Hide' : 'Show'} ${archived.length} archived`}
-            </Button>
-          ) : null}
-        </div>
-        {live.length === 0 ? (
-          // True of THIS CALLER'S list, and said as such. A member outside every
-          // project has an empty live list in a workspace full of them, and
-          // "there are no projects" would be a claim about the workspace.
-          <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
-        ) : (
-          <ul className="gn-workspace-home__projects">
-            {live.map((project) => (
-              <ProjectRow
-                key={project.id}
-                workspaceId={workspace.id}
-                project={project}
-                countsWithheld={viewer.countsWithheld}
-                isAdmin={isAdmin}
-                busy={busy}
-                onArchive={archive}
-              />
-            ))}
-          </ul>
-        )}
-
-        {/* The toggle itself now lives in the heading row above; only the
-            disclosed list is here. */}
-        {archived.length > 0 && showArchived ? (
-          <ul className="gn-workspace-home__projects gn-workspace-home__projects--archived">
-            {archived.map((project) => (
-              <ProjectRow
-                key={project.id}
-                workspaceId={workspace.id}
-                project={project}
-                countsWithheld={viewer.countsWithheld}
-                isAdmin={isAdmin}
-                busy={busy}
-                onArchive={archive}
-              />
-            ))}
-          </ul>
+            The VISIBLE text is the reference's ("1 archived · show" / "Hide
+            archived"); the ACCESSIBLE NAME is deliberately not, and stays the
+            sentence Round 19b gave it. The reference's collapsed label leads
+            with a number and its expanded one names no workspace, so a screen
+            reader on a page that will grow more disclosures would hear "1
+            archived show" with nothing saying what is archived or where. The
+            `aria-label` carries the workspace for the same reason the archive
+            buttons carry the project. */}
+        {archived.length > 0 ? (
+          <Button
+            type="button"
+            aria-expanded={showArchived}
+            aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
+            onClick={onToggleArchived}
+          >
+            {showArchived ? 'Hide archived' : `${archived.length} archived · show`}
+          </Button>
         ) : null}
+      </div>
+      {shown.length === 0 ? (
+        // True of THIS CALLER'S list, and said as such. A member outside every
+        // project has an empty live list in a workspace full of them, and
+        // "there are no projects" would be a claim about the workspace.
+        <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
+      ) : (
+        // ONE grid, not a live list plus a disclosed second one (Round 20) —
+        // but the archived cards sort to its END (Round 21, owner ruling), dimmed
+        // and badged rather than moved to a section of their own. See `shown`'s
+        // own comment above for the order and what it costs.
+        <ul className="gn-workspace-home__projects">
+          {shown.map((project) => (
+            <ProjectCard
+              key={project.id}
+              workspaceId={workspace.id}
+              project={project}
+              countsWithheld={viewer.countsWithheld}
+              isAdmin={isAdmin}
+              busy={busy}
+              onArchive={archive}
+            />
+          ))}
+        </ul>
+      )}
 
-        {restricted !== null ? (
-          <p className="gn-workspace-card__restricted">{restricted}</p>
-        ) : null}
-      </Card>
+      {/* `gn-workspace-home__restricted` (Task 7 review, ROUTED 2): this call
+          site sits outside the /workspaces card's flex-gap door, so it needs
+          its own scoped top offset — see that class's rule in globals.css for
+          why a dedicated class rather than a sibling selector. Round 20 removed
+          the `<Card>` that used to wrap it; the rule's premise is UNCHANGED,
+          because `.gn-shell` is an ordinary block container (globals.css:101)
+          exactly as `.gn-card` was, so this `<p>` still has no flex `gap`
+          supplying its offset and still needs its own. */}
+      {restricted !== null ? (
+        <p className="gn-workspace-card__restricted gn-workspace-home__restricted">{restricted}</p>
+      ) : null}
 
       {/* Non-admins get the reference's refusal NOTE where the form would be,
           rather than nothing — the same rule the member sentence above keeps:
@@ -662,6 +751,17 @@ function WorkspaceHome({
           Only an admin can create a project in this workspace.
         </p>
       )}
+
+      {/* BELOW the projects and the founding form (Round 20), where the
+          reference puts them — they were above both until now. The grid, the
+          notes and every href are untouched by the move; 13.387 asserts the
+          exact set of five inside this nav, and it is scoped by the nav's own
+          accessible name rather than by position, so it holds either way. */}
+      <WorkspaceLinks
+        workspaceId={workspace.id}
+        memberCount={workspace.memberCount}
+        countsWithheld={viewer.countsWithheld}
+      />
     </>
   );
 }

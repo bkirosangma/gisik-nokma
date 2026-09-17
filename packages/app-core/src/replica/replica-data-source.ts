@@ -8,7 +8,7 @@ import type {
   TicketTypeDef,
   WorkflowDef,
 } from '@gisik-nokma/domain';
-import { IST_DAY_REGEX } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, IST_DAY_REGEX, statesWithBacklog } from '@gisik-nokma/domain';
 import {
   isSyncInstruction,
   workflowVersionsOf,
@@ -745,6 +745,11 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       rollup: null,
       hasRestrictedParent: restrictedParent(state, byId),
       pending,
+      // `state.closed ?? null`: `TicketState.closed?` is optional (441
+      // fixtures predate the flag) and `ListRow.closed` is REQUIRED
+      // (backlog/closed spec §1.2, 2026-09-17) — the boundary read every
+      // other producer of a `closed` field takes.
+      closed: state.closed ?? null,
     };
   }
 
@@ -775,7 +780,13 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   function stateNameFrom(defs: ReadonlyMap<string, PublishedWorkflowDef>): (state: TicketState) => string {
     return (state) => {
       const def = defs.get(`${state.workflowId}@${String(state.workflowVersion)}`);
-      const named = def?.states.find((s) => s.id === state.stateId);
+      // `statesWithBacklog(def)`, not `def.states` (backlog/closed spec §1.4,
+      // 2026-09-17): a ticket sitting in the universal Backlog state has no
+      // row in the published definition's own `states`, and reading that
+      // array alone would name it by its bare id instead of "Backlog", the
+      // same fix `apps/server/src/read/list-cards.ts` made for the server's
+      // own list row (case 13.575).
+      const named = def === undefined ? undefined : statesWithBacklog(def).find((s) => s.id === state.stateId);
       // A state its own published definition does not name is the straggler
       // case (`routes/board.ts`): the bare id, because there is no definition
       // to read a human name from and inventing one prints a label nobody
@@ -830,10 +841,25 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       return { projectId, rows };
     },
 
-    /** Settled cards only — offline-born tickets are absent; see `OFFLINE_BORN_ABSENCE`. */
+    /**
+     * Settled cards only — offline-born tickets are absent; see
+     * `OFFLINE_BORN_ABSENCE`. Also excludes a BACKLOG ticket and a CLOSED one
+     * (backlog/closed spec §3.2, 2026-09-17), the same two bound conjuncts
+     * the server's `readBoard` applies (`apps/server/src/routes/board.ts`,
+     * case 13.574) — independently load-bearing there and mirrored the same
+     * way here: without this, a backlog ticket has no row in any published
+     * definition's `states` and falls into the straggler path as a stray
+     * column literally named `backlog`, which is the exact column the spec
+     * says a board must never show.
+     */
     async getBoard(projectId: string): Promise<BoardView> {
       const byId = await confirmedById(ownWorkspaceId);
-      const inProject = [...byId.values()].filter((state) => state.projectId === projectId);
+      const inProject = [...byId.values()].filter(
+        (state) =>
+          state.projectId === projectId &&
+          state.stateId !== BACKLOG_STATE_ID &&
+          (state.closed ?? null) === null,
+      );
       const defs = await defsFor(inProject);
       const pendingIds = new Set<string>();
       for (const state of inProject) {

@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { fontStackOf } from '@gisik-nokma/ui/tokens';
 import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
 import { UNAUTHED_ROUTES, VIEWPORTS, type ViewportName } from './viewports.js';
 import {
@@ -145,7 +146,7 @@ type Signature = {
   shellPaddingLeft: number | null;
   shellContentWidth: number | null;
   titleFontSize: number | null;
-  helpTabsDirection: string | null;
+  helpH2FontSize: number | null;
   notFoundActionsDirection: string | null;
   proseBlockWidth: number | null;
 };
@@ -170,9 +171,19 @@ type Signature = {
  *     row    — apps/web/app/globals.css:116-121
  *     column — apps/web/app/globals.css:221, under (max-width: 40rem)
  *
- *   `.gn-help__tabs` flex-direction
- *     row    — packages/ui/src/ui.css:1277
- *     column — packages/ui/src/ui.css:1311-1312, under (max-width: 40rem)
+ *   `.gn-help__h2` font-size
+ *     22px   (`1.375rem`) — packages/ui/src/ui.css, `.gn-help__h2`
+ *     18.4px (`1.15rem`)  — packages/ui/src/ui.css, under (max-width: 40rem)
+ *
+ *     REPLACES `.gn-help__tabs` flex-direction (row/column at the same
+ *     breakpoint), which was this route's discriminator until 2026-09-15.
+ *     `.gn-help__tabs` no longer exists — the document switch became the
+ *     shared `SegmentedControl` — and because `read()` returns `null` for an
+ *     absent selector and the assertion below is guarded by `!== null`,
+ *     leaving the old selector here would have turned a firing check into a
+ *     silently SKIPPED one. That is the failure this file is least able to
+ *     notice, so the discriminator moved to the OTHER declaration already in
+ *     the same `(max-width: 40rem)` block.
  *
  * `null` means the selector is absent on this route, which is expected and
  * fine — `/sign-in` has no title and no tabs. What is NOT fine is every field
@@ -190,7 +201,7 @@ async function measureSignature(page: Page): Promise<Signature> {
       shellPaddingLeft: read('.gn-shell', (_el, cs) => px(cs.paddingLeft)),
       shellContentWidth: read('.gn-shell', (el) => Math.round(el.getBoundingClientRect().width)),
       titleFontSize: read('.gn-legal__title, .gn-notfound__title', (_el, cs) => px(cs.fontSize)),
-      helpTabsDirection: read('.gn-help__tabs', (_el, cs) => cs.flexDirection),
+      helpH2FontSize: read('.gn-help__h2', (_el, cs) => px(cs.fontSize)),
       notFoundActionsDirection: read('.gn-notfound__actions', (_el, cs) => cs.flexDirection),
       proseBlockWidth: read('.gn-legal__section, .gn-help__doc, .gn-notfound__lead', (el) =>
         Math.round(el.getBoundingClientRect().width),
@@ -761,11 +772,15 @@ for (const route of UNAUTHED_ROUTES) {
         )
         .toBeCloseTo(spec.narrow40rem ? 21.6 : 25.6, 1);
     }
-    if (sig.helpTabsDirection !== null) {
-      // ui.css:1277 (row) vs ui.css:1311-1312 (column)
+    if (sig.helpH2FontSize !== null) {
+      // ui.css `.gn-help__h2` (1.375rem) vs its (max-width: 40rem) override (1.15rem)
       expect
-        .soft(sig.helpTabsDirection, `.gn-help__tabs flex-direction (ui.css:1277 / :1311-1312)`)
-        .toBe(spec.narrow40rem ? 'column' : 'row');
+        .soft(
+          sig.helpH2FontSize,
+          `.gn-help__h2 font-size at ${spec.width}px: (max-width:40rem)=${String(spec.narrow40rem)} ` +
+            `implies ${spec.narrow40rem ? 18.4 : 22}px (ui.css .gn-help__h2 / its 40rem override)`,
+        )
+        .toBeCloseTo(spec.narrow40rem ? 18.4 : 22, 1);
     }
     if (sig.notFoundActionsDirection !== null) {
       // globals.css:116-121 (row) vs globals.css:221 (column)
@@ -959,6 +974,31 @@ for (const route of UNAUTHED_ROUTES) {
       )
       .toEqual([]);
 
+    /* Case 15.31 — and `body` itself is painting in the ORIGIN's stack.
+       The check above is an EQUALITY against `body`, so it says nothing about
+       what `body` resolved to. Since the 2026-09-15 font port that value is
+       `var(--gn-font-sans)`: if the variable ever stops being emitted or is
+       renamed, the declaration is invalid at computed-value time, `body` drops
+       to the UA serif, every inheriting element drops with it, and `uaFont`
+       goes EMPTY — green, with the product's typeface gone everywhere. This is
+       the assertion that can tell those two apart.
+
+       It compares against `fontStackOf('sans')`'s FIRST family rather than the
+       whole string: the expectation comes from the one origin in `tokens.ts`
+       and not a literal copy, while staying immune to the quote and whitespace
+       normalisation `getComputedStyle` applies to a stack. `-apple-system` is
+       in no browser default, so a fallback cannot satisfy it by accident. */
+    const expectedFirstFamily = fontStackOf('sans').split(',')[0]?.trim() ?? '';
+    expect
+      .soft(
+        typeScale.bodyFamily,
+        `body on ${route.path} at ${name} is not painting in the product's stack — it computed to ` +
+          `"${typeScale.bodyFamily}", which does not name "${expectedFirstFamily}". ` +
+          `The likeliest cause is that \`--gn-font-sans\` did not resolve, which ALSO empties the ` +
+          `uaFont list above and would otherwise read as a pass.`,
+      )
+      .toContain(expectedFirstFamily);
+
     const typeKey = `${name}|${route.path}`;
     const typeBaseline = readTypeScaleBaseline();
     const typeAllowed = typeBaseline[typeKey];
@@ -1051,6 +1091,19 @@ for (const route of UNAUTHED_ROUTES) {
        * credentials, so the honest expectation here is ZERO social buttons — the
        * dev stack's real state, asserted rather than worked around.
        *
+       * **The passkey half of that history ENDED with the account/help-screens
+       * plan's Task 8**, which built registration on `/account` — so the button
+       * is back, it is asserted VISIBLE below (not absent), and it is
+       * deliberately grouped with the social-absence assertions only because they
+       * share one page load, not because passkey is gated the same way: a
+       * passkey needs no provider and no server capability check, so unlike
+       * Google/Apple it does not disappear when `/v1/auth/methods` answers all
+       * false. **The final whole-branch review found this case still asserted
+       * `toHaveCount(0)` for the passkey button** — the identical defect already
+       * found and fixed once in `apps/web/e2e/smoke.spec.ts` (see that file's own
+       * docblock for the same fix, applied here), just in a sibling directory
+       * that audit's grep scope could not reach.
+       *
        * The both-directions half of this property lives in
        * `apps/web/test/sign-in.test.tsx` (13.326), where the server's answer can
        * be driven to `true`. A viewport suite cannot set the server's env, so
@@ -1125,7 +1178,22 @@ for (const route of UNAUTHED_ROUTES) {
 
       await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
+      /* Final whole-branch review (C1) — THE SAME TRAP AS 13.292's OWN HISTORY,
+       * sprung a second time in this file: this line read
+       * `…'Sign in with a passkey' }).toHaveCount(0)` until the account/
+       * help-screens plan's Task 8 put the button back (registration now exists
+       * on `/account`), which made this assertion flatly false the moment that
+       * commit landed — this suite is not in the turbo gate, so nothing reddened
+       * for it. `apps/web/e2e/smoke.spec.ts` hit the identical defect and was
+       * already fixed; this file just sat outside that fix's grep scope
+       * (`apps/web/e2e/`, not `apps/web/e2e-viewport/`). The assertion below is
+       * the sharpest one this block can make: with the server answering
+       * `{google:false, apple:false, phone:false}`, every method GATED on that
+       * answer (Google, Apple, the social marks row) is asserted absent above,
+       * and the passkey button surviving that same all-refused answer is the
+       * whole property — a passkey needs no provider and no server capability
+       * check, so it is deliberately NOT gated on `/v1/auth/methods`. */
+      await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
       await expect(page.locator('.gn-sign-in__marks')).toHaveCount(0);
       await page.unroute('**/v1/auth/methods');
 
@@ -1772,6 +1840,13 @@ test('13.298 — a 401 on /workspaces settles the REAL browser on /sign-in', asy
  * live under `data-style="neo"`, the way Task 14's own 13.347 witnesses a
  * rendered value rather than trusting two numbers that only differ in memory.
  *
+ * 13.401 (2026-09-15) is witnessed by the SAME test, at the track-background
+ * read below. The owner removed `background: var(--gn-fill-tertiary)` from
+ * `.gn-segmented`, and `trackBackground` is the direct measurement that the
+ * track paints `rgba(0, 0, 0, 0)` — a claim the `--gn-surface-sunken` read
+ * above does not make, since that token is what the SELECTED SEGMENT composes
+ * against rather than what the track paints.
+ *
  * ## Why this is a STANDALONE test, not another row in the `UNAUTHED_ROUTES` loop
  *
  * That loop's `/v1/auth/methods` stub is DELIBERATELY `phone:false` (see the
@@ -1836,32 +1911,86 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   await expect(phoneTab).toHaveAttribute('aria-selected', 'true');
   await expect(emailTab).toHaveAttribute('aria-selected', 'false');
 
-  // ── DECLARED value: the token pipeline resolved neo's own fillTertiary for
-  // `.gn-segmented`'s track background, not hig/minimal's. Read from the
-  // root custom property, the same technique `assertViewportTookEffect`
-  // already uses for `--gn-surface`.
-  const fillTertiary = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--gn-fill-tertiary').trim(),
+  // ── DECLARED value: the token pipeline resolved NEO's own values, not
+  // hig/minimal's. Read from a root custom property, the same technique
+  // `assertViewportTookEffect` already uses for `--gn-surface`.
+  //
+  // This reads `--gn-surface-sunken` and NOT `--gn-fill-tertiary` as of
+  // 2026-09-15. `fillTertiary` was the segmented TRACK's background and the
+  // owner has removed it ("the background also needs to be removed from the
+  // tablist"), so asserting it here would have gone on passing while naming a
+  // property this component no longer has — a check still green about a thing
+  // that stopped existing. `surfaceSunken` is what the pressed segment's own
+  // shadow composes against, so it is the token this control actually depends
+  // on now.
+  // The LIGHT arm's value: this project sets no `colorScheme`, so the run is
+  // light and `#ede4db` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
+  // as the literal the way the `fillTertiary` assertion it replaces was — and
+  // worth naming, because the first draft asserted the DARK hex (`#141a2e`)
+  // from memory and reddened on all three viewports. It is also exactly the
+  // reference's own `--segOnBg` for neo light, which is the cross-check that
+  // this is the right token rather than merely a passing one.
+  const surfaceSunken = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-sunken').trim(),
   );
   expect(
-    fillTertiary,
-    'the segmented track background should be neo\'s fillTertiary, not hig/minimal\'s',
-  ).toBe('#b0988429');
+    surfaceSunken,
+    'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
+  ).toBe('#ede4db');
+
+  // ── And the track really carries no fill of its own, which is the owner's
+  // change rather than an absence that was always there.
+  const trackBackground = await tablist.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(
+    trackBackground,
+    `the tablist track should paint no background of its own; got ${trackBackground}`,
+  ).toBe('rgba(0, 0, 0, 0)');
 
   // ── RENDERED value, on the actual selected tab element, not just the root
   // custom property — the same "declared vs. witnessed" gap 13.347's own
-  // docblock names. Distinguishing neo from hig by SHAPE (two shadow layers,
-  // a 16px blur) rather than mere non-'none'-ness: hig's own `raised` shadow
-  // is ALSO non-'none' (a single, tighter layer), so "has a shadow" alone
-  // would not tell the two styles apart.
-  // `.split(',').length >= 2` was tried first and is WRONG: `getComputedStyle`
-  // renders each layer's colour as `rgba(r, g, b, a)`, which itself contains
-  // commas, so a SINGLE hig-style layer already splits into 4+ pieces — the
-  // assertion would pass for hig too and prove nothing about layer count.
-  // Checking both layers' own offset/blur geometry (`tokens.ts`'s `neo`/
-  // `light`/`raised`: `7px 7px 16px` + `-7px -7px 16px`, `SHADOWS.neo.light.raised`)
-  // is what actually distinguishes neo's two-layer shadow from hig's one.
+  // docblock names.
+  //
+  // ═══════════════════════════════════════════════════════════════════════
+  // OWNER ROUND 5 (2026-09-16, case 13.412) — A DEDICATED `selected` ROLE,
+  // NOT `sunken` BORROWED FROM ANOTHER COMPONENT
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // The history: owner, 2026-09-15, "the active one had a sunken style... i
+  // want it to follow that" — approximated at the time by pointing `neo` at
+  // the existing `sunken` role (`inset 4px 4px 9px`), which is what this
+  // test used to pin. The reference gives this control FIVE `--segOnShadow`
+  // values split on the style axis (`design-system/interactive/desktop.dc.html`):
+  // a drop shadow under `hig`, `none` under `minimal`, and `inset` pairs
+  // under `neo` — and `neo`'s own geometry is `inset 3px 3px 6px`, which
+  // `sunken`'s `4px 4px 9px` never actually matched. Owner round 5 replaced
+  // the two-role approximation with a dedicated fifth `ShadowRole`,
+  // `selected` (`tokens.ts`'s `SHADOWS` table), so the pinned offsets below
+  // moved from `sunken`'s geometry to `selected`'s own.
+  //
+  // THIS CASE IS THE REASON THE ORIGINAL MISMATCH WAS CAUGHT AT ALL. The
+  // 2026-09-15 change was committed (810d8470) with a note claiming nothing
+  // in the suite read a computed style on this component; this test does,
+  // and reddened on all three viewports. The claim was wrong and the run
+  // said so before anything shipped further — which is the whole argument
+  // for witnessing a rendered value rather than trusting the source.
+  //
+  // Still discriminating by SHAPE rather than by mere non-'none'-ness:
+  // `hig`'s and `minimal`'s `selected` both resolve to values with no
+  // `inset` / to `'none'` (`tokens.ts`'s `SHADOWS` table), so the `inset`
+  // keyword plus these offsets can only appear under `neo`.
+  // `.split(',').length >= 2` was tried in an earlier revision and is WRONG
+  // for the same reason it always was: `getComputedStyle` renders each
+  // layer's colour as `rgba(r, g, b, a)`, which itself contains commas, so
+  // counting commas proves nothing about layer count. The offsets come from
+  // `SHADOWS.neo.<theme>.selected`: `inset 3px 3px 6px` +
+  // `inset -3px -3px 6px`, identical in both themes.
   const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('7px 7px 16px');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-7px -7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('inset');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('3px 3px 6px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-3px -3px 6px');
+  // The old raised geometry, AND the old (approximated) sunken geometry this
+  // case used to pin, must both be GONE — without these, a rule emitting any
+  // of them alongside the real one would satisfy the lines above.
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('7px 7px 16px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('4px 4px 9px');
 });

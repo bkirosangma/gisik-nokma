@@ -11,7 +11,7 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { isUlid, type IngestResult } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
-import { Board, EMPTY_BOARD_COPY, useBoard } from '../../src/views/board.js';
+import { Board, EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY, useBoard } from '../../src/views/board.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { TICKET, WS, boardCardSeed, claim } from '../helpers/seed.js';
 
@@ -206,6 +206,27 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     expect(screen.getByText('claim in transit')).toBeInTheDocument();
     rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
     expect(screen.queryByText('claim in transit')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Case 13.463 (board-prototype-port Task 6, 2026-09-16). `gn-board-card--pending`
+   * carries the spec's dashed in-transit outline (`ui.css`) and has no rule of
+   * its own reason to exist unless `BoardCardView` actually adds it — this is
+   * that wiring's only test, positive AND negative in the same case (not just
+   * "renders when pending"): deleting the ternary in `board.tsx` and hard-coding
+   * `'gn-board-card'` fails the first assertion, and hard-coding the pending
+   * class onto every card fails the second — the same both-arms discipline the
+   * "claim in transit" chip test just above already holds itself to.
+   */
+  it('outlines the card container itself while a claim is in transit, and only then', () => {
+    const board = errandBoard([boardCardSeed({ pending: true })]);
+    const { rerender, container } = render(<Board board={board} onOpenTicket={() => {}} />);
+    const pendingCard = container.querySelector('.gn-board-card');
+    expect(pendingCard?.className).toContain('gn-board-card--pending');
+
+    rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    const settledCard = container.querySelector('.gn-board-card');
+    expect(settledCard?.className).not.toContain('gn-board-card--pending');
   });
 
   it('opens the ticket on title click', async () => {
@@ -747,7 +768,12 @@ describe('useBoard — a project switch is a different question, and it gets ask
 
 /**
  * Plan 6 Task 15b, item 4. Cases 3.112–3.114
- * (`test-cases/03-foundation-ledger.md`).
+ * (`test-cases/03-foundation-ledger.md`). 3.114's second `it` is AMENDED
+ * 2026-09-16 by board-prototype-port Task 7 (Ruling R6) — see that test's own
+ * comment for what changed and why. Cases 13.465–13.467
+ * (`test-cases/13-deployment-dogfooding.md`) cover Task 7's additions: the
+ * per-column empty state, R6 itself, and Ruling 19 (13.467, the isNarrowed
+ * fix found in Task 7's review).
  */
 describe('3.112 an empty board says words, not nothing', () => {
   const emptyBoard: BoardView = { projectId: 'prj_1', groups: [] };
@@ -805,7 +831,22 @@ describe('3.112 an empty board says words, not nothing', () => {
     expect(screen.getAllByRole('region')).toHaveLength(4);
   });
 
-  it('3.114 a group whose columns are all empty is NOT an empty board — it is a board', () => {
+  /**
+   * AMENDED 2026-09-16 (board-prototype-port Task 7, Ruling R6 — case 13.466
+   * takes over this property with a richer, two-column fixture; this one
+   * stays as R6's minimal single-column reproduction rather than being
+   * deleted). Pre-R6 this asserted
+   * ~~`expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull()`~~ — true only
+   * because the old gate was `board.groups.length === 0`, and this fixture
+   * HAS a group. R6 widens the gate to `totalCards === 0` (`board.tsx`'s
+   * `emptyBanner`), which this fixture also satisfies — its one column holds
+   * no cards — so the sentence now renders ABOVE the rail instead of being
+   * silently absent. What the title's original claim ("is NOT an empty
+   * board") still gets right, UNCHANGED by R6: the columns keep rendering —
+   * `getByRole('region', ...)` below is untouched and still passes. Only the
+   * silence is gone.
+   */
+  it('3.114 a group whose columns are all empty says the pinned sentence too, since R6 — and still renders its columns', () => {
     const noCards: BoardView = {
       projectId: 'prj_1',
       groups: [
@@ -818,11 +859,151 @@ describe('3.112 an empty board says words, not nothing', () => {
       ],
     };
     render(<Board board={noCards} onOpenTicket={() => {}} />);
-    // The columns ARE the workflow's states and rendering them is the promise
-    // this file's first describe makes. Saying "no tickets here yet" over a
-    // real column set would delete the one thing the board is for.
+    // The columns ARE the workflow's states and rendering them is the
+    // promise this file's first describe makes — unchanged by R6.
     expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument();
+    // R6: zero cards in total, even with a group present, says the sentence.
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Board-prototype-port Task 7 (2026-09-16) — the per-column empty state
+ * (spec Board `:354-399`) and Ruling R6 (the whole-board sentence widened to
+ * gate on zero CARDS rather than zero groups; `board.tsx`'s `emptyBanner`).
+ * Cases 13.465 (per-column empty state) and 13.466 (R6) —
+ * `test-cases/13-deployment-dogfooding.md`.
+ */
+describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
+  it('13.465 an empty column renders its own empty state; a column holding a card does not', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    // errandBoard(): 'To do', 'Waiting on counterparty' and 'Done' hold no
+    // cards; 'Doing' holds one (boardCardSeed()'s default) — three empty
+    // states, not four, is the positive control this case's own name asks for.
+    expect(screen.getAllByText(EMPTY_COLUMN_COPY)).toHaveLength(3);
+    const doing = screen.getByRole('region', { name: 'Doing' });
+    expect(within(doing).queryByText(EMPTY_COLUMN_COPY)).toBeNull();
+    const todo = screen.getByRole('region', { name: 'To do' });
+    expect(within(todo).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+  });
+
+  it('13.465 offers "Add a ticket" only when the shell handed a create handler down, both arms', async () => {
+    const user = userEvent.setup();
+    const clicks: number[] = [];
+    const { rerender } = render(
+      <Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
+    );
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(clicks).toEqual([1]);
+
+    rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    const todoAgain = screen.getByRole('region', { name: 'To do' });
+    expect(within(todoAgain).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    // The words stay even with no handler — a no-op button here would look
+    // like a way out of an empty column and would not be one, the same
+    // "control that lies" discipline `emptyBanner`'s own docblock already
+    // holds itself to.
+    expect(within(todoAgain).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+  });
+
+  /**
+   * THE R6 CASE ITSELF, 13.466 — the exact scenario the spec's own R6 section
+   * names: "a project that has a workflow attached and zero tickets... skips
+   * the pinned sentence entirely, and draws a rail of empty column trays."
+   * No EXISTING assertion in this file could witness it before this task:
+   * 3.112's fixture has zero GROUPS, not zero cards with a group present, and
+   * that fixture passes on the pre-R6 gate exactly as it does on the new
+   * one — see this task's own report for the reverted-condition mutation
+   * that proves THIS test, and only this one plus the amended 3.114 above,
+   * depend on the widened gate.
+   */
+  it('13.466 says something, and still shows the columns, when a workflow is attached but nothing is in it', () => {
+    const board: BoardView = {
+      projectId: 'p1',
+      groups: [
+        {
+          workflowId: 'wf1',
+          workflowVersion: 1,
+          workflowName: 'Default',
+          columns: [
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+            { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+          ],
+        },
+      ],
+    };
+    render(<Board board={board} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
+
+    // The sentence: pre-R6 this case rendered NOTHING, because the branch
+    // was gated on `groups.length === 0` and there is one group.
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // And the rail survives — it is the one place the workflow's states show.
+    expect(screen.getByText('To do')).toBeInTheDocument();
+    expect(screen.getByText('Doing')).toBeInTheDocument();
+    expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+});
+
+/**
+ * Board-prototype-port Task 7 fix, Ruling 19 (2026-09-16, found in review).
+ * `page.tsx` hands `Board` an ALREADY-NARROWED view (`boardNarrowing.view`) —
+ * cards dropped by the client-side board filter, never columns or groups.
+ * R6's `totalCards` fold reads exactly those narrowed cards, so without a
+ * signal distinguishing "genuinely zero tickets" from "a filter hid them
+ * all", a search matching nothing renders `EMPTY_BOARD_COPY` — "create
+ * one" — over a project that holds real tickets, contradicting the "N of M
+ * shown" strip one row above it and pointing at the wrong remedy. `isNarrowed`
+ * is the fix: `Board`'s own docblock on the prop carries the full account.
+ * Case 13.467.
+ */
+describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when cards were filtered, not absent', () => {
+  /**
+   * The SAME fixture for both arms below, deliberately: two columns, neither
+   * holding a card. On its own this is indistinguishable from R6's genuine
+   * empty-workflow case (13.466) — nothing about the `BoardView` itself says
+   * whether a filter did this. Only `isNarrowed` discriminates, so holding
+   * the fixture constant while flipping only that flag is the direct proof
+   * that the flag — and nothing else — is what changes the outcome.
+   */
+  const narrowedAwayBoard: BoardView = {
+    projectId: 'prj_1',
+    groups: [
+      {
+        workflowId: 'wf1',
+        workflowVersion: 1,
+        workflowName: 'Default',
+        columns: [
+          { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+        ],
+      },
+    ],
+  };
+
+  it('13.467 a narrowed-to-zero board suppresses EMPTY_BOARD_COPY — the rail and per-column empty states still render', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed />);
+    // The wrong-remedy sentence must NOT appear over a filtered board.
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+    // The rail is untouched by `isNarrowed` — it is not the invariant this
+    // prop protects, and the columns are still the one place a person can
+    // clear their narrowing and look again.
+    expect(screen.getByText('To do')).toBeInTheDocument();
+    expect(screen.getByText('Doing')).toBeInTheDocument();
+    // The per-column empty state is explicitly NOT changed by this ruling
+    // (coordinator: "recorded and deferred... not overruling a considered
+    // judgement mid-task") — both columns still carry it.
+    expect(screen.getAllByText(EMPTY_COLUMN_COPY)).toHaveLength(2);
+  });
+
+  it('13.467 the IDENTICAL board, not narrowed, still says the R6 sentence — proving the flag is what discriminates', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed={false} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+  });
+
+  it('13.467 CONTROL — omitting isNarrowed entirely behaves exactly like isNarrowed={false} (the default is "not narrowed")', () => {
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
 

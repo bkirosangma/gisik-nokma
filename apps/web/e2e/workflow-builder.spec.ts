@@ -136,11 +136,23 @@ test.describe('workflow builder smoke — admin', () => {
     await page.getByRole('button', { name: 'Start blank' }).click();
     // the blank draft seeds one open start state named "New"
     await page.getByRole('button', { name: 'Add state' }).click();
+    // `Select` (packages/ui/src/select/select.tsx) is a react-aria button+listbox
+    // widget, not a native <select> — `.selectOption()` is a Playwright API
+    // exclusive to real <select> elements and throws against this at runtime
+    // (TypeScript won't catch it: Locator types the method generically). Role
+    // changed combobox->button to match the migration; name is a regex because
+    // the trigger's accessible name concatenates the current value with the
+    // aria-label (confirmed in packages/ui/src/select/select.tsx and exercised
+    // by the equivalent Vitest queries in canvas.test.tsx, which resolve
+    // against the same component in jsdom). The listbox panel renders via
+    // createPortal(..., document.body), so the option is queried unscoped from
+    // the picked-up listbox rather than from the node locator.
     await page
       .locator('.react-flow__node')
       .filter({ has: page.getByText('New state', { exact: true }) })
-      .getByRole('combobox', { name: 'Category' })
-      .selectOption('terminal');
+      .getByRole('button', { name: /Category/ })
+      .click();
+    await page.getByRole('listbox').getByRole('option', { name: 'terminal' }).click();
     await connectNodes(page, 'New', 'New state');
     await expect(page.getByText('No issues — this workflow can be published.')).toBeVisible();
     await page.getByRole('button', { name: 'Publish' }).click();

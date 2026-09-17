@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid, type Notification } from '@gisik-nokma/domain';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
+import { putNotificationPreferences } from '../../src/notification-preferences/store.js';
 import { insertNotification } from '../../src/notifications/store.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -69,6 +70,27 @@ function sample(userId: string, overrides: Partial<Notification> = {}): Notifica
     createdAt: '2026-08-23T05:00:00.000Z',
     ...overrides,
   };
+}
+
+/** A `mention` row — a payload shape distinct from `sample`'s `assignment` default. */
+function mentionSample(userId: string, overrides: Partial<Notification> = {}): Notification {
+  const id = newUlid();
+  return sample(userId, {
+    id,
+    kind: 'mention',
+    dedupeKey: `mention:${id}`,
+    payload: {
+      ticketId: '01J9GTKA000000000000000000',
+      ticketTitle: 'Renew the DLT registration',
+      mentionedBy: '01J9GUKR000000000000000000',
+      eventId: id,
+      source: 'comment',
+      excerpt: 'cc @you',
+      clientTime: '2026-08-19T10:00:00.000Z',
+      serverTime: '2026-08-19T10:00:01.000Z',
+    },
+    ...overrides,
+  });
 }
 
 describe('GET /v1/me/notifications', () => {
@@ -176,6 +198,38 @@ describe('GET /v1/me/notifications', () => {
     });
     expect(absent.statusCode).toBe(200);
   });
+
+  it('11.200 excludes a kind this caller has muted (account/help-screens plan, Task 5) — the wiring witness', async () => {
+    const me = await signInWithPhone(app, otp, '+919999100014');
+    await insertNotification(db.pool, sample(me.userId));
+    await insertNotification(db.pool, mentionSample(me.userId));
+
+    // Positive control FIRST, same fixture, no preference saved yet: both
+    // kinds are there. Without this, a query that silently returned nothing
+    // at all could pass the exclusion assertion below by coincidence.
+    const before = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    const beforeBody = before.json() as { notifications: Notification[] };
+    expect(beforeBody.notifications.map((n) => n.kind).sort()).toEqual(['assignment', 'mention']);
+
+    // Through the STORE directly rather than the preferences route: this test
+    // pins that `/v1/me/notifications` looks the preference up and passes it
+    // through, not that the preferences route itself works (that is
+    // `notification-preferences.test.ts`'s job).
+    await putNotificationPreferences(db.pool, me.userId, { mutedKinds: ['mention'] });
+
+    const after = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    const afterBody = after.json() as { notifications: Notification[] };
+    expect(afterBody.notifications).toHaveLength(1);
+    expect(afterBody.notifications[0]?.kind).toBe('assignment');
+  });
 });
 
 describe('GET /v1/me/notifications/unread-count', () => {
@@ -218,6 +272,29 @@ describe('GET /v1/me/notifications/unread-count', () => {
       expect(response.statusCode, url).toBe(200);
       expect(response.json(), url).toEqual({ unread: 1 });
     }
+  });
+
+  it('excludes a muted kind from the count too (account/help-screens plan, Task 5) — the wiring witness', async () => {
+    const me = await signInWithPhone(app, otp, '+919999100015');
+    await insertNotification(db.pool, sample(me.userId));
+    await insertNotification(db.pool, mentionSample(me.userId));
+
+    // Positive control first: unmuted, both unread rows count.
+    const before = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications/unread-count',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(before.json()).toEqual({ unread: 2 });
+
+    await putNotificationPreferences(db.pool, me.userId, { mutedKinds: ['mention'] });
+
+    const after = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications/unread-count',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(after.json()).toEqual({ unread: 1 });
   });
 });
 

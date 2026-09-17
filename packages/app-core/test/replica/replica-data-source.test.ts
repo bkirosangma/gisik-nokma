@@ -912,3 +912,122 @@ describe('12.187 the three doors an offline-born ticket reaches', () => {
     expect(miss.hits.map((hit) => hit.ticketId)).not.toContain(bornId);
   });
 });
+
+/**
+ * 13.584 — `ticket.closed`/`ticket.reopened` fold through the SAME shared
+ * reducer (`applyTicketEvent`) every other ticket event does, and `start:
+ * 'backlog'` folds to the universal state: neither is a new fold this file
+ * has to teach the replica, because both landed on `TICKET_EVENT_TYPES` and
+ * `applyTicketEvent`'s own switch before this task (Task 1) — confirmed
+ * here rather than re-derived, over the settled `getTicket` read.
+ *
+ * **What this task does NOT add, and why**: a `getBoard`/`getTickets`
+ * exclusion for backlog/closed tickets, mirroring the server's `readBoard`
+ * WHERE clause (13.574). `getBoard`'s own filter DOES gain the two conjuncts
+ * (below, over the straggler path a backlog ticket would otherwise fall into)
+ * — but `getTickets` deliberately does NOT exclude either: 13.575 already
+ * settled that the LIST carries a backlog and a closed ticket alongside every
+ * other row, narrowable by the new `closed` filter term rather than dropped
+ * outright, and `stateName` for a backlog row already reads `statesWithBacklog`
+ * (`stateNameFrom`, fixed alongside `rowOf`'s new `closed` field in this same
+ * change). So the replica's `getTickets` matches the server's LIST behaviour;
+ * its `getBoard` now matches the server's BOARD behaviour.
+ */
+describe('13.584 ticket.closed / ticket.reopened fold through the shared reducer; a backlog-born ticket is served, not invented', () => {
+  it("a ticket created with start:'backlog' is served at stateId 'backlog' by getTicket AND by getTickets, closed: null", async () => {
+    const { ds, replica } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Born in the backlog',
+        start: 'backlog',
+      }),
+    );
+
+    const read = await ds.query.getTicket(WS, bornId);
+    expect(read?.ticket.stateId).toBe('backlog');
+    expect(read?.ticket.closed ?? null).toBeNull();
+
+    const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === bornId);
+    expect(row?.stateId).toBe('backlog');
+    // `stateNameFrom` reads `statesWithBacklog(def)` — `wfV1.states` alone
+    // does not declare 'backlog', and would otherwise fall back to the bare id.
+    expect(row?.stateName).toBe('Backlog');
+    expect(row?.closed).toBeNull();
+  });
+
+  function cardIdsOn(board: Awaited<ReturnType<ReplicaDataSource['query']['getBoard']>>): string[] {
+    return board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards.map((c) => c.ticketId)));
+  }
+
+  it('after ticket.closed, getTicket AND getTickets both report closed — and getBoard drops the card', async () => {
+    const { ds, replica } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Filed, then closed',
+      }),
+    );
+
+    // POSITIVE CONTROL, before the fold: the ticket IS on the board while it
+    // is open, so the exclusion asserted below is a genuine drop and not an
+    // empty board that would have said "not there" regardless.
+    expect(cardIdsOn(await ds.query.getBoard(PROJECT))).toContain(bornId);
+
+    // `applyServerItem` replays a fact the server already accepted (this
+    // file's own idiom throughout) — it does not re-derive legality, so it is
+    // not asserting that closing from `todo` would pass the real engine's
+    // `close-requires-terminal` gate, only that the FOLD sets the flag.
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.closed', {}, { actorId: USER_B }),
+    );
+
+    const read = await ds.query.getTicket(WS, bornId);
+    expect(read?.ticket.closed).toEqual({ actorId: USER_B, at: SERVER_TIME });
+
+    const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === bornId);
+    expect(row?.closed).toEqual({ actorId: USER_B, at: SERVER_TIME });
+
+    // The `closed` FILTER TERM pinned at this seam, not merely the field:
+    // `getTickets` runs every row through `matchesFilter`, so `{ closed: true }`
+    // must actually narrow to this ticket and `{ closed: false }` must drop it —
+    // the mechanism 13.575's server-side parity relies on this replica having too.
+    expect(
+      (await ds.query.getTickets(PROJECT, { closed: true }, 'flat')).rows.map((r) => r.ticketId),
+    ).toContain(bornId);
+    expect(
+      (await ds.query.getTickets(PROJECT, { closed: false }, 'flat')).rows.map((r) => r.ticketId),
+    ).not.toContain(bornId);
+
+    // getBoard EXCLUDES it — the replica's own mirror of 13.574's two bound
+    // conjuncts (`state.stateId !== BACKLOG_STATE_ID`, `(closed ?? null) ===
+    // null`), unlike getTickets above, which carries it.
+    expect(cardIdsOn(await ds.query.getBoard(PROJECT))).not.toContain(bornId);
+  });
+
+  it('getBoard also excludes a confirmed backlog ticket, straggler path included — a backlog ticket never becomes a board column', async () => {
+    const { ds, replica } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Parked before triage',
+        start: 'backlog',
+      }),
+    );
+    const board = await ds.query.getBoard(PROJECT);
+    const cardIds = board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards.map((c) => c.ticketId)));
+    expect(cardIds).not.toContain(bornId);
+    // NON-VACUOUS: no group anywhere is named for the reserved id — the
+    // straggler path a bare `def.states.find` miss would otherwise take.
+    expect(board.groups.flatMap((group) => group.columns.map((c) => c.stateId))).not.toContain('backlog');
+  });
+});

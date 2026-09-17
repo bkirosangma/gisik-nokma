@@ -113,6 +113,17 @@ const MONTH_NAMES = [
   'December',
 ] as const;
 
+/**
+ * The weekday head's labels — board prototype port Task 10 (2026-09-16), spec
+ * Calendar `:477-504`, "Weekday head" row. `week.days` runs Monday through
+ * Sunday (`calendar-model.js`'s own week construction, pinned by
+ * `calendar-view.test.tsx` 11.71's "labels each row by its own Monday" and by
+ * every `gridColumn` assertion in this suite — column 5 is Friday, column 2 is
+ * Tuesday), so this label row is Monday-first too: labelling column 1 "Sun"
+ * would put every weekday name one column off from the numbers underneath it.
+ */
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
 function monthLabel(month: CalendarMonth): string {
   const name = MONTH_NAMES[month.month - 1];
   // Refused rather than coerced, the way `monthGridWeeks` refuses its bounds:
@@ -260,7 +271,10 @@ export function CalendarView(props: CalendarViewProps) {
         >
           ‹
         </button>
-        <button type="button" className="gn-calendar__nav" onClick={() => moveTo(monthOf(props.today))}>
+        {/* Own class, not `.gn-calendar__nav`: the spec's Calendar table gives
+            "Today" a different ground (transparent, not `ctlBg`) from the
+            arrow buttons beside it — board prototype port Task 10. */}
+        <button type="button" className="gn-calendar__today" onClick={() => moveTo(monthOf(props.today))}>
           Today
         </button>
         <button
@@ -287,8 +301,17 @@ export function CalendarView(props: CalendarViewProps) {
         </p>
       )}
 
-      {/* Rendered only when it has a row: an empty legend is chrome, and chrome
-          that says nothing is noise. */}
+      {/*
+        Rendered only when it has a row: an empty legend is chrome, and chrome
+        that says nothing is noise. Ruling R4 (2026-09-16) merges the
+        prototype's legend-CARD visual treatment onto this SAME conditional —
+        `Due date`/`In transit` are not a reason to show the legend on their
+        own, because they carry no information a hidden field's row doesn't
+        already carry better (a live count). The guard therefore stays keyed
+        on `model.customDateFields.length`, unchanged from before R4: a month
+        with no custom claims still renders no legend at all, verified
+        unmodified by `calendar-view.test.tsx` 11.69's third case.
+      */}
       {model.customDateFields.length > 0 && (
         <fieldset className="gn-calendar__legend" aria-label="Claimed date fields">
           {model.customDateFields.map((field) => (
@@ -298,103 +321,180 @@ export function CalendarView(props: CalendarViewProps) {
                 checked={!hiddenFields.has(field.fieldId)}
                 onChange={() => toggleField(field.fieldId)}
               />
+              {/* Decorative: the swatch carries the colour, the checkbox
+                  carries the control and the text carries the meaning — the
+                  same three-way split the grid's own marker glyph uses. */}
+              <span
+                className="gn-calendar__legend-swatch gn-calendar__legend-swatch--custom"
+                aria-hidden="true"
+              />
               {/* The field's own name, never a paraphrase, and the count — so a
                   switched-off field still says how much it is hiding, which is
                   what makes hiding visibly reversible. */}
               {field.fieldName} ({field.count})
             </label>
           ))}
+          {/*
+            R4's own addition: `Due date` and `In transit` join as READ-ONLY
+            rows — swatch plus label, deliberately NOT an `<input>` (not even
+            a disabled one). Both built-ins already have exactly one legend
+            entry apiece across the whole grid (there is no per-field count to
+            show and nothing a click could switch off), so a checkbox here
+            would offer a control that does nothing — the exact "control that
+            lies" shape the rest of this port refuses elsewhere. A `<span>`,
+            not a `<label>`, for the same reason: `<label>` with no control
+            inside it names nothing.
+          */}
+          <span className="gn-calendar__legend-row">
+            <span
+              className="gn-calendar__legend-swatch gn-calendar__legend-swatch--accent"
+              aria-hidden="true"
+            />
+            Due date
+          </span>
+          <span className="gn-calendar__legend-row">
+            <span
+              className="gn-calendar__legend-swatch gn-calendar__legend-swatch--pending"
+              aria-hidden="true"
+            />
+            In transit
+          </span>
         </fieldset>
       )}
 
-      {model.weeks.map((week, weekIndex) => {
-        const expanded = expandedWeeks.has(weekIndex);
-        const visibleItems = expanded ? week.items : week.items.slice(0, MAX_VISIBLE_PER_WEEK);
-        const folded = week.items.length - visibleItems.length;
-        return (
-          <section key={week.days[0]} className="gn-calendar__week" data-week={week.days[0]}>
-            <div className="gn-calendar__days">
-              {week.days.map((day) => {
-                const isToday = day === props.today;
-                const outside = day.slice(0, 7) !== currentMonthKey;
-                return (
-                  <div
-                    key={day}
-                    className={[
-                      'gn-calendar__day',
-                      isToday ? 'gn-calendar__day--today' : '',
-                      outside ? 'gn-calendar__day--outside' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    data-day={day}
-                    data-today={isToday ? 'true' : undefined}
-                    data-outside={outside ? 'true' : undefined}
-                    aria-current={isToday ? 'date' : undefined}
-                  >
-                    {Number(day.slice(8))}
-                  </div>
-                );
-              })}
-            </div>
+      {/*
+        Board prototype port Task 10 (2026-09-16), spec Calendar `:477-504`,
+        "Grid" row — `trayBg + trayShadow; radius cardR; padding 1px; 7 cols;
+        gap 1px; min-height:420px`. This wrapper carries the tray ground, the
+        card radius and the outer floor height; the "7 cols; gap 1px" tracks
+        themselves live one level down, on `.gn-calendar__weekday-head` and
+        each week's own `.gn-calendar__days` — see that rule's own comment in
+        `ui.css` for why. `min-height` is a FLOOR on this whole container, not
+        a per-row distribution: this product renders a week's events in a
+        separate list below its day numbers rather than inside each day cell
+        (the architecture the fold/`gridColumn` contract in this file already
+        depends on), so there is no single 42-cell grid to stretch evenly —
+        a month with few events shows blank tray below its last week rather
+        than six evenly taller rows. DECLARED DIVERGENCE from the prototype's
+        own single-grid vocabulary, the same shape `.gn-list__section-title`
+        and `.gn-timeline__weeks` already declare for the identical reason.
+      */}
+      <div className="gn-calendar__grid">
+        <div className="gn-calendar__weekday-head">
+          {WEEKDAY_LABELS.map((label) => (
+            <span key={label} className="gn-calendar__weekday">
+              {label}
+            </span>
+          ))}
+        </div>
 
-            <ul className="gn-calendar__items">
-              {visibleItems.map((item, itemIndex) => {
-                const span = weekSpan(item, week.days);
-                const unplaceable = span === null;
-                // `null` becomes the whole row: "this week", which is all the
-                // string comparison that placed it here established. Never a
-                // column — that would name a day nobody claimed.
-                const gridColumn = span ?? '1 / 8';
-                // Two inputs may legitimately carry the same ticket id, so the
-                // key is positional rather than id-derived.
-                const key = `${itemIndex}:${item.kind}:${item.ticketId}`;
-                const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
-                return (
-                  <li key={key} className="gn-calendar__slot" style={{ gridColumn }}>
-                    <button
-                      type="button"
-                      className={itemClassName(item, unplaceable)}
-                      title={item.kind === 'bar' ? item.provenance : item.tooltip}
-                      data-pending={pending ? 'true' : undefined}
-                      data-unplaceable={unplaceable ? 'true' : undefined}
-                      {...(item.kind === 'marker' && item.marker === 'custom'
-                        ? { 'data-field-id': item.fieldId }
-                        : {})}
-                      onClick={() => props.onOpenTicket(item.ticketId)}
+        {model.weeks.map((week, weekIndex) => {
+          const expanded = expandedWeeks.has(weekIndex);
+          const visibleItems = expanded ? week.items : week.items.slice(0, MAX_VISIBLE_PER_WEEK);
+          const folded = week.items.length - visibleItems.length;
+          return (
+            <section key={week.days[0]} className="gn-calendar__week" data-week={week.days[0]}>
+              <div className="gn-calendar__days">
+                {week.days.map((day) => {
+                  const isToday = day === props.today;
+                  const outside = day.slice(0, 7) !== currentMonthKey;
+                  return (
+                    <div
+                      key={day}
+                      // No `--today` modifier class here: the ring it used to
+                      // draw moved onto `.gn-calendar__day-number--today`
+                      // below, and a class with no rule left to style it is
+                      // the exact "reads as doing something, renders nothing"
+                      // shape this file's own legend rows were just written
+                      // to avoid — `data-today`/`aria-current` already carry
+                      // the cell-level signal for both CSS and tests.
+                      className={['gn-calendar__day', outside ? 'gn-calendar__day--outside' : '']
+                        .filter(Boolean)
+                        .join(' ')}
+                      data-day={day}
+                      data-today={isToday ? 'true' : undefined}
+                      data-outside={outside ? 'true' : undefined}
+                      aria-current={isToday ? 'date' : undefined}
                     >
-                      {item.kind === 'bar' ? (
-                        item.title
-                      ) : (
-                        <>
-                          {/* Decorative: the glyph carries the colour, the label
-                              carries the meaning, so the accessible name is the
-                              claim and nothing else. */}
-                          <span className="gn-calendar__glyph" aria-hidden="true">
-                            ◆
-                          </span>
-                          {item.label}
-                        </>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      {/* The spec's "Today ring" — a 24px accent circle around
+                          the NUMBER, not an outline around the whole cell (the
+                          treatment this replaced). The ring/attribute contract
+                          tests key on stays on the outer div: `aria-current`,
+                          `data-today`, `data-day` (11.64) — moving those onto
+                          this span would be a gratuitous break for no gain. */}
+                      <span
+                        className={[
+                          'gn-calendar__day-number',
+                          isToday ? 'gn-calendar__day-number--today' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        {Number(day.slice(8))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {folded > 0 && (
-              <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
-                +{folded} more
-              </button>
-            )}
-            {expanded && week.items.length > MAX_VISIBLE_PER_WEEK && (
-              <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
-                show fewer
-              </button>
-            )}
-          </section>
-        );
-      })}
+              <ul className="gn-calendar__items">
+                {visibleItems.map((item, itemIndex) => {
+                  const span = weekSpan(item, week.days);
+                  const unplaceable = span === null;
+                  // `null` becomes the whole row: "this week", which is all the
+                  // string comparison that placed it here established. Never a
+                  // column — that would name a day nobody claimed.
+                  const gridColumn = span ?? '1 / 8';
+                  // Two inputs may legitimately carry the same ticket id, so the
+                  // key is positional rather than id-derived.
+                  const key = `${itemIndex}:${item.kind}:${item.ticketId}`;
+                  const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
+                  return (
+                    <li key={key} className="gn-calendar__slot" style={{ gridColumn }}>
+                      <button
+                        type="button"
+                        className={itemClassName(item, unplaceable)}
+                        title={item.kind === 'bar' ? item.provenance : item.tooltip}
+                        data-pending={pending ? 'true' : undefined}
+                        data-unplaceable={unplaceable ? 'true' : undefined}
+                        {...(item.kind === 'marker' && item.marker === 'custom'
+                          ? { 'data-field-id': item.fieldId }
+                          : {})}
+                        onClick={() => props.onOpenTicket(item.ticketId)}
+                      >
+                        {item.kind === 'bar' ? (
+                          item.title
+                        ) : (
+                          <>
+                            {/* Decorative: the glyph carries the colour, the label
+                                carries the meaning, so the accessible name is the
+                                claim and nothing else. */}
+                            <span className="gn-calendar__glyph" aria-hidden="true">
+                              ◆
+                            </span>
+                            {item.label}
+                          </>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {folded > 0 && (
+                <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
+                  +{folded} more
+                </button>
+              )}
+              {expanded && week.items.length > MAX_VISIBLE_PER_WEEK && (
+                <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
+                  show fewer
+                </button>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

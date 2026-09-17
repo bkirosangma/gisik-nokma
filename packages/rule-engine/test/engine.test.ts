@@ -515,6 +515,155 @@ describe('the stranding refusal, and what it refuses to ask', () => {
 });
 
 /**
+ * A published v1 with TWO terminal states, so a v2 that drops one still
+ * satisfies `validateWorkflowDef`'s "no terminal state" gate on the survivor
+ * — needed so 13.610 below reaches the stateMapping category check at all
+ * rather than refusing `workflow-structure` first. Every transition is
+ * `from: '*'`, exactly like `basicV1`/`WF`/`wf-proto` above: it satisfies
+ * both the reachability walk and the terminal-inbound check in one shape.
+ */
+const twoTerminalV1: WorkflowDef = {
+  id: 'wf_two_terminal',
+  version: 1,
+  name: 'Two terminal',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'active' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+    { id: 'archived', name: 'Archived', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'todo', rules: [] },
+    { from: '*', to: 'doing', rules: [] },
+    { from: '*', to: 'done', rules: [] },
+    { from: '*', to: 'archived', rules: [] },
+  ],
+};
+
+/** The v2 that drops `done` — TERMINAL — and keeps `archived`, the other terminal. */
+function twoTerminalV2(stateMapping?: Record<string, string>): EventEnvelope {
+  return defined({
+    id: 'wf_two_terminal',
+    version: 2,
+    name: 'Two terminal',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'active' },
+      { id: 'archived', name: 'Archived', category: 'terminal' },
+    ],
+    transitions: [
+      { from: '*', to: 'todo', rules: [] },
+      { from: '*', to: 'doing', rules: [] },
+      { from: '*', to: 'archived', rules: [] },
+    ],
+    ...(stateMapping === undefined ? {} : { stateMapping }),
+  });
+}
+
+/**
+ * 13.610 — Ruling 53(iii), Finding 5 (final whole-branch review, 2026-09-17):
+ * `foldTicketToWorkflowVersion` spreads `...state`, so a closed ticket's
+ * `closed` claim rides along a republish fold unconditionally while
+ * `stateId` moves to wherever `stateMapping` sends it — and until this fix
+ * `workflowStateMapping`'s own validation never asked whether a dropped
+ * TERMINAL state's replacement was itself terminal. A ticket closed in
+ * `done` could be folded onto `doing` (active) by a publish alone, no
+ * `ticket.closed`/`ticket.reopened` event anywhere in its history —
+ * `close-requires-terminal`'s invariant breached through the one door that
+ * is not an event at all.
+ */
+describe('a dropped TERMINAL state may only be remapped to another terminal state (Ruling 53(iii))', () => {
+  it('13.610 refuses "done" (terminal, dropped) mapped to "doing" (active, survives), naming both states', async () => {
+    const { ctx } = spyContext(twoTerminalV1);
+    const verdict = await evaluateEvent(twoTerminalV2({ done: 'doing' }), ctx);
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.workflowStateMapping,
+      reason:
+        'The stateMapping sends terminal state "done" to "doing", which is not terminal; closed tickets must stay in a terminal state, so a dropped terminal state may only map to another terminal state.',
+    });
+  });
+
+  it('accepts "done" mapped to "archived" — terminal to terminal', async () => {
+    const { ctx } = spyContext(twoTerminalV1);
+    const verdict = await evaluateEvent(twoTerminalV2({ done: 'archived' }), ctx);
+    expect(verdict).toEqual({ refused: false });
+  });
+});
+
+/**
+ * `twoTerminalV1`'s own states, but `done` KEEPS its id — never dropped, so
+ * 53(iii)'s `stateMapping` loop never runs over it at all. `archived` stays
+ * terminal, so `validateWorkflowDef`'s "no terminal state" gate does not
+ * fire either — the same reason `twoTerminalV1` carries two terminals in
+ * the first place.
+ */
+function twoTerminalV2CategoryDemoted(): EventEnvelope {
+  return defined({
+    id: 'wf_two_terminal',
+    version: 2,
+    name: 'Two terminal',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'active' },
+      { id: 'done', name: 'Done', category: 'active' },
+      { id: 'archived', name: 'Archived', category: 'terminal' },
+    ],
+    transitions: [
+      { from: '*', to: 'todo', rules: [] },
+      { from: '*', to: 'doing', rules: [] },
+      { from: '*', to: 'done', rules: [] },
+      { from: '*', to: 'archived', rules: [] },
+    ],
+  });
+}
+
+/** The positive control: every state kept, every category unchanged. */
+function twoTerminalV2Unchanged(): EventEnvelope {
+  return defined({
+    id: 'wf_two_terminal',
+    version: 2,
+    name: 'Two terminal',
+    initialStateId: 'todo',
+    states: twoTerminalV1.states,
+    transitions: twoTerminalV1.transitions,
+  });
+}
+
+/**
+ * 13.611 — Ruling 56(a), N1 (opus re-review, final fix wave round 2,
+ * 2026-09-17): closed ⇒ terminal's FOURTH door. 53(iii) gates a dropped
+ * terminal state remapped to a non-terminal survivor; this gates a state
+ * that is not dropped at all — kept, same id, but demoted out of terminal.
+ * `foldTicketToWorkflowVersion` recomputes a ticket's category from THIS
+ * version's definition unconditionally, so a closed ticket sitting in
+ * `done` would ride the fold with `closed` intact while `state_category`
+ * silently follows the demotion — the identical breach, reached without a
+ * `stateMapping` entry ever being owed.
+ */
+describe('a SURVIVING state (never dropped) may not be demoted out of terminal on republish (Ruling 56(a), N1)', () => {
+  it('13.611 refuses "done" kept but demoted terminal -> active, no mapping owed', async () => {
+    const { ctx } = spyContext(twoTerminalV1);
+    const verdict = await evaluateEvent(twoTerminalV2CategoryDemoted(), ctx);
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.workflowStateMapping,
+      reason:
+        'Version 2 changes state "done" from terminal to active; closed tickets must stay in a terminal state, so a terminal state may not be demoted while it keeps its id — drop it and map it, or reopen the tickets in it first.',
+    });
+  });
+
+  it('accepts "done" kept and still terminal — every category unchanged', async () => {
+    const { ctx } = spyContext(twoTerminalV1);
+    const verdict = await evaluateEvent(twoTerminalV2Unchanged(), ctx);
+    expect(verdict).toEqual({ refused: false });
+  });
+});
+
+/**
  * The rule names are cross-plan API: later plans, the HTTP layer and the
  * offline replica all match on these exact strings. Renaming one is a breaking
  * change and should read as one here.
@@ -537,6 +686,10 @@ describe('REFUSAL_RULES', () => {
       requireEvidence: 'require-evidence',
       requireField: 'require-field',
       requireDifferentUser: 'require-different-user',
+      closeRequiresTerminal: 'close-requires-terminal',
+      alreadyClosed: 'already-closed',
+      notClosed: 'not-closed',
+      closedTicket: 'closed-ticket',
     });
   });
 

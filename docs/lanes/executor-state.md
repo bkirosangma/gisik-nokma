@@ -20,7 +20,450 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~18:0x IST. **ROUND 19b — WORK COMPLETE, RE-FROZEN AFTER REVIEW FIX.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a IS DONE AND COMMITTED; ONE PR OPEN
+> # AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE. QUEUE EMPTY — HOLD.**
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2a-catalogue-green.md`. All four Parts are
+> in one commit. **Nothing is in flight; the next task is the controller's to name.**
+>
+> ## Live anchors — measured at this block
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2a-catalogue-green`, cut from `origin/owner/workspace-edits` at `63ffe930` |
+> | **HEAD at gate** | `4d88f878d0f3c0cb5db5ce44d7f10b18f70970f8` — the Step 2a change set. **The gate below was run at THIS sha**, so it is the number to quote. |
+> | branch tip | this commit and no other: the handoff block alone. **No source file differs from `4d88f878`** — re-measure with `git diff 4d88f878 HEAD --stat`, which must name this file only. |
+> | pushed | `origin/exec/step2a-catalogue-green` |
+> | tree | clean |
+> | PR base | `owner/workspace-edits` — NEVER `main`; the product lives on the owner's branch |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33, 0 cached**, 1m37s, **EXIT 0**. Interpreter **v22.22.2** (probed with `pnpm exec node -e`, not read off turbo's launcher path); case **6.128** (`apps/server/test/node-version.test.ts`) green INSIDE the run, which is what names the workers' Node. Per package: domain 486 · ui 315 · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped**. Zero `failed` lines in the log. |
+>
+> ## All six checks raw 0, quoted from this head
+>
+> `check:env` 0 · `check:tasks` **0** → `306 tasks across 24 plan files, 306 ledger rows` ·
+> `check:runbook` 0 · `check:citations` **0** → `2058 checked (✅) ids … 2058 cited, 0 uncited`,
+> ratchet exact on every file · `check:help` 0 · `check-case-ids` **0** → `2189 unique ids`.
+> Three of these were red at every head since the SDD sessions began writing plans.
+>
+> ## ⚠ THE ONE FINDING: the dispatch's Part 1 premise is FALSE for 13 of its 90 rows
+>
+> The dispatch said "90 rows, status `in-flight`". **77 are in-flight; 12 are NOT STARTED and 1 is
+> STRUCK.** `backlog-and-closed-second-wave`'s twelve tasks have no work on any branch: its declared
+> artefacts (`rankBetween`, `isRankKey`, `ticketRankedPayload`, `reopenedAt`, `system-actors`,
+> `autoCloseAfterDays`) return **zero source files** against a positive control that fires
+> (`ticket.closed` 11 files · `proj_tickets` 37 · `Backlog` 17), and cases 13.617–13.625 and
+> 13.630–13.648 are absent from the catalogue — which says so itself, at the hot-reload block:
+> that plan *"would otherwise mint twelve tasks on top of these rows"*. The ledger defines
+> `in-flight` as **"Committed on a branch that has not merged"** and `todo` as **"Not started"**, so
+> those twelve are `todo` with the measurement in the note. Writing `in-flight` would have made
+> Step 4's promotion sweep record **twelve completions that never happened** — the exact class of
+> false record this ledger exists to prevent. `board-prototype-port/1` is the thirteenth: STRUCK
+> 2026-09-16 by the plan's own text ("DO NOT IMPLEMENT THIS TASK"), so it is neither done nor in
+> flight; `todo` is the least-wrong of four statuses and its note says so.
+>
+> **A SECOND, SMALLER ONE the controller should rule on.** By the dispatch's rule "the FIRST
+> occurrence keeps its number", `13.387` still names the **SUPERSEDED** five-door description while
+> the live four-door behaviour now lives at **13.673** (the test was re-pointed by sentence). The
+> gate is green either way — `13.387` remains cited — but a reader looking up the canonical id gets
+> text that is no longer true of the product. One line in the catalogue fixes it (absorb `13.387`
+> into `13.673`); it is the controller's call, not the executor's, because the ordering was the
+> controller's ruling.
+>
+> ## Part 2 and Part 3, in one line each
+>
+> **18 of the 21 uncited ✅ cases were (b)** — the witness existed and only the citation was
+> missing; the §10 fifteen each name their test AND that test's title verbatim in their own text.
+> **3 were (c) and are flipped to ❌ with a dated reason**: `11.212`, `13.476`, `13.477`. The union
+> of every selector any test reads out of `ui.css` is enumerated in the PR: none of `.gn-segmented`,
+> `.gn-list__table*` or `.gn-timeline__title` is in it. **Part 3**: the 13.387×3 and 13.413×2
+> duplicates are REVISION CHAINS; re-minted to `13.672` / `13.673` / `13.674`, each with the witness
+> it never had, re-pointed by SENTENCE rather than by id.
+>
+> ## Prototype refresh — `mobile.dc.html` is no longer HELD
+>
+> `unpack-bundle.mjs` gains **`--mobile-entry <N>`**. The bundle names TWO entries under one id, so
+> the tool still holds with no flag (control run: both printed, neither written) and writes only
+> what the caller NAMES. **Entry #1 is written** (227,232 B, sha256 `7316062b5bb3…`) — it inlines
+> the Google mark as `<svg>`, the same change the 2026-09-18 desktop template made to its own
+> `isSignIn`. Entry #2 (`14ca5b8d89ab…`) is not written; the two differ only at line 153, and which
+> export is NEWER remains underivable (`page_order` is empty, no timestamps) — the choice is
+> recorded as a choice, in `PROVENANCE.md` and in case 13.658. Guards witnessed: no flag → nothing
+> written; `--mobile-entry 3` → exit 1.
+>
+> ## Standing rules unchanged
+>
+> Never compose without the primary checkout's `--env-file`; never `AskUserQuestion`; never pipe a
+> test run into `head`; every PR in this mission targets `owner/workspace-edits`, never `main`;
+> shas in NARRATIVE prose anywhere in this repo are facts about the moment they were written, and
+> the anchors TABLE above is the only thing here checked for reachability.
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~02:4x IST. **STEP 2 — PART 0 IS DONE AND PUSHED; PART 1
+> # (THE LIST TAB, TO THE PROTOTYPE) IS IN FLIGHT, WITH ONE RULING REQUESTED.** *(Merged as #419.)*
+>
+> ## Live anchors — measured at this block, `git branch --contains` clean
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2-list-controls` |
+> | HEAD | `6549a4149c9cddd9f35e50b2d6cbc6e6fd84d91d` — `Step 2 Part 0: the package watchers watch a directory, not an inode` |
+> | pushed | yes — `origin/exec/step2-list-controls` is the same sha |
+> | merge-base with `origin/owner/workspace-edits` | `b6d76a90dcf071baae289df560dd3c31bbdf39ca` (the #417 merge commit) |
+> | ahead / behind that base | **1 / 0** |
+> | tree | clean at last check; the Part 1 implementer is editing `ticket-list.tsx` and its tests now, so a dirty tree is expected — re-measure, do not trust this row |
+> | gate composition | UNCHANGED from #417; no gate has been run on this branch yet |
+>
+> `origin/owner/workspace-edits` was `b6d76a90` when this was written — a real merge commit with
+> parents `f3d36f93` and `e57e7d5d`, *not* a squash. **A trap worth naming:** this machine's Bash hook
+> routes `git log` through `rtk`, and that rewritten `git log` **omits merge commits**, so
+> `git log -1 origin/owner/workspace-edits` printed `e57e7d5d` while `git rev-parse` printed `b6d76a90`.
+> Both are true of different objects. Use plumbing (`rev-parse`, `--is-ancestor`) for refs.
+>
+> ## What Part 0 was, and what it found
+>
+> Both hot containers run their own `tsc -p tsconfig.json --watch` per package, and `tsc`'s default
+> strategy (`UseFsEvents`) watches the FILE — so those loops carried the same inode blindness #417
+> recorded for `tsx watch`, which is case 13.656's 80-second stale revert. Both services now set
+> `TSC_WATCHFILE=UseFsEventsOnParentDirectory`. Witnessed in both containers in one run, no restart
+> between the halves: rename-over **~1 s**, in-place append **~1 s** (host inode verified unchanged),
+> revert back to zero in both `dist` copies. Settled CPU 3.99–6.69 % (server) / 1.55–1.69 % (web).
+> The three pre-existing reds (`check:tasks`, `check:citations`, `check-case-ids`) are **byte-identical**
+> to a pristine extraction of the base in a separate worktree; `check:env`, `check:runbook`,
+> `check:help` exit 0.
+>
+> **Two instruments of mine lied before those numbers were trusted, and both are recorded in the
+> compose comment and in 13.652 — because each produced a confident "the watcher is blind" verdict.**
+> A marker the emitter does not carry never appears in `dist` (a comment before an elided
+> `export type`, and a bare `//` appended at EOF, while a STATEMENT at that same position is emitted);
+> and a poll timed from the operator's own tool call measures the operator, not the watcher. **The
+> first of those had already been written into the compose file as a conclusion that the directory
+> door failed its in-place half, and had to be retracted.** A check that cannot pass is not evidence.
+>
+> ## RULING — Step 2's column set: ANSWERED 2026-09-18. **Build the five; file the rest.**
+>
+> Raised as `gisik-nokma-lanes/EXEC-2026-09-18-step2-column-gap.md`; the controller ruled it the same
+> hour. **The controller's ruling confirmed the hold on all three, and supplied a fourth fact for
+> `Ticket` that the executor did not have:** ticket ids are ULIDs and the tree carries **no**
+> human-readable key (`ticketKey`/`ticketNumber`/`shortId`/`displayId` → zero matches; re-verified here
+> with a positive control, along with `seedUlid('ticket', …)` → 14 live sites and `mappers.ts:1684`
+> reading `ticketId` as a string). So the prototype's short `t.id` has no product counterpart at all.
+>
+> 1. Five columns, five Group-by keys, exactly as built. `flat` keeps its shipped label (the copy
+>    rule). **The tray shows FIVE chips: no inert chip, no invented field.**
+> 2. The gap is filed in three places in the same commit — this block, the `Features.md` List bullet,
+>    and the chip-tray catalogue case (which states the count is five and why).
+> 3. **Not executor work, listed for the owner:** the `workflow` column + grouping axis is a `ListRow`
+>    widening plus a workflow-name lookup (a candidate next step); `Priority` and a human ticket key
+>    are PRODUCT decisions, i.e. a brainstorm.
+>
+> ## Known gaps — the prototype is a design, not a spec of what exists
+>
+> **The List tab ships five columns and five Group-by keys where `design-system/interactive/desktop.dc.html`
+> draws eight and six.** Workflow, Priority and Ticket are NOT rendered and NOT built; the `workflow`
+> grouping axis is absent with them. Reasons, each measured rather than assumed: **Workflow** —
+> `ListRow` drops `workflowId` and nothing resolves a workflow name for a row; **Priority** — no such
+> field anywhere in `domain`/`app-core`/`server`; **Ticket** — the id is a ULID and there is no human
+> key. **A restart should NOT re-ask this and should NOT build the three**; the ruling above is the
+> answer, and the gap is recorded in `Features.md`'s List bullet and in the catalogue so it cannot
+> quietly disappear.
+>
+> ## Prototype delta 2026-09-18 — every screen block, for the port queue
+>
+> The refresh replaced `interactive/desktop.dc.html` (3,773 → 4,050 lines) and supplied the missing
+> `support.js`, so the prototype is now RUNNABLE for the first time. **One mechanical rewrite touches
+> every block**, and it is not a design change: the new bundler's runtime spells raw HTML elements
+> `<sc-raw-*>` and events `sc-camel-on-*` (so `<select>`→`<sc-raw-select>`, `onClick`→`sc-camel-on-click`,
+> `colSpan`→`sc-camel-col-span`), and adds a `style-hover="{{ … }}"` binding. The table below is the
+> verdict AFTER normalising those away; "same" means nothing else differs.
+>
+> | screen | old | new | Δ | verdict |
+> |---|---|---|---|---|
+> | isMobileDevice | 17 | 17 | 0 | same |
+> | isSignIn | 60 | 60 | 0 | CHANGED — Google mark inlined as `<svg>` (was `<img src="./apps/web/public/google-mark.svg">`); `&rsquo;` → literal |
+> | isWorkspaces | 57 | 57 | 0 | CHANGED |
+> | isWorkspace | 81 | 81 | 0 | CHANGED |
+> | isWork | 40 | 40 | 0 | CHANGED |
+> | isBoardView | 47 | 47 | 0 | CHANGED |
+> | **isListView** | 76 | 76 | 0 | **same** — the List spec did NOT change; only line numbers moved |
+> | isCalendarView | 29 | 29 | 0 | CHANGED |
+> | isTimelineView | 44 | 44 | 0 | CHANGED |
+> | isMyWork | 53 | 53 | 0 | same |
+> | isInbox | 44 | 44 | 0 | CHANGED |
+> | isMembers | 138 | 71 | −67 | CHANGED — SPLIT (see below) |
+> | **isInviteAdmin** | — | 78 | new | **ADDED — a screen the old file did not have** |
+> | isSettingsShell | 17 | 17 | 0 | CHANGED |
+> | isTypes | 24 | 24 | 0 | CHANGED |
+> | isWorkflows | 30 | 30 | 0 | same |
+> | isTypeEditor | 88 | 88 | 0 | CHANGED |
+> | isMcpTokens | 54 | 54 | 0 | CHANGED |
+> | isBuilder | 473 | 473 | 0 | CHANGED |
+> | isAccount | 130 | 152 | +22 | CHANGED |
+> | isHelp | 54 | 82 | +28 | CHANGED |
+> | isLegal | 37 | 37 | 0 | same |
+> | isInvite | 40 | 40 | 0 | CHANGED |
+> | isMcpAuth | 47 | 47 | 0 | CHANGED |
+> | isNotFound | 35 | 35 | 0 | CHANGED |
+>
+> **The one structural change is `isMembers` splitting into `isMembers` + `isInviteAdmin`** (138 = 71 +
+> 78 − 11): the 2026-09-18 export draws the invite-admin surface as its own screen. `isAccount` (+22)
+> and `isHelp` (+28) genuinely grew. Everything else is the same size.
+>
+> **Caveat, stated because it bounds the table:** the verdicts come from one normaliser that strips the
+> three rewrites above; a residual "CHANGED" on a size-identical block could be a fourth mechanical
+> rewrite I did not map rather than a design change. `isSignIn`'s residual was read line by line and does
+> contain a real change, so the verdict is not vacuous — but the table is a **porting seed, not a
+> changelog**, and each screen still needs its own read before it is ported. Line numbers are the NEW
+> file's; the offset from the old file is **not constant** (176→180, 477→481, 1827→1905, 2584→2779), so
+> every existing `desktop.dc.html:<line>` citation must be re-measured, never shifted by a delta.
+>
+> ## Part 1 status — gate GREEN, review done, fixes landed, second gate in flight
+>
+> The reviewer returned **no Critical and three Important**, all now fixed and re-verified:
+>
+> 1. **A false coverage claim, hiding a rule no suite could fail on.** The test docblock and the
+>    catalogue both asserted the visual metrics were "held by `packages/ui/test/components.test.tsx`
+>    (declaration-level) and `apps/web/e2e-viewport/` (computed style)". **Neither names a single
+>    `.gn-list__*` selector** — measured with a working control (`.gn-board-card` appears 14× in
+>    `packages/ui/test`, `.gn-list` 0×; `e2e-viewport` never opens the List tab). So
+>    `.gn-list__columns-tray[hidden] { display: none }` could be deleted with every suite green while
+>    the tray stays permanently open in a browser — the exact hazard the rule's own comment names.
+>    Claim retracted in both places, and **case 13.671** (new file `ticket-list-css-binding.test.tsx`)
+>    now holds it with five paired arms and four mutation witnesses.
+> 2. **An unconstrained assertion and a fabricated citation.** 13.662's "counts its own rows" survived
+>    `section.rows.length` → `nodes.length`, and its comment cited a prototype expression that does not
+>    exist (`const n = g.items.length` is the real one, `desktop.dc.html:2920`). Fixed with a collapsed
+>    arm that reddens on exactly that mutation, and the **divergence is now declared** rather than
+>    asserted away: this model counts the epic row, the prototype draws it as the header, so the same
+>    two rendered rows read `1 ticket` there and `2 tickets` here.
+> 3. **The five chips had lost their visible focus ring** — the real checkbox went to `opacity: 0` and
+>    nothing in `ui.css` targeted its focus, against 43 `:focus-visible` rules elsewhere. Rule added at
+>    `ui.css:870`, mutation-witnessed.
+>
+> **An instrument trap worth carrying:** `grep -n "…" file | wc -l` returned **1** where the true count
+> was **0**, because this machine's Bash hook proxies `grep` and `wc` counted the proxy's own summary
+> header. A COUNT taken through the proxy is not a count of matches. It nearly made a true review
+> finding look false.
+>
+> `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 tasks, exit 0**, 1m35s.
+> Per package: domain 486, ui 315, rule-engine 306, editor 178, sync-client 90, **app-core 1442**, desktop
+> 9, mobile 29, web 430, mcp-server 44, **server 1534 passed / 5 skipped**. **The `--concurrency=2` is not
+> decoration: the SAME tree at turbo's default concurrency went RED** on `test/seed/seed-dev.test.ts >
+> lands, and a re-run is a no-op` with a bare `Test timed out in 30000ms` — and that test passes in
+> isolation in **1.8 s**. A load-induced timeout, proven by the isolated run, not assumed.
+> **The Node is proven from inside the run, not from the launcher:** turbo's failure line named
+> `node/v24.11.1/bin/pnpm`, which is the LAUNCHER's path and not the interpreter's (the trap the
+> coordination doc records). What settles it is case **6.128**, which asserts the worker Node satisfies
+> the root `package.json`'s `engines` range (`>=22.0.0 <23`) from inside a vitest worker — it is in
+> `server`'s 150 green files, so the workers ran under Node 22.
+>
+> Case-id block **13.658–13.670** is now the live range: **13.658 is the refresh witness** (the dispatch
+> reserves one of the block for it) and the List work takes **13.659–13.670**. The original allocation
+> 13.658–13.669 was re-measured free at this tip (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`);
+> **13.670–13.679 was then measured free too** (14 hits for `13.66[0-9]` as the live positive control,
+> zero for `13.67[0-9]`), because the List implementer had already claimed all twelve ids.
+>
+> ## ⛔ AND THE THING THAT WILL COST A RESTART IF IT IS MISSED
+>
+> **Never run any compose command without the primary checkout's env file:**
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml -f docker-compose.hot.yml <up|build|…>`.
+> This worktree has no `.env`, so the flag omitted substitutes `${GOOGLE_CLIENT_ID:-}` as EMPTY and
+> brings the server up with Google sign-in OFF while everything still looks healthy. After ANY compose
+> action touching `server`, `curl -s localhost:3000/v1/auth/methods` must still answer `"google":true`.
+> **Both hot containers are UP from this worktree right now and the owner is watching :3001.**
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
+> # SERVER'S WATCHER NOW POLLS. Branch PUSHED (`origin/exec/step1b-web-hot-reload`); the PR against base
+> # `owner/workspace-edits` opens immediately after this commit — it did NOT exist when this block was
+> # first written, and a restart surface that names an event which has not happened sends its reader to
+> # `gh pr list --state open` expecting to find it.**
+>
+> ## Branch and the invariant that replaces a tip sha
+>
+> `exec/step1b-web-hot-reload`, cut with `git checkout --no-track -b exec/step1b-web-hot-reload
+> origin/owner/workspace-edits` at **`f3d36f93`** (`--no-track` because a branch cut from that ref inherits
+> it as its upstream, and a bare `git push` would then push to the OWNER's branch). `git branch --contains`
+> at the time of writing includes this branch; **re-verify, and if it is empty the sha is orphaned** —
+> `git cat-file` passes on reflog-only commits and lies.
+>
+> **The tip sha is deliberately not named**, for the reason the older blocks give: writing it here creates a
+> commit, so the number is stale the instant it saves. The invariant instead — **every commit on this branch
+> belongs to the Step 1b change set**: `docker-compose.hot.yml` (header, the server's watcher + polling
+> environment, the new `web` service), the `dev` stage in `apps/web/Dockerfile`, the root `dev:stack` script,
+> `docs/runbook.md`, `Features.md`, `test-cases/13-deployment-dogfooding.md`, this file.
+>
+> ## What Step 1b is
+>
+> Step 1 made the `server` hot. Step 1b does the same for the `web` and retires the owner's own `next dev` on
+> :3001 — the browser's origin is now the checkout. `docker-compose.dev.yml` stays byte-unchanged
+> (sha256 `4af45990c8cd57052562fb794f64c5bbc84ce3b930ab592a2a5d68f0b4bf4a38` on both sides of the diff), and
+> the web image's `runtime` stage is byte-identical (its extracted sha is `c66cc6f9f59f…` both sides) — the
+> new `dev` stage sits BEFORE it for the reason Step 1 recorded.
+>
+> ## THE FINDING THAT CHANGED THIS STEP'S SHAPE
+>
+> **The assistant's own Edit tool writes by RENAME-OVER, not in place** — the host inode changes on every edit
+> (measured three times: `apps/web/app/sign-in/page.tsx` `204060486 → 204060616 → 204060679`,
+> `apps/server/src/index.ts` `204014631 → 204061084`). And `tsx watch` does not merely MISS that shape: **it
+> permanently loses its watch on the file.** After one such write to `src/index.ts`, neither a true in-place
+> write (inode preserved) nor a `touch` produced a `[tsx]` line in 15–20 s, while the same in-place write on a
+> freshly restarted container produced one in **0.5 s**. In between, the API served stale code with `/healthz`
+> 200 and the correct file on the mount — the 2026-09-09 incident's shape, reachable with no rebuild.
+>
+> That went to the controller as `gisik-nokma-lanes/EXEC-2026-09-18-step1b-finding-edit-tool-vs-tsx.md`;
+> **AMENDMENT 2 ruled it fixed in this PR, door (e) first.** Door (e) — `node --watch --import tsx src/index.ts`
+> — **was measured and is CLOSED**: it restarted on none of a host rename-over, a host in-place write, or a
+> write made INSIDE the container, and the last of those crosses no mount at all, so it is the watcher not
+> seeing its own entry point rather than virtiofs losing events. Door (a) ships instead:
+> **`CHOKIDAR_USEPOLLING=true` + `CHOKIDAR_INTERVAL=1000`** on the `server` service. Witnessed in one
+> container, not restarted between the halves: rename-over restarts it in **1.6 s** with its marker served;
+> a true in-place write after that restarts it again in **1.6 s** (the watch survived the rename); a
+> `packages/domain/src` edit reached `dist` and restarted it **2.6 s** end to end. Cost, settled, in the same
+> session with the variable overridden back to empty: CPU **6.05–6.47 %** on versus **2.39–3.73 %** off,
+> memory ~1.24 vs ~1.22 GiB.
+>
+> **The web half does not share that failure.** Next's webpack watcher saw both shapes (in-place 1.2/1.5/1.5 s,
+> rename-over 1.6 s); one outlier took **59.4 s**, which is why the recorded instrument is the compile line in
+> `docker logs --since …` and not a curl stopwatch — the Edit tool's round-trip alone delays a curl poll by
+> ~17 s. **The package watchers (`tsc --watch`) DO share it**: an in-place revert of a token in
+> `packages/ui/src` never compiled (80 s stale, `dist` and the served page both wrong), and a `touch` did not
+> wake it either — only `restart web` did.
+>
+> ## Case ids — the controller's AMENDMENT 1, applied
+>
+> The dispatch allocated 13.617–13.620; recounting found the **second-wave plan**
+> (`docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`, on the branch since `5039209c`,
+> BEFORE Step 1) reserves **13.613–13.649** and names 13.617–13.620 in its own text. Ruling: the plan wins.
+> **Step 1's four cases were re-minted 13.613→13.650 … 13.616→13.653** everywhere on this branch
+> (`test-cases/13`, `Features.md`, the runbook, this file), **and Step 1b's block is 13.654–13.657**.
+> `13.65x` was re-measured unused at this tip, catalogue AND plans. The allocation note at the top of
+> `test-cases/13` now carries the rule, including why that command's `{3}` width is load-bearing.
+>
+> ## Open items
+>
+> - **No ruling is outstanding.** Amendment 2 is implemented and witnessed; nothing is waiting on the owner.
+> - **For the reviewer, deliberately not fixed:** the `web` container serves `/sign-in` etc. from :3001 while
+>   `SERVER_ORIGIN` points at `server:3000` — unchanged from the prod-shape split, recorded rather than
+>   altered.
+> - **Both hot containers are UP from this worktree** at the end of the step, which the dispatch requires.
+>
+> ## The checks, at this head
+>
+> Six checks: `check:env`, `check:runbook`, `check:help` **exit 0**. `check:tasks` (90 plan tasks with no
+> ledger row), `check:citations` (21 uncited ids) and `check:case-ids` (13.387 ×3, 13.413 ×2) are RED — and
+> **identical in both halves to a pristine extraction of `origin/owner/workspace-edits`**: the uncited id sets
+> diff clean, the plan-task count is 90 on both, the duplicate id sets are the same two ids. Proven, not
+> assumed; the base was extracted to a temporary worktree and the three checks run there.
+
+> # ▣ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~00:5x IST. **STEP 1 OF THE 2026-09-18 MISSION: THE
+> # COMPOSE `server` RUNS THE BRANCH'S SOURCE WITH HOT RELOAD. ONE PR IN FLIGHT, base
+> # `owner/workspace-edits`.** *(Merged as PR #415; keep for the reasoning, not for the position.)*
+>
+> ## Branch — a NEW one, cut from the OWNER's branch, not from `main`
+>
+> `exec/step1-server-hot-reload`, cut with `git checkout -b exec/step1-server-hot-reload
+> origin/owner/workspace-edits` at **`5039209c`**. Verified at handoff:
+> `git rev-parse origin/owner/workspace-edits` → `5039209ccde5412ea083aa1b5fbf49a2b8872490`, and
+> `git rev-list --left-right --count origin/main...origin/owner/workspace-edits` → **`5 277`** — the
+> left figure was `4` when this block was first written and is a **reading of a remote-tracking ref**,
+> which moved under it (`origin/main` gained the controller's mission anchor `c8602573`); re-measure
+> rather than trusting either number. The load-bearing figure is the right one, `277`.
+> **Every PR in this mission targets base `owner/workspace-edits`, NEVER `main`** — the product lives
+> on the owner's branch, which is 277 commits ahead of `main`; a PR opened against `main` by reflex
+> carries all 277 and is closed unmerged. `exec/task12-passkeys` still exists and is untouched; Step 3
+> of the mission deletes it (its work was redone under `account-help-screens` Task 8).
+>
+> **The tip sha is deliberately NOT named**, for the reason the older blocks give: writing it here
+> creates a commit, so the number is stale the instant it saves. The invariant instead — **every
+> commit on this branch belongs to the Step 1 change set**: `docker-compose.hot.yml` (new),
+> the `dev` stage in `apps/server/Dockerfile`, the root `dev:stack` script, `docs/runbook.md`,
+> `Features.md`, `test-cases/13-deployment-dogfooding.md`.
+>
+> ## What Step 1 is, and the two things that would have failed silently
+>
+> The owner's Backlog tab read `list.groups[0].cards[0].closed: expected an object` because the
+> running `server` image was built **2026-09-09T12:32Z** and the first `closed` fold reached
+> `apps/server/src/read/ticket-cards.ts` on **2026-09-17T11:25** — eight days later. The wire card had
+> no `closed` key; `mapClosed` refused an absent key, correctly. The owner asked for hot reload rather
+> than a one-off rebuild, so the deliverable is a mode, not a fix. `docker-compose.dev.yml` is
+> byte-unchanged; hot mode is an OVERRIDE composed on top of it.
+>
+> 1. **The `dev` Dockerfile stage sits BEFORE `runtime`.** Docker builds the LAST stage when no target
+>    is named and neither compose file names one, so appending it would have silently made it the
+>    production image.
+> 2. **The container command is `sh -c` explicitly.** Compose v2 does NOT run a string-form `command`
+>    through a shell — it shell-word-splits it. Measured before the build: the first version rendered
+>    `set`, `-e`, `echo`, … as nine separate argv entries and would have died exec'ing `set`.
+>
+> ## Witnesses — measured, not carried (all four are cases 13.650–13.653, RE-MINTED from 13.613–13.616;
+> ## the block's note in `test-cases/13` carries why, and the ids below this line were written before it)
+>
+> - **W1** cold build **94 s**; healthy **~24 s**; `{"google":true,"apple":false,"phone":false}`;
+>   source read through the MOUNT gives `closed_at` **4** against the same-file control
+>   `collaborator_ids` **3** — where the stale image measured **0** with control 2 (a valid
+>   measurement). Cost at two moments: **1.602 GiB / 7.667 GiB, 2.30 % CPU** just after `up` (the
+>   watchers still emitting their first `dist`) and **1.194 GiB, 2.24 % CPU** settled — the second is
+>   the steady state. The override declares ten mounts; the container reports eleven, the extra one
+>   being the base file's own `./reference` mount surviving the merge. All eleven resolve under this
+>   worktree.
+> - **W2** server-source round-trip **1.62 s** — **with a measured negative half that matters more
+>   than the positive one**: a RENAME-OVER save (`mv`, the atomic-save shape) delivers **no inotify
+>   event into the container at all** and is missed SILENTLY. A timestamped `fs.watch` on the same
+>   file saw one event at 3887 ms for an in-place write and zero for the rename-over. **Polling was
+>   NOT enabled**: the dispatch's condition is that events provably do not cross the Docker Desktop
+>   mount, and they do — partially. Recording the limitation is the honest move; enabling
+>   `CHOKIDAR_USEPOLLING` would have hidden which shape was broken.
+> - **W3** package round-trip through `dist` **3.92 s**, with both restarts in the log
+>   (`change in ./src/index.ts` and `change in ./../../packages/domain/dist/index.js`) and
+>   `HOT_WITNESS` counted **1** in the container's `packages/domain/dist/index.js`. This is the
+>   witness for the WATCHER SHAPE.
+> - **W4/W5** a no-`--build` `up` reuses the same container id `df98f7588bf5…` with zero build
+>   activity; the un-hot path is intact — `config --services` still lists all six including `server`
+>   and `web`, and `git diff origin/owner/workspace-edits -- docker-compose.dev.yml apps/web/` is empty.
+>
+> ## THREE THINGS A RESUMED SESSION MUST KNOW
+>
+> - **The Docker VM's disk hit 100 % and killed the prod-image build with `ENOSPC`** — the disk, not
+>   the code, and the failing step is in the PRE-EXISTING `build` stage that this change does not
+>   touch. `docker builder prune -f` freed **10.38 GB** of zero-active build cache; images and volumes
+>   were deliberately left alone because they hold other lanes' work. To re-measure:
+>   `docker run --rm --entrypoint sh gisik-nokma-dev-server:latest -c 'df -h /'` — the HOST's free
+>   space says nothing about the VM's, which is the one that fills.
+> - **`.env` was copied into this worktree** (mode 600), per Amendment 2. Verified safe BEFORE the
+>   copy, not assumed: `git check-ignore -v .env` → `.gitignore:11`, and `git status` does not see it.
+>   It is a file read of the owner's tree — never a git command run there.
+> - **The `dev` stage's manifest `COPY` block is hand-listed.** A new workspace package needs a line
+>   added there. Not because the install would miss an importer — `COPY . .` precedes it — but because
+>   `pnpm fetch` is the step that list keys, and a package absent from it surfaces as an offline-store
+>   miss. Named here because it is a silent-until-it-isn't coupling, not because it is likely.
+> - **The hot container runs `NODE_ENV=development`, and the suites build the production stage.**
+>   `apps/server/src/auth/auth.ts` documents two security defaults (better-auth's `rateLimit.enabled`,
+>   the CSRF/origin check) whose values key off `NODE_ENV` and had to be pinned explicitly for exactly
+>   that reason. They ARE pinned, so nothing differs today — but the next `NODE_ENV`-sensitive default
+>   will resolve two ways, and the divergent one is in the stack no suite tests.
+>
+> ## Live state at handoff
+>
+> The hot `server` container is **UP from THIS worktree** (`gisik-nokma-dev-server-1`, compose project
+> `gisik-nokma-dev`), so the owner's Backlog tab works **while that container lives**. The mounts point
+> at `gisik-nokma-exec` and **stay that way** — Amendment 1, owner verbatim: *"the image needs to be
+> made from where the code is being written."* Port **3001 was never touched** and `web` was never
+> brought up: the owner's `next dev` still holds it.
+>
+> **Hot mode is a property of the CONTAINER, not of the checkout — do not over-read the sentence
+> above.** Same compose project and service name as the plain stack, so anything that recomputes the
+> config replaces this container: `docker-compose.dev.yml:2` documents the ordinary bring-up as
+> `docker compose -f docker-compose.dev.yml up -d --build`, which names no `target`, resolves to the
+> production image, and reverts this whole change. That is also why the W4 witness is deliberately the
+> `up` WITHOUT `--build` — the path on which the container survives. Anyone who wants the branch live
+> must go through `pnpm dev:stack` (or the equivalent two-file `-f` command).
+>
+> **One dispatch instruction could not be carried out as written:** it asked for the Task 12 pause
+> block to stay below this one with a one-line superseded note at its top. That block is **not in this
+> branch's copy of this file** — it lives on `exec/task12-passkeys` (confirmed: one match there, zero
+> here). Nothing was fabricated to satisfy it; this note is the substitution.
+>
+> ---
+>
+> # ▣ SUPERSEDED — WEDNESDAY 2026-09-09 ~18:0x IST. **ROUND 19b — WORK COMPLETE, RE-FROZEN AFTER REVIEW FIX.**
 >
 > **Branch `exec/19b-workspace-feedback`, HEAD `5628edda`, five commits, cut from `origin/main` at
 > `b47f0253`** (`git checkout -b exec/19b-workspace-feedback origin/main`, NOT from

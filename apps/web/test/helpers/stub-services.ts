@@ -1,6 +1,7 @@
 import type {
   DataSource,
   DataSourceQuery,
+  NotificationPreferencesGateway,
   NotificationsGateway,
   UserPreferences,
   WorkflowAuthoringGateway,
@@ -82,6 +83,15 @@ export type GatewayStubs = {
    * badge stay dark for a stated reason rather than reading 0 and passing.
    */
   notifications?: Partial<NotificationsGateway>;
+  /**
+   * Task 6 (account/help-screens plan). Same rule as every gateway above: an
+   * un-stubbed member rejects BY NAME rather than answering the all-on
+   * default `{ mutedKinds: [] }` a real "nothing saved yet" read gives — that
+   * default is a claim about the world (`EMPTY_NOTIFICATION_PREFERENCES`'s
+   * own meaning in `packages/domain/src/notification-preferences.ts`), and
+   * this helper's whole point is that no case gets it for free.
+   */
+  notificationPreferences?: Partial<NotificationPreferencesGateway>;
   ticketLocation?: Partial<TicketLocator>;
 };
 
@@ -175,6 +185,11 @@ export function stubServices(
       unreadCount: unstubbedGateway('notifications.unreadCount'),
       markRead: unstubbedGateway('notifications.markRead'),
       ...gateways.notifications,
+    },
+    notificationPreferences: {
+      load: unstubbedGateway('notificationPreferences.load'),
+      save: unstubbedGateway('notificationPreferences.save'),
+      ...gateways.notificationPreferences,
     },
     ticketLocation: {
       locate: unstubbedGateway('ticketLocation.locate'),

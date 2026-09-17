@@ -117,7 +117,11 @@ describe('3.77 · T13.1 reopenStateOptions — structurally reachable, non-termi
       ...WF_ERRAND,
       transitions: [{ from: '*', to: 'doing', rules: [] }, { from: 'doing', to: 'todo', rules: [] }],
     };
-    expect(reopenStateOptions(selfWildcard, 'doing').map((state) => state.id)).toEqual(['todo']);
+    // `'backlog'` joined the list since 2026-09-17 (backlog/closed spec §4):
+    // `'doing'` stays non-terminal on `WF_ERRAND.states`, so the universal
+    // Send-to-backlog edge is a genuine, non-terminal reopen destination —
+    // the self-loop exclusion this case is actually about is unaffected.
+    expect(reopenStateOptions(selfWildcard, 'doing').map((state) => state.id)).toEqual(['todo', 'backlog']);
   });
 
   it('T13.1f keeps a rule-bearing target on the list — the server, not this client, refuses it', () => {
@@ -222,6 +226,10 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
     toStateId: 'doing',
     childTicketId,
     childEvent,
+    // Every case in THIS describe block predates the closed flag (ruling 37)
+    // and exercises a merely terminal parent — `false` keeps the batch the
+    // one-element array it always was, so T13.3a-g stay green unchanged.
+    parentClosed: false,
   };
 
   it('T13.3a ingests the parent transition (with cause, wire spelling) before the child, then commits both', async () => {
@@ -285,6 +293,9 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
     expect(outcome).toEqual({
       kind: 'parent-refused',
       refusal: { rule: REFUSAL_RULES.restrictTo, reason: 'Only Anselma Marak may move this out of Done.' },
+      // Ruling 39: `plan` here is `parentClosed: false` — no reopen in the
+      // batch at all — so there is nothing for `parentReopened` to report.
+      parentReopened: false,
     });
     expect(source.ingested).toHaveLength(1); // the child claim was never submitted
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');
@@ -335,6 +346,122 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
     }
     // Two claims went out and NO third: nothing compensates the reopen away.
     expect(source.ingested).toHaveLength(2);
+  });
+});
+
+/**
+ * 13.593 · T13.5 — reopenAndProceed on a CLOSED parent (ruling 37).
+ *
+ * `guarded-child-event.ts`'s own docblock argues WHY the parent's remedy is
+ * one batch rather than two round trips; this describe block is what proves
+ * it does what the docblock claims. `closedPlan` is the T13.3 `plan` above
+ * with `parentClosed: true` — a fresh `childEvent`/`childTicketId` rather than
+ * a shared reference, so a case here can never be mistaken for reusing state
+ * a T13.3 case already consumed.
+ */
+describe('13.593 · T13.5 reopenAndProceed on a CLOSED parent — reopened before transitioned, one batch', () => {
+  const closedChildEvent = submittedTicketCreated();
+  const closedChildTicketId = closedChildEvent.entity.id;
+  const closedPlan = {
+    parent: { ticketId: PARENT, workspaceId: WS },
+    toStateId: 'doing',
+    childTicketId: closedChildTicketId,
+    childEvent: closedChildEvent,
+    parentClosed: true,
+  };
+
+  it('13.593a the FIRST ingest call carries exactly [ticket.reopened, ticket.transitioned] in that order, both on the parent — the child rides only the SECOND call, and a committed outcome carries the TRANSITION\'s own result', async () => {
+    const source = createFakeDataSource();
+    const outcome = await reopenAndProceed(source, closedPlan, make);
+    expect(outcome.kind).toBe('committed');
+    expect(source.ingested).toHaveLength(2); // one parent batch, one child batch
+    const [parentBatch, childBatch] = source.ingested;
+    expect(parentBatch).toHaveLength(2);
+    expect(parentBatch?.[0]?.type).toBe('ticket.reopened');
+    expect(parentBatch?.[0]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    // ticketReopenedPayload = z.object({}).strict() — no cause, no target state.
+    expect(parentBatch?.[0]?.payload).toEqual({});
+    expect(parentBatch?.[1]?.type).toBe('ticket.transitioned');
+    expect(parentBatch?.[1]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(parentBatch?.[1]?.payload).toEqual({
+      to: 'doing',
+      cause: { kind: 'reopened-for-child', childTicketId: closedChildTicketId },
+    });
+    expect(childBatch).toHaveLength(1);
+    expect(childBatch?.[0]).toBe(closedChildEvent); // the SAME claim, retried after the remedy
+    // `parentResult` names the TRANSITION (batch index 1), never the reopen
+    // (index 0) — the fake's default script assigns a distinct, increasing
+    // `seq` per event across every call, so the two are distinguishable.
+    if (outcome.kind === 'committed') {
+      expect(outcome.parentResult.eventId).toBe(parentBatch?.[1]?.id);
+      expect(outcome.parentResult.eventId).not.toBe(parentBatch?.[0]?.id);
+    }
+  });
+
+  it('13.593b a refused ticket.reopened — the FIRST result in the batch — yields parent-refused, and the child is never sent', async () => {
+    const source = createFakeDataSource({}, (events) =>
+      events.map((event, index) =>
+        index === 0
+          ? refusedWith(event.id, 'not-closed', 'This ticket is not closed.')
+          : committed(event.id),
+      ),
+    );
+    const outcome = await reopenAndProceed(source, closedPlan, make);
+    expect(outcome).toEqual({
+      kind: 'parent-refused',
+      refusal: { rule: 'not-closed', reason: 'This ticket is not closed.' },
+      // Ruling 39 · 13.593c: the refused event IS the reopen itself (index
+      // 0) — nothing committed before it, so there is nothing to preserve.
+      parentReopened: false,
+    });
+    // ONE batch went out, carrying both parent events together, and no third
+    // (child) claim — the whole point of surfacing the refusal here.
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]).toHaveLength(2);
+  });
+
+  it('13.593c a refused ticket.transitioned — the SECOND result, reopen itself committed — also yields parent-refused, and the child is still never sent', async () => {
+    const source = createFakeDataSource({}, (events) =>
+      events.map((event, index) =>
+        index === 1
+          ? refusedWith(event.id, REFUSAL_RULES.restrictTo, 'Only Anselma Marak may move this out of Done.')
+          : committed(event.id),
+      ),
+    );
+    const outcome = await reopenAndProceed(source, closedPlan, make);
+    expect(outcome).toEqual({
+      kind: 'parent-refused',
+      refusal: {
+        rule: REFUSAL_RULES.restrictTo,
+        reason: 'Only Anselma Marak may move this out of Done.',
+      },
+      // Ruling 39: the reopen (index 0) COMMITTED before the transition
+      // (index 1) was refused — the parent is permanently no longer closed,
+      // and a caller retrying with a different target MUST know that so it
+      // does not resend `ticket.reopened` into a `not-closed` refusal that
+      // would mask this same transition rule on the next attempt.
+      parentReopened: true,
+    });
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]).toHaveLength(2);
+  });
+
+  it('13.593d a batch answered with FEWER results than events sent is UNKNOWN — the error names the TRANSITION, the one actually left unanswered', async () => {
+    // The reopen (batch index 0) gets an answer; the transition (index 1)
+    // does not — `results.length === 1 < batch.length === 2`. Naming the
+    // WRONG event here (the reopen, which DID answer) would pass just as
+    // easily against a version that always blames `batch[0]`.
+    const source = createFakeDataSource({}, (events) => [committed(events[0]?.id ?? '')]);
+    let caught: unknown;
+    try {
+      await reopenAndProceed(source, closedPlan, make);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(UnansweredClaimError);
+    expect((caught as InstanceType<typeof UnansweredClaimError>).sent.type).toBe(
+      'ticket.transitioned',
+    );
   });
 });
 

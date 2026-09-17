@@ -1,6 +1,7 @@
 'use client';
 
 import { HelpBrowser } from '@gisik-nokma/app-core';
+import { AppNav } from '../../src/app-nav.js';
 
 /**
  * `/help` — the manual and FAQ, in the product.
@@ -15,6 +16,7 @@ import { HelpBrowser } from '@gisik-nokma/app-core';
 export default function HelpPage() {
   return (
     <main className="gn-shell">
+      <AppNav />
       <HelpBrowser />
     </main>
   );

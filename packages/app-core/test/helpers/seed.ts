@@ -102,6 +102,9 @@ export function listRowSeed(overrides: Partial<ListRow> = {}): ListRow {
     // Same default as `boardCardSeed` above and the same meaning: a seeded row
     // is settled fact unless a case says otherwise.
     pending: false,
+    // REQUIRED since backlog/closed spec §1.2 (2026-09-17); `null` is the same
+    // "never closed, or reopened" default `serverCard()` in mappers.test.ts uses.
+    closed: null,
     ...overrides,
   };
 }

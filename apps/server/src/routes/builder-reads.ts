@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z } from 'zod';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type {
   MemberListResponse,
   MigrationOutcome,
@@ -445,6 +445,27 @@ export const MIGRATION_RULES = {
   unknownTargetState: 'migration.unknown-target-state',
   /** An occupied state the `stateMap` does not cover — the dialog's contract. */
   unmappedState: 'migration.unmapped-state',
+  /**
+   * Backlog/closed spec §2.4 (Ruling 53(ii)): a closed row whose mapped
+   * target (or, for a parked row, `BACKLOG_STATE_ID` itself) is not a
+   * TERMINAL state. Answered up front, over the whole ticket set, for the
+   * same reason `unmappedState` is — a closed ticket that lost its terminal
+   * category through a migration is exactly the invariant
+   * `checkTicketWorkflowRebound` (Ruling 53(i)) refuses per event; this is
+   * the route's own pre-flight so a batch this door would let through does
+   * not have to be built and refused one row at a time.
+   */
+  closedToNonTerminal: 'migration.closed-to-non-terminal',
+  /**
+   * N2 (opus re-review, final fix wave round 2, 2026-09-17): a `stateMap`
+   * KEY of `backlog` — the mirror mistake of naming it as a VALUE, which
+   * `unknownTargetState` already refuses. Backlog is never one of
+   * `fromWorkflow.states`, so the dialog can never have built such a key;
+   * a hand-built request that does is silently overridden without this
+   * refusal (`toStateIdFor` always sends `BACKLOG_STATE_ID` for a parked
+   * row, Ruling 52(a), regardless of what the map says for it).
+   */
+  backlogNotMappable: 'migration.backlog-not-mappable',
 } as const;
 
 export function registerBuilderReadRoutes(
@@ -711,6 +732,27 @@ export function registerBuilderReadRoutes(
       // case 7.88, which reddens on the indexed form.
       const stateMap = new Map(Object.entries(parsed.data.stateMap));
 
+      // Ruling 56(b), N2 (opus re-review, final fix wave round 2,
+      // 2026-09-17): a caller-supplied KEY of `backlog` — the mirror of
+      // naming it as a target (`{ todo: 'backlog' }`, refused loudly below
+      // by `unknownTargetState` since backlog is never in `target.states`).
+      // The dialog can never send this key (`stateMap` is built from
+      // `fromWorkflow.states` only, and backlog is never one of those —
+      // spec §1.1), so a hand-built request naming it was previously read
+      // and then silently ignored: `toStateIdFor` always answers
+      // `BACKLOG_STATE_ID` for a parked row (Ruling 52(a)) regardless of
+      // what the map says for it, so an admin who believed they were
+      // choosing a destination for parked tickets had that belief acted on
+      // by nobody. Answered here, before any workspace lookup, because it
+      // needs nothing but the caller's own body to judge.
+      if (stateMap.has(BACKLOG_STATE_ID)) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.backlogNotMappable,
+          `"backlog" cannot be a key in the map: parked tickets carry across as parked automatically and need no entry.`,
+        );
+      }
+
       // Three actor-supplied ids, all three resolved against the workspace the
       // door just approved. `proj_workflows` is keyed `(workflow_id, version)`
       // GLOBALLY (ruling P14), so an unscoped destination lookup would let an
@@ -738,6 +780,7 @@ export function registerBuilderReadRoutes(
       }
 
       const targetStates = new Set(target.states.map((state) => state.id));
+      const targetCategoryOf = new Map(target.states.map((state) => [state.id, state.category]));
       const unknownTargets = [...new Set(stateMap.values())].filter((id) => !targetStates.has(id)).sort();
       if (unknownTargets[0] !== undefined) {
         return refuse(
@@ -747,21 +790,31 @@ export function registerBuilderReadRoutes(
         );
       }
 
-      const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string }>(
-        `SELECT ticket_id, state_id
+      const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string; closed_at: Date | null }>(
+        `SELECT ticket_id, state_id, closed_at
            FROM proj_tickets
           WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3
           ORDER BY ticket_id`,
         [workspaceId, typeId, fromWorkflowId],
       );
 
-      // Every OCCUPIED state needs a target. Occupancy is read from the tickets
-      // actually being moved rather than from the source definition, so a state
-      // the definition still carries but nobody is in does not have to be
-      // mapped, and a state the definition no longer carries but somebody IS in
-      // still does. The dialog's contract is about work, not about shapes.
+      // Every OCCUPIED state needs a target — EXCEPT `backlog`, which the
+      // dialog can never map: `stateMap` is built from `fromWorkflow.states`
+      // only (spec §1.1, backlog is never one of those), so a type holding
+      // even one parked ticket was an unconditional `unmappedState` before
+      // this exception existed, and there was no map the caller could have
+      // sent to answer it (Amendment 3 forbids mapping anything INTO backlog,
+      // so it is not merely unshowable — it is unmappable). Ruling 52(a),
+      // Finding 2 (final whole-branch review, 2026-09-17): parked means
+      // parked, so a `backlog` row is implicitly mapped to `BACKLOG_STATE_ID`
+      // on every migration, the dialog unchanged. Every OTHER occupied state
+      // is read from the tickets actually being moved rather than from the
+      // source definition, so a state the definition still carries but nobody
+      // is in does not have to be mapped, and a state the definition no
+      // longer carries but somebody IS in still does. The dialog's contract
+      // is about work, not about shapes.
       const unmapped = [...new Set(tickets.map((row) => row.state_id))]
-        .filter((stateId) => !stateMap.has(stateId))
+        .filter((stateId) => stateId !== BACKLOG_STATE_ID && !stateMap.has(stateId))
         .sort();
       if (unmapped[0] !== undefined) {
         return refuse(
@@ -771,16 +824,70 @@ export function registerBuilderReadRoutes(
         );
       }
 
+      /**
+       * `stateMap.get(row.state_id)` for every row EXCEPT a parked one, which
+       * always lands on `BACKLOG_STATE_ID` regardless of what (if anything)
+       * `stateMap` names for it — the caller's map cannot express a backlog
+       * destination at all (it is built from declared states only), so
+       * reading it here would be asking a question the map was never able to
+       * answer.
+       */
+      function toStateIdFor(row: { state_id: string }): string {
+        return row.state_id === BACKLOG_STATE_ID ? BACKLOG_STATE_ID : (stateMap.get(row.state_id) as string);
+      }
+
+      // Backlog/closed spec §2.4 (Ruling 53(ii), Finding 5): closed ⇒ terminal
+      // must survive a migration exactly as it must survive a rebind
+      // (`checkTicketWorkflowRebound`, Ruling 53(i)) — the two are the same
+      // invariant reached through the two mechanisms that move a ticket
+      // across workflow versions without an ordinary transition. Asked here,
+      // before a single event is built, for the same reason `unmappedState`
+      // is: a closed row whose destination is not terminal is a refusal
+      // `checkTicketWorkflowRebound` would give one event at a time, and this
+      // route's whole contract (case 7.45) is that a refusal appends nothing.
+      // A parked row's destination (`BACKLOG_STATE_ID`) is category `open`,
+      // never terminal — reachable in principle, only ever unreachable
+      // because every path that could leave a CLOSED ticket sitting in
+      // `backlog` is itself gated elsewhere, named here rather than
+      // asserted flat (hedged 2026-09-17, re-review nit; the four gates
+      // named again by Ruling 56(a)'s own §2.4 paragraph): closing FROM
+      // backlog refuses `close-requires-terminal` (backlog is `open`, never
+      // terminal); transitioning a closed ticket, Send-to-backlog included,
+      // refuses `closed-ticket`; rebinding a closed ticket onto backlog
+      // refuses under 53(i) above (`stateCategoryOf` reads backlog's
+      // category as `open`, so `'open' !== 'terminal'`); and a republish
+      // never drops or maps backlog at all (`foldStateIdForward` returns
+      // early for it) while a category-flip republish (Ruling 56(a)) moves
+      // a declared state's CATEGORY, never its `stateId` — it cannot turn a
+      // declared state INTO backlog either. So this fires only on a
+      // genuinely declared-state target today, by those four gates holding
+      // rather than by anything this route itself enforces — the category
+      // map covers both shapes uniformly rather than special-casing one.
+      const closedToNonTerminal = tickets.filter((row) => {
+        if (row.closed_at === null) return false;
+        const toStateId = toStateIdFor(row);
+        const category = toStateId === BACKLOG_STATE_ID ? 'open' : targetCategoryOf.get(toStateId);
+        return category !== 'terminal';
+      });
+      if (closedToNonTerminal.length > 0) {
+        const states = [...new Set(closedToNonTerminal.map((row) => toStateIdFor(row)))].sort();
+        return refuse(
+          reply,
+          MIGRATION_RULES.closedToNonTerminal,
+          `${closedToNonTerminal.length} closed ticket${closedToNonTerminal.length === 1 ? ' is' : 's are'} mapped to a non-terminal state (${states.map((id) => `"${id}"`).join(', ')}); a closed ticket may only migrate to a terminal state.`,
+        );
+      }
+
       const events: SubmittedEvent[] = tickets.map((row) => ({
         id: newUlid(),
         workspaceId,
         entity: { kind: 'ticket', id: row.ticket_id },
         type: 'ticket.workflow_rebound',
         version: 1,
-        // `stateMap.get(row.state_id)` is defined for every row — the unmapped
-        // check above is what makes that true, and it is asked over these exact
-        // rows with the same own-key lookup this line uses.
-        payload: { toWorkflowId, toStateId: stateMap.get(row.state_id) },
+        // `toStateIdFor(row)` is defined for every row — the unmapped check
+        // above is what makes that true for a declared state, and the
+        // backlog exception makes it true for a parked one.
+        payload: { toWorkflowId, toStateId: toStateIdFor(row) },
         actorId: request.currentUserId,
         // envelope-origin `'web'`: a person's claim that they migrated this
         // type, not the server's own record. The gate refuses a client-submitted

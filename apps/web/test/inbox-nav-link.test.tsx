@@ -46,9 +46,16 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
         <InboxNavLink />
       </Providers>,
     );
-    expect(await screen.findByRole('img', { name: '3 unread notifications' })).toHaveTextContent(
-      '3',
-    );
+    // ROUND 24: the count moved from `UnreadBadge`'s visible text into the
+    // LINK's accessible name, and the visible signal became a dot (owner
+    // ruling). What this case is about — that the total is read once on mount
+    // and surfaced with a real accessible name — is unchanged; only the element
+    // carrying it moved. `UnreadBadge` itself still renders the number on
+    // `/inbox`, and its own tests still cover that.
+    expect(
+      await screen.findByRole('link', { name: 'Inbox, 3 unread notifications' }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.gn-nav__inbox-dot')).not.toBeNull();
   });
 
   it('11.153 does NOT poll for a signed-out viewer — a request that can only 401, forever', async () => {
@@ -71,10 +78,11 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
         <InboxNavLink />
       </Providers>,
     );
-    await waitFor(() => expect(screen.getByRole('link', { name: /Inbox/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Inbox' })).toBeInTheDocument());
     expect(calls).toBe(0);
-    // And no badge is drawn: an absence claims nothing, while a `0` would be a count.
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    // And no indicator is drawn: an absence claims nothing, while a `0` would
+    // be a count. Round 24 — the name is a bare "Inbox" and there is no dot.
+    expect(document.querySelector('.gn-nav__inbox-dot')).toBeNull();
   });
 
   it('11.154 does not read while the session is still in flight, and reads as soon as it lands', async () => {
@@ -132,7 +140,9 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
       await vi.advanceTimersByTimeAsync(REFRESH_MS);
     });
     await waitFor(() => expect(calls).toBe(2));
-    expect(await screen.findByRole('img', { name: '2 unread notifications' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Inbox, 2 unread notifications' }),
+    ).toBeInTheDocument();
   });
 
   it('11.156 keeps the last count when a refresh fails, rather than resetting to none', async () => {
@@ -156,15 +166,19 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
         <InboxNavLink />
       </Providers>,
     );
-    expect(await screen.findByRole('img', { name: '4 unread notifications' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Inbox, 4 unread notifications' }),
+    ).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(REFRESH_MS);
     });
     await waitFor(() => expect(calls).toBe(2));
-    // Still 4. A reset to 0 would have hidden the badge and told the reader
-    // there is nothing waiting, on the strength of a request that failed.
-    expect(screen.getByRole('img', { name: '4 unread notifications' })).toBeInTheDocument();
+    // Still 4. A reset to 0 would have dropped the dot and renamed the link to
+    // a bare "Inbox", telling the reader there is nothing waiting — on the
+    // strength of a request that failed.
+    expect(screen.getByRole('link', { name: 'Inbox, 4 unread notifications' })).toBeInTheDocument();
+    expect(document.querySelector('.gn-nav__inbox-dot')).not.toBeNull();
   });
 
   /**
@@ -186,7 +200,9 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
         <InboxNavLink />
       </Providers>,
     );
-    expect(await screen.findByRole('img', { name: '3 unread notifications' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Inbox, 3 unread notifications' }),
+    ).toBeInTheDocument();
 
     session = { isPending: false };
     rerender(
@@ -194,10 +210,15 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
         <InboxNavLink />
       </Providers>,
     );
-    await waitFor(() => expect(screen.queryByRole('img')).not.toBeInTheDocument());
-    // The link itself stays: the inbox is still somewhere to go, and a viewer
-    // who signs in again should find it where it was.
-    expect(screen.getByRole('link', { name: /Inbox/ })).toBeInTheDocument();
+    // ROUND 24: the count is cleared from the link's NAME and the dot goes with
+    // it. Asserting both matters — the dot alone disappearing while the name
+    // still read "3 unread" would leave the previous session's count being
+    // announced to whoever is looking now, which is the exact defect this case
+    // exists for.
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Inbox' })).toBeInTheDocument(),
+    );
+    expect(document.querySelector('.gn-nav__inbox-dot')).toBeNull();
   });
 
   it('11.157 stops the timer on unmount', async () => {
@@ -258,11 +279,15 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     );
 
     // The door is up...
-    expect(await screen.findByRole('link', { name: /Inbox/ })).toBeInTheDocument();
-    // ...and it carries no number, because no number has been read yet.
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    // ...and it carries no number, because no number has been read yet. Round
+    // 24: that shows as a bare name and no dot, rather than an absent badge.
+    expect(document.querySelector('.gn-nav__inbox-dot')).toBeNull();
 
     first.settle(7);
-    expect(await screen.findByRole('img', { name: '7 unread notifications' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Inbox, 7 unread notifications' }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.gn-nav__inbox-dot')).not.toBeNull();
   });
 });

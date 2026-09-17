@@ -1,8 +1,14 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE,
+  BACKLOG_STATE_ID,
+  BUILTIN_TICKET_TYPE_SEEDS,
+  type StateCategory,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
@@ -11,14 +17,34 @@ import {
   TicketList,
   TicketSheet,
   TimelineView,
+  matchesBoardCard,
+  matchesListRow,
   useAttention,
   useBoard,
   useLiveQuery,
   useTicketList,
+  type Actor,
+  type BoardFilterSpec,
+  type FilterSpec,
   type GroupLabels,
+  type ListFilterSpec,
+  type ListRow,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
+import { Avatar } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
+import { startTargetFor } from '../../../../../src/backlog-start.js';
+import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import {
+  buildFilterChips,
+  describeUnappliedBoardAxes,
+  describeUnappliedListAxes,
+  shouldRenderNarrowingStrip,
+  type BoardFilterChip,
+} from '../../../../../src/board-search-scope.js';
+import { choiceMode, closedMode, withCycledClosed, withCycledId } from '../../../../../src/filter-cycle.js';
+import { listNarrowingWord } from '../../../../../src/list-narrowing-word.js';
+import { ChoiceGlyph, TriStateChoice } from '../../../../../src/tri-state-choice.js';
 import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
 import {
@@ -27,6 +53,8 @@ import {
   toTicketDatesInput,
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
+import { useProjectName } from '../../../../../src/use-project-name.js';
+import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -123,7 +151,22 @@ function ProjectBoard() {
    */
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
-  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
+  /**
+   * The breadcrumb and the title (Task 2 fix round 1 — coordinator Ruling 6).
+   * Both read `GET /v1/me/workspaces`, the SAME call `<AppNav>` below already
+   * makes for its own workspace-name link — `useWorkspaceName` is one shared
+   * hook, not a second derivation, and `useProjectName` narrows one step
+   * further into the same served rows. Both omit (render nothing) while
+   * pending or refused; see each hook's own docblock.
+   */
+  const workspaceName = useWorkspaceName(workspaceId);
+  const projectName = useProjectName(workspaceId, projectId);
+  // Task 10 (backlog/closed spec §5.4, 2026-09-17) adds `'backlog'` to this
+  // union. The default stays `'board'` — Backlog is the FIRST tab in the
+  // rail below (it precedes the board in a ticket's lifecycle), not the
+  // first one a person lands on; nothing about the union's own default
+  // changes.
+  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline' | 'backlog'>('board');
   /**
    * The list's narrowing, and the reason there is one at all.
    *
@@ -142,7 +185,8 @@ function ProjectBoard() {
    * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
    * The first version of this asked for `['open', 'active']` — *"hide done"*, which
    * is the narrowing a person would actually reach for. `toServerFilterSpec`
-   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: the SIX
+   * (`mappers.ts:855-870`, re-pointed 2026-09-17 — the exclude-mode refusal
+   * above it shifted this block) throws `UnexpressibleFilterError` on it: the SIX
    * id-shaped axes are LISTS client-side — `assigneeIds`, `collaboratorIds`,
    * `typeIds`, `stateIds`, `stateCategories`, `projectIds` — while
    * `filterSpecSchema` takes exactly ONE value for each (`text`, `dueBefore`,
@@ -171,6 +215,367 @@ function ProjectBoard() {
   const board = useBoard(dataSource, workspaceId, projectId);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
   const attention = useAttention(dataSource, workspaceId);
+
+  /**
+   * THE CLIENT NARROWING (board-prototype-port Task 4): one `FilterSpec`-shaped
+   * state above the tabs, so a tab switch never resets what a person typed.
+   *
+   * Typed `FilterSpec`, not `BoardFilterSpec` — a deliberate widening of the
+   * brief's own wording ("BoardFilterSpec-shaped state"). If this state were
+   * literally `BoardFilterSpec`, the four axes it omits
+   * (`collaboratorIds`/`dueBefore`/`dueAfter`/`fields`) would be
+   * UNREPRESENTABLE here, and `boardUnappliedAxes` below — the scope note Step
+   * 4 requires — would be dead code with nothing it could ever report. Task 5's
+   * Filters sheet sets those four axes on this SAME state; only the BOARD path
+   * (`boardFilter` below) narrows down to `BoardFilterSpec` before it reaches
+   * `matchesBoardCard`, exactly as the brief's closing sentence says: "only the
+   * board path narrows to `BoardFilterSpec`."
+   *
+   * Only `text` has a control in this task (the search box). The other five
+   * `BoardFilterSpec` axes and the four board-blind ones are set by Task 5's
+   * Filters sheet and Task 8's workflow picker onto this identical piece of
+   * state — not a second filter object, per the disclosure invariant note
+   * below.
+   */
+  const [filter, setFilter] = useState<FilterSpec>({});
+
+  /**
+   * THE FILTERS SHEET (Task 5) — open/closed state, and the trigger's own
+   * ref so a keyboard-operable close (Escape, or the sheet's own "Done") can
+   * return focus to the exact control that opened it rather than to
+   * `document.body`. `closeFilters(returnFocus)` is the ONE close path both
+   * exits share — mirroring `account-menu.tsx`'s `close(returnFocus)`, whose
+   * own docblock is the worked example this task's brief names: a pointer
+   * click outside the sheet does not yank focus from wherever the pointer
+   * landed, but a keyboard exit always leaves focus somewhere real.
+   */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeFilters = useCallback((returnFocus: boolean) => {
+    setFiltersOpen(false);
+    if (returnFocus) filtersButtonRef.current?.focus();
+  }, []);
+
+  /**
+   * RULING 44 — how "hidden by default" and its own removable chip coexist
+   * on Calendar/Timeline. The spec's own mapping (`closed: undefined | true |
+   * false`, Calendar/Timeline passing `closed: false` when unset) has no
+   * fourth state: with `filter.closed` doing double duty as both "the
+   * person's explicit choice" and "the default is in force", picking All on
+   * those two tabs could never distinguish itself from having never touched
+   * the control at all, so the mandated `Closed: hidden` chip could never be
+   * removed. This page-level flag is the fourth state the spec's mapping
+   * lacks: `false` (its own default) means the two date tabs still hide
+   * closed tickets nobody asked to see; `true` means the person removed that
+   * default's own chip, and the date tabs now show every state `filter.closed`
+   * itself allows. An EXPLICIT `filter.closed` (either value) overrides this
+   * flag in both directions — see `datesNarrowing`'s own `effectiveClosed`
+   * below — so this only ever matters while `filter.closed` is unset.
+   */
+  const [showClosedOnDates, setShowClosedOnDates] = useState(false);
+
+  /**
+   * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
+   * field list, restated here exactly once. `boardNarrowing` below and
+   * `activeFilterChips` further down BOTH read this SAME value; before the
+   * review that asked for this, they were two independently hand-written
+   * lists of "which axes exist" that had already drifted (the chip builder
+   * only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
+   * `buildFilterChips` for the full account. A future axis added to
+   * `BoardFilterSpec` now has exactly one object literal to update, not two.
+   */
+  const boardFilter: BoardFilterSpec = useMemo(
+    () => ({
+      text: filter.text,
+      assigneeIds: filter.assigneeIds,
+      typeIds: filter.typeIds,
+      stateIds: filter.stateIds,
+      stateCategories: filter.stateCategories,
+      projectIds: filter.projectIds,
+      // The exclude half, the same five — `collaboratorIds` deliberately dropped
+      // (`BoardFilterSpec.exclude` cannot carry it; `describeUnappliedBoardAxes`
+      // discloses it). Exclude-mode spec §1/§3.
+      exclude:
+        filter.exclude === undefined
+          ? undefined
+          : {
+              assigneeIds: filter.exclude.assigneeIds,
+              typeIds: filter.exclude.typeIds,
+              stateIds: filter.exclude.stateIds,
+              stateCategories: filter.exclude.stateCategories,
+              projectIds: filter.exclude.projectIds,
+            },
+    }),
+    [
+      filter.text,
+      filter.assigneeIds,
+      filter.typeIds,
+      filter.stateIds,
+      filter.stateCategories,
+      filter.projectIds,
+      filter.exclude,
+    ],
+  );
+
+  /**
+   * THE WORKFLOW PICKER'S OWN STATE (Task 8, Ruling R3) — page-level, like
+   * `filter` above, so a tab switch never resets it. Deliberately NOT folded
+   * into `filter`/`boardFilter`: those narrow at CARD granularity, and
+   * `matchesBoardCard` (`board-filter.ts`) takes a `card`/`column`/
+   * `projectId` and a `BoardFilterSpec` — no group anywhere in that
+   * signature — so a workflow axis is structurally unrepresentable there.
+   * This picker narrows at GROUP granularity instead: a different
+   * mechanism, reusing `boardNarrowing`'s shared `shown`/`total` fold below
+   * rather than the six-axis vocabulary that fold also reads.
+   *
+   * `'all'` is the sentinel for "every workflow", not `undefined` — a
+   * `<select>`'s `value` must always equal one of its own rendered
+   * `<option>` values, and `'all'` is the first and default one (R3: the
+   * resting state keeps every card shown exactly once, same as before this
+   * picker existed).
+   */
+  const [workflowFilter, setWorkflowFilter] = useState<string>('all');
+
+  /**
+   * THE RESOLVED PICKER VALUE (Ruling 20(b), coordinator, 2026-09-16) — falls
+   * back to `'all'` whenever `workflowFilter` names a workflow `board.data`
+   * no longer carries. This can only happen MID-SESSION: the picker's own
+   * `<option>`s are built from `board.data.groups` at the moment of
+   * selection (below), so every value `workflowFilter` can ever be WRITTEN
+   * to is valid when written. It stops being valid when the board's own
+   * data changes under it — a workflow reassigned or detached elsewhere
+   * while this page stays open — and `workflowFilter` itself has no way to
+   * notice on its own; it is a plain string, and a plain string cannot tell
+   * a real id from one that used to be real.
+   *
+   * NOT a reconciliation and NOT an error state — a pure fallback,
+   * recomputed fresh on every render from `workflowFilter` and the CURRENT
+   * `board.data`, never written back into `workflowFilter` itself (no
+   * effect, no `setWorkflowFilter` call here — this is a plain `const`, not
+   * a second piece of state to keep in sync with the first). Every
+   * consumer that narrows or displays by workflow reads THIS value from
+   * here down, never `workflowFilter` directly, except the `<select>`'s own
+   * `onChange`, which only ever writes a value drawn from the CURRENT
+   * `board.data.groups` and is therefore always valid at the moment it
+   * writes.
+   *
+   * Falling back beats the alternative it replaces: without this,
+   * `boardNarrowing` below already drops every card for a workflow id that
+   * matches no group (`keepGroup` is simply always false) — but
+   * `workflowChip` would still resolve its label as
+   * `group?.workflowName ?? workflowFilter`, and with no group to find that
+   * prints the RAW INTERNAL ID (`wf-bug`, not a name) as if it were a real,
+   * removable narrowing the person chose. That is worse than merely losing
+   * the selection: it asserts a workflow that is GONE as though it were
+   * still real and still picked, on a project that may hold tickets — the
+   * `boardNarrowing` fold's own `total` — the person can no longer see any
+   * trace of. Exactly the "page asserts a phantom as real" failure this
+   * whole port exists to refuse. `'all'` costs nothing to fall back to — it
+   * is the picker's own resting state, R3's own default — and it asserts
+   * nothing that isn't true.
+   */
+  const resolvedWorkflowFilter =
+    workflowFilter === 'all' || board.data === null
+      ? workflowFilter
+      : board.data.groups.some((group) => group.workflowId === workflowFilter)
+        ? workflowFilter
+        : 'all';
+
+  /**
+   * ONE PASS produces the narrowed board, its shown count, and its total — per
+   * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
+   * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
+   * server-side and the board never does) could disagree with what actually
+   * renders; a single fold cannot disagree with itself. `<Board>` below is
+   * handed `boardNarrowing.view`, never `board.data` directly, so the grid and
+   * the count are reading the SAME computed groups.
+   *
+   * TWO mechanisms fold into this ONE pass as of Task 8, not one:
+   * `boardFilter` (Task 4) drops CARDS, never a column or a group —
+   * `board.tsx:216-219`'s own rule, still exactly true of that mechanism on
+   * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
+   * GROUPS, by construction, whenever a specific workflow is picked. The
+   * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so
+   * `total` still counts every card in a DROPPED group — those cards are
+   * real, and R3's whole point is that the picker is a filter, so its "of
+   * M" must name the project's whole board, never only the remainder it
+   * kept — while `shown` counts only cards that are BOTH in a kept group
+   * AND pass `matchesBoardCard`. A fully-filtered board (by either
+   * mechanism, or both at once) therefore renders its remaining columns
+   * empty, or omits a group's rail entirely, rather than vanishing — the
+   * `N of M shown` count and the removable chip(s) below are the only
+   * disclosure, which is the invariant's whole point. This is also exactly
+   * why `shouldRenderNarrowingStrip`'s third term (`shown !== total`)
+   * exists independently of `activeFilterChips`/`boardUnappliedAxes`: no
+   * axis enumeration can ever name "a whole group was dropped", so the gate
+   * would otherwise miss this mechanism entirely — see that function's own
+   * docblock in `board-search-scope.ts`.
+   *
+   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` — see that
+   * value's own docblock immediately above (Ruling 20(b)): a picked
+   * workflow that has dropped out of `board.data` falls back to `'all'`
+   * here rather than narrowing every group to nothing on a stale id.
+   */
+  const boardNarrowing = useMemo(() => {
+    if (board.data === null) return null;
+    let total = 0;
+    let shown = 0;
+    const groups = board.data.groups.flatMap((group) => {
+      const keepGroup =
+        resolvedWorkflowFilter === 'all' || group.workflowId === resolvedWorkflowFilter;
+      const columns = group.columns.map((column) => ({
+        ...column,
+        cards: column.cards.filter((card) => {
+          total += 1;
+          const keep = keepGroup && matchesBoardCard(card, column, projectId, boardFilter);
+          if (keep) shown += 1;
+          return keep;
+        }),
+      }));
+      return keepGroup ? [{ ...group, columns }] : [];
+    });
+    return { view: { ...board.data, groups }, shown, total };
+  }, [board.data, boardFilter, resolvedWorkflowFilter, projectId]);
+
+  /**
+   * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
+   * cannot answer at all. This is SEPARATE from `activeFilterChips` (declared
+   * further down, once the label resolvers it needs exist) and from the
+   * count: the count reports cards the board filtered, this reports axes the
+   * board never evaluated, and merging the two would put a number on a
+   * filter that never ran (spec's own words). Always computed from `filter`
+   * directly — never from `boardFilter` above, which by construction cannot
+   * carry these three axes at all.
+   *
+   * The logic itself lives in `src/board-search-scope.ts` as a pure function,
+   * not inline here — Task 4's fix round 1 (coordinator concern 4) extracted
+   * it specifically so it has a UNIT test that calls it directly, rather than
+   * shipping with zero executions until Task 5's Filters sheet became its
+   * first real caller.
+   */
+  const boardUnappliedAxes = useMemo(
+    () => describeUnappliedBoardAxes(filter),
+    [filter.collaboratorIds, filter.dueBefore, filter.dueAfter, filter.fields, filter.exclude],
+  );
+
+  /**
+   * THE LIST'S OWN ENUMERATION of `ListFilterSpec` axes from `filter`
+   * (exclude-mode spec §3) — beside `boardFilter`'s, the same "one object
+   * literal per view to update" discipline. `collaboratorIds` dropped from
+   * both halves (`ListFilterSpec` cannot carry it; `listUnappliedAxes` below
+   * discloses it); the due bounds and `fields` INCLUDED, because a list row
+   * can answer them even though no control sets them yet.
+   */
+  const listFilterSpec: ListFilterSpec = useMemo(
+    () => ({
+      text: filter.text,
+      assigneeIds: filter.assigneeIds,
+      typeIds: filter.typeIds,
+      stateIds: filter.stateIds,
+      stateCategories: filter.stateCategories,
+      projectIds: filter.projectIds,
+      dueBefore: filter.dueBefore,
+      dueAfter: filter.dueAfter,
+      fields: filter.fields,
+      // Task 11 (spec §5.5): the List tab honours the Closed control's
+      // EXPLICIT choice only — `filter.closed` itself, never defaulted to
+      // `false` the way Calendar/Timeline's own `datesNarrowing` does below.
+      // An unset control shows every ticket on the List tab, open or closed.
+      closed: filter.closed,
+      exclude:
+        filter.exclude === undefined
+          ? undefined
+          : {
+              assigneeIds: filter.exclude.assigneeIds,
+              typeIds: filter.exclude.typeIds,
+              stateIds: filter.exclude.stateIds,
+              stateCategories: filter.exclude.stateCategories,
+              projectIds: filter.exclude.projectIds,
+            },
+    }),
+    [filter],
+  );
+
+  /**
+   * THE LIST NARROWING (exclude-mode spec §3): `list.rows` through
+   * `matchesListRow` ONCE, and List, Calendar and Timeline all read
+   * `listNarrowing.rows`. `null` while the list has not answered — the three
+   * arms below already gate on `list.rows !== null`, and this mirrors it.
+   * `parentCandidates` and `labels.epicTitle` keep reading `list.rows`
+   * UNnarrowed on purpose: a parent picker that hid tickets because of a view
+   * filter would be the "page asserts they do not exist" failure this shell
+   * refuses, and an epic the filter dropped must still name itself above its
+   * surviving children.
+   */
+  const listNarrowing = useMemo(() => {
+    if (list.rows === null) return null;
+    const rows = list.rows.filter((row) => matchesListRow(row, projectId, listFilterSpec));
+    return { rows, shown: rows.length, total: list.rows.length };
+  }, [list.rows, listFilterSpec, projectId]);
+
+  /**
+   * THE DATES NARROWING (Task 11, Ruling 44) — Calendar and Timeline's own
+   * further cut of `listNarrowing.rows`, layering the "closed hidden by
+   * default" rule the List tab never applies. `listFilterSpec.closed` above
+   * already carries the Closed control's EXPLICIT choice into `listNarrowing`
+   * for every tab alike, so when the person has set the control this memo's
+   * own re-filter is a no-op — `effectiveClosed` below reduces to
+   * `filter.closed` exactly, matching what `listNarrowing.rows` already is.
+   * Only while `filter.closed` is UNSET does it diverge: `showClosedOnDates`
+   * (off by default) decides whether these two tabs additionally hide closed
+   * tickets nobody asked to see. This is Ruling 44's own formula.
+   *
+   * `total` is `list.rows.length` — the SAME value `listNarrowing.total`
+   * already reads, from the unnarrowed source rather than a prior stage
+   * (`listNarrowing`'s own docblock explains why) — so `shown !== total`
+   * answers "did Calendar/Timeline hide anything, for any reason", the same
+   * disclosure invariant `listNarrowing`/`backlogNarrowing` already keep.
+   */
+  const datesNarrowing = useMemo(() => {
+    if (list.rows === null || listNarrowing === null) return null;
+    const effectiveClosed = filter.closed ?? (showClosedOnDates ? undefined : false);
+    const rows = listNarrowing.rows.filter((row) =>
+      matchesListRow(row, projectId, { ...listFilterSpec, closed: effectiveClosed }),
+    );
+    return { rows, shown: rows.length, total: list.rows.length };
+  }, [list.rows, listNarrowing, listFilterSpec, filter.closed, showClosedOnDates, projectId]);
+
+  const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
+
+  /**
+   * THE BACKLOG NARROWING (Task 10, backlog/closed spec §5.4) — the Backlog
+   * tab's own further cut of `listNarrowing.rows`: every row that already
+   * survived the shell's exclude-mode filter (`listNarrowing`, immediately
+   * above) whose `stateId` is the universal `BACKLOG_STATE_ID`. `null` while
+   * `list.rows`/`listNarrowing` have not answered, mirroring both their own
+   * gates.
+   *
+   * `total` counts backlog rows in the UNFILTERED `list.rows` — never
+   * `listNarrowing.rows` — for the same reason `listNarrowing`'s own `total`
+   * counts from `list.rows` rather than from whatever a narrower stage
+   * already dropped: a `total` computed after a filter has run is a count OF
+   * the filter, not of the project, and 12.258/12.384's own defect is a
+   * partial set presented as whole under exactly this kind of silent
+   * substitution. `shown` is the same rows the Backlog tab actually renders.
+   *
+   * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
+   * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
+   * backlog ticket's category is `open`, so that toggle strips every backlog
+   * row out of `list.rows` before this memo ever sees them. With the toggle
+   * on, the Backlog tab reads "Nothing in the backlog — new tickets land
+   * here." over a project that may hold plenty; both `shown` and `total`
+   * read 0, so nothing here can tell the two apart from inside this memo,
+   * and nothing on the Backlog tab today says the toggle is why. Owner:
+   * whoever next revisits the toggle's own scope (its docblock already notes
+   * it predates this tab).
+   */
+  const backlogNarrowing = useMemo(() => {
+    if (list.rows === null || listNarrowing === null) return null;
+    const rows = listNarrowing.rows.filter((row) => row.stateId === BACKLOG_STATE_ID);
+    const total = list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).length;
+    return { rows, shown: rows.length, total };
+  }, [list.rows, listNarrowing]);
+
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
    *
@@ -183,6 +588,45 @@ function ProjectBoard() {
    */
   const ticketTypes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:ticket-types`, () =>
     dataSource.query.getTicketTypes(workspaceId),
+  );
+
+  /**
+   * THE DISTINCT WORKFLOWS BEHIND THE BACKLOG'S OWN ROWS (Ruling 42) —
+   * sorted and joined into one `useLiveQuery` key, so the page fetches ONE
+   * `getWorkflowDef` per DISTINCT workflow among the rows on screen rather
+   * than one per row: a project with forty backlog tickets sharing three
+   * workflows opens three round trips, not forty.
+   */
+  const backlogWorkflowIds = useMemo(() => {
+    if (backlogNarrowing === null || ticketTypes.data === null) return [];
+    const typeById = new Map(ticketTypes.data.map((type) => [type.id, type]));
+    const ids = new Set<string>();
+    for (const row of backlogNarrowing.rows) {
+      const type = typeById.get(row.typeId);
+      if (type !== undefined) ids.add(type.workflowId);
+    }
+    return Array.from(ids).sort();
+  }, [backlogNarrowing, ticketTypes.data]);
+
+  const backlogWorkflowDefs = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${workspaceId}:backlog-workflow-defs:${backlogWorkflowIds.join(',')}`,
+    async () => {
+      const entries = await Promise.all(
+        backlogWorkflowIds.map(
+          async (workflowId): Promise<readonly [string, WorkflowDef | null]> => [
+            workflowId,
+            await dataSource.query.getWorkflowDef(workspaceId, workflowId),
+          ],
+        ),
+      );
+      const defs = new Map<string, WorkflowDef>();
+      for (const [workflowId, def] of entries) {
+        if (def !== null) defs.set(workflowId, def);
+      }
+      return defs;
+    },
   );
 
   // Every read on this page, one rule, one author — see `src/expired-session.tsx`.
@@ -289,24 +733,35 @@ function ProjectBoard() {
   );
 
   /**
-   * `list.rows === null ? [] : …` and NOT `list.rows ?? []`, for the reason the
-   * `parentCandidates` note below gives at length: the two spellings agree here
-   * only because the arms that render these inputs are gated on `list.rows !==
-   * null` themselves. The gate is the guarantee; this expression never carries
-   * an empty array into a view.
+   * `listNarrowing === null ? [] : …` and NOT `list.rows ?? []`, for the
+   * reason the `parentCandidates` note below gives at length: the two
+   * spellings agree here only because the arms that render these inputs are
+   * gated on `list.rows !== null` themselves. The gate is the guarantee; this
+   * expression never carries an empty array into a view.
+   *
+   * Read `listNarrowing.rows` from 2026-09-17 to Task 11 (exclude-mode spec
+   * §3): the Calendar and Timeline tabs drew from the SAME narrowed rows the
+   * List tab's own count and strip report, rather than the complete
+   * unnarrowed set — the whole point of the filter reaching every tab.
+   *
+   * Reads `datesNarrowing.rows` since Task 11 (Ruling 44): one further cut of
+   * exactly those rows, applying the "closed hidden by default" rule the List
+   * tab does not — see `datesNarrowing`'s own docblock above. `datesNarrowing`
+   * is non-null exactly when `list.rows`/`listNarrowing` are (its own
+   * docblock says so), so this still mirrors the old gate precisely.
    */
   const dateInputs = useMemo<TicketDatesInput[]>(
     () =>
-      list.rows === null
+      datesNarrowing === null
         ? []
-        : list.rows.map((row) =>
+        : datesNarrowing.rows.map((row) =>
             toTicketDatesInput(
               row,
               { workspaceId, projectId },
               dateFieldsByType.get(row.typeId) ?? [],
             ),
           ),
-    [list.rows, workspaceId, projectId, dateFieldsByType],
+    [datesNarrowing, workspaceId, projectId, dateFieldsByType],
   );
 
   /**
@@ -325,14 +780,220 @@ function ProjectBoard() {
    *
    * `parentCandidates` is only ever built from rows that ARRIVED. Everything
    * else is a state the create control names out loud below.
+   *
+   * `inFocus` (backlog/closed spec §5.4, 2026-09-17) drives the New-ticket
+   * dialog's "Start in focus" checkbox: a candidate is in focus when it sits
+   * outside the universal Backlog state AND has never been closed (or was
+   * reopened) — `row.closed === null` reads exactly that, the same
+   * `state.closed ?? null` idiom every other reader of the flag spells,
+   * since `ListRow.closed` is REQUIRED (never the optional domain form this
+   * row was assembled from — `view-types.ts`).
    */
   const parentCandidates =
-    list.rows === null ? [] : list.rows.map((row) => ({ id: row.ticketId, title: row.title }));
+    list.rows === null
+      ? []
+      : list.rows.map((row) => ({
+          id: row.ticketId,
+          title: row.title,
+          inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null,
+        }));
 
   const typeOptions =
     ticketTypes.data === null
       ? BUILTIN_TYPE_LADDER
       : ticketTypes.data.map((type) => ({ id: type.id, name: type.name }));
+
+  /**
+   * The board's own column names, id → name, for the `stateIds` chip below.
+   * Sourced from `board.data` directly rather than from `boardNarrowing.view`
+   * (which may already be narrowed) — a chip naming what a filter EXCLUDES
+   * must resolve against the FULL set of states the board has, not the
+   * narrowed remainder.
+   */
+  const boardStateNames = useMemo(() => {
+    const names = new Map<string, string>();
+    if (board.data !== null) {
+      for (const group of board.data.groups) {
+        for (const column of group.columns) {
+          names.set(column.stateId, column.name);
+        }
+      }
+      /**
+       * RULING 45 — the universal Backlog state joins the State options, NO
+       * second def fetch: `BACKLOG_STATE_ID`/`BACKLOG_STATE` are the same
+       * reserved id/name every workflow already carries implicitly
+       * (`workflow.ts`'s own `statesWithBacklog`), so this needs nothing
+       * beyond what `board.data` already answers. Appended LAST — mirroring
+       * `statesWithBacklog`'s own "always last" rule — so it can never
+       * collide with a real column: the id is RESERVED, `validateWorkflowDef`
+       * refuses any definition that declares it, so the loop above can never
+       * already hold this key.
+       */
+      names.set(BACKLOG_STATE_ID, BACKLOG_STATE.name);
+    }
+    return names;
+  }, [board.data]);
+
+  /**
+   * The same map, as `{id, name}` pairs — the shape the Filters sheet's
+   * "State" chips iterate. Derived from `boardStateNames` itself rather than
+   * a second walk of `board.data.groups`, so the two can never enumerate a
+   * different state set.
+   */
+  const boardStateOptions = useMemo(
+    () => Array.from(boardStateNames, ([id, name]) => ({ id, name })),
+    [boardStateNames],
+  );
+
+  const typeNameById = useMemo(
+    () => new Map(typeOptions.map((type) => [type.id, type.name])),
+    [typeOptions],
+  );
+
+  /**
+   * THE REMOVABLE CHIP HALF of the disclosure invariant — built from
+   * `boardFilter` itself (declared above, alongside `boardNarrowing`), one
+   * chip per axis actually set, covering all SIX of `BoardFilterSpec`'s
+   * fields rather than only `text`. See `buildFilterChips`'s own
+   * docblock in `board-search-scope.ts` for why this single-enumeration
+   * design is the fix, not a style choice: the previous version silently
+   * closed the disclosure gate on any of the other five axes narrowing the
+   * board with no chip and no scope-note entry to show for it.
+   *
+   * Declared HERE, after `nameOf`/`typeOptions`/`boardStateNames`, because
+   * label resolution needs the roster and the type/state name maps — moving
+   * this below where they are ready, rather than moving three data reads
+   * above where `filter` is declared, is the smaller reshuffle.
+   */
+  const activeFilterChips = useMemo(
+    () =>
+      buildFilterChips(
+        boardFilter,
+        {
+          assigneeName: nameOf,
+          typeName: (id) => typeNameById.get(id) ?? id,
+          stateName: (id) => boardStateNames.get(id) ?? id,
+        },
+        setFilter,
+      ),
+    [boardFilter, nameOf, typeNameById, boardStateNames],
+  );
+
+  /**
+   * THE WORKFLOW PICKER'S OWN CHIP (Task 8) — built separately from
+   * `buildFilterChips`, on purpose: that function enumerates
+   * `boardFilter`'s six fields one by one, and `workflowFilter` is not one
+   * of them (see its own declaration above) and never can be —
+   * `matchesBoardCard` has no group in its signature for a seventh axis to
+   * join. So this is a second, small builder rather than a seventh case
+   * inside `buildFilterChips`, shaped identically (`BoardFilterChip`)
+   * so it can join the SAME strip at the render site below without a second
+   * chip idiom. `null` while `workflowFilter === 'all'` — the resting state
+   * discloses nothing because it has dropped nothing (R3).
+   *
+   * The label resolves the workflow's NAME from `board.data.groups` (the
+   * FULL, unfiltered group list the picker's own `<option>`s are built
+   * from below) rather than from `boardNarrowing.view.groups` (which, once
+   * a workflow is picked, contains only the surviving group and could never
+   * name the one that is missing) — the same "resolve against the whole
+   * set, not the narrowed remainder" rule `boardStateNames` already follows
+   * for the `stateIds` chip, one section up.
+   *
+   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` (Ruling 20(b)):
+   * `workflowFilter === 'all'` alone would miss the fallback case, and
+   * `group?.workflowName ?? workflowFilter` would then print the raw,
+   * unresolvable id as this chip's own label — the exact phantom-narrowing
+   * failure `resolvedWorkflowFilter`'s own docblock names. With the
+   * fallback, `resolvedWorkflowFilter === 'all'` is true in that case, and
+   * this function returns `null` — no chip, nothing to name — before the
+   * lookup that could never have found anything runs at all.
+   */
+  const workflowChip = useMemo<BoardFilterChip | null>(() => {
+    if (resolvedWorkflowFilter === 'all') return null;
+    const group = (board.data?.groups ?? []).find(
+      (candidate) => candidate.workflowId === resolvedWorkflowFilter,
+    );
+    const label = `Workflow: ${group?.workflowName ?? resolvedWorkflowFilter}`;
+    return { key: 'workflow', label, mode: 'include', onRemove: () => setWorkflowFilter('all') };
+  }, [resolvedWorkflowFilter, board.data]);
+
+  /**
+   * THE STRIP'S FULL CHIP LIST — `activeFilterChips` plus `workflowChip`
+   * when one is active, merged ONLY here, at the render boundary. Every
+   * other reader of `activeFilterChips` (the gate's `chipCount` term below,
+   * and the strip's own `chips` selection for every tab but Board, since
+   * 2026-09-17 — `workflowChip` never reaches List/Calendar/Timeline,
+   * because it narrows GROUPS only the board renders) keeps reading
+   * `activeFilterChips` alone, unmerged — the gate does not need
+   * `workflowChip` counted in `chipCount` because
+   * `shouldRenderNarrowingStrip`'s independent third term
+   * (`shown !== total`) already fires for group-dropping on its own (see
+   * `boardNarrowing`'s own docblock above); double-counting it into
+   * `chipCount` too would not change the gate's answer, only obscure which
+   * term is actually doing the work.
+   */
+  const narrowingChips = useMemo(
+    () => (workflowChip !== null ? [...activeFilterChips, workflowChip] : activeFilterChips),
+    [activeFilterChips, workflowChip],
+  );
+
+  /**
+   * THE LIST/CALENDAR/TIMELINE/BACKLOG CHIP LIST (Task 11, spec §5.5) —
+   * `activeFilterChips` plus the one axis those four tabs can apply that the
+   * Board cannot at all: `closed` (§5.2 — Board is "unchanged" by this task).
+   * A SEPARATE call into `buildFilterChips`, spreading `boardFilter`'s own
+   * six fields rather than folding `closed` onto `boardFilter` itself —
+   * `boardFilter`'s own docblock is exact about why it stops at those six
+   * ("the axes a board can answer"), and `closed` is a SEVENTH `BoardCard`
+   * cannot represent AT ALL (no field for it, unlike the four
+   * `describeUnappliedBoardAxes` already discloses as merely board-blind).
+   * Folding it in there would make `activeFilterChips` — which
+   * `narrowingChips` above spreads onto the BOARD tab's own strip — show a
+   * "Closed: …" chip on a tab where clicking it changes nothing, exactly the
+   * disclosure lie `buildFilterChips`'s own docblock (Task 4 review) was
+   * written to stop. Reusing `boardFilter` via a spread, rather than
+   * hand-listing the six fields a second time, is what keeps this list from
+   * drifting from `activeFilterChips` on the axes the two DO share.
+   */
+  const listFilterChips = useMemo(
+    () =>
+      buildFilterChips(
+        { ...boardFilter, closed: filter.closed },
+        {
+          assigneeName: nameOf,
+          typeName: (id) => typeNameById.get(id) ?? id,
+          stateName: (id) => boardStateNames.get(id) ?? id,
+        },
+        setFilter,
+      ),
+    [boardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
+  );
+
+  /**
+   * THE DEFAULT-HIDE CHIP (Ruling 44) — synthetic, not one of
+   * `buildFilterChips`'s own: it discloses a PAGE-LEVEL default
+   * (`showClosedOnDates`), not an axis set on `filter` at all, so it has no
+   * natural home inside a function that enumerates `FilterSpec` fields.
+   * Present exactly when the default is actually IN FORCE on a date tab —
+   * `filter.closed === undefined` (the person has not overridden it) AND
+   * `!showClosedOnDates` (they have not lifted it either) — mirroring
+   * `workflowChip`'s own "resting state discloses nothing" rule (R3): once
+   * `filter.closed` is set explicitly, `listFilterChips`'s own "Closed: …"
+   * chip takes over and this one stands down, matching Ruling 44's "an
+   * explicit filter.closed overrides both ways" — never both chips at once,
+   * for the same reason `closedMode`/`buildFilterChips`'s closed branch is an
+   * `if`/`else if` rather than two independent conditions.
+   */
+  const closedDefaultInForce = filter.closed === undefined && !showClosedOnDates;
+  const closedDefaultChip: BoardFilterChip | null =
+    (view === 'calendar' || view === 'timeline') && closedDefaultInForce
+      ? {
+          key: 'closed-default',
+          label: 'Closed: hidden',
+          mode: 'exclude',
+          onRemove: () => setShowClosedOnDates(true),
+        }
+      : null;
 
   /**
    * Why the create control is GATED rather than mounted with a disabled picker.
@@ -446,14 +1107,17 @@ function ProjectBoard() {
 
   return (
     <main className="gn-shell">
-      <AppNav workspaceId={workspaceId} projectId={projectId} />
+      {/* No `projectId`: the nav's Board item was removed in Round 23 and that
+          prop was its only consumer, so passing it would be feeding a parameter
+          nothing reads. */}
+      <AppNav workspaceId={workspaceId} />
       <div className="gn-shell__main">
         {expired ? (
           // ONE notice for the page. Four reads can 401 together and they are one
           // event: four panels would describe four.
           <ExpiredSessionNotice />
         ) : (
-          <>
+          <div className="gn-project">
             {/* `?? []` would render no strip at all, which reads as "nothing needs
                 attention" — see `src/shell-refusal.tsx`. */}
             {attention.error !== null ? (
@@ -502,41 +1166,458 @@ function ProjectBoard() {
               ) : null}
             </div>
 
-            <div className="gn-view-tabs" role="tablist">
+            {/*
+              BREADCRUMB AND TITLE (fix round 1, Ruling 6; restructured fix round
+              2, coordinator Critical finding) — stacked children of `.gn-project`
+              itself, NOT of `.gn-project__header`. The metrics table lists "Page
+              padding", "Header row top margin 24px", "Breadcrumb 13/18" and
+              "Title 34/41" as separate entries against a COLUMN
+              (`.gn-project { flex-direction: column; gap: 14px }`), which is three
+              stacked children, not one flex line — putting the 34px/700 heading
+              inside `.gn-project__header` (`align-items: center`, `flex-wrap:
+              wrap`) vertically centred it on the same line as the 13px breadcrumb
+              and the New-ticket button, and would have put Tasks 4/5/8's search
+              box, workflow `<select>` and Filters button on that same line too.
+
+              Each name is independently omitted — not a placeholder, not the raw
+              id — while its own hook holds `null`. Neither reserves space while
+              absent: there is no fixed-height wrapper around either, so the
+              column is exactly as tall as its present children and grows once a
+              name resolves, rather than holding blank space that a name then
+              fills.
+
+              `.gn-project__summary` — DELETED (Task 4). It was declared here
+              unconsumed since Task 2, on the coordinator's own say-so, pending
+              this task's count. The count that actually shipped is
+              `.gn-project__count`, inside the `.gn-project__narrowing` strip
+              below the tab rail — a different rule, at different metrics, next
+              to the chip and the scope note it may never render without. A
+              rule declared for "the task that adds the count" does not get to
+              survive unconsumed once that task has run; see `ui.css` for the
+              deletion.
+            */}
+            {workspaceName !== null ? (
+              <p className="gn-project__breadcrumb">{workspaceName}</p>
+            ) : null}
+            {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+
+            {/*
+              `.gn-project__header` — Task 2 of the prototype port. Controls
+              ONLY: Task 4 (search), Task 8 (workflow `<select>`) and Task 5
+              (Filters) add their own controls here; New ticket is the one
+              control already built, so it moves in now rather than waiting for a
+              later task to relocate it. The breadcrumb and title moved OUT of
+              this container in fix round 2 — see the comment above.
+
+              MOVED OUT OF THE TABLIST, not merely reclassed: `createRegion` used
+              to render as the tablist's fifth child, a plain `<button>` (or a
+              `<p role="status">`) sitting inside a `role="tablist"` alongside four
+              `role="tab"` children — an ARIA violation `.gn-segmented`'s 2px-gap
+              flex track would only have made more visible. Every assertion this
+              page's tests make against `New ticket` queries `screen`/`within(dialog)`
+              directly rather than scoping from the tablist container, so the move
+              changes no test's reach (`page-refusals.test.tsx`,
+              `project-create-gate.test.tsx`).
+
+              SEARCH BOX (Task 4) renders here, ABOVE THE TABS, because `filter`
+              is page-level state that a tab switch must not reset (Step 2). Its
+              `aria-label` says "board" on purpose: today it narrows ONLY the
+              Board tab (Ruling 1 scopes T4 to the board path; Calendar and
+              Timeline already accept a `filter` prop of their own — confirmed by
+              reading `calendar-view.tsx`/`timeline-view.tsx` — but wiring it is
+              explicitly out of this task, since narrowing those tabs with no
+              count and no chip would itself violate the disclosure invariant
+              this task exists to satisfy). A generic, unlabelled "Search" here
+              would be a control implying a reach it does not have; naming the
+              scope in the accessible name is the fix that costs nothing else.
+            */}
+            <div className="gn-project__header">
+              <input
+                type="search"
+                className="gn-project__search"
+                aria-label="Search the board"
+                placeholder="Search the board"
+                value={filter.text ?? ''}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  setFilter((current) => ({ ...current, text: value === '' ? undefined : value }));
+                }}
+              />
+              {/*
+                THE WORKFLOW PICKER (Task 8, Ruling R3). Narrows the board to
+                one workflow's GROUP — a different granularity from every
+                control on this row, which narrow CARDS — so its state
+                (`workflowFilter`) and its fold into `boardNarrowing` are
+                declared beside `boardFilter`/`boardNarrowing` above, not
+                beside `filter`. `All workflows` is the first `<option>` and
+                `workflowFilter`'s own initial value, so the picker's resting
+                state IS the default (R3) with no extra wiring to keep them
+                in sync.
+
+                GATED ON `board.data.groups.length > 1`, not merely on
+                `board.data !== null`: a project with zero or exactly one
+                workflow offers no real choice — "All workflows" and that one
+                workflow's name would render the identical board — so the
+                control would be a picker between one thing and itself. This
+                mirrors `Board`'s OWN gate for the identical judgment one
+                level down (`board.tsx`: `board.groups.length > 1 ? <h3
+                className="gn-board__workflow">` — the workflow name itself
+                only renders once there is more than one to distinguish).
+                Deliberately reading `board.data.groups` here rather than
+                `boardNarrowing.view.groups`: the latter is ALREADY narrowed
+                by `workflowFilter`, so once a person picks a specific
+                workflow it would hold only that one surviving group and this
+                gate would compute `length > 1` as false and unmount the very
+                control that let them pick it — the picker must be judged
+                against the whole board, never against its own output.
+
+                No `.gn-select` (the multi-select combobox in
+                `packages/ui`): that component is a listbox-and-panel widget
+                with no native `<select>` underneath it, and the brief and
+                the design spec both name this control a plain `<select>` —
+                metrics table "Workflow select `:325`", its own new
+                `.gn-project__workflow-select` rule in `ui.css` (`ctlBg`/
+                `ctlR`, no new token role; `ctlShadow` omitted, following
+                `.gn-button`'s own already-recorded open decision — see that
+                rule's docblock).
+
+                `value={resolvedWorkflowFilter}`, not raw `workflowFilter`
+                (Ruling 20(b)) — so the control itself VISIBLY falls back to
+                "All workflows" the moment its own picked workflow drops out
+                of `board.data`, rather than showing a `<select>` whose
+                `value` names an `<option>` that no longer exists (which a
+                browser resolves by silently selecting nothing, an even
+                quieter failure than the phantom chip that motivated the
+                fallback in the first place). `onChange` still WRITES raw
+                `workflowFilter`, never `resolvedWorkflowFilter` — every
+                value this control can write comes from `board.data.groups`
+                at the moment of selection, so it is always valid when
+                written; only the READ side ever needs to fall back.
+              */}
+              {board.data !== null && board.data.groups.length > 1 ? (
+                <select
+                  className="gn-project__workflow-select"
+                  aria-label="Workflow"
+                  value={resolvedWorkflowFilter}
+                  onChange={(event) => setWorkflowFilter(event.target.value)}
+                >
+                  <option value="all">All workflows</option>
+                  {board.data.groups.map((group) => (
+                    <option key={group.workflowId} value={group.workflowId}>
+                      {group.workflowName}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {/*
+                THE FILTERS BUTTON (Task 5). Task 4's own report left it
+                unrendered on purpose ("An inert Filters button is a button
+                that lies... I chose do not render it yet") because nothing
+                existed yet for it to open. It opens now, wired to the SAME
+                `filter` state the search box and the removable chips already
+                share — never a second filter object. `.gn-button`/
+                `.gn-button--ghost` (unchanged, per the plan's own
+                "Divergences already decided") already renders exactly this
+                metric — `min-height:2.75rem` (44px), `padding:0 1.125rem`
+                (18px), `background:fill-tertiary`, `color:text-accent`,
+                `font-weight:600` — so no new CSS rule is needed for the
+                trigger itself.
+              */}
               <button
-                role="tab"
+                ref={filtersButtonRef}
                 type="button"
-                aria-selected={view === 'board'}
-                onClick={() => setView('board')}
+                className="gn-button gn-button--ghost"
+                aria-haspopup="dialog"
+                onClick={() => setFiltersOpen(true)}
               >
-                Board
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'list'}
-                onClick={() => setView('list')}
-              >
-                List
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'calendar'}
-                onClick={() => setView('calendar')}
-              >
-                Calendar
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={view === 'timeline'}
-                onClick={() => setView('timeline')}
-              >
-                Timeline
+                Filters
               </button>
               {createRegion}
             </div>
+
+            {/*
+              The segmented control (`ui.css`'s shared `.gn-segmented` /
+              `.gn-segmented__item` / `.gn-segmented__item--on`), replacing the
+              page-local `.gn-view-tabs`. Same roles, same handlers — a restyle,
+              not a rebuild: `role="tablist"`/`role="tab"`/`aria-selected` are
+              unchanged, and each button still drives `setView` directly.
+
+              One boolean per tab feeds BOTH `aria-selected` and the `--on`
+              modifier class, rather than two `view === 'x'` comparisons that would
+              have to be kept in agreement by hand.
+
+              `.gn-view-tabs` NO LONGER EXISTS ANYWHERE IN THE PRODUCT as of this
+              commit (Task 4, coordinator Ruling 7) — `globals.css`'s own dead
+              rules (`:1244`, `:1391-1392`) and the docblock sentence claiming
+              they "survive… only on the project page" are both removed there;
+              that claim stopped being true the moment THIS page moved onto
+              `.gn-segmented` (Task 2), and a stale rule is one thing but a
+              comment misstating the file it sits in is the thing this repo
+              punishes hardest.
+
+              `['backlog', 'Backlog']` (Task 10, backlog/closed spec §5.4) is
+              FIRST — Backlog precedes the board in a ticket's LIFECYCLE
+              (spec §1.3: every ticket is born there), even though `view`'s
+              own default stays `'board'` (declared above) — the rail's
+              ORDER and the page's DEFAULT SELECTION are independent facts,
+              and this task changes only the first.
+            */}
+            <div className="gn-segmented" role="tablist">
+              {(
+                [
+                  ['backlog', 'Backlog'],
+                  ['board', 'Board'],
+                  ['list', 'List'],
+                  ['calendar', 'Calendar'],
+                  ['timeline', 'Timeline'],
+                ] as const
+              ).map(([tab, label]) => {
+                const selected = view === tab;
+                return (
+                  <button
+                    key={tab}
+                    role="tab"
+                    type="button"
+                    aria-selected={selected}
+                    className={`gn-segmented__item${selected ? ' gn-segmented__item--on' : ''}`}
+                    onClick={() => setView(tab)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/*
+              THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's
+              workflow picker also feeds) — ONE strip, rendered once, with
+              PER-TAB inputs since 2026-09-17 (exclude-mode spec §3): Board
+              reads `boardNarrowing`/`boardUnappliedAxes` and the picker's own
+              chip; List, Calendar and Timeline read
+              `listNarrowing`/`listUnappliedAxes` and the filter chips alone.
+
+              UNTIL 2026-09-17 this was Board-tab-only: the count and the
+              scope note were both facts about the BOARD's own narrowing, and
+              showing them on a tab they said nothing about would have been
+              its own small lie. What changed is `matchesListRow`/
+              `listNarrowing` making the list's own narrowing exactly such a
+              fact, computed once per tab it actually describes — the
+              mechanism below generalises rather than being abandoned.
+
+              Gated on having something to disclose, not merely on `view ===
+              'board'` — with no active axis at all and nothing hidden, the
+              strip renders nothing, so a person who has touched no control
+              never sees an empty bar. The moment any of the three terms
+              becomes true, the count comes along with it (it lives inside
+              the SAME conditional block as the chips and the note), which is
+              what keeps the invariant — count and chip, always together —
+              true by construction rather than by two authors remembering to
+              agree.
+
+              THREE TERMS, not two (Task 4 review, Important finding,
+              remedy 2 — `shouldRenderNarrowingStrip` in
+              `board-search-scope.ts`): `activeFilterChips.length > 0` and
+              `boardUnappliedAxes.length > 0` only cover mechanisms this file
+              can NAME — a filter axis, or an axis outside `BoardFilterSpec`.
+              `boardNarrowing.shown !== boardNarrowing.total` is independent
+              of naming anything: it is true whenever the board actually hid
+              a card, for ANY reason, which is what makes this gate correct
+              for Task 8's workflow picker — that narrows by dropping whole
+              GROUPS, not by setting a filter axis, so no enumeration of axes
+              could ever notice it on its own.
+
+              `chipCount` below reads `activeFilterChips.length`, NOT
+              `narrowingChips.length` (the list actually rendered two lines
+              down ON THE BOARD TAB ONLY — the other three tabs render
+              `activeFilterChips` directly and never touch `narrowingChips` at
+              all — which also includes `workflowChip` when one is active).
+              That is not an oversight: `workflowChip` does not need to be
+              counted into this gate for the gate to fire correctly WHENEVER
+              A CARD IS ACTUALLY HIDDEN — the third term above already does
+              that job by construction, since picking a workflow can only
+              ever change `shown`/`total`, never `activeFilterChips`.
+
+              HEDGED (final whole-branch review, Finding 4, 2026-09-16): this
+              used to claim counting `workflowChip` in here "would not change
+              the gate's answer in any case" — false for one constructible
+              case. Pick a workflow that keeps its own cards while an empty
+              SIBLING group is dropped: `shown === total` (nothing is
+              actually hidden) and the other two terms are already zero, so
+              the strip stays closed even though the picker itself is
+              non-default. Counting `workflowChip` here WOULD open the strip
+              in that case. The invariant this gate exists for still holds
+              either way — no card is ever hidden without the strip
+              disclosing it — and the `<select>` keeps showing the
+              non-default pick regardless of whether the strip renders
+              beside it, so nothing is lost; but the old sentence claimed
+              more certainty than that.
+            */}
+            {(() => {
+              // Task 10 — THE HAZARD THE PARAGRAPH BELOW WARNS ABOUT,
+              // MATERIALIZED. `view` gained a fifth member (`'backlog'`) and
+              // this ternary chain — unlike `TAB_NOUN`'s `Record` two lines
+              // down — has no compiler to catch a missing arm: without this
+              // explicit branch, `'backlog'` would silently fall into the
+              // `: listNarrowing` default and the disclosure strip would
+              // report the LIST's own narrowing while the Backlog tab was on
+              // screen. `unapplied`/`chips` need no matching branch: both
+              // already resolve correctly for `'backlog'` through their
+              // existing `view === 'board' ? … : …` shape, because the
+              // Backlog tab shares the List tab's filter vocabulary exactly
+              // (same `FilterSpec`, same `matchesListRow`-driven axes) —
+              // `board` is the only OTHER special case either needs.
+              //
+              // `narrowing` gained a FOURTH branch in Task 11: Calendar and
+              // Timeline read `datesNarrowing`, not `listNarrowing` — the
+              // further cut that applies the "closed hidden by default" rule
+              // those two tabs alone carry (Ruling 44). `unapplied` needs no
+              // new branch (`describeUnappliedListAxes` already covers all
+              // four non-board tabs identically); `chips` does, to add the
+              // Closed axis's own disclosure — see `listFilterChips`/
+              // `closedDefaultChip`'s own docblocks above for why that is a
+              // SEPARATE list from `activeFilterChips` rather than a change
+              // to it.
+              const narrowing =
+                view === 'board'
+                  ? boardNarrowing
+                  : view === 'backlog'
+                    ? backlogNarrowing
+                    : view === 'calendar' || view === 'timeline'
+                      ? datesNarrowing
+                      : listNarrowing;
+              const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
+              const chips =
+                view === 'board'
+                  ? narrowingChips
+                  : closedDefaultChip !== null
+                    ? [...listFilterChips, closedDefaultChip]
+                    : listFilterChips;
+              // Controller ruling, Task 10 fix round 1 (amended fix round 2):
+              // the scope note names the tab it is actually on, rather than
+              // always saying "the board" for List/Calendar/Timeline too. A
+              // `Record` over `typeof view` — not a ternary chain — because a
+              // ternary falls through to its final `else` for ANY unmatched
+              // value, so a fifth `view` member added later would compile
+              // unchanged and silently inherit `'timeline'`'s noun, the exact
+              // "names the wrong place" defect this note exists to prevent.
+              // `view`'s own type is an inline union (`useState<'board' |
+              // 'list' | 'calendar' | 'timeline' | 'backlog'>` above), not a
+              // named alias, so `typeof view` is what keys this `Record` to
+              // it — a `Record<K, V>` requires EVERY member of `K` as a
+              // property, so a tab added to that union without a matching
+              // entry here fails `typecheck`, not silently at runtime.
+              // Proven, not asserted: fix round 2 deleted the `timeline`
+              // entry and watched `tsc` reject it; Task 10 is the first REAL
+              // addition since, and omitting `backlog` here does fail
+              // `tsc` exactly as promised — confirmed by trying it.
+              const TAB_NOUN: Record<typeof view, string> = {
+                backlog: 'backlog',
+                board: 'board',
+                list: 'list',
+                calendar: 'calendar',
+                timeline: 'timeline',
+              };
+              const tabNoun = TAB_NOUN[view];
+              if (
+                narrowing === null ||
+                !shouldRenderNarrowingStrip({
+                  // `activeFilterChips.length` on the BOARD tab, UNCHANGED
+                  // (see `narrowingChips`'s own docblock on why `workflowChip`
+                  // is deliberately not counted here). `chips.length`
+                  // everywhere else — Task 11's own `closedDefaultChip` is a
+                  // MANDATED disclosure (Ruling 44) that can be present while
+                  // `shown === total` (nothing in this project happens to be
+                  // closed today), so unlike `workflowChip` it is not always
+                  // covered by the gate's third term on its own; counting it
+                  // here is what guarantees a chip this render actually
+                  // building is a chip the strip actually shows.
+                  chipCount: view === 'board' ? activeFilterChips.length : chips.length,
+                  unappliedAxisCount: unapplied.length,
+                  shown: narrowing.shown,
+                  total: narrowing.total,
+                })
+              ) {
+                return null;
+              }
+              return (
+                <div className="gn-project__narrowing" data-testid="board-narrowing">
+                  <span className="gn-project__count" data-testid="board-narrowing-count">
+                    {narrowing.shown} of {narrowing.total} shown
+                  </span>
+                  {chips.map((chip) => (
+                    <span
+                      key={chip.key}
+                      className={chip.mode === 'exclude' ? 'gn-project__filter-chip gn-project__filter-chip--exclude' : 'gn-project__filter-chip'}
+                      data-testid={`board-filter-chip-${chip.key}`}
+                    >
+                      {chip.mode === 'exclude' ? <ChoiceGlyph mode="exclude" /> : null}
+                      {chip.label}
+                      <button
+                        type="button"
+                        className="gn-project__filter-chip-remove"
+                        onClick={chip.onRemove}
+                        aria-label={`Remove filter — ${chip.label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {unapplied.length > 0 ? (
+                    /**
+                     * THE LOCATION CLAUSE — REMOVED (Task 5), NAMES ITS TAB
+                     * (controller ruling, Task 10 fix round 1, 2026-09-17).
+                     * Task 4 shipped "— set on the list tab, where a ticket
+                     * carries the field", written before this sheet existed
+                     * and flagged in that task's own report for
+                     * re-verification once it landed. It is not re-pointed at
+                     * the Filters sheet: on the BOARD, `unapplied` (there,
+                     * `boardUnappliedAxes`) can join UP TO FOUR axis names in
+                     * one sentence (collaborator, due date, custom field,
+                     * closed — the last added Task 11 fix round 2, Ruling 46),
+                     * and after Task 5 only ONE of those — collaborator —
+                     * has a control anywhere in the product, and it lives in
+                     * the Filters sheet, not the list tab. `dueBefore`/
+                     * `dueAfter`/`fields` remain unsettable anywhere today (see
+                     * `FiltersSheet`'s own docblock). A single trailing clause
+                     * cannot name a different true location per axis in a
+                     * joined list, and "set in the Filters sheet" would be
+                     * right for collaborator today and silently wrong for the
+                     * other two the moment either gains a control elsewhere —
+                     * exactly the "names the wrong place" failure this task
+                     * was asked to avoid. Saying only what is true (the axis is
+                     * not applied here) outlives whichever surface next grows a
+                     * control for the other two.
+                     *
+                     * UPDATED Task 11 fix round 2 (Ruling 46): `closed` joined
+                     * `describeUnappliedBoardAxes` as a FOURTH board-blind
+                     * axis — see that function's own docblock for why it is a
+                     * different REASON (the board excludes closed tickets
+                     * entirely, rather than lacking a field for them) and why
+                     * only `filter.closed === true` triggers it. `closed` DOES
+                     * have a control (this task's own Filters-sheet toggle),
+                     * so two of these four axes — collaborator and closed —
+                     * now have one; `dueBefore`/`dueAfter`/`fields` still have
+                     * none.
+                     *
+                     * On the OTHER three tabs, `unapplied` is
+                     * `describeUnappliedListAxes`'s result — collaborator, and
+                     * nothing else, is the only axis that function can ever
+                     * return (its own docblock in `board-search-scope.ts`:
+                     * `matchesListRow` answers the due bounds, field clauses
+                     * AND `closed` itself) — so the "UP TO FOUR" reasoning
+                     * above is Board-specific; List/Calendar/Timeline can only
+                     * ever join a ONE-entry list. `tabNoun` (computed above)
+                     * is what keeps the WHERE half of the sentence honest per
+                     * tab, the same way `unapplied` keeps the WHAT half
+                     * honest per tab.
+                     */
+                    <span className="gn-project__scope-note" data-testid="board-scope-note">
+                      Not applied on the {tabNoun}: {unapplied.join(', ')}.
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
 
             {view === 'calendar' ? (
               // The calendar and the timeline read the SAME list as the List
@@ -605,20 +1686,178 @@ function ProjectBoard() {
             ) : view === 'board' ? (
               board.error !== null ? (
                 <ShellRefusal what="The board" message={board.error} />
-              ) : board.data !== null ? (
-                <Board board={board.data} onOpenTicket={openTicket} />
+              ) : boardNarrowing !== null ? (
+                // `boardNarrowing.view`, never `board.data` — the grid and the
+                // `N of M shown` count above must read the SAME narrowed
+                // groups (Ruling 1), and this is the one render site that
+                // proves it: there is no second `board.data.groups` walk
+                // anywhere on this page.
+                //
+                // `isNarrowed` (Ruling 19, board-prototype-port Task 7 fix,
+                // 2026-09-16): `shown !== total` is the SAME expression
+                // `shouldRenderNarrowingStrip` above already reads as one
+                // of its three terms, not a second definition of "narrowed" —
+                // true exactly when the filter actually dropped a card, which
+                // (since narrowing drops cards only, never columns or groups)
+                // is also exactly when `total > 0` while the cards `Board`
+                // can see have been cut to `shown`. Without this, `Board`'s
+                // own R6 sentence cannot tell "this project truly has no
+                // tickets" from "a filter hid all of them" and says "create
+                // one" for both — see `Board`'s own `isNarrowed` docblock.
+                <Board
+                  board={boardNarrowing.view}
+                  onOpenTicket={openTicket}
+                  isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
+                  /*
+                    THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
+                    13). Gated on `session.kind === 'signed-in'`, the SAME
+                    precedent `createRegion` above already sets for
+                    `CreateTicketFlow` and for the identical reason spelled
+                    out at `currentUserId`'s own declaration: a click landing
+                    in the load window, or from a signed-out viewer, would
+                    build `makeSubmittedFactory({actorId: '', ...})` and post
+                    an event with an empty actor — the door refuses it as a
+                    permission problem when the truth is "not signed in yet",
+                    the exact wrong-sentence failure that fix already exists
+                    to prevent. `undefined` here is what `Board`'s own
+                    `moves?` treats as the capability being entirely absent —
+                    no arrows drawn, not dead ones with no session behind
+                    them (`board.tsx`'s own `BoardMoveCapability` docblock).
+
+                    `onMoved: board.reload` mirrors `TicketSheet.
+                    submitTransition`'s own `read.reload()` call: an
+                    immediate reload rather than relying solely on
+                    `useLiveQuery`'s debounced stream refetch, which can lag
+                    up to 200ms behind a move the person just watched
+                    succeed.
+                  */
+                  {...(session.kind === 'signed-in'
+                    ? {
+                        moves: {
+                          dataSource,
+                          workspaceId,
+                          currentUserId,
+                          onMoved: board.reload,
+                          cache,
+                        },
+                      }
+                    : {})}
+                />
+              ) : (
+                <p>Loading…</p>
+              )
+            ) : view === 'backlog' ? (
+              // Task 10 (backlog/closed spec §5.4) — the Backlog tab. Same
+              // refusal/loading shape every other arm on this page uses;
+              // `backlogNarrowing !== null` implies `list.rows !== null` and
+              // `listNarrowing !== null` (its own docblock, above), so this
+              // gate is complete on its own.
+              list.error !== null ? (
+                <ShellRefusal what="The backlog" message={list.error} />
+              ) : backlogNarrowing !== null ? (
+                <TicketList
+                  // THE SAME NARROWING WORD THE LIST TAB PASSES — not a
+                  // Backlog-specific vocabulary. The brief's own words
+                  // ("narrowing word as the List's"): the Backlog tab shares
+                  // the List tab's `FilterSpec` and its `matchesListRow`-driven
+                  // axes exactly, so whether "your filters" is in force is one
+                  // fact, not two — this is the identical expression the List
+                  // arm below computes, read against `listNarrowing` (not
+                  // `backlogNarrowing`) on purpose, so the word names what the
+                  // FILTER did, the same word on both tabs, while `rows` still
+                  // narrows each tab to its own subset.
+                  {...(() => {
+                    const word = listNarrowingWord(
+                      activeOnly,
+                      shouldRenderNarrowingStrip({
+                        chipCount: activeFilterChips.length,
+                        unappliedAxisCount: listUnappliedAxes.length,
+                        shown: listNarrowing?.shown ?? 0,
+                        total: listNarrowing?.total ?? 0,
+                      }),
+                    );
+                    return word === undefined ? {} : { narrowing: word };
+                  })()}
+                  rows={backlogNarrowing.rows}
+                  currentUserId={currentUserId}
+                  prefs={list.prefs}
+                  onPrefsChange={list.setPrefs}
+                  prefsEditable={list.canSetPrefs}
+                  labels={labels}
+                  onOpenTicket={openTicket}
+                  emptyCopy="Nothing in the backlog — new tickets land here."
+                  /*
+                    THE START CAPABILITY, gated on `session.kind ===
+                    'signed-in'` — the same precedent `createRegion` and the
+                    board's own `moves` prop already set (`currentUserId`'s
+                    own declaration, above): a click landing before the
+                    session resolves, or from a signed-out viewer, would
+                    build an event with an empty `actorId`
+                    (`BacklogStartButton`'s own docblock on why it takes
+                    `currentUserId` at all). Omitted entirely rather than
+                    passed with a blank actor — no trailing column renders
+                    for a signed-out viewer, matching `TicketList`'s own
+                    `rowAction`-absent default.
+
+                    `startTargetFor` resolves the target PER ROW (Ruling 42);
+                    `backlogWorkflowDefs.data ?? new Map()` is the empty
+                    answer while that fetch is in flight, which
+                    `startTargetFor` reads as `null` — Start renders
+                    disabled, never as licence to submit `{to: null}`.
+                  */
+                  {...(session.kind === 'signed-in'
+                    ? {
+                        rowAction: (row: ListRow) => (
+                          <BacklogStartButton
+                            row={row}
+                            toStateId={startTargetFor(row, ticketTypes.data ?? [], backlogWorkflowDefs.data ?? new Map())}
+                            dataSource={dataSource}
+                            workspaceId={workspaceId}
+                            currentUserId={currentUserId}
+                            onStarted={list.reload}
+                          />
+                        ),
+                      }
+                    : {})}
+                />
               ) : (
                 <p>Loading…</p>
               )
             ) : list.error !== null ? (
               <ShellRefusal what="The ticket list" message={list.error} />
-            ) : list.rows !== null ? (
+            ) : list.rows !== null && listNarrowing !== null ? (
               <TicketList
-                // The words, not a flag: the summary has to say WHICH narrowing,
-                // and `undefined` here is what makes the unnarrowed count still
-                // read as the project's own.
-                {...(activeOnly ? { narrowing: 'tickets in progress' } : {})}
-                rows={list.rows}
+                // THE WORDS, not a flag (exclude-mode spec §3, since
+                // 2026-09-17): the summary has to say WHICH narrowing is in
+                // force, now that TWO can be at once — the server-side
+                // "active only" toggle and the client-side filter that
+                // reaches this tab as of this task. `listNarrowingWord` names
+                // either, both (joined), or neither; `undefined` is what
+                // makes the unnarrowed count still read as the project's
+                // own. The second argument calls the SAME
+                // `shouldRenderNarrowingStrip` gate the strip above uses for
+                // this tab, so the summary word and the strip's own
+                // visibility agree BY CONSTRUCTION — one gate, not two hand-
+                // written copies of it that could drift apart. Its third
+                // term (`shown !== total`) is why this is not just
+                // `listUnappliedAxes`/`activeFilterChips`: those two alone
+                // would miss the ONE list-only mechanism that can narrow with
+                // neither: a `dueBefore`/`dueAfter`/`fields` clause set with
+                // no chip and no unapplied-axis entry (both are list-shaped
+                // enumerations).
+                {...(() => {
+                  const word = listNarrowingWord(
+                    activeOnly,
+                    shouldRenderNarrowingStrip({
+                      chipCount: activeFilterChips.length,
+                      unappliedAxisCount: listUnappliedAxes.length,
+                      shown: listNarrowing.shown,
+                      total: listNarrowing.total,
+                    }),
+                  );
+                  return word === undefined ? {} : { narrowing: word };
+                })()}
+                rows={listNarrowing.rows}
                 // `''` while the session resolves or when signed out, and here
                 // that is harmless and deliberate: this prop drives only the
                 // *Recently assigned* pin, so an unknown viewer pins nothing.
@@ -637,7 +1876,7 @@ function ProjectBoard() {
             ) : (
               <p>Loading…</p>
             )}
-          </>
+          </div>
         )}
       </div>
 
@@ -659,6 +1898,421 @@ function ProjectBoard() {
           onClose={closeTicket}
         />
       ) : null}
+
+      {/*
+        Rendered unconditionally on `expired` (matching `TicketSheet` just
+        above) — harmless, since the trigger that could ever set
+        `filtersOpen` true only exists inside the `!expired` branch, and the
+        component's own `if (!open) return null` gate means `expired`
+        toggling can never leave it mounted with nothing behind it.
+      */}
+      <FiltersSheet
+        open={filtersOpen}
+        onClose={closeFilters}
+        filter={filter}
+        setFilter={setFilter}
+        members={members.data}
+        membersError={members.error}
+        typeOptions={typeOptions}
+        typesError={ticketTypes.error}
+        typesPending={ticketTypes.data === null}
+        boardStateOptions={boardStateOptions}
+        boardLoaded={board.data !== null}
+        boardError={board.error}
+      />
     </main>
+  );
+}
+
+/** `stateCategorySchema`'s three values (`packages/domain/src/workflow.ts`), fixed and ordered — never derived from a fixture's own key order. */
+const STATE_CATEGORIES: readonly StateCategory[] = ['open', 'active', 'terminal'];
+const STATE_CATEGORY_LABELS: Record<StateCategory, string> = {
+  open: 'Open',
+  active: 'Active',
+  terminal: 'Terminal',
+};
+
+/**
+ * RULING 13's own regression: "Clear all" (Ruling 12's fix) cleared a
+ * DIFFERENT six than its own docblock and both commit messages claimed —
+ * `collaboratorIds` (not a `BoardFilterSpec` axis) IN, `projectIds` (one of
+ * the six, with a working chip) OUT — because the set existed only as a
+ * hand-typed object literal inside `clearAll`, with nothing else in the file
+ * checking it against the axes it was supposed to name. Exported as ONE
+ * array so `clearAll` and `filters-sheet.test.tsx` read the SAME list rather
+ * than two independently hand-typed copies — the exact mechanism that
+ * produced the wrong six twice. The six `BoardFilterSpec` fields
+ * (`buildFilterChips`'s own domain) plus `collaboratorIds` (this
+ * sheet's one board-blind axis, which discloses through the scope note
+ * rather than a chip — see `FiltersSheet`'s own docblock) — plus `exclude`
+ * (exclude-mode spec §4, 2026-09-17): the whole exclude half, so "Clear all"
+ * clears what the tri-state controls set in EITHER direction. `closed`
+ * (Task 11) joined the same list for the same reason as every other member:
+ * the set's own criterion is "every axis the narrowing strip's chips can
+ * represent" (Ruling 12), and `board-filter-chip-closed`'s own "Remove
+ * filter — Closed: …" button is exactly that since `buildFilterChips` grew
+ * a `closed` branch — without it, "Clear all" would leave an explicit
+ * `filter.closed` in place, the control would still read
+ * `Closed, included`/`Closed, excluded`, and the chip would survive: Ruling
+ * 12's own defect, on the one axis added since Ruling 13 had to re-fix it.
+ * `clearFilterAxes` writes `closed: undefined` here, not the cycler's own
+ * delete-the-key idiom (`withCycledClosed`'s "off" branch) — no special case
+ * needed, since `closedMode` maps `undefined` to `'off'` either way and every
+ * other axis in this array is already reset the same "set to undefined"
+ * way, never deleted.
+ */
+export const FILTERS_SHEET_CLEARABLE_AXES = [
+  'text',
+  'assigneeIds',
+  'typeIds',
+  'stateIds',
+  'stateCategories',
+  'projectIds',
+  'collaboratorIds',
+  'closed',
+  'exclude',
+] as const satisfies readonly (keyof FilterSpec)[];
+
+/**
+ * Resets every axis named in `FILTERS_SHEET_CLEARABLE_AXES` to `undefined`,
+ * leaving every other `FilterSpec` field untouched. A separate function
+ * (rather than inlined in `clearAll`) so it can be unit-tested directly
+ * against a `FilterSpec` carrying `projectIds` — a shape no control on this
+ * page can currently produce through the UI, which is exactly why Ruling
+ * 13's gap went unnoticed until the coordinator's review read the code
+ * axis-by-axis rather than trusting the docblock.
+ */
+export function clearFilterAxes(filter: FilterSpec): FilterSpec {
+  const next: FilterSpec = { ...filter };
+  for (const axis of FILTERS_SHEET_CLEARABLE_AXES) {
+    // Every `FilterSpec` field is optional, so `undefined` is a legal value
+    // for every one of them — the cast exists only because TypeScript
+    // cannot narrow an assignment made through a `keyof` union spanning
+    // fields of different types, not because this could ever be unsafe.
+    (next as Record<keyof FilterSpec, unknown>)[axis] = undefined;
+  }
+  return next;
+}
+
+type FiltersSheetProps = {
+  open: boolean;
+  /** The ONE close path for every exit (Escape, backdrop click, "Done") — see `ProjectBoard`'s own `closeFilters` for why a single function, not one per exit. */
+  onClose: (returnFocus: boolean) => void;
+  filter: FilterSpec;
+  setFilter: (updater: (current: FilterSpec) => FilterSpec) => void;
+  /** `null` while the roster has not been read — never `[]`, which would claim this workspace has no members (see `visibility-editor.tsx:242-245`'s identical rule for the same read). */
+  members: Actor[] | null;
+  /** Distinct from `members === null`: PENDING and REFUSED are different facts, and a "has not loaded yet" sentence over a REAL refusal names the wrong cause — the exact defect `ProjectBoard`'s own docblock on `useSessionStatus` was written about, one component over. */
+  membersError: string | null;
+  /** Already resolved by `ProjectBoard` to the same built-in-ladder-while-loading fallback `createRegion` uses — one source of truth for "what are this workspace's types", not a second. */
+  typeOptions: Array<{ id: string; name: string }>;
+  typesError: string | null;
+  /** True while `typeOptions` is the built-in fallback rather than the workspace's own served types. */
+  typesPending: boolean;
+  boardStateOptions: Array<{ id: string; name: string }>;
+  boardLoaded: boolean;
+  /** Same pending-vs-refused distinction as `membersError`, for the State section. */
+  boardError: string | null;
+};
+
+/**
+ * THE FILTERS SHEET (board-prototype-port Task 5) — a side panel over the
+ * SAME page-level `filter` state the search box and the removable chips
+ * (`board-search-scope.ts`) already read and write. There is no draft copy
+ * here and no "Apply" button: every checkbox and chip writes straight
+ * through to `filter` on click, exactly like the removable chip's own
+ * `onRemove`. A draft-and-apply design would be a second filter state — the
+ * one thing the brief and `page.tsx`'s own comments repeatedly forbid — and
+ * it would desync the moment someone removes a chip from the narrowing strip
+ * while the sheet is closed: the strip writes `filter` directly, and a
+ * buffered copy would not see it. The footer is "Clear all" (RULING 12: the
+ * button's own label is the promise a viewer reads, so it clears every axis
+ * the narrowing strip's chips can represent — the six `BoardFilterSpec`
+ * fields, `text` included even though the search box is Task 4's control
+ * living outside this sheet — PLUS `collaboratorIds`, which this sheet can
+ * set and which discloses through the scope note rather than a chip; see
+ * `clearAll`'s own docblock, corrected by RULING 13, for the exact set —
+ * does not close) and "Done" (closes only).
+ *
+ * ## Which axes get a control here, and which do not
+ *
+ * Five of `BoardFilterSpec`'s six axes get a control (`text` already has the
+ * search box built by Task 4): **Assignee**, **Collaborators**, **Type**,
+ * **State** and **Category** (`assigneeIds`/`collaboratorIds`/`typeIds`/
+ * `stateIds`/`stateCategories`). Every value is ONE control, `TriStateChoice`
+ * (exclude-mode spec §4, 2026-09-17): off → include → exclude → off, cycled
+ * through `withCycledId` onto this same `filter`; the person rows keep their
+ * avatar and name inside that button. `projectIds` gets none: this page is already
+ * scoped to the one project it is showing, Task 4's own report found no
+ * natural label source for it here ("a project-picker axis has no natural
+ * label source... the chip names a COUNT"), and the brief's own curated
+ * metrics line for this task never mentions a project control.
+ *
+ * `collaboratorIds` is deliberately included even though it is one of the
+ * four axes `BoardCard` cannot answer at all (`board-search-scope.ts`'s
+ * `describeUnappliedBoardAxes`) — Task 4's brief explicitly deferred its
+ * third Step-5 test ("names the axes the board could not evaluate... helper
+ * added in Task 5") to this commit, and this is that helper's only possible
+ * home. `dueBefore`/`dueAfter` and `fields` get no control: the design
+ * spec's own Filters-sheet metrics (`:1367-1417`) name exactly two control
+ * shapes — "person row" and "category chip" — and Task 5's brief curates
+ * those same two into its metrics line while dropping the spec's "Toggle"
+ * row entirely, which is the discriminating fact that no boolean/date
+ * control was meant to land here. Rendering an un-speced date-range input
+ * would be building a control the brief gives no shape for, and "An inert
+ * Filters button is a button that lies" cuts the other way too: a control
+ * this sheet cannot honestly justify from the brief is one it should not
+ * invent. So after this task, `dueBefore`/`dueAfter`/`fields` remain
+ * unsettable anywhere in the product — a known, named gap for whoever builds
+ * their control next, not a surprise (see the scope-note copy fix in
+ * `ProjectBoard`, which stopped naming a location for exactly this reason).
+ *
+ * ## Absence, not an invented empty list — and PENDING is not REFUSED
+ *
+ * `members === null` (roster not yet read) and `!boardLoaded` (board not yet
+ * read) each render a sentence saying so, never a silently empty picker —
+ * the same rule `visibility-editor.tsx` already follows for its own person
+ * list, restated here rather than reinvented. But `.data === null` is true
+ * for BOTH a read still pending and one that REFUSED, and those are
+ * different facts calling for different sentences — the same distinction
+ * `typesError`/`typesPending` already draws for the Type section, applied
+ * here too: `membersError`/`boardError` (from `members.error`/`board.error`,
+ * `useLiveQuery`'s own error channel) are checked FIRST, ahead of the
+ * pending branch, so a genuine refusal never gets the "has not loaded yet"
+ * sentence — the same wrong-cause failure this page's own
+ * `useSessionStatus` docblock was written about, one component over.
+ * `typesError !== null` renders a refusal sentence instead of the built-in
+ * ladder for the identical reason: `ProjectBoard`'s own docblock on
+ * `BUILTIN_TYPE_LADDER` forbids that fallback surviving a FAILED read (only
+ * a pending one), and `typeOptions` alone conflates the two, so this
+ * component is handed `typesError`/`typesPending` separately rather than
+ * inferring either from `typeOptions.length`.
+ *
+ * ## Accessibility contract
+ *
+ * `role="dialog"` + `aria-modal="true"`, labelled by its own `<h2>` via
+ * `aria-labelledby` (never a redundant `aria-label` naming the same text
+ * twice). Escape closes and returns focus to the Filters button
+ * (`onClose(true)`); a backdrop click closes without forcing focus
+ * (`onClose(false)`, mirroring `account-menu.tsx`'s outside-pointerdown
+ * case — the click already landed somewhere real). **Focus moves INTO the
+ * panel on open** — the first focusable descendant, mirroring
+ * `account-menu.tsx`'s own worked example and its docblock's own warning:
+ * without this, focus never leaves the trigger, and "Escape returns focus to
+ * the trigger" would be vacuously true because focus never left it. The
+ * test suite proves this is not vacuous by deleting the focus-return line
+ * and watching the case fail — see `filters-sheet.test.tsx`.
+ */
+function FiltersSheet({
+  open,
+  onClose,
+  filter,
+  setFilter,
+  members,
+  membersError,
+  typeOptions,
+  typesError,
+  typesPending,
+  boardStateOptions,
+  boardLoaded,
+  boardError,
+}: FiltersSheetProps) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const headingId = useId();
+
+  // Focus the first focusable descendant on open — see the docblock above
+  // for why this is load-bearing rather than cosmetic.
+  useEffect(() => {
+    if (!open) return;
+    const first = panelRef.current?.querySelector<HTMLElement>(
+      'input, button, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose(true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  /**
+   * RULING 12, corrected by RULING 13 (the first fix cleared a DIFFERENT six
+   * than it claimed to — see `FILTERS_SHEET_CLEARABLE_AXES`'s own docblock
+   * for the exact defect). "Clear all" clears every axis in that ONE
+   * exported list — the six `BoardFilterSpec` fields plus `collaboratorIds`
+   * — read here, not re-typed, so this function and its test share a single
+   * source rather than two hand-typed copies that can silently diverge
+   * again. The search `<input>` needs no separate reset for `text`: it is a
+   * controlled component reading `value={filter.text ?? ''}` directly
+   * (`ProjectBoard`'s own JSX), never local state, so clearing `filter.text`
+   * here empties it for free — checked, not assumed, confirmed by `13.459`.
+   */
+  const clearAll = () => setFilter(clearFilterAxes);
+
+  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
+    <fieldset className="gn-filters__section">
+      <legend className="gn-filters__section-label">{title}</legend>
+      {membersError !== null ? (
+        <p className="gn-filters__pending">
+          This workspace’s roster could not be loaded, so filtering by {title.toLowerCase()} is not
+          offered.
+        </p>
+      ) : members === null ? (
+        <p className="gn-filters__pending">The workspace roster has not loaded yet.</p>
+      ) : members.length === 0 ? (
+        <p className="gn-filters__pending">No members to choose from.</p>
+      ) : (
+        <div className="gn-filters__person-list">
+          {members.map((member) => (
+            <TriStateChoice
+              key={member.id}
+              className="gn-filters__choice--row"
+              label={member.name}
+              mode={choiceMode(filter, key, member.id)}
+              onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
+            >
+              {/*
+                `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
+                its span (`components/avatar.tsx`), so left unhidden it
+                doubles this checkbox's accessible name to "Uma One Uma
+                One" — the label's accname concatenates every descendant's
+                text/label, and the plain `<span>` right after already
+                carries the real one. Decorative here, not a second source
+                of truth.
+              */}
+              <span aria-hidden="true">
+                <Avatar name={member.name} size="small" />
+              </span>
+              <span>{member.name}</span>
+            </TriStateChoice>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+
+  return (
+    <div className="gn-filters__scrim" data-testid="filters-scrim" onClick={() => onClose(false)}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        className="gn-filters__panel"
+        data-testid="filters-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="gn-filters__header">
+          <h2 id={headingId} className="gn-filters__heading">
+            Filters
+          </h2>
+        </div>
+        <div className="gn-filters__body">
+          {personSection('Assignee', 'assigneeIds')}
+          {personSection('Collaborators', 'collaboratorIds')}
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Type</legend>
+            {typesError !== null ? (
+              <p className="gn-filters__pending">
+                This workspace’s ticket types could not be loaded, so filtering by type is not offered.
+              </p>
+            ) : (
+              <>
+                <div className="gn-filters__chip-list">
+                  {typeOptions.map((type) => (
+                    <TriStateChoice
+                      key={type.id}
+                      label={type.name}
+                      mode={choiceMode(filter, 'typeIds', type.id)}
+                      onCycle={() => setFilter((current) => withCycledId(current, 'typeIds', type.id))}
+                    />
+                  ))}
+                </div>
+                {typesPending ? <p className="gn-filters__pending">{BUILTIN_LADDER_NOTICE}</p> : null}
+              </>
+            )}
+          </fieldset>
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">State</legend>
+            {boardError !== null ? (
+              <p className="gn-filters__pending">
+                This project’s board could not be loaded, so filtering by state is not offered.
+              </p>
+            ) : !boardLoaded ? (
+              <p className="gn-filters__pending">This project’s board has not loaded yet.</p>
+            ) : boardStateOptions.length > 0 ? (
+              <div className="gn-filters__chip-list">
+                {boardStateOptions.map((state) => (
+                  <TriStateChoice
+                    key={state.id}
+                    label={state.name}
+                    mode={choiceMode(filter, 'stateIds', state.id)}
+                    onCycle={() => setFilter((current) => withCycledId(current, 'stateIds', state.id))}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </fieldset>
+
+          {/**
+           * THE CLOSED CONTROL (Task 11, spec §5.5): ONE `TriStateChoice`,
+           * not a person row or a chip list — `closed` is a single boolean
+           * with no per-value list the way Assignee/Type/State/Category each
+           * have, so there is exactly one control to render, cycling
+           * `filter.closed` itself through `closedMode`/`withCycledClosed`
+           * (`filter-cycle.ts`) rather than `choiceMode`/`withCycledId`,
+           * which have nothing to add a VALUE to here. Placed after State,
+           * before Category, matching the brief's own ordering.
+           */}
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Closed</legend>
+            <div className="gn-filters__chip-list">
+              <TriStateChoice
+                label="Closed"
+                mode={closedMode(filter)}
+                onCycle={() => setFilter(withCycledClosed)}
+              />
+            </div>
+          </fieldset>
+
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Category</legend>
+            <div className="gn-filters__chip-list">
+              {STATE_CATEGORIES.map((category) => (
+                <TriStateChoice
+                  key={category}
+                  label={STATE_CATEGORY_LABELS[category]}
+                  mode={choiceMode(filter, 'stateCategories', category)}
+                  onCycle={() => setFilter((current) => withCycledId(current, 'stateCategories', category))}
+                />
+              ))}
+            </div>
+          </fieldset>
+        </div>
+        <div className="gn-filters__footer">
+          <button type="button" className="gn-button gn-button--ghost" onClick={clearAll}>
+            Clear all
+          </button>
+          <button
+            type="button"
+            className="gn-button gn-button--primary"
+            onClick={() => onClose(true)}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

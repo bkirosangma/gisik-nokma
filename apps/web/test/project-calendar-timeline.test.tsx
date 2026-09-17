@@ -11,6 +11,14 @@ import { stubServices } from './helpers/stub-services.js';
  * 11.160–11.166 — the four-way `Board | List | Calendar | Timeline` chain, which
  * is Plan 6's Step 5b landed late by Plan 9's Task 14.
  *
+ * FIVE-WAY as of Task 10 (backlog/closed spec §5.4, 2026-09-17): `Backlog`
+ * joined the rail, FIRST, ahead of `Board`. 11.160 and 13.430 below are the
+ * only two cases in this file that name the tabs by fixed array position
+ * (`viewTabs()`'s own callers) — both updated in place for the new count and
+ * order rather than renumbered; every other case in this file addresses a
+ * tab by NAME (`findByRole('tab', {name: …})`) and needed no change.
+ *
+
  * The two questions this file exists for are the two the plan's snippet gets
  * wrong. First, `(list.rows ?? []).map(...)`: a REFUSED `getTickets` renders as
  * a complete month grid with nothing in it — a page saying no ticket here has a
@@ -98,6 +106,7 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     // This shell is online-only, so nothing is ever in transit for it — the
     // same reason `online/mappers.ts` fills `BoardCard.pending` with `false`.
     pending: false,
+    closed: null,
   };
   return { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } };
 }
@@ -130,12 +139,27 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
 }
 
 /**
- * Scoped to `.gn-view-tabs`, not a bare `screen.findAllByRole('tab')` —
- * `AppNav`'s `StyleToggle` (Task 14) is a second, unrelated `role="tablist"`
- * on the same page (`aria-label="Style"`), and an unscoped query over ALL
- * tabs on the page would count its three alongside these four. The view-tabs
- * tablist itself carries no `aria-label` to disambiguate by name, so this
- * scopes by the DOM container instead.
+ * Scoped to `.gn-segmented`, not a bare `screen.findAllByRole('tab')`.
+ *
+ * RENAMED (board-prototype-port Task 2, 2026-09-16): the container was
+ * `.gn-view-tabs` until this task restyled it onto the shared
+ * `.gn-segmented`/`.gn-segmented__item` classes — same `role="tablist"`, same
+ * four `role="tab"` children, only the class changed. `.gn-view-tabs` no
+ * longer exists anywhere in this page's markup (see `page.tsx`'s own
+ * docblock on the change), so a selector still pointed at it would have
+ * thrown on a null container rather than reporting a readable failure.
+ *
+ * STALE AS OF the owner's `StyleToggle` move (2026-09-09): the second,
+ * unrelated `role="tablist"` this scoping originally guarded against
+ * (`AppNav`'s `StyleToggle`, Task 14, `aria-label="Style"`) no longer lives
+ * on this page — it moved to `/account`, first becoming a plain `<select>`
+ * and then, in Phase 2 Wave A, migrating onto the shared `Select` component
+ * from `@gisik-nokma/ui` (whose trigger renders `role="button"`, not a
+ * tablist, so this remains a non-issue either way it's shaped). The scope
+ * is kept anyway rather than loosened back to a bare query: the view-tabs
+ * tablist itself still carries no `aria-label` to disambiguate by name if a
+ * future control ever adds a second tablist here again, and scoping by the
+ * DOM container costs nothing today.
  */
 async function viewTabs(): Promise<HTMLElement[]> {
   // BY ROLE, not by text, since Round 19b: `AppNav` now offers its own
@@ -144,20 +168,24 @@ async function viewTabs(): Promise<HTMLElement[]> {
   // `tab` that happen to share a label — a screen reader can, from the role
   // each carries.
   await screen.findByRole('tab', { name: 'Board' });
-  const container = document.querySelector('.gn-view-tabs') as HTMLElement;
+  const container = document.querySelector('.gn-segmented') as HTMLElement;
   return within(container).getAllByRole('tab');
 }
 
 describe('the project page mounts four views over one list read', () => {
-  it('11.160 offers all four tabs, with Board selected and each tab selected alone', async () => {
+  it('11.160 offers all five tabs (Backlog first), with Board selected and each tab selected alone', async () => {
     render(
       <Providers services={servedList([row()])}>
         <ProjectPage />
       </Providers>,
     );
     const tabs = await viewTabs();
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Board', 'List', 'Calendar', 'Timeline']);
+    // Task 10 (backlog/closed spec §5.4): Backlog joined the rail, FIRST — Board
+    // stays the DEFAULT SELECTION regardless (the rail's order and the page's
+    // default are independent facts; `page.tsx`'s own docblock on `view` says so).
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Backlog', 'Board', 'List', 'Calendar', 'Timeline']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
       'true',
       'false',
       'false',
@@ -169,8 +197,36 @@ describe('the project page mounts four views over one list read', () => {
       'false',
       'false',
       'false',
+      'false',
       'true',
     ]);
+  });
+
+  /**
+   * 13.430 — the tab rail is the SHARED segmented control, not a page-local
+   * lookalike. `viewTabs()` already scopes by `.gn-segmented` (Task 2 of the
+   * board-prototype-port renamed the container from `.gn-view-tabs`), so a
+   * class-name typo or a reverted rename would already null out `container`
+   * and throw before this case's own assertions run — this case adds the one
+   * thing that check does not: that exactly the SELECTED tab, and only it,
+   * carries `.gn-segmented__item--on`, driven from the same `view === tab`
+   * expression that sets `aria-selected` (`page.tsx`), rather than two
+   * comparisons that could drift apart.
+   */
+  it('13.430 the selected tab, and only it, carries gn-segmented__item--on', async () => {
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    const onFlags = (tabs: HTMLElement[]) =>
+      tabs.map((tab) => tab.classList.contains('gn-segmented__item--on'));
+
+    // Order is Backlog, Board, List, Calendar, Timeline (Task 10) — Board (index 1) starts selected.
+    expect(onFlags(await viewTabs())).toEqual([false, true, false, false, false]);
+
+    await openTab('Calendar');
+    expect(onFlags(await viewTabs())).toEqual([false, false, false, true, false]);
   });
 
   /**

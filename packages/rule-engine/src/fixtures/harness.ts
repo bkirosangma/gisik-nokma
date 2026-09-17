@@ -6,6 +6,7 @@ import {
   CONTEST_EVENT_TYPES,
   ORIGINS,
   membershipId,
+  stateCategoryOf,
   stateCategorySchema,
   ticketTypeDefSchema,
   workflowDefinedPayloadSchema,
@@ -468,17 +469,20 @@ function applyPriorEvent(
       const payload = ticketTransitionedFixturePayloadSchema.parse(env.payload);
       const ticket = mustTicket(tickets, env);
       const def = defs.get(`${ticket.workflowId}@${ticket.workflowVersion}`);
-      const state = def?.states.find((s) => s.id === payload.to);
-      if (state === undefined) {
+      // `stateCategoryOf`, not a raw `def.states.find`: it reads the
+      // backlog-aware set (`statesWithBacklog`, Task 1), so a fixture moving a
+      // ticket TO backlog resolves category 'open' instead of throwing.
+      const category = def === undefined ? undefined : stateCategoryOf(def, payload.to);
+      if (category === undefined) {
         throw new Error(`fixture prior event moves ticket ${ticket.id} to unknown state "${payload.to}"`);
       }
-      ticket.stateId = state.id;
-      ticket.stateCategory = state.category;
+      ticket.stateId = payload.to;
+      ticket.stateCategory = category;
       // The entry records the workflow AND version whose vocabulary its
       // toStateId is written in — the ticket's own pair at the moment the
       // move was applied. Both are read back by require-different-user.
       ticket.transitions.push({
-        toStateId: state.id,
+        toStateId: payload.to,
         actorId: env.actorId,
         seq: env.seq,
         workflowId: ticket.workflowId,

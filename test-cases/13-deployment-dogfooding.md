@@ -11,6 +11,18 @@ then-highest id rather than renumbering. **Never renumber**: when Task 16, or an
 they continue from this file's then-highest id in turn, exactly as `09-editor-attachments.md` and
 `12-offline-sync-apps.md` did for the reservation gaps they each recorded.
 
+**AND THE PLANS COUNT TOO — added 2026-09-18, after a real collision.** ids reserved by a plan under
+`docs/superpowers/plans/` count as minted — recount BOTH the catalogue and the plans
+(`git grep -hoE '13\.[0-9]{3}' -- docs/superpowers/plans test-cases | sort -u | tail`) before allocating.
+The trap is exact: a plan reserves its range when it is WRITTEN, a catalogue mint reads the CATALOGUE
+when it runs, and the two see the same numbers as free. Step 1's hot-reload block did that on 2026-09-18
+(13.613–13.616 against the second-wave plan's 13.613–13.649, reserved since `5039209c` — before it) and
+was re-minted to 13.650–13.653; the block's own note at the end of this file carries the detail. **Keep
+the `{3}` width in that command.** It is load-bearing twice over, and both halves are measured on this
+tree rather than argued: widening it to `[0-9]+` puts `13.99` above `13.649` (lexical sort on
+variable-width numbers) and admits `13.9999`/`13.632866`, which are this file's truncation traps rather
+than case ids.
+
 **IDS IN §13 ARE ALLOCATED, NOT DISCOVERED — the same collision class §12 recorded, one file over: Lane D
 independently minted its own 13.1–13.36 for Tasks 7/8 against this file's 13.1–13.6, from a fork point
 that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane C 13.1–13.40** (Tasks 14
@@ -30,6 +42,11 @@ the block was requested from the controller and used provisionally rather than w
 serial mode has one executor and therefore no competing claimant, and an id that has not merged can
 still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. `13.327`–`13.333` is ALLOCATED to Task 12 (passkey registration), of which `13.333` is the rate-limit property. `13.334`–`13.336` is ALLOCATED to round 2c, the phone gating (controller, 2026-09-08). ~~The next free BLOCK after that is `13.337`, controller-allocated ON REQUEST ONLY.~~** **`13.337`–`13.356` is ALLOCATED to the neomorphism-amendment's Tasks 14 and 15 (AMENDMENT 2026-09-09 to `docs/superpowers/plans/2026-09-08-hig-per-screen.md`) — `13.337`–`13.347` minted by Task 14 (the style axis, the toggle, and the shared-pieces restyle; this PR), `13.348`–`13.356` reserved for Task 15 (the sign-in/workspaces/invite neo restyle, not yet landed). The next free BLOCK is `13.357`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
+
+**Line citations into the prototype are dated, not timeless.** Every `desktop.dc.html:<line>` citation
+written before 2026-09-18 refers to the PRE-refresh file, readable at `git show
+b6d76a90:design-system/interactive/desktop.dc.html`; historical plans and anchors are NOT rewritten,
+and a live citation is re-measured by whoever next touches its line.
 
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
 > `11-calendar-notifications.md`'s pointer corrected on 2026-09-08, one file over. It is written once
@@ -1351,6 +1368,10 @@ maximum of `13.3333` — the id pattern collides with the pixel value this very 
   failed** — `/sign-in` AND `/help` at all three widths, each naming its own selectors. Restored with
   `git checkout --` from a commit made BEFORE the mutation (never from an uncommitted tree) and re-run
   green: 19 passed, EXIT 0.*
+  *SELECTOR RENAMED 2026-09-15, finding unchanged: `.gn-help__tab` no longer exists — `/help`'s
+  document switch became the shared `SegmentedControl`, and the class's one remaining user,
+  `apps/desktop`'s help toggle, is now `.gn-help__toggle`. The record below is kept verbatim because it
+  documents how the defect was FOUND; only the name it was found under has moved. See 15.22.*
   *THE MUTATION FOUND A SITE NO SIZE INSTRUMENT COULD HAVE: `button.gn-help__tab` was rendering at
   **16px in Arial**. `ui.css:1321` sets `font-size: 1rem` and no `font-family`, so its SIZE was already
   correct and the defect was invisible to the 12px floor, to the size histogram, and to the raised-floor
@@ -1932,6 +1953,19 @@ the gate would have stayed 33/33.*
   `sweepAccessibleNames` tracks; its accessible name comes from text content and its role is
   implicit from the tag. 13.285 is inert against the loss of a whole unlabelled button — a real
   gap in that guard, reported rather than papered over. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+
+> **13.292 AMENDED AGAIN, 2026-09-15 (final whole-branch review of the account/help-screens plan, fix
+> wave item 1).** The "count 0 ... for the passkey button" sentence above described the case as it
+> stood *before* Task 8: registration now exists on `/account`, so the passkey button is no longer one
+> of the two methods "that could not work". The case's own code kept asserting `toHaveCount(0)` for it
+> anyway — a stale assertion Task 8's own audit had already found and fixed once, in the identical
+> shape, in `apps/web/e2e/smoke.spec.ts`; this file just sat outside that audit's `apps/web/e2e/` grep
+> scope. Deterministic red, not gated by CI (this suite isn't in the turbo gate), caught only by this
+> review. Fixed to `toBeVisible()`: the passkey button is not gated on `/v1/auth/methods` the way
+> Google/Apple are (it needs no provider), so it is the one control that survives the all-refused
+> answer this case drives — the honest expectation is now Google absent, Apple absent, the passkey
+> button visible, and no `.gn-sign-in__marks` row.
+
 - **13.293** ✅ The adopted helper text ("It expires in 15 minutes.") renders on the Email method
   only, not on Phone. — (`apps/web/e2e-viewport/responsive.spec.ts`)
 - **13.294** ✅ No `Password` tab exists on sign-in; `auth.ts:84` forbids the method
@@ -2198,7 +2232,10 @@ nobody ships and then defend it.
 ## Task 14 of the neomorphism amendment (2026-09-09) — the style axis, the toggle, and the shared pieces
 
 Block `13.337`–`13.347`. `packages/ui/src/tokens.ts` gains a `StyleName` axis (`hig`|`minimal`|`neo`)
-beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay`);
+beside `ThemeName`, plus `radiusOf`/`shadowValueOf` (roles `card`/`control` and `raised`/`sunken`/`overlay` —
+**a fourth shadow role, `sunken-compact`, joined 2026-09-16 (block `13.411`), and a fifth, `selected`,
+joined the same day (block `13.412`); see those blocks below rather than treating
+this historical sentence as the current roster**);
 `StyleToggle` (`apps/web/src/style-toggle.tsx`) ships beside `ThemeToggle`, neo default. That half
 committed separately (`8e6c6d31`); this section is the CSS restyle of the nine shared class families
 (`.gn-segmented*`, `.gn-field*`, `.gn-button*`, `.gn-refusal*`, `.gn-page-header*`, `.gn-card`,
@@ -2251,14 +2288,20 @@ card-scale) and is recorded here only for completeness, not as a call.
   override stripping it back to a boundary. — (`packages/ui/test/components.test.tsx`)
 - **13.341** ✅ Dark theme, per style: `surface`↔`surfaceRaised`, `surface`↔`surfaceSunken` and
   `surfaceRaised`↔`surfaceSunken` each separate by fill at or above a LITERAL floor (never derived from
-  the same `colorOf` call the assertion reads). **`neo`'s `surface↔raised` floor is pinned at `1.20`, not
-  the plan's literal "at least Task 13's measured value" (`1.214`, hig/minimal's own figure) — `tokens.ts`'s
-  `neoNavyRaised` docblock records why this is a genuine collision, not an oversight: lightening `neoNavy`
-  far enough to clear 1.214 pushes `accent` on `surfaceRaised` below the 4.5 `CONTRAST_PAIRS` already
-  guarantees it, and the luminance window both constraints would need is empty by ~0.00002 independent of
-  hue. The achieved 1.2035 clears the pinned 1.20 floor; the 0.8% shortfall from 1.214 is recorded, not
-  hidden.** `raised↔sunken` (1.29 floor, 1.292 achieved) and `surface↔sunken` (1.55 floor, 1.555 achieved)
-  clear their own floors for `neo` with margin — only the one pair is exceptional. — (`packages/ui/test/tokens.test.ts`)
+  the same `colorOf` call the assertion reads) — for `hig`/`minimal` only. **UPDATED 2026-09-10, owner:
+  "revert to prototype's exact dark hex and fix the accent colour ratio instead" (the dark+neo input box
+  read visibly lighter/flatter than the prototype's own screenshot).** `neo` previously carried its own
+  narrower `1.20` floor here — `tokens.ts`'s `neoNavyRaised` docblock recorded a genuine collision at the
+  time: lightening `neoNavy` far enough to clear hig/minimal's `1.214` floor pushed the THEN-bare `accent`
+  role below the 4.5 `CONTRAST_PAIRS` guarantee it carried as text against `surfaceRaised`. **That
+  collision stopped binding the same day it was written**: a same-day change split `accent` into a
+  fill-only role and `textAccent` (the role actually derived to read as text), so `CONTRAST_PAIRS` no
+  longer names bare `accent` on `surfaceRaised`/`surface` at all. With `neoNavyRaised`/`neoNavySunken`
+  reverted to `neoNavy`, `neo` is now EXEMPT from this separation floor in dark, the same way it was always
+  exempt in light (`neoPaper`, one shared hex) — a new positive case in the same describe block asserts
+  `surfaceRaised`/`surfaceSunken` equal `surface` exactly for `neo`/dark. Verified empirically before the
+  revert: every `CONTRAST_PAIRS` row for `neo`/dark still passes, with MORE margin, because darker
+  backgrounds only help the light-toned foregrounds in play. — (`packages/ui/test/tokens.test.ts`)
 - **13.342** ✅ The accessible-name ratchet (13.285–13.287) does not fall on any route and rises by
   EXACTLY the `StyleToggle`'s contribution on every signed-in route: `ariaLabel` +1, `role` +4,
   `ariaSelected` +3, `ariaDescribedby` +0 (one `tablist` + three `tab`s), measured live against the
@@ -2287,16 +2330,31 @@ card-scale) and is recorded here only for completeness, not as a call.
   updated to the freshly measured (unchanged-membership) state; no entry was invented to match the
   plan's prediction. **Owner/controller: decide whether this needs its own instrument, an explicit
   roster-exemption line, or stands as documented and sufficient.** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
-- **13.344** ✅ `StyleToggle` renders one `role=tab` per style inside a `role=tablist` named by a
-  required `aria-label`, `data-style` lands on `document.documentElement`, and `aria-selected` tracks the
-  active style. Mutation: drop the `aria-label` → RED (witnessed on the prior commit that introduced this
-  test). — (`apps/web/test/style-toggle.test.tsx`)
-- **13.345** ✅ With nothing stored, the applied `data-style` is `neo`. *Mutation-witnessed here:
+- **13.344** ✅ (retitled a FOURTH time, 2026-09-15: back to `SegmentedControl`, on an owner
+  reference image for the Appearance card. The full identity chain is `SegmentedControl` → plain
+  `<select>` → shared `Select` → `SegmentedControl`; Phase 2 Wave A's invariant that no native
+  `<select>` remains in scope is untouched, since a segmented picker is not a native select — this
+  control simply stopped being a `Select` call site.) `StyleToggle` renders one labelled control —
+  a `role="tablist"` named `Style` holding 3 `role="tab"` entries, **`Apple HIG`/`Minimal`/
+  `Neomorphic`** (the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
+  `data-style` landing on `document.documentElement` when a choice is made, and a line beneath the
+  control naming the selected style. That description line has its own case: it must TRACK the
+  selection, asserted by switching and reading again, because fixed copy would satisfy any
+  single-state assertion. Mutation: drop the control's `aria-label` → RED (the lookup is by that
+  name); hard-code the description → RED on the second read. —
+  (`apps/web/test/style-toggle.test.tsx`)
+- **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed as
+  `aria-selected="true"` on the `Neomorphic` tab (retitled 2026-09-15 with the return to
+  `SegmentedControl`; previously the `Select` trigger's own visible label text, and before that a
+  native `<select>`'s `value`). *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
   check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
 - **13.346** ✅ A stored style choice survives a reload — asserted the same way `ThemeToggle`'s
   persistence is, a fresh mount restoring from `localStorage` rather than drifting from what
-  `layout.tsx`'s pre-paint script already applied. — (`apps/web/test/style-toggle.test.tsx`)
+  `layout.tsx`'s pre-paint script already applied; witnessed via the selected `role="tab"`
+  (retitled 2026-09-15 with the return to `SegmentedControl`; previously the shared `Select`
+  trigger's own visible label text, and before that a native `<select>`'s `value`). —
+  (`apps/web/test/style-toggle.test.tsx`)
 - **13.347** ✅ The positive control the axis needs: switching style changes a WITNESSED rendered value,
   not two numbers that merely differ in memory. `hig` and `neo`'s `raised` box-shadow both appear in
   `themeStylesheet()`'s own output under their own declaration (reusing 13.337's machinery) and the two
@@ -2350,6 +2408,28 @@ controller-allocated ON REQUEST ONLY** — recount the maximum in use against `o
 trusting this pointer, same caveat as every prior one in this paragraph. **Recounted at `b47f0253`
 (this branch's own merge-base) before minting: the maximum id in use was `13.389`; `13.390` occurred
 only in this pointer's own prose, reproducing the documented trap once more.**
+
+**CORRECTED 2026-09-15 — the pointer above was already stale.** `13.400`–`13.402` were minted the same
+day as owner-direct commits on `owner/workspace-edits` (the segmented-control sunken-selection restyle,
+13.400–13.401, and the floating app bar, 13.402) without going through this paragraph's own
+controller-allocation ritual — an owner editing the primary checkout does not queue behind it. Recounted
+at HEAD (`d904efab`, this branch's own tip before Task 10) before minting: the maximum id in use was
+`13.402`. **The workspaces-prototype-port plan's Task 10 (catalogue consolidation, 2026-09-15) mints
+`13.403`–`13.410`** for the eight test-cases debts its own task brief names by description — two
+uncased composite-contrast blocks in `packages/ui/test/tokens.test.ts`, the `projectLine` boundary unit
+tests, the summary-line refusal/empty-read cases, the rendered project-line truncation case, and three
+whole new test files (`workspace-restricted-spacing.test.ts`, `workspace-list-role-pin.test.ts`, and the
+Task 8 fix-round-1 block in `workspaces-invitation-banner.test.tsx`) — see each entry below for the exact
+mapping.
+
+**CORRECTED 2026-09-16 — recounted before minting, per this paragraph's own ritual.** A coordinator
+review of the `sunken-compact` shadow-role fix (owner round 3) stated the next free id as `13.412`; a
+repo-wide grep for every `13.4\d\d` occurrence at this branch's HEAD found the true maximum IN USE was
+still `13.410` (the `13.411` hit was this pointer's own prose, reproducing the exact trap this file's
+"CORRECTED 2026-09-15" paragraph above already documented once). **`13.411` is minted below** for the
+`sunken-compact` role and its `.gn-chip`/`.ticket-type-list__badge` call sites. **`13.412` is minted below**
+for the `selected` shadow role. **`13.413` is minted at the foot of this file** for Round 20, the
+workspace-home prototype port. **The next free BLOCK is now `13.416`.**
 
 **What did NOT need new CSS.** Task 14 already made the shared component classes this route reuses
 (`.gn-card`, `.gn-field`, `.gn-button`, `.gn-segmented`, `.gn-page-header`) variable-driven, and `neo` is
@@ -2425,7 +2505,10 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   avatars, chips, the invitation banner, Help/Account nav) stay unbuilt because no data exists for them.
   *Mutation-witnessed live against the real file: removing the rendered `<p className="gn-workspace-list__role">`
   line reddens exactly the 13.357 assertion in `workspaces-cards.test.tsx`, leaving 3.153/3.154 green;
-  restored via `git checkout HEAD --`, re-verified 3/3 green.* A second refusal at the mapper level pins
+  restored via `git checkout HEAD --`, re-verified 3/3 green.* *(Historical: 3.154 was later removed —
+  see `test-cases/03-foundation-ledger.md`'s 🚫 entry, workspaces-prototype-port Task 10, 2026-09-15 —
+  because the per-project rows its testid keyed no longer render. This mutation record is unaffected;
+  it reports what the tree looked like at the time.)* A second refusal at the mapper level pins
   the same property one layer down: a body with no `role` key throws `MappingError` rather than
   defaulting one. — (`apps/web/test/workspaces-cards.test.tsx`,
   `packages/app-core/test/online/mappers.test.ts`)
@@ -2475,10 +2558,15 @@ same way).
   why that gap matters here too). — (`apps/web/test/sign-in-neo-restyle.test.ts`)
 - **13.360** ✅ `textAccent`'s derivation and the two renamed `CONTRAST_PAIRS` rows (`accent` →
   `textAccent` on `surface`/`surfaceRaised`), plus the retired accent hex measured in both directions: it
-  no longer clears 4.5 as text on a bare light surface, and even dark — which clears the two declared
-  rows unaided — fails against `neoNavySunken` specifically (4.11), which is why `.gn-help__result-title`
-  (rendered on `surfaceSunken`) moved to `textAccent` rather than staying on `accent`. `accentText` on the
-  new `accent` still clears 4.5 in both themes, unnudged (dispatch item 10, verified rather than assumed).
+  no longer clears 4.5 as text on a bare light surface, and dark clears the two declared rows unaided.
+  **UPDATED 2026-09-10 (see 13.341's own update, same day): the third check — `accent` against
+  `neoNavySunken` specifically — used to fail at 4.11, which was WHY `.gn-help__result-title` (rendered on
+  `surfaceSunken`) moved to `textAccent` rather than staying on `accent`. Reverting `neoNavySunken` to
+  `neoNavy` flips that ONE assertion: `accent` now clears 4.5 there too (≈6.39), a changed FACT rather
+  than a claim this case still needs to hold the old way.** `accent` still carries no formal guarantee on
+  a sunken background — nothing derives it to — so `.gn-help__result-title` stays on `textAccent`
+  regardless. `accentText` on the new `accent` still clears 4.5 in both themes, unnudged (dispatch item
+  10, verified rather than assumed).
   *Mutation-witnessed: reverting `textAccentLight` to an intermediate value that clears the two declared
   rows but not the ghost-button composite reddens exactly three cases (200/203 pass) — the pinned-hex
   case, the composite/sunken case, and 13.284's own label-contrast case one describe block up, which is
@@ -2812,24 +2900,26 @@ now RESOLVED. Option 3 — count every project the caller cannot name — is ref
 leak. The `mapWorkspaceRefs` comment forbidding any such count ("the COUNT would itself be the disclosure
 the rule withholds") is AMENDED in the same change set, quoting the sentence it replaces.
 
-- **13.379** ✅ The card renders every element from data the route served, and every input to every
-  displayed number is a DIFFERENT number, so a card reading one field off another cannot pass: member
-  count 5, three projects at 9/4/7 tickets and 3/1/2 blocked, restricted count 2. The monogram carries
-  the workspace's own name as its accessible name and `CC` as its text; the chips read `14 active`
-  (`20 − 6`) and `6 blocked`; the per-project counts are asserted INSIDE their own rows, so a card
-  printing one project's number on another's reddens. **Archived is marked AND hidden**: the archived
-  project is absent until a disclosure whose accessible name carries the workspace is clicked, and it
-  then carries an `Archived` chip — marking without hiding, or hiding without marking, each fails half of
-  this. `aria-expanded` is asserted in both states. The restricted line is one text node
-  (`2 projects · name restricted`), which a three-interpolation version fails. **Three negative controls,
-  because zero is where this card lies most easily:** a card with nothing restricted renders no line at
-  all (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
-  construction), a card with nothing archived renders no toggle (a control revealing nothing lies about
-  the shape of the data), and both singulars — `1 member`, `1 project · name restricted` — are asserted
-  on cards that have one, so the plurals above are a choice rather than the only string the code can
-  produce. Mutations, each red at its own site: drop the `− blocked` subtraction from the active chip;
-  stop splitting archived out of the live list; loosen `count <= 0` to `count < 0` so the line prints at
-  zero. **And the TINT, which the rest of this case does not reach**: `getByLabelText` finds the avatar by
+- **13.379** ✅ **UPDATED same day, Round 19c** (see 13.390 below). The card renders every element from
+  data the route served, and every input to every displayed number is a DIFFERENT number, so a card
+  reading one field off another cannot pass: member count 5, three projects at 9/4/7 tickets and 3/1/2
+  blocked, restricted count 2. The monogram carries the workspace's own name as its accessible name and
+  `CC` as its text; the chips read `14 active` (`20 − 6`) and `6 blocked`; the per-project counts are
+  asserted INSIDE their own rows, so a card printing one project's number on another's reddens. **Archived
+  is a COUNT, not a disclosure** (Round 19c replaced the toggle-and-reveal pattern, since the revealed rows
+  used to carry the one nested `<button>`/project-`<a>` pair that capped the door at the card's head): the
+  archived project's own row is simply absent from the live list, and its only trace is a `1 archived`
+  chip alongside the member/active/blocked chips — asserted present here and, in the negative-control case
+  below, asserted absent at zero rather than printing `0 archived`. The restricted line is one text node
+  (`2 projects · name restricted`), which a three-interpolation version fails. **Negative controls, because
+  zero is where this card lies most easily:** a card with nothing restricted renders no line at all
+  (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
+  construction), a card with nothing archived renders no chip mentioning it, and both singulars — `1
+  member`, `1 project · name restricted` — are asserted on cards that have one, so the plurals above are a
+  choice rather than the only string the code can produce. Mutations, each red at its own site: drop the
+  `− blocked` subtraction from the active chip; stop splitting archived out of the live list; loosen
+  `count <= 0` to `count < 0` so the line prints at zero. **And the TINT, which the rest of this case does
+  not reach**: `getByLabelText` finds the avatar by
   the workspace NAME and asserts its INITIALS, both functions of the name — so keying the tint on the name
   instead of the id survives every other assertion here. Measured, not supposed: that mutation was run and
   passed 235/235 in `packages/ui` and every case in this file. Two cards with IDENTICAL names and
@@ -2839,7 +2929,7 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   asserted; that would pin the hash rather than the property. Positive control: both avatars carry a tint
   class at all, so the inequality cannot pass on two undefineds.
   — (`apps/web/test/workspaces-cards.test.tsx`)
-- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number anywhere. The point of the case is
+- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project · name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
   the absence, not the presence: a card printing the chip AND a zero passes *"'Restricted' is present"*
   and fails this. `0` is a claim — *"no work you can see"* — and it is exactly the claim the server
   declined to make by omitting the key (`13.366` on the route side). The numbers are queried away
@@ -2984,14 +3074,21 @@ true the moment the tree changes.
   `return` where the reload is) reddens this case ALONE, 1 failed / 201 passed.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.387** ✅ The five doors out of the page resolve to routes that exist, asserted as five LITERAL
-  paths. **Four are workspace-scoped and the fifth is not**: `/mcp/tokens` is a global route that takes no
+  paths. **Three are workspace-scoped and two are not**: `/mcp/tokens` is a global route that takes no
   `workspaceId`, so a page building its hrefs from one `/w/${id}/` prefix would emit
   `/w/<id>/mcp/tokens`, which resolves to nothing — **and a test building its expectations the same way
   would agree with the bug.** That is the whole reason the paths are literals, and the negative naming the
   defect (`MCP tokens` must NOT point at a workspace-scoped MCP route) is asserted directly. The link
   count is asserted too, so a sixth link cannot appear unnamed. **Mutation measured:** building the MCP
   href as `/w/<workspaceId>/mcp/tokens` — the exact defect the case is named for — reddens this case
-  ALONE, 1 failed / 201 passed.
+  ALONE, 1 failed / 201 passed. **UPDATED same day (Round 19e, owner: "the ticket type edit is opening in
+  a separate route... repoint it"):** `Ticket types` is now the SECOND non-`/w/<id>/…` door, targeting
+  `/settings?workspaceId=<id>&tab=ticket-types` — the bare `/w/<id>/settings/ticket-types` list it used to
+  point at has no sidebar, and its own Edit button opened the ticket-type editor as a third, separate
+  route, which is the exact bug just closed on `/settings` (§10's ticket-type-editor-inlining entry). The
+  header's own `Settings` button carried the same stale href and is repointed to
+  `/settings?workspaceId=<id>` the same way. `Workflows` is unchanged — its own editor (the builder) was
+  never inlined into `/settings`, so repointing its list here would be cosmetic, not a fix.
   — (`apps/web/test/workspace-home.test.tsx`)
 - **13.388** ✅ The DOOR decides, not the page — driven with no UI in the picture at all. A `member` and a
   `guest` each submit `project.created`, `project.archived` and `project.restored` at the real client door
@@ -3049,32 +3146,58 @@ the create workspace card shouldnt be that big."* The controller's reading of th
 result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every number rendered is one Task
 16/18 already served.
 
-- **13.390** ✅ The `/workspaces` card's HEAD (monogram + name) is a door to `/w/<id>` — `aria-label` set
-  to EXACTLY the workspace's name, which overrides the content-derived name a bare anchor would compute
-  from the avatar's own label, the heading and the role sentence all sitting inside it. Two elements
-  legitimately share that accessible name now (the door and the avatar), which is not an error but did
-  require three pre-existing `getByLabelText` sites to disambiguate with `{ selector: '.gn-avatar' }`.
-  Every OTHER control (project links, the archived toggle, "My Work") stays a sibling, never nested
-  inside the door — asserted by finding each at its own top-level role, which nesting would break. —
+- **13.390** ✅ **UPDATED same day, Round 19c (owner: "the entire workspace card should be clickable ...
+  everything else on the card should just be info, nothing clickable").** The `/workspaces` card's WHOLE
+  content — not just the head — is a door to `/w/<id>`: `aria-label` set to EXACTLY the workspace's name,
+  which overrides the content-derived name a bare anchor would compute from the avatar's own label, the
+  heading, the role sentence, every project name/count and the restricted line, all now sitting inside it.
+  Two elements legitimately share that accessible name (the door and the avatar), which is not an error
+  but did require three pre-existing `getByLabelText` sites to disambiguate with `{ selector: '.gn-avatar'
+  }`. The per-project link, the archived toggle and "My Work" are not merely moved inside the door —
+  they are GONE from the card (project names are plain text; archived survives as a count chip) — so this
+  case now asserts the direct, stronger shape its Round 19b version could only approximate: exactly one
+  link and zero buttons anywhere in the card (`getAllByRole('link')` length 1, `queryAllByRole('button')`
+  length 0), rather than proving absence indirectly by showing other controls still reachable at their own
+  top-level role. Nothing removed is unreachable: `/w/<id>`, one click through this same door, already
+  carries all three (Task 19, Round 19b). —
   (`workspaces-cards.test.tsx`)
 - **13.391** ✅ The nav is CONTEXTUAL, transcribing the prototype's `navItems` FILTER rather than its
-  picture: without a workspace in the route, only the four `always` items render (Workspaces, Inbox,
-  Help, Account) plus a scope note; with one, the served workspace name, My Work, Members and Settings
-  join. **Board is a second, narrower filter this product has and the prototype does not**: it renders
-  only when the route ALSO carries a project, applying the prototype's own "a link appears only when its
-  target exists" rule one level down (a workspace has no single board; a project does). The three shapes
-  are three separate `it()`s (11.185, same file) rather than one array, and the Board-only-with-a-project
-  rule is what that split exists to keep mutation-witnessable at all: widening the condition to drop the
-  project check reddens the "with a workspace, no project" arm alone, because it is the one shape whose
-  expected set has no Board entry while a workspace is present. The workspace-name item OMITS while its
-  read is pending or fails — never the raw id — because `getMyWorkspaces` is one of this product's
-  refusing reads and a name that might be wrong is worse than a name not yet shown. —
+  picture: without a workspace in the route, only the `always` items render plus a scope note; with one,
+  the served workspace name, My Work and Members join. **UPDATED same day (Round 19c, owner: "move
+  members into settings and settings should always be visible on the nav bar"): the always tier grew
+  from four items to five, and Members stayed put.** An earlier draft of this case (and the nav change
+  it covers) also dropped `Members` from the workspace-scoped group, on the theory that "into settings"
+  meant folding it there; the owner's own reference screenshots (design mockups, same feedback round)
+  keep `Members` as its own top-level link beside `Settings`, so that draft was reverted — `Members` is
+  UNCHANGED from before this round, still `!noWorkspace`-gated at `/w/<id>/members`. What DID move is
+  `Settings`: it used to join Members and My Work only when a workspace was in the route, pointed at
+  `/w/<id>/settings/ticket-types`; it now renders UNCONDITIONALLY (Workspaces, Inbox, Members,
+  **Settings**, Help, Account, with Members present only inside a workspace), pointed at a new global
+  `/settings` (`app/settings/page.tsx`) that carries the workspace forward as `?workspaceId=` rather than
+  a path segment, because this shell remembers no "current workspace" outside a route or query param for
+  an unconditional link to target — a query-carrying one still can. **Board is a second, narrower filter
+  this product has and the prototype does not**: it renders only when the route ALSO carries a project,
+  applying the prototype's own "a link appears only when its target exists" rule one level down (a
+  workspace has no single board; a project does). The three shapes are three separate `it()`s (11.185,
+  same file) rather than one array, and the Board-only-with-a-project rule is what that split exists to
+  keep mutation-witnessable at all: widening the condition to drop the project check reddens the "with a
+  workspace, no project" arm alone, because it is the one shape whose expected set has no Board entry
+  while a workspace is present. The workspace-name item OMITS while its read is pending or fails — never
+  the raw id — because `getMyWorkspaces` is one of this product's refusing reads and a name that might be
+  wrong is worse than a name not yet shown. **KNOWN FAILURE (whole-branch review, deferred item 11,
+  recorded 2026-09-16): this case is currently RED at `app-nav.test.tsx:238` (the "no workspace selected"
+  scope-note assertion). It predates the workspaces-prototype-port branch — the last commit to touch nav
+  behaviour is the owner's own `d904efab` — and is deliberately NOT fixed here: repointing a nav
+  scope-note assertion is scope creep inside a `/workspaces` styling fix wave, and the spec already pushed
+  this to a separate pass. Recorded so the ✅ above is not read as "passing" — it means "covered," and one
+  uniformly-ignored red is how a whole gate becomes background noise.** —
   (`app-nav.test.tsx`)
 - **13.392** ✅ Every literal nav target is checked against the app directory itself, not only against
-  what the component renders: a table of nine `[href, page.tsx path]` pairs, each existence-checked with
-  `node:fs`, and the nav's own rendered href set checked both for coverage (every table entry appears)
-  and for closure (every rendered href is in the table) — so a href this table forgot would fail loudly
-  rather than silently passing because nobody asked. —
+  what the component renders: a table of `[href, page.tsx path]` pairs (nine, after Round 19c swapped
+  `/w/<id>/settings/ticket-types` for `/settings?workspaceId=<id>` and kept `/w/<id>/members`), each
+  existence-checked with `node:fs`, and the nav's own rendered href set checked both for coverage (every
+  table entry appears) and for closure (every rendered href is in the table) — so a href this table
+  forgot would fail loudly rather than silently passing because nobody asked. —
   (`app-nav.test.tsx`)
 - **13.393** ✅ The current nav item carries `aria-current="page"`, and it is asserted the ONLY one that
   does — a page with two "current" items is a page that has not said which one is true. The sign-out
@@ -3110,11 +3233,19 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   body, and dies if either reverts to reading the number. A guest's line carries no member-count prefix
   at all, never a `0`. —
   (`workspace-home.test.tsx`)
-- **13.396** ✅ An archived project still offers **"Open board"** — never "Open read-only" — at its own
-  href; archiving is a workspace decision (Task 16), not a permission, and the board underneath stays
-  writable, so the prototype's read-only label would be a false claim about this product's own rule.
-  Archive/Restore reads the same `isAdmin` value 13.388's server-side door answers independently — this
-  case does not re-derive a second opinion, it drives the pairing 13.385 already owns. —
+- **13.396** ✅ An archived project still opens through the **same door a live one gets** — never "Open
+  read-only" — at its own href; archiving is a workspace decision (Task 16), not a permission, and the
+  board underneath stays writable, so the prototype's read-only label would be a false claim about this
+  product's own rule. Archive/Restore reads the same `isAdmin` value 13.388's server-side door answers
+  independently — this case does not re-derive a second opinion, it drives the pairing 13.385 already
+  owns. **Round 20 rewrote the ASSERTION, not the claim:** the "Open board" button this used to name no
+  longer exists (the owner ruled the card's body into the door — 13.413), so the case now reaches the
+  door by its accessible name, and asserts that name CARRIES "archived". That half has teeth:
+  `aria-label` overrides everything inside the anchor, so the visible Archived chip is invisible to
+  assistive tech and a non-admin gets no Archive/Restore button to infer the state from — a door named
+  plainly "Old signage" would leave an archived project indistinguishable from a live one for exactly
+  the callers who cannot see the chip. A LIVE project in the same render is asserted named WITHOUT the
+  suffix, as the positive control against a page that appended it to everything. —
   (`workspace-home.test.tsx`)
 - **13.397** ✅ The home's archived-disclosure control is ABSENT, not merely collapsed, when nothing is
   archived — the SAME rule Task 18/19 already shipped on the `/workspaces` card, restated here because
@@ -3143,3 +3274,4360 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   (`archived = f`, read back from the database); the guest's restricted view and the non-admin refusal
   note both verified live. —
   (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-viewport/responsive.spec.ts`)
+- **pending-13.4xx** ✅ `/account`'s page shell (account/help screens plan, Task 2) — `AccountPage`
+  became a `'use client'` shell composing `AppNav` and the page's `<h1>Account</h1>` title, and gained
+  its first real content section, Appearance, wrapping the already-tested `StyleToggle`/`ThemeToggle`
+  pair (`ThemeToggle` moved off `AppNav` into this new section in the same task). **Task 3 adds two
+  more cases to this same pending block:** the Profile section shows the signed-in caller's current
+  `name` and `email`, edits and saves the name through `authClient.updateUser({ name })` (verified
+  against the installed `better-auth@1.7.2` client's generated types, not assumed), and a save that
+  comes back with an `error` renders that door's `message` verbatim in a `role="alert"` rather than a
+  paraphrase. **Task 4 adds one more case to this same pending block:** the Your workspaces section
+  lists every workspace `dataSource.query.getMyWorkspaces()` answers, each row showing its real `role`
+  (verbatim from `proj_memberships.role`) and `projects.length` as "N project"/"N projects" — no
+  invented fields; two workspaces with different roles and project counts (one with a project, one
+  without) render correctly and independently in the same list. A failed read is out of scope for this
+  case — it collapses to the same empty render an honestly-empty answer produces (disclosed in
+  `Features.md`'s bullet, not asserted here). **Task 7 adds three more cases to this same pending
+  block:** the Sessions half of the new Sign-in and devices section lists every session
+  `authClient.listSessions()` answers with an HONEST device label — a short, explicit substring match
+  against `userAgent` (`Chrome`/`Safari`/`Firefox` × `Mac`/`Windows`/`iPhone`/`iPad`/`Android`) producing
+  e.g. "Chrome on Mac", never a fabricated specific like "iPhone · Shillong", and falling back to
+  "Unknown device" for anything that doesn't match or for a `null`/absent `userAgent`; the current
+  session (matched by token against `authClient.useSession()`'s own `session.token`) renders no revoke
+  control at all, while every other listed session gets one; and clicking that control's "Sign out"
+  calls `authClient.revokeSession({ token })` with the clicked row's own token and re-lists afterward,
+  proven at the page level with two sessions (one current, one not) and a real revoke click. **A real
+  shape mismatch was found and fixed, not merely assumed away:** the plan's own verification step
+  assumed `listSessions()` answers `createdAt`/`updatedAt` as strings; the installed
+  `better-auth@1.7.2` client types them `Date` (its fetch client revives ISO strings back into `Date`
+  instances on the way in), so the adapter converts explicitly rather than passing either straight
+  through as a `string`. **Task 8 adds nine more cases to this same pending block**, the Passkeys half
+  of the same Sign-in and devices section plus the `/sign-in` entry point it makes honest:
+  (a) `PasskeysSection` shows the named empty state ("You have no passkeys yet.") with nothing
+  registered, and no `role="alert"` at all when there is no refusal — the negative half, without which
+  the refusal case is satisfied by a component that renders an empty alert unconditionally;
+  (b) each listed credential carries a delete control whose ACCESSIBLE name is its own
+  (`Delete passkey {name}`), driven with TWO rows and the SECOND clicked, because a single-row fixture
+  passes against a component wired to `passkeys[0]`;
+  (c) adding submits the typed name and then CLEARS the field, so a second click cannot silently
+  re-submit the first name;
+  (d) at the page level, the empty state → add → the row appearing comes from a RE-READ that answers
+  differently the second time (`listUserPasskeys` called twice), which is what distinguishes the
+  server confirming the credential from the page appending the name it was given;
+  (e) deleting calls `authClient.passkey.deletePasskey({ id })` with the clicked row's own id and
+  re-reads, the row leaving and its sibling staying;
+  (f) a refused add renders better-auth's message verbatim in a `role="alert"` AND does not re-read
+  (the call count discriminates the refusal branch from the success branch), and a refusal carrying NO
+  message still surfaces rather than reading as success — `error?.message ?? null` would collapse a
+  message-less refusal to "no error", and a silent no-op after a WebAuthn ceremony is
+  indistinguishable from the passkey having been saved;
+  (g) an ANONYMOUS `/account` load makes NO passkey request at all — the rate-limit gate, since
+  `GET /passkey/list-user-passkeys` is charged to the shared `auth:` bucket and sits behind session
+  middleware (measured as a real 401 in `apps/server/test/auth/sign-in-flows.test.ts`, not asserted in
+  prose), so an anonymous read would spend everyone's sign-in budget on a request that cannot succeed.
+  **Mutation-checked:** deleting the `user !== null` guard reddens this case and only this case;
+  (h) the SERVER half of both paths, from the other side of a seam neither web suite can cross:
+  `GET /api/auth/passkey/list-user-passkeys` answers `200 []` for a signed-in caller and `401` for an
+  anonymous one, and `POST /api/auth/passkey/delete-passkey` reaches better-auth's handler —
+  **asserted by BODY (`code: 'PASSKEY_NOT_FOUND'`), not by status, and the first version of that
+  assertion was WRONG and went red: `not.toBe(404)` cannot work, because 404 is ALSO better-auth's own
+  answer for an id the caller does not own, so a missing route and a working handler are identical in
+  status and opposite in meaning** (the same discipline 13.273 uses to tell two limiters apart);
+  (i) `/sign-in`'s restored "Sign in with a passkey" button — present under every social answer
+  including the dev stack's neither-provider one (it needs no provider, so it is NOT gated on
+  `GET /v1/auth/methods`, and it lives outside `.gn-sign-in__marks`), never called on mount, and called
+  exactly once with `{ autoFill: false }` on click. The argument is asserted rather than the call,
+  because `{ autoFill: true }` would satisfy "was called" while being precisely the
+  conditional-mediation request that must not ship.
+  The SERVER-side companion to (i) lives in this file's own "One limiter on `/api/auth/*`" family
+  rather than here: ten `GET /api/auth/passkey/generate-authenticate-options` probes exhaust
+  production's real `RATE_LIMIT_AUTH_MAX` of 10 and the eleventh genuine `POST /sign-in/magic-link` is
+  refused **by our limiter, identified by body**, against a zero-probe control through the identical
+  pipeline that must NOT be refused; a third case pins that the probe charges the general `auth:`
+  bucket and never the tighter `signin:` one (`/passkey/*` is absent from `SIGN_IN_PREFIXES`), and a
+  fourth that one deliberate click costs one unit and leaves the magic link available.
+  **Both directions mutation-checked:** adding `/passkey` to `SIGN_IN_PREFIXES` reddens the bucket
+  case alone; pointing the probe at a non-auth path reddens the exhaustion case alone.
+  **NOT WITNESSED END TO END, and named rather than left to be discovered:**
+  `apps/web/e2e-stack/passkey-registration.spec.ts` (register a credential over a CDP virtual
+  authenticator on `/account`, sign out, then sign in with it on `/sign-in`, no magic link in the
+  second half) is written and typechecked — `tsconfig.e2e.json` includes `e2e-stack/**`, so it cannot
+  rot silently — but was **never executed**: the stack port was held by a developer's own `next dev`,
+  and `playwright.stack.config.ts` refuses (correctly) to adopt a stray server. Its first green is owed
+  to CI's `gate` job. So the WebAuthn ceremony itself, and the runtime URL better-auth's generated
+  client builds for `listUserPasskeys`/`deletePasskey`, are the two things no test in this change set
+  observes; the member NAMES are settled by `typecheck` (with a negative control) and the PATHS by (h).
+  **The Account STYLING port adds four more cases to this same pending block** (owner, 2026-09-15:
+  "take the styling of the account page and fix the styling in the code", then "it still doesn't match
+  the Style"). **THE REFERENCE IS THE DESKTOP PROTOTYPE'S `isAccount` SCREEN**
+  (`design-system/interactive/desktop.dc.html:1471-1529`), the file this plan's own spec names; the
+  first cut styled against the MOBILE canvas's "Account" screen, which is the phone's More TAB, and
+  that is what "doesn't match" meant. (a) `/account` renders as a centred 680px column of cards with
+  `<h1>Your account</h1>` and a lead sentence, cards at 20px padding, headings at 20px/25px/600, and
+  **transparent** rows separated by the card gap — measured live at 680px, not asserted. The cards
+  run in the SPEC'S ORDER, which is the prototype's — Profile, Appearance, Notifications, Your
+  workspaces, Sign-in and devices, Passkeys — replacing the order they happened to land in as Tasks
+  2-8 each appended its own; §2's "composed in the prototype's order" had not actually been met.
+  Passkeys stays adjacent to Sessions because §7 covers both as one concern; rendering them as ONE
+  card is the remaining divergence from §7 and is not done here. **(f) The APPEARANCE card is rebuilt
+  to its own owner reference image** (2026-09-15) — the one card with no prototype counterpart, since
+  it is this page's own section per spec §4 — as two labelled `SegmentedControl`s in place of a
+  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neomorphic`) with a
+  description line that must TRACK the selection, Theme (`System`/`Light`/`Dark`), and a closing
+  footnote. Cases 13.344-13.346 and 3.83 are retitled for the new control shapes rather than
+  renumbered, and both component suites were rewritten to assert the SAME properties through the new
+  shape. **`system` is kept as a third Theme segment against the reference image's two, pinned by its
+  own case** — it is the default state and the only route back to the device preference. The
+  accessible-name ratchet was CHECKED, not assumed: the signed-out baseline holds no `/account` entry,
+  the stack baseline is `{}`, and the assertion is a `toBeGreaterThanOrEqual` floor that this change
+  raises (`role`, `ariaSelected`) while holding `ariaLabel` level at two. (b)
+  Notifications rows carry a switch built by restyling the real `<input type="checkbox">`, so
+  `getByLabelText(...).not.toBeChecked()` still drives it — the control is unchanged, only its paint
+  is. (c) Each workspace row is a real `<a href="/w/{id}">` named `Open <name>` exactly once, the one
+  piece of new BEHAVIOUR in the port; asserted as a LINK WITH AN HREF rather than as a click, because
+  a `<div onClick>` that passed a click test would still be the defect this shape exists to prevent,
+  and the accessible name is pinned because `Avatar` labels itself with the same workspace name. (d)
+  Sign-in and devices renders a HEDGED empty state ("No signed-in devices to show.") instead of the
+  bare heading it showed before — the wording is the assertion, since the page collapses a failed read
+  to `[]` and a message claiming "you have no other devices" would assert what an empty array does not
+  establish. A fifth case pins the append-only footnote.
+  **(e) The per-device Sign out button stays SOLID, refusing the prototype's tint on a MEASUREMENT.**
+  Measured in a real browser across all six theme x style combinations: `danger` on `surfaceSunken`
+  is 3.84:1 and `danger` on `surfaceRaised` is 4.29:1 (light/`neo`), both under the 4.5 a 0.9375rem
+  label owes, against `dangerText on danger` at 5.38:1 — the only one of the three `CONTRAST_PAIRS`
+  declares and gates. A tinted class was written and then DELETED on that reading, which is the case
+  worth recording: the prototype is the reference for shape, not an override on accessibility. The
+  same sweep found TWO PRE-EXISTING failures outside this change set and left them alone —
+  `.ticket-type-editor__issues` at the same 3.84 and `.gn-contest-banner__action--discard` at 4.29
+  under light/`neo`, both product-wide palette decisions.
+  **WHAT IS AND IS NOT OBSERVED BY A TEST, stated because a styling change invites the assumption that
+  green means it looks right:** (c) and (d) and the footnote ARE covered —
+  `apps/web/test/account-page.test.tsx` (16) and `packages/app-core/test/account/*` (14) are green,
+  and the two new `SessionsSection` cases plus the new workspace-door case are what took app-core
+  1181→1183 and web 262→263. `packages/ui/test/token-discipline.test.ts` proves the block writes no
+  colour literal, and that instrument was POSITIVE-CONTROLLED for this change rather than trusted — a
+  planted `#ff0000` took it red naming `apps/web/app/globals.css` and the exact line. NOTHING asserts
+  the RENDERED geometry of (a) or the switch paint of (b): no unit test reads these rules, and
+  `apps/web/e2e-stack/helpers/non-text-contrast.ts` does not sweep `/account`. Both were instead
+  verified by SCREENSHOT against a static render of the prototype's own markup and tokens, in light/
+  `hig` and dark/`neo`, which is how the `neo` row-invisibility defect in the intermediate cut was
+  caught at all. A rendered sweep of `/account` is the test these two still want. ❌ — **and that ❌
+  sits inside this block's ✅ deliberately, not by oversight:** the behavioural half of this port is
+  test-observed, the geometric half is screenshot-observed only, and flipping the block either way
+  would misreport one of them. The mixed marker is the honest reading until a rendered sweep exists.
+  **Not yet ID-allocated**: this file's own header requires the next free block
+  (after 13.399) to be requested from the controller before minting, and this task has no channel to
+  request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block
+  already carries for its three cases (`/help` and `/account` mounting `AppNav`), unresolved before
+  Task 2, unresolved after Task 2, unresolved after Task 3, unresolved after Task 4, and still
+  unresolved after Task 7. Rename every case in this block to real case ids, in order, once a block is
+  requested. —
+  (`apps/web/test/account-page.test.tsx`, `apps/web/src/account/profile-section.tsx`,
+  `apps/web/src/account/workspaces-section.tsx`, `apps/web/src/account/account-clients.ts`,
+  `packages/app-core/src/account/sessions-section.tsx`,
+  `packages/app-core/test/account/sessions-section.test.tsx`,
+  `packages/app-core/src/account/passkeys-section.tsx`,
+  `packages/app-core/test/account/passkeys-section.test.tsx`,
+  `apps/web/test/sign-in.test.tsx`, `apps/web/app/sign-in/page.tsx`,
+  `apps/server/test/auth/sign-in-flows.test.ts`,
+  `apps/server/test/http/security-middleware.test.ts`,
+  `apps/web/e2e-stack/passkey-registration.spec.ts`,
+  `apps/web/app/globals.css`, `packages/ui/test/token-discipline.test.ts`,
+  `apps/web/app/account/page.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
+  `design-system/interactive/desktop.dc.html`)
+
+- **13.400** ❌ **The selected segment is PRESSED under `neo`, lifted under `hig`, flat under `minimal`**
+  — `[data-style="neo"] .gn-segmented__item--on` overrides the base rule's `var(--gn-shadow-raised)`
+  with `var(--gn-shadow-sunken)`. Owner, 2026-09-15: *"in the prototype it was sunken style. i want it
+  to follow that."*
+  *THE REFERENCE HAS FIVE VALUES FOR THIS CONTROL, NOT ONE, and they split on the style axis. Read off
+  `--segOnShadow` in `design-system/interactive/desktop.dc.html` rather than eyeballed from a
+  screenshot: `0 3px 8px rgba(39,58,99,.16), 0 3px 1px rgba(39,58,99,.06)` (hig light),
+  `0 3px 8px rgba(6,10,22,.66)` (hig dark), `none` (minimal), and two `inset 3px 3px 6px … , inset
+  -3px -3px 6px …` pairs (neo light, neo dark). So the base rule was ALREADY right for two styles of
+  three — `--gn-shadow-raised` resolves to `none` under `minimal` — and only `neo` was inverted. That
+  is why it read as simply backwards rather than as a per-style nuance: `neo` is the shipped default,
+  so the one wrong arm was the one everybody saw. One `[data-style]` override reproduces all five from
+  the two existing shadow roles; no new role, no literal, and `hig`/`minimal` untouched — the same
+  shape as 13.339's `[data-style="neo"] .gn-field__input` rule directly above it in `ui.css`.*
+  *THE BACKGROUND MOVED TOO, and only because a failing assertion forced the value to be looked up
+  rather than assumed. The first draft kept the base rule's `var(--gn-surface-raised)`, reasoning that
+  `neo` collapses its surfaces anyway. It does not collapse them in LIGHT: `surfaceRaised` is `#fbf7f3`
+  there against `surfaceSunken`'s `#ede4db`, so the pressed segment sat a shade too high in exactly the
+  theme this suite runs in. The reference settles it — its own `--segOnBg` under `neo` is `#EDE4DB`
+  light and `#1B2340` dark, which are byte-for-byte
+  `colorOf('light'|'dark', 'surfaceSunken', 'neo')`. So the neo override carries
+  `background: var(--gn-surface-sunken)` as well as the shadow: sunken ground, sunken shadow, the same
+  pairing `.gn-field__input` (13.339) and `.gn-help__search-input` (15.34) take under `neo`.*
+  ***CORRECTION, and it is the useful part of this entry.** The first version of this case said the
+  change was "unasserted — nothing in the suite reads a computed style on this component," and the
+  commit (810d8470) repeated it as "no gate can move on this and none did." **Both were false.**
+  `13.362` reads the selected tab's rendered `box-shadow` in a real Chromium page and pins its
+  geometry; it reddened on all three viewports on the very next run — 3 failed became 6. The reasoning
+  behind the wrong claim was sound as far as it went (`box-shadow` is outside layout, so no ratchet
+  could move) and it was still wrong, because it answered "which RATCHETS can see this" when the
+  question was "what asserts this". A ratchet is not the only kind of gate. The suite caught it before
+  anything shipped further, which is exactly what 13.362's docblock argues for witnessing a rendered
+  value instead of trusting the source.*
+  *So this case IS covered: `13.362` now asserts the `inset` keyword and both `4px 4px 9px` /
+  `-4px -4px 9px` offsets, and asserts the old `7px 7px 16px` raised geometry is GONE — without that
+  last line a rule emitting both would satisfy the others. The discrimination is sharper than the
+  version it replaced: `hig` and `minimal` both resolve `sunken` to `none`, so these offsets can only
+  appear under `neo`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)
+  ***SUPERSEDED, owner round 5 (2026-09-16, case 13.412).** The two-role approximation this entry
+  documents (`raised` for `hig`, `sunken` for `neo`) is replaced by a dedicated fifth `ShadowRole`,
+  `selected`, that reproduces all five prototype values exactly — including `neo`'s own 3px/3px/6px
+  geometry, which `sunken`'s 4px/4px/9px never matched precisely. `13.362`'s pinned offsets moved with
+  it (`4px 4px 9px` → `3px 3px 6px`); see 13.412 for the new arithmetic and mutation evidence. The
+  background half of this entry is UNCHANGED — `background: var(--gn-surface-sunken)` still stands,
+  since a shadow role carries no background of its own.*
+
+- **13.401** ✅ **The segmented track paints no background of its own** — `.gn-segmented` dropped
+  `background: var(--gn-fill-tertiary)`. Owner, 2026-09-15: *"the background also needs to be removed
+  from the tablist."*
+  *It follows from 13.400 rather than being a separate taste call: once the selected segment is a WELL
+  pressed into the page, a tint behind the whole control gives the well a second ground to compose
+  against, and the reference's own neo values compose against the page. The unselected segment is now
+  bare page with no fill of its own — the "normal" half of the owner's description. Geometry
+  (`gap`/`padding`/`--gn-radius-control`) is kept deliberately: with no fill, spacing is the only
+  thing left holding the two segments apart.*
+  *Asserted, and the assertion had to MOVE to stay honest: 13.362 used to read `--gn-fill-tertiary`
+  off the root as its declared-value control, naming it "the segmented track background". That would
+  have gone on passing forever while describing a property this component no longer has — green about
+  a thing that stopped existing. It reads `--gn-surface-sunken` now (what the pressed segment actually
+  composes against) and adds a direct reading of the track's own computed `backgroundColor`, which is
+  `rgba(0, 0, 0, 0)`.* — (`apps/web/e2e-viewport/responsive.spec.ts`, case 13.362)
+
+- **13.402** ❌ **The app bar floats, and everything that must clear it does** — `.gn-nav` is
+  `position: sticky; top: 0; z-index: 20` with a declared `background`. Owner, 2026-09-15: *"make the
+  top nav bar always be floating on the top."* It reverses this rule's own recorded decision — the
+  comment used to end "the bar sits in normal document flow (not `position: sticky`/`fixed`)" — which
+  is rewritten rather than left contradicting the CSS under it.
+  *`sticky`, NOT `fixed`: sticky stays in flow, so the bar still occupies its own height and nothing
+  below needs a compensating top margin — and that margin would have been a second copy of the bar's
+  height to keep in sync with it.*
+  *TWO CONSEQUENCES THE REQUEST DOES NOT NAME, both found by looking rather than by reasoning.*
+  *(1) THE BAR HAD NO BACKGROUND. It only ever looked solid because `body` paints the same
+  `--gn-surface` behind it; measured as `rgba(0, 0, 0, 0)`. Transparent is invisible until something
+  scrolls under it, and then the page's text runs straight through the bar. Declared now at
+  `var(--gn-surface)`, which keeps the resting appearance byte-identical.*
+  *(2) EVERY ANCHOR LANDED BEHIND IT. A fragment navigation scrolls its target to the top of the
+  viewport, which is now under a 69.6px bar. Measured before the fix: clicking "§4 — Getting your
+  people in" put its heading at `top: 0.04px` with `scroll-margin-top: 0px` — the heading you asked
+  for was the only thing you could not see, on every topic link and every search result in `/help`.
+  `.gn-help__section`/`.gn-help__entry` now carry `scroll-margin-top`; re-measured at 86px against a
+  70px bar, clear with 16px of air.*
+  *`--app-nav-offset: 4.35rem` is not a magic number: `.gn-nav__links` is a 2.75rem control row and
+  `.gn-nav__inner` adds 0.8rem of padding twice, which is the 69.6px the browser reports, identical at
+  768px and 1512px — the whole range in which anything else here is sticky. It is DELIBERATELY not a
+  `--gn-` token: `tokens.test.ts` requires every `var(--gn-…)` in `ui.css` to name a declared role, and
+  this is one shell's layout fact rather than a design value. `apps/desktop` renders no nav, resolves
+  the `0px` fallback, and reproduces its previous behaviour exactly.*
+  *WHERE THE NUMBER IS AN UNDERSTATEMENT, recorded rather than left to be discovered: `.gn-nav__links`
+  wraps, so the bar grows on narrow viewports — **measured at 190px on a signed-in workspace route at
+  500px wide**, three rows of links. No single value can cover that, because the height depends on how
+  many links the ROUTE contributes and on the signed-in name's width, neither of which CSS can see, so
+  a media query would only trade one wrong value for another. Both consequences are bounded and both
+  were checked: `.gn-help__sidebar` is `position: static` below 48rem and cannot collide at all, and a
+  fragment lands ~86px down, correct wherever the bar does not wrap and merely short of it on a
+  wrapped phone bar — the heading is then a short scroll away rather than lost. Exactness here needs
+  the bar measured at runtime into the variable, which is a script, not a stylesheet.*
+  *The one property a spec DOES assert about this element was re-checked directly, since it covers
+  signed-in routes the viewport suite never visits: `e2e-stack/viewport.spec.ts` measures `.gn-nav`
+  for horizontal overflow (item 7's own defect — it escaped the viewport by 10px at 390px). Measured
+  live on a signed-in `/members` at the narrowest width this browser allows: **0 escaping elements,
+  `scrollWidth === clientWidth`**, bar sticky and wrapped to 190px. `position: sticky` does not alter
+  horizontal layout, so this was expected — but it is the assertion that exists, so it was read rather
+  than reasoned about.*
+  *`z-index: 20` is chosen against what is already in the tree, not picked: `.gn-select__panel` and
+  `.mention-popup` are 30, `.gn-dialog__scrim`/`.gn-sheet__scrim` are 40. A dropdown opening near the
+  top must render OVER the bar and a modal scrim must cover it; a bar outranking either would clip the
+  menu it belongs to.*
+  *Unasserted — this is CSS positioning, and nothing in the suite reads a computed style on the shell.
+  **Stated carefully this time:** 13.400's first draft made the same claim about the segmented control
+  and was WRONG (13.362 reads that one), so this was checked rather than assumed — no spec in
+  `e2e-viewport` or `e2e-stack` queries `.gn-nav`'s position, background or z-index. What the suite
+  DOES cover is that nothing regressed: overflow 0 at all three viewports, tap-target counts unmoved
+  at 25/23/25, 3 failed / 28 passed unchanged. Verified by direct measurement in the running dev
+  server — bar pinned at `top: 0` while scrolled 1400px, sidebar at 93.6px, anchors at 86px.* —
+  (no test; owner: whoever next asserts computed style on the shell)
+
+## The workspaces-prototype-port plan — Task 10, catalogue consolidation (2026-09-15)
+
+Nine tasks (1–9) ported the owner's `desktop.dc.html` prototype onto `/workspaces`: tokens, shared
+`ui.css` metrics, page shell/title/summary, grid and card geometry, card head/meta line, the project
+line's truncation, the invitation banner, and the founding form. Two of those tasks left tests
+deliberately uncased — Task 1's and Task 3's own reports name the reason: an implementer mid-plan has no
+visibility into numbers concurrent work may claim, so minting was deferred to this consolidation task.
+Five more new test files/cases were built and flagged as owed here by the tasks that wrote them (Task 2,
+Task 4, Task 7 ×3, Task 8). Block `13.403`–`13.410`, minted per the corrected pointer above.
+
+- **13.403** ✅ **`tintWarning` composites legibly on every surface it can reach** — the invitation
+  banner's alpha wash cannot carry a `CONTRAST_PAIRS` row (`tokens.ts:228` forbids naming an alpha
+  primitive there, since `relativeLuminance` ignores alpha and such a row would measure the tint's own
+  colour rather than what it blends into), so the obligation is measured against the COMPOSITE instead,
+  the same shape the pre-existing `fillTertiary` check uses. All twelve numbers (3 styles × 2 themes × 2
+  foregrounds, `text` and `textMuted`) clear 4.5 with margin, tightest at neo/light's `textMuted`, 7.434 —
+  65% above the floor. Carries the anti-vacuous control (`expect(washed).not.toBe(surface)`) so a
+  fully-transparent tint cannot pass by degenerating to text-on-bare-surface. — (`packages/ui/test/tokens.test.ts`)
+- **13.404** ✅ **The chip label composites legibly on `fillTertiary`, over every ground it can reach** —
+  closes a gap the two pre-existing `fillTertiary` checks left open: both measure `textAccent`, not the
+  chip's own `color: var(--gn-text)`, and both composite over `surface`, not `surfaceRaised` — the chip's
+  actual ground, since it sits on `.gn-card`. All six style/theme combinations clear 4.5 with wide margin
+  (minimum 10.49), checked over both `surfaceRaised` and `surface`. Same anti-vacuous-control shape as
+  13.403. — (`packages/ui/test/tokens.test.ts`)
+- **13.405** ✅ **`projectLine`'s truncation boundary: at the cap, over the cap, and the withheld
+  suffix** — joined names exactly at `PROJECT_LINE_CAP` (3) take no suffix at all, the boundary a
+  cap-off-by-one implementation gets wrong; one name past it truncates and COUNTS the remainder
+  (`· +1 more`); and when `countsWithheld` is true the suffix drops the number (`· and more`) rather than
+  leaking one to a guest — 13.380's own property ("no number anywhere") applied to a second surface. Six
+  cases total (`projectLine`), plus three for the sibling `projectCountLine` (singular, plural, and
+  renders nothing at zero, the same withholding rule `restrictedLine` keeps). —
+  (`apps/web/test/workspace-viewer.test.ts`)
+- **13.406** ✅ **The `/workspaces` page-head summary is gated on `workspaces !== null &&
+  workspaces.length > 0`, both halves independently proven** — a REFUSED read is `null` exactly like an
+  in-flight one, so `!== null` must be checked and must short-circuit BEFORE `.length`, or a refusal
+  prints "0 workspaces you belong to." (a count of a list nobody managed to read); fix round 1 added the
+  `length > 0` half, since a SUCCESSFUL empty read is a real counted zero and the summary would sit
+  redundantly atop the page's own "No workspaces yet…" sentence. Both halves mutation-witnessed live: an
+  ungated summary reddens the refusal case alone (`PASS 14 FAIL 1`) and, after the `length > 0` term was
+  added, reddens BOTH the refusal and the empty-read case together (`PASS 14 FAIL 2`) — confirming
+  neither term is redundant with the other. — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.407** ✅ **The card itself truncates a wide workspace's project line, not only `projectLine`'s own
+  unit tests** — "names three projects and counts the rest, so a wide workspace does not grow the card,"
+  pinning `PROJECT_LINE_CAP` where it actually renders. The fixture was extended past the brief's own
+  version (one project, which never reaches the truncating branch: `hidden = 1 − 3 = −2`, an unobservable
+  no-op) to four, so `hidden = 1` and the branch genuinely matters; mutation-witnessed live (`projectLine`
+  forced to always take the numeric branch, ignoring `countsWithheld`) reddens this case alone, caught
+  first by the positive safe-string assertion and independently, with that assertion disabled, by a
+  card-wide digit scan that strips the one digit-bearing string the card IS allowed to show and asserts no
+  digit survives the strip. — (`apps/web/test/workspaces-cards.test.tsx`)
+- **13.408** ✅ **The cross-page spacing pin for `.gn-workspace-card__restricted`, at its two call
+  sites** — `/workspaces` (inside the door's flex column, where `gap` supplies the offset and the shared
+  rule correctly carries `margin: 0`) and the workspace-home header (a direct `<Card>` child outside any
+  flex-gap container, needing its own `margin-top: 0.55rem` via a second class,
+  `.gn-workspace-home__restricted`, since no stable sibling exists there to hang a combinator off). Four
+  source-scan cases: the shared rule still declares `margin: 0`; the override declares
+  `margin-top: 0.55rem`; the override's line index sits textually AFTER the shared rule's (the tie-break
+  both equal-specificity rules rely on); and a mutation witness that swaps the two rules' lines in a copy
+  of the source and re-runs the same ordering computation, confirming it flips to `false` on the swapped
+  text rather than merely being trusted to. — (`apps/web/test/workspace-restricted-spacing.test.ts`)
+- **13.409** ✅ **`.gn-workspace-list__role`'s two cross-page borrowers are pinned back to their
+  pre-port size** — Task 6 resized the shared rule (`0.8rem` → `0.9375rem`, plus a new `line-height`) for
+  the `/workspaces` card's own sake, which silently also grew the class's two OTHER call sites: `/settings`'s
+  workspace-name subtitle and the workspace-home header's meta line. Both are pinned back via a dedicated
+  `.gn-workspace-list__role--pinned` modifier class (`font-size: 0.8rem; line-height: inherit` — `inherit`
+  reproduces the pre-Task-6 rule's own unset `line-height`, verified via `git show` rather than guessed)
+  added directly in JSX at both call sites. Three source-scan cases (the pin rule exists and declares
+  `0.8rem`; the namesake bare-class rule is untouched at `0.9375rem`; a mutation witness deleting the pin
+  rule's text confirms the scan then finds nothing), plus rendered-DOM assertions confirming the modifier
+  class actually reaches the element at both call sites — mutation-witnessed live: removing the class from
+  either JSX call site reddens exactly that page's own case. — (`apps/web/test/workspace-list-role-pin.test.ts`,
+  `apps/web/test/workspace-home.test.tsx`, `apps/web/test/settings-page.test.tsx`)
+- **13.410** ✅ **The invitation banner's restyle is pinned at both the CSS and the rendered-DOM level,
+  not only its behaviour** — the four pre-existing cases in this file are behaviour-only (heading text,
+  per-invitation sentences, accept/decline, the one-line failure message), and none pinned the tint
+  background, the absent shadow/edge, or the icon's `aria-hidden` state, so the whole Task 8 restyle could
+  be reverted with the suite staying green. Four new cases: `.gn-invitations` fills with
+  `var(--gn-tint-warning)`; carries no `box-shadow` (the raised-card treatment is gone); carries no
+  `border-inline-start` (the accent edge is gone); and the rendered banner root carries the class with its
+  icon `aria-hidden`. Both the CSS-level and render-level halves are separately mutation-witnessed live
+  against the real source (planting `box-shadow` back into the rule reddens exactly the box-shadow case;
+  removing `aria-hidden` from the JSX reddens exactly the render-level case), each reverted immediately
+  after capture. — (`apps/web/test/workspaces-invitation-banner.test.tsx`)
+
+## Owner round 3 fix round 1 (2026-09-16) — the fourth shadow role, `sunken-compact`
+
+Block `13.411`, minted per this file's own recount ritual (see the "CORRECTED 2026-09-16" note above
+`13.400`'s block) — the true maximum id in use at HEAD was `13.410`, not `13.411` as a coordinator review
+first stated.
+
+- **13.411** ✅ **A fourth `ShadowRole`, `sunken-compact`, and every place it had to reach** — owner round
+  3: "check the prototype for the shadows of the sunken badges. looks like too much shadow for a small
+  badge." `[data-style="neo"] .gn-chip` and `[data-style="neo"] .ticket-type-list__badge` were both carved
+  with `--gn-shadow-sunken` (`inset 4px 4px 9px`, the SAME treatment `.gn-field__input`/
+  `.ticket-type-list__row` correctly use) where the prototype's own `--chipShadow`
+  (`design-system/interactive/desktop.dc.html:59` light, `:71` dark) defines a smaller `inset 2px 2px 4px`
+  step reserved for badge/chip-scale elements; `--fieldShadow`/`--trayShadow` (`:61`/`:62`) stay the 4px/9px
+  step. Three of the four prototype layer colours are byte-identical to existing primitives
+  (`shadowNeoRaisedDarkLight`, `shadowNeoHighlightLight`, `shadowNeoSunkenHighlightDark` — verified by
+  converting each `rgba()` to this file's 8-digit-hex convention and diffing, not assumed); the dark
+  theme's first layer needed one new primitive, `shadowNeoSunkenCompactDarkDark` (`rgba(0,0,0,0.55)` →
+  `#0000008c`, distinct from `sunken`'s own `rgba(0,0,0,0.6)`). `hig`/`minimal` are `[]` for the new role in
+  both themes, matching the prototype's `--chipShadow:none`. Pinned assertions: `shadowValueOf`'s exact
+  return string for `neo`/light and `neo`/dark (not merely that it contains `inset` or differs from
+  `sunken` — a same-shape-wrong-colour regression would survive a looser check); `hig`'s value is `'none'`.
+  A SEPARATE case (this same block) closes the emission gap the coordinator review's F5 named:
+  `SHADOW_ROLES` (`tokens.ts`, the array `themeStylesheet()` actually emits from) and this file's own
+  `SHADOW_ROLE_NAMES` used to be two hand-maintained, unlinked arrays — a role dropped from the emission
+  array alone would leave every prior case green while the var vanished from the browser. `SHADOW_ROLES` is
+  now exported and `SHADOW_ROLE_NAMES` re-exports it directly (cannot diverge at the source), AND a new
+  case asserts, against a deliberately-hardcoded literal role list (NOT derived from either array, so it
+  cannot silently shrink with a regression), that every declared shadow role's exact declaration string
+  reaches `themeStylesheet()`'s output for every style×theme. Mutation performed and reverted live, not
+  merely claimed: temporarily dropping `'sunken-compact'` from `SHADOW_ROLES` reddened this case
+  (`AssertionError: hig/light/sunken-compact — expected declaration "--gn-shadow-sunken-compact: none;" in
+  themeStylesheet()'s output`), confirming it actually catches the regression it exists for. Every other
+  remaining `--gn-shadow-sunken` call site in `ui.css` (`.fields-editor__row`, `.ticket-type-list__row`,
+  `.gn-help__search-input`, `.gn-help__results`, `.gn-help__none`, `.gn-help__toggle:hover`,
+  `.gn-help__quote`, `.gn-field__input`) was individually reviewed and confirmed field/tray-scale, correctly
+  left on `sunken` — enumerated one by one, not summarised as a group, since a group summary
+  ("fields, trays, rows") is what let `.ticket-type-list__badge` go unnoticed in the first pass.
+  `[data-style="neo"] .gn-segmented__item--on` (`ui.css:2474`) is flagged as needing its OWN, third
+  geometry (the prototype's `--segOnShadow`, `inset 3px 3px 6px`) rather than either existing step, and is
+  deliberately left untouched — a separate scope decision for the owner, out of this block. —
+  (`packages/ui/test/tokens.test.ts`)
+
+### Round 20 — the workspace-home prototype port (`/w/[workspaceId]`)
+
+Block `13.413`, the next free one this file's own pointer recorded after `13.411` and `13.412` were
+minted for the shadow-role work. **The next free BLOCK is now `13.416`.** Round 20 ports the desktop prototype's `isWorkspace`
+screen onto the page Task 19 built: the project list becomes a GRID of per-project cards, the "Projects"
+heading and its toggle leave the `<Card>` that used to wrap them, the archived list merges into the one
+grid, the toggle takes the reference's own label, and the five door-cards move BELOW the projects and the
+founding form. Five prototype elements were deliberately NOT transcribed, each for a reason that already
+exists in this repo: a project `desc` (no such field is served), "Open read-only" (13.396 forbids it),
+"0 archived · show" (13.397 forbids it), "Ask to be named" rows (rulings P32/P38 serve a COUNT, not
+rows), and "Delete this workspace" (the prototype's own handler refuses it as irreversible).
+
+**The bottom "Workspace" card is NOT ported, and that is a measured omission rather than an oversight.**
+Its rename field is gated on admin, but `apps/server/src/permissions/check-permission.ts:349-358` records
+that `workspace.renamed` is not in `ADMIN_ONLY_TYPES`, that a workspace GUEST is admitted for it today,
+and that "which roles may rename a workspace is a product decision no plan in this series has taken".
+Shipping an admin-gated field would therefore render a permission rule the product has not decided —
+unlike every other admin affordance on this page, whose hiding is a DISPLAY of a real server gate, there
+is no gate behind this one to display. **Owner: whoever next takes the rename-permission decision.**
+
+- **13.413** ✅ **Each project card is ONE door, and the admin control is not inside it.** Round 20's owner
+  ruling reverses Round 19b's separate "Open board" button: the card's informational body (name, archived
+  badge, counts) is a single `<Link>` to that project's board. Three things are pinned, and each fails a
+  different plausible implementation. **One link per card**, and no "Open board" anywhere on the page —
+  the ruling REMOVES that button rather than leaving it beside the new door, because a card that was a
+  link and also held an "Open board" button would be the two-doors-to-one-target failure Round 19b named,
+  arrived at from the other side; an implementation that merely wrapped the existing row in a link passes
+  every other assertion here and fails this. **Archive/Restore is not a descendant of the anchor** —
+  `<a>` may not contain `<button>`, a nested one is invalid HTML that renders anyway, and jsdom does not
+  complain, so containment is asserted directly (`door.contains(button)` false, `button.closest('a')`
+  null). **The archived card is revealed IN PLACE**, keeping the served order, which is what the page's
+  single `filter(p => showArchived || !p.archived)` preserves and what `[...live, ...archived]` — the
+  obvious way to build one list from the two bindings already in scope — would break by sinking every
+  archived project to the end. **That third assertion needed its OWN fixture and the shared one would
+  have made it vacuous:** `workspaceAs` serves p1, p2, p3 with p3 archived, already last, so both
+  expressions yield the identical order and the check could not have failed against the implementation it
+  exists to rule out. The case's fixture puts the archived project in the MIDDLE — the only arrangement
+  where the two disagree — and asserts the collapsed order first as a positive control, so a failure is
+  about the disclosure rather than about the grid never having been ordered at all. —
+  (`workspace-home.test.tsx`)
+
+### Round 21 — owner corrections to the workspace-home port
+
+Block `13.414`–`13.415`, the next free ids this file's own pointer recorded after Round 20 minted
+`13.413`. **The next free BLOCK is now `13.416`.** Seven owner corrections, of which three touch cases:
+archived projects sort to the END of the disclosed grid (reversing 13.413), MCP tokens moves off the
+workspace home and out of `/settings` to `/account` (revising 13.387, minting 13.415), and the nav's
+Settings link goes back behind a workspace while Inbox moves to just before Help (minting 13.414 and
+amending 11.185's three arms). The other four are CSS-only and mint nothing: the projects grid becomes
+three fixed columns on `/workspaces`' own breakpoints, Archive/Restore gains a hover, the archived
+dimming moves from the card onto its door, and the four section cards trade a background swap for the
+same brightness pair.
+
+- **13.674** ✅ **REVERSED, not deleted** — the archived cards now sort to the END of the disclosed grid
+  (owner: "always sort the archived projects to the end"), where Round 20 asserted the served order.
+  `[...live, ...archived]` was the implementation Round 20 named as the thing to rule out; it is the
+  requirement now, and the single filter it replaced is what this case rules out. **The cost Round 20
+  argued from was ACCEPTED, not refuted:** a disclosed project does move twice on one click (in, and
+  down); the owner weighed that against grouping retired work and chose the grouping. The other two
+  assertions in this case (exactly one link per card; Archive/Restore not nested in the anchor) are
+  untouched. **Round 20's fixture is what made this a one-line flip** — it puts the archived project in
+  the MIDDLE, the only arrangement where the two expressions disagree, so it discriminates in EITHER
+  direction; had the case been written against the shared `workspaceAs` fixture (p3 archived, already
+  last) it would have been vacuous before and after, and the reversal would have been invisible. —
+  (`workspace-home.test.tsx`)
+- **13.672** ✅ **REVISED from five doors to four.** `/mcp/tokens` left this nav for `/account`, and its
+  absence is now asserted by name rather than left to the length check, so restoring the link reddens the
+  case with a sentence instead of "expected 5 to be 4". The case's ARGUMENT survives the removal, which
+  is why the literals stay: `/mcp/tokens` was the obvious non-`/w/<id>/…` door, but Ticket types is still
+  one (`/settings?workspaceId=<id>&tab=…`, workspace as a query param), so a builder-based rewrite would
+  now emit `/w/<id>/settings?…` and break that door instead — the same defect, one door over. The
+  negative assertion was repointed accordingly. Its other half is 13.415. — (`workspace-home.test.tsx`)
+- **13.414** ✅ Inbox renders IMMEDIATELY before Help (owner: "move inbox to just before help"). Nothing
+  else in the suite pinned nav ORDER — 11.170/11.171 assert presence, and 11.185's arms assert the full
+  ordered set but would keep passing if this pair moved together within it. Asserted over the DOM's own
+  order (`compareDocumentPosition`) plus an adjacency check on the rendered link list, so a link inserted
+  between them fails rather than passing the looser "somewhere after". — (`app-nav.test.tsx`)
+- **13.415** ✅ `/account` mounts the "Connected assistants" section, at heading level 2. **The other half
+  of 13.387's removal**, and the reason it is a separate case: an absence asserted alone is satisfied by
+  deleting the feature outright, so one case proves the link left the workspace and this one proves the
+  screen arrived. **`level: 2` is load-bearing, not decoration** — `McpTokensScreen` defaults to `h1`,
+  right for the standalone `/mcp/tokens` page and wrong here, where `/account`'s own `<h1>Your account</h1>`
+  already owns level 1; mounting it with the default would pass a name-only query and fail this one. —
+  (`account-page.test.tsx`)
+
+**13.391 went GREEN in this round, having been red since `762b1c8d`, and it was not fixed — it became
+true.** That commit moved Settings to the always tier, which made the scope note's sentence ("pick one to
+reach its board, members and settings") false while a Settings link sat plainly in the bar; the note was
+commented out and the case left failing. Round 21's ruling put Settings back behind a workspace, so all
+three nouns the sentence names are workspace-conditional again — verified against the component rather
+than assumed (Board needs `projectId`, Members and Settings need `!noWorkspace`) — and the note renders
+again. The assertion was not touched. Its sibling case in the same describe was rewritten: Settings is
+now asserted as workspace-conditional, and it pins the href that must NOT come back with the revert
+(`/w/<id>/settings/ticket-types`, the sidebar-less page whose Edit button opened a third route), because
+the obvious way to "move it back" is to restore the old target along with the old condition.
+
+### Round 22 — five more owner corrections to the workspace home
+
+**No new ids: the next free BLOCK is still `13.416`.** Four of the five corrections landed; the fifth
+was put to the owner and DECLINED (below), so nothing shipped for it. Only 13.387 changed, and only in its expected set — the other three
+shipped items are CSS-only and mint nothing, the same treatment Round 21's four CSS-only items got.
+
+- **13.673** ✅ **REVISED AGAIN — Workflows joined Ticket types as a query-scoped door**
+  (`/settings?workspaceId=<id>&tab=workflows`), so the split is now two path-segment doors and two
+  query-scoped ones rather than three and one. Owner: "clicking workflows from the project screen opens
+  up a separate page. it should open up the workflows tab in the settings page." Round 19e had left it
+  pointed at the bare route, reasoning the move closed no defect the way ticket types' did; the merit it
+  missed is that the bare page has NO SIDEBAR, so following the card dropped you out of the settings
+  shell with no way back. The case's argument is untouched and now has two doors supporting it instead
+  of one. — (`workspace-home.test.tsx`)
+
+**A false claim was removed from 13.673's docblock (13.387's live revision, re-minted above) in the same edit, and it is worth recording because
+it is the kind that reads as measured.** The docblock asserted "The paths are also checked against the
+app directory itself, in the same run: a link is only proven live by a `page.tsx` existing at the route
+it names." A grep for `existsSync` across `apps/web/test` finds exactly one such check — 13.392's, in
+`app-nav.test.tsx`, over the NAV's targets. These four doors are not nav targets and no filesystem
+assertion has ever covered them. The sentence invited a reader to trust that a typo'd href here would be
+caught by something other than the literal expected in the case itself, which was never true. Three of
+the four targets happen to coincide with routes 13.392 does check, so the real gap is narrow — but the
+claim was wrong about this case, and a wrong claim about coverage is worse than no claim.
+
+**SUPERSEDED THE SAME DAY BY ROUND 23 — read that section first: the Board item is GONE, not merely
+conditional.** What follows is the Round 22 ruling as taken, kept because its reasoning is what rules
+out the implementation somebody will otherwise reach for.
+
+**RULED, 2026-09-16 — "once inside a workspace, the board nav bar item should be always
+visible" is NOT adopted; Board stays conditional on a project being in the route.** The owner was given
+the three options below and chose to leave the behaviour as it is, so `app-nav.tsx` is unchanged by this
+round and the prototype's `navDef` divergence on Board is now a DECIDED difference rather than an
+untranscribed one. Anyone reading that docblock's "a workspace with no project in scope has no true
+Board target" should treat it as standing product policy, re-affirmed here, not as a gap awaiting work.
+The reasoning that made the question worth asking is kept below, because it is what rules out the
+implementation somebody will otherwise reach for next time.
+
+Board renders only when the route carries a project, because the only board route in
+the product is `/w/<id>/p/<pid>`: there is one board per PROJECT, not one per workspace. Making the item
+unconditional therefore needs a target, and the obvious one — the workspace's first served project — was
+REJECTED rather than shipped. It would send two people with the same workspace to different boards
+depending on server ordering, move under one person when a project is founded or archived, and
+manufacture the "current project" `app-nav.tsx`'s own docblock records this shell as refusing to
+remember outside the URL. It would also still need a fallback when a workspace has no projects, so the
+item would remain conditional and the instruction would go unmet anyway. The prototype's `navDef` is not
+evidence for it either: its `go("board")` works because its state holds one implicit current project,
+which is a state model this product does not have. The two alternatives put to the owner were a
+`/w/<id>/board` route rendering a picker, and pointing Board at `/w/<id>` when no project is in scope
+(which would put two nav items on one target while you are on that page — the two-doors-to-one-target
+shape this repo has ruled against twice). **Both were declined in favour of the current behaviour: the
+nav does not offer a link that cannot resolve, which is the prototype's own stated filter rule, and
+that rule wins over its Board row's particular placement.**
+
+### Round 23 — the Board nav item is removed
+
+**No new ids: the next free BLOCK is still `13.416`.** Owner, hours after the Round 22 ruling above:
+"the board on the nav bar doesn't work. lets remove it." It is gone, along with `AppNav`'s `projectId`
+prop, whose only consumer it was.
+
+**It could not have worked, and that is the finding worth keeping.** Round 22 asked the narrower
+question — should the item be visible without a project — and answering "leave it conditional" left in
+place something nobody had stated plainly: this product has one board per PROJECT, so Board's only
+possible target was `/w/<id>/p/<pid>`, so it could render only when the route already carried a
+project, which is exactly when the reader is already standing on that board. **The item was a link to
+the current page in every state it could reach, and `aria-current` resolved to `"page"` every time it
+appeared.** No regression made it useless; it had no useful state. The Round 22 options remain the only
+ways it could return, and both still need a decision nobody has taken.
+
+Three cases moved, none minted. Case **11.185**'s third arm — "WITH a workspace AND a project" — was
+kept, with its job changed: it used to prove a project in the route ADDS Board, and now proves a project
+in the route adds NOTHING. Its expected array is now deliberately identical to the second arm's, because
+the two nav shapes have collapsed into one. That is not a redundant arm: the nav still reads
+`usePathname()`, so a board route remains a distinct input, and a future project-conditional link would
+redden this arm while leaving the second green — which is what would name the fault. Two explicit
+negatives were added beside the array (`not.toContain('/w/ws_1/p/p_1')`, and no link named `Board`) so a
+failure says what came back rather than only that an array grew. The arm's own docblock, which used to
+describe the Board mutation witness, was rewritten rather than left describing a link that no longer
+exists. Case **13.392** lost `/w/ws_1/p/p_1` from the route table. The case checks routes the nav
+RENDERS, and the board route is no longer one — it still exists and is still reached from the workspace
+home's project cards. The table is bidirectional (rendered hrefs are subtracted from it), so a stale row
+would have failed loudly as "nav does not render it" rather than rotting quietly. Case **13.391** is
+untouched and still green, but was re-verified rather than assumed: its scope note says "pick one to
+reach its board, members and settings", and this round removed the bar's only Board link. The sentence
+describes what picking a workspace GETS you, not what the bar renders — a board is one click from the
+workspace home's project grid — so it stays true. It would become false only if boards stopped being
+reachable from a workspace at all. This was checked because the case was made green one round earlier on
+precisely that sentence's accuracy, and a claim that was true when written is exactly the kind that goes
+stale without anyone looking.
+
+### Round 24 — the account menu, and the inbox becomes an icon
+
+**Block `13.416`–`13.423` minted here; the next free BLOCK is `13.424`.** Owner, two instructions in one
+message: *"Current Signout button: make it into a round profile pic like thing, that opens up a context
+menu on click. signout option will be moved to the bottom of that menu. along with the help and account
+item from the nav bar"* and *"make inbox an icon. with an indicator (green dot?) if there is an unread
+event. place it on the left of the round profile pic like thing."*
+
+**This is the first surface on this branch with no prototype to transcribe.** Every other port here
+could point at `desktop.dc.html`. Its nav is a flat `navDef` list (`:2277`) with no avatar, no menu and
+no popover anywhere in the file, so the menu follows the prototype's CONTROL metrics while the behaviour
+is the product's own. A later round that "restores prototype fidelity" here would be restoring something
+that never existed.
+
+**Two owner rulings taken before implementation, both on questions the instruction left open:**
+
+1. **The unread count.** A dot can only say "some", and the badge it replaces said "3". Ruled: dot for
+   the visible signal, **count in the accessible name**. Dropping the number would have removed it for
+   exactly the readers least able to go looking, and would leave unread state signalled by COLOUR ALONE
+   (WCAG 1.4.1). `UnreadBadge` is untouched and still renders the number on `/inbox` itself.
+2. **The menu's header.** Ruled: **name and email**. The control being replaced was `Sign out {name}`,
+   whose accessible name carried the signed-in identity on every page; a monogram carries none, two
+   people with the same initial rendering identically. `useCurrentUser` gained `email` to serve it.
+
+**A regression caught during implementation, recorded because the test that would have caught it was
+already there and green.** The first cut had `AccountMenu` return `null` when signed out — correct in
+itself, it has no name, no email and nothing to sign out of — which silently deleted the only route to
+`/help` from the signed-out shell, on a page explicitly reachable signed out. Help and Account therefore
+**stay bar links when there is no session**, and the pre-existing case "AppNav renders its always-items
+with NO session at all" passes unmodified, which is the evidence the fallback is right rather than
+merely present.
+
+**13.414 is SUPERSEDED, and its subject is gone rather than its claim being false.** Help is no longer a
+link in this bar, so "renders Inbox immediately before Help" is not wrong — it is unaskable. It is
+replaced by 13.416, which pins the same KIND of claim (adjacency in the bar's tail) at the arrangement
+that now exists, so the ordering tripwire Round 21 bought is not lost in the move. Case **13.414** is
+superseded by Round 24 — not renumbered, not reused.
+
+- **13.416** ✅ The inbox icon renders immediately left of the account-menu trigger, asserted over
+  `compareDocumentPosition` plus sibling adjacency so an element inserted between them fails.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.417** ✅ The menu holds Help and Account, both reachable once opened, both with their real hrefs;
+  and the menu is CLOSED on mount with `aria-expanded="false"`. **This case is what makes 11.185's
+  shortened link list safe to assert** — that list got shorter by two entries, which is also exactly
+  what DELETING the links would produce, so without this the suite would agree with that bug.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.418** ✅ Sign out is the LAST menu item and keeps the accessible name `Sign out {name}`. Two
+  claims in one case because they fail together: the owner asked for it at the bottom, and the shell
+  ratchets an accessible-name floor on that string which `e2e-stack/passkey-registration.spec.ts` also
+  addresses the control by. — (`apps/web/test/app-nav.test.tsx`)
+- **13.419** ✅ The menu heads with the signed-in name and email, the identity the replaced control used
+  to carry. — (`apps/web/test/app-nav.test.tsx`)
+- **13.420** ✅ Escape closes the menu AND returns focus to the trigger. The focus half is the
+  load-bearing one: closing without it strands focus at the document root, so a keyboard user who opens
+  the menu and changes their mind must tab from the top of the page. A case asserting only that the menu
+  had gone would pass on that bug. — (`apps/web/test/app-nav.test.tsx`)
+- **13.421** ✅ The dot appears only when unread > 0, and the count is in the link's accessible name at
+  both states. Asserting only "a dot appears" would pass on an implementation that dropped the number,
+  which is the change this case exists to forbid. — (`apps/web/test/app-nav.test.tsx`)
+- **13.422** ✅ "1 unread notification" is singular. — (`apps/web/test/app-nav.test.tsx`)
+- **13.423** ✅ Opening the menu focuses the first item, and ArrowDown/ArrowUp walk the items, wrapping
+  at both ends. **Recorded late — the test landed in Round 24's commit while this file carried `13.423`
+  only as the next-free pointer, so for one commit the case existed in code and nowhere in the
+  catalogue.** That is the drift `Features.md`'s "same change set, never a follow-up" rule exists to
+  prevent, and it is written down rather than quietly backfilled. The case is also **13.420's
+  precondition**: until focus moved into the menu on open, "Escape returns focus to the trigger" was
+  vacuous, because focus had never left. — (`apps/web/test/app-nav.test.tsx`)
+
+**Five existing cases in `inbox-nav-link.test.tsx` were re-aimed, not weakened.** 11.152, 11.155, 11.156,
+11.169 and the load-window case all asserted the count through `UnreadBadge`'s `role="img"`, which the
+nav no longer renders. Each now asserts the same count through the link's accessible name, plus the
+dot's presence or absence — so 11.156 ("keeps the last count when a refresh fails") and 11.169 ("clears
+the count when the session ends in place") still measure exactly what they always did. 11.169 asserts
+BOTH the name and the dot deliberately: a dot that disappeared while the name still read "3 unread"
+would leave the previous session's count being announced to whoever is looking now, which is the defect
+that case exists for.
+
+### Round 25 — the nav remembers the last workspace you opened
+
+**Block `13.424`–`13.427` minted here; the next free BLOCK is `13.428`.** Owner: *"keep the last opened
+workspace in local storage, and based on that, the workspace scoped navbar items should be made visible.
+so that just moving to a separate page (inbox, help, account, etc) does not automatically hide them."*
+
+`use-last-workspace.ts` (NEW) holds the memory, following the `gn-style`/`gn-theme` convention already in
+this shell. `AppNav` takes the route's workspace when there is one and the remembered one otherwise.
+
+**The rule the bar has held since Round 19b is UNCHANGED: a link renders only when its target exists.**
+What changed is where the workspace comes from. That matters because a remembered id is a *guess about
+the past* — it may name a workspace you have since been removed from, or one that was deleted — so the
+two sources are NOT treated alike:
+
+- A **routed** workspace renders its links immediately. Standing on `/w/<id>/members` is proof.
+- A **remembered** one renders them only once `useWorkspaceName` resolves a name from
+  `getMyWorkspaces()`. Rounds 22 and 23 deleted the Board item for offering a link that could not
+  resolve; this is the same hazard arriving from storage instead of from a route. No second request and
+  no second definition of "reachable" — it reuses the read the bar already makes.
+
+**Two assertions in 13.391 changed, and neither was relaxed to fit the code.**
+
+1. The scope note's query moved from `getByText` to `findByText`. It is now gated on a POSITIVE "storage
+   read, nothing remembered for this person" rather than on the synchronous "no workspace", because the
+   synchronous form would flash *"No workspace selected"* at every viewer who HAS a remembered workspace,
+   on every global page they open. The sentence is one tick later and never false.
+2. "No workspace in the ROUTE, no Settings link at all" became "no workspace REACHABLE — none routed and
+   none remembered — no Settings link." The old wording is precisely what the owner's instruction
+   revokes. **13.424 is the counterpart that keeps this honest**: without it, the "no Settings" assertion
+   could be satisfied by a nav that had simply stopped remembering anything at all.
+
+**A stated cost, rather than a hidden one.** When a workspace IS remembered but its name never resolves,
+neither the scoped links nor the scope note render. The alternative — clearing the memory when the name
+fails — would destroy a valid workspace on a TRANSIENT `getMyWorkspaces` failure, throwing away real
+state to recover a hint. `Workspaces` remains one click away and is the real route out.
+
+Case **13.423** belongs in this list too, recorded late in Round 24 — see that section.
+
+- **13.424** ✅ On a global page (`/inbox`) with a workspace remembered and resolvable, the name, My
+  Work, Members and Settings all render with their real hrefs, none carries `aria-current`, and the
+  scope note is absent. The owner's instruction, asserted directly.
+  — (`apps/web/test/app-nav.test.tsx`)
+- **13.425** ✅ A workspace remembered for a DIFFERENT user is ignored: the scope note renders and the
+  other person's workspace NAME appears nowhere. `localStorage` outlives a session, so an unkeyed memory
+  would render the previous viewer's workspace in the next viewer's chrome — the defect 11.169 exists
+  for, one surface over. The assertion is on the name, because the name is the part that leaks.
+  **Mutation-witnessed:** deleting the `storedUserId !== userId` guard reddens this case and nothing
+  else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.426** ✅ A remembered workspace that no longer resolves offers no scoped links. The fixture is a
+  SUCCESSFUL read that does not contain it (`workspacesOf([])`) — what being removed looks like — rather
+  than a rejecting stub, which would prove something weaker since a refusal also yields a null name. The
+  inbox link is asserted first as a settled-render witness, so "no My Work" is a decision and not a
+  snapshot taken too early. **Mutation-witnessed:** treating a remembered id as authoritative reddens
+  this case and nothing else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.427** ✅ Opening a workspace records `{userId, workspaceId}` under `gn-last-workspace`. Asserted
+  through the STORAGE KEY, not through a later render: a later render would also pass if the value were
+  held only in React state, which would not survive the page navigation this whole feature exists for.
+  — (`apps/web/test/app-nav.test.tsx`)
+
+**Test isolation, added here because the nav now WRITES.** jsdom keeps one `localStorage` for the whole
+module, so a case rendering `<AppNav workspaceId="ws_1" />` left the key behind for every case after it —
+order-dependence that shows up as a suite going red when one test is renamed. `app-nav.test.tsx` now
+clears storage and reseeds the mock session in `beforeEach`.
+
+### Round 26 — the nav stops jittering on page changes
+
+**Block `13.428`–`13.429` minted here; the next free BLOCK is `13.430`.** Owner: *"the nav bar item
+jitters on changing pages. the workspace scoped items briefly disappears and reappears. make it so that
+it is smooth and the jitter does not happen."*
+
+**The mount is the bug.** `Providers` lives in the root layout and persists across client-side
+navigation, but `AppNav` is rendered by each PAGE (`app/inbox/page.tsx:210` and fourteen siblings), so
+every navigation unmounts and remounts it. Its state therefore reset to "nothing known yet" on every page
+change: `useLastWorkspace` restarted at `unknown` and `useWorkspaceName` at `null`, so the
+workspace-scoped links vanished for the tick it took to re-read storage and re-fetch the name, then came
+back. Round 25 made this loud by putting four links behind that state; **the workspace-NAME half of it
+predates Round 25 entirely** and flickered even when navigating between two pages of the same workspace,
+where it was one item and easier to miss.
+
+Fixed by holding both answers in MODULE scope, which survives the remount, and initialising `useState`
+from them. The first load of a session still resolves asynchronously — nothing is known yet, and
+painting links from no information would be inventing state.
+
+**Two things the fix must not do, each with its own case and each mutation-witnessed:**
+
+- It must not **resurrect a workspace you have lost**. The cache is read on every remount, so an entry
+  left behind after the product learns the workspace is gone would put the name back one navigation
+  later — 13.426's defect displaced in time rather than fixed. A successful read that does not contain
+  the workspace therefore EVICTS; only a rejected read (transient) leaves the entry alone.
+- It must not **leak across viewers**. Neither cache passes through `readFor`'s user guard — the
+  remembered-workspace cache is checked before it, the name cache is keyed by workspace id alone — so
+  both are dropped when the observed user id changes. Signing out and back in as someone else is a
+  client-side navigation, which does NOT reset module state.
+
+- **13.428** ✅ After a navigation, the workspace name, My Work, Members and Settings are present in the
+  FIRST committed render, and the scope note never flashes in their place. **The case mounts twice and
+  asserts synchronously, and both are load-bearing**: every other case in this file mounts once and so
+  could not see a remount defect at all, and any `findBy*` here would wait exactly long enough to hide
+  the flicker it exists to catch. **Mutation-witnessed:** restoring either hook's cold start reddens this
+  case and nothing else. — (`apps/web/test/app-nav.test.tsx`)
+- **13.429** ✅ A workspace that has become unreachable does not reappear on the next navigation, proving
+  the eviction above. — (`apps/web/test/app-nav.test.tsx`)
+
+**A mutation that was thrown away rather than believed.** The first attempt at witnessing 13.428 replaced
+the `useState` initialiser with `() => { status: 'unknown' }` — a block body returning `undefined`, not
+the object literal intended. It reddened 22 cases, which looks like a strong witness and is worthless:
+the code under test was malformed rather than reverted. A mutation must be the code that plausibly
+SHIPS, and a failure count far larger than expected is a reason to re-read the mutant, not to record a
+result.
+
+### Round 27 — the project/board page's desktop-prototype-port begins: page chrome (`/w/[workspaceId]/p/[projectId]`)
+
+**Block `13.430` minted here; the next free BLOCK is `13.431`.** Task 2 of
+`docs/superpowers/plans/2026-09-16-board-prototype-port.md` (Task 1 was STRUCK — see the plan's
+Progress log — so this is the port's first landed code). Restyles the page's existing chrome rather
+than rebuilding it: `role="tablist"`/`role="tab"`/`aria-selected` are unchanged throughout.
+
+**The tab rail becomes the shared segmented control.** The container's class moves from the
+page-local `.gn-view-tabs` to `.gn-segmented`, and each tab button gains `.gn-segmented__item` plus
+`.gn-segmented__item--on` when selected — the same classes `/sign-in`, `/account` and `/help` already
+share (`packages/ui/src/ui.css`). `.gn-view-tabs` now survives nowhere in the product;
+`apps/web/app/globals.css`'s own docblock had already recorded it as surviving "only on the project
+page", and its three now-dead rules are left in place rather than deleted — out of this task's file
+scope (`page.tsx` and `ui.css` only) and reported rather than silently removed.
+
+**The New-ticket control moves out of the tablist into a new `.gn-project__header` row.** It used to
+render as the tablist's fifth child — a plain `<button>` (or a `<p role="status">` while gated) sitting
+inside a `role="tablist"` beside four `role="tab"` children, an ARIA defect the 2px-gap segmented track
+would only have made more visible. `.gn-project__header` is the container Task 4 (search), Task 5
+(Filters) and Task 8 (the workflow `<select>`) add their own controls to; New ticket is the one already
+built, so it moves in now. No test scopes a `New ticket` query from the tablist container — both
+`page-refusals.test.tsx` and `project-create-gate.test.tsx` query `screen` (or `within(dialog)`)
+directly — so the move changes no test's reach.
+
+**`.gn-project`, `.gn-project__breadcrumb`, `.gn-project__title` and `.gn-project__summary` are
+declared in `ui.css` per the spec's Page-chrome metrics table, and are UNCONSUMED here.** This page
+reads no project name anywhere: `BoardView` is `{projectId, groups}` (`view-types.ts:139`), and
+`DataSourceQuery` has thirteen methods, none named `getProject`/`getProjects` — only
+`getMyWorkspaces()` carries project names, and only on the workspace-home page
+(`apps/web/app/w/[workspaceId]/page.tsx`), not here. Grepped across every task in the port's plan:
+no task ever references `.gn-project__breadcrumb`/`__title`/`__summary` outside this one CSS-declaring
+step. Recorded rather than guessed at — a future task (not yet in this plan) owes the read before
+these three rules render anything real; `.gn-project` itself IS consumed, as the page's own content
+wrapper (`padding`/`column`/`gap`, nested inside the existing `.gn-shell__main`, not merged onto it —
+the two files' rules would otherwise cascade-order against each other).
+
+- **13.430** ✅ The selected tab, and only it, carries `gn-segmented__item--on`, driven from the same
+  boolean that sets `aria-selected` rather than two comparisons kept in agreement by hand.
+  — (`apps/web/test/project-calendar-timeline.test.tsx`)
+
+**Task 2 fix round 1 (coordinator Rulings 5 and 6, same day) — the two findings above were correct,
+and both are now closed rather than merely flagged.**
+
+**Block `13.431`–`13.432` minted here; the next free BLOCK is `13.433`.** Ruling 5: `.gn-project`
+drops its horizontal `padding` entirely (it kept only `flex-direction`/`gap`/bottom `padding`) — the
+brief's literal `padding: 0 2rem 1.5rem` stacked additively on top of `.gn-shell`'s own
+`padding: 0 1.25rem 3rem` (`apps/web/app/globals.css:101`), landing this page's content at 52px from
+the viewport edge (20px + 32px) rather than the prototype's own 32px. `.gn-workspaces`
+(`globals.css:210`) already answers this exact shape for a sibling page — it keeps ONLY what
+`.gn-shell` does not already provide — and `.gn-project` now follows the same rule, with the
+residual 20px-vs-32px gap recorded in a comment on the rule rather than closed: closing it would mean
+moving `.gn-shell` itself, shifting every route in the product for one page's inset.
+
+Ruling 6: the CSS gap was real, but the DATA gap was not — `ProjectRef.name`
+(`packages/app-core/src/view-types.ts:15-23`) already travels on `WorkspaceRef.projects`, served by
+the SAME `getMyWorkspaces()` read `apps/web/src/use-workspace-name.ts` already makes for this page's
+own `<AppNav>` link. Added `apps/web/src/use-project-name.ts`, mirroring `use-workspace-name.ts`'s
+shape and its "omission, never the id" contract exactly, but WITHOUT that hook's module-scoped name
+cache: `AppNav` remounts on every client-side navigation (Round 26's whole reason for caching), while
+this hook mounts once per page load, so there is nothing a cache would buy here and the asymmetry is
+recorded as a decision in the new hook's own docblock. `page.tsx` now renders the workspace name in
+`.gn-project__breadcrumb` and the project name in `<h1 className="gn-project__title">`, each
+independently omitted (not the raw id, not a placeholder) while its own hook holds `null`. Neither
+reserves layout space while absent — no fixed-height wrapper sits around either — so
+`.gn-project__header` is exactly as tall as whichever of its children have resolved and grows once a
+name mounts, rather than holding blank space that a name later fills. `.gn-project__summary` (the
+`N of M shown` line) is UNCHANGED from Round 27: still declared, still unconsumed, left for the task
+that adds the count rather than filled with an invented number.
+
+- **13.431** ✅ A resolved `getMyWorkspaces` read names both the breadcrumb (the workspace) and the
+  title (the project), each independently, disambiguated from `<AppNav>`'s own workspace-name link by
+  scoping to `.gn-project__breadcrumb`. — (`apps/web/test/project-page-chrome.test.tsx`)
+- **13.432** ✅ While `getMyWorkspaces` has not answered (left unstubbed — pending or refused, the same
+  state either way to the caller), neither the breadcrumb nor the title element exists at all, and
+  specifically the raw workspace/project ids are absent from the document — the failure this pair
+  exists to catch is the id standing in for the name nobody could confirm.
+  — (`apps/web/test/project-page-chrome.test.tsx`)
+
+No new token roles: Task 1 was struck, so every `var(--gn-…)` referenced above (`--gn-text-muted`)
+was already declared before this change — the same role `.gn-field__label` already reads in the same
+file. `packages/ui/test/tokens.test.ts`'s role-existence guard and `token-discipline.test.ts`'s
+no-literal-colours guard both pass unchanged.
+
+**Task 2 fix round 2 (coordinator review of fix round 1) — one Critical, one Important, one
+amendment to the coordinator's own Ruling 5.**
+
+**Critical, no new case (the existing 11.160/13.430 tab-role/class assertions and 13.431/13.432's
+own name assertions already cover the corrected markup — the defect was purely structural
+placement, not a missing behaviour).** `.gn-project__header` had been holding the breadcrumb, the
+`<h1>` AND `createRegion` as three children of one `flex; align-items: center; flex-wrap: wrap`
+row — the 34px/700 title sat vertically centred beside the 13px breadcrumb and the New-ticket
+button. The metrics table's separate "Breadcrumb 13/18" / "Title 34/41" / "Header row top margin
+24px" entries describe three STACKED children of `.gn-project`'s own column, not one line, and
+Tasks 4/5/8 would each have landed their own control on that same crowded line. Restructured:
+breadcrumb and `<h1>` are now direct children of `.gn-project`, spaced by its 14px `gap`;
+`.gn-project__header` holds only `createRegion` and keeps its own `margin-top: 1.5rem`. The ARIA
+fix (`createRegion` out of `role="tablist"`) is unchanged.
+
+**Ruling 8 (amending Ruling 5) — `.gn-project` drops its bottom padding too.** Round 1 kept it,
+reasoning `.gn-shell`'s bottom padding didn't "double as this row's tighter one" — wrong: `.gn-shell`
+already supplies 48px bottom, so the kept 24px stacked to 72px against the prototype's 24px alone,
+the same additive defect Ruling 5 removed on the horizontal axis. `.gn-workspaces`, round 1's own
+cited precedent, adds no bottom padding either. `.gn-project` now sets no `padding` property at
+all; the residual gap (20px-vs-32px sides, 48px-vs-24px bottom) is recorded in the rule's own
+comment on both axes, not closed — closing either moves `.gn-shell` for every route.
+
+**Important — 13.432 was order-dependent.** `project-page-chrome.test.tsx` never cleared
+`useWorkspaceName`'s module-scoped `nameCache`, which 13.431 (run first) populates for `WORKSPACE`.
+13.432's assertions were still correct — they would have caught a real `?? id` regression — but its
+*initial* render painted the stale cached name rather than starting cold, so the case was not
+exercising the state its own description names when run after 13.431, and could have walked a
+different path standalone or under `--shuffle`. Fixed the way `app-nav.test.tsx` already does for
+the identical cache: `clearWorkspaceNameCache()` in `beforeEach`. **Confirmed by running 13.432
+alone** (`vitest run -t 13.432`), the check that actually proves the order-dependence is gone
+rather than merely re-passing the full file in its usual order.
+
+Neither case ID changes: 13.431 and 13.432 still name the same two behaviours, now proven true
+independent of run order and with the DOM shape the metrics table actually describes.
+
+## Task 3 — the board's own filter vocabulary (board-prototype-port plan, 2026-09-16)
+
+**Block `13.433`–`13.434` minted here; the next free BLOCK is `13.435`.** The plan's draft proposed
+synthesizing a `TicketState` from a `BoardCard` so the board could reuse `matchesFilter` directly;
+rejected before being built, because `matchesFilter` fails CLOSED on every axis a card cannot supply
+(`collaboratorIds`, `dueBefore`/`dueAfter`, any `fields` clause) and a synthesized state would EMPTY
+the board rather than narrow it. `BoardFilterSpec` is `Pick<FilterSpec, …>` over the six axes a board
+can answer; the four it cannot are unrepresentable, a compile error rather than a wrong answer on
+screen. Two cases, and neither substitutes for the other: agreement proves the shared axes decide
+alike, the compile-time case proves the narrowing is real rather than merely documented.
+
+- **13.433** ✅ `matchesBoardCard` and `matchesFilter` decide identically on all six shared axes
+  (assignee, type, state, state category, project, text — matching and non-matching, plus the empty
+  spec) over a `BoardCard`/`BoardColumn` pair and the equivalent `TicketState`. A dedicated control
+  asserts the corpus contains at least one rejection, so the agreement is not vacuously true of two
+  predicates that both always answer `true`. — (`packages/app-core/test/filter/board-filter.test.ts`)
+- **13.434** ✅ `collaboratorIds` and `dueBefore` are rejected on a `BoardFilterSpec` literal at
+  COMPILE TIME (`@ts-expect-error`), not merely absent from a runtime check — witnessed by temporarily
+  widening `BoardFilterSpec` from the `Pick` to bare `FilterSpec` and confirming `tsc` then reports
+  both directives as unused (`TS2578`), proving the narrowing is what rejects the two axes rather than
+  a typo the compiler happened not to catch. — (`packages/app-core/test/filter/board-filter.test.ts`)
+
+## Task 4 — the board's search box, count, chip, and scope note (board-prototype-port plan, 2026-09-16)
+
+**Block `13.435`–`13.444` minted here; the next free BLOCK is `13.445`.** `matchesBoardCard` (Task 3)
+had no caller. This task adds one: a page-level search box narrows the board through it, an
+`N of M shown` count and a removable chip are derived from the SAME pass that narrows the render
+(coordinator Ruling 1 — never a second count), and a scope note names the axes a `BoardFilterSpec`
+cannot answer. `13.436` replaces the brief's own Step 5 second test, which asked for a case the
+architecture cannot produce — `getBoard(projectId: string)` (`data-source.ts:134`) takes no filter
+argument, so the board's own total is never narrowed by the server-side "Only tickets in progress"
+toggle, and the brief's literal assertion ("a bare `M` would claim the project holds more than it
+does") is false of the board's `M` specifically. The real, reachable version of that hazard — `M`
+accidentally sourced from the LIST's own (narrower) row count instead of the board's — is what
+`13.436` actually witnesses; its FIRST version used a zero-row list fixture, which could not
+distinguish a correct count from a wrong one (any wrong `M` would have failed the single assertion
+just as the real bug would), so it was rewritten (fix round 1) to a nonzero, unequal list fixture
+plus a negative assertion naming the exact wrong string a `list.rows`-sourced bug would print.
+**Fix round 1 (coordinator Ruling 10 and concern 4)** adds `13.439`–`13.441`: the search box sits on
+every tab but narrows only the board, which is the identical asymmetry the spec's own search ruling
+exists to avoid, just approached from the other direction (a WIRE search would narrow the list and
+leave the board unnarrowed; this client search narrows the board and leaves the other three
+unnarrowed with no visible sign of it) — `13.439` is the mirror note that names the limit, only
+while a search term is actually present. `describeUnappliedBoardAxes` (the board's own scope-note
+logic) was extracted to a pure function (`apps/web/src/board-search-scope.ts`) specifically so it
+could be unit-tested directly rather than shipping with zero executions until Task 5's Filters sheet
+became its first real caller — `13.440`/`13.441` are that unit test. **Review fix round (Important
+finding) adds `13.442`–`13.444`.** The disclosure gate (`page.tsx`) enumerated a DIFFERENT axis set
+than the narrowing did: `activeFilterChips` covered only `text`, `boardUnappliedAxes` covered only
+the four board-blind axes, but the `boardFilter` object handed to `matchesBoardCard` carries SIX
+(`text`, `assigneeIds`, `typeIds`, `stateIds`, `stateCategories`, `projectIds`) — so five of those
+six could narrow the rendered cards while tripping neither term, closing the whole disclosure strip
+(count included) on cards that had, in fact, been dropped. Unreachable today (only `text` has a UI
+control), but reachable the instant Task 5's Filters sheet or Task 8's workflow picker writes any
+other axis onto the same state. **Two independent remedies, both required:** (1) the chip list is
+now built by reading `boardFilter` itself (`buildBoardFilterChips`, `13.442`) — one enumeration,
+not two hand-kept in sync; (2) the gate gained a THIRD, independent term,
+`boardNarrowing.shown !== boardNarrowing.total` (`shouldRenderBoardNarrowingStrip`, `13.443`) —
+because Task 8's workflow picker narrows by dropping whole GROUPS, never by setting a filter axis,
+so no enumeration of axes, however complete, could ever notice it; only a fact about the actual
+render (fewer cards shown than exist) can. `13.443` tests the gate expression directly rather than
+through a page render, since the state remedy 2 exists for cannot be constructed from this page's
+current inputs. `13.444` is the review's Minor: Ruling 10's mirror note gained a Calendar-tab arm
+alongside its existing List/Timeline coverage.
+
+- **13.435** ✅ Typing into the board's search box narrows the rendered grid AND reads an honest
+  `N of M shown`: two of three fixture cards leave the DOM, the remaining one stays, and the count
+  names both numbers correctly. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.436** ✅ The count is read from `board.data`, never from `list.rows.length` — a board fixture
+  of three cards against a list fixture of TWO rows (nonzero, and different from three so a
+  `list.rows`-sourced bug prints a plausible wrong number rather than an obviously broken one), with
+  the "Only tickets in progress" toggle on, still reads the board's own total (three) once the
+  search box narrows it to one — and does NOT read "1 of 2 shown", the exact string a
+  `list.rows`-sourced `M` would produce. Mutation-verified: temporarily sourcing `M` from
+  `list.rows.length` was confirmed to fail this case with exactly that string before the fix
+  landed. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.437** ✅ The chip and the count move together: removing the one active filter chip clears the
+  search box, restores every card, AND removes the count with it — no stale "M of M" survives an
+  empty filter, because the strip they share is one conditional block, not two independently gated
+  elements. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.438** ✅ The `.gn-project__narrowing` strip does not render at all while no filter is active —
+  the count is not an unconditional fixture of the board tab. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.439** ✅ The List and Timeline tabs show no "search doesn't apply here" note until a search
+  term actually exists, name the limit once one is typed, and drop the note again once it is
+  cleared; the Board tab — where the search DOES apply — never shows the note at all, even with a
+  term present and cards visibly narrowed. — (`apps/web/test/board-narrowing.test.tsx`)
+- **13.440** ✅ `describeUnappliedBoardAxes` (unit, no page mount): an empty filter, an EMPTY
+  `collaboratorIds`/`fields` (which must not narrow), and each of `collaboratorIds`/`dueBefore`/
+  `dueAfter`/`fields` set individually — including `dueBefore` and `dueAfter` set TOGETHER, which
+  names "due date" exactly once, not twice. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.441** ✅ `describeUnappliedBoardAxes` names all three unapplied axes together in a FIXED
+  order (collaborator, due date, custom field) regardless of the order the caller supplied them on
+  the `FilterSpec` object, and never names a `BoardFilterSpec`-representable axis (`text`,
+  `assigneeIds`) as unapplied. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.442** ✅ `buildBoardFilterChips` (review, Important finding, remedy 1): emits a labelled,
+  removable chip for EACH of the six `BoardFilterSpec` axes when set (not only `text`), resolves an
+  id through the supplied name resolver and falls back to the raw id when the resolver has none,
+  ignores an empty list axis, and each chip's `onRemove` clears exactly its own axis and no
+  other. — (`apps/web/test/board-search-scope.test.ts`)
+- **13.443** ✅ `shouldRenderBoardNarrowingStrip` (review, Important finding, remedy 2): false with
+  nothing active and nothing hidden; true on a chip alone; true on an unapplied axis alone; true on
+  ALL three together; and — the case that would fail without remedy 2 — true when `shown !== total`
+  with NEITHER a chip NOR an unapplied axis, the exact state a group-dropping narrowing mechanism
+  (no filter axis set) produces. Tests the gate expression directly rather than through a page
+  render, per the coordinator's own instruction, since that state cannot be constructed from this
+  page's current inputs (nothing here drops a group without going through a filter axis
+  first). — (`apps/web/test/board-search-scope.test.ts`)
+- **13.444** ✅ The review's Minor: Ruling 10's mirror note (`13.439`) is exercised on the Calendar
+  tab too, not only List and Timeline — the gate is one uniform `view !== 'board'` check, so
+  divergence was unlikely, but untested. — (`apps/web/test/board-narrowing.test.tsx`)
+
+## Task 5 — the Filters sheet (board-prototype-port plan, 2026-09-16)
+
+**Block `13.445`–`13.462` minted here.** The Filters button Task 4
+deliberately left unrendered ("An inert Filters button is a button that lies... I chose do not render
+it yet") gets its sheet: a `role="dialog"` side panel writing straight through to the SAME
+page-level `filter` state the search box and the removable chips already share — no draft copy, no
+"Apply" button. Five of `BoardFilterSpec`'s six axes get a control (`text` already had the search
+box): Assignee and Collaborators as "person row" checkbox lists, Type and State as "category chip"
+multi-selects, and Category over the three fixed `stateCategories` values. `projectIds` gets none —
+this page is already scoped to the one project it shows, and Task 4's own report found no natural
+label source for it here. `dueBefore`/`dueAfter`/`fields` get no control either: the design spec's
+own Filters-sheet metrics name exactly two control shapes ("person row", "category chip"), and this
+task's brief curates those same two into its metrics line while dropping the spec's "Toggle" row
+entirely — the discriminating fact that no boolean/date control was meant to land here. Both remain
+unsettable anywhere in the product after this task, a named gap for whoever builds their control
+next, not a surprise.
+
+`13.451` is the test Task 4's own brief deferred to this commit by name: "names the axes the board
+could not evaluate, beside the count and not inside it... helper added in Task 5... do not stub the
+helper." `openFiltersAndPickCollaborator` in `filters-sheet.test.tsx` is that helper, doing the real
+thing — open the sheet through the Filters button, click a real checkbox — rather than reaching into
+`setFilter` directly. Because `collaboratorIds` is one of the four axes `matchesBoardCard` cannot
+evaluate at all, this is `describeUnappliedBoardAxes`'s (Task 4) first execution through the rendered
+page rather than through its own unit test; it ran clean on the first try.
+
+The scope note's trailing clause — "— set on the list tab, where a ticket carries the field", written
+before this sheet existed — is REMOVED, not re-pointed at the Filters sheet. `boardUnappliedAxes` can
+join up to three axis names in one sentence, and after this task only ONE of the three
+(`collaborator`) has a control anywhere in the product; `dueBefore`/`dueAfter`/`fields` remain
+unsettable anywhere. A single trailing clause cannot name a different true location per axis in a
+joined list, and "set in the Filters sheet" would be right for collaborator today and silently wrong
+for the other two the moment either gains a control elsewhere — the exact "names the wrong place"
+failure the task's own brief warned against. `13.456` guards the deletion.
+
+The dialog's focus contract is mutation-verified in both directions, not merely asserted once:
+`account-menu.tsx`'s own docblock warns that "Escape returns focus to the trigger" is vacuously true
+if focus never left it in the first place. `13.445` asserts focus DID leave the trigger on open
+(`document.activeElement` inside the panel, not on the button) — confirmed load-bearing by temporarily
+deleting the focus-on-open effect and watching that exact assertion fail. `13.446` asserts Escape
+returns focus to the trigger — confirmed load-bearing the same way, by temporarily deleting the
+focus-return line and watching that assertion fail with the trigger untouched. Both mutations were
+reverted with a targeted edit (not `git checkout`), confirmed clean by re-running the full suite.
+
+- **13.445** ✅ The Filters button opens a `role="dialog"` panel with `aria-modal="true"`, labelled by
+  its own `<h2>Filters</h2>` via `aria-labelledby`, and focus moves off the trigger and into the panel
+  on open. Mutation-verified: deleting the focus-on-open effect fails this exact
+  assertion. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.446** ✅ Escape closes the sheet and returns focus to the exact Filters button that opened it.
+  Mutation-verified: deleting the focus-return line fails this exact
+  assertion. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.447** ✅ Checking a person row in the Assignee section narrows the board, shows the
+  `assigneeIds` chip naming them, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.448** ✅ Pressing a Type chip (`aria-pressed` toggles true) narrows the board, shows the
+  `typeIds` chip, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.449** ✅ Pressing a State chip discloses via the `stateIds` chip even when it removes no card
+  (every fixture card shares the one state) — the narrowing strip's three-term gate opens on a chip
+  existing, independent of whether it removed anything. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.450** ✅ Pressing a Category chip narrows the board to zero cards and shows the
+  `stateCategories` chip — the empty-columns-not-vanished-board rule (`board.tsx:216-219`) holds at the
+  limit. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.451** ✅ THE DEFERRED TASK 4 TEST. Picking a Collaborator through the real
+  `openFiltersAndPickCollaborator` helper does not narrow the board (the count stays `M of M`) but
+  the scope note names "collaborator" as not applied on the board — the count reports cards the board
+  filtered, the note reports an axis it never ran, and they stay
+  separate. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.452** ✅ "Clear all" resets the sheet's own five axes (proven on Assignee) without closing the
+  sheet — a distinct action from "Done". — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.453** ✅ Absence, not an invented empty list: while the roster has not been read
+  (`getMembers` never resolving), the Assignee section states so and renders no checkboxes at
+  all. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.454** ✅ A FAILED ticket-types read renders a refusal sentence in the Type section, never
+  falling back to the built-in ladder — the built-in fallback is for a read still PENDING, never one
+  that has REFUSED. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.455** ✅ While the board has not been read, the State section states so rather than rendering
+  zero chips (which would claim the board legitimately has no states). — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.456** ✅ The scope note's copy no longer names "the list tab" — the location clause removed
+  because it names the wrong place for two of the three axes it can
+  join. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Task 5 fix round 1, same session — `advisor()` review before reporting done.** One real, blocking
+gap: `13.453`/`13.455` proved the PENDING sentence for Assignee/Collaborators/State, but those two
+sections collapsed PENDING and REFUSED into one `members === null` / `!boardLoaded` check — the Type
+section already distinguished `typesError`/`typesPending` for the identical reason, and this was the
+same wrong-cause failure `page.tsx`'s own `useSessionStatus` docblock was written about, one component
+over: a real roster/board refusal would have printed "has not loaded yet" instead of naming the
+refusal. Fixed by threading `members.error`/`board.error` (`useLiveQuery`'s own error channel) into
+`FiltersSheet` as `membersError`/`boardError`, checked ahead of the pending branch in both sections —
+`13.457`/`13.458` prove BOTH halves: the refusal sentence appears, AND the pending sentence does not.
+Also fixed in the same round: `.gn-filters__scrim` had no `z-index`, so it would have painted BELOW
+`TicketSheet`'s `.gn-sheet__scrim` (`z-index: 40`) were both ever open at once — invisible to every
+test in this file, since jsdom computes no paint order at all. Matched the house scrims' own `40`
+rather than inventing a second stacking scale; no case can exercise this (jsdom's blindness to paint
+order is exactly the reason it was missed the first time), so it is recorded here as reasoned from the
+CSS rather than proven by a test.
+
+- **13.457** ✅ A FAILED roster read renders the refusal sentence in Assignee, and NOT the "has not
+  loaded yet" pending sentence — the two are checked as mutually exclusive facts, not merely the
+  refusal's presence alone. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.458** ✅ A FAILED board read renders the refusal sentence in State, and NOT the "has not loaded
+  yet" pending sentence, for the identical reason. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Ruling 12 (coordinator remediation, same session) — "Clear all" was not true.** `clearAll` cleared
+the sheet's own five axes and deliberately left `text` alone, on the reasoning that the search box is
+Task 4's control, living outside this sheet — a correct fact about ownership and a wrong answer about
+what the button ON SCREEN promises. A person who types a search term, opens Filters, and clicks a
+button labelled "Clear all" would have watched the text chip survive: an accurate docblock above an
+inaccurate control is still a lie to whoever is looking at the control. **Fix: `clearAll` now clears
+all SIX `BoardFilterSpec` axes the narrowing strip's chips can represent — `text` included** — keeping
+`activeFilterChips` as the one disclosure surface the button's label actually promises. Checked, not
+assumed, before writing the fix: the search `<input>` (`ProjectBoard`'s own JSX) is
+`value={filter.text ?? ''}`, a CONTROLLED component with no local state, so clearing `filter.text` was
+sufficient on its own — no separate desync between the box and the filter to fix.
+
+- **13.459** ✅ "Clear all" removes the text chip AND empties the search box — the two are asserted as
+  separate failure modes (the disclosure surface lying vs. the control itself holding stale text),
+  confirming the fix covers both rather than only the chip the earlier version already
+  handled. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**Ruling 13 (coordinator remediation, same session) — Ruling 12's own fix cleared the WRONG six.** The
+reviewer checked `clearAll` axis-by-axis against `BoardFilterSpec` rather than accepting Ruling 12's
+"clears all six" claim, and found a DIFFERENT six than the docblock and both commit messages named:
+`collaboratorIds` **included** (not a `BoardFilterSpec` axis — produces no chip via
+`buildBoardFilterChips`, only a scope-note entry) while `projectIds` **omitted** (one of the six, WITH
+a working chip). Wrong in both directions at once, and harmless only because nothing on this page sets
+`filter.projectIds` yet — precisely why it needed fixing now: the first future control that writes
+`projectIds` would have found "Clear all" silently failing to clear it, with nothing pointing back at
+this function. **Fix:** the exact axis set — `FILTERS_SHEET_CLEARABLE_AXES`, exported once from
+`page.tsx` — is now the SINGLE source both `clearAll` (via the extracted `clearFilterAxes`) and this
+test file read, rather than two independently hand-typed literals, which is the mechanism that produced
+the wrong six twice. `13.460`'s first case pins the array's own content; its second case is a UNIT test
+against `clearFilterAxes` directly (no UI control exists for `projectIds`, so no end-to-end case is
+possible) with every field asserted by NAME rather than by looping over the array under test — the
+first draft of this case looped over `FILTERS_SHEET_CLEARABLE_AXES` to decide what to check, which
+passed vacuously when `projectIds` was mutated out of the array (the check shrank along with the
+implementation). Mutation-verified both ways: temporarily removing `projectIds` from the array failed
+BOTH of `13.460`'s cases at exactly that field, and the revert was confirmed clean via
+`grep -n MUTATION page.tsx` (zero matches) before the final suite run.
+
+**MINOR (same review) — "Done" and the scrim click were wired but untested.** Both close paths route
+through the same `onClose`/`closeFilters` `13.446` already mutation-proves for Escape, so the risk was
+low, but neither had a passing assertion, and `filters-scrim`'s own testid was referenced by no test at
+all. `13.461`/`13.462` close that gap directly.
+
+- **13.460** ✅ `FILTERS_SHEET_CLEARABLE_AXES` names exactly the six `BoardFilterSpec` fields plus
+  `collaboratorIds` (order-independent set comparison), and `clearFilterAxes` clears every one of those
+  seven fields BY NAME on a `FilterSpec` carrying `projectIds` — the axis Ruling 13 found silently
+  omitted, settable by no control on this page — while leaving an eighth axis outside the clearable set
+  (`dueBefore`) untouched as a negative control. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.461** ✅ Clicking "Done" closes the sheet and returns focus to the Filters button, the same as
+  Escape. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.462** ✅ Clicking the scrim (outside the panel) closes the
+  sheet. — (`apps/web/test/filters-sheet.test.tsx`)
+
+## Task 6 — columns as trays, cards, and the blocked-column indicator (board-prototype-port plan, 2026-09-16)
+
+**Case `13.463` minted here.** Geometry only, per the task's own brief: the column rail
+(`.gn-board__columns` renamed `.gn-board__rail`, spec Board `:354-399`'s "Column rail" row), the
+column tray itself (`.gn-board__column` — sunken surface, sunken shadow, card radius, 18rem lane,
+its own flex column layout), the count (`.gn-board__count`'s body updated to the spec's 13px/18px,
+selector kept for `board.test.tsx:142`), and the card (`.gn-board-card`, 14px padding via
+`.gn-card.gn-board-card`'s source-order win over the untouched `.gn-card`, never a specificity win —
+both are `(0,1,0)`). One real behaviour change, not merely restyling: `.gn-board-card--pending`'s
+dashed in-transit outline had a rule but no wiring — `board.tsx:719` never added the modifier class —
+so it is wired onto `card.pending`, the same flag the existing "claim in transit" chip already reads.
+**The blocked-column indicator needed no CSS work, confirmed rather than assumed**: `board.tsx:409`
+already renders `<Chip tone={column.blocked ? 'blocked' : column.category}>`, and `.gn-chip--blocked
+.gn-chip__dot` (`ui.css:155`) already carries the tone as a coloured dot against a readable
+`--gn-text` label — the tinted-ground-plus-same-hue-text version the prototype and an earlier draft of
+this task's own brief called for was measured (twice, independently) at 3.229–4.291 against the 4.5:1
+WCAG floor in all six style×theme combinations and does not ship (spec, "Both tints were measured and
+NEITHER can ship"). A second, unrelated finding surfaced while confirming that: `.gn-board__column--
+blocked`'s `border-color: var(--gn-blocked)` had been inert since before this task — nothing on
+`.gn-board__column` declared a `border-style`, so the colour painted nothing, and `board.test.tsx`'s
+"marks a blocked state visibly" case asserts only that the class string is present, never a computed
+style, so it could not have caught it.
+
+**Coordinator rulings 14–16, same day, closing all three open items from this task's first pass.**
+**Ruling 14** strikes the brief's own `.gn-board__column-title` metric (17px/22px, 600) the same way
+Task 1 was struck: it has no attachment point under the header markup Tasks 3–5 already shipped
+(`Chip` takes no `className`, and the header renders the column name AS the chip's own child text),
+and a split into a separate title plus a standalone blocked chip was considered and rejected — that
+chip's tone carries CATEGORY for every column, not only blocked, so separating them would change what
+the colour means across the whole board, a semantic change outside this task's scope. **Ruling 15**
+removes the spec's own `cursor: grab` from `.gn-board-card` — shipped in the first pass with no drag
+behaviour behind it, the same "a control that lies" shape Task 4's own brief withheld the inert
+Filters button for; it moves to Task 14's commit, beside the behaviour it promises. **Ruling 16**
+removes the inert `.gn-board__column--blocked` border declaration found above — the sixth time this
+session hit the "declares a visual effect that never paints" shape the dead `.gn-view-tabs` rules were
+(Task 4); the class itself is untouched, still applied conditionally and still asserted by
+`board.test.tsx:56-61`, only the misleading declaration is gone. Confirmed to change no rendered
+pixel: nothing else in the cascade sets `border`/`border-style` on that selector either, before or
+after.
+
+**Coordinator ruling 17, code review — the padding fix's own reasoning was not applied to the
+neighbouring property in the same rule.** `.gn-board-card`'s literal `border-radius: 0.75rem` (12px)
+carried the SAME `(0,1,0)` specificity as `.gn-card`'s own token-driven radius and sat later in the
+file, so it won on source order for every style — pinning every board card at 12px where `neo` should
+draw `.gn-card`'s `--gn-radius-card` at 20px (`tokens.ts:798-801`). This is the exact defect case
+13.355 already fixed one surface over (`.gn-card.gn-invite`'s literal radius tying `.gn-card`'s
+token); the padding line two properties over got the "does this compete with `.gn-card`'s own token"
+scrutiny (verified 12px stays the product default, only the board card takes 14px), and the radius
+line, transcribed from the brief's own CSS block, did not. **Removed, not replaced with a token —
+minting a `.gn-board-card`-specific radius role to preserve the prototype's flatter 12px corner was
+considered and rejected, the same precedent 13.355 already set: a new token role to reproduce one
+decoration.** The board card now falls through to `.gn-card`'s own radius and moves with the style
+axis like every other card; the prototype's genuine 12px-vs-16px distinction is given up, honestly,
+not silently.
+
+- **13.463** ✅ `BoardCardView` outlines the card container itself (`.gn-board-card--pending`) while
+  `card.pending` is true and not otherwise — proven in both directions on the same render/rerender
+  pair the neighbouring "claim in transit" chip test already uses, and mutation-checked: a
+  never-wired constant class fails the positive assertion, an always-wired one fails the negative. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.464** ✅ `.gn-board-card` declares no `border-radius` of its own (mirroring case 13.355's own
+  source-scan shape, `neo-card-radius.test.ts`) — the rule still exists and still carries its 14px
+  padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
+  token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
+  `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)
+
+## Task 7 — the per-column empty state and Ruling R6 (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.465`–`13.466` minted here**, continuing directly from `13.464` (verified against the real
+case list via `node scripts/check-case-ids.mjs`, not the file's own "next free" prose, per this task's
+own brief). `board.tsx:70` (pre-R6; that line is unrelated comment prose today, the gate it names having
+been superseded by this very ruling) — its whole-board sentence (`EMPTY_BOARD_COPY`) was gated on
+`board.groups.length === 0` — a project with a workflow attached and zero tickets in it took
+`groups.length === 1`, skipped the sentence, and drew a silent rail of empty column trays, one layer
+under the exact "loaded, refused nothing, said nothing" failure that branch was first written to catch.
+**Ruling R6** (owner, spec review pass, "go with your recommendation" — the one ruling in this port that
+went the recommended way rather than the owner's own free-text alternative) widens the gate to
+`board.tsx`'s new `totalCards` fold: the sentence renders whenever the board holds zero cards in TOTAL,
+not only when it holds zero GROUPS. `groups.length === 0` implies `totalCards === 0`, so this is a strict
+**superset** — the pre-existing `EMPTY_BOARD_COPY` assertions (3.112, 3.113, and 3.114's CONTROL
+sub-case) pass UNMODIFIED, run and confirmed rather than assumed (`packages/app-core` suite, 1224/1224
+green, Node v22.23.2). One pre-existing test's own assertion contradicted the new behaviour by
+construction rather than by defect — **3.114's second `it`**
+(`test-cases/03-foundation-ledger.md:100`, "a group whose columns are all empty is NOT an empty board")
+used a single-group, single-empty-column fixture and asserted `EMPTY_BOARD_COPY` absent; that fixture IS
+the R6 case in miniature, so its assertion was now the opposite of correct and is AMENDED, not left
+standing — see its own updated comment in `board.test.tsx` for the before/after. The rail's own presence
+claim in that test (`getByRole('region', ...)`) is untouched and still passes.
+
+**The witness (Step 6 of this task's own brief).** Reverted `emptyBanner`'s gate from `totalCards === 0`
+back to the old `board.groups.length === 0` (a one-line, targeted `Edit`, never `git checkout --`, and
+only after the real work below was committed) and re-ran `test/views/board.test.tsx`: **exactly two
+tests reddened** — `13.466` (below) and the amended 3.114 test, both of which depend on the widened
+gate by construction — while every other test, INCLUDING the three pre-existing `EMPTY_BOARD_COPY`
+assertions, stayed green. Restored immediately after, confirmed clean, no second commit needed since the
+mutation was never committed. Two reddening rather than the brief's literal "the new test alone" is the
+correct count here: the brief's wording assumed only one new test would exist, and this task additionally
+corrects a second, pre-existing test whose own assertion the ruling falsifies — both are R6-dependent by
+the same construction, so both flip together.
+
+**The per-column empty state** (spec Board `:354-399`, "Empty column"/"Empty icon"/"Empty copy"/"Empty
+action" rows; markup verified against `design-system/interactive/desktop.dc.html:387-394`, the ONLY
+place in the repo giving the icon itself — a plain "+" glyph, `stroke="currentColor"`, `aria-hidden`) is
+a DIFFERENT granularity from R6's sentence and both may render together: `.gn-board__column-empty`
+(fill4 → `--gn-fill-quaternary`, radius → the TOKEN `--gn-radius-card` rather than the prototype's
+literal 12px — a new card-like rule takes the token, the same rule case 13.464 just above already
+established for `.gn-board-card`'s own radius), a 34px `.gn-board__column-empty-icon` circle replicating
+`.gn-chip`'s own three-branch chipBg/chipShadow treatment on a new selector (never editing the shared,
+do-not-edit `.gn-chip`), and `EMPTY_COLUMN_COPY` — a new exported constant, deliberately NOT a
+re-spelling of `EMPTY_BOARD_COPY` (`"No tickets in this column yet."` against `"No tickets here
+yet — create one."`), because both can render on the same screen under R6 and a `getByText` query on
+either must still resolve to exactly one element. The action button reuses `@gisik-nokma/ui`'s `Button`
+component UNCHANGED (`.gn-button`, ghost variant) rather than inventing a `ctlBg`/`ctlShadow` CSS
+treatment: `ui.css:22-30`'s own docblock already records the prototype's raised neo control shadow as an
+OPEN DECISION deliberately left to the repo owner, and this port's own plan settles it for every board
+control — "Board controls use `.gn-button` unchanged"
+(`docs/superpowers/plans/2026-09-16-board-prototype-port.md:57`) — so this task does not reopen it.
+Labelled "Add a ticket" rather than repeating the whole-board button's "Create a ticket": both reuse the
+SAME unscoped `onCreateTicket` handler (`BoardProps` carries no per-column target, and adding one is
+outside this task), so identical wording on every button rendered when a board is both globally and
+per-column empty (R6) would be indistinguishable by accessible role and name alike; the different wording
+does not claim the created ticket lands in that specific column.
+
+**The filtered-to-zero column, considered and decided against a second copy.** `BoardColumn`
+(`view-types.ts:119-125`) carries `stateId`/`name`/`category`/`blocked`/`cards` and nothing else — no
+signal distinguishing a column that genuinely holds no tickets from one the client-side board filter
+(`filter/board-filter.ts`, Task 3) narrowed to zero. The narrowing pass that WOULD know the difference
+runs above `Board`, in the shell computing `boardNarrowing`, and it already discloses an active filter
+through the `N of M shown` count and its removable chips (spec, "The count must not lie"). Writing a
+second, column-scoped disclosure here — with data this component was never given — would risk an
+unsynchronised second copy of the same fact, so `EMPTY_COLUMN_COPY` says only what is true in both cases,
+the same discipline `EMPTY_BOARD_COPY`'s own docblock already holds itself to. No new prop, no new field
+on `BoardColumn`, and no second sentence were added; this is a decision, not an oversight, and it is
+recorded here rather than only in the component's own comment.
+
+- **13.465** ✅ The per-column empty state: an empty column renders `EMPTY_COLUMN_COPY` and its icon; a
+  column holding a card does not (`errandBoard()`'s three empty columns vs. `Doing`, scoped with
+  `within` so a false positive from an unscoped `getByText` cannot pass). Both arms of the optional
+  "Add a ticket" action are tested — present and wired to `onCreateTicket` when the shell hands one down,
+  absent (words only) when it does not — the same both-arms discipline `emptyBanner`'s own docblock
+  already holds itself to. — (`packages/app-core/test/views/board.test.tsx`)
+- **13.466** ✅ RULING R6 ITSELF: one group, every column empty — `EMPTY_BOARD_COPY` renders AND both
+  columns' names render, proving the rail survives beside the sentence. This is the case no existing
+  assertion could witness before this task, and the witness above (revert to `groups.length === 0`,
+  re-run) proves it: this case and the amended 3.114 test are the only two that redden. —
+  (`packages/app-core/test/views/board.test.tsx`)
+
+## Task 7 fix round — Ruling 19: the R6 sentence must be gated on the board BEFORE narrowing (found in review, 2026-09-16)
+
+**Case `13.467` minted here**, continuing directly from `13.466`. A cross-task interaction neither Task 4
+(client-side board narrowing) nor this task's own R6 caught on its own: `page.tsx:1063` hands `<Board>`
+`boardNarrowing.view`, the POST-FILTER groups, never `board.data` directly (Ruling 1, Task 4). Task 4's
+narrowing drops CARDS only — never a column or a group (`board.tsx:216-219`'s own invariant) — so pre-R6
+this was harmless: the old gate read `board.groups.length`, which a card filter never touches, so the
+narrowed-to-zero state could never reach it. R6's `totalCards` fold reads exactly the narrowed cards,
+so without a fix a search matching nothing rendered `EMPTY_BOARD_COPY` — "No tickets here yet — create
+one." — over a project holding real tickets, one row beneath a strip reading "0 of 10 shown" with a
+removable chip: the page contradicting itself on one screen, and "create one" naming the wrong remedy
+(the fix is clearing the filter sitting right there, not creating a ticket).
+
+**Fix: `Board` gains an optional `isNarrowed?: boolean` prop** (`BoardProps`, following `onCreateTicket`'s
+own precedent immediately above it — a mount with nothing to say passes nothing, and `Board` behaves
+exactly as before this prop existed). `emptyBanner`'s gate becomes `totalCards === 0 && isNarrowed !==
+true`. `page.tsx` passes `isNarrowed={boardNarrowing.shown !== boardNarrowing.total}` — the SAME
+expression `shouldRenderBoardNarrowingStrip` already reads as one of its three terms, not a second
+definition of "narrowed"; since narrowing drops cards only, `shown !== total` is true exactly when real
+cards exist but were filtered away, and by construction `shown === total === 0` whenever the board is
+genuinely, unfilteredly empty — so the flag never suppresses R6's real case. `EMPTY_BOARD_COPY`'s text is
+unchanged; this changes WHEN it shows, never what it says.
+
+**Deliberately NOT changed, per the ruling itself**: the per-column `EMPTY_COLUMN_COPY` shown under a
+filter, where the column may hold hidden tickets. The reviewer judged that copy neutral (it names no
+reason, per its own docblock) and approved it deliberately in Task 7's review; not overruled mid-task,
+recorded for final review instead.
+
+**Witness, same discipline as R6's own**: committed the real work first, then reverted `emptyBanner`'s
+condition from `totalCards === 0 && isNarrowed !== true` back to `totalCards === 0` alone (a targeted
+`Edit`, never `git checkout --`) and re-ran `board.test.tsx`. Confirmed the narrowed-to-zero case (the
+first `it` below) reddens while the R6 case (13.466, not narrowed) and the "not narrowed" arms of this
+same case stay green — proving `isNarrowed` and only `isNarrowed` discriminates the two. Restored; `git
+diff --stat HEAD` empty, full suite green again.
+
+**Standing instruction now in force (coordinator, this round): every report must carry `tsc` output for
+every package touched.** `packages/ui`'s typecheck, red since `8eb40607` (Task 6 fix round 2) on two
+`noUncheckedIndexedAccess` errors in `test/components.test.tsx`, was fixed in a concurrent commit
+(`ddc42c21`, "Task 6 fix round 3") by another implementer on this same branch while this fix round was in
+progress — confirmed by re-running `tsc -p tsconfig.typecheck.json` in `packages/ui` twice, both exit 0,
+rather than assumed from the earlier report's stash-verified baseline.
+
+- **13.467** ✅ `isNarrowed` suppresses `EMPTY_BOARD_COPY` on a board narrowed to zero cards (the rail and
+  per-column empty states still render, `EMPTY_COLUMN_COPY` unaffected — the same fixture proves both:
+  `isNarrowed` true suppresses, `isNarrowed` false OR omitted on the IDENTICAL fixture still shows the
+  sentence, isolating the flag as the one variable that discriminates. Mutation-witnessed: reverting the
+  `&& isNarrowed !== true` guard reddens this case's first `it` while 13.466 and this case's other two
+  `it`s stay green. — (`packages/app-core/src/views/board.tsx`, `packages/app-core/test/views/board.test.tsx`,
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`)
+
+## Task 8 — the workflow picker, defaulting to All workflows (Ruling R3, 2026-09-16)
+
+**Cases `13.468`–`13.471` minted here**, continuing directly from `13.467` (verified against the real
+case list via `scripts/check-case-ids.mjs`, not the file's own "next free" prose, which the script's own
+self-test proves can false-hit on a truncated id — the sweep run before this task started found `13.632`
+and `13.999` as apparent hits that were actually a truncation of `13.632866`/`13.9999`, two example ids
+inside this file's own prose about the script's regex, three sections up). The picker narrows the board
+by dropping a whole GROUP — `matchesBoardCard` (`board-filter.ts`) takes a `card`/`column`/`projectId`
+and a `BoardFilterSpec`, with no group anywhere in that signature, so no axis this file's own chip
+builder enumerates could ever name this mechanism. `boardNarrowing` (`page.tsx`, Task 4's "ONE PASS"
+fold) widens to fold BOTH mechanisms into the SAME `shown`/`total` pair rather than gaining a second,
+parallel count: `total` sums every card in every group, including ones the workflow picker drops;
+`shown` counts only cards that are both in a KEPT group and pass `matchesBoardCard`.
+`shouldRenderBoardNarrowingStrip`'s third term (`shown !== total`, `board-search-scope.ts`) was written
+for exactly this case in Task 4's own review — before this task nothing could make it true while
+`activeFilterChips` stayed empty, so the wiring was verified by reading the code, not by a test that
+reaches it through real narrowing data. `13.470` is that test, and the wiring was
+MUTATION-WITNESSED, not merely asserted: the gate's own call was temporarily changed from
+`shown: boardNarrowing.shown` to `shown: boardNarrowing.total` (defeating only the third term), `13.470`
+and `13.471` reddened while every other case in the file — including `13.468`, which does not depend on
+the gate firing — stayed green, and the change was reverted and the suite re-run clean.
+
+The picker's own chip is built separately from `buildBoardFilterChips` (which enumerates `boardFilter`'s
+six fields and cannot be extended to a seventh it structurally has no data for) and merged with
+`activeFilterChips` ONLY at the render site (`narrowingChips`, `page.tsx`) — the gate's own `chipCount`
+argument deliberately keeps reading `activeFilterChips.length` alone, since the third term already covers
+group-dropping and double-counting the workflow chip there would not change the gate's answer, only
+obscure which term does the work.
+
+**The single-workflow decision (`13.469`).** A project with exactly one workflow offers no real choice
+between "All workflows" and that one workflow's name — both render the identical board. The picker is
+gated on `board.data.groups.length > 1`, mirroring `Board`'s OWN identical judgment for its group heading
+(`board.tsx`: `board.groups.length > 1 ? <h3 className="gn-board__workflow">`). Deliberately reads
+`board.data.groups` (the full, unfiltered set), never `boardNarrowing.view.groups` — the latter is
+already narrowed BY the picker, so once a workflow is picked it holds only the one surviving group, and
+gating against it would unmount the very control that let a person pick it.
+
+**Interaction with Task 7's `isNarrowed` (Ruling 19) — checked, not assumed.** Picking a workflow whose
+own group holds zero cards makes `boardNarrowing.shown === 0` while `boardNarrowing.total > 0` (the OTHER
+workflow's cards), so `isNarrowed` is `true` and `Board`'s `EMPTY_BOARD_COPY` — "create one" — is
+suppressed exactly as it is for a card-level filter that empties the view. The per-column
+`EMPTY_COLUMN_COPY` and its own "Add a ticket" button still render (unaffected by `isNarrowed`, per
+`Board`'s own docblock), and the narrowing strip reads "0 of N shown" with the removable workflow chip.
+Judged CORRECT, matching Ruling 19's own reasoning exactly: the remedy for an empty picked workflow is
+the chip sitting in the strip, not a project-wide "create a ticket" prompt naming the wrong fix. Not
+separately case-numbered — no new branch exists to test; the SAME `isNarrowed` expression Task 7 already
+built and case `13.467` already covers is what fires here, over data this task's own fixtures did not
+happen to construct.
+
+- **13.468** ✅ The picker defaults to `'all'`, so every group renders, no card is dropped, and the
+  disclosure strip this mechanism shares with the client filter (`13.438`'s own rule) stays absent at the
+  resting state. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+- **13.469** ✅ The picker renders no `<select>` at all for a project with exactly one workflow —
+  mirroring `Board`'s own group-heading gate, cross-confirmed by asserting the heading is absent too. —
+  (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/test/board-narrowing.test.tsx`)
+- **13.470** ✅ THE DEFERRED TASK 4 TEST, by name: reaches `shouldRenderBoardNarrowingStrip`'s third term
+  through real group-dropping data. Picking a workflow narrows the board to that group's own cards, reads
+  an honest `N of M shown` against the PROJECT's whole total (not the surviving group's), and shows a
+  removable chip naming the hidden workflow — the surviving cards are asserted BY NAME, not only by
+  count, and the dropped group's own heading is asserted absent. Mutation-witnessed: hardcoding the
+  gate's `shown` argument to equal `total` reddens this case (and `13.471`) while every other case in the
+  file stays green. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+- **13.471** ✅ Removing the workflow chip restores every group, resets the picker to `'all'`, and the
+  strip disappears entirely — the same rule `13.438` pins for the card-level filter, proven here for the
+  group-level one. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+
+## Task 8 fix round — Ruling 20, 2026-09-16
+
+**Cases `13.472`–`13.473` minted here**, continuing directly from `13.471` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, not a naive grep — see the false-hit note in the section
+above). Two closures the coordinator required after reviewing Task 8's own report.
+
+**Ruling 20(a) — the deferred fixture, taken up on the report's own offer.** The Task 8 report verified
+the empty-picked-workflow / `isNarrowed` interaction by COMPOSITION: `isNarrowed={boardNarrowing.shown
+!== boardNarrowing.total}` (`page.tsx`) and `Board`'s own gate (`totalCards === 0 && isNarrowed !==
+true`, `board.tsx`) are both unchanged by Task 8, and case `13.467` already proves the second half while
+`13.470` already proves the picker drives the first. The coordinator's reasoning for still wanting it
+run: this session already carries two instances of a path that was reasoned about correctly and still
+hid something when it finally executed (the board scope-note JSX shipping unexercised through two tasks;
+`rule()`'s `string | undefined` sitting latent in a shared helper until one new call site used the value
+as a plain string). "Composition proves the pieces; it does not run them together." `13.472` is that run,
+mutation-witnessed: hardcoding `<Board isNarrowed={false}>` (defeating only the suppression) reddens
+`13.472` alone — every other case in the file, `13.473` included, stays green.
+
+**Ruling 20(b) — an unresolvable picked workflow falls back to `All`.** The Task 8 report's own second
+concern: if the picked workflow's group disappears from `board.data` mid-session (reassigned or detached
+elsewhere, page left open), `workflowFilter` keeps naming an id nothing in `board.data.groups` matches
+any more. Recoverable (remove the chip), but until then the page would assert a phantom as real — the
+chip's own label falls back to `group?.workflowName ?? workflowFilter`, and with no group to find that
+prints the RAW INTERNAL ID as if it were a real, chosen narrowing, on a project that may hold tickets
+(`boardNarrowing`'s own `total`) the person can no longer see any trace of. Fixed with
+`resolvedWorkflowFilter` (`page.tsx`) — a plain, unmemoized `const`, recomputed every render from
+`workflowFilter` and the CURRENT `board.data`, falling back to `'all'` when the picked id matches no
+group; every consumer that narrows or displays by workflow (`boardNarrowing`'s `keepGroup`,
+`workflowChip`, the `<select>`'s own `value`) reads THIS, never raw `workflowFilter`, except the
+`<select>`'s `onChange`, which only ever WRITES a value drawn from the current option list and is
+therefore always valid when written. `13.473` is the case, exercised through a REAL mid-session update —
+`rerender` with a new `Providers services={…}` whose `getBoard` no longer carries the picked workflow,
+keeping the SAME `ProjectPage` instance mounted so `workflowFilter`'s own state survives the change; this
+is not a simulated shortcut but the same effect-dependency path (`useLiveQuery`'s first effect keys on
+`source` identity) a real workspace-stream event drives in production, confirmed by reading
+`use-live-query.ts`'s own two effects before relying on it. Mutation-witnessed: collapsing
+`resolvedWorkflowFilter` to raw `workflowFilter` reddens `13.473` alone — all thirteen other cases in the
+file, `13.472` included, stay green.
+
+`packages/app-core/src/index.ts` also gains `EMPTY_COLUMN_COPY` in its public re-export, alongside
+`EMPTY_BOARD_COPY` — `13.472` is the first `apps/web` case that needs it, for the identical reason
+`EMPTY_BOARD_COPY`'s own docblock already gives (assert the SAME string that renders, never a re-typed
+copy of it).
+
+- **13.472** ✅ Picking a workflow whose own group holds zero cards, on a project whose OTHER workflow
+  holds real tickets: `EMPTY_BOARD_COPY` is absent (R19's remedy is the chip, not "create one"), the
+  strip reads an honest `0 of 2 shown` against the project's whole total, the removable chip names the
+  picked workflow, and the rail still draws both of the picked group's columns with their own
+  `EMPTY_COLUMN_COPY`. Mutation-witnessed: `isNarrowed={false}` reddens only this case. —
+  (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/test/board-narrowing.test.tsx`,
+  `packages/app-core/src/index.ts`)
+- **13.473** ✅ A picked workflow that drops out of `board.data` via a real mid-session re-fetch (`rerender`
+  with new `Providers services`, the SAME `ProjectPage` instance) falls back to the picker's own `'all'`
+  default — no phantom chip naming a raw internal id, no strip at all, every surviving group's cards
+  shown. Mutation-witnessed: collapsing `resolvedWorkflowFilter` to raw `workflowFilter` reddens only
+  this case. — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+
+## Task 11: Timeline restyle — geometry only, 2026-09-16
+
+**Case `13.474` minted here**, continuing directly from `13.473` (verified against `scripts/
+check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool is `13.473`, matching the
+dispatching agent's own count — never the file's own "next free" prose, per the false-hit note two
+sections up). Pure geometry over the metrics spec's Timeline table (`:506-538`), on selectors this task
+already owns end to end (`.gn-timeline*`) — no shared-surface question of the kind Task 9 hit, since
+`TimelineView` renders its own markup rather than a shared component. No new token role: `trayBg`/
+`trayShadow` → `--gn-surface-sunken`/`--gn-shadow-sunken` (the same pair the board's own column trays,
+Task 6, already use for identical prototype vocabulary) and `fill4` → `--gn-fill-quaternary`, both
+already declared and already consumed elsewhere in `ui.css`. The bar's `accent` ground / `accentText`
+text is UNCHANGED — it already used the pair `.gn-filters__chip[aria-pressed='true']` settled during
+this port's own Filters-sheet task over the plan's literal `--onColor` → `--gn-text-inverted` mapping,
+because `CONTRAST_PAIRS` (`tokens.ts`) measures `accentText` against `accent` and never measures
+`textInverted` there — so nothing about the bar's colour changed here, only its box.
+
+**Two pinned literals updated, both sanctioned by the tests' own docblocks rather than loosened.**
+`test/timeline/timeline-view.test.tsx` (11.82, "the window width is the model's, stated once") pins the
+component's published `--timeline-week-columns` value by EXACT equality (two cases: the default-eight
+window and a `weeksCount:2` forward) and, separately, an EXACT substring of `ui.css` itself
+(`` `grid-template-columns: 12rem var(${published[0]});` ``) whose own comment reads *"a change to the
+width alone will redden this too, and re-reading this comment is the intended cost."* Both paid here:
+the leading (title) track widens from Plan 9's `12rem` to the spec's `230px` (`14.375rem` — this repo's
+existing rem idiom, 1rem = 16px), and the published track-list value changes from `repeat(n, 1fr)` to
+`repeat(n, minmax(0, 1fr))` — the spec's own literal for this row ("`repeat(8,minmax(0,1fr))`"), and not
+merely a spec transcription: a bare `1fr` track carries CSS Grid's implicit automatic minimum of `auto`
+(min-content), so without `minmax(0, …)` a long bar or title could still push a week column wider than
+its share and defeat `.gn-timeline__bar`'s own `overflow:hidden; text-overflow:ellipsis`. Both the
+component (`timeline-view.tsx`) and the three affected assertions in `timeline-view.test.tsx` were
+updated together; the test's own regex guard against the WRAPPED form
+(`expect(css).not.toMatch(/repeat\(\s*var\(--timeline-/)`) is unaffected — `ui.css` still never wraps the
+var in `repeat()`, only the component's own published STRING contains the function now. The `+2` column
+arithmetic the `12rem` comment protects depends on there being exactly ONE leading track, not its width,
+and that count is unchanged.
+
+**Zebra uses `:nth-of-type`, not `:nth-child`, and this was checked rather than assumed.** Each row's
+siblings inside `.gn-timeline__group` include the group's own `<h3 class="gn-timeline__group-heading">`
+ahead of the rows; `:nth-child(odd)` would count that heading as sibling #1 and shift every row's parity
+by one, so a group's FIRST row would render unshaded. Read `timeline-view.tsx` to confirm every sibling
+`<div>` inside a group is in fact a `.gn-timeline__row` (the heading is the only non-div sibling), which
+is what makes `:nth-of-type` — same-tag-name counting only — the correct fix rather than a coincidental
+one.
+
+**Row height is a floor, not a match.** `min-height: 2.625rem` (42px) sets the metric's own number, but
+`.gn-timeline__bar` carries `margin: 0.3125rem 0.1875rem` (5px top and bottom) inside the row, and
+`.gn-timeline__title` carries its own `padding: 0.25rem` — a row whose content needs more than 42px
+(the bar's 16px line-height plus its 10px of vertical margin already totals 26px before the title's own
+padding) renders taller than 42px rather than clipping to it, which is the correct behaviour for a floor
+but is worth naming since the prototype's own 42px may read as a fixed height rather than a minimum.
+
+**The two load-bearing checks named in this task's brief, both re-verified rather than assumed clean.**
+(1) `timeline-view.test.tsx:396-441`'s per-reason side-list modifier classes
+(`gn-timeline__side-entry--no-dates`/`--start-only`/`--due-only`/`--start-after-due`/`--unplaceable-day`)
+are untouched by this task — no selector renamed, no modifier collapsed — and the case they anchor
+(11.77) still passes; this task never rendered a side-list fixture at all, so nothing here could have
+reached that code. (2) `packages/app-core/test/inbox/inbox-css-binding.test.tsx` references
+`.gn-timeline__bar` in exactly three places, and reading them shows why the reference is inert to this
+task: all three are FIXTURE STRINGS inside the inbox scanner's own self-test, proving the `gn-inbox`
+prefix matcher is not fooled by a different prefix (`.gn-timeline__bar { color: blue; }` as planted CSS,
+a rendered `<span class="gn-inbox__glyph gn-timeline__bar">` as a planted DOM tree, and
+`.gn-timeline__bar[data-pending] { outline: 1px dashed red; }` as a planted attribute-selector rule) —
+none of the three reads the REAL `ui.css` or the REAL `TimelineView`. The gate is a NEGATIVE control on a
+literal string, not a binding assertion on this component; it passed before this task's edits and after,
+unchanged (`inbox-css-binding.test.tsx`'s own suite: 8/8).
+
+`tsc --noEmit` clean on `packages/app-core` and `packages/ui` (Node v22.23.2). `pnpm exec vitest run` on
+`packages/app-core` (1227/1227) and `packages/ui` (308/308); `pnpm turbo run test` at the repo root
+confirmed `apps/web`'s `test/project-calendar-timeline.test.tsx` (queries `.gn-calendar`/`.gn-timeline`/
+`.gn-board` existence — Test impact table's own instruction to re-verify, not assume) still passes
+against the rebuilt `dist/` app-core consumes. `packages/ui/test/token-discipline.test.ts` and
+`tokens.test.ts` re-run directly (not from cache): clean, no colour literal, every new `var(--gn-…)`
+declared. **No live cross-style/cross-theme visual check was performed** — the spec's own Verification
+section calls for one ("A live read of the board, list, calendar and timeline in all three styles × both
+themes") and it is named here as a gap for whoever reviews this before merge, not silently skipped.
+
+- **13.474** 🟡 The timeline restyles to the prototype's metrics: 230px title column + `trayBg`/
+  `trayShadow` header grid, `minmax(0, 1fr)` week tracks, 42px zebra rows, a 6px-radius `accent`/
+  `accentText` bar (still `0` on the clipped side only), and a `trayBg`/`trayShadow` undrawn footer.
+  **Covered:** the three literals `timeline-view.test.tsx` pins by exact equality/substring
+  (`--timeline-week-columns`'s two values, the `ui.css` leading-track string), re-run and green after
+  each edit; the untouched 11.77 modifier-class case and the `inbox-css-binding` self-test, both re-run
+  unchanged. **NOT covered:** every other geometry value in the table above (padding, margin, radius,
+  min-height, colours as rendered) — jsdom computes no layout, so nothing here mechanically asserts a
+  pixel. `🧪` is not used because that marker means a hand reproduction was actually performed
+  (this file's own legend), and no live render, in any style or theme, was — corrected from an initial
+  `🧪` marking that overstated what had been checked. Marked `🟡` pending that render, matching `13.475`'s
+  own honesty about what a suite-and-`tsc` pass does and does not prove for a pure restyle. **This bullet
+  as originally written was also incomplete against the SPEC, not merely unverified by eye: the spec's
+  Timeline table's "Row title" row was missing from what shipped, because the plan's own condensed prose
+  had dropped it before it ever reached this task's brief — see Ruling 22, `13.477`, immediately below.**
+  — (`packages/app-core/src/timeline/timeline-view.tsx`, `packages/app-core/test/timeline/
+  timeline-view.test.tsx`, `packages/ui/src/ui.css`)
+
+## Ruling 22 (coordinator, 2026-09-16) — the plan dropped a Timeline row; the spec still had it
+
+**Case `13.477` minted here**, continuing directly from `13.476` (verified against
+`scripts/check-case-ids.mjs`'s real sweep). The spec's Timeline metrics table
+(`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:365-376`) has EIGHT rows; the plan's
+own Task 11 section condensed that table into a single prose sentence naming only six, dropping "Header
+cell" (implemented anyway, from the spec directly) and "Row title" (not implemented — nothing named it).
+`task-brief` extracts the task section verbatim, so the loss was inherited silently: `grep "Row title"`
+returns zero hits in the plan and zero in the Task 11 brief, against one in the spec. The coordinator
+verified this directly before ruling, rather than taking the report's "every metric in its brief" framing
+as sufficient — true of the brief, not of the spec the plan itself says wins on disagreement.
+
+**The missing row:** `| Row title | padding 6px 12px; 15px/20px; ellipsis; nowrap |`. Landed on
+`.gn-timeline__title` — previously `padding: 0.25rem; min-width: 0;` (4px all round, no type at all) —
+now `padding: 0.375rem 0.75rem; min-width: 0; font-size: 0.9375rem; line-height: 1.25rem;`. `min-width: 0`
+is kept though it names no metric: it is load-bearing for `.gn-timeline__title-text`'s own
+`overflow:hidden; text-overflow:ellipsis; white-space:nowrap` (unchanged, already correct before this
+ruling) to truncate inside a grid item rather than push the column wide. No token role involved — both
+new values are plain length/type literals, matching how every other spacing/size value in this file is
+written.
+
+**Checked row by row against the CURRENT tree, not assumed clean from memory, per the coordinator's own
+ask ("tell me if anything else is missing").** All other seven Timeline metric rows read directly against
+`packages/ui/src/ui.css` after Ruling 22's own edit: Header grid (`.gn-timeline__weeks`), Header cell
+(`.gn-timeline__week`), Row (`.gn-timeline__row`), Bar (`.gn-timeline__bar`), Bar-clipped
+(`[data-clipped-start]`/`[data-clipped-end]`), Undrawn footer (`.gn-timeline__side`), and Undrawn copy
+(`.gn-timeline__side-copy`) all match their spec row exactly. Nothing else is missing.
+
+**Not a finding, explicitly cleared by the coordinator and left alone:** `.gn-timeline__bar`'s
+`border-radius: 0.375rem` (6px) is a literal, not a token — `RADIUS_ROLES` is only `card` (16/20px) and
+`control` (8/14px), neither near 6px, so this is a literal-to-literal change from the pre-existing 4px,
+not a Ruling-17-shaped token→literal regression.
+
+**A stale self-citation was also fixed in this commit, unrelated to the missing row:** a comment at
+`ui.css` (immediately above `.gn-timeline__weeks,` `.gn-timeline__row`) cited
+`` `.gn-filters__chip[aria-pressed='true']` `` at `:3224-3227` — correct when Ruling 21's own commit was
+written, but Ruling 21's ~67-line insertion earlier in the same file moved the real rule to `:3306-3309`.
+Re-grepped and corrected.
+
+Full `packages/ui` (308/308) and `packages/app-core` (1227/1227) suites green; `packages/ui/test/
+token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean. `tsc --noEmit` clean on
+both packages (Node v22.23.2). `pnpm turbo run test` at the repo root, run on the true final tree rather
+than a pre-Ruling-21 snapshot: **all 17 tasks green, `apps/server` included (149/149)** — the `apps/server`
+failures earlier this session (a different pair each of three prior runs) are now confirmed as
+environmental flakes rather than anything this work touched, since the identical suite is clean here with
+no `apps/server` changes at all.
+
+- **13.477** ❌ The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
+  row, dropped by the plan before reaching this task's brief) lands on `.gn-timeline__title`. All eight
+  Timeline spec rows re-checked row by row against the shipped CSS and confirmed matching. Not verified
+  by a live render in any style or theme. — (`packages/ui/src/ui.css`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits d958ab8f. `timeline-view.test.tsx` uses `.gn-timeline__title` only for DOM structure (`closest()`), never for its padding, and no test reads that rule out of `ui.css`.
+
+## Task 9: List restyle — geometry only, ONE ruling deferred, 2026-09-16
+
+**Case `13.475` minted here**, continuing directly from `13.474` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, run again after Task 11's own addition — not the file's own
+"next free" prose, per the false-hit note recorded three sections up). Landed on `.gn-list-*` selectors
+only, per the task's own Step 1 ("`.gn-table` and `.gn-select` are shared surfaces — do not edit them"):
+a new `.gn-list__table-wrap` wraps `<Table>` (`ticket-list.tsx`'s `ListTable`, `@gisik-nokma/ui`'s shared
+component) FROM THE OUTSIDE, giving the metrics table's "Container" row (`cardBg + cardShadow; radius
+cardR; overflow:auto`) without adding or changing any rule `Table` itself renders through
+(`.gn-table__scroll`, `.gn-table`). `cardBg`/`cardShadow`/`cardR` → `--gn-surface-raised`/
+`--gn-shadow-raised`/`--gn-radius-card` — not a new triple, but the SAME three roles the shared `.gn-card`
+rule (`ui.css:160-165`, unedited) already pairs, confirmed by reading it rather than assumed. The
+Group-by/Columns picker's `<summary>` becomes a pill (`min-height:36px; padding:0 12px; radius 999px;
+cardBg + cardShadow; 13px`), its `999px` a plain corner-radius literal — lengths are not what
+`token-discipline.test.ts` bans, and `radiusVariableName` names only `card`/`control` roles, so a pill
+radius has never been tokenised anywhere in this file, `.gn-chip`'s own identical literal included
+(`ui.css:113`). Its checkboxes are sized to the metric's 18px tick box via `accent-color: var(--gn-accent)`
+— the FIRST use of that property in `ui.css`, checked by grep before writing the justifying comment, not
+assumed. The collapse caret (`.gn-list__collapse`) gets a real `min-width`/`min-height: 22px` tap target
+around its glyph (previously sized only to the glyph's own intrinsic box); the title button
+(`.gn-list__open`) goes to 17px/22px.
+
+**The depth-based title indentation's FORMULA changes; its TOTAL does not become pixel-exact, and this
+distinction is the whole reason Task 9 could not simply "restyle the title cell."** The metric reads
+`padding:12px 16px 12px calc(16px + depth*22px)`, applying to the `<td>` (`.gn-table__cell`) itself. This
+task cannot zero out that shared cell's own `padding: 0.45rem 0.6rem` (the do-not-edit rule again), so the
+depth term is applied where it already lived — a `paddingLeft` INLINE STYLE on the inner
+`.gn-list__title-cell` span, ADDED ON TOP OF the cell's own padding rather than replacing it — with its
+FORMULA corrected from the old, ungrounded `depth * 1.1rem` to the metric's own `16 + depth * 22` (in px,
+computed in JS since `depth` is a render-time number, not a CSS `calc()`). The rendered offset is
+therefore the metric's indentation LOGIC, layered on a base this task cannot remove — not the metric's
+exact total. Recorded rather than left implicit, so a reviewer measuring pixels against the metrics table
+does not read this as a shipped miss.
+
+**DECLARED DIVERGENCE, not a match: "Group header row."** The metric (`padding 11px 16px; trayBg +
+trayShadow`) is applied to `.gn-list__section-title`, the existing per-group `<h3>` that sits OUTSIDE the
+table — the closest restyle available without rebuilding the grouping shape this task's own brief holds
+fixed ("Keep the Group-by / Columns wiring untouched... this is a restyle, not a rewiring"). The prototype
+draws this as a `<tr>` spanning the table's own columns; this product's architecture already renders one
+grouping's rows as a SEPARATE `<table>` per section (`apps/web/test/list-prefs-wiring.test.tsx` proves the
+wiring this shape depends on), so there is no in-table row to restyle. `trayBg`/`trayShadow` →
+`--gn-surface-sunken`/`--gn-shadow-sunken`, the same pair Task 11's `.gn-timeline__weeks` uses for
+identical prototype vocabulary — cited forward at the time it was written, confirmed still true by
+re-reading `ui.css` after both tasks landed.
+
+**FIVE metrics NOT implemented — a stop-and-report, not a silent gap, and named by the task's own brief
+before this task started.** "Table: min-width:820px", "Header cell" (13px/18px/600/label2/trayBg/padding/
+nowrap), "Zebra" (odd rows `fill4`), "Data cell" (padding/15px/nowrap), and the title cell's own
+`min-width:260px` are each reachable only by putting a class on an element `Table` (`@gisik-nokma/ui`)
+renders ITSELF — `<table>`, `<th>`, `<td>`, `<tr>` — confirmed by reading `table.tsx`: no `className` prop
+on the root, no per-column class hook on `TableColumn`, unlike `Card` (`card.tsx:7`,
+`['gn-card', className].filter(Boolean).join(' ')`), which is exactly the shape that would fix this. Two
+alternatives were considered and both rejected on this task's own authority: (1) a descendant-scoped
+override such as `.gn-list__table-wrap .gn-table__header {…}` still NAMES `.gn-table__header` in a
+selector `grep '\.gn-table'` would find, which is precisely what the shared-surface doctrine exists to
+keep out of reach from outside the component; (2) inventing a way to zero the shared cell's padding and
+restate it on an inner wrapper (as was done for the title cell's indentation ALONE) cannot reach `<table>`'s
+own `min-width` or `<tr>`'s own zebra at all, since neither has an inner wrapper this task controls. **A
+ruling request, recorded here rather than landed:** extend `Table`'s props the same way `Card` already is
+— optional `className` on `<table>`, `headerClassName`, `rowClassName`, `TableColumn.cellClassName` — so
+every rule these five metrics need could be written on a `.gn-list-*` selector alone, with `.gn-table`'s
+own rule untouched for `Table`'s one other repo-wide consumer today: none (`<Table` greps to exactly the
+one call site in `ticket-list.tsx`, confirmed before writing this). Not built on this task's own
+authority: the port's own global constraints name this precise trap for Task 9 by number ("if a list
+metric seems reachable only by editing `.gn-table`, stop and report rather than editing"), and eight
+implementers on this plan have been right to stop and report before this task.
+
+**The visible result is a mixed one — a finished frame around an unfinished interior — and this is
+recorded so a screenshot is not mistaken for the whole job.** A rounded, shadowed card now surrounds a
+header row, zebra pattern, and data cells that still render at `Table`'s original, unrestyled metrics.
+
+`apps/web/test/list-prefs-wiring.test.tsx` — the Group-by/Columns wiring this task was told to leave
+alone — re-run unchanged, both before and after, 2/2. `packages/app-core/test/views/ticket-list.test.tsx`
+37/37. Full `packages/app-core` (1227/1227) and `packages/ui` (308/308) suites green;
+`packages/ui/test/token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean, no
+colour literal, every `var(--gn-…)` this task added (`--gn-surface-raised`, `--gn-shadow-raised`,
+`--gn-radius-card`, `--gn-surface-sunken`, `--gn-shadow-sunken`, `--gn-accent`) already declared in
+`TOKEN_ROLES`/`radiusVariableName`. `pnpm turbo run test` at the repo root: `apps/web` 363/363 against the
+rebuilt `dist/` app-core consumes. `tsc --noEmit` clean on `packages/app-core` and `packages/ui` (Node
+v22.23.2). **No live cross-style/cross-theme visual check was performed**, the same open item Task 11
+carries — named here rather than silently skipped.
+
+- **13.475** 🟡 The list restyled PARTIALLY to the prototype's metrics as of Task 9's own commit: the
+  container frame, the Group-by/Columns picker pill and its 18px tick boxes, the collapse caret's 22px
+  tap target, the title button's 17px/22px, and the title cell's corrected depth formula landed; the
+  table's own min-width, header cell, zebra, and data-cell padding did not — each reachable only through
+  the shared `Table` component's own `<table>`/`<th>`/`<td>`/`<tr>`, which had no class hook, and a ruling
+  request (extend `Table` the way `Card` already is) was recorded rather than acted on. Group-by/Columns
+  wiring re-verified unchanged (`list-prefs-wiring.test.tsx`, 2/2). **The ruling request was approved
+  (Ruling 21) and the remaining five metrics landed — see `13.476` immediately below.** Still not
+  verified by a live render in any style or theme. — (`packages/app-core/src/views/ticket-list.tsx`,
+  `packages/ui/src/ui.css`)
+
+## Ruling 21 (coordinator, 2026-09-16) — `Table` gains class hooks, the five deferred List metrics land
+
+**Case `13.476` minted here**, continuing directly from `13.475` (verified against
+`scripts/check-case-ids.mjs`'s real sweep, run again after this section's own addition). The coordinator
+verified the report's premise independently before ruling — `Table` has exactly one PRODUCTION consumer
+repo-wide (`ticket-list.tsx`) plus its own test (`packages/ui/test/components.test.tsx`) — and approved
+extending `Table` (`packages/ui/src/components/table.tsx`) with four optional props: `className` on
+`<table>`, `headerClassName` on `TableColumn` (applied to every `<th>`), `rowClassName` on `<Table>`
+(applied to every `<tr>`), and `cellClassName` on `TableColumn` (applied to that column's `<td>`s). All
+four compose the way `card.tsx:7` already composes `Card`'s own `className` —
+`[own, extra].filter(Boolean).join(' ')`, appending to `gn-table*` rather than replacing it — so a caller
+passing nothing (every consumer before this change, and `Table`'s own existing test, which passes none of
+the four) gets byte-identical output. Confirmed, not assumed: `components.test.tsx`'s `Table` describe
+block (renders headers/cells, asserts a row click fires) re-run unmodified and green.
+
+`ticket-list.tsx`'s `ListTable` now passes `className="gn-list__table"` and `rowClassName="gn-list__table-row"`
+to `<Table>`, and `headerClassName: 'gn-list__table-header'` plus a per-column `cellClassName`
+(`gn-list__table-cell--title` on the title column, `gn-list__table-cell--data` on every other) on each
+`TableColumn`. Every new `ui.css` rule these add is a plain `.gn-list-*` selector — none names
+`.gn-table`/`.gn-table__header`/`.gn-table__cell`/`.gn-table__row` — so those four rules (`ui.css:284-288`
+and neighbours) are unedited, confirmed by grepping the full diff for any added/removed line that BEGINS
+with one of the seven shared do-not-edit selectors (`.gn-card`, `.gn-chip`, `.gn-avatar`, `.gn-table`,
+`.gn-select`, `.gn-button`, `.gn-segmented`): zero matches. `.gn-list__table-cell--data`/`--title` win
+over `.gn-table__cell`'s own shared `padding: 0.45rem 0.6rem` by the SAME equal-specificity/
+later-source-order technique `.gn-board-card` already uses against `.gn-card` (both single-class rules,
+`(0,1,0)`, this one later in the file) — not `!important`, not extra specificity.
+
+**The title cell's padding is pixel-exact for the first time.** `.gn-list__table-cell--title` zeroes the
+`<td>`'s own left padding and supplies the metric's static top/right/bottom third (`12px 16px 12px`); the
+DEPTH-dependent left term (`calc(16px + depth*22px)`) stays exactly where it already was — a per-row
+inline `paddingLeft` on the inner `.gn-list__title-cell` span, since `depth` is a fact about one ROW and
+`cellClassName` is declared once per COLUMN — but now composes against a zeroed base instead of an
+uneditable one, closing the "not pixel-exact" caveat `13.475` recorded.
+
+No new token role: `--gn-text-muted` (label2) and `--gn-surface-sunken` (trayBg) on the header cell are
+the SAME pair `.gn-timeline__weeks` already uses (`ui.css:1939-1942`); `--gn-fill-quaternary` (fill4) on
+the zebra row is already declared and consumed elsewhere. The two new length-only rules (`min-width:820px`
+on `.gn-list__table`, `min-width:260px` on `.gn-list__table-cell--title`) are plain literals — this file
+has no length-token axis (`radiusVariableName` names only `card`/`control`), matching how every other
+spacing/size value in `ui.css` is written.
+
+Full `packages/ui` (308/308) and `packages/app-core` (1227/1227) suites green; `packages/ui/test/
+token-discipline.test.ts`/`tokens.test.ts` re-run directly (not cached): clean. `tsc --noEmit` clean on
+both packages (Node v22.23.2). `pnpm turbo run test` at the repo root: `apps/desktop` (3/3),
+`apps/web` (363/363) — both rebuilt against the changed `packages/ui`/`packages/app-core` — green;
+`apps/server` failed on two DB-dependent tests unrelated to this change (a different pair failed than in
+the prior two runs, consistent with a pre-existing environmental flake, not a regression this change
+introduced).
+
+- **13.476** ❌ The five metrics `13.475` deferred now land through `Table`'s new optional class hooks:
+  `.gn-list__table` (min-width:820px), `.gn-list__table-header` (13px/18px/600/label2/trayBg/padding/
+  nowrap, uniform across every column), `.gn-list__table-row:nth-child(odd)` (fill4 zebra), `.gn-list__
+  table-cell--data` (12px 16px padding/15px/nowrap), and `.gn-list__table-cell--title` (min-width:260px
+  plus the pixel-exact static padding third). `Table`'s own test (`components.test.tsx`) and the seven
+  shared do-not-edit selectors confirmed unedited by a full-diff grep. Not verified by a live render in
+  any style or theme. — (`packages/ui/src/components/table.tsx`, `packages/ui/src/ui.css`,
+  `packages/app-core/src/views/ticket-list.tsx`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits 9dd3574b. None of its five selectors (`gn-list__table`, `__table-header`, `__table-row:nth-child(odd)`, `__table-cell--data`, `__table-cell--title`) appears in any test file; `ticket-list.test.tsx:1432` names `.gn-list__table-wrap`, a different class.
+
+## Task 12 — the transition gate, as a pure function (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.478`–`13.485` minted here**, continuing directly from `13.477` (verified against the real
+case list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool is
+`13.477` — never the file's own "next free BLOCK" prose at :2415, which an earlier task already found to
+be a false hit). Phase 6, Board writes: `moveOutcome(def, fromStateId, toStateId)` is the gate Tasks 13
+(move arrows) and 14 (drag-and-drop) both route a proposed move through before anything is submitted. It
+ships no UI and derives nothing of its own — built entirely over `transitionOptions`
+(`views/transition-dialog.tsx:41-61`), which already predicts the engine's own `find(exact) ?? find('*')`
+resolution (`rule-engine/src/transition.ts:91-93`). Fixture: `WF_ERRAND` (`test/helpers/seed.ts`), which
+already declares a wildcard edge (`* -> todo`), so the plain wildcard-reachable case needed no second
+fixture; two purpose-built definitions cover the precedence and wildcard-carries-rules cases below.
+
+**Mutation-witnessed** (`board-moves.ts` edited in place, `pnpm exec vitest run test/views/
+board-moves.test.ts` re-run after each edit, then reverted with a targeted `Edit` — never `git checkout
+--`, which has destroyed uncommitted work in this repo before). Replacing the `transitionOptions` call
+with a naive re-derivation that scanned `def.transitions` in array order and stopped at the first edge
+reaching `toStateId` — ignoring exact-before-wildcard — reddened `13.483` alone; every other case in the
+file stayed green. Hardcoding `available: []` on the refused branch reddened all three REFUSED cases —
+`13.478`, `13.479`, **and `13.485`** (a first prediction named only the first two and was corrected against
+the actual run: `13.485` is a refusal too, off `todo → todo`) — while the five direct/needs-dialog cases,
+`13.480`–`13.484`, which never reach that branch, stayed green. Inverting the rules check
+(`rules.length === 0` routing to `needs-dialog`, anything else to `direct`) reddened exactly those five —
+`13.480`/`13.481`/`13.482`/`13.483`/`13.484`, every direct/needs-dialog case swapping kind — while
+`13.478`/`13.479`/`13.485` (the refused cases, unreached by that branch) stayed green.
+
+- **13.478** ✅ Refuses an undeclared target and names the one move that IS available from that state. —
+  (`packages/app-core/src/views/board-moves.ts`, `packages/app-core/test/views/board-moves.test.ts`)
+- **13.479** ✅ Refusing from a state with THREE declared edges names all three, in `transitionOptions`'
+  own order — not merely a non-empty list. — (same files)
+- **13.480** ✅ A declared, rules-free edge answers `direct`. — (same files)
+- **13.481** ✅ A declared edge carrying `require-comment` answers `needs-dialog`. — (same files)
+- **13.482** ✅ A target reachable ONLY through the wildcard edge (no exact edge exists to it) still
+  answers `direct`, off the wildcard edge's own (empty) rules. — (same files)
+- **13.483** ✅ Wildcard declared FIRST and carrying rules, exact declared SECOND and rules-free, both
+  reaching the SAME target: the exact edge's rules win — `direct`, matching the engine's `find(exact) ??
+  find('*')` regardless of array order. This is ruling P27's own concern one level up, and the case the
+  re-derivation mutation above reddens alone. — (same files)
+- **13.484** ✅ A wildcard-only edge that DOES carry rules answers `needs-dialog`, on a purpose-built
+  definition with a `flagged` state reachable only by `* -> flagged`. — (same files)
+- **13.485** ✅ A move back onto the current state refuses like any other undeclared move —
+  `transitionOptions` already excludes `to === fromStateId`, even against a wildcard edge that would
+  otherwise reach it. Asserts both `kind: 'refused'` and `available: ['doing']`; the mutation above
+  kills it on the `available` half — self-exclusion itself (the `kind`) is pinned by
+  `transitionOptions`'s own tests in `transition-dialog.test.tsx`, not mutated here. — (same files)
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2, `pnpm exec vitest run
+test/views/board-moves.test.ts`: 8/8 green). `node scripts/check-case-ids.mjs` re-run after minting:
+duplicate list unchanged at `13.387`/`13.413` only.
+
+## Task 12, Ruling 25 — `moveOutcome` must not answer differently from the dialog it opens
+
+**Cases `13.486`–`13.487` minted here**, continuing directly from `13.485` (verified against the real
+case list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Task 12's own
+concern 2: `TransitionDialog` skips an already-claimed `require-field` input
+(`transition-dialog.tsx:183`/`:257`, calling the shared `fieldAlreadyClaimed` predicate —
+extracted since this ruling to `field-claims.ts:55`, see below), but `moveOutcome` never received
+`ticketFields` and always answered `needs-dialog` for any `require-field` rule — the exact fork Task 12's
+own docblock warned `transitionOptions` against, arriving from the other side: two places deriving "does
+this field still need asking" and free to disagree.
+
+**Fixed by extraction, not by a third re-derivation.** `fieldAlreadyClaimed(ticketFields, field)`
+(`packages/app-core/src/views/field-claims.ts`, new) is the ONE predicate now read by both
+`TransitionDialog` (its `missingFields` filter and its required-field render gate) and `moveOutcome`
+(its `unmet` filter). `moveOutcome` gained a fourth parameter, `ticketFields: Record<string, FieldClaim>`;
+a declared edge is `direct` only once every `require-field` rule on it reads satisfied through that
+predicate, and `needs-dialog` otherwise. `require-comment`/`require-evidence` are unaffected — neither has
+an "already satisfied" reading before a submission exists, so either still always answers `needs-dialog`.
+`restrict-to`/`require-different-user`-only edges still always answer `needs-dialog` too — recorded this
+time as a DELIBERATE choice (Ruling 25), considered and rejected routing to `direct`, not the same shape
+of gap `require-field` was.
+
+**Regression proof, not just new coverage.** The full `transition-dialog.test.tsx` suite (21/21) was
+re-run after refactoring the dialog onto the shared predicate — unchanged and green, confirming the
+extraction changed nothing about the dialog's own behaviour, only where the check lives. The full
+`packages/app-core` suite (82 files, 1239 tests) was re-run too: green.
+
+**Mutation-witnessed** (`board-moves.ts`'s `unmet` filter edited to treat every `require-field` rule as
+always unmet — `ticketFields` read but not applied — re-run, then reverted with a targeted `Edit`,
+`git diff --stat` confirmed empty after). Prediction, written before running: reddens `13.486` alone;
+`13.487` and all eight `13.478`–`13.485` cases stay green. Result matched exactly — 9/10 green, `13.486`
+failed with `expected { kind: 'direct', toStateId: 'doing' }` and received `{ kind: 'needs-dialog', toStateId:
+'doing' }`.
+
+- **13.486** ✅ A `require-field` edge whose field the ticket ALREADY carries a value for (mirroring
+  `transition-dialog.test.tsx`'s own "a required field the ticket ALREADY carries is not re-asked" scenario
+  one layer up, same field name and claim shape) answers `direct`, not `needs-dialog`. — (`packages/
+  app-core/src/views/board-moves.ts`, `packages/app-core/src/views/field-claims.ts`,
+  `packages/app-core/test/views/board-moves.test.ts`)
+- **13.487** ✅ THE CONTROL 13.486 needs: the identical edge with the field UNCLAIMED still answers
+  `needs-dialog` — without it, an implementation that always answered `direct` for `require-field`, or that
+  accepted `ticketFields` and silently ignored it, would pass 13.486 for the wrong reason. — (same files)
+
+## Task 12, Ruling 26 — mirror the rule engine: trim, treat whitespace-only as unset
+
+**Cases `13.488`–`13.489` minted here**, continuing directly from `13.487` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep). Same-day coordinator ruling on Ruling 25's own
+follow-up: `fieldAlreadyClaimed` (`!= null`) disagreed with `evaluateRequireField`
+(`packages/rule-engine/src/rules/require-field.ts`), which trims and treats a whitespace-only value as
+unset — deliberate, tested, Task 9's own controller ruling
+(`packages/rule-engine/test/engine.test.ts`, describe "require-field and require-evidence refuse a blank
+value, not only an absent one", case "refuses require-field when the field is set to a whitespace-only
+string"). Before Ruling 25 the divergence was contained (every `require-field` edge opened
+`TransitionDialog`, which has `serverRefusal` wired); Ruling 25 removed that containment, so a ticket with
+`dueDate: '   '` could answer `direct` from `moveOutcome` and then fail against the real server with
+nothing visible on Tasks 13/14's arrows or drag-and-drop — the exact failure `transitionOptions`'s own
+docblock warns against.
+
+**Fixed by mirroring the engine's semantics, not by importing its machinery.**
+`packages/rule-engine/src/index.ts:32-39` deliberately withholds `refuse()`/`ACCEPT` — "a consumer outside
+this package has no business minting a `Refusal`" — so `fieldAlreadyClaimed` was NOT changed to call into
+the engine; it now computes the same `isSet` expression `evaluateRequireField` computes
+(`value !== undefined && value !== null && !(typeof value === 'string' && value.trim().length === 0)`),
+independently stated in the client's own vocabulary.
+
+**Checked for an existing test pinning the old, wrong behaviour before changing anything.** An earlier
+pass of this grep ran over `packages/app-core/test` and `packages/app-core/src` only, and a claim naming
+`packages/rule-engine/test` as covered was written before that path was actually searched — caught in
+review and corrected here rather than left standing. The command actually run, both patterns over BOTH
+directories: `grep -rn "value: ''" packages/app-core/test packages/rule-engine/test` and `grep -rn
+"value: '   '\|value: ' '\|value: '\t" packages/app-core/test packages/rule-engine/test`. Three hits, all
+accounted for and none a counter-example: a `<select>` option's `value: ''` in
+`new-ticket-dialog.test.tsx` (not a `FieldClaim`); a DOM `target: { value: '   ' }` in
+`saved-filters-menu.test.tsx` (not a `FieldClaim`); and `engine.test.ts:855`'s own `due_date: '   '`
+fixture — the SERVER's test asserting the engine REFUSES that ticket, i.e. the correct, authoritative
+behaviour this change now matches, not an assertion of the client's old, wrong "claimed" reading. No
+`FieldClaim` fixture anywhere asserts a blank/whitespace value as already claimed or satisfied. Nothing
+needed amending; this is a pure gap-fill, not a defect-vs-test negotiation. The full `packages/app-core`
+suite (83 files, 1249 tests, up from 82/1239 — the new file and cases, nothing lost) and the full
+`transition-dialog.test.tsx` (21/21) were re-run to confirm, not merely grepped for.
+
+**The dialog's behaviour changes, and it is a FIX, not a regression**, per the coordinator's own framing:
+today a blank-but-present field reads as claimed, the dialog does not prompt for it, the person clicks
+Move, and the server refuses them; after the trim the dialog prompts, they fill it in, and the move
+succeeds. The engine required this all along — `TransitionDialog` was the thing out of step, not the
+other way round.
+
+**The agreement is pinned by a genuine round trip against the real, exported engine**, not a
+self-comparison: `packages/app-core/test/views/field-claims.test.ts` (13.489) runs `fieldAlreadyClaimed`
+and the real `evaluateTransitionRules` (`@gisik-nokma/rule-engine`'s public dispatcher — the same one the
+server calls) side by side over nine value shapes, through a minimal stub `EngineContext`
+`evaluateRequireField` never touches (it reads only `input.ticket.fields`). Each shape states its own
+expected `direct`/`unset` verdict independently, so a bug shared by both implementations would still show
+up as a wrong comparison against that independent expectation rather than a silent agreement.
+
+**Mutation-witnessed** (`fieldAlreadyClaimed`'s trim removed, reverted to bare `!= null`; reverted after
+with a targeted `Edit`, `git diff --stat` confirmed empty). Prediction, written before running: reddens
+`13.488` and exactly the THREE whitespace/blank sub-cases of `13.489` (empty string, whitespace-only,
+mixed whitespace); the other ten `board-moves` cases and six other `field-claims` sub-cases stay green.
+Result matched exactly — 4 failed / 16 passed across the two files, the failing set precisely `13.488` plus
+those three `13.489` sub-cases.
+
+- **13.488** ✅ The SAME `require-field` edge as `13.486`/`13.487`, field set to a WHITESPACE-ONLY string
+  (`'   '`), answers `needs-dialog` — not `direct`. This is the case that motivated Ruling 26. —
+  (`packages/app-core/src/views/board-moves.ts`, `packages/app-core/src/views/field-claims.ts`,
+  `packages/app-core/test/views/board-moves.test.ts`)
+- **13.489** ✅ `fieldAlreadyClaimed` agrees with the REAL rule engine across nine value shapes (absent,
+  `null`, `''`, whitespace-only, mixed-whitespace, a real string, `0`, `false`, a real object) — a genuine
+  round trip against `evaluateTransitionRules`, not a self-comparison, so a future drift between the two
+  implementations reddens this rather than passing silently. — (`packages/app-core/src/views/
+  field-claims.ts`, `packages/app-core/test/views/field-claims.test.ts`)
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node v22.23.2). `node
+scripts/check-case-ids.mjs` re-run after minting: duplicate list unchanged at `13.387`/`13.413` only.
+
+## Task 13 — move arrows: refusal and its positive control (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.490`–`13.505` minted here**, continuing directly from `13.489` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep — max ordinal in this file's own `13.` pool was
+`13.489` — never the file's own "next free BLOCK" prose, an already-recorded false hit). Phase 6, Board
+writes: per-card `‹ ›` move arrows, the first WRITE path in this port. `arrowTarget`
+(`views/board-arrows.ts`) resolves each arrow's target — the nearest state in that direction for which
+`transitionOptions` declares a real edge, never the literal adjacent column — and `MoveArrows`
+(`views/board.tsx`) routes every click through `moveOutcome` (Task 12) without re-deriving its verdict.
+
+**`board-arrows.test.ts` — 8 cases (`13.490`–`13.497`), all against the pure `arrowTarget` scan.**
+Fixture: `WF_ERRAND` for the ordinary and wildcard cases, plus one purpose-built three-state definition
+(`todo -> done` declared, `doing` undeclared and sitting between them in column order) for the brief's own
+canonical illustration.
+
+**Mutation-witnessed** (`board-arrows.ts` edited in place — `scanRange.find((id) => declared.has(id)) ??
+null` replaced with the naive `scanRange[0] ?? null`, i.e. the literal adjacent column, ignoring
+`declared` entirely — `pnpm exec vitest run test/views/board-arrows.test.ts` re-run, then reverted with a
+targeted `Edit`; a functional re-run of the full 8-case file afterward confirmed the revert, since a new,
+still-untracked file shows no `git diff` either way). Prediction, written before running: reddens exactly
+the two cases built to distinguish "nearest declared" from "literal adjacent" — `13.494` and `13.496` —
+leaving the other six green, since every other case's expected answer happens to coincide with the literal
+adjacent column for reasons unrelated to the scan (either only one candidate exists, or none does).
+Result matched exactly: 6 passed / 2 failed, the failing set precisely `13.494` and `13.496` —
+`expected 'waiting' to be 'doing'` and `expected 'doing' to be 'done'` respectively.
+
+- **13.490** ✅ The nearest declared forward target IS the adjacent column — the ordinary case, `todo`
+  `next` → `doing`. — (`packages/app-core/src/views/board-arrows.ts`,
+  `packages/app-core/test/views/board-arrows.test.ts`)
+- **13.491** ✅ No declared edge points back at `todo` from anywhere, so `previous` answers `null`. —
+  (same files)
+- **13.492** ✅ From `doing`, THREE targets are declared (`todo` via wildcard, `waiting`, `done`); `next`
+  picks the NEARER of the two forward ones (`waiting`), not merely a declared one — proves "nearest",
+  not "any". — (same files)
+- **13.493** ✅ `previous` from `doing` resolves through the WILDCARD edge (`* -> todo`), not only an
+  exact one. — (same files)
+- **13.494** ✅ THE SKIP CASE inside the shared fixture: from `done`, `waiting` sits between `doing` and
+  `done` in column order but is NOT declared reachable from `done`; `previous` skips it and lands on the
+  further, genuinely declared `doing`. The mutation's own witness. — (same files)
+- **13.495** ✅ `done` is the last column; `next` has nothing to scan forward into and answers `null`. —
+  (same files)
+- **13.496** ✅ THE BRIEF'S OWN CANONICAL EXAMPLE, its own purpose-built fixture: `todo -> done` declared,
+  `doing` sitting between them purely visually with no edge touching it at all. `next` from `todo`
+  resolves straight to `done`, never the physically adjacent `doing`; the paired control confirms `doing`
+  itself has no move in EITHER direction, so the skip did not merely relabel which arrow `doing` answers
+  to. The mutation's other witness. — (same files)
+- **13.497** ✅ A `fromStateId` absent from `columnOrder` entirely has no column to scan from and answers
+  `null` in both directions. — (same files)
+
+**`board-moves-ui.test.tsx` — 8 cases (`13.498`–`13.505`), the component-level wiring: `Board`'s `moves`
+capability, `MoveArrows`, and `MoveRefusalNotice`.**
+
+**Why the refusal path is proven at the `moveOutcome`/`refusalCopy`/`MoveRefusalNotice` seam, not through a
+simulated wrong click.** `MoveArrows` computes each arrow's target via `arrowTarget`, which by
+construction only ever returns a member of `transitionOptions(workflow, fromStateId)` — the SAME set
+`moveOutcome`'s own refusal check reads off the identical `(workflow, fromStateId)`. So a target this
+component ever actually SUBMITS is, by construction, always declared, and a live click on an ENABLED arrow
+cannot organically drive `moveOutcome` into its `refused` branch. `13.502`/`13.503` prove the real refusal
+RENDERING instead — the actual `moveOutcome` output, fed into the actual `refusalCopy`/`MoveRefusalNotice`
+— which is the honest seam given the click-side is provably unreachable, and is also exactly the pipeline
+Task 14's drag-and-drop reuses for real, since a drop target is not filtered this way.
+
+- **13.498** ✅ THE POSITIVE CONTROL the brief demands: clicking an available arrow on a declared,
+  rules-free edge submits the SHIPPED `{to}` `ticket.transitioned` payload (never `{toStateId}`), with the
+  right `actorId`/`origin`, calls `onMoved`, and renders no refusal of either kind. Only this case tells a
+  refusal that fires on everything apart from a refusal that actually works. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.499** ✅ THE PAIRED NEGATIVE CONTROL: the direction with no declared target is a genuinely disabled
+  button (native `disabled`, not merely styled to look inert), and firing a click at it anyway submits
+  nothing. — (same files)
+- **13.500** ✅ The `moves` capability itself absent (not passed to `Board` at all) renders NO move arrows
+  whatsoever — the whole feature absent, not merely every direction disabled. — (same files)
+- **13.501** ✅ A declared edge whose rules are NOT already met (`require-comment` on the nearest-declared
+  edge, a purpose-built gated `WF_ERRAND` variant) opens `TransitionDialog` rather than submitting blind.
+  **The dialog is NOT pre-aimed at the arrow's own target** — only `(workflow, fromStateId)` are threaded
+  through; the dialog's own `<Select>` starts empty and this test picks "Doing" from it the same way a
+  person would. What it proves: the dialog opens on the right workflow and the right `fromStateId` (not
+  merely that SOME dialog opens), and completing it submits the SHIPPED `{to, comment: {text}}` payload. —
+  (same files)
+- **13.502** ✅ The refusal pipeline, end to end and for real: `moveOutcome(WF_ERRAND, 'todo', 'waiting',
+  {})` refuses with `available: ['doing']` (the one real alternative — `moveOutcome`'s own test suite
+  already proves this fact; this case's job is only what renders from it), and `MoveRefusalNotice` fed
+  that exact output renders text naming "Doing" BY NAME — never a bare "you can't do that", and never the
+  raw id leaking through unnamed. — (same files)
+- **13.503** ✅ The zero-alternatives sentence (`moveOutcome`'s `available: []`) is still an honest one —
+  `"This ticket can't move from here."`, not `"try ."` — both from `refusalCopy` directly and from
+  `MoveRefusalNotice`'s own rendering. — (same files)
+- **13.504** ✅ A REJECTED `ingest` (a transport failure, not a server answer) does not brick the card:
+  found in review, not authored blind — `submitDirect`'s own `submitting` latch (no precedent in
+  `TicketSheet.submitTransition`, which never disables its Move button in flight) was originally reset
+  only after a successful `await`, so a rejection left both arrows `disabled` forever with nothing on
+  screen. Fixed with `try/catch/finally`. Mutation-witnessed the other direction — the FIX reverted back
+  to the pre-fix shape, `pnpm exec vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this
+  case alone (`Unable to find role="alert"`, and the DOM dump shows both arrows `disabled=""`) — the other
+  six cases in the file stayed green, then reverted with a targeted `Edit`. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.505** ✅ THE SAME transport-failure fix `13.504` proved for `submitDirect`, now proved for
+  `submitFromDialog`: found in a THIRD review round, requested before declaring the `13.504` follow-up
+  done. `TransitionDialog`'s `onSubmit` prop is `void`-typed and `MoveArrows`' own call site is
+  fire-and-forget (`onSubmit={(submission) => void submitFromDialog(submission)}`), so before this fix a
+  rejected `ingest` from inside the dialog became an unhandled promise rejection — the dialog stayed open
+  with nothing on screen saying it failed. Fixed with a `try/catch` around `submitFromDialog`'s body,
+  reusing `TransitionDialog`'s EXISTING `serverRefusal` display (`transition-dialog.tsx:311-314`) rather
+  than inventing a new one. Mutation-witnessed: the `try/catch` reverted to the pre-fix shape, `pnpm exec
+  vitest run test/views/board-moves-ui.test.tsx` re-run, reddened this case alone (`PASS (7) FAIL (1)`,
+  timeout waiting for the dialog's own alert), the other seven cases in the file stayed green, then
+  reverted with a targeted `Edit` and re-confirmed `PASS (8) FAIL (0)`. — (`packages/app-core/src/
+  views/board.tsx`, `packages/app-core/test/views/board-moves-ui.test.tsx`)
+
+**A separate, related fix carries NO case number, and that absence is deliberate, not an oversight.**
+The `try/catch/finally` `13.504` added made every local `setState` call in both `submitDirect` and
+`submitFromDialog` run unconditionally after an `await` — including on a card that has unmounted in the
+meantime, which is not rare: a successful move on ANY card (this one or a sibling) calls `moves.onMoved()`
+→ `board.reload()`, which can restructure the board and unmount a DIFFERENT card whose own slower `ingest`
+is still in flight. Found in a second-opinion review (the same one that led to `13.505`), fixed with a
+`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s
+`isCurrent()` and `TransitionDialog`'s own precheck `cancelled` flag already use — while leaving
+`moves.onMoved()` itself unguarded (it reaches the parent and is safe regardless of this component's mount
+state). **React 18 drops the console warning for a setState on an unmounted component, so no assertion in
+jsdom/RTL can observe the difference the guard makes** — confirmed true of both cited precedents as well,
+neither of which carries a dedicated test for this either. Rather than write a test that only LOOKS like it
+exercises the race (and would pass identically with or without the guard), this fix is documented instead
+of witnessed — the honest alternative to a check that cannot fail. `packages/app-core/src/views/board.tsx`.
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core`; `tsc -p tsconfig.json --noEmit && tsc -p
+tsconfig.e2e.json --noEmit` (the package's own `typecheck` script) clean on `apps/web`. Node `v22.23.2`.
+Full `packages/app-core` suite: 87 files, 1265 tests, green (up from 83/1249 before this task — the two
+new files' 16 cases, nothing lost). Full `apps/web` suite: 363 tests, green, run AFTER wiring `moves` into
+`page.tsx` — whether any of those 363 tests exercise the project page's board tab with a signed-in session
+was not individually traced; the claim made here is only the measured one, that the full suite stayed
+green with the wiring in place, not a claim about which tests do or do not reach the new code path.
+
+**A repo-wide `pnpm turbo run test` (dist freshly built for every upstream package, so `apps/web`'s own
+resolution of `@gisik-nokma/app-core` to `dist/` is proven against this task's REAL changes, not a stale
+build) surfaced 3 unrelated timeouts in `apps/server`** (`test/determinism.test.ts`,
+`test/seed/seed-dev.test.ts`, `test/visibility/grant-backfill.test.ts`, all `Error: Test timed out in
+30000ms`, 1518 passed / 5 skipped otherwise) — investigated, not waved off: this task changed zero files
+under `apps/server`, `apps/server:typecheck` already passed clean in the same run, the log's own error
+line names a DIFFERENT Node (`v24.11.1`) than every other package ran under in this task (`v22.23.2`), and
+all 18 tests across the three files pass cleanly when re-run in isolation under the correct Node with no
+contention from the other 16 packages building/testing at once. Pre-existing environmental flakiness
+and/or a Node-version drift in turbo's own subprocess spawning, not a regression this task introduced —
+see the task report for the full account. Every package this task actually touched (`ui` 309/309,
+`app-core` 1264/1264, `web` 363/363) passed clean in that same full run, as did every other untouched
+package.
+
+**Review caught two additional real defects before this landed, both fixed and both proven with their own
+mutation witnesses (case `13.504` above, and see that case for the specific witness); a third was a wording
+correction with no code change** — `board-moves-ui.test.tsx`'s own `13.501` describe block and the
+`13.501` bullet above both originally claimed `TransitionDialog` opens "aimed at the right target"; it does
+not — only `(workflow, fromStateId)` are threaded through, and the target is chosen from the dialog's own
+dropdown, the same way `TicketSheet`'s "Move…" button already works. Reworded in the test file, this
+file, and the task report rather than left standing. `.gn-board-card__move--previous`/`--next` were also
+dropped from the arrow buttons' `className` — empty class hooks with no corresponding `ui.css` rule, the
+exact shape this repo has already removed once (`481ad12c`).
+
+**A THIRD review round, requested before declaring the `13.504` follow-up done, found two more real
+issues** — `13.505` above (the `submitFromDialog` transport-failure fix, code changed and
+mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see
+above for why). Two further points from that same round were left as documented judgment calls rather
+than code changes: `submitFromDialog` still carries no `try/catch` of its OWN distinct from the transport
+fix already applied (moot — the fix IS the catch); and the client-invented `rule: 'transport'`/
+`rule: 'no-response'` values render through the identical `Refused by the server — ${rule}: ${reason}`
+sentence a REAL server refusal uses, which a viewer cannot distinguish from an actual server answer —
+changing that sentence now would redden the `13.504` mutation-witnessed assertion that the alert text
+contains `'network unreachable'`, so it was left as a coordinator-level decision rather than changed
+unilaterally.
+
+`node scripts/check-case-ids.mjs` re-run after minting `13.505`: duplicate list unchanged at
+`13.387`/`13.413` only.
+
+## Ruling 27 (coordinator, 2026-09-16) — the client was minting refusals
+
+The coordinator's own review of Task 13's four commits found what the third review round above (concern 5
+in the task report) treated as a documented, deliberately-unfixed judgment call was actually a real
+violation of `rule-engine/src/index.ts:32-41`'s own stated door: "`refuse()` and `ACCEPT`... stay internal…
+a consumer outside this package has no business minting a `Refusal`, and exporting them would hand every
+client a way to fabricate a verdict that looks engine-made". `board.tsx` never imported `refuse()` — it
+built `{ rule: 'no-response'|'transport', reason }` objects by hand instead, and fed them into
+`serverRefusal`, the SAME channel `TransitionDialog`'s own docblock calls "the authority's answer, shown
+VERBATIM whenever present." Neither `no-response` nor `transport` exists in `REFUSAL_RULES`
+(`rule-engine/src/refusal-rules.ts:9-25`, fifteen real entries). A dropped connection or an empty `ingest`
+response rendered through the identical `Refused by the server — ${rule}: ${reason}` sentence a real
+refusal uses — indistinguishable from an actual server verdict, and calling for the opposite next action
+(retry, not "fix the thing the server objected to").
+
+**The fix: a wholly separate channel, never a `{rule, reason}` pair.** `MoveArrows` (`board.tsx`) gained a
+new `transportError: string | null` state, kept SEPARATE from `serverRefusal` rather than merged into it
+with a `kind` tag — `serverRefusal` now carries ONLY what `moveOutcome`'s gate or a real `IngestResult`
+actually said; `transportError` carries a plain sentence for the two cases where nobody adjudicated at all.
+`TransitionDialog` (`transition-dialog.tsx`) gained the identical `transportError: string | null` prop
+(now REQUIRED, matching `serverRefusal`'s own required shape — every caller must consciously pass `null`
+rather than silently defaulting), rendered in its own `<p role="alert" className="gn-refusal
+gn-refusal--transport">`, never alongside "Refused by the server". `ui.css` gained `.gn-refusal--transport`,
+reusing the `warning` role `.gn-refusal--preview` already uses (amber, not `--server`'s danger-red) — the
+same "not the authority speaking" register, a different reason. `ticket-sheet.tsx`'s own
+`TransitionDialog` mount passes `transportError={null}`, with a comment explaining why: `TicketSheet.
+submitTransition` stays unguarded (an unhandled promise rejection on a transport failure, the existing,
+untouched precedent `board.tsx`'s own docblocks already cite) — it never fabricated a refusal either, it
+just never caught the rejection at all, so there is nothing to pass but `null`. No import of `refuse()`/
+`ACCEPT` anywhere — the fix stays on the "never mint a verdict" side of the door the ruling quotes, not a
+smaller violation of it.
+
+**Wording:** the "silence" case (`results[0] === undefined`) keeps its exact original sentence, moved to
+the new channel — `"The server did not answer this move."` The "transport failure" case (a rejected
+`ingest`) is new — `` `We could not reach the server for this move — ${message}` ``.
+
+**On `13.504`: amended, and the amendment is quoted, not just described, per the coordinator's own
+instruction.**
+
+- **BEFORE:** `expect(screen.getByRole('alert')).toHaveTextContent('network unreachable')` — one substring
+  check.
+- **Measured, not assumed, that this did NOT organically redden under Ruling 27's fix** (the coordinator
+  expected it would): the new sentence — `"We could not reach the server for this move — network
+  unreachable"` — still CONTAINS the substring `'network unreachable'`, so the old assertion passed under
+  BOTH the defective rendering and the fixed one. Running the full affected suite (`board-moves-ui.
+  test.tsx` + `transition-dialog.test.tsx`) against the fix with the assertion still in its pre-amendment
+  shape confirmed this directly: `PASS (29) FAIL (0)`. The test was too weak to catch the defect it was
+  never written to look for — it checked that SOME message with the right substring appeared, never that
+  the message avoided claiming server authority it did not have.
+- **AFTER:** the alert is captured once and checked five ways — `toHaveTextContent('We could not reach the
+  server for this move')`, `toHaveTextContent('network unreachable')`, `not.toHaveTextContent('Refused by
+  the server')`, `toHaveClass('gn-refusal--transport')`, `not.toHaveClass('gn-refusal--server')` — plus the
+  original "arrows stay usable" assertion, unchanged. `13.505` (the `submitFromDialog` sibling) got the
+  identical amendment for the identical reason, quoted the same way in its own docblock.
+- **Mutation witness, run against the fix itself rather than assumed correct:** `board.tsx`,
+  `transition-dialog.tsx`, and `ticket-sheet.tsx` reverted in place to their exact pre-Ruling-27 content
+  (`git show f5041052:<path>`, the last commit before this ruling), the two affected test files re-run.
+  Result: `PASS (27) FAIL (3)` — exactly the three cases touched by this ruling (amended `13.504`, the new
+  `13.506` below, amended `13.505`) and nothing else. The failure text is the ruling's own defect, produced
+  by the actual reverted code rather than described secondhand: `13.504` and `13.505` both failed with
+  `Received: "Refused by the server — transport: network unreachable"`; the new case failed with `Received:
+  "Refused by the server — no-response: The server did not answer this move."` — direct proof the
+  pre-ruling code fabricated BOTH `rule: 'transport'` and `rule: 'no-response'`, not only the one the
+  coordinator's file:line citations named first. Files restored byte-identical afterward (`diff` against a
+  pre-revert backup of each, confirmed clean) and the full suite re-confirmed green.
+
+- **13.506** ✅ (new, no prior coverage existed of this path in this file) — `submitDirect`'s "silence"
+  case: `ingest` answers with an empty array, so `results[0]` is `undefined` and nobody adjudicated. Same
+  channel, same distinguishing assertions as amended `13.504`, checked against `"The server did not answer
+  this move."` instead of the transport sentence. — (`packages/app-core/src/views/board.tsx`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`)
+
+**Case IDs `13.506` minted here**, continuing from `13.505` (verified against `scripts/check-case-ids.mjs`'s
+real sweep, not this file's own prose). `packages/app-core/test/views/transition-dialog.test.tsx`'s shared
+`renderDialog` helper gained a `transportError={null}` default (the prop is now required on
+`TransitionDialogProps`) — no new case minted there: `13.505`'s amended assertions already exercise
+`TransitionDialog`'s own `transportError` rendering through the real dialog (`within(dialog).getByRole(
+'alert')`), so a second, isolated unit test of the identical render branch would be a redundant guard
+rather than new coverage — the exact shape this repo's own case-review discipline warns against minting
+for its own sake.
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` (Node `v22.23.2`). Full `packages/app-core`
+suite: 85 files, 1266 tests, green (up from 1265 — the one new case, nothing lost). `node
+scripts/check-case-ids.mjs` re-run after minting `13.506`: duplicate list unchanged at `13.387`/`13.413`
+only.
+
+## Task 14 — drag-and-drop, the plan's final task (board-prototype-port plan, 2026-09-16)
+
+**Cases `13.507`–`13.513` minted here**, continuing directly from `13.506` (verified against the real case
+list via `scripts/check-case-ids.mjs`'s real sweep, not this file's own prose). Dragging a card from one
+board column and dropping it on another — the SAME `moveOutcome` gate Task 13's arrows already route
+through, never a second one: a drop's target comes from whichever column it lands on, and the dragged
+card's own `MoveArrows` instance (`views/board.tsx`) registers its real `attemptMove` closure into a
+shared per-board registry (`MoveRegistry`) keyed by ticket id, on every render; the target column's drop
+handler looks it up and calls it — the identical function an arrow click on that card would call. This
+ships **no second module and no second decision point** — `views/board-arrows.ts`'s own forward reference
+to "that task's own module" is corrected in place (this task's own commit) to describe the registry
+instead, since no second module exists.
+
+**`board-drag-drop.test.tsx` — 6 cases (`13.507`–`13.512`), a sibling file to `board-moves-ui.test.tsx`,
+the same convention that file's own docblock set for itself relative to `board.test.tsx`.** Every test
+drives the board through a REAL `fireEvent.dragStart` → (`dragover` where relevant) → `fireEvent.drop`
+sequence, never calling anything drag-specific directly — the whole point of this task is that a drop and
+an arrow reach `moveOutcome` through the exact same code, provable only by reaching it the way a person
+actually would. `DataTransfer`/`DragEvent` are unimplemented in this repo's jsdom (25.0.1 — confirmed
+empirically: `new window.DataTransfer()` throws `is not a constructor`); `@testing-library/dom`'s own
+`events.js` documents the identical gap and attaches whatever plain object is passed as `dataTransfer`
+directly onto the fired event with no validation, so each test builds a hand-rolled `DataTransfer`
+stand-in (`setData`/`getData` over a `Map`, format-aware — never answering the same value for every
+format), cast `as unknown as DataTransfer`, mirroring the established `ClipboardEvent`/`clipboardData`
+precedent already in this codebase (`packages/editor/test/drive-never-inline.test.ts`). ONE instance is
+passed to both the `dragStart` and the `drop` fire calls in every test, never two — a real browser hands
+one `DataTransfer` object to every event in a single drag gesture, and two fakes would prove nothing about
+whether the drop side actually reads what the drag side wrote.
+
+- **13.507** ✅ THE POSITIVE CONTROL the brief demands, mirroring `13.498`'s role for the arrows: dragging
+  the card in `todo` and dropping it on `doing` (a declared, rules-free edge) submits the SHIPPED `{to:
+  'doing'}` `ticket.transitioned` payload with the right actor/origin, calls `onMoved`, and renders no
+  alert. — (`packages/app-core/src/views/board.tsx`, `packages/app-core/test/views/board-drag-drop.test.tsx`)
+- **13.508** ✅ THE CASE AN ARROW CANNOT ORGANICALLY REACH: dropping the `todo` card on `waiting` (`todo`'s
+  only declared target in `WF_ERRAND` is `doing` — proven by `moveOutcome`'s own suite and reused verbatim
+  by `13.502`) refuses, and the rendered alert NAMES "Doing" rather than merely appearing; nothing is
+  ingested. The first END-TO-END exercise of the refusal pipeline this port has — `13.502` proves the same
+  pipeline only at the pure-gate seam, because an arrow's own target is always declared by construction. —
+  (same files)
+- **13.509** ✅ THE THIRD OUTCOME the design spec's own Test impact section names for this task alongside
+  the positive control and the refusal above ("a drop on a rules-bearing edge opening the dialog"):
+  dropping on a `todo -> doing` edge regated with `require-comment` (`13.501`'s own gated-edge fixture,
+  reused verbatim) opens `TransitionDialog`, aimed at the right `(workflow, fromStateId)`. Does not
+  re-prove `submitFromDialog`'s own mechanics — `13.501`/`13.504`/`13.505` already do, over the identical
+  function this drop reaches; this case's whole job is the DISPATCH, not what happens after. — (same files)
+- **13.510** ✅ THE MECHANISM every outcome case above is blind to: `fireEvent.drop` in a test dispatches
+  straight to React's listener regardless of what `dragover` did, so a suite built only from `13.507`–
+  `13.509` could pass in full against an implementation where a real browser's default action (disallow
+  dropping) would silently defeat every drop. Pinned directly — `fireEvent.dragOver(column, {
+  dataTransfer })` returns `false`, the `dispatchEvent` return value exactly when something called
+  `preventDefault()` on a cancelable event (`dragover`'s own default `cancelable: true`,
+  `@testing-library/dom`'s event map) — not inferred from any drop succeeding. — (same files)
+- **13.511** ✅ A `drop` with no real `dragstart` behind it (an empty `DataTransfer`, `getData` answering
+  `''`) is a SILENT, INERT no-op, not a thrown error and not a refusal: `''` is not a ticket id the
+  registry has ever seen, so `Map.get` answers `undefined` and the drop handler does nothing further — no
+  ingest, no alert, no dialog. Distinguishes "the gate ran and refused" from "the handler found nothing to
+  act on", the one outcome `MoveRegistry`'s own docblock names as the case this feature does not narrate. —
+  (same files)
+- **13.512** ✅ RULING 15'S OWN WORDS, proven rather than asserted in prose: "a grab cursor on an
+  undraggable card is an affordance claim the product cannot honour." Mirrors `13.500`'s identical "no
+  arrows at all" proof for the same `moves` capability being absent: the card's `<li>` is NOT matched by the
+  literal selector `ui.css` uses to grant the grab cursor when there is no `MoveArrows` instance behind it
+  to register an `attemptMove`, and a drop aimed at it anyway is still inert, since `onDropCard` itself is
+  `null` on that path and the column never receives an `onDrop` handler at all. — (same files)
+
+  **AMENDED, Ruling 29 (coordinator, 2026-09-16).** Originally asserted the literal
+  `toHaveAttribute('draggable', 'false')` — a SPELLING of how the element fails to be draggable, not the
+  CONTRACT the cursor rule depends on. `.gn-board__card-slot[draggable="true"]` is equally unmatched by an
+  EXPLICIT `draggable="false"` and by the attribute being ABSENT entirely — both read "not draggable" to a
+  browser. The old assertion would have reddened a future refactor that switched to omitting the attribute
+  instead of setting it `false` (e.g. `draggable={arrows !== null ? true : undefined}`), even though the
+  CSS contract would still hold — a phantom regression, found by the coordinator rather than caught by any
+  test. **Now asserts the contract directly**: `card.matches('[draggable="true"]')` is `false` — the
+  identical selector string `ui.css` uses, read off the real DOM via the standard `Element.matches` API,
+  rather than one particular way of failing to satisfy it.
+
+  **Mutation-witnessed both directions, not merely reasoned about.** (A) `draggable={arrows !== null}` →
+  `draggable={true}` (a REAL regression — always draggable, even with no `moves` capability): reddened
+  `13.512` and nothing else (`AssertionError: expected true to be false`). (B) `draggable={arrows !== null}`
+  → `draggable={arrows !== null ? true : undefined}` (the PHANTOM the old assertion would have flagged —
+  omits the attribute rather than setting it `false`, same CSS outcome): the AMENDED assertion stayed
+  green (`PASS (9) FAIL (0)`), confirmed by first restoring the OLD assertion text and re-running the same
+  mutation — which reddened, proving the fix actually removes the phantom rather than merely being asserted
+  to. Both mutations reverted; the 9-case file re-confirmed green afterward.
+- **13.514** ✅ THE REGISTRY MUST HOLD THE LATEST `attemptMove`, not one captured once. Every other case in
+  this file drops exactly once; this drags and drops the SAME card TWICE in sequence (both times onto the
+  declared, rules-free `doing` edge) and asserts BOTH submit — two `ingest` calls, `onMoved` called twice.
+  Proves the `useEffect` that re-registers `attemptMove` on every render actually publishes the fresh
+  closure (the one that sees `submitDirect`'s own `finally`-reset `submitting` flip back to `false`), not a
+  closure frozen at first render — the shape of bug an over-eager `useCallback` memoization could introduce
+  silently, either bricking the card after one move or bypassing the double-submit latch entirely, without
+  touching any line this file's other six cases exercise. — (same files)
+
+## Ruling 28 — the notice scrolls into view following a drop, never following an arrow (coordinator, 2026-09-16)
+
+**The tension, named rather than resolved unilaterally.** `.gn-board__rail` (`packages/ui/src/ui.css:315`) is
+`overflow-x: auto`. The refusal/server-refusal/transport-error notices render exactly where `MoveArrows`
+already renders them for arrow clicks — under the SOURCE card, in its origin column — never a second site
+near the drop point, since a second site would be the "two products" fork this task exists to avoid. But
+after a rightward drag the origin column can scroll out of view before a sighted person reads why their
+card snapped back, which is functionally the "silent snap-back" the design spec forbids
+(`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:270-271`) — for sighted users
+specifically: `role="alert"` already announces the notice to assistive technology regardless of scroll
+position.
+
+**Fix: keep the single rendering site, scroll it into view on the drop path only.** `MoveArrows` gained a
+`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter
+(defaulting to `'arrow'` — every arrow `onClick` is unchanged); the registry wrapper `registerAttempt`
+registers now passes `'drop'` explicitly. The three notices are wrapped in one `<div
+className="gn-board-card__notice" ref={noticeRef}>` (`display: contents` in `ui.css`, so the wrapper is
+invisible to `.gn-board-card__moves`'s own flex layout — no visual change to the arrows or notice
+placement), and a `useEffect` watching `[refusal, serverRefusal, transportError]` calls
+`noticeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })` exactly when something is
+about to render AND the triggering attempt's source was `'drop'`.
+
+- **13.515** ✅ Drops a card onto an undeclared column (the refusal path, reusing `13.508`'s own setup) and
+  asserts `scrollIntoView` — a `vi.fn()` stub, since jsdom 25 implements no `scrollIntoView` at all
+  (confirmed empirically: a bare jsdom element throws `is not a function`) — was called exactly once, with
+  `{ block: 'nearest', inline: 'nearest' }`. — (`packages/app-core/src/views/board.tsx`,
+  `packages/app-core/test/views/board-drag-drop.test.tsx`)
+- **13.516** ✅ THE PAIRED NEGATIVE, proving the DISCRIMINATION itself rather than only the drop side: an
+  arrow click that reaches a real notice (`board-moves-ui.test.tsx`'s own `13.504` transport-failure
+  fixture — an arrow click can never reach the CLIENT-side `refusal` notice, Task 13's own unrelated
+  constraint, so any real notice reached via an arrow proves the point equally well) must NOT call
+  `scrollIntoView`. `13.515` alone would still pass an implementation that scrolled on every notice
+  regardless of source; this is what rules that out. — (same files)
+
+**Both mutation-witnessed.** (1) The `scrollIntoView` call itself removed: reddened exactly `13.515`
+(`AssertionError: expected "spy" to be called 1 times, but got 0 times`), `13.516` untouched (still nothing
+to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires
+regardless of source): reddened exactly `13.516` (`Number of calls: 1`, expected `0`), `13.515` untouched
+(still correctly called once on its own drop). Both reverted; the 9-case file re-confirmed green
+afterward.
+
+## Ruling 29 — `13.512` asserts the contract, not one spelling of how it fails to match (coordinator, 2026-09-16)
+
+See `13.512`'s own AMENDED bullet above for the fix and its mutation witness (both directions: the amended
+assertion still catches a real regression, `draggable={true}` unconditionally, AND stays green under the
+phantom `draggable={arrows !== null ? true : undefined}` mutation the OLD assertion would have wrongly
+reddened on — verified by literally restoring the old assertion text against that same phantom mutation and
+watching it fail, not merely reasoned about).
+
+**Every outcome-dispatch case (`13.507`–`13.509`) and the `dragover` mechanism case (`13.510`) is
+mutation-witnessed, not merely passing once.** Two mutations, each applied via a targeted `Edit`, run
+against the 6-case file, then reverted via a second targeted `Edit` restoring the exact original text
+(confirmed by re-reading the diff, not assumed):
+
+1. `handleDrop`'s `if (attempt !== undefined) attempt(toStateId);` changed to `if (false && attempt !==
+   undefined) attempt(toStateId);` — predicted to redden exactly the three cases that depend on
+   `attemptMove` actually firing. Result: `PASS (3) FAIL (3)`, the failing set exactly `13.507`/`13.508`/
+   `13.509`, the other three (`13.510`–`13.512`, none of which depends on the registry call firing)
+   untouched.
+2. `onDragOver`'s handler changed from `(event) => event.preventDefault()` to a no-op `(_event) => {}` —
+   predicted to redden exactly `13.510`. Result: `PASS (5) FAIL (1)`, the sole failure `13.510` with
+   `AssertionError: expected true to be false`.
+
+Both mutations reverted; the full 6-case file, plus the full 76-case pre-existing board suite
+(`board-moves-ui.test.tsx`, `board.test.tsx`, `board-arrows.test.ts`, `board-moves.test.ts`), re-confirmed
+green afterward (`PASS (82) FAIL (0)`).
+
+**`packages/ui/test/components.test.tsx` — 1 case (`13.513`), a CSS-binding gate, the same shape
+`inbox-css-binding.test.tsx` already uses for `gn-timeline__bar`.**
+
+- **13.513** ✅ `.gn-board__card-slot[draggable="true"]` sets `cursor: grab` in `ui.css`. Proves only that
+  the RULE exists with the right body — `13.512` above is what proves `draggable="true"` (and therefore
+  this selector's match) actually tracks the `moves` capability rather than being always on or always off.
+  — (`packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`)
+
+**Why `cursor: grab` is NOT declared on `.gn-board-card` itself** (Ruling 15's own instruction was to add
+it "beside the behaviour that makes it true", not where the spec's literal metrics table puts it) — two
+independent reasons, either alone sufficient: (1) `.gn-board-card` still renders on the READ-ONLY path
+(`moves` capability absent — session loading, signed out, or no capability wired at all), where the card
+genuinely cannot be dragged, and a grab cursor there would be the exact "control that lies" shape Ruling
+15 already named; `13.512` is the case that would have caught the alternative. (2) Case `13.464`'s own
+`rule()` helper (`packages/ui/test/components.test.tsx`) matches the FIRST literal substring
+`.gn-board-card {` it finds via a plain regex with no selector parser — any new rule whose selector text
+happened to end in that exact substring, even a compound one like `.foo .gn-board-card { … }`, would
+silently hijack `13.464`'s match and break a case this task never touched. `.gn-board__card-slot` contains
+no `.gn-board-card` substring at all (`__card-slot`, not `-card`), so it cannot collide — checked by
+inspection of the regex (`packages/ui/test/components.test.tsx`'s own `rule()`), not merely assumed safe.
+
+**Two decisions recorded here rather than left for a reviewer to find, per the task's own instruction to
+surface a stated decision rather than let it be discovered:**
+
+- **Same-column drop.** Dropping a card back onto the column it is already in is refused like any other
+  undeclared target — `transitionOptions` already excludes `toStateId === fromStateId`
+  (`board-moves.ts`'s own docblock), so `moveOutcome` treats a same-column drop identically to any other
+  wrong target, with no special case. Consistent with the plan's own "same four outcomes" instruction; not
+  separately tested, since it is the same code path `13.508` already exercises for a different
+  `toStateId`.
+- **Where the refusal renders.** `MoveRefusalNotice` renders where `MoveArrows` already renders it — under
+  the SOURCE card, in its origin column — never a second site near the drop point. Adding a second
+  rendering site would be exactly the fork ("two products") this task exists to avoid, even though the
+  rail is `overflow-x: auto` and the origin column can in principle be scrolled out of view by the time the
+  drag lands elsewhere. Left as-is, named rather than silently accepted.
+
+**Keyboard reachability — proven unaffected, not merely assumed.** `board-moves-ui.test.tsx` (the arrows'
+own 8-case suite, `13.498`–`13.505`) runs UNCHANGED and stays green — this task edited no assertion, no
+`aria-label`, no `disabled` logic in that file (confirmed: `PASS (9) FAIL (0)` on that file alone,
+unmodified). `draggable` is a plain HTML attribute; it adds no tabstop, no ARIA role, and no accessible-name
+change, so the `‹ ›` arrows remain the complete keyboard path they were before this task — drag-and-drop is
+a pure addition, never a replacement.
+
+`tsc -p tsconfig.typecheck.json` clean on `packages/app-core` AND `packages/ui` (Node `v22.23.2`). Full
+`packages/app-core` suite: 1272 tests green; full `packages/ui` suite: 310 tests green; full `apps/web`
+suite: 363 tests green (`tsc` clean there too — `tsconfig.json` and `tsconfig.e2e.json` both). `pnpm turbo
+run typecheck` and `pnpm turbo run test` both green across all 17 packages. `node scripts/check-case-ids.mjs`
+re-run after minting `13.507`–`13.513`: sum rose from 2047 to 2054 (+7) and union rose from 2044 to 2051
+(+7) — the same delta, so the pre-existing `13.387`/`13.413` duplicates are unchanged and no new duplicate
+was introduced.
+
+## Final whole-branch review, fix wave (2026-09-16) — Findings 1–5
+
+The whole-branch review ("I would merge this, with Findings 1 and 2 fixed first") returned five
+findings. **Case `13.517` minted here** for Finding 1, the one that changes tested behavior; Findings
+2, 4 and 5 are prose/citation corrections with no new case; Finding 3 changes an exported string
+constant (covered by existing cases that read the constant rather than a hand-typed copy of it, so no
+new case is needed there either — see `board.test.tsx`'s own docblock on why `EMPTY_COLUMN_COPY` is
+exported in the first place).
+
+- **13.517** ✅ **Finding 1 — the Filters sheet's five non-`text` axes were undisclosed on the three
+  non-board tabs.** The mirror note (Ruling 10, `13.439`/`13.444`) was gated on
+  `activeFilterChips.some((chip) => chip.key === 'text')` — accurate when `text` was the only axis with
+  a control, silently inert on `assigneeIds`/`typeIds`/`stateIds`/`stateCategories`/`projectIds` once
+  Task 5's Filters sheet reached them onto the same page-level `filter` from every tab. Open Filters on
+  List, tick an assignee, press Done: the list did not change, and nothing on screen said so — the same
+  one-axis-enumeration defect `buildBoardFilterChips` was already rewritten to stop repeating for the
+  strip eight lines above, recurring in the note eight lines below it.
+  **Fixed by widening the gate to `activeFilterChips.length > 0 || boardUnappliedAxes.length > 0`** —
+  the SAME two terms the strip's own three-term gate reads (never its third, `shown !== total`, which is
+  a fact about the BOARD's own render and meaningless on a tab the board never touches).
+  `activeFilterChips` already enumerates all six `BoardFilterSpec` axes; `boardUnappliedAxes` covers the
+  three the board itself cannot evaluate either — between them every axis `filter` can carry is covered.
+  **The sentence itself was also generalised, and deliberately does not say "the board only":** a
+  `filter` set to only a `boardUnappliedAxes` entry (`collaboratorIds`/`dueBefore`/`dueAfter`/`fields`)
+  narrows nothing on the board either, so claiming "the board only" would overclaim exactly there — the
+  new copy, "Filters set here are not applied on this tab.", names only what the page can know for
+  certain under every combination that trips the gate.
+  Drives the REAL path — the Filters sheet's own Assignee checkbox, not a `setFilter` shortcut — on the
+  List tab, and asserts the List tab's own render is untouched (the axis has no control anywhere else,
+  which is precisely why the note is the only disclosure available). **Mutation-witnessed**: reverting
+  the gate to the old `chip.key === 'text'` check reddened `13.517` alone — `13.439`/`13.444` (both
+  driven by a real search TERM, which still trips the old gate) stayed green — confirming the new case
+  discriminates rather than merely existing. Reverted with a targeted `Edit`, confirmed byte-identical by
+  SHA-256 checksum (not `git diff` — this repo has a recorded case of `git diff` reporting identical for
+  differing files). — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
+  `apps/web/test/board-narrowing.test.tsx`)
+
+**Finding 2 — 34 stale line-number citations swept**, all introduced by this branch's own edits shifting
+content the citations pointed at. Six in shipped source (`page.tsx:342`, `board-search-scope.ts:59`,
+`ui.css:336`/`:718`/`:1906`, `board.tsx:1043`), the rest across `Features.md`, this file, the spec and
+the plan, plus two more found in `board-narrowing.test.tsx` itself by an exhaustive repo grep that the
+review's own summary count had missed. Every citation whose target still exists in the file (just moved)
+was re-pointed to its real current line, verified by opening the file there rather than computing an
+offset. Five citations of `board.tsx:70` name a gate (`board.groups.length === 0` as the sole
+`EMPTY_BOARD_COPY` condition) that Ruling 19/R6 SUPERSEDED rather than merely moved — re-pointing those
+to a "current" line would have manufactured a second falsehood that reads as freshly checked, so they
+are marked `(pre-R6)` instead, left without a specific present-day line. One citation
+(`transition-dialog.tsx:128`) named an inline predicate later extracted to `field-claims.ts:55`
+(Ruling 25) — a cross-file re-point, not a number bump. Full table in
+`.superpowers/sdd/2026-09-16-board-prototype-port/final-fix-report.md`.
+
+**Finding 3 — `EMPTY_COLUMN_COPY`'s docblock corrected, and "yet" dropped.** The docblock justified the
+unconditional per-column copy on "the narrowing pass... runs above this component... with data this
+component was never given" — no longer true since Ruling 19 gave `Board` an `isNarrowed` signal; `Board`
+simply does not thread it down into `BoardGroupSection`. Docblock now says exactly that: the shell can
+disclose narrowing (it does, via the strip), `Board` itself now could too, but the wiring the rest of the
+way stops one level short — a deferred follow-up, not a structural impossibility. **"Yet" dropped**: `No
+tickets in this column yet.` reads, under an active filter, as asserting none were ever created — chosen
+because it reads better once the reason it might be empty is no longer "definitely none ever existed".
+No test hand-types the string (all reference the exported constant), so no case needed updating.
+
+**Finding 4 — page.tsx docblock hedged.** "Counting it [`workflowChip`] here too would not change the
+gate's answer in any case" was false for one constructible case: a workflow with its own cards picked
+while an empty SIBLING group is dropped leaves `shown === total` with the other two terms already zero,
+so the strip stays closed though the picker is non-default — counting `workflowChip` there would open it.
+The invariant the gate exists for still holds (no card is ever hidden without disclosure) and the
+`<select>` keeps showing the pick regardless, so nothing is lost; the docblock now says so instead of
+claiming a certainty that does not hold.
+
+**Finding 5 — this file's own `13.505` narrative said "checked four ways" while listing five assertions
+and the code has five** (`13-deployment-dogfooding.md:5424`, above). Corrected to "checked five ways".
+
+`node scripts/check-case-ids.mjs` re-run after minting `13.517`: only `13.387`/`13.413` remain as
+duplicates (pre-existing, unrelated to this fix wave, carried since before Task 3 — see the "Case-id fix"
+entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.
+
+## The whole card opens the ticket (owner request, 2026-09-17)
+
+Before this, only the title button on a board card opened the ticket sheet; the owner asked for a click
+anywhere on `.gn-board-card` to open it, "but take care that dragging the ticket does not open it". The
+listener lives on the `<li class="gn-board__card-slot">` wrapper — extracted into `BoardCardSlot`
+(`board.tsx`) so it can hold a ref — never on `Card` (`packages/ui`, documented "never itself
+interactive") and never as a `role="button"` (the card already contains buttons). The title stays a real
+`<button>`: the keyboard path and the accessible name are unchanged. Two bail-outs, both proven by
+deletion below: a click whose target sits inside a control or inside the `TransitionDialog` subtree
+(`CARD_CLICK_BAIL_SELECTOR`) is that thing's click, and a click that follows `dragstart` is the tail of a
+drag. The flag clears on the NEXT `mousedown`, not on `dragend` (which precedes any stray click the same
+gesture could produce) and not on a timer. Suite: `packages/app-core/test/views/board-card-click.test.tsx`
+(6 cases), `packages/ui/test/components.test.tsx` (`13.523`). All under Node v22.23.2.
+
+- **13.518** ✅ A click on the card body itself (`.gn-board-card`, no `moves` wired — the read-only path)
+  calls `onOpenTicket` exactly once with that ticket's id.
+- **13.519** ✅ A click on the title button still opens the ticket EXACTLY ONCE. The button's own `onClick`
+  opens it and the click then bubbles into the slot's listener; the `closest()` bail is what stops a
+  second open. Mutation M2 (bail deleted) → this case fails with 2 calls.
+- **13.520a** ✅ A click on the provenance toggle unfolds it (`aria-expanded="true"`) and does NOT open the
+  ticket. M2 → fails.
+- **13.520b** ✅ A click on a live `›` arrow submits the move (`onMoved` called) and does NOT open the
+  ticket. M2 → fails.
+- **13.521** ✅ THE GUARD THE REQUEST IS ABOUT. `mousedown` → `dragstart` (real `DataTransfer` stand-in,
+  the same one `board-drag-drop.test.tsx` documents) → `click`: swallowed, zero calls. Then a fresh
+  `mousedown` → `click`: opens once — the positive control for the first half. Mutation M1 (the
+  `draggedRef` check deleted) → first half fails; mutation M3 (the `mousedown` reset deleted) → second
+  half fails with `expected 1, got 0`. Native drag-and-drop withholds `click` after a completed drag in
+  every browser this product targets, so in the field this is belt-and-braces; in jsdom, which drags
+  nothing, it is the only observable proof.
+- **13.522** ✅ THE HAZARD THAT ONLY EXISTS BECAUSE THE DIALOG RENDERS INSIDE THE CARD: `MoveArrows`
+  mounts `TransitionDialog` under the card and `Dialog` (`packages/ui`) does not portal; its scrim closes
+  the dialog on click WITHOUT stopping propagation. Reached through a REAL arrow click on a workflow
+  whose `todo → doing` edge requires a comment (`WF_GATED`), then a click on `dialog-scrim`: the dialog
+  closes and `onOpenTicket` is NOT called. M2 → fails (the sheet would open as the dialog closed).
+- **13.523** ✅ CSS binding, `packages/ui/test/components.test.tsx`: the bare `.gn-board__card-slot` rule
+  sets `cursor: pointer` (a card that can be opened but not dragged — the read-only path — looks
+  clickable) AND `.gn-board__card-slot[draggable="true"]` still sets `cursor: grab` (`13.513`'s own
+  assertion, repeated here because the new bare rule sits immediately above it and loses on
+  specificity by design). Watched fail RED with `no rule for .gn-board__card-slot` before the rule
+  existed.
+
+Mutation results, `board-card-click.test.tsx`, each run against a scratchpad backup and restored
+byte-identical (`cmp`): M1 kills `13.521` only; M2 kills `13.519`, `13.520a`, `13.520b`, `13.522` and
+nothing else; M3 kills `13.521` only. `13.518` survives all three, as it should — it is the positive
+case none of the guards touch. Full `app-core` suite 1281/1281, `ui` 311/311, `apps/web`
+`board-narrowing` + `filters-sheet` 34/34, `app-core` typecheck clean, Node v22.23.2.
+
+Known limit, named rather than hidden: selecting text inside a card body by mouse-drag on the READ-ONLY
+board (where the slot is not `draggable`, so no `dragstart` fires) ends in a `click` and opens the ticket.
+The title is a button and the meta chips are short, so there is little to select; no guard was added for
+it because jsdom has no honest way to fail such a case.
+
+Citations displaced by this change set, re-pointed against the current tip (Ruling 30's own method —
+opened the file, never added an offset): `BoardCardSlot` and its docblock land ABOVE `BoardCardView`, so
+`<Card className={card.pending …}>` moved `board.tsx:650` → `:719` (`Features.md`, this file's Task 6
+narrative, the port plan `:751`); the bare `.gn-board__card-slot` rule and its comment add five lines to
+`ui.css`, so `.gn-timeline__weeks` moved `ui.css:1934-1937` → `:1939-1942` (this file, the Ruling 21
+narrative). Every other `ui.css` citation past `:514` was checked against HEAD and found ALREADY stale
+before this change (e.g. `ui.css:1321` cited as "sets `font-size: 1rem`" points at `cursor: pointer;`);
+left untouched — not this change's drift, and a blind `+5` would have moved wrong numbers to different
+wrong numbers. `scripts/check-case-citations.mjs` reports `13.401`/`13.476`/`13.477`/`15.26` uncited —
+all four already uncited at HEAD (`git grep` on the tests at HEAD finds none), pre-existing on this
+branch and not touched here; the six new cases are each cited by id in their test file.
+
+## Move arrows: one declared target moves, several ask (owner request, 2026-09-17)
+
+Owner's words: "The next button: this needs care, as the ticket may be able to move to different columns.
+If multiple paths exist for the column, on clicking next, it should open up a modal to select which. Also
+this modal will be used if any comments/attachments required rules are there on the workflow." Rulings
+taken in the brainstorm: `›` offers forward targets only, `‹` backward only (symmetric); a single target
+that carries a rule opens the dialog ALREADY AIMED at it. Task 13 shipped the arrows on `arrowTarget` —
+the NEAREST declared target — so `WF_ERRAND`'s `doing` (forward: `waiting`, then `done`) silently took
+`waiting` and `done` was unreachable by arrow at all. Now `arrowTargets` (the same walk, kept in full;
+the singular is defined as its head) drives each arrow: one entry → `attemptMove`, unchanged; several →
+`TransitionDialog` as a picker over exactly those (`offerStateIds`), aimed when one (`initialToStateId`).
+`MoveArrows` mounts the dialog only while its `dialog` state is non-null — a fresh mount per open.
+Suites: `board-arrows.test.ts`, `transition-dialog.test.tsx`, `board-moves-ui.test.tsx`,
+`board-drag-drop.test.tsx`. Every case watched RED first (the plural "is not a function", the picker
+labels absent, the dialog on "Choose a state" with three options). Node v22.23.2 throughout.
+
+- **13.524** ✅ `arrowTargets(WF_ERRAND, order, 'doing', 'next')` is `['waiting', 'done']` — nearest
+  first — and `arrowTarget(...)` equals its head, asserted as `toBe(arrowTargets(...)[0])` so a second walk
+  that disagreed would fail here by name.
+- **13.525** ✅ Backward from `done`: `['doing', 'todo']` — `waiting` between them is NOT declared from
+  `done` and is skipped (`13.494`'s skip, in list form); the wildcard `* → todo` is included, after the
+  nearer exact edge.
+- **13.526** ✅ `[]` wherever the singular answered `null`: nothing declared that way (`todo` previous,
+  `done` next) and a column the def does not know.
+- **13.527** ✅ `TransitionDialog` with `offerStateIds: ['waiting', 'done']` from `doing` offers EXACTLY
+  `Waiting on counterparty, Done` in declaration order; `To do` (declared via the wildcard, but not
+  offered) is absent. Mutation M4 (the filter replaced by `() => true`) → fails.
+- **13.528** ✅ `initialToStateId: 'done'` opens with the trigger reading `Done` (not "Choose a state"),
+  the comment box already on screen, Move disabled until it is filled; filling and pressing Move hands
+  back `{ toStateId: 'done', comment: 'shipped', fieldValues: {} }`. M5 (`useState('')`) → fails.
+- **13.528b** ✅ The control: neither prop → placeholder and all three options, exactly as before.
+- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state —
+  Waiting on counterparty or Done"; the click opens the dialog on "Choose a state"; the select lists
+  exactly `[Waiting on counterparty, Done]` and NOT `To do`; picking the rules-free one and pressing Move
+  ingests ONE `ticket.transitioned` with the shipped `{ to: 'waiting' }` and calls `onMoved`. M4 → fails
+  (`To do` appears); M6 (several targets take the nearest, Task 13's behaviour restored) → fails (no dialog,
+  a direct submit instead).
+- **13.530** ✅ `‹` MIRRORED — on a def built so the negative can fail. From `WF_ERRAND`'s `done` every
+  declared target is backward, so "offers only the backward ones" passed under M4 in the first draft of
+  this case (measured; a check that could not fail). Rebuilt on `WF_ERRAND` + `waiting → done`, card in
+  `waiting`: `‹` reads "Move to previous state — Doing or To do", the picker offers `Doing`/`To do` and
+  NOT `Done`, which `transitionOptions` does declare from `waiting`. M4 → fails; M6 → fails.
+- **13.531** ✅ ONE gated forward target (`todo → doing` with `require-comment`, `13.501`'s idiom): the
+  arrow keeps its plain name "Move to Doing"; the dialog opens with the trigger reading `Doing` and the
+  comment box visible with NO pick; typing and Move ingests `{ to: 'doing', comment: { text } }`. M5 →
+  fails. `13.501`'s docblock, which said the dialog was NOT pre-aimed, is corrected; its re-pick of "Doing"
+  is kept deliberately — it now proves the select is live over a one-entry offer, not a dead control.
+- **13.532** ✅ A cancelled pick does not survive into the next open: pick `Done`, Cancel, click `›`
+  again → "Choose a state". Before, the dialog stayed mounted while closed and its `toStateId` state
+  survived. M6 → fails (the second `›` never opens a dialog).
+- **13.533** ✅ (in `13.509`'s own case) A DROP on the gated `doing` column opens the dialog aimed at
+  `doing`, comment box on screen — "what the gesture meant" for the drop path. M5 → fails.
+- **13.534** ✅ THE FLAKE MADE DETERMINISTIC. While gating this work on a machine at load average 11.5,
+  `13.507`, `13.514` and `13.515` each failed once, in separate runs, with one signature: the drop did
+  NOTHING — no `onMoved`, no notice of any kind in the DOM dump, the case dying at `waitFor`'s 1000 ms
+  (1070/1068/1025 ms measured against ~20 ms for a pass). Mechanism: `settled()` returns when the arrows
+  are IN THE DOM (a MutationObserver microtask), while the drop registry was filled by a PASSIVE effect
+  React schedules as a later macrotask for a render a promise resolution triggered; under load the drop
+  could look before the effect ran, and `13.511` documents that a drop with nothing registered is silent.
+  This case fires the drop from INSIDE a MutationObserver callback of its own — the same microtask slot,
+  never later — and failed 3/3 RED under `useEffect` (`expected [] to have a length of 1`), then passed
+  3/3 under `useLayoutEffect`, which registers synchronously inside the commit that paints the card
+  `draggable="true"`. Ruling 15 from the other side: an affordance the DOM shows is live the instant it
+  is shown. Nothing else about the registration changed. The commit message's "React 19.2.8, no SSR
+  warning" is from React 19's own changelog (the `useLayoutEffect`-on-the-server warning was removed),
+  NOT measured here — vitest/jsdom is not SSR; the stronger reason no warning could fire is structural:
+  `MoveArrows` mounts only after `useLiveQuery` resolves the workflow read, which never happens during a
+  prerender.
+
+Mutations (scratchpad backups, restored byte-identical by `cmp`): M4 kills `13.527`, `13.529`, `13.530`;
+M5 kills `13.528`, `13.531`, `13.533`; M6 kills `13.529`, `13.530`, `13.532`. Gate after the last edit:
+`app-core` 1292/1292 twice in a row, `ui` 311/311, `apps/web` 364/364 (the whole suite), both typechecks
+clean, Node v22.23.2.
+
+Citations displaced and re-pointed against the tip: `TransitionDialogProps` gained two documented props
+(+21 lines) and the component two lines of destructuring and two of filtering, so `transition-dialog.tsx:158`
+→ `:183` and `:232` → `:257` (Task 12 narrative, above), `:286-289` → `:311-314` (Task 13 narrative and
+`board.tsx`'s own `submitFromDialog` docblock). `board-moves.ts:67`'s wrapped `transition-dialog.tsx: 241-248`
+(the restrict-to notice) was ALREADY stale at HEAD — that notice sat at `:271` before this change — and is
+left alone for the same reason as the `ui.css` ones above.
+
+Named, not absorbed: the board path still passes `ticketFields={{}}` / `moveOutcome(…, {})`, so
+`require-field` is always treated as unmet there (`MoveArrows`'s own docblock, "the conservative reading of
+an honest absence"). `BoardCard` carries no field claims; fixing it needs data the board does not have.
+
+## The whole card opens the ticket — the portal the first pass missed (review, 2026-09-17)
+
+Advisor review of the two change sets above raised what the six cases in `board-card-click.test.tsx`
+could not see: `Select` (`packages/ui`) portals its dropdown panel to `document.body`. React synthetic
+events bubble through the REACT tree, so a click inside that panel reaches `BoardCardSlot`'s `onClick`;
+`closest()` walks the DOM, where the panel's ancestors are itself and `body`, and can match nothing in
+`CARD_CLICK_BAIL_SELECTOR`. And `13.529` had just made that dropdown the primary path for a multi-target
+move. Measured before designing anything, in three cases (same file):
+
+- **13.535** ✅ THE FACT: with the picker's dropdown open, `listbox.closest('.gn-board__card-slot')` is
+  `null`. Established rather than assumed; the next two rest on it.
+- **13.536** ✅ An OPTION click does NOT open the ticket — and not because of anything in
+  `BoardCardSlot`: react-aria's `usePress` (behind `useOption`) stops the synthetic `click`, so it never
+  arrives. Named as the positive control it is. Deleting the `contains` guard leaves it green; deleting
+  `closest()` fails it at the `›` ARROW click on the way in, never at the option.
+- **13.537** ✅ THE CLICK THAT DOES ARRIVE: `.gn-select__panel` carries `0.25rem` of padding (`ui.css`),
+  plain DOM with no press handling. A click there — the dropdown's edge, its scrollbar gutter — bubbles up
+  through the portal to the slot. First run: GREEN with no new guard, which meant something else was
+  bailing; found by reading the React tree, then PROVED by mutation: `Dialog`'s own
+  `<section role="dialog" onClick={stopPropagation}>` (`packages/ui/src/components/dialog.tsx`) sits on
+  the portal's React-parent chain and swallows the click on its way up. With that one line mutated to a
+  no-op, `13.537` fails (`onOpenTicket` called) and `13.536` still passes (react-aria). That line exists
+  for the scrim's sake, in another package; a card's click guard should not be correct only by courtesy
+  of it. Guard added — `if (!event.currentTarget.contains(event.target as Node)) return;` ahead of the
+  existing `closest()` bail — under the Dialog mutation as its RED: mutated Dialog + guard → 9/9 green;
+  Dialog restored → 9/9 green; Dialog restored + guard deleted (M7) → 9/9 green, DOCUMENTED as expected:
+  the guard's falsifier is the combined mutation, because two independent mechanisms now cover the same
+  click. It names no library internals and catches any future portal from inside the card, whether or not
+  a `Dialog` happens to sit above it in the React tree.
+
+M1/M2/M3 re-run after the guard landed: M1 kills `13.521`; M2 kills `13.519`, `13.520a`, `13.520b`,
+`13.522`, `13.536`, `13.537` (the last two at the arrow click on the way in); M3 kills `13.521` —
+`contains` subsumed none of them, since every one of those targets is DOM-contained.
+
+## Filters: exclude mode, reaching every tab (owner request, 2026-09-17)
+
+The exclude-mode design (`docs/superpowers/specs/2026-09-17-filter-exclude-all-tabs-design.md`)
+extends filter semantics to every tab by adding an `exclude` half to `FilterSpec`, eliminating the
+need for per-tab filter variants. These eleven tasks build that capability from the vocabulary up.
+
+- **13.538** ✅ `filter/id-axes.ts` — the two base rules (`narrowsTo`/`excludedBy`) and their any-of forms,
+  plus `claimedDueDay`/`claimText` moved here unchanged; and `FilterSpec.exclude` typed as the same
+  `IdAxes` the include half spreads in (a `@ts-expect-error` proves `text` has no exclude form).
+- **13.539** ✅ `matchesFilter` honours `exclude` on all six id axes, after the include half; empty
+  exclude lists exclude nothing; unassigned work survives an assignee exclusion; include+exclude on one
+  axis = must match an include and none of the excludes. Mutation (the `typeIds` exclude line deleted)
+  kills the type case and the composition case.
+- **13.540** ✅ `BoardFilterSpec.exclude` is `BoardIdAxes` — `exclude.collaboratorIds` is a compile error
+  (it would silently WIDEN the board: `excludedBy(list, [])` is never out).
+- **13.541** ✅ `13.433`'s agreement corpus extended with eight exclude cases and a rejection control;
+  mutation (the `stateIds` exclude line deleted) kills the `excluded state` case.
+- **13.542** ✅ `matchesListRow` agrees with `matchesFilter` over one ticket rendered as a `ListRow` on 28
+  cases spanning every axis it serves — the five id axes, text, both due bounds (inclusive; undated
+  excluded), field clauses (string, number-as-text, mismatch, unknown) and the exclude half — with a
+  rejection control. Mutations: `dueAfter` line → its case fails; `projectIds` exclude line → its case fails.
+- **13.543** ✅ `ListFilterSpec` rejects `collaboratorIds` in both halves at compile time.
+- **13.544** ✅ `toServerFilterSpec` throws `UnexpressibleFilterError('exclude', …)` naming the axes on any
+  non-empty exclude; an empty object or empty lists pass through unrefused.
+- **13.545** ✅ `withIdAxis` (`apps/web/src/filter-edits.ts`) — the one writer of either half of one axis:
+  empty list → `undefined`, an exclude half with no defined axis → `undefined`; pure.
+- **13.546** ✅ `buildFilterChips` (renamed from `buildBoardFilterChips`) emits `exclude.<axis>` chips
+  labelled "Not assignee/type/state/category/project: …" directly after each axis's include chip, with
+  `mode`; an exclude chip's × clears only that half (the include half survives, and vice versa); the last
+  exclude axis removed collapses `exclude`; empty lists earn no chip. Mutation (clearExclude clearing the
+  whole half) kills the only-that-axis case.
+- **13.547** ✅ `describeUnappliedBoardAxes` names collaborator for `exclude.collaboratorIds` (once);
+  `describeUnappliedListAxes` names collaborator only — due dates and fields are answered by the list.
+- **13.548** ✅ `choiceMode` reads a value's half (include wins if both); `nextMode` cycles off → include →
+  exclude → off.
+- **13.549** ✅ `withCycledId` moves a value between halves through `withIdAxis`, collapses what empties,
+  repairs a both-halves shape, and over a full three-click cycle never leaves a value in both halves;
+  works on the `StateCategory`-typed axis. Mutation (exclude-half removal skipped) kills the repair case.
+- **13.550** ✅ `TriStateChoice` — accessible names "X" / "X, included" / "X, excluded" via `aria-label`
+  built from a required `label: string` prop (the brief's verbatim code used a visually-hidden sibling
+  span instead; measured RED — the accname algorithm joins sibling contributions with a synthetic space,
+  producing "Uma One , included", not the exact string). Fix round 1 (2026-09-17) split `label` out of
+  `children`: `children` is optional `ReactNode`, defaulting to `label`, free to carry a person row's
+  avatar beside the name — proven by a case rendering an `aria-hidden` avatar span plus a name span as
+  children and confirming all three exact names still hold. `data-mode` as the only hook, SVG glyphs
+  `aria-hidden`, no `aria-pressed`, `onCycle` on click, variant class accepted.
+- **13.551** ✅ CSS binding: include = accent ground + accent text; exclude strikes the label and never
+  names `--gn-danger`; the row variant keeps 2.75rem. (Fix round 1 dropped the `.gn-visually-hidden` case
+  and rule — the naming mechanism it served was replaced by `aria-label` before this task shipped, leaving
+  it an unconsumed utility; removed as YAGNI rather than left as a rule nothing calls.)
+- **13.552** ✅ Through the real sheet, a person row's accessible name walks "Uma One" → "Uma One, included"
+  → "Uma One, excluded" → "Uma One", `data-mode` following, no `aria-pressed`.
+- **13.553** ✅ Excluding an assignee drops that card from the board under "1 of 2 shown" with a
+  "Not assignee: Uma One" chip (and no include chip); the chip's × restores both cards and the strip goes.
+  Mutation (`boardFilter.exclude` forced `undefined`) kills this, 13.554 AND 13.555 — the last only because
+  its own `1 of 2 shown` precondition reads the narrowed board, not because it independently exercises
+  Clear-all-clears-exclude — while 13.552 stays green (the name cycles regardless of board wiring).
+- **13.554** ✅ A type chip excludes (bug card gone, "Not type: Bug"); a category chip reaches the excluded
+  state and empties the one-column board honestly ("0 of 2 shown").
+- **13.555** ✅ "Clear all" clears an exclusion through the real button, without closing the sheet;
+  `13.460` extended: `FILTERS_SHEET_CLEARABLE_AXES` names `exclude` and `clearFilterAxes` resets it.
+- **13.556a** ✅ (Task 9 fix round 1, coordinator Important finding) An EXCLUDED collaborator — the one
+  axis `boardFilter.exclude` cannot carry at all — is disclosed ONLY by the scope note
+  (`describeUnappliedBoardAxes` → `collaboratorsSet` reading `filter.exclude?.collaboratorIds`), never by
+  a chip in either direction, and narrows nothing (both cards stay, "2 of 2 shown"). Two clicks (off →
+  included → excluded) show the note naming "collaborator"; a third (excluded → off) clears it. Mutation
+  (`filter.exclude` dropped from `boardUnappliedAxes`'s deps in `page.tsx`) kills the THIRD click's
+  assertion specifically — that transition is the one where `filter.collaboratorIds` itself does not
+  change (`undefined` on both sides), so it cannot ride along on a co-occurring change to a still-watched
+  dependency the way the first two clicks do; the stale note ("Not applied on the board: collaborator.")
+  survives instead of clearing.
+- `13.447`/`13.448`/`13.451`/`13.452`/`13.460` updated for the control change (checkbox → button;
+  `aria-pressed` → `data-mode`).
+- **13.556** ✅ `listNarrowingWord`: undefined / "tickets in progress" / "your filters" / both joined.
+- **13.556b** ✅ (controller ruling, Task 10 fix round 1, 2026-09-17) The scope note names its OWN tab, not
+  always "the board": on the List tab, an excluded collaborator (`ListFilterSpec`'s one unanswerable axis,
+  same as the board's) narrows nothing and earns no chip, and `board-scope-note` reads "Not applied on the
+  list: collaborator." — both list rows stay on screen, the strip itself still renders. Mutation (hard-coding
+  `tabNoun` to `'board'`) kills it — the note then reads "the board" while sitting on the List tab.
+- **13.557** ✅ The search box narrows the List tab: the non-matching row drops, the strip shows the LIST's
+  own count ("1 of 2 shown", never the board's 3), the text chip is there, the old mirror note's testid
+  is absent, and `TicketList`'s summary reads "narrowed to your filters". Mutation (`rows={list.rows}`)
+  kills it via its row-absence assertion; the same mutation also killed 13.517 and 13.560, which assert
+  row absence too.
+- **13.558** ✅ The Timeline draws from the narrowed rows at TICKET LEVEL; the Calendar shows the same
+  count ("1 of 2 shown" on each; no mirror note). The strip's own count is `listNarrowing`'s alone and
+  cannot distinguish a correct `dateInputs` from a stale one, so the real proof is a title check on the
+  Timeline tab (left active after the loop): a due-only fixture ticket lands in `TimelineView`'s own
+  `sideList` ("Undated or partially dated"), which renders `entry.title` regardless of a missing
+  `startDate` — Calendar's own due-only marker does not render the ticket's title at all, so Timeline is
+  the tab that can prove this at ticket level (Calendar's own assertion stays at the count level). The
+  fixture needs `fields.dueDate`/`fields.title` as real `FieldClaim`s (`fieldClaim()`), not the top-level
+  `ListRow.dueDate` convenience field alone — `dateClaimOf`/`titleOf` read `row.fields` verbatim and never
+  look at it. Mutation (`dateInputs` from `list.rows`) kills it.
+- **13.559** ✅ Clearing the term restores the row and removes the strip on the List tab.
+- `13.517` FLIPPED 2026-09-17 (see its own bullet above): an assignee picked in the sheet now NARROWS the
+  list (the row assigned to someone else drops) and discloses through the strip; the note it asserted is
+  gone along with the mechanism it disclosed.
+- **13.560** ✅ An EXCLUDED assignee drops the row assigned to them on the List tab, "Not assignee" chip shown.
+- **13.561** ✅ The create dialog's parent picker still offers a ticket the filter dropped — `parentCandidates`
+  reads the unnarrowed rows. Passes unchanged before this task's implementation lands (`parentCandidates`
+  already read unnarrowed `list.rows`) — a regression guard against a future narrowing reaching it, not a
+  TDD RED/GREEN case for this task's own code.
+- `13.439`/`13.444` retired (their subject — the mirror note — no longer exists); their numbers stay unused.
+
+**Task 11 — final gate, catalogue checks, citation sweep, spec amendments (2026-09-17).** Node
+`v22.23.2` for every command below (`source ~/.nvm/nvm.sh && nvm use 22`, printed once per shell and
+re-confirmed before each run).
+
+*Gate (all EXIT 0):* `packages/app-core` — `pnpm exec vitest run`: **1353 passed (1353)**;
+`pnpm run typecheck`: clean. `packages/ui` — `pnpm exec vitest run`: **314 passed (314)**.
+`apps/web` — `pnpm exec vitest run`: **405 passed (405)**; `pnpm run typecheck`: clean. `apps/server`
+— `pnpm run typecheck` (`tsconfig.typecheck.json`): clean.
+
+*Catalogue checks:* `node scripts/check-case-ids.mjs` — real sweep 2106 sum / 2103 union across 12
+files; the only duplicates are `13.387` (three citations) and `13.413` (two), the known baseline,
+unchanged by this plan. `node scripts/check-case-citations.mjs` — 1997 checked ✅ ids across 12
+files, 1976 cited, 21 uncited; this file's own count is 444 cited / 3 uncited / 447 total, and the
+three uncited ids are exactly `13.401`, `13.476`, `13.477` — the pre-existing baseline, and every
+✅ id this plan minted (`13.538`–`13.561`, `13.556a`, `13.556b`) is cited. The ratchet also reports
+regressions in `03-foundation-ledger.md` (1), `10-workflow-builder.md` (15),
+`11-calendar-notifications.md` (1) and `15-in-app-help.md` (1) — pre-existing, in files this plan
+never touched, left as found per the dispatch brief.
+
+*Mutation summary, one line per task, read from each task's own catalogue entry:*
+
+- **Task 1** (`13.538`) — type-level only: an `@ts-expect-error` on `exclude.text` and `BoardIdAxes`'s
+  `Pick` stand in for a mutation; no runtime mutation is cited.
+- **Task 2** (`13.539`) — deleting the `typeIds` exclude line kills the type case and the
+  include+exclude composition case.
+- **Task 3** (`13.540`–`13.541`) — `13.540` is compile-time (`exclude.collaboratorIds` on
+  `BoardFilterSpec` is a type error, no runtime mutation); deleting the `stateIds` exclude line kills
+  `13.541`'s excluded-state case.
+- **Task 4** (`13.542`–`13.543`) — deleting the `dueAfter` line fails `13.542`'s due-bound case;
+  deleting the `projectIds` exclude line fails `13.542`'s project-exclude case; `13.543` is
+  compile-time (no runtime mutation).
+- **Task 5** (`13.544`) — no mutation cited; the refusal is asserted directly against the exact axes
+  named in the thrown error.
+- **Task 6** (`13.545`–`13.547`) — mutating `clearExclude` to clear the whole half instead of one axis
+  kills `13.546`'s only-that-axis case; `13.545`/`13.547` cite no mutation.
+- **Task 7** (`13.548`–`13.549`) — skipping the exclude-half removal in the repair step kills
+  `13.549`'s repair case; `13.548` cites no mutation.
+- **Task 8** (`13.550`–`13.551`) — no mutation cited; verified instead against the brief's own
+  rejected mechanism (the visually-hidden sibling span), which measured RED with the exact wrong
+  string before the `aria-label` fix.
+- **Task 9** (`13.552`–`13.555`, `13.556a`) — forcing `boardFilter.exclude` to `undefined` kills
+  `13.553`, `13.554` **and** `13.555` (the last only because its own "1 of 2 shown" precondition reads
+  the narrowed board, not because it independently exercises Clear-all); dropping `filter.exclude`
+  from `boardUnappliedAxes`'s dependency list in `page.tsx` kills `13.556a`'s THIRD-click assertion
+  specifically (the transition where `filter.collaboratorIds` itself does not change).
+- **Task 10** (`13.556`, `13.556b`, `13.557`–`13.561`, `13.517` flipped) — hard-coding `tabNoun` to
+  `'board'` kills `13.556b` (the note then names the board while rendered on the List tab); reverting
+  `dateInputs`/the tab's rows source back to `rows={list.rows}` (unnarrowed) kills `13.557` via its
+  row-absence assertion, and the SAME mutation also kills `13.517` and `13.560`; sourcing
+  `dateInputs` from `list.rows` instead of the narrowed rows kills `13.558`. `13.556` and `13.559`
+  cite no mutation; `13.561` is an explicit regression guard, not a TDD case, and was green
+  unmodified.
+
+*Citation sweep (`git diff --stat 5c8d1bd6..HEAD`'s seven touched basenames, grepped per the brief's
+exact command against `Features.md`, `test-cases/`, `docs/superpowers/specs/`,
+`packages/*/src`, `apps/web/src`, `apps/web/app`):*
+
+- **Re-pointed** (correct at `5c8d1bd6`, displaced by this plan, fixed by direct read at HEAD, never
+  by offset arithmetic): `page.tsx`'s own docblock citing `mappers.ts:838-853` → `:855-870`, and the
+  adjacent self-citation of its own `:180-184` → `:187-191` (both shifted by the Task 5 exclude-refusal
+  block inserted above them); the 2026-09-17 spec's own `mappers.ts:836-859` → `:837-876` and
+  `view-types.ts:159-200` (`ListRow`) → `:180-221` (shifted by the same refusal block and by `IdAxes`
+  being declared above `ListRow`, respectively); the 2026-09-16 board-prototype-port spec's
+  `view-types.ts:142-153` (the old single-block `FilterSpec`) → `:148-155` (the new standalone
+  `IdAxes`, the type that actually carries the "plural" claim being made) and its
+  `matches-filter.ts:25-56` → `:35-97` (the exclude checks appended to the function body).
+- **`board-filter.ts`** — zero citations of this basename exist anywhere in the searched tree; nothing
+  to check.
+- **`ui.css`** — this plan's only edit is a pure append after line 3612 (the new
+  `.gn-filters__choice[data-mode=…]` rules); every existing citation of `ui.css` in the searched tree
+  targets a line at or below 2596, so none are displaced by this plan. Left unchanged.
+- **Already-stale before this plan, left alone (not this plan's doing):** `page.tsx:1063` in this
+  file's own Task-4-era Finding (`13.467`'s note) already pointed at unrelated tab-button code at
+  `5c8d1bd6`, not the `<Board boardNarrowing.view>` handoff it describes; `mappers.ts:508` (cited
+  twice from `data-source-gateway.ts`) and `mappers.ts:906` (`builder-wiring.tsx`) were already
+  pointing at unrelated docblocks pre-plan; `view-types.ts:157`/`:180`/`:220` (`07-api-realtime-search.md`)
+  and `:183`/`:165` (`index.ts`, `contest-view-model.ts`) were already wrong pre-plan; `page.tsx:129`
+  and its four sibling line numbers in `12-offline-sync-apps.md` were already wrong pre-plan. None of
+  these sit in a file this plan touched for its own reasons, and re-pointing them was out of this
+  task's scope.
+- **Historical narrative, left as written:** the earlier "Finding 2 — 34 stale line-number citations
+  swept" paragraph above (2026-09-16, `board-prototype-port`) names `page.tsx:342` and
+  `board-search-scope.ts:59` as citations it fixed at the time; and this file's own 2026-09-02
+  planted-defect note names `mappers.ts:818`/`:822` and `view-types.ts:238`/`:239`. Both are frozen
+  records of a past verification, not live claims about current code shape, so re-pointing their
+  numbers to today's tip would misrepresent what those past events actually found — left as written,
+  per the same reasoning `03-foundation-ledger.md`'s other pre-existing issues are left alone.
+
+*Prose citations of pre-Task-6 names, re-pointed to the current names* (`board-search-scope.ts`,
+`filters-sheet.test.tsx`, `board-narrowing.test.tsx`, `Features.md`): `buildBoardFilterChips` →
+`buildFilterChips` and `shouldRenderBoardNarrowingStrip` → `shouldRenderNarrowingStrip`, each marked
+"(renamed 2026-09-17)" where the surrounding sentence is itself historical (`board-narrowing.test.tsx:613`'s
+workflow-picker docblock; `filters-sheet.test.tsx:502`'s Ruling 13 paragraph;
+`board-search-scope.test.ts:93`/`:174`'s section headers), and left as a plain current-name swap where
+the sentence is a live "see also" pointer (`filters-sheet.test.tsx:245`). The `describe(...)` titles at
+`board-search-scope.test.ts:106`/`:185` are untouched — `13.442`/`13.443` are cited by those titles
+verbatim, and the catalogue names them historically. `Features.md` (lines 75, 83, 85) had seven mentions
+of the two pre-Task-6 names, all seven re-pointed, and every one of the seven carries the full
+"(renamed 2026-09-17; was `...`)" annotation — none of them is a bare, unannotated swap, including the
+two inside the live `- ✅` workflow-picker bullet at line 85. Commit `e282fa96`'s own message describes
+two of those seven as plain renames with no annotation; that description is wrong — all seven carry the
+annotation — and this paragraph, not the commit message, is the record. **Final review fix wave
+(2026-09-17) correction: this paragraph itself previously undercounted — a seventh, bare mention (the
+`13.443` gate-expression sentence on line 75, quoting `13.443`'s own unrenamed describe title) survived
+the round this paragraph describes, contradicting its own "none of them is a bare, unannotated swap."
+Now annotated, and the count above is the corrected seven, not the original six.** `apps/web/src/filter-edits.ts:7`'s
+citation of "the `toggledArray` convention" (deleted in Task 9) is rephrased to name it as the collapse convention
+`page.tsx`'s former `toggledArray` set, deleted 2026-09-17, with `withIdAxis` as its successor.
+
+*Spec amendments* (`docs/superpowers/specs/2026-09-17-filter-exclude-all-tabs-design.md`, new
+"Amendments during execution" section): (1) §4's accessible name is set via `aria-label` from a new
+`label: string` prop, not a visually-hidden suffix span — the sibling-span mechanism measured
+"Uma One , included" (a synthetic space between sibling contributions), so `.gn-visually-hidden` was
+never shipped and `13.551` does not assert it; (2) §3's scope note names its own tab via `TAB_NOUN`, a
+`Record` over the `view` union, so a fifth tab is a compile error rather than a silent `'board'`
+fallback (`13.556b`); (3) §2's wire refusal is reachable today through `toServerPreferences`
+(`online/mappers.ts:1018`, which maps every saved filter through `toServerFilterSpec`) for a saved
+filter carrying `exclude` — no code path writes one yet, since the project page mounts no saved-filter
+control, but whoever wires one owes it a catch/translate layer so the person sees a sentence about
+what their filter cannot express, not `UnexpressibleFilterError`'s developer-facing string.
+`toServerPreferences` builds a WHOLE-DOCUMENT PUT — one `.map()` over every `SavedFilter` feeds a
+single request body that also carries `listColumns` and `grouping` for every project — so an uncaught
+throw here fails the entire preferences save, not just the one filter; the follow-on catch/translate
+layer must scope the failure to the one filter.
+
+*Spec §8, named but not built, unchanged by this task:* server-side negation and plural axes on the
+wire (worth doing only past the 2000-row cap); filter state in the URL (a separate change — today's
+include-only filter isn't there either); date and field controls in the Filters sheet
+(`matchesListRow` already answers both axes, so a future control narrows every tab without touching
+the predicates); and State options' source moving from the board's rendered columns to the workflow
+definitions, deferred to the backlog/closed change set's own spec.
+
+## Backlog and closed (owner request, 2026-09-17)
+
+*Owner's words (brainstorm, 2026-09-17): "lets have another status for tickets (this status is default
+in all workflows) - backlog. have a separate tab for backlogs. so that board is only populated by
+tickets which need to be in focus. another status on the other side should be closed. closed tickets
+are also not shown on the board." Then: "backlog by default. and lets actually have closed be a flag
+instead of a status. but you can only close a ticket in a terminal state. so that we can see the final
+state of the ticket easily, and maybe even filter to see things." Then: "explicit reopen." Spec:
+`docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md`. Every task below is TDD with mutation.*
+
+- **13.562** ✅ `statesWithBacklog` appends the one universal Backlog state (category open) after the
+  declared states; `universalTransitions` declares Start (`backlog → initialStateId`) and Send-to-backlog
+  from every declared NON-terminal state, no rules, and never from a terminal one; `transitionsWithBacklog`
+  is the declared edges followed by the universal ones with declared rules intact; `stateCategoryOf(def,
+  'backlog')` reads `'open'`; both helpers are pure — the def is never mutated. Mutation (dropping the
+  `state.category !== 'terminal'` filter in `universalTransitions`) kills the "no edge from done"
+  assertion — (`packages/domain/test/backlog.test.ts`)
+- **13.563** ✅ `foldStateIdForward('backlog', …)` folds forward across a version that dropped a declared
+  state, with no mapping required — the exemption is for backlog alone; a dropped DECLARED state with no
+  mapping still refuses. Mutation (dropping the early-return in `foldStateIdForward`) kills the backlog
+  case only — (`packages/domain/test/backlog.test.ts`)
+- **13.564** ✅ `validateWorkflowDef` refuses `backlog` as a reserved id — as a declared state and as a
+  transition endpoint even when no state declares it — with the message "`backlog` is reserved — every
+  workflow has it without declaring it."; a clean def carries no such issue —
+  (`packages/domain/test/validate-workflow.test.ts`)
+- **13.565** ✅ `ticket.created`'s `start` decides where a ticket is born: `'backlog'` lands it in the
+  universal state (category open, `closed` null); `'focus'` and an absent `start` (a v1 event) both land
+  it at the workflow's own initial state — absence must mean focus, not a new default, or an additive
+  field would rewrite what every event before it meant. Mutation (`p.start === 'backlog'` →
+  `p.start !== 'focus'`) kills the "no start → focus" case, and only that case —
+  (`packages/domain/test/ticket-state.test.ts`)
+- **13.566** ✅ `ticket.closed` records `{ actorId, at }` from the envelope into `TicketState.closed`;
+  `ticket.reopened` clears it back to `null`; neither ever touches `stateId`. `TICKET_EVENT_TYPES` names
+  both, so every replay reader that iterates it folds them —
+  (`packages/domain/test/ticket-state.test.ts`)
+- **13.567** ✅ `ticketCreatedPayload` accepts `start: 'backlog' | 'focus'` and its absence, refuses any
+  other value; `ticketClosedPayload` and `ticketReopenedPayload` are `z.object({}).strict()` — an empty
+  claim accepted, an extra key refused; both event types are registered on the ticket entity at version 1
+  — (`packages/domain/test/ticket-events.test.ts`)
+- **13.568** ✅ `checkTicketClosed` accepts closing a ticket sitting in a terminal state and refuses two
+  ways: a non-terminal state names it (`close-requires-terminal`, `A ticket can only be closed from a
+  terminal state; "Doing" is not one.`), and a second close on an already-closed ticket refuses
+  `already-closed`; both are reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a
+  misfiled entity kind is REFUSED `malformed-payload` naming the kind, not silently accepted — the shape
+  every sibling check already has (`transition.ts`, `workflow-rebind.ts`, `fields.ts`). Mutation (reverting
+  the split guard to its original `env.type !== … || env.entity.kind !== 'ticket') return ACCEPT`) kills
+  the misfiled-kind case only, and only that case — (`packages/rule-engine/test/close.test.ts`)
+- **13.569** ✅ `checkTicketReopened` accepts reopening a closed ticket and refuses `not-closed` on one that
+  is not, reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a misfiled entity kind is
+  refused `malformed-payload` naming the kind, not silently accepted, mirroring 13.568's mutation —
+  (`packages/rule-engine/test/close.test.ts`)
+- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed —
+  reopen it first.") before any edge is looked at — proven not merely against a legal destination but
+  against `move('nowhere')`, a destination that is not even a real state, which still answers
+  `closed-ticket` rather than `unknown-state` (fix round 1, review, Minor 3: the earlier case proved the
+  closed check beats one legal move, not that it runs before the workflow is consulted at all); after a
+  `ticket.reopened` the same move is judged by the workflow again —
+  (`packages/rule-engine/test/close.test.ts`)
+- **13.571** ✅ The universal edges are legal through the real engine without being declared: Start
+  (`backlog → initialStateId`) is accepted and a non-initial destination from backlog is still
+  `illegal-transition`; Send-to-backlog is accepted from a non-terminal state and refused
+  `illegal-transition` from a terminal one; the parent-terminal invariant counts a backlog child as open;
+  and — controller ruling extending this task's brief — a declared wildcard edge (`from: '*'`) never
+  resolves FROM backlog under `WF` (every state reachable via `* →` edges): `move('done')` from backlog is
+  refused `illegal-transition` and only `move('todo')`, backlog's Start edge, is accepted. Mutation
+  (reverting `statesWithBacklog(latest)` to `latest.states` for `toState`) kills the Send-to-backlog case
+  with `unknown-state`; a second mutation (dropping the backlog-only branch in `transition.ts`'s edge
+  resolution) kills the wildcard-from-backlog case by wrongly accepting `move('done')` —
+  (`packages/rule-engine/test/transition-backlog.test.ts`)
+- **13.572** ✅ `proj_tickets.closed_at` / `closed_by` (backlog/closed spec §3.1, 2026-09-17): a created
+  ticket has both NULL; a `ticket.closed` fills both from the event (`closed_by` the actor, `closed_at`
+  the event's server time); a `ticket.reopened` clears both back to NULL — proven through a real
+  `ticket.created` → two `ticket.transitioned` → `ticket.closed` → `ticket.reopened` sequence, one
+  `applyCommitted` per step, reading the row after each. `rowToTicketState` maps the pair to
+  `TicketState.closed` and null to null. Mutation (`rowToTicketState` returning `closed: null`
+  unconditionally) kills the second case only, and only that case. Reconciled against the brief's
+  "three server test literals" needing `closed: null`: they were the shared `expectedCard()` factory
+  plus one inline `ticketState` literal, both in `real-door-round-trip.test.ts` — two edits covered
+  them (no third was found, and `apps/server` typecheck agrees) —
+  (`apps/server/test/projections/tickets-closed.test.ts`)
+- **13.573** ✅ A card `assembleTicketCards` produces from a closed row carries `closed: { actorId, at }`;
+  from an open row `closed: null` — both assertions in the same call, so a reader that answered `null`
+  unconditionally cannot pass the closed half (backlog/closed spec §3.1/§3.3, 2026-09-17) —
+  (`apps/server/test/read/ticket-cards.test.ts`)
+- **13.574** ✅ The board excludes a backlog ticket AND a closed one — bound conjuncts in `readBoard`'s
+  own WHERE (`t.state_id <> BACKLOG_STATE_ID`, `t.closed_at IS NULL`), not a filter over the assembled
+  cards — so no column is ever `stateId: 'backlog'` and neither ticket is placed by any bucketing pass,
+  straggler included; a third, done-but-NOT-closed ticket is the positive control that the exclusion is
+  about `closed_at`, not about every terminal card. RED was a wrong straggler column
+  (`['todo','doing','waiting','done','backlog']`), not a missing assertion. Mutation (removing `AND
+  t.closed_at IS NULL`) reddens only the closed half, leaving the backlog exclusion intact — proving the
+  two conjuncts are independently load-bearing (backlog/closed spec §3.2, 2026-09-17) —
+  (`apps/server/test/routes/board.test.ts`)
+- **13.575** ✅ Unlike the board, the list CARRIES both a backlog and a closed ticket: the backlog row's
+  `stateName`/`stateCategory` resolve through `statesWithBacklog(def)` (`read/list-cards.ts`, previously
+  `def.states.find`, which throws "has no state 'backlog'" for a ticket that is not malformed at all —
+  RED was exactly that throw, a 500, before either filter term was even exercised) and its `closed` field
+  is `null`; the closed row's `closed` is `{ actorId, at }`. `filter: { closed: true }` answers only the
+  closed row; `filter: { closed: false }` answers only the backlog row, which is the positive control that
+  the narrowing is about the flag and not an empty project (backlog/closed spec §3.2/§3.3, 2026-09-17) —
+  (`apps/server/test/routes/list.test.ts`)
+- **13.575b** ✅ Fix round 2: `groupBy=status`'s own label lookup (`groupCards`'s `case 'status'`,
+  distinct from 13.575's per-row `stateName`) resolves through `statesWithBacklog(def)`, not
+  `def.states`, so a backlog group's `label` is `Backlog` rather than the bare id `backlog` its
+  `?? stateId` fallback used to fall through to. RED was exactly that: `expected 'backlog' to be
+  'Backlog'`. The same fix was applied to `attention.ts`'s `stateNameOf` and
+  `notifications/sweep.ts`'s stale-ticket state-name read, both UNREACHABLE with a backlog row today
+  (recorded honestly rather than claimed covered: `attention.ts`'s blocked bucket can never key on
+  `backlog` because no validated definition ever declares it, and `sweep.ts`'s own query filters
+  `state_category = 'active'`, which backlog's `'open'` category never satisfies) and neither gained a
+  test for that reason (backlog/closed spec §1.4/§3.2, 2026-09-17) — (`apps/server/test/routes/list.test.ts`)
+- **13.576** ✅ `GET /v1/me/work`: a closed ticket assigned to the caller is in no group (`t.closed_at IS
+  NULL` bound beside the assignee clause AND beside `sharedWithMeRows`'s audience clause); a backlog
+  ticket assigned to them is in `open`, exactly where `bucketFor`'s existing switch already sends every
+  other open-category ticket — no new branch, no change to its "refuses a fourth value" contract.
+  DISCOVERED beyond the brief's named edits: `stateNamesFor`'s `def.states.find` throws "has no state
+  'backlog'" for the same reason 13.575's did, and RED was that throw (a 500) reached simply by seeding a
+  backlog ticket assigned to the caller — fixed the same way, `statesWithBacklog(def).find` —
+  (backlog/closed spec §1.4/§3.2, 2026-09-17) — (`apps/server/test/routes/my-work.test.ts`)
+- **13.577** ✅ `GET /v1/workspaces/:id/attention`: a closed ticket produces no item in any bucket, proven
+  against the one bucket that does not already exclude it by CATEGORY — `blocked` reads its flag "whatever
+  the category" (this route's own docblock), so the fixture is a workflow whose TERMINAL state is ALSO
+  flagged blocked; a ticket that reaches it and stays open is the positive control, still warning in the
+  same run as the one that reaches it and is closed. RED was the closed ticket's id present in the blocked
+  bucket (backlog/closed spec §3.2, 2026-09-17) — (`apps/server/test/routes/attention.test.ts`)
+- **13.578** ✅ `compileFilterSpec`: `{ closed: true }` compiles to `t.closed_at IS NOT NULL`, `{ closed:
+  false }` to `t.closed_at IS NULL`, absent to no clause — a plain conjunct over `t`, binding no parameter
+  and reaching no other table, so it is added to (not exempted from) "every clause that reaches another
+  table correlates on t.workspace_id"'s own enumeration as a non-reaching term, keeping that test's
+  "enumerates every term" claim true (backlog/closed spec §3.2, 2026-09-17) —
+  (`apps/server/test/read/compile-filter.test.ts`)
+- **13.579** ✅ `filterSpecSchema.closed` accepts a boolean and refuses a string; the NUL-slot count test's
+  own docblock is corrected from "the other four slots" to "the other five", naming `closed` beside
+  `blocked` as the boolean that needs no NUL guard (backlog/closed spec §3.2, 2026-09-17) —
+  (`packages/domain/test/filter-spec.test.ts`)
+- **13.580** ✅ The client vocabulary carries `closed`: `mapListPage` reads the wire card's `closed` onto
+  `ListRow.closed` unchanged, present and null; `toServerFilterSpec`/`toClientFilterSpec` carry the term
+  through unchanged (no plural/singular disagreement to refuse over, unlike the id axes); `toClientFilterSpec`
+  reads it as a REQUIRED boolean (`asBoolean`), refusing a `'true'` string rather than silently coercing it
+  (backlog/closed spec §1.2/§3.2/§4, 2026-09-17) — (`packages/app-core/test/online/mappers.test.ts`)
+- **13.581** ✅ `matchesFilter`/`matchesListRow` honour `closed` (backlog/closed spec §4, 2026-09-17): `true`
+  closed only, `false` not closed, absent all — a single boolean, not an id axis, so it has no
+  include/exclude halves; a legacy `TicketState` fixture with no `closed` key at all (`TicketState.closed?`
+  predates the flag on 441 fixtures) counts as not closed, same as an explicit `null`. `ListFilterSpec`'s
+  `Pick` names `closed`; `BoardFilterSpec`'s does not — a `BoardCard` carries no `closed` field, so the axis
+  is a compile error there rather than a silent no-op —
+  (`packages/app-core/test/filter/matches-filter.test.ts`, `packages/app-core/test/filter/list-filter.test.ts`)
+- **13.582** ✅ `transitionOptions` offers the universal Backlog edges like declared ones (backlog/closed
+  spec §4, 2026-09-17), read off `statesWithBacklog`/`transitionsWithBacklog` — the SAME helpers the engine
+  itself resolves edges over — rather than a second, driftable copy of the universal set: Start is the ONLY
+  option from backlog (controller ruling, Task 6, extending the brief: a declared wildcard edge means "from
+  any AUTHORED state" and backlog is universal rather than authored, so a wildcard edge never resolves FROM
+  it), and Send to backlog is appended LAST from every declared non-terminal state, never offered from a
+  terminal one. The site-identifying assertion adds `{ from: '*', to: 'done' }` to `WF_ERRAND` and proves
+  `transitionOptions(def, 'backlog')` is still exactly `[{ toStateId: 'todo', name: 'To do', rules: [] }]` —
+  the wildcard edge never resolves from backlog even though backlog would otherwise match `'*'` like any
+  other state. Mutation (dropping the `fromStateId === BACKLOG_STATE_ID` branch) kills exactly that one
+  assertion and no other: under plain `WF_ERRAND` the Start edge and the (harmless) wildcard-to-`todo`
+  resolution agree, so only a def whose wildcard reaches a DIFFERENT target than Start can tell the two
+  implementations apart. Ripples into every other caller of `transitionOptions` over a non-terminal
+  `fromStateId` — `moveOutcome`'s `available` lists, `MoveRefusalNotice`/`refusalCopy`'s rendered
+  alternatives, and `reopenStateOptions` (`flows/guarded-child-event.ts`) all now include `backlog` as a
+  genuine non-terminal destination, and the existing tests naming those lists were updated in place rather
+  than left to rot green over a wrong assertion —
+  (`packages/app-core/test/views/transition-dialog.test.tsx`, `packages/app-core/test/views/board-moves.test.ts`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`, `packages/app-core/test/flows/guarded-child-event.test.ts`)
+- **13.583** ✅ `precheckEvent` mirrors `checks/close.ts` for `ticket.closed`/`ticket.reopened`
+  (backlog/closed spec §2, 2026-09-17), hand-rolled rather than routed through the shared engine like
+  `precheckParentTerminal` — but UNLIKE that function, these two can answer `passed`: `evaluate.ts` is a
+  flat switch with exactly one check per event type, and neither `checkTicketClosed` nor
+  `checkTicketReopened` reads a ticket-type definition, so gate 4 does not apply. A `ticket.closed` for a
+  `doing` ticket previews `close-requires-terminal` naming "Doing"; the SAME refusal for a ticket sitting in
+  `backlog` names "Backlog" rather than the bare id — proving the state name is resolved over
+  `statesWithBacklog`, which `def.states` alone does not declare — and an already-closed ticket previews
+  `already-closed`. A transition on a closed ticket previews `closed-ticket`, decided with NO workflow
+  definition cached at all, mirroring the engine's own order (`transition.ts:72`, ahead of `getWorkflowDef`
+  at `:76`): the refusal reads only the flag this client already holds. A `ticket.reopened` on a ticket that
+  is not closed previews `not-closed`; on a closed ticket it passes. The transition branch's own
+  `acceptRestsOnUnseenChildren` (`precheck.ts:426/437`) and `needsMembership` (`precheck.ts:461/468-473`) now resolve states/edges over
+  `statesWithBacklog`/`transitionsWithBacklog`, with the same backlog-only Start rule `transitionOptions`
+  takes — a destination or a ticket sitting in backlog is not the raw-`def` miss it used to be —
+  (`packages/app-core/test/precheck.test.ts`)
+- **13.584** ✅ `ticket.closed`/`ticket.reopened` fold through the SAME shared reducer (`applyTicketEvent`)
+  every other ticket event does, and `start: 'backlog'` folds to the universal state — both landed on
+  `TICKET_EVENT_TYPES`/`FOLDING_TICKET_TYPES` before this task (Task 1) and are confirmed here rather than
+  re-derived: a ticket created with `start: 'backlog'` is served at `stateId: 'backlog'` by the replica's
+  `getTicket` AND by `getTickets` (whose row also carries `closed: null`, and whose `stateName` now reads
+  "Backlog" via `stateNameFrom`'s own `statesWithBacklog` fix); after `ticket.closed` both doors report
+  `closed: { actorId, at }`. `getBoard` gains the SAME two bound conjuncts the server's `readBoard` applies
+  (case 13.574) — `stateId !== BACKLOG_STATE_ID`, `(closed ?? null) === null` — proven against both a
+  closed ticket and a confirmed backlog-born one, straggler path included (without the fix a backlog ticket
+  has no row in any published definition's `states` and falls into the straggler path as a stray column
+  literally named `backlog`). `getTickets` deliberately does NOT gain the same exclusion: 13.575 already
+  settled that the LIST carries a backlog and a closed ticket alongside every other row, narrowable by the
+  `closed` filter term rather than dropped outright, so the replica's `getTickets` matches the server's LIST
+  behaviour while its `getBoard` now matches the server's BOARD behaviour (backlog/closed spec §1.3/§3.2,
+  2026-09-17) — (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.585** ✅ `TicketSheet` shows **Close** (not **Reopen**) on a terminal, not-closed ticket (backlog/closed
+  spec §5.3, 2026-09-17): `state.stateCategory === 'terminal' && closed === null` gates the button, and
+  clicking it ingests exactly one `ticket.closed` with `payload {}` through the same `make`/`ingest` idiom
+  `submitTransition` uses for a move — the envelope alone carries actor and time (spec §1.2). A `committed`
+  answer clears any refusal and reloads BOTH live reads this sheet holds (`read.reload()` AND
+  `history.reload()`, mirroring `submitTransition`'s own committed branch, since closing writes a ledger
+  line too) — proven here by asserting `getTicket` is asked a second time, off the same `read.reload()`
+  every other transition in this file refreshes through — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.586** ✅ A closed ticket shows the header badge — `Closed by <name> on <date>`, the name resolved
+  through the SAME `actorLabel`/roster join every other claim in this sheet uses, the date through the one
+  IST formatter (`formatDate`) — shows **Reopen** (not **Close**), disables **Move…**
+  (`disabled={closed !== null}`), and shows the sentence "Closed — reopen it first" beside it as a
+  `<span className="gn-sheet__closed-note">` — TEXT, never a `title=` tooltip (spec §5.3). Clicking Reopen
+  ingests exactly one `ticket.reopened` with `payload {}`. The badge reuses `Chip` tone `terminal`
+  (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch. The fixture's `closed.at` is
+  `19:00 UTC` — a DISCRIMINATING instant (same technique as the history-tab battery's `18:30 UTC` → `17
+  Aug`): it crosses midnight under `+05:30` to `21 Aug`, one day past its own UTC date, so the assertion
+  can tell `formatDate`/`formatIstInstant` apart from a same-day UTC slice that would print the wrong date
+  identically to the right one on a non-discriminating instant — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.587** ✅ A non-terminal ticket shows neither **Close** nor **Reopen** — the two buttons' gates
+  (`stateCategory === 'terminal' && closed === null`, and `closed !== null`) both read false for an active
+  or open ticket, so this sheet offers no closing affordance at all outside a terminal state
+  (backlog/closed spec §5.3, 2026-09-17). Mutation (dropping `state.stateCategory === 'terminal' &&` from
+  the Close gate, `cp`/`sha256sum` restore): kills exactly this case (**Close** now renders on the
+  non-terminal fixture) and no other in the file — 13.585/13.586/13.588 stay green — proving the negative
+  assertion is not vacuous — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588** ✅ A refused `ticket.closed` (answered `refused` with rule `close-requires-terminal`, the
+  rule-engine id from spec §2's table) renders its rule and reason VERBATIM in the sheet's refusal slot —
+  carried without paraphrase, the same invariant `submitTransition`'s own refusal handling holds. The slot
+  is a NEW render block beside the action row rather than `TransitionDialog`'s own `serverRefusal` copy:
+  `Dialog` (`packages/ui/src/components/dialog.tsx:15`) returns `null` whenever `open` is false, so that
+  copy is unreachable while the Move dialog is closed — exactly when Close/Reopen fire. The new block is
+  gated on `!moveOpen` so the two never both render: the Move dialog's own `onClose` already clears
+  `serverRefusal` when it closes, and `submitTransition` never sets it while `moveOpen` is false —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588a** ✅ Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch. Close/Reopen mirror
+  `board.tsx`'s `MoveArrows.submitting` (`:956`, `finally`-reset per `:1029-1035`'s own docblock): both
+  buttons carry `disabled={submitting}` for the lifetime of their own ingest, re-enabled once it settles
+  regardless of outcome. Proven with a DEFERRED ingest (a promise the test resolves by hand): Close is
+  enabled before the click, disabled while the promise is pending, a second click in that window queues
+  no second `ingest` call, and resolving the promise re-enables it. `Move…` is deliberately untouched — it
+  opens a dialog with its own submit path. Mutation (dropping the `finally` reset, `cp`/`sha256sum`
+  restore): kills exactly this case (Close never re-enables) and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588b** ✅ Ruling 33 (fix round 2, 2026-09-17) — a REJECTED `ingest` is a transport failure, never
+  a refusal, and gets its OWN slot: `transportError`, rendered as `<p role="alert"
+  className="gn-refusal gn-refusal--transport">`, gated on `!moveOpen` identically to `serverRefusal`'s
+  own copy. Fix round 1 had folded a rejected `ingest` into `serverRefusal` under a synthetic
+  `ingest-rejected` rule name — caught in review as the exact defect Ruling 27 removed from `board.tsx`
+  (case 13.504, "never claims to be the server's own verdict"): a dropped connection is not an
+  adjudication, however the sentence is worded. Proven with a fake data source whose `ingest` throws
+  (`socket hung up`): clicking **Close** shows the amber transport notice with the message carried
+  verbatim (`We could not reach the server for this change — socket hung up`), the text "Refused by the
+  server" is absent from the document, and **Close** re-enables once the rejection settles — the
+  `finally` reset does not care which branch ran. `results[0]` (not `results.find(...)`) is THE result,
+  since exactly one event is ingested; a `result === undefined` (the door answering nothing) shares the
+  same `transportError` slot with the message "The server did not answer this change." Mutation (moving
+  `setSubmitting(false)` out of the `finally` to after the committed reload only, `cp`/`sha256sum`
+  restore): kills exactly this case (Close stays disabled forever after a rejection) and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588c** ✅ Ruling 34 (fix round 3, 2026-09-17) — the `results[0] === undefined` ("silence")
+  branch clears `serverRefusal` too, the same pairing the `catch` branch already carries (13.588b): a
+  wording gap in Ruling 33 itself left this one branch setting `transportError` without clearing
+  `serverRefusal`, so a REFUSED click followed by a SILENT one rendered BOTH notices at once — the
+  earlier "Refused by the server — …" describing an answer that no longer holds. Proven by sequencing
+  two different answers through the fake data source's ordinary per-call closure (no test-helper change
+  needed): `refused` (rule `close-requires-terminal`) on the first `ingest`, an empty `[]` on the second.
+  First click shows the server notice with the reason; second click shows ONLY the transport notice
+  ("The server did not answer this change.") — the server notice's class (`gn-refusal--server`) and its
+  reason text are both confirmed ABSENT, not merely joined by the new one — and Close re-enables.
+  Mutation (dropping the new `setServerRefusal(null)`, `cp`/`sha256sum` restore): kills exactly this case
+  on the "server notice gone" assertion and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.589** ✅ A card in `done` (`WF_ERRAND`'s only terminal state — verified against `helpers/seed.ts`,
+  not assumed) renders a **Close** button beside the two arrows: `aria-label` `` `Close ${card.title}` ``,
+  `disabled={submitting}` sharing the arrows' own latch. Clicking it ingests exactly one `ticket.closed`
+  with the empty payload spec §1.2 gives the envelope-only event (actor/origin carried the identical way
+  `submitDirect`'s own `{to}` transition already is), then calls `moves.onMoved()` — the SAME
+  `board.reload()` `submitDirect`'s `committed` branch calls; the server's own `getBoard` excludes closed
+  tickets (spec §3.2), so the reload, not a local delete, is what removes the card, and this case asserts
+  the ingest and the call rather than a disappearance `useBoard`'s own live-query hook would have to fake.
+  A card in `doing` (non-terminal, `stateCategory: 'active'`) renders no Close button at all — `MoveArrows`
+  derives the gate itself from `stateCategoryOf(workflow, fromStateId)` (Ruling 35, coordinator,
+  2026-09-17 — correcting this task's own brief, which had proposed threading a second `column.category`
+  prop down instead) rather than reading a second, driftable copy of a fact this component can derive with
+  no new data. A click on Close never opens the ticket sheet — the same `CARD_CLICK_BAIL_SELECTOR` bail
+  every arrow button already gets (`board-card-click.test.tsx`'s own "a click on a move arrow does NOT
+  open the ticket" proves the mechanism) — proven here PAIRED with a positive control in the same test (a
+  click on the card's own title button DOES call `onOpenTicket`), so the negative discriminates a real
+  bail from a button that merely does nothing. Mutation (forcing the terminal gate permanently true —
+  `{true || category === 'terminal' ? ...}` — `cp`/`sha256sum` restore): kills exactly the `doing`-negative
+  case and no other (`PASS (4) FAIL (1)`) —
+  (`packages/app-core/test/views/board-close.test.tsx`)
+- **13.590** ✅ A refused `ticket.closed` (rule `close-requires-terminal`, mirroring `ticket-sheet.tsx`'s
+  own `13.588` fixture verbatim) renders through the board's existing server-refusal notice —
+  `role="alert"`, `.gn-refusal--server`, the rule and reason carried VERBATIM, the same invariant every
+  other refusal on this board holds. A REJECTED `ingest` (a transport failure, never a server answer)
+  renders instead through `.gn-refusal--transport` with `closeCard`'s own "this close" wording ("We could
+  not reach the server for this close — …"), the words "Refused by the server" absent from the document —
+  mirroring case `13.504`'s two-branch shape and Ruling 27's split exactly, `closeCard` sharing
+  `submitDirect`'s identical `serverRefusal`/`transportError` channels rather than inventing its own. Both
+  branches leave **Close** and `‹` (a live, two-target picker from `done` — `arrowTargets` finds both
+  `doing` and `todo` declared backward from the last column, so the label reads "Move to previous state —
+  Doing or To do", never a bare "Move to Doing") re-enabled once the answer settles, proving the shared
+  `submitting` latch resets in `closeCard`'s own `finally` exactly as it already does in `submitDirect`'s.
+  `›` stays disabled throughout BOTH branches — structural (no forward edge is declared from `done` at
+  all), never a stuck latch — and is asserted as such rather than left for a reader to wonder whether the
+  latch missed it —
+  (`packages/app-core/test/views/board-close.test.tsx`)
+- **13.590a** ✅ Ruling 36 (coordinator, 2026-09-17; found reviewing Task 8's `closeCard`, whose docblock
+  claimed to mirror `submitDirect` "almost exactly" while `submitDirect`'s own `result === undefined`
+  branch had never carried the Ruling-34 pairing `closeCard` already did) — `submitDirect`'s silence
+  branch now clears `serverRefusal` alongside `transportError`, proven by sequencing a `refused` answer on
+  the first arrow click and an empty `[]` on the second (the exact `13.588c` technique, over the fake data
+  source's own per-call closure): after the second click only the amber `.gn-refusal--transport` notice
+  reads, `.gn-refusal--server` is gone from the document, and the arrow re-enables. **Measured, not
+  assumed, and the measurement corrects the ruling's own predicted mutation**: `submitDirect` has exactly
+  one call site, inside `attemptMove`, which already runs its own unconditional `setServerRefusal(null)`
+  synchronously before every arrow/drop attempt — a wrapper `closeCard` has no equivalent of, since
+  nothing wraps its `onClick`. Reverting ONLY the new line this ruling adds leaves this case GREEN
+  (`PASS (15) FAIL (0)`, the whole file unchanged); reverting ONLY `attemptMove`'s own pre-existing clear,
+  with the new line left in place, is ALSO green, for the identical reason in reverse. The case only
+  reddens when BOTH are absent at once (`PASS (14) FAIL (1)`, this case alone) — so the new line is real,
+  correct, and brings `submitDirect` into textual and behavioural agreement with `closeCard`, but is
+  REDUNDANT defense-in-depth on the arrows specifically today, not the closing of a live, reachable gap
+  the way the identical-looking line is for `closeCard`/`closeOrReopen`. Kept for that agreement and as a
+  second line of defence if `attemptMove` ever stops clearing on its own; `cp`/`sha256sum` restore
+  performed after each of the three mutations above —
+  (`packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.591** ✅ New tickets are born in the backlog, with one exception (backlog/closed spec §5.4,
+  2026-09-17) — `NewTicketDialog` states "Starts in the backlog" under the title field, UNCONDITIONALLY.
+  `NewTicketDraft` gains a REQUIRED `start: 'backlog' | 'focus'` (never optional here, even though the
+  wire's `ticketCreatedPayload.start` is optional and an absent value means focus for events written
+  before the field existed — a rule about legacy compatibility, not about what a client built after the
+  field exists is allowed to leave out). With NO parent chosen, no checkbox renders and the draft leaves
+  with `start: 'backlog'`. Choosing an IN-FOCUS parent (`parentCandidates` now carry `inFocus: boolean`
+  beside `id`/`title`, a claim the CALLER computes — this component derives nothing from a candidate's own
+  state) renders a **"Start in focus"** checkbox, CHECKED BY DEFAULT, and the draft leaves with
+  `start: 'focus'`; unticking it flips the SAME draft to `'backlog'` without touching the chosen parent.
+  Choosing a BACKLOG parent (`inFocus: false`) renders no checkbox at all and the draft stays `'backlog'`
+  — the checkbox's visibility (`startCheckboxVisible`) and the draft's `start` both read the SAME
+  `chosenParent`/`noUsableParent` values computed once, so a checkbox can never be on screen while the
+  payload it claims to set is about to leave as `'backlog'` anyway, or absent while a `'focus'` claim
+  leaves with nothing on screen to explain it —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.591f** ✅ The `inFocus` derivation itself, at its ONE real-data call site (`page.tsx`'s
+  `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null`) — nothing in `packages/app-core`
+  can witness this, since every case there PASSES `inFocus` in as a literal fixture value; a wrong `!==`
+  or a dropped `row.closed === null` half would ship with 13.591a–e and every other gate reporting green.
+  Three list rows differing only in the two facts the formula reads: a BACKLOG row (`stateId: 'backlog'`,
+  never closed), a plain ACTIVE row (neither backlog nor closed), and a CLOSED terminal row (not backlog,
+  but closed). Only the ACTIVE row's pick renders the "Start in focus" checkbox; the BACKLOG and CLOSED
+  picks both render none. Mutation 1 (`row.closed === null` → `row.closed !== null`, `cp`/`sha256sum`
+  restore): kills exactly this case, on the CLOSED-row assertion (`PASS (9) FAIL (1)`). Mutation 2
+  (`row.stateId !== BACKLOG_STATE_ID` → `===`, same restore method): kills exactly this case again, on the
+  BACKLOG-row assertion — the two mutations redden the SAME case at two DIFFERENT assertions, proving both
+  halves of the formula are load-bearing and neither alone would catch the other's defect —
+  (`apps/web/test/project-create-gate.test.tsx`)
+- **13.592** ✅ `CreateTicketFlow.create` never leaves `start` off the `ticket.created` payload it builds
+  (backlog/closed spec §1.3), whatever the draft's own value: a create with no parent sends
+  `payload.start: 'backlog'`, and choosing an in-focus parent with the checkbox left checked sends
+  `payload.start: 'focus'` — proving the value travels from the DRAFT rather than a hardcoded constant.
+  The load-bearing assertion is `Object.keys(payload)` containing `'start'`, not a value comparison: a
+  mutated `create()` that drops the `start:` line from its payload object literal produces a payload with
+  NO `start` key at all, and `toEqual`/`toBe`-style value checks treat a missing key the same as one
+  holding `undefined` — they would not catch that mutation; only reading the key set does. Mutation
+  (dropping the `start: draft.start,` line from `create-ticket-flow.tsx`'s payload literal,
+  `cp`/`sha256sum` restore): kills EXACTLY the two 13.592 cases (`PASS (16) FAIL (2)` of the file's 18)
+  and no other case in the file —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593** ✅ Ruling 37 — creating under a CLOSED terminal parent submits `ticket.reopened` for the
+  parent FIRST, then the reopening transition, then the child, and the first two travel in ONE
+  `source.ingest` batch call rather than two round trips (the owner decision: the person is asked once).
+  Split across two files (Ruling 38): `flows/guarded-child-event.test.ts` pins the UNIT behaviour — with
+  `ReopenPlan.parentClosed: true` the FIRST `ingest` call carries exactly `[ticket.reopened,
+  ticket.transitioned]` in that order, both on the parent, and the child rides only the SECOND call; a
+  committed outcome's `parentResult` names the TRANSITION's own result (the LAST element of the batch),
+  never the reopen's; a refusal of EITHER event in that batch — the reopen itself, or the transition after
+  a committed reopen — yields `parent-refused` and the child is never sent. **Fix round 1 (Ruling 39,
+  coordinator, 2026-09-17): `parent-refused` now carries `parentReopened: boolean`** — `true` exactly
+  when the reopen (batch index 0) committed before the transition (index 1) was refused, `false` for a
+  refusal AT index 0 or a plan with no reopen at all — pinned by extending 13.593b (refused at index 0 →
+  `false`) and 13.593c (refused at index 1, reopen committed → `true`) in place, plus T13.3d
+  (`parentClosed: false` → `false`). With `parentClosed: false` the batch stays the single-element array
+  T13.3a–g already pinned, unchanged. `views/reopen-flow.test.tsx`
+  proves the same shape end to end: a CLOSED `PARENT_READ` (`ticket.closed` set) drives the reopen offer
+  through the dialog, and the confirm click's recorded `source.ingested` batches show the same
+  `[reopened, transitioned]` pair ahead of the child, exactly as the unit test pins. `CreateTicketFlow`
+  reads `parentClosed` off `parentRead.ticket.closed ?? null` — never `!== null` alone, which would
+  misread an unflagged legacy ticket (441 fixtures predate the flag) as closed —
+  (`packages/app-core/test/flows/guarded-child-event.test.ts`, `packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593d** ✅ Ruling 37's own silence clause — "if the array is shorter than the batch, throw
+  `UnansweredClaimError` naming the unanswered event" — pinned directly, since 13.593a–c all exercise
+  FULL-length results arrays and T13.2f exercises `submitChildEvent`, not `reopenAndProceed`. A batch of
+  two (`[ticket.reopened, ticket.transitioned]`, `parentClosed: true`) answered with only ONE result (the
+  reopen commits; the transition gets nothing back) throws `UnansweredClaimError` whose `.sent` is the
+  TRANSITION — the event actually left unanswered, not `batch[0]` (the reopen, which DID answer) —
+  discriminating a correct implementation from one that always blames the first element —
+  (`packages/app-core/test/flows/guarded-child-event.test.ts`)
+- **13.593e** ✅ Fix round 1, Ruling 39 (coordinator, 2026-09-17; review Finding 1) — retrying with a
+  DIFFERENT target after a closed parent's reopen half already committed no longer resends
+  `ticket.reopened`. Confirmed against the REAL server, not a fake's assumption: `IngestService`
+  (`apps/server/src/ingest/ingest-service.ts`) commits each batch event independently, in its own
+  transaction, so `[reopened, transition→A]` can commit the reopen while a rule on that specific edge
+  (`restrict-to`, say) refuses transition→A — reachable, not hypothetical, and exactly what a stale
+  `ReopenPrompt.parentClosed: true` would have resent into a `not-closed` refusal on the next attempt,
+  MASKING whatever transition→B actually answers. `CreateTicketFlow.acceptReopen` now flips
+  `reopenPrompt.parentClosed` to `false` (`outcome.parentReopened`) before the parent's own refusal
+  renders, so a retry's plan builds `[transition]` alone. Proven end to end: first "Reopen and proceed"
+  gets `[committed, refused]` (reopen commits, transition→Doing refused); the dialog stays open exactly
+  as the ordinary (non-closed) shape already does; picking "To do" and confirming again sends a SECOND
+  parent batch of exactly ONE event, `ticket.transitioned` — no `ticket.reopened` — which then commits,
+  followed by the (retried) child. Mutation (dropping the `setReopenPrompt` update in `acceptReopen`,
+  `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one event" assertion (`PASS (18)
+  FAIL (1)`, the retry batch resending both events) —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593f** ✅ Final whole-branch review, fix wave A, Ruling 50 (2026-09-17; review Finding 3) — the
+  OTHER order of failure from 13.593e's: the batch's `ticket.reopened` HALF is the one refused, at index
+  0, with `not-closed` — someone else reopened the parent a second before the person confirmed.
+  `reopenAndProceed` reports `parentReopened: false` for an index-0 refusal (13.593b), so 13.593e's own
+  fix condition does not fire here on its own; without this ruling, `acceptReopen` would leave
+  `reopenPrompt.parentClosed` at `true`, and a retry with a different target would rebuild
+  `[ticket.reopened, transition]` again, refuse `not-closed` a second time, and mask whatever the new
+  transition would have answered — Ruling 39's exact masking, reached from the other side. Fix: also flip
+  `parentClosed` to `false` when `outcome.refusal.rule === REFUSAL_RULES.notClosed` — the server saying
+  "this parent is not closed" is the same fact `parentReopened` conveys, learned from a different
+  sentence. Proven end to end: the first "Reopen and proceed" is refused `not-closed` at index 0 (the
+  reopen itself); the dialog stays open with the refusal rendered; picking "To do" and confirming again
+  sends a SECOND parent batch of exactly ONE event, `ticket.transitioned` — no `ticket.reopened` — which
+  then commits, followed by the (retried) child. Mutation (dropping the new `|| outcome.refusal.rule ===
+  REFUSAL_RULES.notClosed` arm, `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one
+  event" assertion (`PASS (19) FAIL (1)` of the file's 20) —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.591g** ✅ Fix round 1, Ruling 40 (coordinator, 2026-09-17; review Finding 3) — "checked by default"
+  (spec §5.4) is a promise PER CHOSEN PARENT, not a one-time initial value for the whole dialog session.
+  Unticking "Start in focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent,
+  renders the new parent's checkbox CHECKED (not inheriting the previous parent's untick) — the Parent
+  picker's own `onChange` now resets `startInFocus` to `true` on every selection. Mutation (dropping that
+  reset, `cp`/`sha256sum` restore): kills exactly this case, on the "checkbox B is checked" assertion
+  (`PASS (11) FAIL (1)`). Named `g` rather than the coordinator's literal `13.591a` — that id already
+  covers this file's own "states the note unconditionally" case, a different, already-cited behaviour;
+  continuing the block's own lettering avoids one checkmark covering two unrelated assertions —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.594** ✅ Task 10 (backlog/closed spec §5.4, 2026-09-17) — the Backlog tab. A FIFTH tab, `Backlog`,
+  joins the project page's segmented rail FIRST — ahead of `Board`, since a ticket sits in the backlog
+  BEFORE the board in its lifecycle (spec §1.3) — while `view`'s own default stays `'board'`: the rail's
+  ORDER and the page's DEFAULT SELECTION are independent facts, and this task changes only the first
+  (pinned by asserting `aria-selected` still opens on `Board`, not `Backlog`). `backlogNarrowing`
+  (`page.tsx`) is `listNarrowing.rows` (the shell's own exclude-mode-filtered set) further cut to rows
+  whose `stateId` is the universal `BACKLOG_STATE_ID`; `total` counts backlog rows in the UNFILTERED
+  `list.rows`, never in `listNarrowing.rows`, for the same "a count computed after a filter has run
+  is a count of the filter, not of the project" reason `listNarrowing`'s own docblock gives. Clicking the
+  Backlog tab shows ONLY backlog-state rows; the List tab is UNCHANGED (spec §5.5: "the List shows
+  everything") and keeps showing both a project's backlog and focused tickets, same `TicketList`, same
+  narrowing word (see 13.595 below) —
+  (`apps/web/test/backlog-tab.test.tsx`)
+- **13.595** ✅ Task 10, Ruling 41/42 (coordinator, backlog-and-closed-core dispatch, 2026-09-17) — the
+  per-row **Start** button and the target it resolves. **Ruling 41 struck the brief's "a gated initial
+  edge still asks" branch**: spec §1.2 says the universal Start edge (`backlog → def.initialStateId`)
+  "carries no rules, ever", and `universalTransitions` (`packages/domain/src/workflow.ts:71`) builds it
+  with `rules: []` — `moveOutcome` could only ever answer `direct`, so no page-level `TransitionDialog`
+  and no `MoveArrows` extraction exist for it (the brief's own "choose the smaller diff and say which" is
+  resolved as neither). `BacklogStartButton` (`apps/web/src/backlog-start-button.tsx`) submits
+  `ticket.transitioned { to: toStateId }` straight through `dataSource.ingest`, mirroring `board.tsx`'s
+  `submitDirect` idiom (`submitting` latch reset in a `finally`, a `committed` answer calling the page's
+  `list.reload()`, a real refusal rendered as `role="alert" className="gn-refusal gn-refusal--server"`
+  reading `Refused by the server — <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
+  `ingest` rendered as `gn-refusal--transport`, never the word "Refused"). Proven end to end: Start
+  ingests `ticket.transitioned` with `to` equal to the fixture workflow's `initialStateId` (the exact
+  payload captured and asserted, not merely "an event fired"), and the row leaves the Backlog tab once a
+  CALL-COUNT-DRIVEN `getTickets` stub answers, on its second read, that the ticket's state moved — a
+  fixed answer could not have falsified `list.reload()` firing. A refused Start renders the reason and
+  re-enables the button; the transport wording never appears for a refusal. **Ruling 42's target
+  resolution**: `ListRow` carries no `workflowId` (`view-types.ts:187-231` — `typeId`/`stateId` only), so
+  `startTargetFor(row, types, defs)` (`apps/web/src/backlog-start.ts`) joins `row.typeId` through the
+  workspace's own `TicketTypeDef[]` to a `workflowId`, then reads that `WorkflowDef`'s `initialStateId`
+  from a `Map` the page fetches ONE `getWorkflowDef` per DISTINCT workflow among the backlog rows on
+  screen (never one per row) — unit-tested directly (known type+def → the initial state; unknown type →
+  null; known type, def not yet arrived → null); a `null` target disables Start rather than submitting
+  `{to: null}`. **Addition beyond Ruling 42's literal prop list**: `BacklogStartButton` also takes
+  `currentUserId`, undeclared in the ruling's `{row, toStateId, dataSource, workspaceId, onStarted}` —
+  `makeSubmittedFactory` needs an `actorId` and nothing else in that list supplies one; the page gates the
+  whole `rowAction` capability on `session.kind === 'signed-in'` (mirroring `board.tsx`'s own `moves`
+  gate, case 3.144's "the write door is never offered an empty actor"), so it is never `''` when a click
+  can reach it. Mutation (submitting `to: row.stateId` instead of `toStateId`, `cp`/`sha256sum` restore):
+  kills exactly this case's ingest-payload assertion (`PASS (3) FAIL (1)` of the file's 4) and no other —
+  (`apps/web/test/backlog-tab.test.tsx`, `apps/web/test/backlog-start.test.ts`)
+- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog — new tickets land here.`,
+  passed to `TicketList`'s new `emptyCopy?` prop. **`emptyCopy` defaults to ABSENCE, not a new sentence**:
+  before this task `TicketList` rendered NOTHING beneath its controls bar for a zero-row set (`groupRows([],
+  DEFAULT_GROUPING, labels)` answers `[]` for every grouping but `flat`, and `sections.map` over `[]`
+  iterates nothing; `flat` itself answers one section holding zero rows, an empty table with no message
+  either) — measured by reading the component, not assumed. A component-owned default sentence was
+  considered and refused: `rows.length === 0` means "the project truly holds none" on one tab and "a
+  filter hid all of them" on another (`listNarrowing`'s own docblock; Ruling 19's `isNarrowed` one layer
+  up in `board.tsx`), and `TicketList` cannot tell the two apart — only a caller holding the narrowing
+  context can. So the List tab passes nothing and keeps its pre-Task-10 silence (pinned directly); only
+  the Backlog tab passes a sentence true of itself —
+  (`packages/app-core/test/views/ticket-list.test.tsx`, `apps/web/test/backlog-tab.test.tsx`)
+- **13.597** ✅ Task 10 — `TicketList`'s two new Backlog-tab-facing seams, neither exclusive to the Backlog
+  tab. `rowAction?: (row: ListRow) => ReactNode` renders once per row in a trailing `<td>` (a matching
+  empty `<th>` in the header row), threaded to BOTH `ListTable` mounts (the "Recently assigned" pin and
+  every grouped section) — absent, no trailing column renders at all, byte-identical to before this task
+  (pinned directly). A second `<Chip tone="neutral">Closed</Chip>` renders BESIDE the existing state chip
+  (`ListCell`'s `'status'` case, `:411-416` pre-task) when `row.closed !== null` — beside, never replacing,
+  since `closed` and `stateId` are independent facts (spec §1.2: a closed ticket keeps the state it was
+  closed FROM). Both fixture rows in the pinning case carry `assignee: null` deliberately: a row assigned
+  to `currentUserId` legitimately renders TWICE (this component's own invariant 1 — "exactly once ACROSS
+  THE SECTIONS", not "exactly once on the page"), which would double-count `rowAction` and double-render
+  the Closed chip, passing either assertion by accident —
+  (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.598** ✅ Task 11 (spec §5.5, Ruling 45) — the Closed axis's own cycle. `closedMode(filter):
+  ChoiceMode`/`withCycledClosed(filter): FilterSpec` (`filter-cycle.ts`) read/write `filter.closed`
+  directly (`undefined → 'off'`, `true → 'include'`, `false → 'exclude'`) rather than through
+  `withIdAxis`'s per-axis list machinery — `closed` is a single boolean, not an `IdAxes` member, so there
+  is no list to add or remove a value from. The cycle itself reuses `nextMode` UNCHANGED: off → include →
+  exclude → off, the same three states every other control in the Filters sheet already drives, which is
+  why `TriStateChoice` needs no new prop shape to render it. **Ruling 44/45 replaces the brief's own
+  names** (`closedMode(filter): 'all' | 'only' | 'hidden'`, `nextClosedMode`, `withClosedMode`) with this
+  `ChoiceMode`-shaped pair — a second three-word vocabulary alongside `ChoiceMode` would be two spellings
+  of the one cycle the control renders. `off` DELETES the `closed` key (verified via `'closed' in filter`
+  being `false`, not merely `toEqual({})`, since `toEqual` cannot distinguish a deleted key from one
+  written `undefined`) rather than writing `closed: undefined` the way `withIdAxis`'s own collapse rule
+  does for an emptied id-axis list —
+  (`apps/web/test/filter-cycle.test.ts`)
+- **13.599** ✅ Task 11 (spec §5.5, Ruling 44) — the Closed axis's own chip in `buildFilterChips`
+  (`board-search-scope.ts`): `spec.closed === true` → `Closed: only` (mode `include`); `spec.closed ===
+  false` → `Closed: hidden` (mode `exclude`); unset → no chip. ONE chip, never two — unlike every axis
+  `buildFilterChips` already covers, `closed` is a single boolean with no include/exclude halves that
+  could both be set at once, so this is an `if`/`else if`, not two independent `has()` checks. Joins the
+  chip list directly after the category chips, before `projectIds` — pinned by asserting the exact key
+  order on a spec that sets all three. `spec`'s own parameter type widens `BoardFilterSpec` with an
+  optional `closed` rather than `closed` joining `BoardFilterSpec` itself: a `BoardCard` cannot answer it
+  at all (no field for it, unlike the four axes `describeUnappliedBoardAxes` already discloses as merely
+  board-blind), so `page.tsx`'s own Board-tab call into this function (bare `boardFilter`) never sets it
+  and this branch never fires there — see 13.600/13.601 for the List/Calendar/Timeline call that does.
+  `onRemove` clears it back to unset via the same `clear({ axis: undefined })` idiom every include-half
+  chip in this file already uses —
+  (`apps/web/test/board-search-scope.test.ts`)
+- **13.600** ✅ Task 11 (spec §5.5, Ruling 44/45) — the Closed control in the Filters sheet, and Backlog
+  joining the State chips. ONE `TriStateChoice`, not a person row or a chip list (`closed` has no
+  per-value set the way Assignee/Type/State/Category each do), placed in its own fieldset directly after
+  State: cycles with the accessible names `Closed` / `Closed, included` / `Closed, excluded`, the SAME
+  `TriStateChoice`/`ChoiceMode` contract 13.552 already proved for a person row, now driven by
+  `closedMode`/`withCycledClosed` instead of `choiceMode`/`withCycledId`. On the List tab, "Closed only"
+  narrows to exactly the closed row under a `Closed: only` chip; "Not closed" (the next click) hides it
+  under a `Closed: hidden` chip — `listFilterSpec.closed = filter.closed` (`page.tsx`) is what reaches
+  `matchesListRow`'s own `closed` clause for real, not merely a control that renders. **Ruling 45 — no
+  second def fetch**: the State section's options are the board's own column states (already read for the
+  board's moves) PLUS the universal `{ id: BACKLOG_STATE_ID, name: BACKLOG_STATE.name }` from
+  `@gisik-nokma/domain`, appended LAST in `boardStateNames` (mirroring `statesWithBacklog`'s own "always
+  last" rule) — `Backlog` appears exactly once among the State chips, never duplicated with a real column,
+  because the id is RESERVED and `validateWorkflowDef` refuses any definition that declares it. The
+  brief's own "via `getWorkflowDef`" is dropped: nothing here fetches a definition `page.tsx` was not
+  already holding —
+  (`apps/web/test/filters-sheet.test.tsx`)
+- **13.601** ✅ Task 11 (spec §5.5, Ruling 44) — Calendar and Timeline hide closed tickets by default.
+  **The coexistence problem Ruling 44 exists to solve**: the spec's own mapping (`closed: undefined | true
+  | false`, the two date tabs passing `closed: false` when unset) has no fourth state, so "All" could
+  never show a closed ticket on those tabs and the mandated `Closed: hidden` chip could never be removed.
+  **The fix**: a page-level `const [showClosedOnDates, setShowClosedOnDates] = useState(false)`; the
+  effective clause Calendar/Timeline's own `datesNarrowing` (`page.tsx`) applies is `filter.closed ??
+  (showClosedOnDates ? undefined : false)` — an EXPLICIT `filter.closed` (either value) always wins;
+  only while it is unset does `showClosedOnDates` decide anything. `datesNarrowing` is a FURTHER cut of
+  `listNarrowing.rows` (not a fork of it), and `dateInputs` reads `datesNarrowing.rows`, not
+  `listNarrowing.rows`, from this task on. Proven: a closed ticket with a due date is absent from both the
+  Calendar's own count (`1 of 2 shown`, not `2 of 2`) and the Timeline's own ticket-level rendering (its
+  "Undated or partially dated" side list, 13.558's own discriminator — the title is genuinely gone, not
+  merely uncounted) while the default is in force; the strip carries a `Closed: hidden` chip (key
+  `closed-default`, distinct from the EXPLICIT control's own `closed` chip so the two can never collide)
+  whenever `filter.closed === undefined && !showClosedOnDates`, gated to the calendar/timeline tabs only;
+  its `onRemove` calls only `setShowClosedOnDates(true)` — never touches `filter` — and removing it
+  restores the ticket. **AMENDED per Ruling 44's own text** ("removing the `Closed: hidden` chip shows the
+  closed ticket on the Calendar; the List tab is unaffected; the Timeline likewise"): the List tab is
+  proven unaffected directly — `listFilterSpec.closed` carries only the explicit control
+  (`page.tsx`'s own `listFilterSpec`), so the closed row is visible there throughout, regardless of
+  `showClosedOnDates`. An explicit `Closed only` set on the Calendar overrides the default in the other
+  direction, surviving to show only the closed ticket (same `1 of 2 shown` shape, opposite surviving
+  ticket, one `closed` chip and no `closed-default` chip). The strip's gate counts the mandated default
+  chip (`chipCount: chips.length` on these tabs, not the Board-only `activeFilterChips.length`) because,
+  unlike the workflow picker's own chip, it is not always covered by `shown !== total` on its own — a
+  project with zero closed tickets today would otherwise compute the chip and never render it. Mutation
+  (`filter.closed ?? (...)` → `filter.closed` on `datesNarrowing`'s own clause, `cp`/`cmp` restore): kills
+  exactly this case's three assertions and no other (`PASS (17) FAIL (3)` of the file's 20) —
+  (`apps/web/test/board-narrowing.test.tsx`)
+- **13.602** ✅ Task 11 fix round 2 (Ruling 46, review Finding 1) — `describeUnappliedBoardAxes` gains a
+  FOURTH board-blind axis, `closed`, for a reason distinct from the original three: `matchesBoardCard`
+  does not merely lack a field to compare `closed` against, the board EXCLUDES closed tickets from every
+  column entirely (spec §3.2), before a card can ever reach it. That asymmetry is why only
+  `filter.closed === true` ("Closed only") is disclosed — `false` ("Not closed") is already vacuously
+  true of the board by construction, so naming it would describe a real axis doing nothing, the opposite
+  of this function's own purpose. **The gap this closes**: `buildFilterChips` grew a `closed` branch in
+  this same task (13.599), making `closed` chip-representable and therefore filter-settable — but
+  `boardFilter` never carries it (Board is "unchanged" per spec §5.2), so an explicit "Closed only" was
+  silently unenforced on the Board tab: ordinary cards kept showing, with no chip (correct — a chip would
+  lie) and, before this fix, no disclosure either. Pushed LAST, after `custom field` (the three original
+  axes were already ordered before this one existed) — pinned by a case that sets both `dueBefore` and
+  `closed: true` and asserts `['due date', 'closed']` exactly. Mutation (dropping the new
+  `if (filter.closed === true) axes.push('closed')`, `cp`/`cmp` restore): kills exactly the "names closed"
+  and "joins last" assertions and no other (`PASS (34) FAIL (2)` of the file's 36). **The page-level
+  sibling question (Ruling 46 point 2)**: `board-narrowing.test.tsx` has no page-level sibling of 13.440
+  (a real-UI Board-tab unapplied-axis disclosure) — its one `board-scope-note` reference (13.556b) is
+  List-tab-specific, proving the note names "the list", not "the board". The actual sibling is
+  `filters-sheet.test.tsx`'s 13.451 ("the deferred Task 4 test: collaborator is unapplied on the board"),
+  which drives the real Filters-sheet UI and asserts `note.toHaveTextContent(/not applied on the board/i)`
+  for the collaborator axis — the same render template (`page.tsx`'s `Not applied on the {tabNoun}:
+  {unapplied.join(', ')}.`) would read `Not applied on the board: closed.` for an explicit Closed-only
+  filter with no other unapplied axis, but no new assertion was added there: Ruling 46 point 2 scoped the
+  "add one assertion" instruction to `board-narrowing.test.tsx` conditionally, and that file has no such
+  sibling to add it to —
+  (`apps/web/test/board-search-scope.test.ts`)
+
+## Task 12 — closing paragraph: final gate, catalogue checks, citation sweep
+
+**Gate (Node v22.23.2, all six packages, whole-suite `vitest run` plus
+`typecheck`):**
+
+| Package | Tests | Typecheck |
+|---|---|---|
+| `packages/domain` | PASS 486 / FAIL 0 | EXIT=0 |
+| `packages/rule-engine` | PASS 298 / FAIL 0 | EXIT=0 |
+| `packages/app-core` | PASS 1418 / FAIL 0 | EXIT=0 |
+| `packages/ui` (incl. token-discipline scan) | PASS 315 / FAIL 0 | EXIT=0 |
+| `apps/web` | PASS 430 / FAIL 0 | EXIT=0 |
+| `apps/server` (Postgres) | PASS 1531 / FAIL 0 / SKIP 5 | EXIT=0 |
+
+`node scripts/check-case-ids.mjs`: EXIT=1 (expected -- the only two duplicates are the pre-existing, explicitly-allowed `13.387`/`13.413`; "check-case-ids: real sweep -- bare 1136, bold 977, marker-first 43, sum 2156, union 2153, 12 files scanned").
+`node scripts/check-case-citations.mjs`: EXIT=1 overall, but file 13's own uncited set is exactly `13.401`/`13.476`/`13.477` as required -- "13-deployment-dogfooding.md: 485 cited / 3 uncited / 488 total". The script's 5 ratchet violations are ALL pre-existing at `3222b908` (verified in a disposable worktree at that commit, identical output) and touch files this plan never opened (`03-foundation-ledger.md`, `10-workflow-builder.md`, `11-calendar-notifications.md`, `15-in-app-help.md`); not this task's doing and out of its scope.
+
+**Per-task mutation summary** (one line per task, quoting each task's own
+report, `.superpowers/sdd/2026-09-17-backlog-and-closed-core/task-N-report.md`):
+
+- **Task 1** — two mutations, each killing exactly one predicted case:
+  dropping the terminal-state filter from `universalTransitions`'s
+  Send-to-backlog computation kills 13.562 alone ("no edge from `done`");
+  removing `foldStateIdForward`'s backlog early-return kills 13.563 alone.
+- **Task 2** — mutating `p.start === 'backlog'` to `p.start !== 'focus'`
+  kills 13.565 alone (plus one knock-on assertion sharing the same cause);
+  "the mutation is caught exactly where the additive-field rule's own guard
+  lives, and only there among tests that don't happen to also omit `start`."
+- **Task 3** — three mutations against the brief's own predictions, plus one
+  in the fix round: deleting the closed check kills 13.570 alone; reverting
+  `toState` to `latest.states` kills both 13.571 Send-to-backlog cases;
+  collapsing the backlog-only ternary back to a plain wildcard lookup kills
+  "the new wildcard case `13.571 … a wildcard edge does not apply from
+  backlog — only Start does`" alone; reverting `checkTicketClosed`'s split
+  guard (fix round) kills 13.568 alone, "every other case, including the
+  unrelated `13.569`/`13.570` cases, stayed green."
+- **Task 4** — the `rowToTicketState`-to-unconditional-`closed:null`
+  mutation kills "exactly 13.572's second case."
+- **Task 5** — removing `AND t.closed_at IS NULL` from `readBoard` reddens
+  13.574 alone; removing the `closed` clause from `compile-filter.ts`
+  reddens 13.578 (plus the pre-existing axis-enumeration test, expected
+  fallout); fix round 2's three `def.states.find ?? stateId` →
+  `statesWithBacklog` fixes are pinned by the new case 13.575b (RED/GREEN).
+- **Task 6** — three mutations: reverting `transitionOptions`'s general
+  loop to `def.transitions`/`def.states` "killed 9 tests, including the
+  named 13.582 case"; removing the `fromStateId === BACKLOG_STATE_ID`
+  special case "killed exactly one test — the wildcard-to-`done`-never-
+  resolves-from-backlog assertion — and *not* the plain 'from backlog:
+  exactly the Start edge' case," as predicted, since only a definition
+  whose wildcard reaches a target different from Start can discriminate the
+  two implementations; dropping the `closed` clause in `matchesListRow`
+  "killed 3 tests."
+- **Task 7** — five mutations across three fix rounds, each killing exactly
+  one case: removing `disabled={closed !== null}` from Move… kills 13.586
+  alone; reverting the non-terminal check on Close's render guard kills
+  13.587 alone; removing the `finally` block (submitting never resets)
+  kills 13.588a alone; moving `setSubmitting(false)` to the committed
+  branch only kills 13.588b alone; dropping the new
+  `setServerRefusal(null)` on the silence branch kills 13.588c alone, "on
+  the 'server notice gone' assertion."
+- **Task 8** — the Close-renders-regardless-of-category mutation "killed
+  exactly `renders no Close button on a non-terminal column` and nothing
+  else"; the ruling's predicted `submitDirect` silence-clear mutation was
+  MEASURED, not assumed, to be redundant on the arrow path (the call
+  site's own unconditional clear already covers it) — recorded honestly in
+  13.590a's catalogue entry rather than claimed as a live discriminator.
+- **Task 9** — dropping `start: draft.start` from the create payload kills
+  exactly the two 13.592 cases; dropping the `setReopenPrompt` update on
+  retry kills "exactly 13.593e, on the 'exactly one event' assertion (the
+  retry resent both)"; dropping the reset on parent-selection change kills
+  "exactly 13.591g."
+- **Task 10** — mutating the ingest payload from `toStateId` to
+  `row.stateId` kills "the ONE failure is 13.595's ingest-payload
+  assertion; no other case moved" (`PASS (3) FAIL (1)` of `backlog-tab.test.tsx`'s 4).
+- **Task 11** — the `datesNarrowing` closed-clause mutation "killed exactly
+  the three 13.601 assertions"; dropping
+  `names.set(BACKLOG_STATE_ID, BACKLOG_STATE.name)` from `boardStateNames`
+  "killed exactly the Backlog-chip case in 13.600"; dropping the new
+  `axes.push('closed')` line "kills exactly 13.602's two closed-sensitive
+  assertions, nothing else."
+
+**Citation sweep** (Ruling 30's method — open the file at `3222b908` and at
+HEAD, never by offset — over every source file the diff
+`git diff --numstat 3222b908..HEAD -- '*.ts' '*.tsx' '*.css' '*.sql'`
+(excluding `.superpowers/`) shows this plan grew, 87 files;
+every `test-cases/*.md` file grepped, not only this one):
+
+- 115 candidate citations found across
+  `03-foundation-ledger.md`, `05-tickets-hierarchy.md`,
+  `06-auth-visibility.md`, `07-api-realtime-search.md`,
+  `12-offline-sync-apps.md`, `13-deployment-dogfooding.md` (including this
+  section's own citations) and `14-mcp-server.md`. Two of the 87 files this
+  plan grew (`page.tsx`, `precheck.ts`) account for most candidates; most of
+  the 87 (every pure-insertion file among `view-types.ts`, `ticket-events.ts`,
+  `filter-spec.ts`, `read-models.ts`, `entity-state.ts`, `matches-filter.ts`,
+  `evaluate.ts`, `refusal-rules.ts`, `compile-filter.ts`, and every file this
+  plan itself created new — `close.ts`, `backlog-start.ts`,
+  `backlog-start-button.tsx`, `filter-cycle.ts`) drew zero pre-existing
+  citations from outside this plan's own section.
+- **12 re-pointed**, verified correct at `3222b908` and at the fixed line by
+  direct read (never by offset arithmetic): `06-auth-visibility.md:248`
+  `precheck.ts:154-157`→`:180-183`; `07-api-realtime-search.md:485,494`
+  `precheck.ts:268`→`:294` (both occurrences); `07-api-realtime-search.md:501`
+  `ticket-state.ts:56-63`→`:59-66`; `05-tickets-hierarchy.md:54,60`
+  `ticket-state.ts:94`→`:99` and `:211`→`:221`; `12-offline-sync-apps.md:2395`
+  `list.ts:143`→`:144`, `:103-112`→`:104-113`, `:205`→`:206`;
+  `12-offline-sync-apps.md:140` `sync-routes.ts:59`→`:71`;
+  `12-offline-sync-apps.md:1432` `ticket-sheet.tsx:276`→`:299`;
+  `12-offline-sync-apps.md:152` `precheck.test.ts:165–180`→`:173–188`;
+  `12-offline-sync-apps.md:1618` `workflow.ts:138`→`:184`;
+  `12-offline-sync-apps.md:127` `harness.ts:567–577`→`:571–581`; plus, within
+  this section's OWN prose (never checked against `3222b908` — it postdates
+  it — checked directly against HEAD instead): `precheck.ts:425/437`→`:426/437`
+  and `:460/467-473`→`:461/468-473` (13.583's paragraph), and
+  `view-types.ts:188-220`→`:187-231` (Ruling 42's paragraph).
+- **Already-stale before this plan, left alone (not this plan's doing):**
+  the majority of the DATA-GAP citations `07-api-realtime-search.md`'s
+  §7.187–7.196 make into `view-types.ts`/`board.tsx` — these predate even
+  the `board-prototype-port`/`filter-exclude-all-tabs` plans and no longer
+  point at the content their own sentences quote, unrelated to anything
+  this plan touched; `03-foundation-ledger.md:85`'s `workflow.ts:144`
+  (points at an unrelated `cause` field, not the `to` spelling it cites);
+  `ui.css:1321` (cited twice in `13-deployment-dogfooding.md`, already
+  found stale by the `board-prototype-port` plan's own sweep, "found
+  ALREADY stale before this change").
+- **Historical narrative, left as written, per the precedent this file's
+  own prior sweep set** (`13-deployment-dogfooding.md`'s "Historical
+  narrative, left as written" bullet, itself pre-existing at `3222b908`):
+  every citation embedded in a dated, closed retrospective section —
+  `03-foundation-ledger.md`'s "Planted defect"/"RECONCILED 2026-09-02"
+  notes; the `board-prototype-port` plan's own dated sections ("Task 3"
+  through "Ruling 29", 2026-09-16, lines 4157–5673) and its own "Final
+  whole-branch review, fix wave" and "Finding 2 — 34 stale line-number
+  citations swept" paragraphs; the `filter-exclude-all-tabs` plan's own
+  "citation sweep" closing paragraph (lines 6097–6165) and its "Prose
+  citations of pre-Task-6 names" paragraph — left untouched even where this
+  plan's own edits shifted the line numbers those paragraphs quote, because
+  re-pointing a number a retrospective reports AS ITS OWN FINDING would
+  misrepresent what that past investigation actually found, exactly the
+  reasoning the prior sweep itself recorded. A borderline case decided the
+  same way: `07-api-realtime-search.md:501`'s "METHOD NOTE" records that
+  `sync-routes.ts:32` once read "ten of them" — Task 2 of this plan changed
+  that line's own wording to "twelve of them" (the line NUMBER is
+  unaffected, 32 both before and after), so the note's quoted fragment is
+  now stale prose, left as written since the note is itself a permanent
+  lesson inside a still-tracked case (7.259), not a live claim about the
+  docblock's current wording.
+
+**§9's named-not-built additions** (this plan's own follow-ons, found
+during execution — full list and file:line in the spec's "Follow-ons named
+during execution" appendix, cross-referenced from §9): `check-case-citations.mjs`
+letter-suffix support; `submitFromDialog`'s empty-results-as-committed gap;
+the refused (not redirected) rebind into backlog; the parked fixture-suite
+entries for the four new refusals; the untested signed-out `moves`/`rowAction`
+gates; the sheet's `submitTransition` rejected-ingest path; the board strip's
+untested-end-to-end "Not applied on the board: closed." sentence; and
+13.588a's committed-path-only mutation witness.
+
+**Suffixed-id hand check** (`scripts/check-case-citations.mjs` folds a
+letter-suffixed id into its base id before computing the uncited set, so it
+cannot see a suffixed case with no citation of its own — Task 12's own
+follow-on above): every `13\.[0-9]+[a-z]` id in this file —
+`13.520a`/`13.520b`/`13.528b`/`13.556a`/`13.556b`/`13.575b`/`13.588a`/`13.588b`/
+`13.588c`/`13.590a`/`13.591a`–`g`/`13.593a`–`f` (`13.591b`–`e` appear only as
+the range "13.591a–e" in prose, not as individual tokens; checked directly
+against test files regardless) — appears in at least one file under
+`packages/*/test` or `apps/*/test`. None missing; no fix needed. (13.593f
+itself post-dates this Task 12 sweep — added by the final whole-branch
+review's fix wave A, Ruling 50 — and is included here because leaving the
+range at "a–e" would misstate this file's own current contents the moment
+it was read.)
+
+**Second-wave plan**: `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+does not exist yet — §8 (ranking, auto-close, bulk close) is designed and
+approved in the spec but has no plan document as of this task.
+
+## Final whole-branch review, fix wave A (2026-09-17)
+
+Range `3222b908..5181af11` (31 commits) reviewed at HEAD `5181af11`; full
+findings in `.superpowers/sdd/2026-09-17-backlog-and-closed-core/final-review.md`
+(git-ignored, not in this repo's history). This entry covers Rulings 49 and
+50 — the client-side BLOCKER and one should-fix, from Findings 1 and 3.
+13.593f (Ruling 50) is filed above, beside the 13.593 series it extends,
+rather than down here; 13.603 (Ruling 49) has no series of its own and
+stands alone below.
+
+- **13.603** ✅ Ruling 49, Finding 1 — THE BLOCKER (2026-09-17) — `mapTicketState`
+  (`packages/app-core/src/online/mappers.ts`) enumerated every `TicketState`
+  field by hand and never read `record['closed']`, so `mapTicketRead` — the
+  sole producer of `TicketRead.ticket` for the shipped web shell
+  (`createOnlineDataSource`'s `getTicket` → `mapTicketRead` → `mapTicketState`,
+  wrapped in `withCacheFeed` for the `ClientStateCache` too) — silently
+  discarded the flag. Every reader spells `state.closed ?? null`, so the
+  wrong answer (`undefined`) was indistinguishable from the right one
+  (`null`) for a ticket that had never been closed, which is exactly why the
+  sheet's badge/Reopen/Move-disabled, `precheck.ts`'s `closed-ticket`/
+  `already-closed` gates, and `create-ticket-flow.tsx`'s `parentClosed` were
+  all dead in production while every one of their OWN tests stayed green —
+  each seeds a fake `DataSource` or `ticketStateSeed` directly and none
+  crosses this mapper; found only because the review read the producer
+  every scoped task's tests bypassed. Fix: one line,
+  `closed: mapClosed(record['closed'], \`${path}.closed\`)`, reusing the
+  helper `mapListRow` already calls for the identical wire shape (13.580).
+  `mapClosed` throws on an absent key rather than defaulting, so
+  `mappers.test.ts`'s shared `ticketReadBody` fixture now states its
+  `ticketState.closed` explicitly (defaulting to `null`, so every
+  pre-existing call site keeps exercising the "never closed" arm
+  unchanged) instead of relying on this mapper's old silence. Proven THREE
+  ways in this case: a wire `ticketState.closed` of `{actorId, at}`
+  round-trips onto `TicketRead.ticket.closed` unchanged; `null` maps to
+  `null`; and an ABSENT `closed` key is REFUSED (`MappingError`), not
+  defaulted — pinned separately because a mutant reading
+  `record['closed'] === undefined ? null : mapClosed(record['closed'], …)`
+  satisfies the first two assertions (still validating a PRESENT claim
+  through `mapClosed`) while silently reintroducing this exact defect for
+  any body omitting the key outright (planted and confirmed: reddens ONLY
+  the third assertion, `PASS (62) FAIL (1)` of 63, `cp`/`sha256sum`
+  restore). Mutation (dropping the new `closed:` line entirely instead,
+  same restore method): reddens BOTH `it`s this case is split across
+  (`PASS (61) FAIL (2)` of the file's 63) —
+  (`packages/app-core/test/online/mappers.test.ts`)
+
+**Second commit of this wave — Rulings 53(iv) and 54, and the spec/`Features.md`
+nits (Findings 5's docblock, 7, 6 and 9):**
+
+- **Ruling 53(iv), Finding 5's docblock (no new case — a comment-only
+  correction).** `ticket-sheet.tsx`'s Close/Reopen comment claimed "`closed`
+  never survives a fold that also changes `stateId` … so a closed ticket
+  stays terminal" — false: a rebind or republish fold CAN move a closed
+  ticket's `stateId` into a non-terminal state (`foldTicketToWorkflowVersion`
+  spreads `...state`; neither `ticket.closed`/`ticket.reopened` touches
+  `stateId`). Rewritten to the true, smaller claim: the two buttons never
+  both show because their render conditions are mutually exclusive on
+  `closed` alone, not because closed implies terminal forever — that
+  invariant is the rule engine's to hold (fix wave B, Ruling 53, at the
+  rebind check and the republish validator). No behaviour change, no test.
+- **13.604** ✅ Ruling 54, Finding 7 (2026-09-17) — the four close/reopen
+  refusal REASON strings (`close-requires-terminal`, `already-closed`,
+  `not-closed`, `closed-ticket`) are typed out twice, once in
+  `checks/close.ts`/`transition.ts`, once in `precheck.ts`, and 13.583's own
+  cases check `precheckEvent`'s copy against a literal THIS FILE wrote,
+  never against the engine's — the RULE ID is already one shared constant
+  (`REFUSAL_RULES`, imported from `@gisik-nokma/rule-engine` on both sides),
+  but the reason TEXT has no shared source. **Option taken**: rather than
+  export new reason constants from the rule engine (the ruling's
+  alternative, and the larger of the two changes), this case drives each of
+  the four refusals through the engine's own already-exported entry point,
+  `evaluateEvent` (dispatching to `checkTicketClosed`/`checkTicketReopened`/
+  `evaluateTicketTransitioned`, none of which is itself exported for a test
+  to call standalone), and through `precheckEvent`, over the identical
+  ticket/event pair, and asserts `reason` byte-identical — proving the
+  agreement rather than assuming it, with zero changes to
+  `packages/rule-engine`. **Verified as load-bearing, not merely
+  non-vacuous, by two planted drifts** (`cp`/`sha256sum` restore both times):
+  drifting `precheck.ts`'s own `already-closed` text reddens BOTH this case
+  and 13.583 (both hardcode/derive the same string); drifting the ENGINE's
+  `checks/close.ts` text instead — the gap this case exists to close —
+  reddens ONLY 13.604 (`PASS (36) FAIL (1)` of the file's 37); 13.583 stays
+  green throughout, because it never reads the engine's own answer —
+  (`packages/app-core/test/precheck.test.ts`)
+
+**Spec nits swept in the same wave** (Findings 6 and 9,
+`docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md`): §1.2 and
+§6 both said the replica backfill list (`sync-routes.ts`'s
+`BOOTSTRAP_BACKFILL_TYPES`) "gains" or is "gained" by the two closed-flag
+event types — Amendment 5 already says the opposite (unchanged, on purpose:
+neither event carries content beyond the fold a replica needs backfilled
+verbatim) — a sixth body sentence the Amendments appendix's "five
+rewritten" count had missed; both sentences now carry the
+"(amended 2026-09-17, see Amendments — Ruling 5)" marker the other five
+do, and the appendix's own count is corrected to six. §3.1's migration
+filename, `1789000000000_proj-tickets-closed.sql`, never matched the
+shipped file, `1789100000000_proj-tickets-closed.sql`
+(`apps/server/migrations/`) — corrected at its one occurrence.
+**`Features.md` checked, nothing to change**: no bullet claims the closed
+flag reaches the sheet specifically "online" (as opposed to through the
+replica, or as a data-source-agnostic fact) — the "Close / Reopen from the
+ticket sheet" bullet describes `TicketSheet` reading `state.closed ?? null`
+"off the read it already holds," true of either data source and never
+false at the mapper layer 13.603 fixes, so it needed no hedge and needs no
+un-hedge now.
+
+**Final whole-branch review, fix wave B (2026-09-17) — Findings 2, 4 and 5
+(the engine/server/validator half; the client half shipped in fix wave A).**
+
+- **13.605** ✅ Ruling 52(b), Finding 2 (2026-09-17) — `checkTicketWorkflowRebound`
+  (`packages/rule-engine/src/checks/workflow-rebind.ts:106`) refused
+  `toStateId: 'backlog'` unconditionally, because `target.states` never
+  contains backlog (universal, never declared — spec §1.1) — for a ticket
+  ALREADY parked as much as for one that was not, which is what made the
+  bulk migration route (13.606) a dead end for any type holding a parked
+  ticket. Fix: accept `toStateId === 'backlog'` iff the ticket's CURRENT
+  `stateId` is also `'backlog'` — parked-to-parked, never a declared state
+  mapped INTO backlog. Two cases pin both halves: a ticket already parked
+  (folded onto `stateId: 'backlog'` by a prior `ticket.transitioned {to:
+  'backlog'}`, the universal Send-to-backlog edge) rebinding onto
+  `wf-ops`'s backlog commits; a ticket on `wf-basic`'s own `todo` (not
+  parked) rebinding onto the identical `toStateId: 'backlog'` still refuses
+  `ticket.rebound-unknown-state`, proving Amendment 3 stands for the case it
+  was written for and this is a narrow carve-out, not a general loosening —
+  (`packages/rule-engine/test/workflow-rebind.test.ts`)
+- **13.606** ✅ Ruling 52(a), Finding 2 (2026-09-17) — the bulk rebind route's
+  occupied-state check (`apps/server/src/routes/builder-reads.ts`) filtered
+  `unmapped` states with `!stateMap.has(stateId)` alone, so a `backlog` row
+  — a state the dialog's own `stateMap` is built from `fromWorkflow.states`
+  only and therefore can NEVER name — was an unconditional
+  `migration.unmapped-state` for any type holding one, with no map the
+  caller could ever have sent to answer it. Fix: the occupied-state check
+  now skips `BACKLOG_STATE_ID`, and the emit loop sends `toStateId:
+  BACKLOG_STATE_ID` for a parked row regardless of what (if anything)
+  `stateMap` names for it. Own workflow pair, type and two tickets seeded
+  (one on a declared state, one parked via `ticket.transitioned {to:
+  'backlog'}`) in the 7.88/7.89 shape: a COMPLETE map of the source
+  workflow's own declared states does not refuse `migration.unmapped-state`,
+  both tickets commit (`count: 2`), and `proj_tickets` shows the parked
+  ticket on the NEW workflow with `state_id = 'backlog'` while the other
+  lands on its mapped declared state —
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- **13.607** ✅ Ruling 51, Finding 4 (2026-09-17) — MCP's `create_ticket`
+  (`packages/mcp-server/src/tools/write-tools.ts`) sent no `start` at all, so
+  the domain's additive-field rule read that silence as focus and an
+  assistant-created ticket landed on the board instead of the backlog every
+  other creation path defaults to (spec §1.3/§5.4, amended to name MCP as a
+  second creation path). Fix: the tool's input schema gains an optional
+  `start: 'backlog' | 'focus'`, and the payload always sends `start: a.start
+  ?? 'backlog'` — an explicit key either way, never an absent one, mirroring
+  the discipline `parentId` (13.593a's neighbour, 14.71) already gets. Two
+  assertions in one case: the argument's absence still emits `start:
+  'backlog'` as an OWN property (`Object.hasOwn`, not merely
+  `!== undefined`); naming `'focus'` gets exactly that back, unchanged. Dev
+  seeds under `apps/server/src/seed/*` are unaffected — deliberately: they
+  populate boards on purpose and are not a production creation path —
+  (`packages/mcp-server/test/write-tools.test.ts`)
+- **13.608** ✅ Ruling 53(i), Finding 5 (2026-09-17) — `checkTicketWorkflowRebound`
+  never read `ticket.closed` at all, so a closed ticket in a terminal state
+  could be rebound onto an ACTIVE (or open) state of the target workflow
+  with nothing to stop it — `close-requires-terminal`'s own invariant,
+  breached through the one door that never asked. Fix: when the ticket is
+  closed and the target state's category (`stateCategoryOf`, backlog-aware)
+  is not `terminal`, refuse `REFUSAL_RULES.closedTicket` with the reason
+  "This ticket is closed; a migration may only move it to a terminal
+  state." Two cases, reusing `WF_OPS_V2` (already declared for the
+  "latest, not pinned" case) rather than a new fixture, since it carries an
+  active state (`triage`) and a terminal one (`shipped`) at the same
+  version: a closed ticket (moved to `done`, then `ticket.closed`) mapped to
+  `triage` refuses with the reason verbatim; mapped to `shipped` (a
+  DIFFERENT terminal state) commits, and a second context that also folds
+  the accepted rebind confirms — via `getEntityState`, not assumed from the
+  accept alone — the ticket lands on `shipped`/`terminal` still carrying its
+  `closed` claim —
+  (`packages/rule-engine/test/workflow-rebind.test.ts`)
+- **13.609** ✅ Ruling 53(ii), Finding 5 (2026-09-17) — the bulk rebind route
+  had no gate at all for a closed row: the SELECT never read `closed_at`, so
+  a closed ticket's own occupied state could be mapped onto a non-terminal
+  target and commit, landing `closed_at IS NOT NULL` beside an active
+  `state_category` — the same invariant breach as 13.608, reached through
+  the route instead of a single event. Fix: the SELECT gains `closed_at`,
+  and BEFORE any event is built, a closed row (`closed_at IS NOT NULL`)
+  whose mapped target's category is not terminal refuses the whole request
+  with `migration.closed-to-non-terminal`, naming the count and the
+  non-terminal state(s), following `migration.unmapped-state`'s own
+  refusal shape. Own workflow pair, type and two tickets seeded (one open,
+  one moved to `done` then closed): mapping the closed ticket's `done` onto
+  a declared ACTIVE target refuses with the reason verbatim and appends
+  NOTHING (ledger unchanged, `proj_tickets` unmoved); the identical batch
+  with `done` mapped onto a DIFFERENT terminal state instead commits
+  (`count: 2`) and the ticket lands there still closed —
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- **13.610** ✅ Ruling 53(iii), Finding 5 (2026-09-17) — `workflow.defined`'s
+  republish check validated a `stateMapping`'s target only for EXISTING
+  (`unknownTargetState`) and DROPPED-not-current (`stillExists`), never for
+  CATEGORY — so a dropped TERMINAL state could be remapped to a non-terminal
+  survivor, and `foldTicketToWorkflowVersion` (which spreads `...state`)
+  would carry a closed ticket's `closed` claim onto that non-terminal
+  `stateId` with no event in its history ever having touched it. Fix: for
+  each `stateMapping` entry, when the OLD state's category (in `latest`) is
+  `terminal` and the TARGET's category (in `payload.states`) is not, refuse
+  `REFUSAL_RULES.workflowStateMapping` with the reason "The stateMapping
+  sends terminal state "<old>" to "<target>", which is not terminal; closed
+  tickets must stay in a terminal state, so a dropped terminal state may
+  only map to another terminal state." New fixture `wf_two_terminal` (two
+  terminal states in v1, `done`/`archived`) so v2 can drop one and still
+  satisfy `validateWorkflowDef`'s own "no terminal state" gate on the
+  survivor — needed for this case to reach the stateMapping category check
+  at all rather than refusing `workflow-structure` first: `done` (terminal,
+  dropped) mapped to `doing` (active, survives) refuses, naming both
+  states; mapped to `archived` (the OTHER terminal survivor) accepts —
+  (`packages/rule-engine/test/engine.test.ts`)
+
+**Final fix wave, round 2 (2026-09-17) — opus re-review findings N1 and N2.**
+
+- **13.611** ✅ Ruling 56(a), Finding N1 of the opus re-review (2026-09-17) —
+  closed ⇒ terminal's FOURTH door: 53(iii)'s loop only walks
+  `stateMapping`, owed for a DROPPED state, but a state that KEEPS its id
+  owes no mapping at all — and `foldTicketToWorkflowVersion`
+  (`ticket-state.ts:359`) recomputes a ticket's `stateCategory` from the
+  new definition regardless, so an author flipping a SURVIVING terminal
+  state's category to active or open (the builder's category select
+  carries no published-state lock, only a permission gate,
+  `state-node.tsx:41-42`) reaches the identical `closed_at IS NOT NULL`
+  beside a non-terminal `state_category` that (iii) exists to forbid, with
+  `validateWorkflowDef` seeing nothing wrong (some OTHER state is still
+  terminal). Fix: a second loop over `payload.states`, refusing
+  `REFUSAL_RULES.workflowStateMapping` (the SAME id as 53(iii) — chosen
+  because `workflowStructure` refusals come only from
+  `validateWorkflowDef(payload)` alone, which never sees `latest` and so
+  could never name a "before" to compare against, while this check is
+  inherently a two-version comparison over the identical invariant) when a
+  state present in both `latest.states` and `payload.states` has category
+  `terminal` in `latest` and something else in `payload`. New fixture
+  `wf_two_terminal`'s `done` KEPT but demoted terminal → active (no drop,
+  no mapping) refuses with the reason verbatim; kept and unchanged
+  accepts — the positive control proving the gate reads categories, not
+  merely "did anything change" —
+  (`packages/rule-engine/test/engine.test.ts`)
+- **13.612** ✅ Ruling 56(b), Finding N2 of the opus re-review (2026-09-17) —
+  the bulk rebind route's `stateMap` accepted a caller-supplied `backlog`
+  KEY and silently overrode it (`toStateIdFor` always answers
+  `BACKLOG_STATE_ID` for a parked row regardless of what the map names for
+  it, Ruling 52(a)) — the unrefused mirror of naming `backlog` as a VALUE,
+  which `migration.unknown-target-state` already catches. The dialog can
+  never send such a key (`stateMap` is built from `fromWorkflow.states`
+  only), but a hand-built request can. Fix: a new rule
+  `migration.backlog-not-mappable`, checked right after `stateMap` is
+  built — before any workspace lookup, since the question needs nothing
+  but the caller's own body — with the reason "\"backlog\" cannot be a key
+  in the map: parked tickets carry across as parked automatically and need
+  no entry." A request naming `backlog` as a key refuses with that reason
+  verbatim and appends nothing —
+  (`apps/server/test/routes/builder-reads.test.ts`)
+
+**Block 13.650–13.653 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
+the property under test is that a CONTAINER, started by compose, picks up HOST edits — there is no test
+runner on either side of a Docker Desktop bind mount, and a unit test of the compose file would assert
+YAML rather than prove the reload. Numbers below were measured once, on this machine, at the head of
+this change's PR; they are readings, not guarantees. (The branch's high-water mark was **13.612**;
+`13.632`/`13.999` are this file's documented truncation traps, not free ids.)
+
+**These four were minted as 13.613–13.616 and RE-MINTED here on the controller's ruling of 2026-09-18.**
+Renumbering is otherwise forbidden in this catalogue; it is done once, for this block, because the four
+ids were not free when they were taken. `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+— on the branch since `5039209c`, which is BEHIND this change — reserves `13.613–13.649` for its twelve
+tasks and names `13.613`/`13.614`/`13.615`/`13.616` in its own test names. That plan was written when
+this file's high-water mark was 13.612, so "the next free id here" and "the next reserved id there"
+pointed at the same four numbers, and only this file was consulted. Nothing was red: the plan's ids are
+not in the catalogue yet, so no duplicate id existed to trip `check-case-ids`. It is fixed now rather
+than left because the second wave would otherwise mint twelve tasks on top of these rows, and a plan's
+reservation is a reservation. The allocation note at the top of this file now carries the rule.
+
+- 🧪 **13.650 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
+  baked image.** `docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml
+  up -d --build server` run from the executor's worktree: cold build **94 s**, container healthy
+  **~24 s** after start, `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,
+  "phone":false}` — which proves the OAuth pair reached the container but NOT that `--env-file` is
+  what put it there, and the causal half was measured and refuted: with the flag omitted, compose
+  auto-loads `.env` from the project directory and `GOOGLE_CLIENT_ID` still renders its full 72
+  characters (control: `env | grep -c GOOGLE_CLIENT_ID` → 0 in the shell). The flag's real effect is
+  turning a MISSING `.env` into a hard stop rather than a silent empty substitution. Then the check
+  that the 2026-09-09 incident was: `docker exec gisik-nokma-dev-server-1 grep -c closed_at
+  /repo/apps/server/src/read/ticket-cards.ts` → **4**, with the same-file control `collaborator_ids` →
+  **3**. Read through the mount, so it is the branch's source rather than a compiled-in value — against
+  the stale image it was **0** (control 2, i.e. a valid measurement), and the owner's Backlog tab was
+  failing at exactly that. Cost, two readings at two moments rather than the flattering one:
+  **1.602 GiB / 7.667 GiB, 2.30 % CPU** immediately after W1, while the seven `tsc --watch` processes
+  were still emitting their initial `dist`, and **1.194 GiB, 2.24 % CPU** once settled. The second is
+  the steady state. Mounts: the override declares **ten**, and the container reports **eleven** — the
+  extra is the base file's own `./reference:/app/reference:ro` surviving the merge, as designed, and
+  inert because `/app` does not exist in the dev stage. The mount that matters for `seed:cc` is
+  `/repo/reference`, which this override declares itself. All eleven resolve under the worktree
+  (`docker inspect --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}'`).
+  (`docker-compose.hot.yml`, `apps/server/Dockerfile`)
+- 🧪 **13.651 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
+  `console.log("HOT-WITNESS-SERVER")` added at the top of `apps/server/src/index.ts` appeared in
+  `docker logs` and a `[tsx] change in ./src/index.ts` restart line followed in **1.93 s** —
+  re-measured after the container command gained the watcher supervisor; it was **1.62 s** before
+  that, and the supervisor costs nothing on the reload path (`restarts=0` on the container across
+  every edit here). **The
+  measurement carries a negative half that matters more than the positive one:** the same edit written
+  as a RENAME-OVER (`mv` a temp file onto the path — the atomic-save shape) produced **NO inotify event
+  in the container at all** and never reloaded, measured with a timestamped `fs.watch` on the same file
+  (in-place append → one event at 3887 ms; rename-over → zero events). So host→container events cross
+  the Docker Desktop mount for in-place writes and NOT for rename-over, and a save that uses the latter
+  is missed silently rather than slowly. Recorded rather than papered over with polling: the dispatch's
+  condition for enabling `CHOKIDAR_USEPOLLING` is that inotify events provably do not cross, and this
+  measurement shows they do, partially. **The same case carries a second negative: the watcher
+  SUPERVISOR was tried and does not work.** A dead package watcher is invisible from outside — the
+  container stays up, `/healthz` answers, `docker ps` says healthy — so a `kill -0` poll over the two
+  backgrounded jobs was written and shipped to a running container. It was then measured: `pkill` on
+  the tsc processes left the container healthy and `restarts=0`, and the supervisor never fired. Two
+  independent reasons, both measured — busybox `ash` has no `wait -n` (a job exiting 7 reported status
+  0), and `kill -0` on an exited-but-unreaped background child still succeeds, so the liveness test
+  never turns false. The guard was **removed rather than left in place**, because a guard that cannot
+  fire is worse than none: it is trusted. The failure is documented as an operator check instead, with
+  a count — `ps -o args= | grep -c "typescript/bin/tsc"` → **7**, one per package; the near-miss
+  pattern `tsconfig.json --watch` matches **9** because the container's own command line and the
+  `pnpm -r` parent both contain it. (`docker-compose.hot.yml`, `docs/runbook.md`)
+
+  **AMENDED 2026-09-18 (Step 1b) — the save shape of the tool that does the editing, the watcher change it
+  forced, and a correction to the count at the end of this case.** The in-place measurement above was true
+  and incomplete. `tsx watch` is still what runs; what changed is that it now POLLS, and both halves of that
+  sentence are measured:
+  **the assistant's Edit tool writes by RENAME-OVER, not in place** — the host inode changes on every edit,
+  measured three times across two files (`apps/web/app/sign-in/page.tsx` `204060486 → 204060616 → 204060679`,
+  `apps/server/src/index.ts` `204014631 → 204061084`), which makes the rename-over shape this case calls an
+  occasional "atomic save" the shape EVERY assistant-written server edit has. **And that shape does not
+  merely get missed — it kills the watch.** After one such write to `src/index.ts`, neither a true in-place
+  write (inode preserved, measured) nor a `touch` produced a `[tsx]` line in 15–20 s, while the same in-place
+  write on a freshly restarted container produced `[tsx] change in ./src/index.ts Restarting...` in **0.5 s**.
+  In between, the API served stale code with `/healthz` answering 200 and the correct file on the mount.
+  **Door one was measured and is closed:** `node --watch --import tsx src/index.ts` — Node's watch mode
+  watches each loaded module's parent DIRECTORY rather than the inode, so it should be indifferent to the
+  save shape — did not restart on a host rename-over, a host in-place write, or a write made INSIDE the
+  container. The last of those crosses no mount at all, so it is the watcher not seeing its own entry point,
+  not virtiofs losing events. **Door two ships:** `CHOKIDAR_USEPOLLING=true` with `CHOKIDAR_INTERVAL=1000`.
+  Witnessed in ONE container, not restarted between the halves — an Edit-tool write (rename-over, inode
+  verified changed) restarts it in **1.6 s** and its marker is served; a true in-place write AFTER that
+  restarts it again in **1.6 s**, so the watch survived the rename; and a `packages/domain/src` edit reached
+  `dist` and restarted the server **2.6 s** end to end. Cost, settled `docker stats` with the variable
+  overridden back to empty in the same session: CPU **6.05–6.47 %** with polling on versus **2.39–3.73 %**
+  off, memory ~1.24 GiB versus ~1.22 GiB.
+  **The correction:** the two operator counts at the end of this case cannot be produced by the commands as
+  written. Measured on a container with all seven watchers alive — unbracketed
+  `ps -o args= | grep -c "typescript/bin/tsc"` prints **9** and unbracketed `"tsconfig.json --watch"` prints
+  **11**, because the `sh -c` line and the `grep` process match themselves. Bracketing the first character
+  (`"[t]ypescript/bin/tsc"` → **7**, `"[t]sconfig.json --watch"` → **9**) reproduces the numbers this case
+  claims. The runbook's copy of the check is corrected in the same change set.
+  (`docker-compose.hot.yml`, `docs/runbook.md`)
+- 🧪 **13.652 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
+  watcher SHAPE.** `export const HOT_WITNESS = "domain-hot";` appended to
+  `packages/domain/src/index.ts`, plus `console.log(HOT_WITNESS)` in the server entry importing it from
+  `@gisik-nokma/domain` (by package name, so it resolves through `./dist`): the marker appeared in
+  **3.74 s** (re-measured with the supervisor; **3.92 s** before it), with `HOT_WITNESS` counted **1**
+  in `/repo/packages/domain/dist/index.js` and the log
+  showing both restarts — `change in ./src/index.ts` and `change in
+  ./../../packages/domain/dist/index.js`. Total watchers on a settle: seven `tsc -p tsconfig.json
+  --watch` (one per package), `tsx watch`, and the server process.
+  **AMENDED 2026-09-18 (Step 2 Part 0) — the package watchers' OWN save shape.** The `tsc --watch` loops
+  behind this case watched each FILE: `tsc`'s default strategy is `UseFsEvents`, which in the 5.9.3
+  bundle is `fsWatch(fileName, File, …)` — a watch on the inode, so it carries the same blindness this
+  case records for `tsx watch`. Both hot services now set
+  **`TSC_WATCHFILE=UseFsEventsOnParentDirectory`** (case 5 of the same bundle), which watches the parent
+  DIRECTORY rather than the file. Witnessed in BOTH containers with no restart between the halves: a
+  rename-over Edit of a marker reached both `dist` copies in **~1 s** (host write `1789679099`, compile
+  line `2:35:00`); an in-place append of a STATEMENT marker that followed reached both in **~1 s**
+  (host inode `204132254` before **and** after, so provably not a rename; write `1789679122`, compile
+  line `2:35:22`); and the revert put both back to zero. Settled `docker stats` for the pair: `server`
+  **3.99–6.69 %** CPU / 1.266 GiB, `web` **1.55–1.69 %** / 1.332 GiB, beside this file's chokidar
+  figure for the server's own watcher.
+  **Two instruments lied before these numbers were trusted, and both are recorded because both read as
+  a watcher verdict.** (a) *A marker the emitter does not carry measures nothing.* A marker comment
+  placed before an elided declaration (`export type { PrefsOrigin }` — a type-only re-export, absent
+  from the JS output) is dropped with it, and a bare `//` comment appended at EOF is dropped too, while
+  a STATEMENT marker at that same EOF position is emitted; both silent shapes read as `0 in dist`.
+  (b) *A poll timed from the operator's own tool call measures the OPERATOR* — the write is often
+  already compiled before the loop's first iteration, so it reports `0 s` and measures nothing, and a
+  broken marker's `0 in dist` then gets read as a watcher failure. The instrument that actually
+  measures is the compile line in `docker logs --since …` against the host file's mtime. **This case's
+  own amendment was first written the other way round** — a "the directory door fails the in-place
+  half" conclusion drawn entirely from instrument (a) — and is corrected here rather than deleted,
+  because the false reading was confident enough to have shipped.
+  (`docker-compose.hot.yml`)
+- 🧪 **13.653 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
+  container.** `docker compose … up -d server` with **no** `--build`: container id
+  `df98f7588bf5…` identical before and after, and zero build/export/name lines in the output. And the
+  plain path still reads what it read before: `docker compose --env-file .env -f docker-compose.dev.yml
+  config --services` lists all six services including `server` and `web`; `git diff
+  origin/owner/workspace-edits -- docker-compose.dev.yml apps/web/` is **empty**; and `docker build -f
+  apps/server/Dockerfile .` with no target still produces an image whose `CMD` is
+  `["node","dist/index.js"]` — the check that the new `dev` stage did not become the default build,
+  which it would have if it had been appended after `runtime` instead of placed before it.
+  (`docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`)
+
+**Block 13.654–13.657 — hot-reload dev mode for the compose `web`, 2026-09-18.** All four are `🧪`, for the
+reason the block above gives: the property under test is that a CONTAINER, started by compose, picks up HOST
+edits, and there is no test runner on either side of a Docker Desktop bind mount. Numbers were measured once,
+on this machine, at the head of this change's PR — readings, not guarantees.
+
+- 🧪 **13.654 — the hot `web` comes up from the worktree, serves the BRANCH's source, and proxies to the hot
+  server.** Cold image build **68 s**. `up -d web` (no `--build`) → `curl :3001/` answers **307** (the sign-in
+  redirect) **40 s** later, and `curl :3001/v1/auth/methods` returns
+  `{"google":true,"apple":false,"phone":false}` in **139 ms** — the load-bearing half, because with
+  `SERVER_ORIGIN` unset or wrong the same proxied path returns **500 after a 30-second hang** while the app
+  itself still serves. All **11** mounts resolve under the executor's worktree (4 under `apps/web/`, 7 package
+  `src` trees, none of them `node_modules`, `dist` or `.next`), and the `server` container was **not**
+  recreated by that command (same id, `Up 19 minutes` at the reading).
+  **The :3001 handover, as it happened.** The listener was pid **26954**, `ucomm=node`, executable
+  `/Users/kiro/.nvm/versions/node/v22.22.2/bin/node`, thread titled `next-server (v15.5.25)`; its parent
+  26946's argv was `.../next/dist/bin/next dev -p 3001`, grandparent `pnpm --filter @gisik-nokma/web dev`,
+  cwd the owner's primary checkout. The whole tree was stopped, not just the socket holder, because
+  `next dev` respawns its server child. 3001 was free **1 s** later, and the first 307 came **107 s** after the
+  kill. **A second, unplanned recovery is part of this case:** at ~01:35 the Docker engine restarted on its own
+  (every container `Exited`, the `dev` ones 137), and `up -d server web` brought both back with the **same
+  container ids** in **7 s**, `google:true` included.
+  (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
+- 🧪 **13.655 — a web-source edit is live in seconds, in BOTH save shapes, with the executor's own tool.** A
+  `data-hot-witness` marker added to `apps/web/app/sign-in/page.tsx` via the Edit tool was served by
+  `curl :3001/sign-in` (and gone again after the revert), restarting the compile in **1.2 s / 1.5 s / 1.5 s**;
+  a **rename-over** (`mv` a modified copy onto the path) compiled in **1.6 s**; and a **true in-place write**
+  (host inode verified UNCHANGED, `204060733 → 204060733`) compiled in **2.6 s** and was served within 4 s.
+  That last one was measured on a SECOND pass, and the correction matters: the first pass labelled the three
+  Edit-tool timings "in-place edits", and **they were not** — the Edit tool writes by rename-over (host inode
+  changed on every edit: `204060486 → 204060616 → 204060679`), so the entire first pass was the rename-over
+  shape, which is what the case four sentences later says. The numbers were right and the label was wrong, and
+  a reader would have taken "both shapes" as licence not to care which one a save uses. The rename-over half
+  is the load-bearing one either way: it is the shape 13.651 records the SERVER's watcher permanently losing
+  its watch over, and Next's webpack watcher takes it without complaint.
+  **One outlier is recorded rather than smoothed: 59.4 s** between a write and its compile; it landed, but a
+  30-second wait reads it as lost, which is how the first pass mis-read it. **The instrument matters:** the
+  Edit tool's round-trip precedes any curl poll, so a curl-based stopwatch starts ~17 s late; the write's own
+  mtime against the compile line is the measurement.
+  **A claim in this case was retracted, and the retraction is the more useful half.** The first version said
+  `docker logs` WITHOUT `--since` under-reports (6 lines against 9). It does not: that reading compared a
+  **summarised** result against a pass-through one — this machine's Bash hook routes commands through `rtk`,
+  which can replace a bare `docker logs` output with its own summary, and the tell was a trailing
+  `[warn] 0 warnings (0 unique)` / `[info] 0 info messages` footer that is rtk's and not the container's.
+  As a control, bare and `rtk proxy` agree exactly (**658 lines each**). The surviving rule is the inverse one:
+  a suspiciously short log read is evidence about the READER, not about the container.
+  (`docker-compose.hot.yml`, `docs/runbook.md`)
+- 🧪 **13.656 — a PACKAGE edit reaches the web through `dist`, and the package watcher can silently stop.**
+  `packages/ui/src/tokens.ts`: `blue600` `#3a6db0` → `#abcdef`. The web container's own
+  `packages/ui/dist/tokens.js` gained the new hex, and the SERVED HTML carried it **4 times** with the old hex
+  at **0** — `themeStylesheet()` reads the palette through `dist`, so a token edit is visible on :3001 without
+  a rebuild. Compile **6.7 s** after the write (20:19:21 → 20:19:27.7). **The revert is the finding:** the
+  in-place write that put the old hex back was **not** seen by the web container's `tsc --watch` — 80 s later
+  `dist` was still stale and the served page still `#abcdef`, and a `touch` did not wake it either. Only
+  restarting the container restored it (307 again in **10 s**, palette back on the first poll). So the
+  package watchers share the server's failure class even though Next's own watcher does not, and the reliable
+  recovery is a restart rather than a save-shape change. Cost of the settled pair, one reading with polling
+  on: `server` **8.03 %** CPU / 1.686 GiB, `web` **1.80 %** CPU / 2.685 GiB — the web holds its own `dist`
+  and `.next`, which is why its memory is the larger of the two.
+  **AMENDED 2026-09-18 (Step 2 Part 0).** The web container's package watcher is the one this case caught
+  going stale (the 80 s revert above). Its cause is now named rather than inferred: the default
+  `UseFsEvents` strategy watches the file's INODE, so a rename-over save — the shape the assistant's own
+  Edit tool writes — leaves it watching a file that no longer exists at that path. Both hot services now
+  carry `TSC_WATCHFILE=UseFsEventsOnParentDirectory`; the `web` half was witnessed in the same run as
+  13.652's amendment, one write reaching both containers' `dist` copies in ~1 s, in both save shapes,
+  with the inode checked to have survived the in-place half. **So the remedy this case records — restart
+  the container — is no longer the remedy for a LOST watch**; a `restart web` is still what a dependency
+  or `package.json` change needs. Cost of the settled pair after the change is in 13.652.
+  (`docker-compose.hot.yml`)
+- 🧪 **13.657 — the un-hot path is intact, a no-`--build` `up` neither rebuilds nor replaces, and the prod
+  stages are unchanged — proven by CHECKSUM, not by reading a diff.** `docker compose … up -d server web`
+  with no `--build`: exit 0, **zero** build/export/name lines, and `web`'s container id `daac60fe23a7`
+  identical before and after. `docker-compose.dev.yml` is byte-identical to the base
+  (sha256 `4af45990c8cd57052562fb794f64c5bbc84ce3b930ab592a2a5d68f0b4bf4a38` on both sides, and that is the
+  proof — the `git diff` for it prints nothing at all, which is also what a typo'd command prints);
+  `apps/web/Dockerfile` is **67 added / 0 deleted**, and its `runtime` stage extracted from the first
+  `FROM … AS runtime` hashes identically to the base's (`c66cc6f9f59f…`). And the un-targeted build is still
+  the production one: `docker build -f apps/web/Dockerfile .` with no target produces an image whose
+  `CMD` is `["node","apps/web/server.js"]` with `WORKDIR=/app` (digest `34e65c7a…`) — the check that the new
+  `dev` stage did not become the default, which it would have if it had been appended after `runtime`. **One
+  caveat on the instrument:** the FIRST attempt at that build was killed by the engine restart above, and the
+  background wrapper reported `exit code 0` while its own log said `EXIT=1` — the log is the reading.
+  (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
+
+**Block 13.658 — the interactive prototype refresh, 2026-09-18.** 🧪, for the block's usual reason: the
+property under test is that an UNPACK is faithful, and there is no test runner on either side of it. The
+proof is a comparison, so the case is written as one.
+
+- 🧪 **13.658 — the owner's 2026-09-18 export unpacks deterministically and the unpacked page renders what
+  the bundle renders.** `design-system/tools/unpack-bundle.mjs` reads the self-extracting "Bundled Page"
+  (`__bundler/manifest` `:371`, `ext_resources` `:375`, `page_order` `:379`, `template` `:383` of the
+  565,271-byte snapshot, sha256 `bf64cc44…`) and writes `interactive/desktop.dc.html` (320,109 B, sha256
+  `2cda054b…`) plus the runtime `interactive/support.js` (69,150 B, sha256 `8fe7df74…`), which the repo has
+  never contained — **so the committed prototype was previously un-runnable and is now runnable**. It
+  prints every file it wrote with its byte count and hash, and refuses a bundle whose three required blocks
+  are absent. **The faithfulness witness is a CONTROL, not an assertion:** the bundle is itself
+  self-extracting, so it renders the same page from its own inline payload, and the two were loaded side
+  by side (`python3 -m http.server 8777` for the unpack, `:8788` for the bundle — never 3001/3021). Both
+  produced `#dc-root` with **identical visible text** ("Gisik Nokma The keeper of memory Phone Email link
+  …", 213 chars) and **zero** surviving `{{ }}` placeholders; the rendered DOM dumps differ by exactly one
+  attribute, the runtime's own `data-sc-name`, derived from the page's filename (`desktop` vs
+  `2026-09-18-gisik-nokma-desktop-1.bundle`). Everything else is byte-identical. The List screen was then
+  reached through the prototype's own sign-in flow and screenshotted
+  (`refs/2026-09-18-desktop-unpacked-list.png`): controls row, the `epic · 4 tickets` group band,
+  hierarchy rows, status pills, due-date sentences and `N of M done` all match the owner's screenshot.
+  **Two instruments lied inside this case.** (a) The first version asserted `customElements.get('x-dc')`
+  is defined and `querySelector('x-dc')` is non-null — **both are FALSE on success**: the runtime finds the
+  raw tag, injects `x-dc{display:none}`, and REPLACES it with `<div id="dc-root">`, so that check could
+  never have passed. (b) A shell `diff` reported the two DOM dumps **"identical"** while they differed by
+  32 bytes — the same false-"identical" this repo has recorded before; `cmp` and a raw byte comparison in
+  Node found the difference immediately. **And one real difference from the bundle is recorded rather than
+  smoothed:** the unpacked page emits 5 console errors + 2 warnings the bundle does not — parse-time
+  failures on `{{ n.iconPath }}`-style bindings inside inline `<svg><path d=…>` — because the bundle keeps
+  its template inert inside a `<script>` while the committed form is the template as live HTML. The final
+  DOM is unaffected (the dumps match), so this is parse-time noise inherent to committing the template as
+  a page, not a loss of fidelity; it is named here because the dispatch's bar was "zero console errors"
+  and the measurement is 7.
+  (`design-system/tools/unpack-bundle.mjs`, `design-system/interactive/PROVENANCE.md`,
+  `design-system/interactive/desktop.dc.html`, `design-system/interactive/support.js`,
+  `design-system/MASTER.md`)
+
+**The mobile entry is written too, and it took a flag to say so.** `ext_resources` names TWO entries
+under one id (`./Gisik%20Nokma%20-%20Mobile.dc.html`), so the tool holds rather than picking: with no
+flag it prints both and writes neither, which is how this refresh was first filed. `--mobile-entry 1`
+now NAMES one, and the refresh wrote `interactive/mobile.dc.html` (227,232 B, sha256 `7316062b5bb3…`)
+from entry #1 — the one that inlines the Google mark as `<svg>`, consistent with the same change the
+2026-09-18 desktop template made to its own `isSignIn`. Entry #2 (226,533 B, sha256 `14ca5b8d89ab…`)
+is not written; the two differ only at line 153, and which export is NEWER is still not derivable from
+the bundle (`page_order` is empty, no timestamps), so the choice is recorded as a choice rather than a
+determination. Both halves of the flag are witnessed: no flag → nothing written; `--mobile-entry 3` →
+exit 1, *"this bundle has 2 mobile entries"*.
+
+
+**Block 13.659–13.671 — the List tab restyled to the desktop prototype, 2026-09-18.** ✅ for the thirteen
+cases below, which live in `packages/app-core/test/views/ticket-list.test.tsx` and
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx`, and are green at the tip
+(the package suite reads `1454 passed`, exit 0). **The block carries one scope statement rather than one
+doubt:** this package vitest config loads no stylesheet, so every assertion is about the MARKUP a restyle
+renders — which classes exist, which state each control reports, which sentence each cell composes — and
+never about a colour, a radius or a pixel; a case here that claimed to measure a shadow would be measuring
+jsdom. **The claim that used to sit here — that the visual half was held by `packages/ui/test/components.test.tsx`
+and `apps/web/e2e-viewport/` — was FALSE and is retracted: neither suite names a single `.gn-list__*`
+selector (every `it` in the ui file names another block; the viewport sweeps never open this tab, because
+the project page defaults to the board).** It was a load-bearing falsehood: it sat above
+`.gn-list__columns-tray[hidden] { display: none }`, which could have been deleted with every suite green
+while the tray stopped closing in a browser. What holds the declarations this restyle depends on is now
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx` (13.671). **The residual gap is named, not
+papered over:** nothing measures the COMPUTED result for this tab in a browser — no viewport sweep, no
+screenshot diff — so a declaration that is present and then overridden, or a token that resolves to the
+wrong colour, is invisible to every suite in this repo. **Citations name the
+2026-09-18 prototype (`design-system/interactive/desktop.dc.html`, 4,050 lines, 320,109 B, sha256
+`2cda054b…`), whose `isListView` block is `:405-479`** — the same file 13.658 unpacks, and the reason
+these numbers are not 13.658-era numbers: the 2026-09-18 refresh moved every line (the offset is not
+constant: 176→180, 477→481, 1827→1905, 2584→2779), so every citation here was re-measured against the new
+file rather than shifted by a delta.
+
+- ✅ **13.659 — `Group by` keeps its accessible name and exactly its five keys.** The chip tray and the
+  picker are the two things a restyle silently rewrites, so the picker is asserted twice over: the
+  `aria-label` attribute verbatim (`Group by`) and the panel offering `epic/status/assignee/type/flat`
+  and **no sixth key** — the negative half is the one a `toEqual` over five names cannot make, because it
+  is the half that catches a key quietly grown to six. Measured and recorded, not "fixed": the COMPUTED
+  accessible name is `epic Group by`, since React Aria composes `aria-labelledby` from the value and the
+  label and that wins over the explicit `aria-label`. Pre-existing, and the constraint pins the attribute.
+  (`packages/app-core/src/views/ticket-list.tsx`)
+
+- ✅ **13.660 — the tray renders five chips, each with its own accessible name and checked state.**
+  `Status/Assignee/Due date/Type/Progress` as five real checkboxes, checked exactly where the preferences
+  say, so "five chips" is a count of CONTROLS and not of decorated spans. The CONTROL arm asserts both
+  answers in one run — including that the chips are MOUNTED while the tray is closed, which is what the
+  `hidden` attribute (rather than a `{open ? … : null}` conditional) buys and what an existing case in
+  this file depends on. A `hidden` subtree is out of the accessible tree, so the closed-tray arm reads the
+  DOM directly and says so.
+
+- ✅ **13.661 — the Columns toggle opens and closes the tray it names.** `aria-expanded` false → true →
+  false across a click, with the tray’s `hidden` attribute flipping in step — the state the old
+  `<details>`/`<summary>` disclosure reported structurally and that a plain button has to state itself.
+
+- ✅ **13.662 — the group header band names its group and counts its own rows.** Each of the four axes
+  renders its own word (`epic`, `state`, `assignee`, `type`) beside its own section title and a count of
+  that section’s own rows; the singular (`state · 1 ticket`) and the flat case (no band at all — there is
+  no group to name) are cases in their own right, because a band that renders under `flat` would be naming
+  nothing. Counts were MEASURED, not inferred from the fixture list: `assignee · 3 tickets` (not 4) and
+  `type · 3 tickets` (not 4), the assigned row and the epic row being the two that move. **A fifth arm is
+  the one that makes the count FALSIFIABLE:** every other arm renders a section whose rows and whose
+  visible nodes are the SAME set, so `nodes.length` (the post-`visibleNodes` list) passes them all —
+  measured: swapping the two in `ticket-list.tsx` compiled and left the whole suite green. The collapsed
+  arm collapses a parent under `epic` grouping and asserts the band still reads `epic · 2 tickets` while
+  the table shows one row; it is the only fixture arrangement where the two numbers differ (`status` puts
+  the parent and child in different sections so they never nest, and `flat` has no band), and the same
+  mutation now reddens exactly that case with `epic · 1 ticket`. **A DECLARED DIVERGENCE rides with it:**
+  the prototype counts a group’s CHILDREN (`const n = g.items.length`, `:2920`, held separately from
+  `g.epic` at `:2904`), so for the same two rendered rows it prints `1 ticket` where this prints
+  `2 tickets` — because here the epic IS a row (`list-model.ts`, `nestRows`) and the band answers for its
+  section the way the summary answers for the project. An earlier revision of this bullet cited a
+  prototype expression that does not exist; the measured behaviour is what is recorded now.
+
+- ✅ **13.663 — the title cell indents by depth, from the row’s own numbers.** `16 + depth*22`:
+  epic 16px, child 38px, grandchild 60px, three distinct values, scoped to the List region because an
+  assigned row also renders in the *Recently assigned* pin at depth 0. A second arm holds the leaf case:
+  the left edge is set by DEPTH and not by `hasChildren`, so a leaf reserves the caret’s column rather
+  than sliding 22px left of its siblings.
+
+- ✅ **13.664 — the status pill renders the state’s name and its category dot.** `Doing` inside a chip
+  carrying the active category’s own modifier and a real `.gn-chip__dot`, and `Done` under terminal’s
+  — with the dot asserted present in one case and the modifier asserted ABSENT in the other, so the two
+  arms cannot both pass on the same markup.
+
+- ✅ **13.665 — a due date is rendered as a claim, with its claimant.** `30 Aug 2026 — Kiro’s claim` —
+  the date plus who asserted it, which is the fact the column is about. (The prototype’s relative
+  labels — `Overdue by N days`, `Due today`, `Due tomorrow`, `Due <weekday>` — are NOT reproduced: they
+  need a clock, no view in `app-core` reads one, `TicketList` has no `today` prop, and the prototype
+  itself pins `new Date("2026-09-08T00:00:00Z")`. Filed rather than faked.)
+
+- ✅ **13.666 — a closed ticket’s due cell reads its closure, still attributed.** `Closed 17 Sep 2026 —
+  Kiro’s claim`, plus the negative that the bare due date does NOT also appear: the swap is a
+  replacement, not an addition. The closure travels as its own claim (`ListRow.closed`), which is what
+  makes the prototype’s `"Closed " + (t.closed || nice)` exact here instead of a formatting accident.
+
+- ✅ **13.667 — an unclaimed due date is named, never blank.** `No date claimed`, and no dash — a dash
+  beside an attributed-claims column reads as "we looked and found nothing", which is a claim about the
+  record this view cannot make.
+
+- ✅ **13.668 — progress reads `N of M done`, and its absence is a dash.** `3 of 8 done` and
+  `4 of 8 done · 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
+  silently dropped), and a row with no rollup rendering `—` — asserted together with the absence of
+  `/done/`, so the empty arm cannot pass on a `0 of 0 done` that would be a claim about nothing.
+
+- ✅ **13.669 — the controls row, tray and table render under all three styles.** `hig`, `minimal` and
+  `neo` each render the controls row, the tray, the summary, the band and the table, and then their
+  `innerHTML` strings are compared with exactly one mask (`react-aria-*` → `ID`). The narrow mask is what
+  makes the equality a proof: React Aria’s `useId` tokens advance per React root, so the raw strings
+  differ on that alone and a broader normalisation would have hidden a real difference. No file in
+  `packages/app-core/src` reads `data-style`; the style is carried by CSS alone, and this case is the
+  product-side half of that claim.
+
+- ✅ **13.670 — the title’s weight is a fact about the row, not about the class.** epic 600, a child 400,
+  an unparented non-epic 500 — three distinct values, so a class-level weight cannot satisfy the case.
+  The prototype computes it per row (`isEpicT(t) ? "600" : depth ? "400" : "500"`), which is why it
+  renders as an inline style rather than in `.gn-list__open`.
+
+- ✅ **13.671 — the List’s classes, the attributes its selectors key on, and the four declarations this
+  restyle turns on, read out of `ui.css` rather than assumed.** Declared in
+  `packages/app-core/test/views/ticket-list-css-binding.test.tsx`, which exists because the block
+  docblock above used to claim the visual half was "held by `packages/ui/test/components.test.tsx` and
+  `apps/web/e2e-viewport/`" — **measured, that was false: neither suite names a single `.gn-list__*`
+  selector.** The false claim sat above `.gn-list__columns-tray[hidden] { display: none }`, a rule that
+  could have been deleted with every suite in the repo green while the tray stopped closing in a browser,
+  since the component closes the tray with the `hidden` ATTRIBUTE and `display: flex` outranks the UA
+  sheet. Five arms, each a pair of facts rather than one: (a) the class SET EQUALITY in both directions,
+  with the five known-inert hooks NAMED (`__empty`, `__narrowing`, `__pinned`, `__section`,
+  `__section-name`) so a new class with no rule cannot hide; (b) `display: flex` beside `[hidden] display:
+  none`, read as one shape so a missing rule reads as `null` rather than as an absent assertion, plus the
+  rendered `hidden` attribute the selector needs; (c) the spacer and the caret at the same width
+  (`1.375rem`, the prototype’s 22px — a relative assertion with an absolute one beside it); (d) the
+  transparent real checkbox beside the `:focus-visible` ring on the box that follows it, plus the
+  focusability and sibling order that make the rule paintable at all; (e) every `[attribute]` in a
+  `.gn-list*` selector checked against the attributes the component writes. **Four mutation witnesses:**
+  renaming the `[hidden]` selector reddens (a)+(b), changing the spacer width reddens (c), renaming the
+  focus rule reddens (a)+(d), and renaming a class in `ticket-list.tsx` reddens (a) — with `ui.css`
+  restored to its pre-mutation SHA-256 after each. **The residual gap is named, not papered over:** this
+  is declaration-level, so nothing here measures a COMPUTED result for this tab in a browser — there is no
+  viewport sweep, no screenshot diff, and a declaration that is present and then overridden is invisible
+  to every suite in the repo.
+
+(`packages/app-core/src/views/ticket-list.tsx`, `packages/app-core/test/views/ticket-list.test.tsx`,
+`packages/app-core/test/views/ticket-list-css-binding.test.tsx`, `packages/ui/src/ui.css`, `Features.md`)

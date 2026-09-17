@@ -836,12 +836,17 @@ describe('11.82 the window width is the model\'s, stated once', () => {
     const root = container.querySelector('.gn-timeline');
     expect(container.querySelectorAll('[data-week]')).toHaveLength(8);
     expect(root).toBeInstanceOf(HTMLElement);
-    // The TRACK LIST, not a bare count: `12rem var(--timeline-week-columns)`
+    // The TRACK LIST, not a bare count: `14.375rem var(--timeline-week-columns)`
     // substitutes a var as a component of the value, where
-    // `repeat(var(--n), 1fr)` would substitute one into a function argument —
-    // a form no test here could check, since jsdom computes no layout.
+    // `repeat(var(--n), minmax(0, 1fr))` would substitute one into a function
+    // argument — a form no test here could check, since jsdom computes no
+    // layout. `minmax(0, 1fr)` per week track (Board prototype port Task 11,
+    // spec Timeline `:506-538`) rather than a bare `1fr`: a plain `1fr` track
+    // carries an implicit automatic minimum of `auto` (min-content), so a
+    // long bar could still push a column wider than its share and defeat
+    // `.gn-timeline__bar`'s own ellipsis truncation.
     expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe(
-      'repeat(8, 1fr)',
+      'repeat(8, minmax(0, 1fr))',
     );
   });
 
@@ -853,7 +858,7 @@ describe('11.82 the window width is the model\'s, stated once', () => {
       '2026-08-24',
     ]);
     expect((root as HTMLElement).style.getPropertyValue('--timeline-week-columns')).toBe(
-      'repeat(2, 1fr)',
+      'repeat(2, minmax(0, 1fr))',
     );
   });
 
@@ -891,19 +896,23 @@ describe('11.82 the window width is the model\'s, stated once', () => {
     expect(consumed.length).toBeGreaterThan(0);
     expect([...new Set(consumed)]).toEqual(published);
 
-    // And the SUBSTITUTION FORM, which a name check cannot see. `12rem
+    // And the SUBSTITUTION FORM, which a name check cannot see. `14.375rem
     // var(--…)` substitutes the property as a plain COMPONENT of the value;
-    // `repeat(var(--…), 1fr)` substitutes into a function argument, fails to
-    // parse, and turns the whole declaration into `none` — the same silent
-    // collapse as the typo, behind the same green suite, because jsdom
-    // computes no layout.
-    // `12rem` is pinned DELIBERATELY, and it couples this app-core case to a ui
-    // width: what is load-bearing is that exactly ONE track precedes the week
-    // track list, because that is where the bar's `grid-column: i + 2` gets
-    // its `+ 2`. A ui-side change to the number of leading tracks must be seen
-    // here; a change to the width alone will redden this too, and re-reading
-    // this comment is the intended cost.
-    expect(css).toContain(`grid-template-columns: 12rem var(${published[0]});`);
+    // `repeat(var(--…), minmax(0, 1fr))` substitutes into a function
+    // argument, fails to parse, and turns the whole declaration into `none`
+    // — the same silent collapse as the typo, behind the same green suite,
+    // because jsdom computes no layout.
+    // The leading-track width is pinned DELIBERATELY, and it couples this
+    // app-core case to a ui width: what is load-bearing is that exactly ONE
+    // track precedes the week track list, because that is where the bar's
+    // `grid-column: i + 2` gets its `+ 2`. A ui-side change to the number of
+    // leading tracks must be seen here; a change to the width alone will
+    // redden this too, and re-reading this comment is the intended cost —
+    // paid here: Board prototype port Task 11 (2026-09-16, spec Timeline
+    // `:506-538`) widens the leading track from Plan 9's 12rem to the spec's
+    // 230px (14.375rem). Still exactly one leading track, so the `+ 2` math
+    // is unaffected.
+    expect(css).toContain(`grid-template-columns: 14.375rem var(${published[0]});`);
     expect(css).not.toMatch(/repeat\(\s*var\(--timeline-/);
   });
 

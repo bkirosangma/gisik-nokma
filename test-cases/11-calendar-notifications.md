@@ -61,6 +61,9 @@ computed "now".
 - **11.71** ✅ The grid states which days belong to the month it is headed by — (`calendar-view.test.tsx`)
 - **11.72** ✅ Whatever the mounting shell hands the grid is what the grid actually uses — (`calendar-view.test.tsx`)
 - **11.158** ✅ A workspace's own rank-1 type heads the lane in the calendar view, not just the built-in `'epic'` — (`calendar-view.test.tsx`)
+- **11.211** ✅ Ruling R4 (2026-09-16), the legend merge: the legend has exactly one checkbox per custom field — never fewer (a lost toggle) and never more (a read-only row disguised as a checkbox) — `Due date`/`In transit` render as read-only swatch-and-label rows and are provably not among the checkboxes, and both stay gated behind the SAME `model.customDateFields.length` guard 11.69 already pins, so they are never a reason to show the legend on their own — (`calendar-view.test.tsx`)
+- **11.212** ❌ Board prototype port Task 10: the calendar view restyles to the spec's Calendar metrics table (`docs/superpowers/specs/2026-09-16-board-prototype-port-design.md:349-363`) — nav/Today buttons, month title, legend card, a new weekday-head row, the day grid's tray ground with card/fill4 cells, a 24px today ring on the day number (replacing the prior whole-cell outline), and the accent-ground event pill generalised from bars-only to every non-custom item. ONE declared exception: the custom-field marker (`.gn-calendar__item--custom`) keeps its plain-text treatment and does not become a tinted pill — no `--gn-tint-purple` role exists or is added, per the spec's own measured refusal. Verified by `packages/ui/test/token-discipline.test.ts` (no colour literals) and `packages/ui/test/tokens.test.ts` (every `var(--gn-…)` referenced names an already-declared role — no new role was needed) staying green, plus `packages/ui/test/in-transit.test.ts`'s `.gn-calendar__item--pending` assertion, which this task left untouched, still passing — (`ui.css`, `calendar-view.tsx`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits 3104eae2. Nothing asserts the calendar’s restyled metric set; the verification the case itself named was three unrelated suites "staying green", which is the shape case 11.213 was retired for.
+- **11.214** ✅ Board prototype port Task 10, RULING 24 correction (coordinator, 2026-09-16): `.gn-calendar__items` declares `background: var(--gn-surface)`, not the calendar grid's tray — the REAL gate for the follow-up round's contrast fix, reading the actual `ui.css` the same way `packages/ui/test/in-transit.test.ts`'s existing checks already do. **Replaces case 11.213, retired**: 11.213 (`packages/ui/test/tokens.test.ts`) computed `contrastRatio(customMarker, surface)` from `tokens.ts` role lookups alone, framed as new coverage on the false premise that no `CONTRAST_PAIRS` row already named that pairing — one has, since commit `e09666ce` (Plan 9, 2026-09-04), already exercised across every style/theme by the pre-existing "declared contrast pairs meet their minimums" loop. 11.213 never read `ui.css` and so could not have caught the regression it claimed to guard: deleting `.gn-calendar__items`'s `background: var(--gn-surface)` declaration left 11.213, and the whole suite, green. This case is that CSS-reading gate, proven to guard by deliberately deleting the declaration, confirming the test reddens, and restoring it byte-identical — (`packages/ui/test/in-transit.test.ts`)
 
 ## Timeline view — React component (`packages/app-core`)
 - **11.73** ✅ A bar is drawn only from a claimed pair, with the rest sitting beside the grid — never in both places at once — (`timeline-view.test.tsx`)
@@ -194,8 +197,47 @@ it stayed in `apps/web` when the gateway left.*
   project: `/w/<id>/p/<pid>` (Board) joins too, between the workspace name and My Work — nine links.
   Each arm is its own `it()`, asserted in order, so a link added to any one shape reddens that shape's
   arm by name — the same discipline the single-array version kept, extended to three shapes instead of
-  one. —
-  (`app-nav.test.tsx`)
+  one. **AMENDED AGAIN, same day (Round 19c, owner: "move members into settings and settings should
+  always be visible on the nav bar"): `Settings` LEFT the workspace-scoped group; `Members` did NOT.**
+  An earlier draft of this change also dropped `Members`, on the theory that "move members into
+  settings" meant folding it under Settings' nav slot — the owner's own reference screenshots (design
+  mockups, same feedback round) contradicted that by keeping `Members` as its own top-level link
+  beside `Settings`, so it was restored, unchanged from before this round. What DID move is `Settings`:
+  it now points at a new global `/settings` (`app/settings/page.tsx`) instead of `/w/<id>/settings/
+  ticket-types`, carrying the workspace forward as `?workspaceId=` rather than a path segment when one
+  is in scope — a workspace-TYPED href cannot be unconditional, since this shell remembers no "current
+  workspace" outside a route or query param, but a query-carrying one can be. The three shapes are now:
+  without a workspace, `/workspaces`, `/inbox`, `/settings`, `/help`, `/account` — five, one more than
+  before (`Settings` joined the always tier). With one and no project: the served name, `/w/<id>/
+  my-work` and `/w/<id>/members` join after `/workspaces`, and `/settings?workspaceId=<id>` sits where
+  the old workspace-scoped `Settings` link did — eight links, same count as before this round, Board
+  absent. With one AND a project: Board joins too — nine links, same count as before.** **AMENDED AGAIN
+  2026-09-16 (Round 21, owner: "move back the nav bar settings to only be visible once a workspace is
+  opened... and move inbox to just before help"): `Settings` REJOINED the workspace-scoped group, and
+  `Inbox` moved to the bar's end.** Both reverse-or-move a link inside arms this case already owned, so
+  all three expected arrays changed in the same change set that changed the component — the discipline
+  this case exists to enforce, applied to itself. The shapes are now: without a workspace,
+  `/workspaces`, `/inbox`, `/help`, `/account` — FOUR, back to the pre-19c count, `/settings` having
+  left the always tier. With one and no project: the served name, `/w/<id>/my-work`, `/w/<id>/members`
+  and `/settings?workspaceId=<id>` join, with `/inbox` now sitting AFTER them, just before `/help` —
+  eight links, unchanged in count. With one AND a project: Board joins too — nine, unchanged in count.
+  **Two of the three arms would have stayed green on the Inbox move alone had they been unordered
+  sets**, which is why they are asserted in order; the adjacency itself is pinned separately by 13.414,
+  because an ordered whole-array assertion still passes if Inbox and Help move together within it.
+  **AMENDED AGAIN 2026-09-16 (Round 23, owner: "the board on the nav bar doesn't work. lets remove
+  it"): there are now TWO nav shapes, not three, and the third arm proves it.** Board is gone — it could
+  only ever render when the route already carried a project, which is exactly when the reader was
+  already standing on that board, so it was a link to the current page in every state it could reach.
+  `AppNav`'s `projectId` prop went with it, Board being its only consumer, so the third arm expresses
+  "a project is in the route" through `currentPath` alone. **The arm is KEPT rather than deleted, and
+  its job is now the inverse of what it was:** it used to prove a project ADDS Board, and now proves a
+  project adds NOTHING, with an expected array deliberately identical to the second arm's. That is not
+  a redundant duplicate — the nav still reads `usePathname()`, so a board route remains a distinct
+  input, and a future project-conditional link would redden this arm while leaving the second green,
+  which is what names the fault. Two explicit negatives sit beside the array (nothing points at
+  `/w/ws_1/p/p_1`; no link is named `Board`) so a failure says what came back rather than only that an
+  array grew. The shapes are now: without a workspace, four links; with one, eight; with one AND a
+  project, the same eight. — (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
 - **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the
@@ -248,9 +290,35 @@ pinned this contract's producer end while stating that its consumer was out of r
 - **11.194** ✅ `markRead` actually marks it: the count the client re-reads moves, and a second mark is still idempotent — (`notifications-consumer-roundtrip.test.ts`)
 - **11.195** ✅ `markRead` THROWS on another user's row, and that row is still unread when measured at the store — (`notifications-consumer-roundtrip.test.ts`)
 
+## Notification preferences — global, per-kind mute list (`apps/server`, `packages/domain`)
+
+*Account/help-screens plan, Task 5. A `mutedKinds` list, global (no `workspaceId` — the Inbox itself is a
+global route) and stored in a NEW table (`user_notification_preferences`), never as a fourth key on
+`PreferencesDoc`/`user_preferences` — see `packages/domain/src/notification-preferences.ts` for why that
+table's `(user_id, workspace_id)` key and its 30-day sweep-on-revocation make it the wrong home. Muting
+hides a kind from what is READ; it never stops the row from being WRITTEN.*
+- **11.197** ✅ `notificationPreferencesSchema` accepts the empty (everything-on) default and any real subset of the five kinds, refuses an unknown kind, and refuses an unknown top-level key (`.strict()`) — `EMPTY_NOTIFICATION_PREFERENCES` is exactly the empty-list answer — (`packages/domain/test/notification-preferences.test.ts`)
+- **11.198** ✅ The store answers the empty default for a user with no row, round-trips a written preference, upsert-REPLACES rather than merges on a second write, keeps two users' rows independent, and the database's own `CHECK` refuses a kind outside the five (positive control: a valid kind inserts fine) — (`apps/server/test/notification-preferences/store.test.ts`)
+- **11.199** ✅ `GET`/`PUT /v1/me/notification-preferences`: 401 with no session on both verbs and nothing stored; `GET` answers the empty default for a fresh user; `PUT` then `GET` round-trips and the `PUT` answers what it stored; an unknown kind and an unknown top-level key are both refused `400 {error:'invalid_notification_preferences'}` with nothing partial landed; and one user's write never touches another's row (positive control: the writer's own row did move) — (`apps/server/test/routes/notification-preferences.test.ts`)
+- **11.200** ✅ The read-side filter: `unreadNotificationCount` and `listNotifications` both exclude a muted kind's rows entirely — not merely marking them read — while an unmuted kind's row in the SAME fixture stays visible (the positive control against a query that silently returned nothing at all); an empty muted list changes nothing, the default; and `/v1/me/notifications` and its `/unread-count` sibling actually look the caller's stored preference up and pass it through — the wiring witness that `notifications.test.ts`'s own docblock says a route-registration test alone cannot give, since a store-level pass here is silent about whether the ROUTE ever calls `getNotificationPreferences` at all — (`apps/server/test/notifications/store.test.ts`, `apps/server/test/routes/notifications.test.ts`)
+
+*Task 6, same plan — the client half: the HTTP gateway over the route above, and the `/account`
+Notifications section it feeds. Driven against the REAL `createHttpClient` over a scripted `fetch`,
+matching `notifications.test.ts`'s own argument against a hand-written `HttpClient` stub.*
+- **11.201** ✅ `createHttpNotificationPreferencesGateway`'s `load()` GETs `/v1/me/notification-preferences` with no query string and parses the result through the domain's own schema — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.202** ✅ `save()` PUTs the whole document to the same path — asserted against the actual PARSED body `scriptedHttp` captured, not merely a `hadBody: true` flag, so a mutation sending `{}`, a hardcoded document, or a renamed key reddens this rather than passing unnoticed (coordinator review, 2026-09-15) — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.203** ✅ `load()` refuses a body naming a kind outside the five, rather than handing it to the view — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.204** ✅ `load()` names the door on a 404 rather than handing zod a bare `null` to parse — this route is session-gated and answers 401 to a stranger, never 404, so a 404 here means the request never reached the route at all — (`packages/app-core/test/online/notification-preferences.test.ts`)
+- **11.205** ✅ `NotificationsSection` renders one checked-by-default row per real kind, five rows — no invented "email" column, no "weekly digest" row, since neither exists server-side — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.206** ✅ A muted kind renders unchecked, and only that one — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.207** ✅ Clicking a row calls `onToggle` with that kind and does not flip local state itself — the component is controlled, owning no state of its own — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.208** ✅ The wiring witness: `/account` reads real preferences through `useAppServices().notificationPreferences` and renders the muted row unchecked — proof the seam carries a real answer through, which the page's own un-stubbed-rejects-to-all-on fallback (every other case in this file) cannot show — (`apps/web/test/account-page.test.tsx`)
+- **11.209** ✅ Toggling an unmuted row on `/account` flips it and calls `notificationPreferences.save()` with the expected next `mutedKinds` — the ONLY state update on the success path, so the flip standing is `toggleKind`'s own optimistic `setPrefs`, not an accident of the mock (coordinator review, 2026-09-15: `toggleKind`'s optimistic-flip-then-revert had zero coverage before this and 11.210) — (`apps/web/test/account-page.test.tsx`)
+- **11.210** ✅ A refused save reverts the optimistic flip once the reload settles — `load()` is called a second time (the `.catch()`'s reload firing, not the DOM settling on its own) and the row is drawn from that reloaded answer, so the optimistic mute does not stick — the same mechanism `/inbox`'s own `markRead` catch uses (case 11.147) — (`apps/web/test/account-page.test.tsx`)
+
 ## Permanently unused id ranges
 
-Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
+Three disjoint ranges/ids will never be filled, for three different reasons. Neither is a gap
 to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) for the same pattern.
 
 - **11.9–11.17, 11.19–11.35, 11.40–11.47** — Plan 9 Task 15's own plan text reserved this range
@@ -261,12 +329,62 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 - **11.123–11.129** — a renumber gap left by Task 14's own fix/renumber round on this branch. The
   rule against renumbering existing ids (`test-cases/README.md`) means a range vacated by a
   renumber stays vacated rather than being reused by a later, unrelated case.
+- **11.213** — RETIRED, RULING 24 (coordinator review, 2026-09-16), same day it was minted. It was
+  written for a `packages/ui/test/tokens.test.ts` block that duplicated a pre-existing
+  `CONTRAST_PAIRS` row (`{ fg: 'customMarker', bg: 'surface', minimum: 4.5 }`, `tokens.ts`, live
+  since commit `e09666ce`) while its own docblock claimed the pairing was previously uncovered —
+  and, because it computed the contrast from `tokens.ts` role lookups alone, it never read `ui.css`
+  and so could not have caught the CSS regression it was written to guard (proof: deleting the
+  declaration it depended on left 11.213, and the whole suite, green). The block was deleted rather
+  than corrected in place, and the real gate — reading the actual stylesheet — landed as a NEW id,
+  **11.214**, at `packages/ui/test/in-transit.test.ts`, per the same "a vacated id stays vacated"
+  discipline the `11.123–11.129` entry above already states. `11.213` names no test in this
+  codebase as of this commit.
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.197.**  
-*(11.196 is IN USE, at the entry directly above. This pointer means the NEXT FREE id — that is the
-convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188). #293 set it
-equal to the highest id instead of one past it, and #304 then minted exactly the id the pointer named;
-no duplicate resulted only because #304 advanced the pointer to its own new maximum, carrying the
-fault forward. Restored to max+1 here. Nothing validates this line, so it is checked by reading.)*
+**New cases continue from 11.215.**  
+*(11.210 was IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
+server half 11.197–11.200, Task 6's client half 11.201–11.210 — the last two, 11.209–11.210, added on
+2026-09-15 coordinator review to close a coverage gap in `toggleKind`'s optimistic-flip-then-revert
+logic that 11.201–11.208 left unexercised). Board prototype port Task 10 (2026-09-16) then minted
+11.211–11.212 at the Calendar view section above (the R4 legend merge and the metrics restyle).
+`11.213`, minted the same day for a contrast gate that turned out to duplicate existing coverage
+and never actually read `ui.css`, was RETIRED same-day (Ruling 24, coordinator review) — see
+*Permanently unused id ranges* below — and its real replacement landed as `11.214`, a NEW id, per
+this file's own "a vacated id stays vacated" rule. Each advance was verified against the real sweep
+(`node scripts/check-case-ids.mjs`) before this pointer moved, not against this prose, which the
+file's own convention (below) warns is exactly the kind of line that can drift. This pointer means the
+NEXT FREE id —
+that is the convention this file was created with (`e09666c`: pointer 11.189, highest entry 11.188).
+#293 set it equal to the highest id instead of one past it, and #304 then minted exactly the id the
+pointer named; no duplicate resulted only because #304 advanced the pointer to its own new maximum,
+carrying the fault forward. Restored to max+1 there, and kept at max+1 here. Nothing validates this
+line, so it is checked by reading.)*
+
+### Round 24 (2026-09-16) — five cases re-aimed, none minted here
+
+**No new ids in §11.** The account-menu and inbox-icon work minted `13.416`–`13.422` in
+`13-deployment-dogfooding.md`; the cases below are existing ones whose ASSERTION SURFACE moved because
+the nav stopped rendering `UnreadBadge`.
+
+Owner: *"make inbox an icon. with an indicator (green dot?) if there is an unread event."* Ruled: the
+dot is the visible signal and **the count moves into the link's accessible name** (`"Inbox, 3 unread
+notifications"`; a bare `"Inbox"` at zero). `UnreadBadge` itself is untouched and still renders the
+number on `/inbox`, so its own cases are unaffected.
+
+Case **11.152** now makes the same claim, read off the link's accessible name instead of the badge's
+`role="img"`, plus the dot's presence — (`apps/web/test/inbox-nav-link.test.tsx`). Case **11.153** is
+unchanged in substance; the "no badge drawn" half now reads as a bare `"Inbox"` name and an absent dot —
+an absence still claims nothing, which was always the point. Case **11.155** makes the same cadence
+claim, with the count read from the accessible name. Case **11.156** still measures exactly what it did:
+the count after a FAILED refresh. A reset to 0 would now drop the dot and rename the link to a bare
+`"Inbox"` — telling the reader there is nothing waiting, on the strength of a request that failed — so
+the case asserts both. Case **11.169** clears the count when the session ends in place, and asserts BOTH
+the name and the dot deliberately: a dot that vanished while the name still read "3 unread" would leave
+the previous session's count being announced to whoever is looking now, which is the exact defect this
+case exists for, and a dot-only assertion would pass on it. Case **11.185**'s three closed link sets each
+lost `/help` and `/account`, which are now menu items — an `<a role="menuitem">` carries the menuitem
+role, not `link`, so `getAllByRole('link')` cannot see them by design even with the menu open. Their
+reachability is pinned separately at **13.417**, which is what keeps this shortening honest: a shorter
+expected list is also what deleting the links would produce.

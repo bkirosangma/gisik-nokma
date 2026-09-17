@@ -87,7 +87,7 @@ export function App() {
   }, [workspaceId, token]);
 
   const helpToggle = (
-    <button type="button" className="gn-help__tab" onClick={() => setShowHelp((v) => !v)}>
+    <button type="button" className="gn-help__toggle" onClick={() => setShowHelp((v) => !v)}>
       {showHelp ? 'Back' : 'Manual & FAQ'}
     </button>
   );

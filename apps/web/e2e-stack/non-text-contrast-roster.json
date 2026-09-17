@@ -76,14 +76,24 @@
       "selector": "[data-style=\"neo\"] .gn-field__input",
       "sanctioned": true,
       "ratioLight": 1.24,
-      "ratioDark": 1.16,
+      "ratioDark": 1.0,
       "border": "none — sunken box-shadow only, not compositable by this instrument",
       "backdrop": "surface (neo)",
       "routes": [
         "/sign-in",
         "/workspaces"
       ],
-      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Measured by Task 13 (docs/neo-token-report.md); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is Task 13's measurement, cited."
+      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavyRaised docblock), not re-measured."
+    },
+    {
+      "selector": "[data-style=\"neo\"] .gn-select__panel",
+      "sanctioned": true,
+      "ratioLight": 1.24,
+      "ratioDark": 1.19,
+      "border": "none — raised box-shadow only, not compositable by this instrument",
+      "backdrop": "surface (neo)",
+      "routes": [],
+      "citation": "Task 4 (Shared Select, Phase 1): the neo panel uses the same shadow-only-elevation pattern as [data-style=\"neo\"] .gn-field__input above (surface/surfaceRaised/surfaceSunken share one flat hex under neo, so depth comes entirely from box-shadow, not a border or fill boundary) — but a FRESH manual computation, not a copy of the input row's numbers, because the panel composites a different token pair: --gn-shadow-raised's own layers (tokens.ts SHADOWS.neo.light/dark.raised: shadowNeoRaisedDarkLight/shadowNeoHighlightLight in light, shadowNeoRaisedDarkDark/shadowNeoRaisedHighlightDark in dark) over --gn-surface-raised (neoPaper #ede4db light, neoNavyRaised #1b2340 dark), not the sunken-shadow pair the field-input entry measures. Computed worst-of-2-layers per the same WCAG relative-luminance method docs/neo-token-report.md's Rule (a) used: light composites to 1.242 (rounds 1.24 — coincidentally equal to the input row because both reuse shadowNeoHighlightLight as their light-mode highlight layer), dark composites to 1.191 (rounds 1.19 — genuinely different from the input row's own 1.16, which is the sunken-shadow token's own layers, not the raised one this panel uses). Both below the 3:1 WCAG 1.4.11 floor a non-text boundary owes, same as the field-input case — but note the 2026-09-09 owner ruling this citation echoes (Task 14 AMENDMENT rule (a)) was scoped to the EMPTY INPUT specifically, not a blanket approval of every neo shadow-only element; this entry is sanctioned on the plan brief's own authority (Task 4 brief Step 5: 'this entry documents the exception in advance rather than reacting to a future false-fail'), on the strength that it is structurally the identical mechanism (box-shadow elevation the automated tool cannot composite), not because the owner separately ruled on the Select panel by name. Flag for re-confirmation with the owner if/when the Select panel is wired to a real route (Task 10) and this waiver is first exercised for real."
     }
   ]
 }

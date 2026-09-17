@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Avatar, Chip, Table, type TableColumn } from '@gisik-nokma/ui';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Avatar, Chip, Select, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import {
@@ -30,6 +30,30 @@ import { usePreferences } from './use-preferences.js';
 
 const GROUPING_OPTIONS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
 const AVAILABLE_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'type', 'progress'];
+
+/**
+ * What a group's title NAMES, transcribed from the prototype's own grouping
+ * table (`design-system/interactive/desktop.dc.html:2897-2917`, where every
+ * `push(key, title, meta)` call carries one of these seven words).
+ *
+ * The band prints `${meta} · ${n} ticket(s)` — one sentence saying what kind of
+ * thing the title above it is and how many of them are in it. Only four of the
+ * prototype's seven words are reachable here: `workflow` groups by a field the
+ * ListRow projection does not carry, and `not in this narrowing` / `names none`
+ * are that same table's two epic-specific ABSENCE cases, which this product
+ * spells on the section title itself (`list-model.ts`: "No epic",
+ * "Unassigned") — naming the absence twice on one band would read as two facts.
+ *
+ * `flat` has no entry because it has no band: `groupRows` answers one section
+ * whose rows are the whole set, and `TicketList` has never rendered a heading
+ * for it.
+ */
+const GROUP_META: Record<Exclude<Grouping, 'flat'>, string> = {
+  epic: 'epic',
+  status: 'state',
+  assignee: 'assignee',
+  type: 'type',
+};
 
 /**
  * Whether the arrangement on screen is the user's own or this client's stock
@@ -81,6 +105,49 @@ export type TicketListProps = {
   prefsEditable?: boolean;
   labels: GroupLabels;
   onOpenTicket: (ticketId: string) => void;
+  /**
+   * A trailing, per-row slot (Task 10, backlog/closed spec §5.4) — the Backlog
+   * tab's per-row **Start** button rides here (`apps/web/src/backlog-start-button.tsx`),
+   * called once per row and rendered in a trailing `<td>` of `ListTable`'s own
+   * table, with a matching empty header cell.
+   *
+   * OPTIONAL, and absence means NO trailing column at all — not one rendered
+   * with empty cells. The List, Calendar and Timeline arms of the project page
+   * pass nothing here and render byte-identical markup to before this prop
+   * existed (13.597 pins the negative: `queryAllByRole('button', {name: /^Row
+   * action /})` is empty with no `rowAction` passed).
+   *
+   * Threaded to BOTH `ListTable` mounts below (the pinned "Recently assigned"
+   * section and every grouped section) — a row assigned to `currentUserId`
+   * legitimately renders TWICE on screen (invariant 1, this component's own
+   * docblock), so its `rowAction` renders twice too, with whatever
+   * distinguishes two occurrences of the same entity left to the caller (an
+   * `aria-label` keyed only by title, for instance, would collide — see the
+   * Backlog tab's own row fixtures, which are deliberately unassigned).
+   */
+  rowAction?: (row: ListRow) => ReactNode;
+  /**
+   * The sentence a zero-row set shows in place of the table. OPTIONAL, and
+   * absence means NO sentence — this is the ENTIRE pre-Task-10 behaviour,
+   * carried forward rather than replaced: before this prop existed,
+   * `TicketList` rendered nothing at all beneath its controls bar for a
+   * zero-row set (`groupRows([], grouping, labels)` answers `[]` for every
+   * grouping but `flat`, so `sections.map` has nothing to iterate; `flat`
+   * itself answers one section holding zero rows, which renders an empty
+   * table with no message either). Measured by reading the component, not
+   * assumed — see 13.596 (`ticket-list.test.tsx`) for the pinned default.
+   *
+   * A DEFAULT sentence was considered and refused: `rows.length === 0` means
+   * "the project truly holds none" on one tab and "a filter hid all of them"
+   * on another (`listNarrowing`'s own docblock in `apps/web`, and Ruling 19's
+   * `isNarrowed` one layer up in `board.tsx`), and this component cannot tell
+   * the two apart — only a caller holding the narrowing context can. So the
+   * List tab passes nothing and keeps its silence; the Backlog tab
+   * (`apps/web`'s project page) passes "Nothing in the backlog — new tickets
+   * land here." — a sentence that is TRUE of that tab specifically, not a
+   * generic one this component would have had to invent.
+   */
+  emptyCopy?: string;
 };
 
 /**
@@ -120,14 +187,40 @@ export function TicketList({
   labels,
   onOpenTicket,
   narrowing,
+  rowAction,
+  emptyCopy,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * The column tray's own open/closed state — component-local and deliberately
+   * NOT a preference. `prefs` is the arrangement (which columns, in what
+   * order); whether the tray is currently unfolded is a fact about this moment
+   * on this screen, and storing it would PUT a document to the server every
+   * time somebody glanced at the column list.
+   *
+   * Replaces a `<details>`/`<summary>` disclosure, and the reason is layout
+   * rather than taste: the prototype's tray is a full-width band BESIDE the
+   * controls row (`desktop.dc.html:415-421`), and a `<details>` in a flex row
+   * puts its content inside its own flex item, so the tray could only ever be
+   * as wide as the toggle. The tray below is a sibling of the controls row
+   * instead. The summary's accessible name ("Columns") is carried over
+   * verbatim onto the button that replaces it, and `aria-expanded` states what
+   * the `<details>` element used to state structurally.
+   */
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const counts = countRows(rows); // ALWAYS from the flat set — sections cannot alter it
   // The ONE place a stock value is named, with the origin still in hand. The
   // `default` arm of `Chosen` carries no `value`, so this narrowing is not a
   // style choice — reading `prefs.columns.value` unguarded does not compile.
   const columns = prefs.columns.origin === 'stored' ? prefs.columns.value : DEFAULT_LIST_COLUMNS;
   const grouping = prefs.grouping.origin === 'stored' ? prefs.grouping.value : DEFAULT_GROUPING;
+  // Bound ONCE here rather than indexed at the band below: the band sits inside
+  // `sections.map`'s callback, and a `Grouping` narrowed to its non-`flat` arm
+  // by an enclosing `=== 'flat'` test is not carried into a closure. Reading
+  // `GROUP_META[grouping]` down there does not compile under `strict`; reading
+  // it here, where the narrowing is still in hand, does — the same
+  // one-binding-earlier adaptation `list-model.ts`'s `groupRows` records.
+  const groupMeta: string | null = grouping === 'flat' ? null : GROUP_META[grouping];
   const sections = useMemo(() => groupRows(rows, grouping, labels), [rows, grouping, labels]);
   const pinned = useMemo(() => recentlyAssignedRows(rows, currentUserId), [rows, currentUserId]);
 
@@ -183,39 +276,34 @@ export function TicketList({
             narrowed to {narrowing} — not the whole project
           </span>
         )}
-        <label className="gn-list__control">
-          Group by
-          <select
+        <div className="gn-list__control">
+          <span>Group by</span>
+          <Select
+            options={GROUPING_OPTIONS.map((option) => ({ value: option, label: option }))}
             value={grouping}
             disabled={!prefsEditable}
-            onChange={(event) =>
+            onChange={(next) =>
               onPrefsChange({
                 ...prefs,
-                grouping: { origin: 'stored', value: event.target.value as Grouping },
+                grouping: { origin: 'stored', value: next as Grouping },
               })
             }
-          >
-            {GROUPING_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-        <details className="gn-list__columns-picker">
-          <summary>Columns</summary>
-          {AVAILABLE_COLUMNS.map((id) => (
-            <label key={id} className="gn-list__column-option">
-              <input
-                type="checkbox"
-                checked={columns.includes(id)}
-                disabled={!prefsEditable}
-                onChange={() => toggleColumn(id)}
-              />
-              {columnLabel(id)}
-            </label>
-          ))}
-        </details>
+            aria-label="Group by"
+          />
+        </div>
+        <button
+          type="button"
+          className="gn-list__columns-toggle"
+          aria-expanded={columnsOpen}
+          onClick={() => setColumnsOpen((open) => !open)}
+        >
+          {/* The prototype's own caret (`desktop.dc.html:2789`): `▸` closed,
+              `▾` open — drawn in CSS off `aria-expanded` rather than rendered
+              as text, so the toggle's accessible name stays exactly
+              "Columns" and no screen reader announces a direction glyph. */}
+          <span className="gn-list__columns-caret" aria-hidden="true" />
+          <span>Columns</span>
+        </button>
         {/*
           P24's asymmetry, at the only place a user can see it. Both scopes of
           it, because the ruling has two and the surface used to say only one:
@@ -249,6 +337,70 @@ export function TicketList({
         )}
       </div>
 
+      {/*
+        The column tray — the prototype's `columnsOpen` band
+        (`design-system/interactive/desktop.dc.html:415-421`), a sunken strip of
+        raised pill chips BELOW the whole controls row.
+
+        RENDERED ALWAYS, HIDDEN WITH `hidden`. Not a `{columnsOpen ? … : null}`
+        conditional, and the reason is a test that would otherwise go red
+        silently: `ticket-list.test.tsx:274` clicks `getByLabelText('Type')` on a
+        List whose tray has never been opened, so the checkbox must be IN THE
+        DOCUMENT while the tray is closed. That is exactly what the `<details>`
+        this replaces gave it — jsdom keeps a closed `<details>`' children
+        mounted — and dropping the element instead of hiding it would turn that
+        case into "unable to find a label with the text of: Type" for a reason
+        (a markup change) that has nothing to do with what the case measures
+        (which half of the preferences a column toggle transfers authority
+        over). The CSS carries the matching `.gn-list__columns-tray[hidden]`
+        rule, because `display: flex` outranks the UA's `[hidden]` treatment.
+
+        FIVE OPTIONS, NOT THE PROTOTYPE'S EIGHT. `AVAILABLE_COLUMNS` is the
+        wire-backed half of `LIST_COLS`; `Workflow`, `Priority` and the
+        ticket-key column have no field on `ListRow` to read, and inventing one
+        is what the column-gap ruling forbids.
+      */}
+      <div className="gn-list__columns-tray" data-testid="list-columns-tray" hidden={!columnsOpen}>
+        {AVAILABLE_COLUMNS.map((id) => (
+          <label key={id} className="gn-list__column-option">
+            {/*
+              A REAL `<input type="checkbox">`, kept for three reasons that all
+              outrank drawing the prototype's box by hand: `getByLabelText`
+              resolves to it (four cases in this file's suite query the column
+              toggles by label text, including the click above), it is the
+              control the browser gives a real checked state and a real keyboard
+              contract for free, and `disabled={!prefsEditable}` needs an
+              element that HAS a disabled state. It is moved out of flow and
+              made transparent in CSS rather than replaced.
+
+              The box is the span below, and it is EMPTY IN THE DOM: the tick is
+              a `::after` pseudo-element, so it contributes no text node. The
+              prototype draws that tick as an 11px character
+              (`desktop.dc.html:2795`, `font-size:11px`), which is under this
+              product's own 12px label floor (`apps/web/e2e-viewport/type-scale.ts`,
+              `LABEL_FLOOR_PX`) — a floor that measures DIRECT text nodes, which
+              a pseudo-element is not. Drawing it in CSS passes the floor
+              honestly instead of dodging it with a lower case.
+            */}
+            <input
+              type="checkbox"
+              checked={columns.includes(id)}
+              disabled={!prefsEditable}
+              onChange={() => toggleColumn(id)}
+            />
+            <span className="gn-list__column-box" aria-hidden="true" />
+            {/*
+              The visible label is its OWN span so that `label.textContent` is
+              exactly the column name. `getByLabelText('Status')` matches on
+              the wrapper label's whole text, so a tick or a box glyph sitting
+              as a sibling text node would break four existing cases on a
+              spelling rather than on a behaviour.
+            */}
+            <span>{columnLabel(id)}</span>
+          </label>
+        ))}
+      </div>
+
       {pinned.length > 0 ? (
         <section role="region" aria-label="Recently assigned" className="gn-list__pinned">
           <h3 className="gn-list__section-title">Recently assigned</h3>
@@ -258,6 +410,7 @@ export function TicketList({
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onOpenTicket={onOpenTicket}
+            rowAction={rowAction}
           />
         </section>
       ) : null}
@@ -266,17 +419,72 @@ export function TicketList({
         const nodes = visibleNodes(nestRows(section.rows), collapsed);
         return (
           <section key={section.key} role="region" aria-label={section.label} className="gn-list__section">
-            {grouping === 'flat' ? null : <h3 className="gn-list__section-title">{section.label}</h3>}
+            {groupMeta === null ? null : (
+              /*
+                The band's SECOND sentence, and it is a count of the section's
+                own rows — never of what is on screen. `visibleNodes` above can
+                hide a collapsed subtree; `groupRows` cut this section from the
+                complete set, so the band keeps answering for the section the
+                same way the summary keeps answering for the project
+                (`countRows`'s own docblock: a count read off the screen is a
+                count of the user's scroll position).
+
+                `section.rows.length`, and the prototype prints a DIFFERENT
+                number beside the same word. Measured in the 2026-09-18 file:
+                the sentence is built at `:2923` as
+                `g.meta + " · " + n + (n === 1 ? " ticket" : " tickets")` with
+                `const n = g.items.length` (`:2920`), and under the epic
+                grouping the epic is held SEPARATELY (`g.epic`, `:2904`) and
+                never pushed into `items` — so the prototype counts a group's
+                CHILDREN while it renders the epic row above them (`:2927`,
+                `:2928`). An epic with three children reads `epic · 3 tickets`
+                there and renders four rows; here it reads `epic · 4 tickets`.
+                The three non-epic axes agree.
+
+                DECLARED DIVERGENCE, kept deliberately: in this model an epic is
+                a row like any other (`list-model.ts`, `nestRows`), the section's
+                own list is the whole membership, and the band answers for its
+                section the way the summary answers for the project — a count
+                that left the epic out would name a membership no row on screen
+                has. For the same reason the count is `section.rows.length` and
+                not `nodes.length` below: `visibleNodes` hides a collapsed
+                subtree, and a band that shrank when a row was collapsed would be
+                a count of the user's scroll position.
+              */
+              <h3 className="gn-list__section-title">
+                <span className="gn-list__section-name">{section.label}</span>
+                <span className="gn-list__section-meta">
+                  {`${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
+                </span>
+              </h3>
+            )}
             <ListTable
               nodes={nodes}
               columns={columns}
               collapsed={collapsed}
               onToggleCollapse={toggleCollapse}
               onOpenTicket={onOpenTicket}
+              rowAction={rowAction}
             />
           </section>
         );
       })}
+
+      {/*
+        Task 10 (backlog/closed spec §5.4) — see `emptyCopy`'s own docblock on
+        `TicketListProps` for why this is gated on the CALLER supplying a
+        sentence rather than a component-owned default: `rows.length === 0`
+        is ambiguous between "the project has none" and "a filter hid them
+        all", and only the caller holds enough context to say which. Reads
+        `rows`, the raw prop, never a section or `pinned` count — the exact
+        set this component was asked to show, before grouping or collapsing
+        touch it.
+      */}
+      {rows.length === 0 && emptyCopy !== undefined ? (
+        <p className="gn-list__empty" data-testid="list-empty">
+          {emptyCopy}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -288,6 +496,46 @@ export function TicketList({
  * the day the table grows a sticky header or a scroll shadow this surface would
  * silently not get it. The indentation, the collapse toggle and the
  * restricted-parent marker all fit in the first column's `cell`.
+ *
+ * ## Board prototype port Task 9 (2026-09-16), spec List `:405-479`
+ *
+ * `.gn-list__table-wrap` gives the metrics table's "Container" row —
+ * `cardBg + cardShadow; radius cardR; overflow:auto` — WITHOUT touching
+ * `Table`'s own shared output: it wraps the `<Table>` element from the
+ * outside, so `.gn-table__scroll`/`.gn-table` (both on the do-not-edit list,
+ * `.gn-table` by name) render exactly as they do for every other consumer.
+ *
+ * ## Ruling 21 (coordinator, 2026-09-16) — the five deferred metrics, now landed
+ *
+ * The task's own report deferred "Table: min-width:820px", "Header cell",
+ * "Zebra", "Data cell" and the title cell's own "min-width:260px" — each was
+ * reachable only through an element `Table` renders itself, and `Table` had
+ * no class hook. The coordinator approved extending `Table` with optional
+ * `className`/`headerClassName`/`rowClassName`/`TableColumn.cellClassName`
+ * (`table.tsx`, composed the way `Card` already composes its own), so every
+ * new rule these five metrics need lands on a `.gn-list-*` selector here,
+ * never on `.gn-table`/`.gn-table__header`/`.gn-table__cell`/`.gn-table__row`
+ * themselves.
+ *
+ * `gn-list__table-header` on every column (title and data alike — the
+ * metric is uniform across the row) gives "Header cell". `gn-list__table`
+ * on `<Table>` gives "Table". `gn-list__table-row` on `<Table>` gives
+ * "Zebra". `gn-list__table-cell--data` on every non-title column gives
+ * "Data cell". `gn-list__table-cell--title` on the title column ALONE
+ * — distinct from `--data` because its metric differs (`min-width:260px`,
+ * and a depth-dependent LEFT edge the other columns don't have) — gives the
+ * title cell's static top/right/bottom padding and its own `min-width`; the
+ * one part that still cannot live there is the DEPTH-dependent portion of
+ * the left padding, since `depth` is a fact about one ROW, not the column,
+ * and `cellClassName` is declared once per column. That stays exactly where
+ * it already was: a `paddingLeft` inline style on the inner
+ * `.gn-list__title-cell` span. Because `--title` now zeroes the `<td>`'s own
+ * left padding (the SAME equal-specificity/later-source-order technique
+ * `.gn-board-card` already uses against `.gn-card`), the span's inline style
+ * is now the CELL's entire left edge rather than an addition on top of an
+ * uneditable base — so the rendered padding is pixel-exact against the
+ * metric's `calc(16px + depth*22px)` for the first time, closing the
+ * Task 9 report's own "not pixel-exact" caveat.
  */
 function ListTable({
   nodes,
@@ -295,22 +543,33 @@ function ListTable({
   collapsed,
   onToggleCollapse,
   onOpenTicket,
+  rowAction,
 }: {
   nodes: ListRowNode[];
   columns: ListColumnId[];
   collapsed: ReadonlySet<string>;
   onToggleCollapse: (ticketId: string) => void;
   onOpenTicket: (ticketId: string) => void;
+  rowAction?: (row: ListRow) => ReactNode;
 }) {
   const tableColumns: TableColumn<ListRowNode>[] = [
     {
       id: 'title',
       header: 'Title',
+      headerClassName: 'gn-list__table-header',
+      cellClassName: 'gn-list__table-cell--title',
       cell: (node) => (
         <span
           className="gn-list__title-cell"
           data-testid={`ticket-card-${node.row.ticketId}`}
-          style={{ paddingLeft: `${node.depth * 1.1}rem` }}
+          // Spec List `:405-479`, "Title cell": `padding:12px 16px 12px
+          // calc(16px + depth*22px)`. The top/right/bottom thirds now live
+          // on the `<td>` itself (`.gn-list__table-cell--title`, this
+          // function's docblock) — only the DEPTH-dependent left offset
+          // stays here, since depth is a per-ROW fact `cellClassName`
+          // (declared once per COLUMN) cannot express. Plain arithmetic,
+          // not a CSS calc(): depth is a number known only at render time.
+          style={{ paddingLeft: `${16 + node.depth * 22}px` }}
         >
           {node.hasChildren ? (
             <button
@@ -321,8 +580,42 @@ function ListTable({
             >
               {collapsed.has(node.row.ticketId) ? '▸' : '▾'}
             </button>
-          ) : null}
-          <button type="button" className="gn-list__open" onClick={() => onOpenTicket(node.row.ticketId)}>
+          ) : (
+            /*
+              The prototype's `noCaret` spacer (`desktop.dc.html:449`):
+              `width:22px; flex:none`. Without it, a row with no children has
+              its title 22px to the left of its siblings' — the caret's column
+              disappears instead of standing empty, so a section of leaves and
+              a section of parents do not line up down the left edge, and two
+              rows at the SAME depth (the thing `paddingLeft` above is the
+              whole measure of) do not start at the same x. Drawn as an empty
+              span: it is a layout reservation, not a character.
+            */
+            <span className="gn-list__caret-spacer" aria-hidden="true" />
+          )}
+          {/*
+            "Title button": the prototype computes the weight per ROW
+            (`desktop.dc.html:2873`) — `isEpicT(t) ? "600" : depth ? "400" :
+            "500"` — so it cannot live in a class: `gn-list__open` is declared
+            once, and which of the three applies is a fact about this row.
+
+            `typeRank === 1` is this product's `isEpicT`. The prototype tests
+            the type's NAME (`t.type === "Epic"`); `ListRow` carries no type
+            name (the column-gap ruling's second round-trip would have to fetch
+            one), but it carries the fact the name is a label FOR: rank 1 is
+            the epic rank, which is the same rank `epicId`'s own docblock names
+            ("the nearest rank-1 ancestor, for grouping by epic") and the same
+            one `packages/domain/src/ticket-types.ts` gives the built-in
+            `{ id: 'epic', name: 'Epic', rank: 1 }`. Reading the rank rather
+            than the id also keeps this true for a workspace that has renamed
+            or replaced its top-level type.
+          */}
+          <button
+            type="button"
+            className="gn-list__open"
+            style={{ fontWeight: node.row.typeRank === 1 ? 600 : node.depth > 0 ? 400 : 500 }}
+            onClick={() => onOpenTicket(node.row.ticketId)}
+          >
             {node.row.title}
           </button>
           {node.row.pending ? (
@@ -341,44 +634,124 @@ function ListTable({
     ...columns.map((id) => ({
       id,
       header: columnLabel(id),
+      headerClassName: 'gn-list__table-header',
+      cellClassName: 'gn-list__table-cell--data',
       cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} />,
     })),
+    // Task 10 (backlog/closed spec §5.4) — a TRAILING column, present only
+    // when a caller supplies `rowAction`. An empty header cell (`header:
+    // ''`) rather than omitting the header row's cell entirely: `Table`
+    // renders one `<th>` per entry in `columns`, so a mismatched column
+    // count between `<thead>` and every `<tbody>` row would be the bug, not
+    // the fix.
+    ...(rowAction === undefined
+      ? []
+      : [
+          {
+            id: 'row-action',
+            header: '',
+            headerClassName: 'gn-list__table-header',
+            cell: (node: ListRowNode) => rowAction(node.row),
+          },
+        ]),
   ];
-  return <Table columns={tableColumns} rows={nodes} rowKey={(node) => node.row.ticketId} />;
+  return (
+    <div className="gn-list__table-wrap">
+      <Table
+        columns={tableColumns}
+        rows={nodes}
+        rowKey={(node) => node.row.ticketId}
+        className="gn-list__table"
+        rowClassName="gn-list__table-row"
+      />
+    </div>
+  );
 }
 
 function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
   switch (columnId) {
     case 'status':
       return (
-        <Chip
-          tone={row.stateCategory}
-          title={`marked ${row.stateName} by ${actorLabel(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
-        >
-          {row.stateName}
-        </Chip>
+        <>
+          <Chip
+            tone={row.stateCategory}
+            title={`marked ${row.stateName} by ${actorLabel(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
+          >
+            {row.stateName}
+          </Chip>
+          {/*
+            Task 10 (backlog/closed spec §5.4/§1.2) — BESIDE the state chip,
+            never replacing it: `closed` and `stateId` are independent facts
+            (spec §1.2 — a closed ticket keeps the state it was closed FROM),
+            so a card closed out of "Doing" still reads "Doing" — the Closed
+            chip is what says it will not move again without a reopen. `row.closed`
+            is REQUIRED on `ListRow` (unlike the optional domain `TicketState.closed?`
+            441 fixtures predate — `view-types.ts:223-230`), so this reads it
+            directly rather than through the `?? null` idiom readers of the
+            optional form use.
+          */}
+          {row.closed !== null ? (
+            <Chip tone="neutral" title={`closed by ${actorLabel(row.closed.actorId, null)} on ${formatDate(row.closed.at)}`}>
+              Closed
+            </Chip>
+          ) : null}
+        </>
       );
     case 'assignee':
+      // "Unassigned" rather than a dash (spec List `:2850`, the prototype's own
+      // `t.who ? … : "Unassigned"`). Not a cosmetic preference: an absent
+      // ASSIGNEE is a state a person acts on ("nobody has this"), and a bare
+      // `—` under an "Assignee" header reads as a value that failed to load.
+      // Rendered at full label tone, not the muted `.gn-list__empty-cell` the
+      // dash used — the prototype's plain-cell `tone` is `--label` unless the
+      // cell is a due date, which is the next case.
       return row.assignee === null ? (
-        <span className="gn-list__empty-cell">—</span>
+        <span>Unassigned</span>
       ) : (
         <span className="gn-list__assignee">
           <Avatar name={actorLabel(row.assignee.id, row.assignee.name)} size="small" />
           {actorLabel(row.assignee.id, row.assignee.name)}
         </span>
       );
-    case 'dueDate':
+    case 'dueDate': {
       // A date is a CLAIM and renders attributed (spec §7 Calendar's rule,
       // applied here too): whose claim it is travels with it, so nobody reads a
       // due date as a fact the system established.
-      return row.dueDate === null ? (
-        <span className="gn-list__empty-cell">—</span>
-      ) : (
-        <span>
-          {formatDate(row.dueDate.date)} — {actorLabel(row.dueDate.claim.actorId, row.dueDate.claim.actorName)}
-          &apos;s claim
+      const due = row.dueDate;
+      if (due === null) {
+        // The prototype NAMES this absence too (`desktop.dc.html:2362`,
+        // `dueInfo`'s own first branch: `{ label: "No date claimed" }`), and
+        // the name is doing real work a dash cannot: "No date claimed" says the
+        // missing thing is a CLAIM — a person has not asserted a date — where
+        // `—` beside an attributed-claims column reads as "we looked and found
+        // nothing", which is a claim about the record this view cannot make.
+        return <span className="gn-list__empty-cell">No date claimed</span>;
+      }
+      /*
+        A CLOSED ticket's due date is moot — the useful fact about a finished
+        ticket's date is when it finished — so the prototype swaps in the
+        closure label (`desktop.dc.html:2366`: `"Closed " + (t.closed || nice)`).
+        This product carries the closure moment as its own claim (`ListRow.closed`,
+        backlog/closed spec §1.2), so the swap is exact rather than the
+        prototype's fallback-to-the-due-date. That spec section is also why the
+        test is `row.closed` and not `stateCategory === 'terminal'`: a ticket
+        keeps the state it was closed FROM, so a terminal-category row is not
+        necessarily a closed one, and only `closed` says a closure was recorded.
+
+        The attribution is deliberately UNCHANGED — still the due date's own
+        claimant, never the person who closed it. The sentence form is
+        `${date} — ${actor}'s claim`, and the dash's left side is the only part
+        this case rewrites. (The prototype names the ASSIGNEE here, `t.who`;
+        this product's due cell has always named whoever CLAIMED the date, which
+        is the stronger attribution and the one two existing cases pin.)
+      */
+      const when = row.closed === null ? formatDate(due.date) : `Closed ${formatDate(row.closed.at)}`;
+      return (
+        <span className="gn-list__due">
+          {when} — {actorLabel(due.claim.actorId, due.claim.actorName)}&apos;s claim
         </span>
       );
+    }
     case 'type':
       return <span>{row.typeId}</span>;
     case 'progress':

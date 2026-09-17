@@ -256,6 +256,9 @@ describe('PublishControls — the state-mapping dialog', () => {
   /**
    * 10.32 — the mapping dialog lists every stranded state with in-flight counts; confirm gated on full mapping.
    */
+  /**
+   * 10.88 — the state-mapping dialog's target-state select renders as the shared Select (button trigger, portal listbox): the confirm button stays disabled until every row is picked, and the submitted payload reflects exactly what was picked.
+   */
   it('lists every stranded state with its in-flight count and requires a target for each', async () => {
     const user = userEvent.setup();
     const workflowId = newUlid();
@@ -276,7 +279,8 @@ describe('PublishControls — the state-mapping dialog', () => {
 
     const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
     expect(confirm).toBeDisabled();
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'Send them to — Review' }), 'todo');
+    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
 
@@ -309,7 +313,8 @@ describe('PublishControls — the state-mapping dialog', () => {
     expect(confirm).toBeDisabled();
     expect(gateway.submitted).toHaveLength(0);
 
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'Send them to — Review' }), 'done');
+    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.click(confirm);
     expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
     const payload = gateway.submitted[0]!.payload as PublishedWorkflowDef;
@@ -358,41 +363,41 @@ describe('PublishControls — the state-mapping dialog', () => {
 
     // Only the FIRST row picked — kills a guard that reads dropped[0] alone.
     expect(confirmButton()).toBeDisabled();
-    await user.selectOptions(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('combobox', { name: 'Send them to — Triage' }),
-      'done',
+    await user.click(
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
     );
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(confirmButton()).toBeDisabled();
 
     // Only the SECOND row picked — kills a guard that reads the last row alone.
     cleanup();
     setup(draftDroppingTriageAndReview(workflowId), seed);
     await openDialog();
-    await user.selectOptions(
-      within(screen.getByTestId('mapping-row-review')).getByRole('combobox', { name: 'Send them to — Review' }),
-      'todo',
+    await user.click(
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
     );
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirmButton()).toBeDisabled();
 
     // Both picked: enabled, and the payload carries BOTH entries — a mapping
     // that collapsed to one would still satisfy every assertion above.
-    await user.selectOptions(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('combobox', { name: 'Send them to — Triage' }),
-      'done',
+    await user.click(
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
     );
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(confirmButton()).toBeEnabled();
     cleanup();
 
     const gateway = setup(draftDroppingTriageAndReview(workflowId), seed);
     await openDialog();
-    await user.selectOptions(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('combobox', { name: 'Send them to — Triage' }),
-      'done',
+    await user.click(
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
     );
-    await user.selectOptions(
-      within(screen.getByTestId('mapping-row-review')).getByRole('combobox', { name: 'Send them to — Review' }),
-      'todo',
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.click(
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
     );
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     await user.click(confirmButton());
     expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
     const payload = gateway.submitted[0]!.payload as PublishedWorkflowDef;
@@ -435,7 +440,8 @@ describe('PublishControls — the state-mapping dialog', () => {
     const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
     expect(confirm).toBeDisabled();
 
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'Send them to — Review' }), 'todo');
+    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
 

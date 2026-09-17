@@ -216,7 +216,8 @@ there are two thresholds, and the three viewports discriminate all three states:
 
 | measured property | 390 | 768 | 1512 |
 |---|---|---|---|
-| `.gn-help__tabs` / `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
+| `.gn-notfound__actions` flex-direction (40rem = 640px) | `column` | `row` | `row` |
+| `.gn-help__h2` font-size (40rem = 640px) | 18.4px | 22px | 22px |
 | `.gn-shell` padding-left (60rem = 960px) | 12px | 12px | 20px |
 
 ### Item 6 — the text palette is sound; the NON-TEXT palette is not, and nothing was watching either
@@ -348,17 +349,49 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   *(Refuted limb, recorded so nobody builds against it: the challenge rows are NOT unbounded —
   `findVerificationValue` sweeps expired rows globally on every call, `disableCleanup` is unset, and
   phone-OTP verification calls it. No cleanup job is owed.)*
-  **STATE OF THE FEATURE, PLAINLY: passkey sign-in has NO ENTRY POINT on the sign-in screen as of
-  this change — no button, and no autofill offer either.** The `autocomplete="username webauthn"`
-  token is present and inert; it does nothing until something issues a conditional-mediation request.
-  **Task 12 restores the entry point together with registration**, which is the only pairing that makes
-  sense: an offer to use a passkey has no population it can serve until a user can register one. The
-  narrowing was accepted by the controller on the measured 429 rather than taken unilaterally.
-  **That makes the sign-in screen honest; it does not close the gap.** Until Task 12 lands, no user of
-  this product can hold a passkey, and the method is unavailable however well it is wired.
+  **STATE OF THE FEATURE AS OF 2026-09-08: passkey sign-in had NO ENTRY POINT on the sign-in screen —
+  no button, and no autofill offer either.** The `autocomplete="username webauthn"` token was present
+  and inert; it does nothing until something issues a conditional-mediation request. The entry point
+  was to return together with registration, which is the only pairing that makes sense: an offer to use
+  a passkey has no population it can serve until a user can register one. The narrowing was accepted by
+  the controller on the measured 429 rather than taken unilaterally.
   *Recorded here rather than left to the absence of a button, because an unrecorded deferral is defect
   class 4 from Plan 1 — and because the button's removal is exactly the change that would otherwise
   make the gap harder to notice, not easier.*
+
+  **CLOSED 2026-09-15** by the account/help-screens plan's **Task 8** — which absorbed the scope this
+  item assigned to "Task 12 of the HIG per-screen plan", a task that was never executed under that
+  name. Both halves landed in one change set, as this item required:
+
+  - **Registration exists.** `/account` gained a Passkeys section
+    (`packages/app-core/src/account/passkeys-section.tsx`, wired through
+    `apps/web/src/account/account-clients.ts`) that lists, adds and deletes credentials via
+    `authClient.passkey.listUserPasskeys` / `addPasskey` / `deletePasskey`. The two generated member
+    names were established by typechecking a probe against the installed package **with a negative
+    control**, not from documentation — only `addPasskey` is hand-declared by the client plugin.
+  - **The entry point is back — as a BUTTON, not conditional mediation**, and this item's own
+    measurement is the reason. `signIn.passkey({ autoFill: false })` is reachable from exactly one
+    `onClick` and from nowhere else: no effect, no render path, no autofill trigger. **The rule kept is
+    the one this item protects: an anonymous `/sign-in` load charges the shared `auth:` bucket ZERO
+    times.**
+  - **The 429 measurement now lives in the suite rather than in this paragraph.**
+    `apps/server/test/http/security-middleware.test.ts` drives the ten probes through the assembled app
+    and asserts the eleventh magic link is refused **by our limiter, identified by body**, with a
+    zero-probe control on the identical path that must NOT be refused — and a third case pinning that
+    the probe charges the general `auth:` bucket and never the tighter `signin:` one. Both directions
+    were mutation-checked: adding `/passkey` to `SIGN_IN_PREFIXES` reddens the bucket case, and pointing
+    the probe at a non-auth path reddens the exhaustion case.
+  - **`docs/manual.md` and `docs/faq.md` needed no edits** — they have described this exact button in
+    these exact words throughout, so `pnpm check:help` passes unchanged and the copy became accurate
+    again rather than being rewritten.
+
+  **What is still owed, and it is not nothing:** the end-to-end witness —
+  `apps/web/e2e-stack/passkey-registration.spec.ts`, registering over a CDP virtual authenticator and
+  then signing in with the credential — is written and typechecked but was **never executed**, because
+  the stack port was held by a developer's own dev server at the time and `playwright.stack.config.ts`
+  refuses (correctly) to adopt one. So the WebAuthn ceremony itself is unwitnessed end to end; the
+  component, the page wiring, the server endpoints and the rate-limit cost each have their own tests.
+  Its first green is owed to CI's `gate` job or to the next run with a real stack up.
 
 
 - **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were

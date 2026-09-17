@@ -6,6 +6,7 @@ import {
   type PublishedWorkflowDef,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
+import { Card, Select } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -207,185 +208,198 @@ export function TicketTypeEditorScreen(props: {
   return (
     <section className="ticket-type-editor">
       {canAuthor ? null : <ReadOnlyBanner />}
-      <label className="ticket-type-editor__name">
-        <span>Type name</span>
-        <input
-          type="text"
-          aria-label="Type name"
-          disabled={!canAuthor}
-          value={def.name}
-          onChange={(changeEvent) => setDef((current) => ({ ...current, name: changeEvent.target.value }))}
-        />
-      </label>
-      <IconPicker
-        value={def.icon}
-        disabled={!canAuthor}
-        onChange={(icon) => setDef((current) => ({ ...current, icon }))}
-      />
-      <label className="ticket-type-editor__rank">
-        <span>Hierarchy rank</span>
-        <input
-          type="number"
-          aria-label="Hierarchy rank"
-          min={1}
-          disabled={!canAuthor || isBuiltin}
-          value={def.rank}
-          onChange={(changeEvent) =>
-            setDef((current) => ({ ...current, rank: Number.parseInt(changeEvent.target.value, 10) || 1 }))
-          }
-        />
-      </label>
-      {isBuiltin ? (
-        <p className="ticket-type-editor__builtin-note">Built-in type — its place in the hierarchy is fixed.</p>
-      ) : null}
-      <p className="ticket-type-editor__implications" data-testid="rank-implications">
-        {rankImplicationsCopy(implications)}
-      </p>
-      <label className="ticket-type-editor__workflow">
-        <span>Workflow</span>
-        <select
-          aria-label="Workflow"
-          disabled={!canAuthor}
-          value={def.workflowId}
-          onChange={(changeEvent) => setDef((current) => ({ ...current, workflowId: changeEvent.target.value }))}
-        >
-          <option value="" disabled hidden></option>
-          {context.workflows.map((workflow) => (
-            <option key={workflow.id} value={workflow.id}>
-              {workflow.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {showDivergence ? (
-        <section className="ticket-type-editor__divergence" data-testid="workflow-divergence">
-          {rebind.phase === 'migrated' ? (
-            // The divergence is OVER for these tickets, so the notice stops
-            // asserting it. Left standing, the heading and body went on saying
-            // "14 existing tickets of this type stay on X" in the same paragraph
-            // as "14 tickets moved to Y" — a contradiction the screen printed to
-            // itself. The count behind that body was read before the move and is
-            // not re-read, so the honest thing is to retire it, not restate it.
-            <p className="ticket-type-editor__divergence-migrated">
-              {rebind.count === 1
-                ? `1 ticket moved to "${rebind.toWorkflowName}".`
-                : `${rebind.count} tickets moved to "${rebind.toWorkflowName}".`}
+      <div className="ticket-type-editor__layout">
+        <div className="ticket-type-editor__main">
+          <Card className="ticket-type-editor__card">
+            <label className="ticket-type-editor__name">
+              <span className="gn-field__label">Type name</span>
+              <input
+                type="text"
+                className="gn-field__input"
+                aria-label="Type name"
+                disabled={!canAuthor}
+                value={def.name}
+                onChange={(changeEvent) => setDef((current) => ({ ...current, name: changeEvent.target.value }))}
+              />
+            </label>
+            <IconPicker
+              value={def.icon}
+              disabled={!canAuthor}
+              onChange={(icon) => setDef((current) => ({ ...current, icon }))}
+            />
+            <label className="ticket-type-editor__rank">
+              <span className="gn-field__label">Hierarchy rank</span>
+              <input
+                type="number"
+                className="gn-field__input"
+                aria-label="Hierarchy rank"
+                min={1}
+                disabled={!canAuthor || isBuiltin}
+                value={def.rank}
+                onChange={(changeEvent) =>
+                  setDef((current) => ({ ...current, rank: Number.parseInt(changeEvent.target.value, 10) || 1 }))
+                }
+              />
+            </label>
+            {isBuiltin ? (
+              <p className="ticket-type-editor__builtin-note">Built-in type — its place in the hierarchy is fixed.</p>
+            ) : null}
+          </Card>
+          <Card className="ticket-type-editor__card">
+            <label className="ticket-type-editor__workflow">
+              <span className="gn-field__label">Workflow</span>
+              <Select
+                options={context.workflows.map((workflow) => ({ value: workflow.id, label: workflow.name }))}
+                value={def.workflowId || null}
+                onChange={(workflowId) => setDef((current) => ({ ...current, workflowId }))}
+                disabled={!canAuthor}
+                searchable
+                aria-label="Workflow"
+              />
+            </label>
+            {showDivergence ? (
+              <section className="ticket-type-editor__divergence" data-testid="workflow-divergence">
+                {rebind.phase === 'migrated' ? (
+                  // The divergence is OVER for these tickets, so the notice stops
+                  // asserting it. Left standing, the heading and body went on saying
+                  // "14 existing tickets of this type stay on X" in the same paragraph
+                  // as "14 tickets moved to Y" — a contradiction the screen printed to
+                  // itself. The count behind that body was read before the move and is
+                  // not re-read, so the honest thing is to retire it, not restate it.
+                  <p className="ticket-type-editor__divergence-migrated">
+                    {rebind.count === 1
+                      ? `1 ticket moved to "${rebind.toWorkflowName}".`
+                      : `${rebind.count} tickets moved to "${rebind.toWorkflowName}".`}
+                  </p>
+                ) : (
+                  <>
+                    <h3 className="ticket-type-editor__divergence-title">Existing tickets stay where they are</h3>
+                    {divergenceCountLine(population) !== null ? (
+                      <p className="ticket-type-editor__divergence-count">{divergenceCountLine(population)}</p>
+                    ) : null}
+                    {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name) !== null ? (
+                      <p className="ticket-type-editor__divergence-body">
+                        {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name)}
+                      </p>
+                    ) : null}
+                    {nothingStaysBehind ? null : rebind.phase === 'left' ? (
+                      <p className="ticket-type-editor__divergence-left">
+                        {`Left on "${outgoingWorkflow.name}". They keep their own board columns.`}
+                      </p>
+                    ) : (
+                      // The `!canAuthor` term on both buttons below is defence in
+                      // depth, and it is NOT pinned by a test — deliberately, because
+                      // no test can reach it. `diverged` is false at mount for every
+                      // role (it compares def.workflowId against the initialDef's
+                      // own), and the only gesture that can make it true is the
+                      // Workflow combobox, which is itself `disabled={!canAuthor}`.
+                      // Measured at this sha: dropping `!canAuthor` from either
+                      // button reddens 0 of the 213 tests in test/workflow-builder +
+                      // test/ticket-types. The lock that actually holds is the outer
+                      // one, and THAT is tested — access.test.tsx's "locks the binding
+                      // itself, so the divergence section a migration lives in never
+                      // opens". A test aimed at these two terms would have to defeat
+                      // the combobox gate in its own setup, and would then be
+                      // asserting that setup rather than the gate.
+                      <div className="ticket-type-editor__divergence-actions">
+                        <button
+                          type="button"
+                          className="ticket-type-editor__divergence-move"
+                          disabled={!canAuthor || !bindingCommitted || rebind.phase === 'migrating'}
+                          onClick={() => setRebind({ phase: 'mapping', toWorkflowId: def.workflowId })}
+                        >
+                          {`Move them to "${incomingWorkflow.name}"…`}
+                        </button>
+                        {/* Staying put is a decision, not the absence of one. */}
+                        <button
+                          type="button"
+                          className="ticket-type-editor__divergence-leave"
+                          disabled={!canAuthor}
+                          onClick={() => setRebind({ phase: 'left' })}
+                        >
+                          {`Leave them on "${outgoingWorkflow.name}"`}
+                        </button>
+                        {bindingCommitted ? null : (
+                          <p className="ticket-type-editor__divergence-hint">
+                            {`Save the ticket type first — until it is saved, new tickets would still go to "${outgoingWorkflow.name}".`}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {rebind.phase === 'mapping' && pendingTarget !== null ? (
+                      <WorkflowRebindDialog
+                        fromWorkflow={outgoingWorkflow}
+                        toWorkflow={pendingTarget}
+                        onCancel={() => setRebind({ phase: 'left' })}
+                        onConfirm={(stateMap) => void onMigrate(pendingTarget, stateMap)}
+                      />
+                    ) : null}
+                    {rebind.phase === 'refused' ? (
+                      <div className="ticket-type-editor__divergence-refused">
+                        <p>The server refused this move.</p>
+                        <p>{rebind.reason}</p>
+                        <p>{`rule: ${rebind.rule}`}</p>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </section>
+            ) : null}
+          </Card>
+          <Card className="ticket-type-editor__card">
+            <h3 className="ticket-type-editor__fields-title">{`Fields · ${def.fields.length}`}</h3>
+            <FieldsEditor
+              fields={def.fields}
+              disabled={!canAuthor}
+              onChange={(fields) => setDef((current) => ({ ...current, fields }))}
+            />
+            {schemaMessages.length > 0 ? (
+              <ul className="ticket-type-editor__issues">
+                {schemaMessages.map((message, at) => (
+                  <li key={at}>{message}</li>
+                ))}
+              </ul>
+            ) : null}
+          </Card>
+          {canAuthor ? (
+            <button
+              type="button"
+              className="ticket-type-editor__save"
+              disabled={!parsed.success || save.phase === 'saving'}
+              onClick={() => void onSave()}
+            >
+              Save ticket type
+            </button>
+          ) : null}
+          {/* The other half of the same guarantee: a screen that still reads
+              "Ticket type saved." beside a binding the server has never seen is
+              reporting success about an uncommitted state. */}
+          {save.phase === 'saved' && bindingCommitted ? (
+            <p className="ticket-type-editor__saved">Ticket type saved.</p>
+          ) : null}
+          {save.phase === 'refused' ? (
+            <div className="ticket-type-editor__refused">
+              <p>The server refused this ticket type.</p>
+              <p>{save.reason}</p>
+              <p>{`rule: ${save.rule}`}</p>
+            </div>
+          ) : null}
+          {save.phase === 'invalid' ? (
+            <div className="ticket-type-editor__invalid">
+              <p>The server could not read this claim.</p>
+              <p>{save.message}</p>
+            </div>
+          ) : null}
+        </div>
+        <aside className="ticket-type-editor__aside">
+          <Card className="ticket-type-editor__card">
+            <h3 className="ticket-type-editor__aside-title">Implications</h3>
+            <p className="ticket-type-editor__implications" data-testid="rank-implications">
+              {rankImplicationsCopy(implications)}
             </p>
-          ) : (
-            <>
-              <h3 className="ticket-type-editor__divergence-title">Existing tickets stay where they are</h3>
-              {divergenceCountLine(population) !== null ? (
-                <p className="ticket-type-editor__divergence-count">{divergenceCountLine(population)}</p>
-              ) : null}
-              {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name) !== null ? (
-                <p className="ticket-type-editor__divergence-body">
-                  {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name)}
-                </p>
-              ) : null}
-              {nothingStaysBehind ? null : rebind.phase === 'left' ? (
-                <p className="ticket-type-editor__divergence-left">
-                  {`Left on "${outgoingWorkflow.name}". They keep their own board columns.`}
-                </p>
-              ) : (
-                // The `!canAuthor` term on both buttons below is defence in
-                // depth, and it is NOT pinned by a test — deliberately, because
-                // no test can reach it. `diverged` is false at mount for every
-                // role (it compares def.workflowId against the initialDef's
-                // own), and the only gesture that can make it true is the
-                // Workflow combobox, which is itself `disabled={!canAuthor}`.
-                // Measured at this sha: dropping `!canAuthor` from either
-                // button reddens 0 of the 213 tests in test/workflow-builder +
-                // test/ticket-types. The lock that actually holds is the outer
-                // one, and THAT is tested — access.test.tsx's "locks the binding
-                // itself, so the divergence section a migration lives in never
-                // opens". A test aimed at these two terms would have to defeat
-                // the combobox gate in its own setup, and would then be
-                // asserting that setup rather than the gate.
-                <div className="ticket-type-editor__divergence-actions">
-                  <button
-                    type="button"
-                    className="ticket-type-editor__divergence-move"
-                    disabled={!canAuthor || !bindingCommitted || rebind.phase === 'migrating'}
-                    onClick={() => setRebind({ phase: 'mapping', toWorkflowId: def.workflowId })}
-                  >
-                    {`Move them to "${incomingWorkflow.name}"…`}
-                  </button>
-                  {/* Staying put is a decision, not the absence of one. */}
-                  <button
-                    type="button"
-                    className="ticket-type-editor__divergence-leave"
-                    disabled={!canAuthor}
-                    onClick={() => setRebind({ phase: 'left' })}
-                  >
-                    {`Leave them on "${outgoingWorkflow.name}"`}
-                  </button>
-                  {bindingCommitted ? null : (
-                    <p className="ticket-type-editor__divergence-hint">
-                      {`Save the ticket type first — until it is saved, new tickets would still go to "${outgoingWorkflow.name}".`}
-                    </p>
-                  )}
-                </div>
-              )}
-              {rebind.phase === 'mapping' && pendingTarget !== null ? (
-                <WorkflowRebindDialog
-                  fromWorkflow={outgoingWorkflow}
-                  toWorkflow={pendingTarget}
-                  onCancel={() => setRebind({ phase: 'left' })}
-                  onConfirm={(stateMap) => void onMigrate(pendingTarget, stateMap)}
-                />
-              ) : null}
-              {rebind.phase === 'refused' ? (
-                <div className="ticket-type-editor__divergence-refused">
-                  <p>The server refused this move.</p>
-                  <p>{rebind.reason}</p>
-                  <p>{`rule: ${rebind.rule}`}</p>
-                </div>
-              ) : null}
-            </>
-          )}
-        </section>
-      ) : null}
-      <FieldsEditor
-        fields={def.fields}
-        disabled={!canAuthor}
-        onChange={(fields) => setDef((current) => ({ ...current, fields }))}
-      />
-      {schemaMessages.length > 0 ? (
-        <ul className="ticket-type-editor__issues">
-          {schemaMessages.map((message, at) => (
-            <li key={at}>{message}</li>
-          ))}
-        </ul>
-      ) : null}
-      {canAuthor ? (
-        <button
-          type="button"
-          className="ticket-type-editor__save"
-          disabled={!parsed.success || save.phase === 'saving'}
-          onClick={() => void onSave()}
-        >
-          Save ticket type
-        </button>
-      ) : null}
-      {/* The other half of the same guarantee: a screen that still reads
-          "Ticket type saved." beside a binding the server has never seen is
-          reporting success about an uncommitted state. */}
-      {save.phase === 'saved' && bindingCommitted ? (
-        <p className="ticket-type-editor__saved">Ticket type saved.</p>
-      ) : null}
-      {save.phase === 'refused' ? (
-        <div className="ticket-type-editor__refused">
-          <p>The server refused this ticket type.</p>
-          <p>{save.reason}</p>
-          <p>{`rule: ${save.rule}`}</p>
-        </div>
-      ) : null}
-      {save.phase === 'invalid' ? (
-        <div className="ticket-type-editor__invalid">
-          <p>The server could not read this claim.</p>
-          <p>{save.message}</p>
-        </div>
-      ) : null}
+          </Card>
+        </aside>
+      </div>
     </section>
   );
 }

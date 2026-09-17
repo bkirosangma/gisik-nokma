@@ -1059,3 +1059,108 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(guest.items.map((item) => item.card.ticketId)).toEqual([fx.guestDueId]);
   });
 });
+
+/**
+ * 13.577 (backlog/closed spec §3.2, 2026-09-17) — a closed ticket never
+ * produces an attention item.
+ *
+ * The blocked bucket is the one that can prove this: it reads the `blocked`
+ * flag "whatever the category" (this route's own docblock), so a ticket
+ * closed while sitting in a state its workflow flags blocked would still
+ * warn — unless the query itself never returns it. Stale and due-soon already
+ * exclude a closed ticket's usual resting states by CATEGORY (stale requires
+ * `active`, due-soon excludes `terminal`), so neither could tell this
+ * exclusion apart from "it was never eligible anyway" — a case built on
+ * either would be a check that cannot fail. A dedicated tiny workflow whose
+ * TERMINAL state is ALSO flagged blocked (the schema allows it; nothing about
+ * `blocked` implies a category) is what makes the positive control possible:
+ * one ticket reaches that state and stays open, one reaches it and is closed,
+ * and only the open one may still warn.
+ */
+describe('GET /v1/workspaces/:workspaceId/attention — backlog and closed (owner request, 2026-09-17)', () => {
+  const workflowId = 'wf-attn-closed-spec';
+  const typeId = 'attn-closed-spec';
+  let openBlockedId: string;
+  let closedBlockedId: string;
+
+  beforeAll(async () => {
+    openBlockedId = newUlid();
+    closedBlockedId = newUlid();
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        payload: {
+          id: workflowId,
+          version: 1,
+          name: 'Closed-attention flow',
+          initialStateId: 'open',
+          states: [
+            { id: 'open', name: 'Open', category: 'open' },
+            // Blocked AND terminal. `workflowStateSchema`'s `blocked` flag is
+            // orthogonal to `category` on purpose (amendment 9) — this state
+            // is the shape that proves it, and the only shape that can: a
+            // `done`-like terminal state that is NOT blocked would leave a
+            // closed ticket out of the blocked bucket for a reason that has
+            // nothing to do with `closed_at`.
+            { id: 'wontfix', name: "Won't fix", category: 'terminal', blocked: true },
+          ],
+          transitions: [
+            { from: '*', to: 'open', rules: [] },
+            { from: '*', to: 'wontfix', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        payload: { id: typeId, name: 'Closed-attention spec', icon: 'flag', rank: 3, workflowId, fields: [] },
+      }),
+
+      // The POSITIVE CONTROL: reaches the blocked terminal state and is NEVER
+      // closed. Without it, an implementation that excluded every terminal
+      // ticket from the blocked bucket (not only closed ones) would still
+      // pass the assertion below.
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: openBlockedId },
+        type: 'ticket.created',
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Blocked forever, still open' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: openBlockedId }, type: 'ticket.transitioned', payload: { to: 'wontfix' } }),
+
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedBlockedId },
+        type: 'ticket.created',
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Blocked forever, then closed' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedBlockedId }, type: 'ticket.transitioned', payload: { to: 'wontfix' } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedBlockedId }, type: 'ticket.closed', payload: {} }),
+    ]);
+  }, 60_000);
+
+  it('13.577 the closed ticket carries no attention item; the same blocked-flagged state still warns for the one that stayed open', async () => {
+    // The positive control the row itself carries, read back before the
+    // strip is asked anything.
+    const rows = await db.pool.query<{ ticket_id: string; state_id: string; closed_at: Date | null }>(
+      'SELECT ticket_id, state_id, closed_at FROM proj_tickets WHERE ticket_id = ANY ($1::text[])',
+      [[openBlockedId, closedBlockedId]],
+    );
+    const byId = new Map(rows.rows.map((row) => [row.ticket_id, row]));
+    expect(byId.get(openBlockedId)).toMatchObject({ state_id: 'wontfix' });
+    expect(byId.get(openBlockedId)?.closed_at).toBeNull();
+    expect(byId.get(closedBlockedId)).toMatchObject({ state_id: 'wontfix' });
+    expect(byId.get(closedBlockedId)?.closed_at).not.toBeNull();
+
+    const body = await strip('owner');
+    expect(idsOf(body, 'blocked')).toContain(openBlockedId);
+    expect(idsOf(body, 'blocked')).not.toContain(closedBlockedId);
+    // No bucket at all carries the closed ticket — not merely "not blocked".
+    expect(body.items.map((item) => item.card.ticketId)).not.toContain(closedBlockedId);
+  });
+});

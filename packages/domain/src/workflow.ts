@@ -38,6 +38,48 @@ export const transitionSchema = z.object({
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
+/**
+ * THE UNIVERSAL STATE (backlog/closed spec §1.1, 2026-09-17). Every workflow
+ * has a Backlog BEFORE its own initial state without declaring it: new tickets
+ * are born there (§1.3), the board never shows it, the Backlog tab does. The id
+ * is reserved — `validateWorkflowDef` refuses a definition that declares it —
+ * so no authored state can collide with it, and `foldStateIdForward` treats it
+ * as never dropped, so no republish can strand a ticket that sits in it.
+ *
+ * Consumers that need the FULL state or edge set read the two helpers below
+ * instead of `def.states`/`def.transitions`: the engine's edge resolution, the
+ * client's `transitionOptions`, the precheck. A consumer that reads the raw
+ * arrays sees only what the workflow AUTHORED — correct for the builder and
+ * the validator, wrong for anything that decides whether a move is legal.
+ */
+export const BACKLOG_STATE_ID = 'backlog';
+export const BACKLOG_STATE: WorkflowState = { id: BACKLOG_STATE_ID, name: 'Backlog', category: 'open' };
+
+/** `def.states` plus `BACKLOG_STATE`, always last. Pure. */
+export function statesWithBacklog(def: WorkflowDef): WorkflowState[] {
+  return [...def.states, BACKLOG_STATE];
+}
+
+/**
+ * The universal edges: Start (`backlog → def.initialStateId`) and Send to
+ * backlog (`s → backlog` for every declared NON-terminal `s`, in declared
+ * order). A terminal ticket cannot go to backlog — finished, not parked. No
+ * rules, ever: a workflow cannot gate its own Start edge; the first DECLARED
+ * edge out of the initial state keeps whatever rules it has.
+ */
+export function universalTransitions(def: WorkflowDef): Transition[] {
+  const start: Transition = { from: BACKLOG_STATE_ID, to: def.initialStateId, rules: [] };
+  const sendBack = def.states
+    .filter((state) => state.category !== 'terminal')
+    .map((state): Transition => ({ from: state.id, to: BACKLOG_STATE_ID, rules: [] }));
+  return [start, ...sendBack];
+}
+
+/** `def.transitions` followed by `universalTransitions(def)`. Pure. */
+export function transitionsWithBacklog(def: WorkflowDef): Transition[] {
+  return [...def.transitions, ...universalTransitions(def)];
+}
+
 export const workflowDefSchema = z.object({
   id: z.string().min(1),
   version: z.number().int().min(1),
@@ -112,6 +154,10 @@ export function foldStateIdForward(
   latest: WorkflowDef,
   intermediate: (version: number) => WorkflowDef | null,
 ): FoldedState {
+  // Backlog is universal (spec §1.4): in no version's `states`, dropped by
+  // none, so it folds to itself across any chain — including one with holes,
+  // which is why this returns before the version walk rather than inside it.
+  if (stateId === BACKLOG_STATE_ID) return { ok: true, stateId };
   let current = stateId;
   for (let version = fromVersion + 1; version <= latest.version; version += 1) {
     const def = version === latest.version ? latest : intermediate(version);

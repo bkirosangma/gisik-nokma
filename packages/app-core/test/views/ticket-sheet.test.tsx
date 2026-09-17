@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
@@ -315,7 +315,8 @@ describe('TicketSheet — the transition round-trip', () => {
     const source = renderSheet(ticketRead());
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(
       screen.getByLabelText('Comment (required by this transition)'),
       'filed at the portal',
@@ -352,7 +353,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     await waitFor(() => expect(source.ingested).toHaveLength(1));
@@ -385,7 +387,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'trying anyway');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     const serverBox = await screen.findByRole('alert');
@@ -415,7 +418,8 @@ describe('TicketSheet — the transition round-trip', () => {
     renderSheet(read, source);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'trying anyway');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     const serverBox = await screen.findByRole('alert');
@@ -428,7 +432,8 @@ describe('TicketSheet — the transition round-trip', () => {
     const source = renderSheet(ticketRead());
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.type(screen.getByLabelText('Comment (required by this transition)'), 'done and filed');
     await user.click(screen.getByRole('button', { name: 'Move' }));
     await waitFor(() => expect(screen.queryByLabelText('Move to')).toBeNull());
@@ -465,7 +470,10 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
     await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
     // `passed` is not a promise of acceptance and says nothing on screen. What
     // it proves here is that the engine PARSED the payload: a `{toStateId}`
@@ -480,9 +488,10 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
     await settled();
     await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
     // doing → done declares require-comment, and the pre-check candidate carries
     // no comment, so the engine refuses by that rule.
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-comment');
     // THE KILL. With the plan's `{toStateId}` payload this same box reads
@@ -787,5 +796,304 @@ describe('3.116 TicketSheet — the "Who can see this" section is mounted', () =
     await settled();
     const section = screen.getByRole('region', { name: 'Who can see this' });
     expect(within(section).getByRole('status')).toHaveTextContent('not being served yet');
+  });
+});
+
+/**
+ * THE CLOSE/REOPEN ROUND-TRIP (backlog/closed spec §5.3, 2026-09-17).
+ *
+ * `TicketSheet` reads `TicketState.closed` (`{actorId, at} | null | undefined`,
+ * spec §1.2) straight off `read.data.ticket` — `state.closed ?? null`, the
+ * same optional chain every other reader in this plan spells — never a
+ * separate flag this view invents. Close and Reopen are each other's
+ * complement over that value, gated by `stateCategory`, so this block proves
+ * both the gating and the one wire fact that matters: the SHIPPED payload for
+ * both events is `{}` (the envelope alone carries actor and time, spec §1.2),
+ * never a client-invented shape.
+ */
+describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3, 2026-09-17)', () => {
+  /**
+   * `Sheet`'s own dismiss button (`packages/ui/src/components/sheet.tsx`)
+   * carries `aria-label="Close"`, so its ACCESSIBLE NAME is "Close" too —
+   * identical to this feature's button text. `within` the state row keeps
+   * `getByRole('button', { name: 'Close' })` pointed at this sheet's own
+   * button rather than colliding with the header's dismiss control.
+   */
+  function stateRow(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__state') as HTMLElement;
+  }
+
+  /**
+   * 13.585 — a terminal, not-closed ticket shows Close and not Reopen;
+   * clicking it ingests exactly one `ticket.closed` with `payload {}`, and the
+   * sheet reloads — `getTicket` asked again, off the SAME `read.reload()`
+   * `submitTransition`'s own committed branch calls for a move.
+   */
+  it('13.585 shows Close (not Reopen) on a terminal, not-closed ticket, and closing it ingests {} and reloads', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    let getTicketCalls = 0;
+    const source = createFakeDataSource({
+      getTicket: async () => {
+        getTicketCalls += 1;
+        return read;
+      },
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    expect(within(stateRow()).queryByRole('button', { name: 'Reopen' })).toBeNull();
+    await waitFor(() => expect(getTicketCalls).toBe(1));
+
+    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.closed');
+    expect(batch[0]!.payload).toEqual({});
+    expect(batch[0]!.actorId).toBe('user_kiro');
+    expect(batch[0]!.origin).toBe('web');
+    // The sheet reloads: `read.reload()` re-asks `getTicket`.
+    await waitFor(() => expect(getTicketCalls).toBe(2));
+  });
+
+  /**
+   * 13.586 — a closed ticket shows the badge with the roster-resolved name
+   * and the IST-formatted date, shows Reopen (not Close), disables Move… with
+   * the sentence beside it as TEXT (never a tooltip), and clicking Reopen
+   * ingests one `ticket.reopened` with `payload {}`.
+   */
+  it('13.586 shows the closed badge, Reopen, a disabled Move… with its note, and reopening ingests {}', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        stateId: 'done',
+        stateCategory: 'terminal',
+        // 19:00 UTC crosses midnight under +05:30 (00:30 IST, 21 Aug) — a
+        // DISCRIMINATING instant, the same technique the history-tab battery
+        // above uses (`clientTime: '2026-08-16T18:30:00.000Z'` → '17 Aug
+        // 2026'). A same-day UTC instant would print the same date through a
+        // naive UTC slice as through the real `formatDate`/`formatIstInstant`
+        // path, so it would prove nothing about WHICH renderer ran.
+        closed: { actorId: 'user_anselma', at: '2026-08-20T19:00:00.000Z' },
+      }),
+    });
+    const source = sheetSource(read);
+    renderSheet(read, source);
+    await waitFor(() =>
+      expect(within(stateRow()).getByRole('button', { name: 'Reopen' })).toBeInTheDocument(),
+    );
+    expect(within(stateRow()).queryByRole('button', { name: 'Close' })).toBeNull();
+    // The roster resolves the name through the SAME `actorLabel` join every
+    // other claim in this sheet goes through; the date is the one IST
+    // formatter (`formatDate`), never a raw ISO slice — the 21 Aug date below
+    // is one calendar day past the event's own UTC date for exactly that
+    // reason.
+    expect(screen.getByText('Closed by Anselma Marak on 21 Aug 2026')).toBeInTheDocument();
+    expect(within(stateRow()).getByRole('button', { name: 'Move…' })).toBeDisabled();
+    const note = screen.getByText('Closed — reopen it first');
+    expect(note.className).toBe('gn-sheet__closed-note');
+    expect(note.getAttribute('title')).toBeNull();
+
+    await user.click(within(stateRow()).getByRole('button', { name: 'Reopen' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.reopened');
+    expect(batch[0]!.payload).toEqual({});
+  });
+
+  /** 13.587 — a non-terminal ticket shows neither button. */
+  it('13.587 shows neither Close nor Reopen on a non-terminal ticket', async () => {
+    renderSheet(ticketRead()); // default fixture: stateId 'doing', category 'active'
+    await settled();
+    expect(within(stateRow()).queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(within(stateRow()).queryByRole('button', { name: 'Reopen' })).toBeNull();
+  });
+
+  /**
+   * 13.588 — a refused close renders the rule and reason verbatim in the
+   * sheet's refusal slot. `TransitionDialog`'s own `serverRefusal` copy is
+   * invisible while `moveOpen` is false (`Dialog` returns `null` whenever
+   * `open` is false), so this proves the slot Close/Reopen actually render
+   * through, not the dialog's unreachable one.
+   */
+  it('13.588 a refused close renders the rule and reason verbatim', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'close-requires-terminal',
+          reason: 'A ticket can only be closed from a terminal state; "Done" is not one.',
+        })),
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Refused by the server — close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
+    );
+  });
+
+  /**
+   * 13.588a — Ruling 32 (fix round 1): the double-submit latch.
+   * `closeOrReopen` mirrors `board.tsx`'s `submitDirect` (`:1029-1035`'s own
+   * docblock explains why `finally`, not after the `await`): a rapid
+   * double-click on Close would otherwise fire two overlapping `ticket.closed`
+   * ingests before the first one's `committed`/`refused` answer ever comes
+   * back. `Close` (and, symmetrically, `Reopen`) is `disabled={submitting}`
+   * for the lifetime of its own ingest and re-enabled once it settles,
+   * regardless of outcome — a REJECTED ingest must not leave the button
+   * bricked forever, which is exactly what `finally` (vs. resetting only on
+   * the happy path) buys.
+   */
+  it('13.588a Close is disabled while its ingest is in flight, and enabled again once it settles', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    // A DEFERRED ingest: resolved by hand, below, so the test controls
+    // exactly how long "in flight" lasts rather than racing a microtask.
+    let resolveIngest!: (results: IngestResult[]) => void;
+    const pendingIngest = new Promise<IngestResult[]>((resolve) => {
+      resolveIngest = resolve;
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => pendingIngest,
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+    expect(closeButton).toBeEnabled();
+
+    await user.click(closeButton);
+    await waitFor(() => expect(closeButton).toBeDisabled());
+    // Still in flight: a second click must not queue a second ingest.
+    await user.click(closeButton);
+    expect(source.ingested).toHaveLength(1);
+
+    resolveIngest([
+      { status: 'committed', eventId: 'evt_close_1', seq: 99, serverTime: '2026-08-20T09:00:00.000Z' },
+    ]);
+    await waitFor(() => expect(closeButton).toBeEnabled());
+  });
+
+  /**
+   * 13.588b — Ruling 33 (fix round 2, 2026-09-17): a REJECTED `ingest` is a
+   * transport failure, not a refusal, and gets its OWN slot and sentence —
+   * never `serverRefusal`'s "Refused by the server — …", which would claim
+   * an adjudication the door/engine never made (Ruling 27, case 13.504,
+   * `board.tsx`'s identical distinction). Close re-enables once the rejection
+   * settles, same as any other outcome (the `finally` reset doesn't care
+   * which branch ran).
+   */
+  it('13.588b a rejected ingest renders the transport notice, never "Refused by the server", and Close re-enables', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new Error('socket hung up');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+
+    await user.click(closeButton);
+    const notice = await screen.findByRole('alert');
+    expect(notice.className).toBe('gn-refusal gn-refusal--transport');
+    expect(notice).toHaveTextContent('We could not reach the server for this change — socket hung up');
+    expect(document.body.textContent).not.toContain('Refused by the server');
+    await waitFor(() => expect(closeButton).toBeEnabled());
+  });
+
+  /**
+   * 13.588c — Ruling 34 (fix round 3, 2026-09-17): the `result === undefined`
+   * branch clears `serverRefusal` too, the same pairing the `catch` branch
+   * already carries (case 13.588b). Without it, a REFUSED click followed by a
+   * SILENT one leaves the earlier "Refused by the server — …" notice on
+   * screen ALONGSIDE the new transport one — two notices for one click's
+   * outcome, the older one describing an answer that no longer holds.
+   *
+   * The fake data source's `ingestScript` is an ordinary closure per call,
+   * not a fixed, one-shot script — `createFakeDataSource`'s `ingest` invokes
+   * it fresh on every call — so it sequences two different answers across two
+   * clicks (`refused`, then an empty `[]` — `results[0]` undefined) with NO
+   * change to the test helper.
+   */
+  it('13.588c a refused click followed by a silent one shows only the transport notice, never both', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    let calls = 0;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) => {
+        calls += 1;
+        if (calls === 1) {
+          return events.map((event) => ({
+            status: 'refused' as const,
+            eventId: event.id,
+            rule: 'close-requires-terminal',
+            reason: 'A ticket can only be closed from a terminal state; "Done" is not one.',
+          }));
+        }
+        // The second click's answer: silence — no result for the one event
+        // submitted, `results[0] === undefined`.
+        return [];
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+
+    await user.click(closeButton);
+    const serverNotice = await screen.findByText(/close-requires-terminal/);
+    expect(serverNotice.className).toBe('gn-refusal gn-refusal--server');
+    await waitFor(() => expect(closeButton).toBeEnabled());
+
+    await user.click(closeButton);
+    const transportNotice = await screen.findByText('The server did not answer this change.');
+    expect(transportNotice.className).toBe('gn-refusal gn-refusal--transport');
+    // The earlier server notice must be GONE, not merely joined by the new one.
+    expect(screen.queryByText(/close-requires-terminal/)).toBeNull();
+    expect(document.querySelector('.gn-refusal--server')).toBeNull();
+    await waitFor(() => expect(closeButton).toBeEnabled());
   });
 });

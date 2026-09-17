@@ -1,8 +1,13 @@
 import { REFUSAL_RULES, evaluateEvent, type EngineContext } from '@gisik-nokma/rule-engine';
 import {
+  BACKLOG_STATE_ID,
+  statesWithBacklog,
+  ticketClosedPayload,
   ticketCreatedPayload,
+  ticketReopenedPayload,
   ticketReparentedPayload,
   ticketTransitionedPayloadSchema,
+  transitionsWithBacklog,
   type EventEnvelope,
   type SubmittedEvent,
   type TicketState,
@@ -61,7 +66,12 @@ function notEvaluated(): PrecheckResult {
  *
  * The line the whole module is built to hold is between the last two: a
  * pre-check may never manufacture a `passed` out of ABSENCE. Four gates keep
- * it, and each names the absence it closes:
+ * it for `ticket.transitioned`'s accept path, and each names the absence it
+ * closes — the `closed-ticket` refusal ahead of them (fired on a
+ * `ticket.transitioned` whose ticket is closed, backlog/closed spec §2,
+ * 2026-09-17) is a REFUSAL, decided from the flag alone, and is not one of
+ * the four for that reason: it never manufactures the `passed` the gates
+ * exist to guard:
  *
  *  1. the moving ticket and its workflow definition must be cached at all;
  *  2. every workflow version the forward fold could consult must be cached, at
@@ -98,6 +108,9 @@ export async function precheckEvent(
     return precheckParentTerminal(submitted, cache);
   }
 
+  if (submitted.type === 'ticket.closed') return precheckTicketClosed(submitted, cache);
+  if (submitted.type === 'ticket.reopened') return precheckTicketReopened(submitted, cache);
+
   // Every other type: the shared engine has no case for it, so an accept from
   // it would mean only "this engine had nothing to say", which is not a
   // pre-check result — it is the absence of one.
@@ -105,6 +118,19 @@ export async function precheckEvent(
 
   const ticket = cache.getTicket(submitted.entity.id);
   if (ticket === undefined) return notEvaluated();
+
+  // The explicit reopen (backlog/closed spec §2), mirrored from the engine's
+  // OWN order: `transition.ts:72` decides this before it even fetches the
+  // workflow def at `:76`, because a closed ticket has no legal move at all
+  // and the flag is a fact this cache already holds — no def, no version
+  // chain, nothing further is needed to answer confidently. Deciding it here,
+  // ahead of the gates below, is what makes this branch predict the engine on
+  // a ticket whose def or version chain is NOT fully cached, where the gates
+  // would otherwise defer on a claim the engine can refuse outright.
+  if ((ticket.closed ?? null) !== null) {
+    return { kind: 'refused', rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed — reopen it first.' };
+  }
+
   const def = cache.getWorkflowDef(ticket.workflowId);
   if (def === undefined) return notEvaluated();
   if (!versionChainIsCached(cache, ticket, def)) return notEvaluated();
@@ -270,6 +296,61 @@ function precheckParentTerminal(submitted: SubmittedEvent, cache: ClientStateCac
 }
 
 /**
+ * `ticket.closed`/`ticket.reopened`, hand-rolled from `checks/close.ts`'s own
+ * conditions and rule ids (backlog/closed spec §2, 2026-09-17) — the same
+ * shape `precheckParentTerminal` takes, and NOT routed through the shared
+ * engine for the same reason that function gives (`evaluate.ts` is a flat
+ * switch, one check per event type, so there is nothing else to call through).
+ *
+ * UNLIKE `precheckParentTerminal`, these two CAN answer `passed`. Gate 4
+ * exists because `checkTicketCreated`/`checkTicketReparented` read a
+ * ticket-type definition this cache has no store for; `checkTicketClosed` and
+ * `checkTicketReopened` read neither — `checkTicketClosed` reads only
+ * `ticket.closed` and `ticket.stateCategory`, both cached facts, and consults
+ * a workflow def ONLY to spell the state's NAME inside a refusal reason it has
+ * already decided to give. So once every fact a verdict rests on is genuinely
+ * held, a `passed` here is not an accept manufactured from absence — it is the
+ * one this module's own invariant permits.
+ */
+function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
+  const parsed = ticketClosedPayload.safeParse(submitted.payload);
+  if (!parsed.success) return notEvaluated();
+  const ticket = cache.getTicket(submitted.entity.id);
+  if (ticket === undefined) return notEvaluated();
+  if ((ticket.closed ?? null) !== null) {
+    return { kind: 'refused', rule: REFUSAL_RULES.alreadyClosed, reason: 'This ticket is already closed.' };
+  }
+  if (ticket.stateCategory !== 'terminal') {
+    // The def is read ONLY for the name in the reason below, never for the
+    // verdict — `ticket.stateCategory` is already the cached fact the refusal
+    // rests on — so an uncached definition degrades the name to the bare
+    // state id rather than turning a confident refusal into `not-evaluated`,
+    // exactly as `checks/close.ts`'s own `def === null` branch does.
+    const def = cache.getWorkflowDef(ticket.workflowId);
+    const stateName =
+      def === undefined ? ticket.stateId : statesWithBacklog(def).find((state) => state.id === ticket.stateId)?.name ?? ticket.stateId;
+    return {
+      kind: 'refused',
+      rule: REFUSAL_RULES.closeRequiresTerminal,
+      reason: `A ticket can only be closed from a terminal state; "${stateName}" is not one.`,
+    };
+  }
+  return { kind: 'passed' };
+}
+
+/** `ticket.reopened`'s only condition is the flag itself, which this cache already holds. */
+function precheckTicketReopened(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
+  const parsed = ticketReopenedPayload.safeParse(submitted.payload);
+  if (!parsed.success) return notEvaluated();
+  const ticket = cache.getTicket(submitted.entity.id);
+  if (ticket === undefined) return notEvaluated();
+  if ((ticket.closed ?? null) === null) {
+    return { kind: 'refused', rule: REFUSAL_RULES.notClosed, reason: 'This ticket is not closed.' };
+  }
+  return { kind: 'passed' };
+}
+
+/**
  * The parent named by a hierarchy claim: `null` for "no parent", `undefined`
  * for "this payload does not say". Read through the SAME registered schemas the
  * server's door uses rather than a cast — `EventEnvelope.payload` is `unknown`,
@@ -348,7 +429,12 @@ function acceptRestsOnUnseenChildren(
   payload: TicketTransitionedPayload,
   cache: ClientStateCache,
 ): boolean {
-  const toState = def.states.find((state) => state.id === payload.to);
+  // `statesWithBacklog(def)`, not `def.states` (backlog/closed spec §1.4,
+  // 2026-09-17): backlog is a legal destination (Send to backlog) and is
+  // never terminal, but `def.states` alone does not declare it — a miss here
+  // used to fall through to the conservative `!hasCompleteChildren` branch
+  // below for a destination that can never need a vouched child set at all.
+  const toState = statesWithBacklog(def).find((state) => state.id === payload.to);
   if (toState !== undefined && toState.category !== 'terminal') return false;
   return !cache.hasCompleteChildren(ticket.id);
 }
@@ -373,9 +459,18 @@ function acceptRestsOnUnseenChildren(
  * too, which is gate 2's business and belongs with it.
  */
 function needsMembership(ticket: TicketState, def: WorkflowDef, payload: TicketTransitionedPayload): boolean {
+  // `transitionsWithBacklog(def)`, with the same backlog-only Start rule the
+  // engine applies (backlog/closed spec §1.1/§4, 2026-09-17): a wildcard edge
+  // never resolves FROM backlog, so a ticket sitting there only ever matches
+  // the universal Start edge — which, like every universal edge, carries no
+  // rules at all, so this can never manufacture a membership requirement out
+  // of a wildcard that was never backlog's to take.
+  const edges = transitionsWithBacklog(def);
   const transition =
-    def.transitions.find((edge) => edge.from === ticket.stateId && edge.to === payload.to) ??
-    def.transitions.find((edge) => edge.from === '*' && edge.to === payload.to);
+    ticket.stateId === BACKLOG_STATE_ID
+      ? edges.find((edge) => edge.from === BACKLOG_STATE_ID && edge.to === payload.to)
+      : edges.find((edge) => edge.from === ticket.stateId && edge.to === payload.to) ??
+        edges.find((edge) => edge.from === '*' && edge.to === payload.to);
   if (transition === undefined) return true;
   return transition.rules.some((rule) => rule.kind === 'restrict-to' && (rule.roles?.length ?? 0) > 0);
 }

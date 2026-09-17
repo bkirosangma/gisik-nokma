@@ -30,12 +30,15 @@ export type ProjTicketRow = {
   assignee_id: string | null;
   collaborator_ids: string[];
   fields: Record<string, FieldClaim>;
+  /** `TicketCard.closed`'s pair, unmapped — see `assembleTicketCards` for the fold (backlog/closed spec §3.1, 2026-09-17). */
+  closed_at: Date | null;
+  closed_by: string | null;
 };
 
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
-  't.assignee_id, t.collaborator_ids, t.fields';
+  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.
@@ -148,6 +151,12 @@ export async function assembleTicketCards(
       fields: row.fields,
       stateProvenance: prov,
       rollup,
+      // Both NULL means never closed — the same fold `rowToTicketState` makes
+      // over these two columns (backlog/closed spec §3.1/§3.3, 2026-09-17).
+      closed:
+        row.closed_at === null || row.closed_by === null
+          ? null
+          : { actorId: row.closed_by, at: row.closed_at.toISOString() },
     });
   }
   return cards;

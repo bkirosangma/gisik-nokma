@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { TOKEN_ROLES, cssVariableName, themeStylesheet } from '@gisik-nokma/ui/tokens';
+import {
+  TOKEN_ROLES,
+  cssVariableName,
+  fontStackOf,
+  fontVariableName,
+  themeStylesheet,
+} from '@gisik-nokma/ui/tokens';
 import { installTheme } from './theme.js';
 
 /**
@@ -40,11 +46,35 @@ function fakeDocument(): { doc: Document; appended: FakeStyle[] } {
 }
 
 describe('the desktop shell installs the design tokens (15.17)', () => {
-  it('appends one stylesheet to the head', () => {
+  it('appends the token stylesheet and the shell base rules, in that order', () => {
     const { doc, appended } = fakeDocument();
     installTheme(doc);
-    expect(appended).toHaveLength(1);
+    expect(appended).toHaveLength(2);
     expect(appended[0]?.attrs['data-gn-tokens']).toBe('');
+    expect(appended[1]?.attrs['data-gn-base']).toBe('');
+  });
+
+  /**
+   * 15.30 — the desktop window renders in the PRODUCT's typeface. It did not:
+   * `ui.css` declares no `font-family` and `index.html` no `<style>`, so the
+   * only stack the product named lived in `apps/web/app/globals.css`, which
+   * this app never loads, and every glyph here was the browser's default serif.
+   * Exactly the defect above, one property along.
+   *
+   * It asserts the VARIABLE is referenced and that the token sheet DEFINES it —
+   * both halves, because either alone is a check that cannot fail. A `body`
+   * rule pointing at an undefined custom property is invalid at computed-value
+   * time and falls straight back to the serif, which is the failure it looks
+   * most like success.
+   */
+  it('15.30 sets the body typeface from the token the same install defines', () => {
+    const { doc, appended } = fakeDocument();
+    installTheme(doc);
+    const tokens = appended[0]?.textContent ?? '';
+    const base = appended[1]?.textContent ?? '';
+    expect(base).toContain(`font-family: var(${fontVariableName('sans')})`);
+    expect(base).toContain('-webkit-font-smoothing: antialiased');
+    expect(tokens).toContain(`${fontVariableName('sans')}: ${fontStackOf('sans')};`);
   });
 
   /**

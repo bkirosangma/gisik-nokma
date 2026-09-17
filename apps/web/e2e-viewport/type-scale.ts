@@ -170,13 +170,35 @@ export type TypeScale = {
    * `apps/web/app/globals.css` turns this list non-empty and names the
    * selectors.
    *
-   * Safe as an equality because this product has exactly one font stack: the
-   * only `font-family` declarations in `globals.css`, `ui.css` and
-   * `editor.css` are `body`'s own and two `inherit`s. A deliberate second
-   * typeface would need this comparison widened to a set — and it would fail
-   * loudly here first, which is the right way to find out.
+   * Safe as an equality because this product has exactly one SANS stack, and
+   * the loop above skips `code`/`kbd`/`pre` descendants before reaching here.
+   * The declarations are `body`'s own `var(--gn-font-sans)`; four `inherit`s
+   * (`button`, the `input, textarea, select` rule, and
+   * `.gn-mcp-authorize__input`'s own); and — the second typeface, added
+   * 2026-09-15 with the prototype's fonts — two MONO rules, `.gn-help__code` in
+   * `ui.css` and `.gn-invite-mint__url` in `globals.css`. Neither mono site is
+   * examined here: `code` is skipped by the `closest()` guard above, and
+   * `editor.css` is loaded only inside the RN webview this suite never opens. A
+   * second SANS typeface in a LABEL position would still need this widened to a
+   * set, and would still fail loudly here first.
+   *
+   * ITS FALSE-GREEN MODE, AND WHY `bodyFamily` IS REPORTED BELOW. This compares
+   * each element to `body` and never to the product. Since 2026-09-15 `body`'s
+   * family is `var(--gn-font-sans)`; a custom property that fails to resolve
+   * makes the declaration invalid at computed-value time, so `body` falls back
+   * to the UA serif — and then every inheriting element matches it, `uaFont` is
+   * EMPTY, and the run is green with the typeface gone from the whole product.
+   * That is the precise failure this list was built to catch, wearing the shape
+   * of a pass. `bodyFamily` is carried out so the spec can assert `body` is
+   * painting in the ORIGIN's stack, which is the half an equality cannot state.
    */
   uaFont: TextSample[];
+  /**
+   * `body`'s own computed `font-family` — the thing every comparison above is
+   * relative to, reported so that "relative to what" is itself checkable. See
+   * the false-green note on `uaFont`.
+   */
+  bodyFamily: string;
   /** Invisible, empty, or code-owned: counted so a silent-empty run is visible. */
   skipped: number;
   /** The worst reading found, reported whether or not it offends. */
@@ -269,6 +291,7 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
         offenders,
         bodyOwned,
         uaFont,
+        bodyFamily,
         skipped,
         smallest,
       };

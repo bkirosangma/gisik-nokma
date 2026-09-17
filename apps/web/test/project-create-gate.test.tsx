@@ -131,6 +131,7 @@ const LIST: TicketListView = {
       // This shell is online-only, so nothing is ever in transit — the same
       // `false` the board card above carries, for the same reason.
       pending: false,
+      closed: null,
     },
   ],
 };
@@ -157,15 +158,42 @@ afterEach(() => {
   push.mockClear();
 });
 
-/** The type `<select>`'s option labels, in order, printed rather than counted. */
-function typeOptionLabels(): string[] {
-  const picker = screen.getByLabelText('Type');
-  return within(picker).getAllByRole('option').map((option) => option.textContent ?? '');
+/**
+ * The dialog's Type and Parent pickers are the shared SEARCHABLE `Select` now, so their options
+ * can no longer be read off the trigger: the trigger is an `<input role="combobox">` with no
+ * `<option>` children of its own, and the rows exist only while the panel is OPEN, portal-rendered
+ * into a `listbox` on `document.body` (`packages/ui/src/select/select.tsx`). A searchable `Select`
+ * renders no `HiddenSelect` mirror either, so there is no always-present copy to read instead.
+ *
+ * Hence: open, read, close. Still the labels in order and printed rather than counted, which is
+ * the whole point of these two helpers — `toEqual` on a printed list is simultaneously the pin and
+ * its own control, and a failure names the options that were actually offered.
+ *
+ * `textContent` remains exactly the label: `SelectOptionRow` renders the selected row's check mark
+ * as an `aria-hidden` `<svg>` carrying no text, and these options have no icon or description.
+ */
+async function optionLabels(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+): Promise<string[]> {
+  await user.click(screen.getByRole('combobox', { name }));
+  const listbox = await screen.findByRole('listbox');
+  const labels = within(listbox)
+    .getAllByRole('option')
+    .map((option) => option.textContent ?? '');
+  // Closed again before returning: there is one portal-rendered `listbox` for the whole document,
+  // so a panel left open would make any later `findByRole('listbox')` in the same test ambiguous.
+  await user.keyboard('{Escape}');
+  return labels;
 }
 
-function parentOptionLabels(): string[] {
-  const picker = screen.getByLabelText('Parent');
-  return within(picker).getAllByRole('option').map((option) => option.textContent ?? '');
+/** The type picker's option labels, in order, printed rather than counted. */
+function typeOptionLabels(user: ReturnType<typeof userEvent.setup>): Promise<string[]> {
+  return optionLabels(user, 'Type');
+}
+
+function parentOptionLabels(user: ReturnType<typeof userEvent.setup>): Promise<string[]> {
+  return optionLabels(user, 'Parent');
 }
 
 describe('3.142 a refused ticket list is never rendered as "this project has no parents"', () => {
@@ -202,6 +230,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     expect(await screen.findByText('Rewire the shop sign')).toBeInTheDocument();
 
     // The control IS offered now — creation at project root never needed the list.
+    const user = userEvent.setup();
     const open = await screen.findByRole('button', { name: 'New ticket' });
     fireEvent.click(open);
 
@@ -227,13 +256,25 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     // Parent adds a second only when the picker renders.
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).queryAllByRole('combobox')).toHaveLength(1);
-    expect(within(dialog).queryByRole('option', { name: 'None (project root)' })).toBeNull();
+    // The second half USED to read `within(dialog).queryByRole('option', { name: 'None (project
+    // root)' })`, and that spelling had to go for the very reason the paragraphs above exist.
+    // Both pickers are the shared searchable `Select` now, and its rows are portal-rendered onto
+    // `document.body` only while the panel is OPEN — so an option query scoped `within(dialog)`
+    // matches nothing in EITHER state, whether or not the parent picker is rendered. It would
+    // have become a third spelling of the same defect this comment was written to record: an
+    // assertion that is null for opposite reasons and therefore cannot fail.
+    //
+    // Named on the control instead of its contents. The count above still discriminates (Title is
+    // a textbox, Type is the one combobox, Parent would add a second), and this names WHICH
+    // combobox is missing, so the pair cannot be satisfied by a dialog that dropped the Type
+    // picker and kept the Parent one.
+    expect(within(dialog).queryByRole('combobox', { name: 'Parent' })).toBeNull();
     expect(
       screen.getByText(/the list of tickets that could be a parent cannot be shown/),
     ).toBeInTheDocument();
 
     // The type picker is untouched: types still gate creation, parents do not.
-    expect(typeOptionLabels()).toContain('Epic');
+    expect(await typeOptionLabels(user)).toContain('Epic');
   });
 
   it('offers the real rows once the list ANSWERS, so the gate is not "never offer it"', async () => {
@@ -251,8 +292,12 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
         <ProjectPage />
       </Providers>,
     );
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
-    expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    // Still exactly these two, and still in this order, after the shared-Select migration: the
+    // synthetic `{ value: '', label: 'None (project root)' }` option replaces the hand-written
+    // `<option value="">` one-for-one at the head of the list rather than adding to it.
+    expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
     // The paired absence is the REASON, not the old refusal. `"…could be a parent, so
     // New ticket is not offered"` was deleted with `createRegion`'s list arm and is
     // produced by no source file now, so asserting it absent asserted nothing — it
@@ -288,10 +333,11 @@ describe('3.158 a preferences failure does not claim the parent list cannot be s
         <ProjectPage />
       </Providers>,
     );
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
 
     // The true thing present...
-    expect(parentOptionLabels()).toEqual(['None (project root)', 'Rewire the shop sign']);
+    expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
     // ...and the false one absent. Paired, as every case in this file is.
     expect(
       screen.queryByText(/the list of tickets that could be a parent cannot be shown/),
@@ -313,16 +359,20 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
         <ProjectPage />
       </Providers>,
     );
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
 
+    // Read ONCE and asserted three times: opening the panel is now a real interaction, so three
+    // separate reads would be three open/close cycles of the same list to no purpose.
+    const typeLabels = await typeOptionLabels(user);
     // The whole list, in the server's order. `toEqual` is simultaneously the pin
     // and its own control: these, in this order, and no others. A `toContain`
     // would stay green for a page rendering the ladder AND the answer.
-    expect(typeOptionLabels()).toEqual(['Epic', 'Chore', 'Task']);
+    expect(typeLabels).toEqual(['Epic', 'Chore', 'Task']);
     // Named individually as well, because the ladder shares `Epic` and `Task`
     // with this fixture: presence alone cannot tell the two apart.
-    expect(typeOptionLabels()).not.toContain('Story');
-    expect(typeOptionLabels()).not.toContain('Sub-task');
+    expect(typeLabels).not.toContain('Story');
+    expect(typeLabels).not.toContain('Sub-task');
     // And the loading marker is gone, because this is an answer.
     expect(screen.queryByText(BUILTIN_LADDER_NOTICE)).not.toBeInTheDocument();
   });
@@ -344,8 +394,9 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
         <ProjectPage />
       </Providers>,
     );
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'New ticket' }));
-    expect(typeOptionLabels()).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    expect(await typeOptionLabels(user)).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
     // The sentence that stops the ladder from passing itself off as the answer.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
   });
@@ -428,5 +479,85 @@ describe('3.144 the write door is never offered an empty actor', () => {
 
     // The actor id, printed. `not.toBe('')` alone would pass for `undefined`.
     await waitFor(() => expect(ingested.map((event) => event.actorId)).toEqual([ANSELMA]));
+  });
+});
+
+/**
+ * 13.591f (backlog/closed spec §5.4, Task 9) — `parentCandidates`'s own
+ * `inFocus` derivation, at the ONE site that computes it from real row data:
+ * `page.tsx`'s `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed ===
+ * null`. Nothing in `packages/app-core` can witness this — its own tests pass
+ * `inFocus` in as a literal on the fixture, never derive it — so a wrong `!==`
+ * or a dropped `row.closed === null` half here would ship with every gate
+ * this task ran reporting green. Three rows, told apart only by the two facts
+ * the formula reads: a BACKLOG row (`stateId: 'backlog'`, the reserved id —
+ * dispatch context's own binding ruling — never closed), a plain ACTIVE row
+ * (neither backlog nor closed — the one case that should show the checkbox),
+ * and a CLOSED terminal row (not backlog, but closed). `typeRank`/`typeId`
+ * copy `LIST.rows[0]`'s shape; only the three fields the formula reads differ
+ * between rows.
+ */
+describe('13.591f the New-ticket dialog\'s "Start in focus" checkbox tracks a REAL row\'s state', () => {
+  const BACKLOG_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000BACKLOG01',
+    title: 'Sits in the backlog',
+    stateId: 'backlog',
+    stateName: 'Backlog',
+    stateCategory: 'open' as const,
+    closed: null,
+  };
+  const ACTIVE_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000ACTIVE001',
+    title: 'Actively worked, never closed',
+    stateId: 'doing',
+    stateName: 'Doing',
+    stateCategory: 'active' as const,
+    closed: null,
+  };
+  const CLOSED_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000CLOSED001',
+    title: 'Done, and closed',
+    stateId: 'done',
+    stateName: 'Done',
+    stateCategory: 'terminal' as const,
+    closed: { actorId: ANSELMA, at: '2026-09-17T09:00:00.000Z' },
+  };
+  const LIST_THREE: TicketListView = {
+    projectId: PROJECT,
+    rows: [BACKLOG_ROW, ACTIVE_ROW, CLOSED_ROW],
+  };
+
+  async function pickParent(user: ReturnType<typeof userEvent.setup>, title: string): Promise<void> {
+    await user.click(screen.getByRole('combobox', { name: 'Parent' }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: title }));
+  }
+
+  it('13.591f a backlog row and a closed row both compute inFocus: false — only the plain active row shows the checkbox', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD,
+          getTickets: async () => LIST_THREE,
+          getTicketTypes: async () => WORKSPACE_TYPES,
+          getPreferences: async () => EMPTY_PREFERENCES,
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+
+    await pickParent(user, 'Sits in the backlog');
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    await pickParent(user, 'Done, and closed');
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    await pickParent(user, 'Actively worked, never closed');
+    expect(screen.getByRole('checkbox', { name: 'Start in focus' })).toBeInTheDocument();
   });
 });

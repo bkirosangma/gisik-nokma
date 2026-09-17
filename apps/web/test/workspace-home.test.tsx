@@ -9,7 +9,7 @@ import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * `/w/[workspaceId]` — the workspace home (Task 19), cases 13.384–13.387.
+ * `/w/[workspaceId]` — the workspace home (Task 19), cases 13.384–13.387, 13.673.
  *
  * ## WHAT COULD MAKE EVERY CASE IN THIS FILE PASS FOR THE WRONG REASON
  *
@@ -184,7 +184,10 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       name: 'Show archived projects in Convenience Corner',
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent('Show 1 archived');
+    // Round 20: the VISIBLE text is the reference's ("1 archived · show"), while
+    // the accessible name above stays the sentence that names the workspace —
+    // deliberately two different strings, argued at the control's own call site.
+    expect(toggle).toHaveTextContent('1 archived · show');
     // ...and MARKED once revealed.
     await userEvent.click(toggle);
     expect(within(row('p3')).getByText('Old signage')).toBeInTheDocument();
@@ -195,7 +198,15 @@ describe('13.384 the workspace home lists projects with the caller’s own count
 
     // The restricted line, one text node — a three-interpolation version is
     // split across nodes and fails this.
-    expect(screen.getByText('2 projects · name restricted')).toBeInTheDocument();
+    const restrictedLine = screen.getByText('2 projects · name restricted');
+    expect(restrictedLine).toBeInTheDocument();
+    // IMPORTANT 2 (Task 7 fix round 1): the CSS-scan tests in
+    // `workspace-restricted-spacing.test.ts` only prove the STYLESHEET rule
+    // exists for `.gn-workspace-home__restricted`; nothing anywhere proved
+    // this element actually CARRIES the class the rule targets. A JSX edit
+    // that dropped it — silently losing the 0.55rem offset again — would
+    // have left every one of those four scan tests green.
+    expect(restrictedLine).toHaveClass('gn-workspace-card__restricted', 'gn-workspace-home__restricted');
   });
 
   it('renders NO number at all for a guest, and still names every project', async () => {
@@ -213,10 +224,11 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     ]);
 
     const only = await screen.findByTestId('project-row-p1');
-    // The name is plain text now (Round 19b): "Open board" is the row's one
-    // door, not the name doubling as a second link to the same target.
+    // Round 20 (owner ruling): the card's BODY is the door and "Open board" is
+    // gone — the name is inside that one link, named by it, rather than plain
+    // text beside a second link to the same target.
     expect(within(only).getByText('Shop operations')).toBeInTheDocument();
-    expect(within(only).getByRole('link', { name: 'Open board' })).toHaveAttribute(
+    expect(within(only).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
       'href',
       `/w/${WORKSPACE}/p/p1`,
     );
@@ -403,16 +415,54 @@ describe('13.386 archive hides a project and restore returns it — read from th
 });
 
 /**
- * 13.387 — the five doors out of this page resolve to the routes that exist.
+ * 13.673 — the four doors out of this page resolve to the routes that exist.
  *
- * **Asserted as five LITERAL paths, and that is the whole case.** Four of the
- * five live under `app/w/[workspaceId]/`; `/mcp/tokens` does NOT — it is a
- * global route that takes no `workspaceId`. A page that built its hrefs from one
- * `/w/${id}/` prefix would emit `/w/<id>/mcp/tokens`, which resolves to nothing,
- * and a test that built its expectations the same way would agree with the bug.
+ * **Asserted as four LITERAL paths, and that is the whole case.** Two of the
+ * four live under `app/w/[workspaceId]/`; Ticket types and Workflows do NOT —
+ * both carry their workspace as a QUERY PARAM on the global `/settings` route. A
+ * page that built its hrefs from one `/w/${id}/` prefix would emit
+ * `/w/<id>/settings?…`, which resolves to nothing, and a test that built its
+ * expectations the same way would agree with the bug.
  *
- * The paths are also checked against the app directory itself, in the same run:
- * a link is only proven live by a `page.tsx` existing at the route it names.
+ * **Five until Round 21 (owner: "move MCP tokens to the account page. as this
+ * should not be scoped to a workspace").** `/mcp/tokens` used to be the obvious
+ * non-`/w/` door and carried this case's whole argument; the argument SURVIVES
+ * it, which is why the literals stay. Its absence is now asserted here too, so
+ * restoring the link reddens this case rather than passing unnoticed — and
+ * `account-page.test.tsx` holds the other half, that the screen actually landed
+ * where it went. A removal nobody asserts is a removal that comes back.
+ *
+ * **Ticket types became a non-`/w/<id>/…` door with owner feedback 2026-09-09
+ * ("the ticket type edit is opening in a separate route... repoint it").** It
+ * targets `/settings?workspaceId=<id>&tab=ticket-types` now, not
+ * `/w/<id>/settings/ticket-types` — that bare list page's own Edit button
+ * opened the ticket-type editor as a THIRD, sidebar-less route, the exact
+ * defect `/settings` itself was just fixed to close; leaving this link
+ * pointed at the page that bypasses the fix would have kept the bug
+ * reachable a second way.
+ *
+ * **Workflows joined it in Round 22** (owner: "clicking workflows from the
+ * project screen opens up a separate page. it should open up the workflows tab
+ * in the settings page"). Round 19e had left it pointed at
+ * `/w/<id>/settings/workflows` on the reasoning that repointing it closed no
+ * equivalent defect — the workflow BUILDER was never inlined into `/settings`
+ * either, so the move would be cosmetic. The owner asked for it on its own
+ * merits: the bare page has no sidebar, so following this card dropped you out
+ * of the settings shell with no way back to the other sections. The bare route
+ * still resolves and `authoring-routes.test.tsx` still drives it.
+ *
+ * **These paths are NOT checked against the app directory, and this docblock
+ * used to claim they were** ("in the same run: a link is only proven live by a
+ * `page.tsx` existing at the route it names") — corrected in Round 22 after a
+ * grep for `existsSync` found the only such check in the repo is 13.392's, in
+ * `app-nav.test.tsx`, over the NAV's targets. These four doors are not nav
+ * targets and no filesystem assertion has ever covered them. The sentence read
+ * as measured and was not, which is worse than its absence: it invited a reader
+ * to trust that a typo'd href here would be caught, when what actually catches
+ * one is the literal expected in this case and nothing else. Three of the four
+ * targets happen to coincide with routes 13.392 does check (`/w/<id>/my-work`,
+ * `/w/<id>/members`, `/settings`), so the gap is narrow — but it is a gap, and
+ * naming it is what stops the next reader inheriting the wrong confidence.
  *
  * **Names are EXACT, unchanged by Round 19b's notes.** The first draft folded
  * each note into its link's content and let the accessible name become the
@@ -426,27 +476,37 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * name rather than folded into it) — see `page.tsx`'s own docblock on
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
-describe('13.387 the workspace-section links resolve to the real routes', () => {
-  it('carries five links, four workspace-scoped and one global', async () => {
+describe('13.673 the workspace-section links resolve to the real routes', () => {
+  it('carries four links, two workspace-scoped and two query-scoped', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     const expected: Array<[string, string]> = [
       ['My Work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
-      ['Ticket types', `/w/${WORKSPACE}/settings/ticket-types`],
-      ['Workflows', `/w/${WORKSPACE}/settings/workflows`],
-      ['MCP tokens', '/mcp/tokens'],
+      ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
+      ['Workflows', `/settings?workspaceId=${WORKSPACE}&tab=workflows`],
     ];
     for (const [name, href] of expected) {
       expect(within(nav).getByRole('link', { name }), name).toHaveAttribute('href', href);
     }
     expect(within(nav).getAllByRole('link')).toHaveLength(expected.length);
-    // The negative that names the actual defect: nothing here points at a
-    // workspace-scoped MCP route, which does not exist.
-    expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).not.toHaveAttribute(
+    // The negative that names the actual defect the literals exist to prevent:
+    // nothing here points at a workspace-scoped `/settings` PATH, which does not
+    // exist — the workspace rides as a query param or the route resolves to
+    // nothing.
+    expect(within(nav).getByRole('link', { name: 'Ticket types' })).not.toHaveAttribute(
       'href',
-      `/w/${WORKSPACE}/mcp/tokens`,
+      `/w/${WORKSPACE}/settings?tab=ticket-types`,
     );
+    // Round 21: MCP tokens is GONE from this workspace-scoped nav. Asserted
+    // rather than left to the length check above, so the failure names the
+    // reason instead of reading "expected 5 to be 4".
+    //
+    // 13.672 — the superseded middle revision of this case ("REVISED from five
+    // doors to four"), re-minted out of the 13.387 triple. Its own claim is
+    // exactly this line: /mcp/tokens left the nav for /account, and its
+    // absence is asserted BY NAME rather than left to the length check.
+    expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).toBeNull();
   });
 
   /**
@@ -467,9 +527,11 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
     expect(
       within(nav).getByText('States, transitions and published versions.'),
     ).toBeInTheDocument();
-    expect(
-      within(nav).getByText('Let an assistant act as you, with your permissions.'),
-    ).toBeInTheDocument();
+    // The MCP tokens note ("Let an assistant act as you, with your
+    // permissions.") is NOT asserted here any more — Round 21 moved that door to
+    // `/account`, and its own note travelled with it. Named rather than silently
+    // dropped, so a reader comparing this list to the four links above can see
+    // the fifth left on purpose.
   });
 
   it("13.398 a guest's Members note carries no number — memberCount is withheld, not zero", async () => {
@@ -502,6 +564,21 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
     const avatar = await screen.findByLabelText('Convenience Corner', { selector: '.gn-avatar' });
     expect(avatar).toHaveClass(`gn-avatar--tint-${byId}`);
     expect(avatar).not.toHaveClass(`gn-avatar--tint-${byName}`);
+  });
+
+  /**
+   * IMPORTANT 3 (Task 7 fix round 1) — the CSS-scan tests for
+   * `.gn-workspace-list__role--pinned` (`workspace-list-role-pin.test.ts`)
+   * only ever proved the RULE exists in `globals.css`; nothing anywhere
+   * proved this page's header meta line actually CARRIES the class. A JSX
+   * edit that dropped the modifier — restoring the card head's 0.9375rem
+   * type here by accident — would have left every existing test in this file
+   * green, because none of them reads `className`.
+   */
+  it('the header meta line carries the pinned-size modifier class, not just the base role class', async () => {
+    mount([[workspaceAs('member', { id: WORKSPACE, name: 'Convenience Corner' })]]);
+    const meta = await screen.findByText(/active project/);
+    expect(meta).toHaveClass('gn-workspace-list__role', 'gn-workspace-list__role--pinned');
   });
 
   it('carries no member number for a guest, and the role clause matches the /workspaces card\'s own source', async () => {
@@ -556,22 +633,138 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
 });
 
 /**
- * 13.396 — the project card: "Open board" for an archived project too (the
- * same label a live one gets, never "read-only" — archiving is not a
- * permission), and Archive/Restore read the same role value the server gate
- * answers independently (13.388's half; 13.385 already drives the pairing).
+ * 13.396 — an archived project's card opens exactly like a live one's: the same
+ * door, at its own href, and never "read-only". Archiving is a workspace
+ * decision, not a permission (Task 16), so the board underneath stays writable
+ * and the prototype's "Open read-only" would be a false claim about this
+ * product's own rule.
+ *
+ * Round 20 rewrote the ASSERTION and not the claim. The label this used to read
+ * ("Open board") no longer exists — the owner ruled the card's body into the
+ * door — so the case now names the door the way a screen reader reaches it.
+ *
+ * The accessible name is asserted to CARRY "archived", and that is the half
+ * with teeth: `aria-label` overrides everything inside the anchor, so the
+ * visible "Archived" chip is invisible to assistive tech, and a non-admin gets
+ * no Archive/Restore button to infer the state from either. A door named
+ * plainly "Old signage" would leave an archived project indistinguishable from
+ * a live one for exactly the callers who cannot see the chip.
  */
-describe('13.396 archived projects still open, with the same label a live one gets', () => {
-  it('offers "Open board" — not "Open read-only" — for an archived project, at the archived project\'s own href', async () => {
+describe('13.396 archived projects still open, through the same door a live one gets', () => {
+  it("names the archived project's door with its archived state, at its own href, and never read-only", async () => {
     mount([[workspaceAs('admin')]]);
     await userEvent.click(
       await screen.findByRole('button', { name: 'Show archived projects in Convenience Corner' }),
     );
     const archivedRow = row('p3');
     expect(
-      within(archivedRow).getByRole('link', { name: 'Open board' }),
+      within(archivedRow).getByRole('link', { name: 'Old signage, archived' }),
     ).toHaveAttribute('href', `/w/${WORKSPACE}/p/p3`);
     expect(within(archivedRow).queryByText(/read-only/i)).toBeNull();
+    // The POSITIVE CONTROL for the name above: a LIVE project in the same
+    // render is named WITHOUT the suffix. Asserting only the archived name
+    // passes against a page that appended ", archived" to every project.
+    expect(within(row('p1')).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    expect(within(row('p1')).queryByRole('link', { name: /archived/ })).toBeNull();
+  });
+});
+
+/**
+ * 13.413 — THE CARD IS THE DOOR, and the admin control is not inside it
+ * (Round 20, owner ruling reversing Round 19b's "Open board" button).
+ *
+ * Three things, and each fails a different plausible implementation:
+ *
+ * 1. **Exactly ONE link per card.** The ruling removes "Open board" rather than
+ *    leaving it beside the new door — a card that was a link AND held an "Open
+ *    board" button would be the two-doors-to-one-target failure 19b named,
+ *    arrived at from the other side. An implementation that merely wrapped the
+ *    existing row in a link passes every other assertion here and fails this.
+ *
+ * 2. **Archive/Restore is NOT a descendant of the anchor.** `<a>` may not
+ *    contain `<button>`; a nested one is invalid HTML that renders, so nothing
+ *    would look wrong. jsdom will not complain either — the containment is
+ *    asserted directly.
+ *
+ * 3. **The archived cards sort to the END of the disclosed grid** (Round 21,
+ *    owner: "always sort the archived projects to the end"), rather than
+ *    appearing in the position the server served them.
+ *
+ *    **THIS ASSERTION WAS REVERSED IN ROUND 21, and it is the same check
+ *    pointing the other way — not a deleted one.** Round 20 asserted the served
+ *    order and named `[...live, ...archived]` as the implementation to rule out;
+ *    that expression is now the REQUIREMENT, and the single filter it replaced
+ *    is what this case rules out. The cost Round 20 argued from is unchanged and
+ *    was accepted, not refuted: a disclosed project does move twice on one click
+ *    (in, and down). The owner weighed that against grouping retired work and
+ *    chose the grouping.
+ *
+ *    **That third assertion needs its OWN fixture, and the shared one would
+ *    make it vacuous IN EITHER DIRECTION.** `workspaceAs` serves p1, p2, p3 with
+ *    p3 archived — already last — so the single filter and the concatenation
+ *    produce the identical order, and the check could not fail against whichever
+ *    implementation it exists to rule out. The fixture below puts the archived
+ *    project in the MIDDLE, the only arrangement where the two expressions
+ *    disagree. It was built that way in Round 20 and it is what let this case be
+ *    turned around here by flipping one expected array.
+ */
+describe('13.413 each project card is one door, with the admin control outside the anchor', () => {
+  it('carries exactly one link and does not nest the archive button in it', async () => {
+    mount([[workspaceAs('admin')]]);
+    const liveCard = await screen.findByTestId('project-row-p1');
+
+    // 1 — one door, and no "Open board" anywhere on the page any more.
+    expect(within(liveCard).getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Open board' })).toBeNull();
+
+    // 2 — the button exists, and the anchor does not contain it.
+    const door = within(liveCard).getByRole('link', { name: 'Shop operations' });
+    const archiveButton = within(liveCard).getByRole('button', { name: 'Archive Shop operations' });
+    expect(door.contains(archiveButton)).toBe(false);
+    expect(archiveButton.closest('a')).toBeNull();
+  });
+
+  /**
+   * 13.674 — REVERSED, not deleted: the archived cards now sort to the END of
+   * the disclosed grid (owner: "always sort the archived projects to the end").
+   * `[...live, ...archived]` was the implementation Round 20 named as the thing
+   * to rule out; it is the requirement now. The other assertions in 13.413
+   * (exactly one link per card; Archive/Restore not nested in the anchor) stay
+   * with 13.413 itself, which the test above carries.
+   */
+  it('sorts a revealed archived project to the END, after every live one', async () => {
+    // Archived in the MIDDLE — see the docblock. Under `[...live, ...archived]`
+    // the disclosed grid reads p1, p3, p2; under a single filter over the served
+    // array it reads p1, p2, p3. Only this arrangement tells them apart.
+    mount([
+      [
+        workspaceAs('admin', {
+          projects: [
+            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p2', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
+            { id: 'p3', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+          ],
+        }),
+      ],
+    ]);
+
+    // POSITIVE CONTROL: collapsed, the archived one is absent and the two live
+    // ones are in served order — so a failure below is about where disclosure
+    // PUTS the archived card, and not about the grid never having been ordered
+    // at all. It also pins that the live projects keep the served order among
+    // themselves, which is what makes "archived last" a reordering of the two
+    // GROUPS rather than a sort of the whole list.
+    await screen.findByTestId('project-row-p1');
+    expect(
+      screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
+    ).toEqual(['project-row-p1', 'project-row-p3']);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show archived projects in Convenience Corner' }),
+    );
+    expect(
+      screen.getAllByTestId(/^project-row-/).map((node) => node.getAttribute('data-testid')),
+    ).toEqual(['project-row-p1', 'project-row-p3', 'project-row-p2']);
   });
 });
 

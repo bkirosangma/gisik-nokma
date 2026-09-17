@@ -416,6 +416,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       rollup: null,
       hasRestrictedParent: false,
       pending: false,
+      closed: null,
     });
     render(
       <Providers

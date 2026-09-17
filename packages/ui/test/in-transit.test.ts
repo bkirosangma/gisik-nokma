@@ -89,3 +89,48 @@ describe('in-transit is drawn the same way wherever a claim is drawn', () => {
     }
   });
 });
+
+/**
+ * Case **11.214** (`test-cases/11-calendar-notifications.md`) — RULING 24
+ * (coordinator, 2026-09-16), correcting case 11.213.
+ *
+ * `.gn-calendar__item--custom`'s text colour (`--gn-custom-marker`) was
+ * measured against `--gn-surface` — the ground `.gn-calendar__items` sits on
+ * (Board prototype port Task 10). That task's own `.gn-calendar__grid`
+ * wrapper introduced a NEW tray background, `--gn-surface-sunken`, and
+ * nothing between that wrapper and `.gn-calendar__items` paints an opaque
+ * ground of its own — so without `.gn-calendar__items`'s own explicit
+ * `background: var(--gn-surface)` declaration (`ui.css:1686`), the items row
+ * — and every claim drawn inside it, the custom marker included — silently
+ * inherits the tray instead. MEASURED, not assumed: `customMarker` on
+ * `hig`/`minimal` LIGHT's `surfaceSunken` is 4.310, below 4.5.
+ *
+ * **This is a CORRECTION, not new coverage from nothing.** The first attempt
+ * at gating this (case 11.213, `tokens.test.ts`) computed
+ * `contrastRatio(colorOf(theme, 'customMarker', style), colorOf(theme,
+ * 'surface', style))` — two `tokens.ts` LOOKUPS, never a read of `ui.css`.
+ * It duplicated a `CONTRAST_PAIRS` row that had already existed since Plan 9
+ * (`{ fg: 'customMarker', bg: 'surface', minimum: 4.5 }`, commit `e09666ce`,
+ * confirmed by `git log -S`) and was already exercised by this file's own
+ * "declared contrast pairs meet their minimums" loop — so deleting the
+ * `.gn-calendar__items` declaration this fix depends on left BOTH 11.213 and
+ * the rest of the suite green. The risk was real, the fix was correct, and
+ * the gate for it did not exist. This is that gate: it reads the actual
+ * stylesheet, the same technique the in-transit checks above already use and
+ * already prove against a planted fixture, and it fails if the declaration
+ * is ever removed or repointed at a different role.
+ *
+ * PROVEN TO GUARD, not merely written and trusted: with the declaration
+ * temporarily deleted from the real `ui.css`, this test reddened; restored,
+ * it passed again, and the file diffed byte-identical to its committed
+ * state. See task-10-report.md's "Ruling 24" section for the transcript.
+ */
+describe("the calendar's events row keeps the ground its item colours were measured against (11.214)", () => {
+  const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  it('.gn-calendar__items declares background: var(--gn-surface), not the grid tray it visually sits inside', () => {
+    const declarations = declarationsFor(css, '.gn-calendar__items');
+    expect(declarations, '.gn-calendar__items').not.toBeNull();
+    expect(declarations ?? '').toMatch(/(^|[\s;])background:\s*var\(--gn-surface\)\s*;/);
+  });
+});

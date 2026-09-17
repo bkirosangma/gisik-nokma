@@ -15,7 +15,20 @@ export {
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
 export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
-export { Board, EMPTY_BOARD_COPY, useBoard, type BoardProps } from './views/board.js';
+export {
+  Board,
+  EMPTY_BOARD_COPY,
+  // Re-exported alongside `EMPTY_BOARD_COPY` for the identical reason that
+  // constant's own docblock gives: a consumer's test should assert the SAME
+  // string this renders, not a re-typed copy of it, and a copy change should
+  // fail the assertion rather than pass a stale paraphrase. Added for
+  // board-prototype-port Task 8's fix round (Ruling 20(a)) — the first
+  // `apps/web` case to need it; `packages/app-core/test/views/board.test.tsx`
+  // already imports it directly, being in the same package.
+  EMPTY_COLUMN_COPY,
+  useBoard,
+  type BoardProps,
+} from './views/board.js';
 export {
   columnLabel,
   countRows,
@@ -138,6 +151,13 @@ export {
   type IsEpicType,
 } from './hierarchy/epic-ancestor.js';
 export { matchesFilter } from './filter/matches-filter.js';
+// The board's own filter vocabulary (Plan: board-prototype-port, Task 3) —
+// `BoardFilterSpec` is declared in `filter/board-filter.ts` and has exactly
+// one export path, unlike `FilterSpec` above, which already leaves through
+// `view-types.ts`'s `export *`.
+export { matchesBoardCard, type BoardFilterSpec } from './filter/board-filter.js';
+// Exclude-mode spec §2 (2026-09-17): the list-row predicate, beside the board's.
+export { matchesListRow, type ListFilterSpec } from './filter/list-filter.js';
 export {
   buildCalendarModel,
   type CalendarBar,
@@ -266,4 +286,37 @@ export { ContestBanner } from './contests/contest-banner.js';
 export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
 export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
 export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
+// Account/help-screens plan, Task 6 — the Notifications section of
+// `/account` and the abstract half of its gateway. The concrete HTTP
+// adapter (`createHttpNotificationPreferencesGateway`) is a `./online`
+// export beside its sibling `createHttpNotificationsGateway`, matching how
+// `PreferencesGateway` above is named here while nothing implements it at
+// the package root either.
+export type { NotificationPreferencesGateway } from './account/notification-preferences-gateway.js';
+export {
+  NotificationsSection,
+  type NotificationsSectionProps,
+} from './account/notifications-section.js';
+// Account/help-screens plan, Task 7 — the Sessions half of `/account`'s
+// "Sign-in and devices" section (Passkeys is a later task) and the abstract
+// half of its client. The concrete `authClient`-backed adapter
+// (`createSessionsClient`) is an `apps/web`-local export, matching how
+// `NotificationPreferencesGateway` above is named here while its own HTTP
+// implementation lives at the package root's `./online` instead.
+export type { SessionsClient, SessionSummary } from './account/sessions-client.js';
+export {
+  SessionsSection,
+  type SessionsSectionProps,
+} from './account/sessions-section.js';
+// Account/help-screens plan, Task 8 — the Passkeys half of `/account`'s
+// "Sign-in and devices" section (the half Task 7's own note deferred) and the
+// abstract half of its client. The concrete `authClient`-backed adapter
+// (`createPasskeyClient`) is an `apps/web`-local export, exactly as
+// `createSessionsClient` above is, and for the same reason: it speaks
+// `@better-auth/passkey`, which this package must not.
+export type { PasskeyClient, PasskeySummary } from './account/passkey-client.js';
+export {
+  PasskeysSection,
+  type PasskeysSectionProps,
+} from './account/passkeys-section.js';
 export * from './help/index.js';

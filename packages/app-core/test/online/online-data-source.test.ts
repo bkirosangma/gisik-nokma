@@ -127,6 +127,7 @@ function listCard(ticketId: string) {
     stateName: 'Doing',
     assignedProvenance: null,
     hasRestrictedParent: false,
+    closed: null,
   };
 }
 
@@ -169,6 +170,7 @@ const BOARD: BoardResponse = {
             cause: null,
           },
           rollup: null,
+          closed: null,
         },
       ],
     },

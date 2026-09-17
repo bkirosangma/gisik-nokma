@@ -106,6 +106,11 @@ export function compileFilterSpec(spec: FilterSpec, params: SqlParams): Compiled
     needsBlockedCte = true;
     clauses.push(spec.blocked ? BLOCKED_MEMBERSHIP : `NOT (${BLOCKED_MEMBERSHIP})`);
   }
+  // `closed` (backlog/closed spec §3.2, 2026-09-17): a plain column comparison
+  // over `t` itself, so unlike `blocked`/`text` it reaches no other table and
+  // needs no correlation — `compileFilterSpec`'s own docblock's "every clause
+  // that reaches another table" claim is about THOSE two, not this one.
+  if (spec.closed !== undefined) clauses.push(spec.closed ? 't.closed_at IS NOT NULL' : 't.closed_at IS NULL');
   if (spec.text !== undefined) {
     // websearch_to_tsquery, never to_tsquery: it parses ANY string as a
     // phrase instead of raising a syntax error, so a hostile query term

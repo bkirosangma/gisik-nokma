@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import { statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Button, Chip, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -170,6 +170,29 @@ export function TicketSheet({
   const [tab, setTab] = useState<'details' | 'history'>('details');
   const [moveOpen, setMoveOpen] = useState(false);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  /**
+   * Ruling 33 (fix round 2, 2026-09-17) — Close/Reopen's OWN transport-error
+   * slot, separate from `serverRefusal`. Ruling 27 (board-prototype-port,
+   * cited on `board.tsx`'s identical pair) is the reason the two must stay
+   * apart: `serverRefusal` carries only what the engine actually adjudicated
+   * — a real `{rule, reason}` pair the door or the rule engine wrote — and a
+   * silence or a dropped connection is not that, however much it might read
+   * the same wrapped in the "Refused by the server — …" sentence. Filed here
+   * (fix round 1) as `serverRefusal` under a synthetic `ingest-rejected` rule
+   * name until this ruling gave it a proper slot.
+   */
+  const [transportError, setTransportError] = useState<string | null>(null);
+  /**
+   * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
+   * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
+   * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
+   * rapid double-click fires a second `ticket.closed`/`ticket.reopened`
+   * ingest before the first one's answer returns — this sheet has no arrow
+   * pair to double-click through, but the same click-then-await window
+   * exists on ONE button. Scoped to Close/Reopen only: `Move…` opens a
+   * dialog with its own submit and its own concerns, untouched here.
+   */
+  const [submitting, setSubmitting] = useState(false);
 
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
     dataSource.query.getTicket(workspaceId, ticketId),
@@ -289,9 +312,118 @@ export function TicketSheet({
     else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
 
+  /**
+   * Close / Reopen — the same `make`/`ingest`/result idiom `submitTransition`
+   * uses above, collapsed to the one-event case: `ticket.closed` and
+   * `ticket.reopened` both carry `payload: {}` (spec §1.2, 2026-09-17), the
+   * envelope alone naming the actor and the server time the badge later
+   * reads. A `committed` answer clears any standing refusal and reloads both
+   * the ticket and its ledger — the same pair `submitTransition` refreshes,
+   * because a close/reopen writes a ledger line too. A `refused` or `invalid`
+   * answer is carried without paraphrase into `serverRefusal`, exactly as
+   * `submitTransition` carries a move's.
+   *
+   * UNGUARDED against unmount mid-flight, on purpose and for the same reason
+   * `submitTransition` is left unguarded (see that function's docblock,
+   * cited by `board.tsx`): this file tracks no mounted-ness anywhere else, and
+   * adding one guard for this call alone would be a second convention beside
+   * the existing unguarded one rather than a fix to it. **This is a DIFFERENT
+   * concern from the `submitting` latch below** — unmount-safety is about a
+   * setState landing after this component is gone; the latch is about a
+   * second click landing while THIS component is still very much mounted and
+   * still waiting on the first click's answer. `board.tsx`'s `MoveArrows`
+   * needs both guards because it can unmount mid-flight (a sibling card's
+   * move can reload the board out from under it); nothing here reloads this
+   * sheet out from under itself, so only the latch applies.
+   *
+   * Ruling 33 (fix round 2, 2026-09-17) — SUPERSEDES fix round 1's own
+   * rationale here, which read: "this sheet has no transport-error slot to
+   * hand [a rejection] to," and so folded a rejected `ingest` into
+   * `serverRefusal` under a synthetic `ingest-rejected` rule name. That was
+   * caught in review as the exact defect Ruling 27 removed from `board.tsx`
+   * (case 13.504): a rejection or a silent non-answer is NOT the server's own
+   * verdict, however it is worded, and dressing it in the "Refused by the
+   * server — …" sentence claims an adjudication that never happened. This
+   * sheet now HAS a transport slot (`transportError`, declared beside
+   * `serverRefusal` above), and the three outcomes below are told apart by
+   * which slot they fill, never by wording alone: `results[0] === undefined`
+   * (the door answered nothing for the one event submitted — a typed case,
+   * not an expected one) and a REJECTED promise both go to `transportError`;
+   * only a real `refused`/`invalid` answer goes to `serverRefusal`. `results[0]`,
+   * not `results.find(...)`, because exactly one event is ingested here — the
+   * result at index 0 IS the result, and searching implies a batch this call
+   * never sends.
+   *
+   * Ruling 32 (fix round 1) — `submitting` is set BEFORE the `ingest` call and
+   * reset in a `finally`, mirroring `board.tsx`'s `submitDirect`
+   * (`:1029-1035`'s own docblock on why `finally` rather than after the
+   * `await`): a REJECTED ingest must not leave Close/Reopen disabled forever,
+   * which resetting only on the happy path would do. The early `if
+   * (submitting) return` guards against a second click landing on the same
+   * render pass as the first, before React has re-rendered the `disabled`
+   * attribute onto the DOM (`userEvent`'s own await notwithstanding, this is
+   * belt-and-braces for a synchronous double-invoke, not the primary defence
+   * — the `disabled` attribute is).
+   */
+  const closeOrReopen = async (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type,
+        payload: {},
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        // Ruling 27/33/34: silence is not a refusal — `transportError`, never
+        // a hand-built `{rule, reason}` pair standing in for one. `serverRefusal`
+        // is cleared here too, the same pairing the `catch` branch below
+        // already does: without it, a REFUSED answer followed by a SILENT one
+        // (two separate clicks, two separate ingests) would leave the old
+        // "Refused by the server — …" notice on screen alongside the new
+        // transport one — two notices for one click's outcome, the earlier one
+        // describing an answer that is no longer what happened.
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      setTransportError(null);
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } catch (error) {
+      // Ruling 27/33: a transport failure is not a refusal either — same
+      // `transportError` channel `board.tsx`'s `submitDirect` (`:1082-1088`)
+      // uses, own sentence, never `serverRefusal`.
+      setServerRefusal(null);
+      const message = error instanceof Error ? error.message : String(error);
+      setTransportError(`We could not reach the server for this change — ${message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const state = ticketRead.ticket;
+  // `statesWithBacklog`, not `workflow.data?.states` (backlog/closed spec
+  // §1.4, 2026-09-17): a ticket in the universal Backlog state has no row in
+  // the published definition's own `states`, and the sheet must still say
+  // "Backlog" rather than the bare id.
   const currentStateName =
-    workflow.data?.states.find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
+    workflow.data == null
+      ? state.stateId
+      : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
+  // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
+  // 2026-09-17); every reader spells the same `?? null`.
+  const closed = state.closed ?? null;
 
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>
@@ -321,8 +453,97 @@ export function TicketSheet({
             <span className="gn-ticket-sheet__provenance">
               {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
             </span>
-            <Button onClick={() => setMoveOpen(true)}>Move…</Button>
+            {closed !== null ? (
+              <span className="gn-sheet__closed-badge">
+                <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
+              </span>
+            ) : null}
+            {/*
+              Spec §5.3: Close only from a terminal, not-yet-closed state;
+              Reopen only once closed. The two buttons never both show, but
+              NOT because "closed implies terminal forever" — that claim is
+              false (final whole-branch review Finding 5, 2026-09-17: a
+              rebind or a republish fold can move a closed ticket's `stateId`
+              into a non-terminal state while `closed` rides along, since
+              `foldTicketToWorkflowVersion` spreads `...state` and neither
+              event touches `stateId`). What actually holds is smaller and
+              true today: Close's own condition
+              (`stateCategory === 'terminal' && closed === null`) and
+              Reopen's (`closed !== null`) are mutually exclusive on `closed`
+              alone, so exactly one — or neither, on a still-open,
+              non-terminal ticket — can ever be true at once. The closed ⇒
+              terminal invariant this comment used to (wrongly) lean on is
+              the RULE ENGINE's to hold, not this component's: fix wave B,
+              Ruling 53, adds it at the rebind check and the republish
+              validator.
+            */}
+            {state.stateCategory === 'terminal' && closed === null ? (
+              <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
+                Close
+              </Button>
+            ) : null}
+            {closed !== null ? (
+              <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
+                Reopen
+              </Button>
+            ) : null}
+            {/*
+              Opening Move… clears any standing Close/Reopen refusal AND
+              transport error first (Ruling 33 adds the second clear): a
+              `close-requires-terminal` reason, or a "could not reach the
+              server" notice, left over from a prior Close/Reopen click would
+              otherwise carry into — or reappear behind — the Move dialog,
+              naming a fact that has nothing to do with the move being
+              attempted.
+            */}
+            <Button
+              onClick={() => {
+                setServerRefusal(null);
+                setTransportError(null);
+                setMoveOpen(true);
+              }}
+              disabled={closed !== null}
+            >
+              Move…
+            </Button>
+            {closed !== null ? (
+              <span className="gn-sheet__closed-note">Closed — reopen it first</span>
+            ) : null}
           </div>
+
+          {/*
+            Close/Reopen's own refusal, shown OUTSIDE `TransitionDialog`.
+            `serverRefusal` is the same state `submitTransition` fills, and
+            `TransitionDialog` renders it too (`gn-refusal--server`, spec
+            citation on that prop) — but `Dialog` returns `null` whenever
+            `open` is false (`packages/ui/src/components/dialog.tsx:15`), so
+            that copy is invisible while `moveOpen` is false, which is exactly
+            when Close/Reopen fire. Gating this copy on `!moveOpen` keeps the
+            two from ever both being on screen: the Move dialog's `onClose`
+            already clears `serverRefusal` when it closes, and `submitTransition`
+            never sets it while `moveOpen` is false (the dialog does not close
+            itself on a refusal), so the two conditions are mutually exclusive
+            rather than a duplicate render of the same fact.
+          */}
+          {serverRefusal !== null && !moveOpen ? (
+            <p role="alert" className="gn-refusal gn-refusal--server">
+              {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            </p>
+          ) : null}
+          {/*
+            Ruling 33 (fix round 2) — Close/Reopen's OWN transport slot,
+            never the same sentence or class as `serverRefusal` above (Ruling
+            27's own rule, repeated at the site that dropped it): a silence or
+            a dropped connection is not an adjudication. Gated identically to
+            `serverRefusal`'s copy, and for the identical reason — invisible
+            while the Move dialog is open, since that is not where this state
+            is set.
+          */}
+          {transportError !== null && !moveOpen ? (
+            <p role="alert" className="gn-refusal gn-refusal--transport">
+              {transportError}
+            </p>
+          ) : null}
 
           {/*
             Three different facts, three different sentences. A RESTRICTED
@@ -415,10 +636,19 @@ export function TicketSheet({
           onClose={() => {
             setMoveOpen(false);
             setServerRefusal(null);
+            setTransportError(null);
           }}
           onSubmit={(submission) => void submitTransition(submission)}
           precheck={precheck}
           serverRefusal={serverRefusal}
+          // `submitTransition` above stays unguarded (see its own docblock
+          // precedent, cited by `board.tsx`'s `submitDirect`/`submitFromDialog`)
+          // — a rejected `ingest` here is an unhandled promise rejection, not a
+          // state this component tracks, so there is nothing to pass but `null`.
+          // Not Ruling 27's scope: that ruling is about a fabricated `{rule,
+          // reason}` pair standing in for a real refusal, which this file never
+          // did — it just never caught the rejection at all.
+          transportError={null}
           uploadEvidence={uploadEvidence}
         />
       ) : null}

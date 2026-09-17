@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax` — settled at test/views/board.test.tsx
 // and re-corrected at canvas.test.tsx. The plan's Task 12 snippet still carries
@@ -85,6 +85,15 @@ function valueControls(): HTMLElement[] {
     ...screen.queryAllByRole('combobox'),
     ...screen.queryAllByRole('checkbox'),
     ...screen.queryAllByRole('spinbutton'),
+    // The shared Select component's trigger is a real <button> (react-aria's
+    // useSelect), not a <select>/combobox — but it is still the value-bearing
+    // control for whichever field it picks, so the enumeration has to keep
+    // catching it under its new role rather than silently losing coverage.
+    // Scoped by name to the Select call sites reachable from this screen's
+    // tree: "Field type" (fields-editor.tsx, Task 5 of the shared-select
+    // plan) and "Category" (state-node.tsx's canvas picker, added by Phase 2
+    // Wave B Task 1 — one per rendered state, so 5 in the errand template).
+    ...screen.queryAllByRole('button', { name: /Field type|Category/ }),
   ];
 }
 
@@ -145,6 +154,16 @@ describe('read-only workflow views for non-admins', () => {
       screen.queryByText('Could not load workspace people and types — reload to try again.'),
     ).not.toBeInTheDocument();
     for (const button of screen.queryAllByRole('button')) {
+      // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
+      // <button> elements too, but they're a value-bearing control, not a
+      // navigation jump or an authoring action. This test never calls
+      // valueControls(), so assert disabled right here rather than only
+      // skip — an enabled Select trigger reaching a guest would otherwise
+      // pass this loop silently.
+      if (button.className.includes('gn-select__trigger')) {
+        expect(button).toBeDisabled();
+        continue;
+      }
       expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
     }
     expect(gateway.submitted).toEqual([]);
@@ -273,13 +292,17 @@ describe('no authoring action is reachable by any path the builder screen offers
     await screen.findByText('Later'); // the canvas nodes mount a tick after the screen
     const memberControls = valueControls();
     // Enumerated, not counted alone: 1 workflow-name textbox + 5 category
-    // comboboxes + 5 blocked checkboxes, one pair per errand state. A zero here
-    // would make "every one of them is disabled" vacuously true.
+    // pickers (Select trigger buttons, since Phase 2 Wave B Task 1) + 5
+    // blocked checkboxes, one pair per errand state. A zero here would make
+    // "every one of them is disabled" vacuously true.
     expect(memberControls).toHaveLength(11);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Read-only is not hidden: nothing was omitted, only frozen. One category
-    // picker per state, all five still on screen.
-    expect(screen.getAllByRole('combobox', { name: 'Category' })).toHaveLength(5);
+    // picker per state, all five still on screen. Role changed combobox->button
+    // by Phase 2 Wave B Task 1's Select migration; name is a regex because
+    // Select's trigger accessible name concatenates the current value with the
+    // aria-label (see canvas.test.tsx's equivalent queries).
+    expect(screen.getAllByRole('button', { name: /Category/ })).toHaveLength(5);
   });
 
   it('control: the admin render has the SAME controls, every one of them enabled', async () => {
@@ -317,6 +340,14 @@ describe('no authoring action is reachable by any path the builder screen offers
 
     function everyButtonIsAJump(): void {
       for (const button of screen.queryAllByRole('button')) {
+        // Same as the guest test above: a Select trigger (Category, one per
+        // canvas node) is a value-bearing control, not a jump or an
+        // authoring action — assert disabled rather than only skip, so an
+        // enabled one reaching a member doesn't pass this loop silently.
+        if (button.className.includes('gn-select__trigger')) {
+          expect(button).toBeDisabled();
+          continue;
+        }
         expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
       }
     }
@@ -427,7 +458,13 @@ describe('the bulk migration — the one irreversible call — is unreachable fo
     renderEditor(adminSession);
     const picker = await screen.findByRole('combobox', { name: 'Workflow' });
     expect(picker).toBeEnabled();
-    await user.selectOptions(picker, errandPublished.id);
+    // Workflow's trigger is now the shared searchable Select (Task 7 of the
+    // shared-select plan) — a real <input role="combobox">, not a native
+    // <select>, so `selectOptions` no longer applies: click to open, then
+    // pick the option from the portal-rendered listbox.
+    await user.click(picker);
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: errandPublished.name }));
     expect(await screen.findByTestId('workflow-divergence')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }),
@@ -527,13 +564,15 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     return gateway;
   }
 
-  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice', async () => {
+  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice or a gated Field-type control', async () => {
     renderTypeEditor(memberSession);
     await screen.findByRole('textbox', { name: 'Type name' });
     const memberControls = valueControls();
     // Enumerated, not counted alone: 4 textboxes (Type name, two Field names —
     // a textarea reports as one too, so the select field's options box is in
-    // here) + 3 comboboxes (Workflow, two Field types) + 1 spinbutton (rank).
+    // here) + 1 combobox (Workflow) + 2 Field-type Select triggers (the shared
+    // Select's trigger is a <button>, counted by valueControls()'s dedicated
+    // query for it) + 1 spinbutton (rank).
     expect(memberControls).toHaveLength(8);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Named separately from the sweep because this is the D4 field and the
@@ -541,17 +580,20 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toBeDisabled();
 
     // The button analogue of the builder screen's `everyButtonIsAJump`: every
-    // button a member is offered here is an icon choice, and every one of them
-    // is disabled. FieldsEditor's Add/Remove and the Save button are the ones
-    // that would appear if a gate came down, and they are buttons, so a count
-    // that matches the icon group is the whole claim.
+    // button a member is offered here is either an icon choice or one of the
+    // two Field-type Select triggers — a value control already covered by the
+    // sweep above, not an authoring affordance — and every one of them is
+    // disabled. FieldsEditor's Add/Remove and the Save button are the ones
+    // that would appear if a gate came down.
     const iconGroup = screen.getByRole('group', { name: 'Icon' });
+    const fieldTypeTriggers = screen.getAllByRole('button', { name: /Field type/ });
+    expect(fieldTypeTriggers).toHaveLength(2);
     const buttons = screen.queryAllByRole('button');
     // Non-vacuity: sixteen icon choices ship at this sha, so an empty list here
     // would mean the picker never rendered rather than that nothing escaped.
     expect(buttons.length).toBeGreaterThan(8);
     for (const button of buttons) {
-      expect(iconGroup.contains(button)).toBe(true);
+      expect(iconGroup.contains(button) || fieldTypeTriggers.includes(button)).toBe(true);
       expect(button).toBeDisabled();
     }
     // The named half, whose control is the next test — without it a typo in any

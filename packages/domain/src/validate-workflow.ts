@@ -1,4 +1,5 @@
 import type { WorkflowDef } from './workflow.js';
+import { BACKLOG_STATE_ID } from './workflow.js';
 
 export type Issue = { code: string; message: string };
 
@@ -25,6 +26,19 @@ export function validateWorkflowDef(def: WorkflowDef): Issue[] {
     issues.push({
       code: 'duplicate-state-id',
       message: `Two states share the id "${id}"; state ids must be unique.`,
+    });
+  }
+
+  // The universal state's id is reserved (backlog/closed spec §1.1): every
+  // workflow has it without declaring it, so a declaration would be a second
+  // state wearing the universal one's name.
+  const declaresReserved =
+    def.states.some((state) => state.id === BACKLOG_STATE_ID) ||
+    def.transitions.some((t) => t.from === BACKLOG_STATE_ID || t.to === BACKLOG_STATE_ID);
+  if (declaresReserved) {
+    issues.push({
+      code: 'reserved-state-id',
+      message: '`backlog` is reserved — every workflow has it without declaring it.',
     });
   }
 

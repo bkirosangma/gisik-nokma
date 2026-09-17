@@ -6,9 +6,11 @@ import type { EventEnvelope } from './envelope.js';
 import type { FieldClaim, TicketState } from './entity-state.js';
 import {
   ticketAssignedPayload,
+  ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketFieldSetPayload,
+  ticketReopenedPayload,
   ticketReparentedPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
@@ -25,6 +27,7 @@ import type { TicketTypeDef } from './ticket-types.js';
 // `dist/`, so a source file here importing its own package root is a build-order
 // cycle, not an import.
 import {
+  BACKLOG_STATE_ID,
   foldStateIdForward,
   ticketTransitionedPayloadSchema,
   type WorkflowDef,
@@ -51,7 +54,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — TEN of the THIRTEEN registered against
+ * The event types this reducer folds — TWELVE of the FIFTEEN registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -76,6 +79,8 @@ export const TICKET_EVENT_TYPES = [
   'ticket.field_set',
   'ticket.reparented',
   'ticket.workflow_rebound',
+  'ticket.closed',
+  'ticket.reopened',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -115,9 +120,13 @@ export function applyTicketEvent(
         `applyTicketEvent: workflow "${type.workflowId}" is not defined — the engine must refuse ticket.created before it reaches a projection`,
       );
     }
-    const category = stateCategoryOf(wf, wf.initialStateId);
+    // Spec §1.3: `start === 'backlog'` → the universal state; anything else —
+    // `'focus'`, or the field absent on an event older than it — the
+    // workflow's initial state, which is what every v1 event meant.
+    const bornIn = p.start === 'backlog' ? BACKLOG_STATE_ID : wf.initialStateId;
+    const category = stateCategoryOf(wf, bornIn);
     if (!category) {
-      throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${wf.initialStateId}"`);
+      throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${bornIn}"`);
     }
     return {
       kind: 'ticket',
@@ -131,12 +140,13 @@ export function applyTicketEvent(
       // moves nothing that already exists.
       workflowId: type.workflowId,
       workflowVersion: wf.version,
-      stateId: wf.initialStateId,
+      stateId: bornIn,
       stateCategory: category,
       assigneeId: null,
       collaboratorIds: [],
       fields: { title: claim(p.title, env) },
       transitions: [],
+      closed: null,
     };
   }
 
@@ -255,6 +265,19 @@ export function applyTicketEvent(
         stateId: p.toStateId,
         stateCategory: category,
       };
+    }
+    case 'ticket.closed': {
+      // Terminal-only is the engine's door to police (Plan 3's refusal layer),
+      // not the reducer's: this fold only replays what the engine already
+      // accepted, per this function's own header. `stateId` is untouched — the
+      // flag and the state are orthogonal, on purpose (spec §1.2).
+      ticketClosedPayload.parse(env.payload);
+      return { ...state, closed: { actorId: env.actorId, at: env.serverTime } };
+    }
+    case 'ticket.reopened': {
+      // The explicit reopen (spec §1.2): clears the flag, moves nothing else.
+      ticketReopenedPayload.parse(env.payload);
+      return { ...state, closed: null };
     }
     case 'comment.added':
     case 'attachment.added':

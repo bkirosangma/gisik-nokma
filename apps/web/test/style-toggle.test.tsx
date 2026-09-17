@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StyleToggle } from '../src/style-toggle.js';
 
 beforeEach(() => {
@@ -8,56 +8,109 @@ beforeEach(() => {
   delete document.documentElement.dataset['style'];
 });
 
+/**
+ * REWRITTEN for the segmented control the owner's Appearance reference asks
+ * for (2026-09-15), which takes this one picker back off the shared `Select`
+ * that Phase 2 Wave A had migrated it onto. The cases below assert the same
+ * properties the `Select` versions did — all three styles offered, `neo` the
+ * default, `data-style` stamped on change, a stored choice restored — plus
+ * the description line the reference adds.
+ *
+ * TWO CASES FROM THE `Select` ERA ARE DELIBERATELY GONE, not lost: the
+ * DOM-nesting case (a `<p>` wrapping `Select`'s internal `<div>`) and the
+ * no-enclosing-`<label>` case both existed because `Select` renders a hidden
+ * native `<select>` inside a `<div>`. `SegmentedControl` renders three plain
+ * `<button>`s and no hidden input, so neither defect is expressible any more.
+ * The nesting guard is kept anyway, in generalised form, because it costs one
+ * spy and this file is where that class of bug was last found.
+ */
+const tablist = () => screen.getByRole('tablist', { name: 'Style' });
+const segment = (name: string) => within(tablist()).getByRole('tab', { name });
+
 describe('StyleToggle — neo is the default, not the absence of a choice', () => {
   /**
-   * 13.344 — one control per style with an aria-label, `data-style` set on the
-   * theme element, and `aria-selected` tracking the active style. Mutation:
-   * drop the group's `aria-label` → RED.
+   * Kept from the `Select` era in generalised form. `apps/web/test/setup.ts`
+   * has no suite-wide console guard, so a `validateDOMNesting` warning would
+   * otherwise be silent here and every test would still go green with the
+   * defect live. Placed FIRST on purpose: React dedupes this warning per
+   * parent/child tag pair at module scope, so it fires only on the first
+   * render of an offending shape in the file.
    */
-  it('renders one tab per style, group-labelled, sets data-style, and tracks the active one via aria-selected', async () => {
-    const user = userEvent.setup();
-    render(<StyleToggle />);
-    const list = screen.getByRole('tablist', { name: 'Style' });
-    const tabs = within(list).getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['HIG', 'Minimal', 'Neu']);
-    const [higTab, minimalTab, neoTab] = [tabs[0]!, tabs[1]!, tabs[2]!];
-    expect(neoTab).toHaveAttribute('aria-selected', 'true');
-    expect(higTab).toHaveAttribute('aria-selected', 'false');
-    expect(minimalTab).toHaveAttribute('aria-selected', 'false');
-
-    await user.click(higTab);
-    expect(document.documentElement.dataset['style']).toBe('hig');
-    expect(higTab).toHaveAttribute('aria-selected', 'true');
-    expect(neoTab).toHaveAttribute('aria-selected', 'false');
+  it('never emits a DOM-nesting warning', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(<StyleToggle />);
+      const messages = consoleError.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(messages).not.toMatch(/cannot be a descendant/);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   /**
-   * 13.345 — with nothing stored, the applied `data-style` is `neo`. Mutation:
+   * 13.344, restated for the new shape: all three styles are visible at once
+   * under one labelled control, and picking one stamps `data-style` on the
+   * theme element. The LABELS are pinned too — the reference names them
+   * "Apple HIG", "Minimal" and "Neomorphic", not the old abbreviations
+   * ("HIG"/"Neu"). Mutation: drop the control's `aria-label` → RED (the
+   * `tablist` lookup is by that name).
+   */
+  it('shows all three styles at once and sets data-style on change', async () => {
+    const user = userEvent.setup();
+    render(<StyleToggle />);
+
+    const names = within(tablist())
+      .getAllByRole('tab')
+      .map((tab) => tab.textContent);
+    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neomorphic']);
+
+    await user.click(segment('Apple HIG'));
+    expect(document.documentElement.dataset['style']).toBe('hig');
+    expect(segment('Apple HIG')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  /**
+   * 13.345 — with nothing stored, the selected style is `neo`. Mutation:
    * default the component's initial state to `hig` → RED.
    */
   it('defaults to neo when nothing is stored', () => {
     render(<StyleToggle />);
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(segment('Neomorphic')).toHaveAttribute('aria-selected', 'true');
   });
 
   /**
-   * 13.346 — the stored style survives a reload, asserted the same way
-   * `ThemeToggle`'s persistence is: a stored value restores on mount rather
-   * than the component starting from its own default and drifting from what
-   * `layout.tsx`'s pre-paint script already applied. Mutation: stop writing
-   * `localStorage` in `apply` → RED (the second render never sees the choice).
+   * 13.346 — the stored style survives a reload: a stored value restores on
+   * mount rather than the component starting from its own default and
+   * drifting from what `layout.tsx`'s pre-paint script already applied.
+   * Mutation: drop the `useEffect` that reads `localStorage` → RED.
    */
   it('a stored choice is restored on mount', async () => {
     localStorage.setItem('gn-style', 'minimal');
     render(<StyleToggle />);
-    expect(await screen.findByRole('tab', { name: 'Minimal' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'false');
+    expect(await screen.findByRole('tab', { name: 'Minimal', selected: true })).toBeInTheDocument();
   });
 
   it('persists an explicit choice for the next mount to restore', async () => {
     const user = userEvent.setup();
     render(<StyleToggle />);
-    await user.click(screen.getByRole('tab', { name: 'Minimal' }));
+    await user.click(segment('Minimal'));
     expect(localStorage.getItem('gn-style')).toBe('minimal');
+  });
+
+  /**
+   * The description line the reference adds under the control, and it must
+   * TRACK the selection rather than being fixed copy — that is the whole
+   * point of putting it there. Asserted by switching and reading it again,
+   * because a static line would pass any single-state assertion. Mutation:
+   * hard-code the note to one style's text → RED on the second read.
+   */
+  it('describes the selected style, and the description follows the selection', async () => {
+    const user = userEvent.setup();
+    render(<StyleToggle />);
+    expect(screen.getByText(/^Neomorphic:/)).toBeInTheDocument();
+
+    await user.click(segment('Minimal'));
+    expect(screen.getByText(/^Minimal:/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Neomorphic:/)).toBeNull();
   });
 });

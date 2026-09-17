@@ -3,6 +3,7 @@ import {
   BUILTIN_TICKET_TYPE_SEEDS,
   filterSpecSchema,
   groupingSchema,
+  statesWithBacklog,
   type FilterSpec,
   type Grouping,
   type ListCard,
@@ -263,7 +264,16 @@ async function groupCards(
           const separator = key.indexOf(':');
           const workflowId = key.slice(0, separator);
           const stateId = key.slice(separator + 1);
-          return defs.get(workflowId)?.states.find((state) => state.id === stateId)?.name ?? stateId;
+          // `statesWithBacklog(def)`, not `def.states` (backlog/closed spec
+          // §1.4/§3.2, 2026-09-17; fix round 2): `backlog` is the universal
+          // state every workflow carries WITHOUT declaring it, so a bare
+          // `def.states.find` never finds it and this label fell back to the
+          // bare id `'backlog'` instead of the name `'Backlog'` — the `??
+          // stateId` fallback stays for a genuinely unknown id (an absent
+          // `def`, or a state neither list carries).
+          const def = defs.get(workflowId);
+          const state = def === undefined ? undefined : statesWithBacklog(def).find((candidate) => candidate.id === stateId);
+          return state?.name ?? stateId;
         },
       );
     }

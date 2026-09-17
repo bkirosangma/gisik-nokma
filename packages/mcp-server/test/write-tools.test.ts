@@ -85,6 +85,36 @@ describe('every write builds an envelope the SERVER would accept', () => {
     expect(payload['parentId']).toBeNull();
   });
 
+  /**
+   * 13.607 — Ruling 51, Finding 4 (final whole-branch review, 2026-09-17):
+   * `create_ticket` is a SECOND production producer of `ticket.created`
+   * (`write-tools.ts:91-100`), and until this fix it sent no `start` at all —
+   * the domain schema's additive-field rule then read that as focus
+   * (`ticket-state.ts:126`), so an MCP-created ticket landed on the board
+   * instead of the backlog every other creation path uses by default (spec
+   * §1.3). Both halves pinned: the argument's absence still sends an
+   * EXPLICIT `start: 'backlog'` (never an absent key — the same discipline
+   * `parentId` gets above), and a caller naming `'focus'` gets exactly that
+   * back, unchanged.
+   */
+  it("13.607 create_ticket sends start: 'backlog' when the argument is absent, and 'focus' when given", async () => {
+    const { session, sent } = sessionCapturing(COMMITTED);
+    await tool('create_ticket', session).handler({
+      workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PRJ000000000000000000A',
+      typeId: 'task', title: 'x',
+    });
+    const defaulted = (sent[0]?.[0] as { payload: Record<string, unknown> }).payload;
+    expect(Object.hasOwn(defaulted, 'start')).toBe(true);
+    expect(defaulted['start']).toBe('backlog');
+
+    await tool('create_ticket', session).handler({
+      workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PRJ000000000000000000A',
+      typeId: 'task', title: 'y', start: 'focus',
+    });
+    const explicit = (sent[1]?.[0] as { payload: Record<string, unknown> }).payload;
+    expect(explicit['start']).toBe('focus');
+  });
+
   it('14.72 transition_ticket uses the key `to`, not `toStateId`', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('transition_ticket', session).handler({

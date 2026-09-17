@@ -108,3 +108,71 @@ export function restrictedLine(count: number): string | null {
   if (count <= 0) return null;
   return `${count} ${count === 1 ? 'project' : 'projects'} · name restricted`;
 }
+
+/**
+ * *"2 projects"* — the card's meta line, and the count is `live.length` ALONE.
+ *
+ * The tempting sum is `live.length + nameRestrictedProjectCount`, and it is
+ * wrong. `apps/server/src/read/workspace-counts.ts:259-265` states that the
+ * restricted count **is never split by `archived` and cannot be** — a project
+ * whose name is withheld has no `archived` flag as far as this caller is
+ * concerned, because that flag is served only alongside the name it rides
+ * with. Adding an archived-UNKNOWN count to an archived-EXCLUDED one produces
+ * a number that counts nothing. The restricted projects keep their own
+ * sentence (`restrictedLine` above), which is why that sentence exists apart
+ * from this one.
+ *
+ * Zero renders NOTHING, the same rule `restrictedLine` keeps.
+ */
+export function projectCountLine(liveCount: number): string | null {
+  if (liveCount <= 0) return null;
+  return `${liveCount} ${liveCount === 1 ? 'project' : 'projects'}`;
+}
+
+/**
+ * How many project names the card prints before it stops naming them.
+ *
+ * A COUNT, deliberately, and not a CSS line-clamp. A clamp truncates whatever
+ * overflows — including the "+N more" suffix itself, which would hide the very
+ * number the suffix exists to give. Three names is CHOSEN as what should fit
+ * the prototype's ~280px card on two lines at 15px — not measured against a
+ * render.
+ */
+export const PROJECT_LINE_CAP = 3;
+
+/**
+ * *"Delivery · Site readiness · Winter stock · +1 more"* — the prototype's
+ * single project line, truncated.
+ *
+ * `names` is the LIVE, NAMED projects: archived ones never reach this card,
+ * and name-restricted ones are absent from the served array by construction.
+ * An empty list renders nothing rather than an empty line, and the
+ * name-restricted sentence covers the case where that emptiness is the point.
+ *
+ * ## The suffix has two forms, and the reason is a test's name
+ *
+ * `test/workspaces-cards.test.tsx`'s 13.380 is *"a guest card shows one
+ * 'Restricted' chip and **no number outside the owner-ruled restricted
+ * sentence**"* (retitled, whole-branch review Minor 2 — the card's own "1
+ * project · name restricted" is a number, so the original "no number
+ * anywhere" title was false; the test strips that exact sentence before its
+ * digit scan). A guest still sees the
+ * project names — their set is exactly the errands handed to them by name —
+ * so the line renders; but "+1 more" is a number, so a withheld viewer gets
+ * "and more" instead. Both forms read `countsWithheld`, which the caller took
+ * from `viewerOf(role)`: there is no second read of the role here.
+ *
+ * ONE interpolation, not several — React renders each as its own text node,
+ * and a sentence split across nodes is split in the accessibility tree and in
+ * every `getByText` that looks for it.
+ */
+export function projectLine(
+  names: readonly string[],
+  countsWithheld: boolean,
+): string | null {
+  if (names.length === 0) return null;
+  const shown = names.slice(0, PROJECT_LINE_CAP).join(' · ');
+  const hidden = names.length - PROJECT_LINE_CAP;
+  if (hidden <= 0) return shown;
+  return `${shown} · ${countsWithheld ? 'and more' : `+${hidden} more`}`;
+}

@@ -607,4 +607,35 @@ describe('assembleTicketCards', () => {
       assembleTicketCards(db.pool, world.member, [{ ...row, fields: {} }]),
     ).rejects.toThrow(/no title claim/);
   });
+
+  /**
+   * 13.573 — a card assembled from a closed row carries `closed: { actorId, at }`; from an open row `closed: null` (backlog/closed spec §3.1/§3.3, 2026-09-17).
+   */
+  it('13.573 a card assembled from a closed row carries closed: { actorId, at }; from an open row closed: null', async () => {
+    const openId = newUlid();
+    const closedId = newUlid();
+    await applyCommitted(db.pool, [created({ id: openId, actorId: world.owner }), created({ id: closedId, actorId: world.owner })]);
+
+    const closeEvent = makeCommitted({
+      workspaceId: world.workspaceId,
+      actorId: world.member,
+      entity: { kind: 'ticket', id: closedId },
+      type: 'ticket.closed',
+      payload: {},
+    });
+    await applyCommitted(db.pool, [closeEvent]);
+
+    const rows = await fetchTicketRows(db.pool, [openId, closedId]);
+    const cards = await assembleTicketCards(db.pool, world.owner, rows);
+    const byId = new Map(cards.map((c) => [c.ticketId, c]));
+
+    // The positive control sits in the SAME assembler call as the closed
+    // card: a reader that answered `closed: null` unconditionally would still
+    // pass the open assertion alone.
+    expect(byId.get(openId)?.closed).toBeNull();
+    expect(byId.get(closedId)?.closed).toEqual({
+      actorId: world.member,
+      at: closeEvent.serverTime,
+    });
+  });
 });

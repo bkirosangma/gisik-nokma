@@ -54,7 +54,19 @@ const RANK_REASON =
 const INSTANT_PARENT_TERMINAL_REASON =
   '"Registrations" is in a terminal state; it must reopen because it is acquiring live work.';
 
-function parentState(overrides: { stateId: string; stateCategory: 'terminal' | 'active' }) {
+function parentState(overrides: {
+  stateId: string;
+  stateCategory: 'terminal' | 'active';
+  /**
+   * Absent or `undefined` means never closed — the same `?? null` idiom
+   * `create-ticket-flow.tsx` reads `TicketState.closed` through, since the
+   * domain field is optional (441 fixtures predate it). Written explicitly as
+   * `null` below rather than left absent so every fixture built through this
+   * helper states its closed-ness rather than relying on the field's own
+   * default.
+   */
+  closed?: { actorId: string; at: string };
+}) {
   return ticketStateSeed({
     id: PARENT,
     parentId: null,
@@ -62,6 +74,7 @@ function parentState(overrides: { stateId: string; stateCategory: 'terminal' | '
     workflowVersion: 1,
     stateId: overrides.stateId,
     stateCategory: overrides.stateCategory,
+    closed: overrides.closed ?? null,
     fields: {
       title: {
         value: 'Registrations',
@@ -75,6 +88,24 @@ function parentState(overrides: { stateId: string; stateCategory: 'terminal' | '
 
 const PARENT_READ: TicketRead = {
   ticket: parentState({ stateId: 'done', stateCategory: 'terminal' }),
+  title: 'Registrations',
+  stateProvenance: claim(),
+  parent: null,
+  rollup: null,
+};
+
+/**
+ * 13.593 · T13.5 (view half, Ruling 38b) — the same PARENT, but CLOSED. Used
+ * only by the describe block below; every other case in this file reads
+ * `PARENT_READ` and gets `parentClosed: false` (`flows/guarded-child-event
+ * .test.ts`'s T13.3a-g pin the batch that produces for that shape).
+ */
+const CLOSED_PARENT_READ: TicketRead = {
+  ticket: parentState({
+    stateId: 'done',
+    stateCategory: 'terminal',
+    closed: { actorId: 'user_anselma', at: '2026-09-17T09:00:00.000Z' },
+  }),
   title: 'Registrations',
   stateProvenance: claim(),
   parent: null,
@@ -121,13 +152,33 @@ function flowSource(
 async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'New ticket' }));
   await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
-  await user.selectOptions(screen.getByLabelText('Parent'), PARENT);
+  // The Parent picker is the shared searchable `Select` now, so it is opened and clicked rather
+  // than `selectOptions`'d: its trigger is an `<input role="combobox">` with no `<option>`
+  // children, and the options are portal-rendered into a `listbox` on `document.body` only while
+  // the panel is open. Matched BY TITLE, not by `PARENT` (the id) — `selectOptions` matched on an
+  // option's VALUE, a click matches on what the row actually reads. The title is the one
+  // `renderFlow` below supplies for `PARENT` in this file's own `parentCandidates` fixture.
+  await user.click(screen.getByLabelText('Parent'));
+  await user.click(
+    within(await screen.findByRole('listbox')).getByRole('option', { name: 'Registrations' }),
+  );
   await user.click(screen.getByRole('button', { name: 'Create' }));
 }
 
 function renderFlow(
   source: FakeDataSource,
-  extra: { cache?: ReturnType<typeof createClientStateCache> } = {},
+  extra: {
+    cache?: ReturnType<typeof createClientStateCache>;
+    /**
+     * Defaults to a non-in-focus "Registrations" candidate — `inFocus: false` —
+     * so every pre-existing case in this file (none of which is ABOUT the
+     * checkbox) keeps seeing no "Start in focus" control and a plain
+     * `start: 'backlog'` first attempt, same as before this field existed.
+     * The 13.592/13.593 describe blocks below pass their own, deliberately
+     * `inFocus: true` or closed-parent candidate lists instead.
+     */
+    parentCandidates?: Array<{ id: string; title: string; inFocus: boolean }>;
+  } = {},
 ): ReturnType<typeof vi.fn> {
   const onCreated = vi.fn();
   render(
@@ -138,7 +189,7 @@ function renderFlow(
       projectId="01J9GPRJ000000000000000000"
       currentUserId="user_kiro"
       typeOptions={[{ id: 'task', name: 'Task' }]}
-      parentCandidates={[{ id: PARENT, title: 'Registrations' }]}
+      parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations', inFocus: false }]}
       onCreated={onCreated}
     />,
   );
@@ -161,14 +212,24 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     expect(dialog).toHaveTextContent('Registrations is Done.');
     expect(dialog).toHaveTextContent(`Refused by the server — hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`);
 
-    // The picker offers only structurally reachable non-terminal states.
-    const picker = screen.getByLabelText('Reopen to');
-    const optionValues = [...picker.querySelectorAll('option')].map((option) =>
-      option.getAttribute('value'),
-    );
+    // The picker offers only structurally reachable non-terminal states. Read from
+    // the shared Select's HiddenSelect mirror rather than `getByLabelText('Reopen
+    // to')`: post-migration that name resolves to BOTH the visible trigger button
+    // and HiddenSelect's own hidden native <select> (they share the accessible
+    // name), so an unscoped getByLabelText throws "Found multiple elements"
+    // (confirmed empirically). HiddenSelect is fed from the same buildCollection
+    // source as the visible panel (confirmed in select.tsx), so this stays a
+    // genuine, non-vacuous check of the same options. Its blank placeholder
+    // option (value="") is filtered out, matching the established pattern at
+    // workflow-builder/publish.test.tsx:411-413.
+    const picker = within(dialog).getByTestId('hidden-select-container');
+    const optionValues = [...picker.querySelectorAll('option')]
+      .map((option) => option.getAttribute('value'))
+      .filter((value) => value !== '');
     expect(optionValues.sort()).toEqual(['doing', 'todo']);
 
-    await user.selectOptions(picker, 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(3));
@@ -198,7 +259,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const onCreated = renderFlow(source);
     await createTicketUnderParent(user);
     await screen.findByRole('dialog', { name: 'Reopen parent?' });
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -224,7 +286,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     const onCreated = renderFlow(source);
     await createTicketUnderParent(user);
     await screen.findByRole('dialog', { name: 'Reopen parent?' });
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     const alertBox = await screen.findByRole('alert');
@@ -304,7 +367,8 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // Accepting it submits the parent first and then the child, exactly as the
     // server-refused path does — the instant route is a shortcut to the offer,
     // never a shortcut past the two claims.
-    await user.selectOptions(screen.getByLabelText('Reopen to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');
@@ -446,6 +510,270 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
       'Refused by the server — invalid-payload: title: must not be blank — a title of only spaces names nothing',
     );
     expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 13.592 (backlog/closed spec §1.3, §5.4) — `CreateTicketFlow.create` never
+ * leaves `start` off the `ticket.created` payload it builds, whatever the
+ * draft's own value. The key assertion below is `Object.keys(payload)`, not a
+ * value comparison: a mutated `create()` that drops the `start:` line from its
+ * payload object literal produces a payload with NO `start` key at all, and
+ * `toEqual`/`toBe` value checks treat a missing key the same as one holding
+ * `undefined` — they would not catch that mutation. Reading the key set is
+ * what does.
+ */
+describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created', () => {
+  it('13.592a a create with no parent sends payload.start: "backlog", and the key is never omitted', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
+    const onCreated = renderFlow(source, { parentCandidates: [] });
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
+    expect(payload.start).toBe('backlog');
+    expect(Object.keys(payload)).toContain('start');
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it('13.592b choosing an in-focus parent with "Start in focus" left checked sends payload.start: "focus"', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
+    const onCreated = renderFlow(source, {
+      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: true }],
+    });
+    await createTicketUnderParent(user);
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
+    expect(payload.start).toBe('focus');
+    expect(Object.keys(payload)).toContain('start');
+    expect(onCreated).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 13.593 · T13.5 (view half, Ruling 38b) — creating under a CLOSED terminal
+ * parent. `flows/guarded-child-event.test.ts`'s 13.593a/b pin the unit-level
+ * batching; this case is the same behaviour proven end to end through the
+ * dialog, the offer, and the confirm click, over the fake `DataSource`'s own
+ * recorded `ingested` calls — the same technique T13.4a already uses for the
+ * merely-terminal (not closed) shape.
+ */
+describe('13.593 creating under a CLOSED terminal parent — the confirm submits reopened, then the transition, then the child', () => {
+  it('13.593 confirming the offer submits ticket.reopened and the transition together, in ONE batch, ahead of the child — and all three commit', async () => {
+    const user = userEvent.setup();
+    const source = flowSource(
+      (call, events) =>
+        call === 1
+          ? events.map((event) => parentTerminal(event.id))
+          : events.map((event) => committed(event.id)),
+      { getTicket: async () => CLOSED_PARENT_READ },
+    );
+    const onCreated = renderFlow(source, {
+      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+    });
+    await createTicketUnderParent(user);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    expect(dialog).toHaveTextContent('Registrations is Done.');
+
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(3));
+    const [refusedCreate, parentBatch, childBatch] = source.ingested;
+    const childTicketId = refusedCreate?.[0]?.entity.id;
+    // ONE ingest call for the parent, carrying BOTH events, reopen first.
+    expect(parentBatch).toHaveLength(2);
+    expect(parentBatch?.[0]?.type).toBe('ticket.reopened');
+    expect(parentBatch?.[0]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(parentBatch?.[0]?.payload).toEqual({});
+    expect(parentBatch?.[1]?.type).toBe('ticket.transitioned');
+    expect(parentBatch?.[1]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(parentBatch?.[1]?.payload).toEqual({
+      to: 'doing',
+      cause: { kind: 'reopened-for-child', childTicketId },
+    });
+    expect(childBatch?.[0]).toBe(refusedCreate?.[0]); // the same claim, retried after the remedy
+    expect(onCreated).toHaveBeenCalledWith(childTicketId);
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.593e (Ruling 39, coordinator, fix round 1, 2026-09-17) — retrying with a
+ * DIFFERENT target after a closed parent's reopen half already committed. The
+ * server processes a batch per-event, never atomically
+ * (`guarded-child-event.ts`'s docblock cites the real `IngestService`), so
+ * `[reopened, transition→A]` can commit the reopen while refusing
+ * transition→A — Finding 1's exact walk. Without Ruling 39, the retry to
+ * target B would resend `ticket.reopened` against an already-open parent,
+ * refused `not-closed`, masking whatever transition→B actually answers. This
+ * proves the FIX end to end: the retry's own parent-batch `ingest` call
+ * carries exactly ONE event, the transition — no `ticket.reopened` — because
+ * `acceptReopen` flips `reopenPrompt.parentClosed` to `false` the moment it
+ * learns the reopen half committed.
+ *
+ * Named `e` rather than reusing the coordinator's literal `13.593d`: that id
+ * already covers this file's own advisor-follow-up case (the short-batch
+ * `UnansweredClaimError` path in `guarded-child-event.test.ts`) — a different,
+ * already-cited behaviour. Continuing the block's own lettering instead of
+ * overwriting a live id, same reasoning as 13.591g below it.
+ */
+describe('13.593e retrying a different target after a closed parent\'s reopen half already committed', () => {
+  it('13.593e the retry sends [transition] ALONE — the already-committed ticket.reopened is never resent', async () => {
+    const user = userEvent.setup();
+    const source = flowSource(
+      (call, events) => {
+        if (call === 1) return events.map((event) => parentTerminal(event.id));
+        if (call === 2) {
+          // First "Reopen and proceed": batch [reopened, transition→Doing].
+          // The reopen COMMITS; the transition is refused by a rule on that
+          // specific edge — reachable structurally (13.1f's own point) and
+          // exactly Finding 1's walk.
+          return events.map((event, index) =>
+            index === 0
+              ? committed(event.id)
+              : refused(event.id, 'restrict-to', 'Only Anselma Marak may move this out of Done.'),
+          );
+        }
+        // call 3 (the retry's parent batch) and call 4 (the child): commit.
+        return events.map((event) => committed(event.id));
+      },
+      { getTicket: async () => CLOSED_PARENT_READ },
+    );
+    const onCreated = renderFlow(source, {
+      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+    });
+    await createTicketUnderParent(user);
+
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    // First attempt refused (the transition, after the reopen committed) —
+    // the offer stays on screen, exactly as T13.4b already proves for the
+    // ordinary (not-closed-parent) shape.
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Refused by the server — restrict-to: Only Anselma Marak may move this out of Done.',
+    );
+
+    // Pick a DIFFERENT target and retry, in the SAME dialog session.
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(4));
+    const [refusedCreate, firstParentBatch, retryParentBatch, childBatch] = source.ingested;
+    const childTicketId = refusedCreate?.[0]?.entity.id;
+    // The FIRST attempt really did carry both events (the positive control
+    // proving the second attempt's shape is a CHANGE, not what every attempt
+    // always sends).
+    expect(firstParentBatch).toHaveLength(2);
+    expect(firstParentBatch?.[0]?.type).toBe('ticket.reopened');
+    // The RETRY: exactly one event, and it is the transition, not the reopen.
+    expect(retryParentBatch).toHaveLength(1);
+    expect(retryParentBatch?.[0]?.type).toBe('ticket.transitioned');
+    expect(retryParentBatch?.[0]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(retryParentBatch?.[0]?.payload).toEqual({
+      to: 'todo',
+      cause: { kind: 'reopened-for-child', childTicketId },
+    });
+    expect(childBatch?.[0]).toBe(refusedCreate?.[0]);
+    expect(onCreated).toHaveBeenCalledWith(childTicketId);
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.593f (Ruling 50, final whole-branch review fix wave A, 2026-09-17,
+ * Finding 3) — the OTHER order of failure from 13.593e's, reached the moment
+ * Finding 1 lands: this time the batch's `ticket.reopened` HALF is the one
+ * refused, at index 0, with `not-closed` — someone else reopened the parent a
+ * second before the person confirmed. `reopenAndProceed` reports
+ * `parentReopened: false` for an index-0 refusal (13.593b already pins that;
+ * the reopen never committed, so there is nothing to report as reopened), so
+ * the fix for 13.593e's own case does not fire here on its own condition.
+ * Without Ruling 50, `acceptReopen` would leave `reopenPrompt.parentClosed`
+ * at `true`, and picking a different target would rebuild
+ * `[ticket.reopened, transition]` again — resending a reopen against a parent
+ * the server just said is NOT closed, refused `not-closed` a second time, and
+ * masking whatever the new transition would have answered: Ruling 39's exact
+ * masking, reached from the other side. The fix reads the SAME fact off a
+ * different sentence: `outcome.refusal.rule === REFUSAL_RULES.notClosed` is
+ * the server saying "this parent is already open" exactly as `parentReopened`
+ * does, so `acceptReopen` flips `parentClosed` to `false` on that condition
+ * too, and the retry's batch is `[transition]` alone — proven below.
+ */
+describe('13.593f a not-closed refusal of the reopen itself also unsticks the retry', () => {
+  it('13.593f the retry sends [transition] ALONE after the reopen itself was refused not-closed', async () => {
+    const user = userEvent.setup();
+    const source = flowSource(
+      (call, events) => {
+        if (call === 1) return events.map((event) => parentTerminal(event.id));
+        if (call === 2) {
+          // First "Reopen and proceed": batch [reopened, transition→Doing].
+          // The REOPEN ITSELF is refused `not-closed` — the mirror of
+          // 13.593e, which refused the transition half instead.
+          return events.map((event, index) =>
+            index === 0
+              ? refused(event.id, 'not-closed', 'This ticket is not closed.')
+              : committed(event.id),
+          );
+        }
+        // call 3 (the retry's parent batch) and call 4 (the child): commit.
+        return events.map((event) => committed(event.id));
+      },
+      { getTicket: async () => CLOSED_PARENT_READ },
+    );
+    const onCreated = renderFlow(source, {
+      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+    });
+    await createTicketUnderParent(user);
+
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    // Refused at index 0 (the reopen) — the offer stays on screen, same as
+    // 13.593e's index-1 refusal.
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Refused by the server — not-closed: This ticket is not closed.',
+    );
+
+    // Pick a DIFFERENT target and retry, in the SAME dialog session.
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(4));
+    const [refusedCreate, firstParentBatch, retryParentBatch, childBatch] = source.ingested;
+    const childTicketId = refusedCreate?.[0]?.entity.id;
+    // The FIRST attempt really did carry both events (the positive control).
+    expect(firstParentBatch).toHaveLength(2);
+    expect(firstParentBatch?.[0]?.type).toBe('ticket.reopened');
+    // The RETRY: exactly one event, the transition — no `ticket.reopened`.
+    expect(retryParentBatch).toHaveLength(1);
+    expect(retryParentBatch?.[0]?.type).toBe('ticket.transitioned');
+    expect(retryParentBatch?.[0]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(retryParentBatch?.[0]?.payload).toEqual({
+      to: 'todo',
+      cause: { kind: 'reopened-for-child', childTicketId },
+    });
+    expect(childBatch?.[0]).toBe(refusedCreate?.[0]);
+    expect(onCreated).toHaveBeenCalledWith(childTicketId);
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
   });
 });
 

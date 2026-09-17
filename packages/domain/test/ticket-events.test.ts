@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { parseEvent } from '../src/parse-event.js';
-import { ticketCreatedPayload, ticketFieldSetPayload } from '../src/events/ticket-events.js';
+import {
+  ticketClosedPayload,
+  ticketCreatedPayload,
+  ticketFieldSetPayload,
+  ticketReopenedPayload,
+} from '../src/events/ticket-events.js';
 import { makeEnvelope } from '../src/testing.js';
+import { domainRegistry } from '../src/vocabulary.js';
 
 const TICKET = '01J9GTKA000000000000000000';
 const PROJECT = '01J9GPRJ000000000000000000';
@@ -272,5 +278,25 @@ describe('ticket.created title must not be blank', () => {
     expect(refusalMessage('ticket.created', created('   '))).toBe(
       "payload for 'ticket.created' v1 is invalid at title: must not be blank — a title of only spaces names nothing",
     );
+  });
+});
+
+/** 13.567 — the payload schemas (spec §1.2/§1.3). */
+describe('13.567 start and the two flag payloads', () => {
+  it('ticketCreatedPayload accepts start backlog|focus and its absence, refuses anything else', () => {
+    const base = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x' };
+    expect(ticketCreatedPayload.parse({ ...base, start: 'backlog' }).start).toBe('backlog');
+    expect(ticketCreatedPayload.parse({ ...base, start: 'focus' }).start).toBe('focus');
+    expect(ticketCreatedPayload.parse(base).start).toBeUndefined();
+    expect(() => ticketCreatedPayload.parse({ ...base, start: 'parked' })).toThrow();
+  });
+  it('ticket.closed and ticket.reopened carry an empty, strict payload', () => {
+    expect(ticketClosedPayload.parse({})).toEqual({});
+    expect(() => ticketClosedPayload.parse({ reason: 'x' })).toThrow();
+    expect(ticketReopenedPayload.parse({})).toEqual({});
+  });
+  it('both types are registered on the ticket entity at version 1', () => {
+    expect(domainRegistry.get('ticket.closed', 1)?.entityKind).toBe('ticket');
+    expect(domainRegistry.get('ticket.reopened', 1)?.version).toBe(1);
   });
 });

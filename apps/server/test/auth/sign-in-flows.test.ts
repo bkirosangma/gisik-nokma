@@ -361,6 +361,101 @@ describe('passkey endpoints', () => {
     expect(options.json().challenge).toBeTruthy();
     expect(options.json().rp).toEqual({ name: 'Gisik Nokma', id: 'localhost' });
   });
+
+  /**
+   * ACCOUNT/HELP-SCREENS PLAN, TASK 8 — the SERVER half of the two paths
+   * `/account`'s Passkeys section drives, and the reason this block grew.
+   *
+   * `apps/web/src/account/account-clients.ts` reaches them as
+   * `authClient.passkey.listUserPasskeys()` and
+   * `authClient.passkey.deletePasskey({ id })`. Those member names are NOT
+   * hand-declared by the client plugin — they are generated from the server
+   * endpoint PATHS by better-auth's `PathToObject`/`CamelCase` machinery — and
+   * the web suite mocks `auth-client.js` wholesale, so nothing over there can
+   * witness that the paths below exist at all. These two cases are that
+   * witness, from the other side: the client's member names are settled by
+   * `typecheck`, the paths are settled here, and only the runtime URL the
+   * generated member builds sits between them.
+   */
+  it('lists a signed-in user’s passkeys, and refuses an anonymous caller', async () => {
+    const { token } = await signInWithPhone(app, otp, '+919000000106');
+    const mine = await app.inject({
+      // GET, matching the endpoint table in the installed package's
+      // `dist/index-B7Y0IgKK.d.mts` — not guessed from the verb "list".
+      method: 'GET',
+      url: '/api/auth/passkey/list-user-passkeys',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(mine.statusCode).toBe(200);
+    // Honestly empty: this user has registered nothing, and an empty array is
+    // the answer `createPasskeyClient().list()` maps to `[]`.
+    expect(mine.json()).toEqual([]);
+
+    /**
+     * THE MEASURED FACT `apps/web/app/account/page.tsx`'s GATE RESTS ON.
+     *
+     * That page reads this path on mount only when `user !== null`, and its
+     * docblock justifies the gate by saying an anonymous read "would buy a 401
+     * with a unit of everyone's sign-in budget". That is a claim about this
+     * endpoint's middleware, so it is measured here rather than asserted in
+     * prose — if better-auth ever made this path public, the gate would be
+     * costing a real feature nothing and the docblock would be lying.
+     */
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: '/api/auth/passkey/list-user-passkeys',
+    });
+    expect(
+      anonymous.statusCode,
+      'an anonymous caller was NOT refused. `app/account/page.tsx` gates its mount-time read of ' +
+        'this path on `user !== null` precisely because an anonymous read cannot succeed and ' +
+        'still spends a unit of the shared `auth:` budget — re-read that docblock if this ' +
+        'endpoint has become public.',
+    ).toBe(401);
+  });
+
+  it('answers the delete path for a signed-in user, and refuses an anonymous one', async () => {
+    const { token } = await signInWithPhone(app, otp, '+919000000107');
+    const gone = await app.inject({
+      // POST with `{ id }`, matching the endpoint's declared zod body.
+      method: 'POST',
+      url: '/api/auth/passkey/delete-passkey',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { id: 'no-such-passkey' },
+    });
+    /**
+     * BY BODY, NOT BY STATUS — and the first version of this assertion got it
+     * wrong, which is worth keeping rather than quietly fixing.
+     *
+     * It read `expect(gone.statusCode).not.toBe(404)`, on the reasoning that a
+     * mistyped path would 404 from Fastify's router. It went RED, and the
+     * failure message printed the reason:
+     * `{"message":"Passkey not found","code":"PASSKEY_NOT_FOUND"}` — **404 is
+     * also better-auth's own answer for an id the caller does not own.** The
+     * two are identical in status and opposite in meaning: one says the
+     * feature is missing, the other says the feature ran and looked.
+     *
+     * So the discriminator is the BODY, which is the same discipline 13.273
+     * uses in `test/http/security-middleware.test.ts` to tell two limiters
+     * apart at one status. Fastify's router 404 carries
+     * `{"error":"Not Found","message":"Route POST:/… not found"}` and no
+     * `code`; better-auth's carries `PASSKEY_NOT_FOUND`. Only the second can
+     * be produced by a handler that exists.
+     */
+    expect(
+      gone.json(),
+      `\`POST /api/auth/passkey/delete-passkey\` did not reach better-auth's handler. A Fastify ` +
+        `router 404 and better-auth's PASSKEY_NOT_FOUND are both 404, so the body is the only ` +
+        `thing that tells them apart. Body was: ${gone.body.slice(0, 200)}`,
+    ).toMatchObject({ code: 'PASSKEY_NOT_FOUND' });
+
+    const anonymous = await app.inject({
+      method: 'POST',
+      url: '/api/auth/passkey/delete-passkey',
+      payload: { id: 'no-such-passkey' },
+    });
+    expect(anonymous.statusCode).toBe(401);
+  });
 });
 
 describe('sign-in tells an unauthenticated caller nothing about who exists', () => {

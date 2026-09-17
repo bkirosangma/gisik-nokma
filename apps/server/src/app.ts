@@ -25,6 +25,7 @@ import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
+import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
@@ -904,6 +905,12 @@ export function buildApp(
   // here it is a read-enforcement surface: another user's notification id
   // must read as `not_found`, never as a different, more informative refusal.
   registerNotificationRoutes(app, { pool: deps.pool }, requireSession);
+  // Notification preferences (account/help-screens plan, Task 5) — a global,
+  // per-kind mute list. Same preHandler by parameter as every route above
+  // it, and no `requireMember` gate: unlike `registerPreferencesRoutes`,
+  // there is no workspace here to be a member OF — the Inbox itself is a
+  // global route, and so is this.
+  registerNotificationPreferencesRoutes(app, { pool: deps.pool }, requireSession);
 
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
 

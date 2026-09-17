@@ -17,6 +17,7 @@ import type {
   ContestedClaim,
   FilterSpec,
   Grouping,
+  IdAxes,
   ListColumnId,
   ListRow,
   MyWorkView,
@@ -816,6 +817,13 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
     });
     spec.fields = fields;
   }
+  // `closed` (backlog/closed spec §3.2/§4, 2026-09-17): the wire and the
+  // client spell it the same, a plain carry rather than a rename — but a
+  // REQUIRED boolean read as one (`asBoolean`'s own docblock): a `'true'`
+  // string silently becoming `true` is the exact failure that guard exists
+  // to catch, and it applies here the same as everywhere else this module
+  // reads a wire boolean.
+  if (record['closed'] !== undefined) spec.closed = asBoolean(record['closed'], `${path}.closed`);
   return spec;
 }
 
@@ -835,6 +843,22 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
  */
 export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> {
   const spec: Record<string, unknown> = {};
+
+  // Exclude-mode spec §2 (2026-09-17): `filterSpecSchema` has no negation term,
+  // so an exclude half cannot be sent. Refused, not dropped — the identical
+  // reasoning as the plural refusal below. Empty lists and an empty object
+  // exclude nothing and are not refused.
+  const exclude = filter.exclude ?? {};
+  const excludedAxes = (Object.keys(exclude) as (keyof IdAxes)[]).filter(
+    (axis) => (exclude[axis]?.length ?? 0) > 0,
+  );
+  if (excludedAxes.length > 0) {
+    throw new UnexpressibleFilterError(
+      'exclude',
+      `filterSpecSchema has no negation term, and this filter excludes on ${excludedAxes.join(', ')}`,
+    );
+  }
+
   const singular = (key: string, values: string[] | undefined, serverKey: string): void => {
     if (values === undefined || values.length === 0) return;
     if (values.length > 1) {
@@ -878,6 +902,10 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   if (fields.length > 0) {
     spec['fields'] = fields.map(([fieldId, value]) => ({ fieldId, op: 'eq', value }));
   }
+  // `closed` — the wire and the client spell it the same (`filterSpecSchema`
+  // already carries the term server-side), so this is a plain carry and not
+  // a narrowing like the plural axes above.
+  if (filter.closed !== undefined) spec['closed'] = filter.closed;
   return spec;
 }
 
@@ -1208,6 +1236,23 @@ function mapDueDate(
   };
 }
 
+/**
+ * `TicketCard.closed` → `ListRow.closed`, unchanged: REQUIRED on both sides
+ * (backlog/closed spec §1.2/§3.3, 2026-09-17), `null` meaning never closed or
+ * reopened. The same shape `mapCause` takes — `null` survives as the truth,
+ * an ABSENT key is a different claim left to `asRecord` to refuse, and the
+ * two members are read rather than cast so a garbled claim (no actor, no
+ * clock) cannot render as one somebody made.
+ */
+function mapClosed(raw: unknown, path: string): { actorId: string; at: string } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    actorId: asString(record['actorId'], `${path}.actorId`),
+    at: asString(record['at'], `${path}.at`),
+  };
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1258,6 +1303,7 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
     // concept of this client's outbox, so a `pending` on the body would be the
     // server asserting something only the client can know.
     pending: false,
+    closed: mapClosed(record['closed'], `${path}.closed`),
   };
 }
 
@@ -1420,6 +1466,15 @@ function mapTicketState(raw: unknown, path: string): TicketState {
         workflowVersion: asNumber(transition['workflowVersion'], `${at}.workflowVersion`),
       };
     }),
+    // Case 13.603 (final whole-branch review Finding 1, BLOCKER, 2026-09-17):
+    // this member was missing entirely — every OTHER field above was hand
+    // enumerated when `closed` did not exist yet, and it was never added when
+    // it did. REQUIRED on the wire (backlog/closed spec §1.2 — the server
+    // always sends it, `rowToTicketState` sets it on every row), so `mapClosed`
+    // (`:1247`, the same shape `mapListRow` already reads it through) is the
+    // right helper: it throws on an absent key rather than defaulting to
+    // `null`, which is what would have hidden this exact defect a second time.
+    closed: mapClosed(record['closed'], `${path}.closed`),
   };
 }
 

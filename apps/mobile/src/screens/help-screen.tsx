@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +16,7 @@ import {
   type HelpDocument,
   type HelpSpan,
 } from '@gisik-nokma/app-core';
-import { helpPaletteFor, helpPalette, themeFor } from './help-theme.js';
+import { helpPaletteFor, helpPalette, monoFamilyFor, themeFor } from './help-theme.js';
 import type { ThemeName } from '@gisik-nokma/ui/tokens';
 
 /**
@@ -134,7 +135,10 @@ export function makeHelpStyles(theme: ThemeName) {
   bullet: { width: 22, fontSize: 16, lineHeight: 24, color: token.textMuted },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
-  code: { fontFamily: 'Courier', backgroundColor: token.surfaceSunken },
+  /* The prototype's mono face, branched per platform because RN takes one
+     family name and not a CSS stack — see `monoFamilyFor` for why the branch
+     lives in the sibling module and why body text's family stays unset. */
+  code: { fontFamily: monoFamilyFor(Platform.OS), backgroundColor: token.surfaceSunken },
   cellLabel: { fontWeight: '600' },
   });
 }

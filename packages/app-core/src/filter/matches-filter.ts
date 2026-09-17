@@ -1,5 +1,13 @@
 import type { TicketState } from '@gisik-nokma/domain';
 import type { FilterSpec } from '../view-types.js';
+import {
+  claimText,
+  claimedDueDay,
+  excludedBy,
+  excludedByAny,
+  narrowsTo,
+  narrowsToAny,
+} from './id-axes.js';
 
 /**
  * Does this ticket satisfy the filter, evaluated on the client?
@@ -20,31 +28,19 @@ import type { FilterSpec } from '../view-types.js';
  * of would widen a filtered view back to unfiltered and look exactly like a
  * filter that matched everything. So each of the ten is evaluated, and where
  * client and server cannot mean the same thing the divergence is NAMED below
- * rather than left to be discovered.
+ * rather than left to be discovered. Since 2026-09-17 the six id axes are
+ * evaluated twice — include, then exclude — through `id-axes.ts`'s two base
+ * rules.
  */
 export function matchesFilter(state: TicketState, spec: FilterSpec): boolean {
-  if (spec.assigneeIds !== undefined && spec.assigneeIds.length > 0) {
-    if (state.assigneeId === null || !spec.assigneeIds.includes(state.assigneeId)) return false;
-  }
-  if (spec.collaboratorIds !== undefined && spec.collaboratorIds.length > 0) {
-    if (!spec.collaboratorIds.some((id) => state.collaboratorIds.includes(id))) return false;
-  }
-  if (spec.typeIds !== undefined && spec.typeIds.length > 0 && !spec.typeIds.includes(state.typeId)) {
-    return false;
-  }
-  if (spec.stateIds !== undefined && spec.stateIds.length > 0 && !spec.stateIds.includes(state.stateId)) {
-    return false;
-  }
-  if (
-    spec.stateCategories !== undefined &&
-    spec.stateCategories.length > 0 &&
-    !spec.stateCategories.includes(state.stateCategory)
-  ) {
-    return false;
-  }
-  if (spec.projectIds !== undefined && spec.projectIds.length > 0 && !spec.projectIds.includes(state.projectId)) {
-    return false;
-  }
+  // The include half — every rule below is `id-axes.ts`'s `narrowsTo`, read,
+  // not restated (exclude-mode spec §2).
+  if (!narrowsTo(spec.assigneeIds, state.assigneeId)) return false;
+  if (!narrowsToAny(spec.collaboratorIds, state.collaboratorIds)) return false;
+  if (!narrowsTo(spec.typeIds, state.typeId)) return false;
+  if (!narrowsTo(spec.stateIds, state.stateId)) return false;
+  if (!narrowsTo(spec.stateCategories, state.stateCategory)) return false;
+  if (!narrowsTo(spec.projectIds, state.projectId)) return false;
   /**
    * DIVERGENCE, stated by the plan itself: text here matches TITLES only.
    * Full-text over descriptions and comments is the server's search
@@ -83,21 +79,27 @@ export function matchesFilter(state: TicketState, spec: FilterSpec): boolean {
   for (const [fieldId, wanted] of Object.entries(spec.fields ?? {})) {
     if (claimText(state.fields[fieldId]?.value) !== wanted) return false;
   }
+  /**
+   * `closed` (backlog/closed spec §4, 2026-09-17): a single boolean, not an
+   * id axis — `true` matches only a closed ticket, `false` only one that is
+   * not, absent narrows nothing. `state.closed ?? null` reads a legacy
+   * fixture with no `closed` key (`TicketState.closed?` predates the flag) as
+   * not closed, same as an explicit `null`.
+   */
+  if (spec.closed !== undefined && ((state.closed ?? null) !== null) !== spec.closed) return false;
+  /**
+   * The exclude half (exclude-mode spec §1-2), after every include check: a
+   * ticket matching ANY listed value on an axis is out. `excludedBy` answers
+   * `false` for an absent or empty list and for a null value, so unassigned
+   * work survives an assignee exclusion — the mirror of `narrowsTo`'s "null
+   * never matches a set list".
+   */
+  const exclude = spec.exclude ?? {};
+  if (excludedBy(exclude.assigneeIds, state.assigneeId)) return false;
+  if (excludedByAny(exclude.collaboratorIds, state.collaboratorIds)) return false;
+  if (excludedBy(exclude.typeIds, state.typeId)) return false;
+  if (excludedBy(exclude.stateIds, state.stateId)) return false;
+  if (excludedBy(exclude.stateCategories, state.stateCategory)) return false;
+  if (excludedBy(exclude.projectIds, state.projectId)) return false;
   return true;
-}
-
-/** The claimed due DAY, or null when nothing was claimed (or what was claimed is not a day). */
-function claimedDueDay(state: TicketState): string | null {
-  const value = state.fields['dueDate']?.value;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const { date } = value as { date?: unknown };
-  return typeof date === 'string' ? date : null;
-}
-
-/** What Postgres's `->>` would render for this claim value, or null where it yields SQL NULL. */
-function claimText(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  if (typeof value === 'boolean') return String(value);
-  return null;
 }

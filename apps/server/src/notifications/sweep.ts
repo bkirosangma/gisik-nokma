@@ -3,6 +3,7 @@ import {
   istDayBounds,
   istDayOf,
   newUlid,
+  statesWithBacklog,
   type Notification,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
@@ -267,7 +268,16 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
       // omits. A workflow id is scoped to its workspace, and the row carries
       // both, so the workspace comes from the row rather than from the run.
       const def = await getWorkflowDefFromProjection(deps.pool, row.workspace_id, row.workflow_id);
-      const stateName = def?.states.find((state) => state.id === row.state_id)?.name ?? null;
+      // `statesWithBacklog(def)`, not `def.states` (backlog/closed spec
+      // §1.4/§3.2, 2026-09-17; fix round 2), for consistency with every other
+      // state-name lookup in this codebase — though this one is UNREACHABLE
+      // with `row.state_id === 'backlog'` today, and more directly so than
+      // `attention.ts`'s `stateNameOf`: the query above filters
+      // `t.state_category = 'active'`, and the universal backlog state's
+      // category is `'open'` (`stateCategoryOf`/`statesWithBacklog`), so no
+      // backlog row can ever reach this loop at all.
+      const stateName =
+        (def === null ? undefined : statesWithBacklog(def).find((state) => state.id === row.state_id))?.name ?? null;
       // `entered_at` is a timestamptz; pg hands it back as a Date, which is an
       // absolute instant, so `toISOString()` is the same string under every
       // process and session timezone. The key is therefore stable across runs

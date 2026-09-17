@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { newUlid, statesWithBacklog, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
 import { Button } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -23,7 +24,8 @@ export type CreateTicketFlowProps = {
   projectId: string;
   currentUserId: string;
   typeOptions: Array<{ id: string; name: string }>;
-  parentCandidates: Array<{ id: string; title: string }>;
+  /** See `NewTicketDialogProps.parentCandidates` — this flow only passes it through. */
+  parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
   /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */
   parentCandidatesUnavailable?: string;
   /** See `NewTicketDialogProps.parentCandidatesNarrowing`. */
@@ -40,6 +42,22 @@ type ReopenPrompt = {
   reopenStates: Array<{ id: string; name: string }>;
   refusal: Refusal;
   refusalOrigin: RefusalOrigin;
+  /**
+   * Whether the parent is CLOSED (backlog/closed spec §2, ruling 37) — never
+   * merely terminal. A closed ticket needs `ticket.reopened` ahead of the
+   * transition, in the SAME batch, so the person is asked once and the two
+   * events land or refuse together; a terminal-but-open parent (the v1 shape
+   * every case before this task exercised) needs only the transition, as
+   * before.
+   *
+   * `parentRead.ticket.closed` is `{actorId; at} | null | undefined` —
+   * optional on the domain `TicketState` because 441 fixtures predate the
+   * flag (dispatch-context's binding ruling) — so this reads it through the
+   * SAME `?? null` normalisation every other reader of the flag uses, rather
+   * than `!== null` alone, which would treat an undefined (pre-flag) ticket
+   * as closed.
+   */
+  parentClosed: boolean;
 };
 
 type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigin };
@@ -163,8 +181,12 @@ export function CreateTicketFlow({
       });
       return;
     }
+    // `statesWithBacklog`, not `def.states` (backlog/closed spec §1.4,
+    // 2026-09-17): a parent parked in the universal Backlog state has no row
+    // in its own published definition, and the reopen prompt must still name
+    // it "Backlog" rather than the bare id.
     const parentStateName =
-      def.states.find((state) => state.id === parentRead.ticket.stateId)?.name ??
+      statesWithBacklog(def).find((state) => state.id === parentRead.ticket.stateId)?.name ??
       parentRead.ticket.stateId;
     setReopenPrompt({
       childEvent,
@@ -175,6 +197,7 @@ export function CreateTicketFlow({
       reopenStates: reopenStateOptions(def, parentRead.ticket.stateId),
       refusal,
       refusalOrigin,
+      parentClosed: (parentRead.ticket.closed ?? null) !== null,
     });
   };
 
@@ -189,6 +212,13 @@ export function CreateTicketFlow({
         projectId,
         parentId: draft.parentId,
         title: draft.title,
+        // Backlog/closed spec §1.3: ALWAYS sent, never left to the wire's own
+        // absence-means-focus fallback. That fallback exists for events
+        // written before this field did; this client was not, and a v2
+        // client leaving an additive field out is a choice, not a compatible
+        // silence. `NewTicketDraft.start` is itself required (never
+        // optional) for the identical reason, one layer up.
+        start: draft.start,
       },
     });
 
@@ -242,6 +272,7 @@ export function CreateTicketFlow({
         toStateId,
         childTicketId: reopenPrompt.childTicketId,
         childEvent: reopenPrompt.childEvent,
+        parentClosed: reopenPrompt.parentClosed,
       },
       make,
     );
@@ -255,6 +286,32 @@ export function CreateTicketFlow({
     if (outcome.kind === 'parent-refused') {
       // Stays open, in the dialog, verbatim: the parent's own rules refused the
       // reopen, and another target on the same list may still be allowed.
+      if (outcome.parentReopened || outcome.refusal.rule === REFUSAL_RULES.notClosed) {
+        // Ruling 39 (fix round 1, 2026-09-17): the batch's `ticket.reopened`
+        // half already COMMITTED before its transition half was refused — the
+        // server processes a batch per-event, never atomically
+        // (`guarded-child-event.ts`'s own docblock cites the real
+        // `IngestService`), so this is reachable, not hypothetical. The
+        // parent is no longer closed, permanently, and a retry that resent
+        // `ticket.reopened` would itself be refused `not-closed` — masking
+        // whatever the next target's own transition would have answered.
+        // Flipping `parentClosed` to `false` here is what makes the retry
+        // build `[transition]` alone, the same batch `openReopenPrompt` would
+        // have built had it re-read the ticket after this commit.
+        //
+        // Ruling 50 (final whole-branch review fix wave A, 2026-09-17,
+        // Finding 3): `outcome.parentReopened` is `false` for EVERY index-0
+        // refusal (13.593b), including the one this OR-arm now catches — the
+        // reopen half ITSELF refused `not-closed`, because someone else
+        // reopened the parent a second before this confirm. That refusal is
+        // the identical fact `parentReopened` reports, learned from a
+        // different sentence: the server is saying "this parent is not
+        // closed" either way, and a retry that still believes `parentClosed`
+        // would resend `ticket.reopened` into the SAME refusal again,
+        // masking the next target's transition — Ruling 39's masking,
+        // reached from the other side. Case 13.593f.
+        setReopenPrompt((prev) => (prev === null ? prev : { ...prev, parentClosed: false }));
+      }
       setParentRefusal(outcome.refusal);
       return;
     }

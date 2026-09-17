@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { UnreadBadge } from '@gisik-nokma/app-core';
 import { useAppServices, useSessionStatus } from './providers.js';
 
 /** The plan's cadence: "the badge and the list update within a minute". */
@@ -31,13 +30,18 @@ export const REFRESH_MS = 60_000;
  * because it gates a WRITE. The load window is pinned as its own case (11.154),
  * so the equivalence stays a measured fact rather than a hope.
  *
- * ## What the badge does when a REFRESH fails, and why that is not zero
+ * ## What the indicator does when a REFRESH fails, and why that is not zero
  *
- * `unread` starts at 0 and `UnreadBadge` renders nothing at 0, so before the
- * first answer there is no badge — an absence, which claims nothing. After an
- * answer, a FAILED refresh leaves the last count standing rather than resetting
- * it: "you have 3 unread" that is a minute stale is a smaller error than "you
- * have none" asserted from a request that failed.
+ * `unread` starts at 0 and nothing renders at 0, so before the first answer
+ * there is no dot — an absence, which claims nothing. After an answer, a FAILED
+ * refresh leaves the last count standing rather than resetting it: "you have 3
+ * unread" that is a minute stale is a smaller error than "you have none"
+ * asserted from a request that failed.
+ *
+ * Round 24 turned the visible count into a dot and moved the number into the
+ * accessible name; `UnreadBadge` is untouched and still carries the count on
+ * `/inbox` itself. This paragraph's promise is unchanged by that — it is about
+ * the VALUE of `unread`, not about how it is drawn.
  *
  * That promise is about a failed REFRESH and nothing else, and the wording is
  * narrow on purpose. It does NOT extend across a session ending: a count that
@@ -97,8 +101,58 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
   }, [notifications, signedIn]);
 
   return (
-    <Link href="/inbox" className="gn-nav__inbox" aria-current={active ? 'page' : undefined}>
-      Inbox <UnreadBadge count={unread} />
+    <Link
+      href="/inbox"
+      className="gn-nav__inbox"
+      aria-current={active ? 'page' : undefined}
+      /* THE COUNT DID NOT GO AWAY — it moved into the accessible name (Round 24,
+         owner ruling: "dot visually, count in the accessible name").
+
+         The visible signal is now a dot, and a dot can only say "some". If the
+         accessible name were also just "Inbox", this change would have deleted
+         the unread count from the product's chrome for exactly the people least
+         able to go looking for it, which is a downgrade wearing a restyle's
+         clothes. It would also leave the unread state signalled by COLOUR ALONE
+         (WCAG 1.4.1); the name is what keeps that honest.
+
+         At zero the name is a bare "Inbox" and no dot renders: an absence, which
+         claims nothing, exactly as `UnreadBadge` returning null did. */
+      aria-label={
+        unread > 0
+          ? `Inbox, ${unread} unread notification${unread === 1 ? '' : 's'}`
+          : 'Inbox'
+      }
+    >
+      <InboxIcon />
+      {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
     </Link>
+  );
+}
+
+/**
+ * Inline rather than from an icon package: this repo ships no icon dependency,
+ * and adding one for a single glyph would put a package in the bundle of every
+ * page in the product. `aria-hidden` because the link's own `aria-label` is the
+ * accessible name — an unlabelled `<svg>` here would be announced as a second,
+ * nameless thing inside the link.
+ */
+function InboxIcon() {
+  return (
+    <svg
+      className="gn-nav__inbox-icon"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 13h4l1.5 3h5L16 13h4" />
+      <path d="M5.5 5h13l1.5 8v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4z" />
+    </svg>
   );
 }

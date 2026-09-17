@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FieldClaim, WorkflowDef } from '@gisik-nokma/domain';
-import { Button, Dialog } from '@gisik-nokma/ui';
+import {
+  BACKLOG_STATE_ID,
+  statesWithBacklog,
+  transitionsWithBacklog,
+  type FieldClaim,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
+import { Button, Dialog, Select } from '@gisik-nokma/ui';
 import type { PrecheckResult } from '../precheck.js';
+import { fieldAlreadyClaimed } from './field-claims.js';
 
 type TransitionRules = WorkflowDef['transitions'][number]['rules'];
 
 export type TransitionOption = { toStateId: string; name: string; rules: TransitionRules };
 
 /**
- * Only what the definition declares — never an invented move (spec §7).
+ * What the definition declares, plus the universal Backlog edges — never an
+ * invented move (spec §7; the Backlog half is spec §4, see below).
  *
  * `from: '*'` means "from any state", so a wildcard edge is offered from
  * everywhere except the state it points at: offering `doing → doing` would put
@@ -18,9 +26,9 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * **The exact edge supplies the rules, and declaration order does not matter.**
  * That is not a preference — it is what the engine does, and this function's
- * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:91-93`
+ * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:120-121`
  * resolves `find(exact) ?? find('*')`, and `precheck.ts`'s `needsMembership`
- * already mirrors it at :375-378. This is the third copy of one rule.
+ * already mirrors it at :467-473. This is the third copy of one rule.
  *
  * This paragraph used to say the target *"keeps the FIRST edge's rules, in
  * declaration order, rather than merging two rule sets into one that no
@@ -37,11 +45,42 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * A target the definition names but has no state for is dropped rather than
  * rendered as a bare id: a select option a user cannot read is not an option.
+ *
+ * ## The universal Backlog edges, since 2026-09-17 (backlog/closed spec §4)
+ *
+ * Start (`backlog → def.initialStateId`) and Send to backlog (every declared
+ * non-terminal state → backlog) are offered like declared ones — read off the
+ * SAME `statesWithBacklog`/`transitionsWithBacklog` helpers the engine itself
+ * resolves edges over (`packages/rule-engine/src/transition.ts:106-121`), so
+ * this function still predicts the engine rather than keeping a second,
+ * driftable copy of the universal set.
+ *
+ * Backlog is a special case within that, not an ordinary member of it
+ * (controller ruling, Task 6): a declared `from: '*'` edge means "from any
+ * AUTHORED state" — the author who wrote it never knew about the universal
+ * Backlog — so a wildcard edge never resolves FROM backlog; its only exit is
+ * Start. Without this, a template declaring `* → done` would let a backlog
+ * ticket jump straight to Done, skipping Start entirely — the exact hazard
+ * `transition.ts`'s own docblock names for the engine, mirrored here.
  */
 export function transitionOptions(def: WorkflowDef, fromStateId: string): TransitionOption[] {
+  if (fromStateId === BACKLOG_STATE_ID) {
+    // Read off `transitionsWithBacklog(def)` itself, not re-derived by hand
+    // (fix round 1, review Important 1): the paragraph above claims the
+    // universal set comes from "the SAME helpers … rather than a second,
+    // driftable copy", and a literal `def.initialStateId`/`rules: []` here
+    // was exactly that second copy — correct only because
+    // `universalTransitions` happens to build Start the same way today.
+    const start = transitionsWithBacklog(def).find((t) => t.from === BACKLOG_STATE_ID);
+    if (start === undefined) return [];
+    const state = statesWithBacklog(def).find((candidate) => candidate.id === start.to);
+    return state === undefined ? [] : [{ toStateId: start.to, name: state.name, rules: start.rules }];
+  }
+
+  const allTransitions = transitionsWithBacklog(def);
   // Which targets are reachable at all, in declaration order of first mention.
   const targets: string[] = [];
-  for (const transition of def.transitions) {
+  for (const transition of allTransitions) {
     if (transition.from !== fromStateId && transition.from !== '*') continue;
     if (transition.to === fromStateId) continue;
     if (!targets.includes(transition.to)) targets.push(transition.to);
@@ -50,9 +89,9 @@ export function transitionOptions(def: WorkflowDef, fromStateId: string): Transi
     .map((toStateId) => {
       // The engine's resolution, in the engine's order.
       const edge =
-        def.transitions.find((t) => t.from === fromStateId && t.to === toStateId) ??
-        def.transitions.find((t) => t.from === '*' && t.to === toStateId);
-      const state = def.states.find((candidate) => candidate.id === toStateId);
+        allTransitions.find((t) => t.from === fromStateId && t.to === toStateId) ??
+        allTransitions.find((t) => t.from === '*' && t.to === toStateId);
+      const state = statesWithBacklog(def).find((candidate) => candidate.id === toStateId);
       if (edge === undefined || state === undefined) return null;
       return { toStateId, name: state.name, rules: edge.rules };
     })
@@ -85,7 +124,53 @@ export type TransitionDialogProps = {
   precheck: (toStateId: string) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
+  /**
+   * The opposite of an answer — Ruling 27 (board-prototype-port, 2026-09-16).
+   * `serverRefusal` above is documented, in this exact file, as "the
+   * authority's answer, shown VERBATIM". A dropped connection or an empty
+   * `ingest` response is not an answer at all: nobody adjudicated, so there is
+   * no verdict to carry verbatim. Before this ruling, `MoveArrows` (`board.tsx`)
+   * built `{ rule: 'transport', … }`/`{ rule: 'no-response', … }` objects by
+   * hand and fed them into `serverRefusal` — never through this package's own
+   * `refuse()` (deliberately unexported, `rule-engine/src/index.ts:32-41`, for
+   * exactly this reason: "a consumer outside this package has no business
+   * minting a `Refusal`"), but arriving at the identical forbidden result
+   * through a different door: a plain client-built object, shaped like a
+   * refusal, rendered through the identical "Refused by the server — …"
+   * sentence a REAL refusal uses. A reader could not tell "the server said no"
+   * from "we never heard back", and the two call for opposite next actions —
+   * fix the thing the server objected to, versus retry.
+   *
+   * This prop carries a PLAIN SENTENCE, never a `{ rule, reason }` pair, so it
+   * cannot accidentally be mistaken for a `Refusal`-shaped value at the type
+   * level either. Rendered in its own alert, its own CSS class
+   * (`gn-refusal--transport`, reusing the `warning` tone `.gn-refusal--preview`
+   * already uses — amber, not the danger-red `--server` wears), and never
+   * alongside the words "Refused by the server".
+   */
+  transportError: string | null;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
+  /**
+   * The dialog only ever OFFERS what the gesture meant (owner request,
+   * 2026-09-17, the board's `‹ ›` arrows): when present, the "Move to" select
+   * is narrowed to these states — in `transitionOptions`'s own order, never
+   * re-sorted — so a `›` that found two forward targets shows those two and
+   * not the backward one the wildcard also declares. Absent (as `TicketSheet`'s
+   * own "Move…" button leaves it) the full declared list is offered, exactly as
+   * before. An id here that `transitionOptions` does not declare is simply not
+   * offered: this prop can narrow the declared list, never widen it — the
+   * spec's "never an invented move" holds through it.
+   */
+  offerStateIds?: string[];
+  /**
+   * Open already aimed at this state rather than on "Choose a state" — the
+   * arrow (or the drop) resolved to exactly one target, so asking the person
+   * to pick it again from a select is a step with nothing to decide. Read
+   * once, on mount: a caller that wants a fresh aim per open mounts a fresh
+   * dialog per open (`MoveArrows` does), which is also what stops a
+   * cancelled pick surviving into the next open.
+   */
+  initialToStateId?: string | null;
 };
 
 /**
@@ -110,10 +195,15 @@ export function TransitionDialog({
   onSubmit,
   precheck,
   serverRefusal,
+  transportError,
   uploadEvidence,
+  offerStateIds,
+  initialToStateId,
 }: TransitionDialogProps) {
-  const options = transitionOptions(workflow, fromStateId);
-  const [toStateId, setToStateId] = useState('');
+  const options = transitionOptions(workflow, fromStateId).filter(
+    (option) => offerStateIds === undefined || offerStateIds.includes(option.toStateId),
+  );
+  const [toStateId, setToStateId] = useState(initialToStateId ?? '');
   const [comment, setComment] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [evidenceAttachmentId, setEvidenceAttachmentId] = useState<string | null>(null);
@@ -124,8 +214,11 @@ export function TransitionDialog({
   const needsComment = rules.some((rule) => rule.kind === 'require-comment');
   const needsEvidence = rules.some((rule) => rule.kind === 'require-evidence');
   const requiredFields = rules.flatMap((rule) => (rule.kind === 'require-field' ? [rule.field] : []));
+  // `fieldAlreadyClaimed` (`field-claims.ts`) is the SAME predicate
+  // `moveOutcome`'s gate reads (Task 12, Ruling 25) — extracted so the two
+  // never derive "is this field already satisfied" two different ways.
   const missingFields = requiredFields.filter(
-    (field) => ticketFields[field]?.value == null && (fieldValues[field] ?? '') === '',
+    (field) => !fieldAlreadyClaimed(ticketFields, field) && (fieldValues[field] ?? '') === '',
   );
 
   // The same ref idiom `useLiveQuery` uses, and for the same reason: `precheck`
@@ -180,19 +273,16 @@ export function TransitionDialog({
 
   return (
     <Dialog open={open} title="Move ticket" onClose={onClose}>
-      <label className="gn-transition__field">
-        Move to
-        <select value={toStateId} onChange={(event) => setToStateId(event.target.value)}>
-          <option value="" disabled>
-            Choose a state
-          </option>
-          {options.map((option) => (
-            <option key={option.toStateId} value={option.toStateId}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="gn-transition__field">
+        <span>Move to</span>
+        <Select
+          options={options.map((option) => ({ value: option.toStateId, label: option.name }))}
+          value={toStateId === '' ? null : toStateId}
+          onChange={setToStateId}
+          placeholder="Choose a state"
+          aria-label="Move to"
+        />
+      </div>
 
       {needsComment ? (
         <label className="gn-transition__field">
@@ -202,7 +292,7 @@ export function TransitionDialog({
       ) : null}
 
       {requiredFields.map((field) =>
-        ticketFields[field]?.value != null ? null : (
+        fieldAlreadyClaimed(ticketFields, field) ? null : (
           <label key={field} className="gn-transition__field">
             {`${field} (required before this transition)`}
             <input
@@ -259,6 +349,14 @@ export function TransitionDialog({
       {serverRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+        </p>
+      ) : null}
+
+      {/* Ruling 27 — never the same sentence, never the same class, never a
+          `{rule, reason}` pair: see this prop's own docblock above. */}
+      {transportError !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--transport">
+          {transportError}
         </p>
       ) : null}
 

@@ -1,5 +1,4 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import WorkspacesPage from '../app/workspaces/page.js';
@@ -7,12 +6,20 @@ import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * 3.153/3.154 — the two `data-testid` hooks Plan 11 T13's E2E needs to
- * address one specific workspace or project card among structurally
- * identical siblings (house style `mapping-row-${state.id}` /
- * `state-node-${data.stateId}`): the id goes on the entity's own container,
- * disambiguation only — every interaction here still goes through the
- * accessible `name`/role, never the testid itself.
+ * 3.153 — the `data-testid` hook Plan 11 T13's E2E needs to address one
+ * specific workspace card among structurally identical siblings (house style
+ * `mapping-row-${state.id}` / `state-node-${data.stateId}`): the id goes on
+ * the entity's own container, disambiguation only — every interaction here
+ * still goes through the accessible `name`/role, never the testid itself.
+ *
+ * 3.154 (the sibling per-project hook) drove this page until the 2026-09-15
+ * prototype port (Task 7) replaced the per-project `<ul>` rows with one
+ * joined project line — the `project-card-<id>` testid it asserted no longer
+ * exists anywhere in the app (the workspace-home project rows use their own,
+ * unrelated `project-row-<id>` testid). Its assertions are removed here per
+ * that task's brief rather than repointed at a subject that no longer
+ * exists; the case NUMBER is left unused, not reassigned. A later task owns
+ * marking it 🚫 in `test-cases/` and `Features.md` — out of scope here.
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -73,6 +80,21 @@ function mount() {
   mountWith(WORKSPACES);
 }
 
+/**
+ * Task 4's refusal fixture, built the same way `page-refusals.test.tsx`
+ * builds one for this same page (`getMyWorkspaces` rejecting), rather than
+ * inventing a second helper for one branch this file already knows how to
+ * reach: `ShellRefusal` renders whatever `Error#message` the read rejects
+ * with, unparaphrased.
+ */
+function mountRefusing(message: string) {
+  render(
+    <Providers services={stubServices({ getMyWorkspaces: () => Promise.reject(new Error(message)) })}>
+      <WorkspacesPage />
+    </Providers>,
+  );
+}
+
 describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () => {
   it('3.153 keys each workspace card by its own workspaceId, distinguishing two siblings', async () => {
     mount();
@@ -81,21 +103,6 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     expect(ws1).not.toBe(ws2);
     expect(within(ws1).getByRole('heading', { name: 'Convenience Corner' })).toBeInTheDocument();
     expect(within(ws2).getByRole('heading', { name: 'Second Workspace' })).toBeInTheDocument();
-  });
-
-  it('3.154 keys each project card by its own projectId, scoped inside its own workspace card', async () => {
-    mount();
-    const ws1 = await screen.findByTestId('workspace-card-ws1');
-    const p1 = within(ws1).getByTestId('project-card-p1');
-    const p2 = within(ws1).getByTestId('project-card-p2');
-    expect(p1).not.toBe(p2);
-    expect(within(p1).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
-      'href',
-      '/w/ws1/p/p1',
-    );
-    expect(within(p2).getByRole('link', { name: 'Deliveries' })).toHaveAttribute('href', '/w/ws1/p/p2');
-    // The other workspace's project never leaks into this one's scope.
-    expect(within(ws1).queryByTestId('project-card-p3')).toBeNull();
   });
 
   /**
@@ -126,6 +133,33 @@ describe('Workspaces page — entity-keyed data-testid hooks (Plan 11 T13)', () 
     // sentence beside it.
     expect(within(ws1).queryByText('owner')).toBeNull();
     expect(within(ws2).queryByText('member')).toBeNull();
+
+    // ROUTED 4(ii) (Task 7 review): everything above asserts the sentence's
+    // TEXT, so none of it would fail if Task 6's relocation of this sentence
+    // — from the card head, under the name, to below the chip row — were
+    // ever reverted; the sentence reads the same either way. This is a
+    // DOM-POSITION assertion instead: the chip row must PRECEDE the role
+    // sentence in document order, which is true only at the current
+    // position.
+    const chips = within(ws1).getByText('3 members').closest('.gn-workspace-card__chips');
+    expect(chips, 'no .gn-workspace-card__chips ancestor found for the "3 members" chip').not.toBeNull();
+    const role = within(ws1).getByText("You're an owner here.");
+    const position = chips!.compareDocumentPosition(role);
+    // m2 (Task 7 fix round 1): `& FOLLOWING` alone also passes if `role` sat
+    // INSIDE `chips` — `compareDocumentPosition` sets both FOLLOWING and
+    // CONTAINED_BY on a descendant, so a version of this test that only
+    // checked FOLLOWING would not catch the sentence being nested inside the
+    // chip row, only moved before it. Masking out CONTAINED_BY makes the
+    // assertion test what its own name claims: a SIBLING that comes after,
+    // not a descendant.
+    expect(
+      position & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the role sentence no longer follows the chip row in document order',
+    ).toBeTruthy();
+    expect(
+      position & Node.DOCUMENT_POSITION_CONTAINED_BY,
+      'the role sentence is nested INSIDE the chip row, not merely following it',
+    ).toBe(0);
   });
 });
 
@@ -161,7 +195,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
 }
 
 describe('13.379 the card renders every element from data the route served', () => {
-  it('shows the monogram, the member count, both chips, the per-project count, the archived split and the restricted line', async () => {
+  it('shows the monogram, the member count, all three chips, the per-project count and the restricted line', async () => {
     mountWith([
       workspace({
         id: 'ws1',
@@ -182,8 +216,8 @@ describe('13.379 the card renders every element from data the route served', () 
     // is what makes two cards' avatars distinguishable to a screen reader —
     // the tint alone is not available to one.
     //
-    // `{ selector: '.gn-avatar' }` disambiguates from the head's own door
-    // (Round 19b): the card's head is now a `<Link aria-label={workspace.name}>`
+    // `{ selector: '.gn-avatar' }` disambiguates from the card's own door
+    // (Round 19b/19c): the whole card is now a `<Link aria-label={workspace.name}>`
     // wrapping the avatar, so TWO elements share this accessible name — the
     // door and the monogram inside it — and a bare `getByLabelText` cannot
     // tell them apart. Two elements sharing a name is not itself a defect;
@@ -192,6 +226,12 @@ describe('13.379 the card renders every element from data the route served', () 
       within(card).getByLabelText('Convenience Corner', { selector: '.gn-avatar' }),
     ).toHaveTextContent('CC');
 
+    // The meta line: `live.length` alone. Two live projects here (p3 is
+    // archived), so a sum that folded in `nameRestrictedProjectCount` (2) would
+    // print "4 projects" and redden.
+    expect(within(card).getByText('2 projects')).toBeInTheDocument();
+
+    // The chip set is UNCHANGED by the prototype port — the built labels stay.
     expect(within(card).getByText('5 members')).toBeInTheDocument();
     // THE TWO CHIP NUMBERS, and every input to them is a different number so
     // neither can be the other by accident: 9+4+7 tickets, 3+1+2 blocked, over
@@ -199,38 +239,53 @@ describe('13.379 the card renders every element from data the route served', () 
     expect(within(card).getByText('14 active')).toBeInTheDocument();
     expect(within(card).getByText('6 blocked')).toBeInTheDocument();
 
-    // Per-project counts, scoped to their own row so a card that printed one
-    // project's number on another's row reddens.
-    const p1 = within(card).getByTestId('project-card-p1');
-    expect(within(p1).getByText('9 tickets')).toBeInTheDocument();
-    const p2 = within(card).getByTestId('project-card-p2');
-    expect(within(p2).getByText('4 tickets')).toBeInTheDocument();
+    // Task 7: the two live projects, joined into ONE line. `getByText` on the
+    // whole sentence is the assertion a multi-interpolation version fails.
+    expect(within(card).getByText('Shop operations · Deliveries')).toBeInTheDocument();
+    // The archived project is named nowhere — its only trace is the chip.
+    expect(within(card).queryByText(/Last winter/)).toBeNull();
+    expect(within(card).queryByTestId('project-card-p1')).toBeNull();
 
-    // ARCHIVED IS HIDDEN BY DEFAULT, and the toggle's accessible name carries
-    // the workspace so two cards do not present two identical buttons.
+    // Round 19c: archived is no longer a disclosure — the card renders LIVE
+    // projects only, and the sole trace of the archived one is a count chip.
     expect(within(card).queryByTestId('project-card-p3')).toBeNull();
-    const toggle = within(card).getByRole('button', {
-      name: 'Show archived projects in Convenience Corner',
-    });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(toggle);
-    const p3 = within(card).getByTestId('project-card-p3');
-    // Marked as well as hidden: revealing it is not the whole of "archived".
-    expect(within(p3).getByText('Archived')).toBeInTheDocument();
-    expect(
-      within(card).getByRole('button', { name: 'Hide archived projects in Convenience Corner' }),
-    ).toHaveAttribute('aria-expanded', 'true');
+    expect(within(card).getByText('1 archived')).toBeInTheDocument();
+    expect(within(card).queryByRole('button')).toBeNull();
 
     // ONE text node, plural. `getByText` on the whole sentence is the assertion
     // that a three-interpolation version would fail.
     expect(within(card).getByText('2 projects · name restricted')).toBeInTheDocument();
   });
 
-  it('renders no restricted line and no archive toggle when there is nothing to say', async () => {
+  // Case 13.407 (test-cases/13-deployment-dogfooding.md) — minted by the
+  // workspaces-prototype-port plan's Task 10, catalogue consolidation.
+  // Task 7: a truncation case at the card level, so `projectLine`'s own rule
+  // (`PROJECT_LINE_CAP`, `src/workspace-viewer.ts`) is pinned where it
+  // actually renders too, not only inside the helper's own unit tests.
+  it('names three projects and counts the rest, so a wide workspace does not grow the card', async () => {
+    mountWith([
+      workspace({
+        id: 'ws1',
+        memberCount: 3,
+        projects: ['Delivery', 'Site readiness', 'Winter stock', 'Payroll'].map((name, i) =>
+          project({ id: `p${i}`, name, ticketCount: 1, blockedCount: 0 }),
+        ),
+      }),
+    ]);
+    const card = await screen.findByTestId('workspace-card-ws1');
+    expect(
+      within(card).getByText('Delivery · Site readiness · Winter stock · +1 more'),
+    ).toBeInTheDocument();
+    // The meta line still counts ALL four, so the truncation never becomes
+    // the card's answer to "how many projects are in here".
+    expect(within(card).getByText('4 projects')).toBeInTheDocument();
+  });
+
+  it('renders no restricted line and no archived chip when there is nothing to say', async () => {
     // THE NEGATIVE CONTROL for both, and it is not decoration: `0 projects ·
     // name restricted` would appear on every owner's card, where the count is
-    // zero by construction, and a toggle revealing nothing lies about the shape
-    // of the data.
+    // zero by construction, and an "archived" chip with nothing behind it
+    // would claim a split in the data that is not there.
     mountWith([
       workspace({
         id: 'ws1',
@@ -241,7 +296,7 @@ describe('13.379 the card renders every element from data the route served', () 
     ]);
     const card = await screen.findByTestId('workspace-card-ws1');
     expect(within(card).queryByText(/name restricted/)).toBeNull();
-    expect(within(card).queryByRole('button', { name: /archived/ })).toBeNull();
+    expect(within(card).queryByText(/archived/)).toBeNull();
     // And the singular, on a card that HAS one — so the plural above is a
     // choice the code makes rather than the only string it can produce.
     expect(within(card).getByText('1 member')).toBeInTheDocument();
@@ -309,7 +364,7 @@ describe('13.379 the card renders every element from data the route served', () 
   });
 });
 
-describe('13.380 a guest card shows one "Restricted" chip and no number anywhere', () => {
+describe('13.380 a guest card shows one "Restricted" chip and no number outside the owner-ruled restricted sentence', () => {
   it('prints no count, and prints "Restricted" instead — while still naming the project and its restricted total', async () => {
     mountWith([
       workspace({
@@ -321,8 +376,19 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
         // this fixture is the client half of it.
         memberCount: null,
         nameRestrictedProjectCount: 1,
+        // ROUTED 1 (Task 7 review): FOUR live projects — one past
+        // `PROJECT_LINE_CAP` (3) — so the truncation branch actually runs
+        // for a guest. With only a single project (the original fixture)
+        // `projectLine`'s `hidden` count is negative and no suffix ever
+        // renders, regardless of which branch a bug takes; the mutation
+        // proof below would have been a silent no-op against that fixture.
+        // Every name here is deliberately digit-free, so the scan below
+        // cannot pass by accident.
         projects: [
           project({ id: 'p1', name: 'Shared with a guest', ticketCount: null, blockedCount: null }),
+          project({ id: 'p2', name: 'Second guest errand', ticketCount: null, blockedCount: null }),
+          project({ id: 'p3', name: 'Third guest errand', ticketCount: null, blockedCount: null }),
+          project({ id: 'p4', name: 'Fourth guest errand', ticketCount: null, blockedCount: null }),
         ],
       }),
     ]);
@@ -339,12 +405,37 @@ describe('13.380 a guest card shows one "Restricted" chip and no number anywhere
     expect(within(card).queryByText(/active/)).toBeNull();
     expect(within(card).queryByText(/blocked/)).toBeNull();
     expect(within(card).queryByText(/tickets?$/)).toBeNull();
+    // 13.380's own name is "no number anywhere", and the meta line is a number.
+    expect(within(card).queryByText(/\d+ projects?$/)).toBeNull();
 
-    // The name is still served (rulings P32/P38 withhold names, not this one),
-    // and so is the restricted line — the string the whole owner ruling exists
-    // to make renderable.
-    expect(within(card).getByRole('link', { name: 'Shared with a guest' })).toBeInTheDocument();
+    // The names are still served (rulings P32/P38 withhold names, not this
+    // one) — all four, joined and truncated to the SAFE "and more" form, not
+    // the numeric "+1 more" a non-withheld viewer would get.
+    expect(
+      within(card).getByText(
+        'Shared with a guest · Second guest errand · Third guest errand · and more',
+      ),
+    ).toBeInTheDocument();
     expect(within(card).getByText('1 project · name restricted')).toBeInTheDocument();
+
+    // ROUTED 1 (Task 7 review, load-bearing): none of the shape-specific
+    // regexes above matches "+1 more" — the exact suffix `projectLine` would
+    // print if it ever ignored `countsWithheld` — so a leaked truncation
+    // count would have sailed through every check above and left this case
+    // green. This is a card-wide digit scan instead of one more shape: ANY
+    // digit anywhere on the card fails it, minus the one digit this card IS
+    // allowed to show — the restricted count above, never withheld (see
+    // `restrictedLine`'s own docblock) — which is stripped out by its exact
+    // text rather than excluded by yet another pattern.
+    const restrictedSentence = '1 project · name restricted';
+    const fullText = card.textContent ?? '';
+    const withoutRestrictedSentence = fullText.replace(restrictedSentence, '');
+    // Proves the strip actually fired, rather than silently no-op-ing if the
+    // sentence text ever drifted from what is asserted two lines above.
+    expect(withoutRestrictedSentence, 'the restricted sentence text was not found to strip').not.toBe(
+      fullText,
+    );
+    expect(withoutRestrictedSentence).not.toMatch(/\d/);
   });
 });
 
@@ -400,26 +491,25 @@ describe('13.381 the role sentence and every gated affordance read ONE value', (
 });
 
 /**
- * 13.390 — the card's HEAD is a door to `/w/<id>` (Round 19b, owner feedback
- * item 1: *"the workspace card should be clickable ... and on click it should
- * lead into the workspace page"*).
+ * 13.390 — the WHOLE card is a door to `/w/<id>` (Round 19c, owner feedback:
+ * *"the entire workspace card should be clickable ... everything else on the
+ * card should just be info, nothing clickable"*).
  *
  * The accessible name is asserted to be EXACTLY the workspace's name, not that
  * name padded with the role sentence or repeated — the failure a naive
- * `aria-label` built from the head's full text content would produce, since
- * the avatar carries its own `aria-label` and the role sentence sits beside
- * the heading inside the same link.
+ * `aria-label` built from the card's full text content would produce, since
+ * the avatar carries its own `aria-label` and the role sentence, every
+ * project name/count and the restricted line all sit inside the same link.
  *
- * "No nested interactive content" is asserted the only way it can be from
- * outside the DOM tree: every OTHER control on the card (the project links,
- * the archived toggle, "My Work") is still reachable as its OWN top-level
- * role, scoped to the card — which a browser could not do if any of them were
- * nested inside the door anchor (nested interactive elements are invalid HTML
- * and most browsers hoist the inner one out of the outer, breaking exactly
- * this kind of scoped lookup).
+ * Round 19b's version of this case proved "no nested interactive content"
+ * indirectly, by showing every other control was still reachable as its own
+ * top-level role — the only way to prove it when some of the card WAS meant to
+ * stay outside the door. Round 19c removed those controls instead of keeping
+ * them beside the door, so the direct proof is now the stronger one: exactly
+ * one link and zero buttons anywhere in the card.
  */
 describe('13.390 the card is a door to /w/<id>', () => {
-  it('the head is a link named by the workspace, and every other control stays reachable on its own', async () => {
+  it('the whole card is one link named by the workspace, with no nested interactive content', async () => {
     mountWith([
       workspace({
         id: 'ws1',
@@ -434,24 +524,28 @@ describe('13.390 the card is a door to /w/<id>', () => {
     ]);
     const card = await screen.findByTestId('workspace-card-ws1');
 
-    const door = within(card).getByRole('link', { name: 'Convenience Corner' });
+    // EXACTLY ONE link in the whole card, and it is the door — a project link
+    // or a "My Work" link surviving the refactor would fail this count even if
+    // every other assertion here still passed.
+    const links = within(card).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    const door = links[0];
     expect(door).toHaveAttribute('href', '/w/ws1');
-    // EXACTLY the name — not padded with the role sentence, which sits
-    // inside the same link visually but must not join its accessible name.
+    expect(door).toHaveAccessibleName('Convenience Corner');
+    // Not padded with the role sentence, which sits inside the same link
+    // visually but must not join its accessible name.
     expect(door).not.toHaveAccessibleName(/owner/i);
 
-    // Every OTHER control is still its own top-level reachable role, scoped
-    // to the card — which nesting inside `door` would have broken.
-    expect(within(card).getByRole('link', { name: 'My Work' })).toHaveAttribute(
-      'href',
-      '/w/ws1/my-work',
-    );
-    expect(within(card).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
-    const toggle = within(card).getByRole('button', {
-      name: 'Show archived projects in Convenience Corner',
-    });
-    await userEvent.click(toggle);
-    expect(within(card).getByRole('link', { name: 'Old signage' })).toBeInTheDocument();
+    // No button anywhere — the archived-disclosure toggle is gone, replaced
+    // by the plain "1 archived" chip in ChipRow.
+    expect(within(card).queryAllByRole('button')).toHaveLength(0);
+
+    // The info that used to live behind separate controls is still ON the
+    // card, just not clickable: the live project by name, and the archived
+    // one as a count rather than a revealed row.
+    expect(within(card).getByText('Shop operations')).toBeInTheDocument();
+    expect(within(card).queryByText('Old signage')).toBeNull();
+    expect(within(card).getByText('1 archived')).toBeInTheDocument();
   });
 
   it('keeps the door\'s target current when the caller belongs to more than one workspace', async () => {
@@ -469,5 +563,50 @@ describe('13.390 the card is a door to /w/<id>', () => {
       'href',
       '/w/ws2',
     );
+  });
+});
+
+/**
+ * Case 13.406 (test-cases/13-deployment-dogfooding.md) — minted by the
+ * workspaces-prototype-port plan's Task 10, catalogue consolidation.
+ *
+ * Task 4 — the page head's one-line summary, gated on `workspaces !== null &&
+ * workspaces.length > 0`. The `!== null` term is the withholding half: a
+ * REFUSED read is `null` at this point in the component exactly like an
+ * in-flight one is, so a naive `workspaces.length` gate would print "0
+ * workspaces you belong to." — a count of a list nobody managed to read — and
+ * it stays FIRST so it short-circuits before `.length` is ever read on a
+ * refusal. The `length > 0` term (fix round 1) is a copy judgement, not a
+ * withholding one: a SUCCESSFUL empty read is a real, counted zero, and the
+ * summary would sit redundantly on top of the page's own "No workspaces
+ * yet…" sentence, which already says it better.
+ */
+describe('Task 4 — the workspaces summary line', () => {
+  it('prints no summary when the workspaces read refused — a count of nothing counted', async () => {
+    mountRefusing('The ledger is unavailable.');
+    await screen.findByText(/ledger is unavailable/i);
+    expect(screen.queryByText(/workspaces? you belong to/i)).toBeNull();
+  });
+
+  it('summarises the list once it has one', async () => {
+    mountWith([workspace({ id: 'ws1', memberCount: 1 }), workspace({ id: 'ws2', memberCount: 1 })]);
+    expect(await screen.findByText('2 workspaces you belong to')).toBeInTheDocument();
+  });
+
+  /**
+   * Fix round 1 — the case the coordinator's ruling 3 requires: a
+   * SUCCESSFUL read that answers `[]` is `!== null`, so without the
+   * `length > 0` term this would print "0 workspaces you belong to."
+   * directly above the empty-state sentence. Both halves are asserted: the
+   * summary is absent, AND the page's own empty-state copy is what actually
+   * renders instead — a presence-only check on the empty-state sentence
+   * would pass even if the summary also leaked through above it.
+   */
+  it('prints no summary — and the empty-state sentence instead — when the read succeeds with zero workspaces', async () => {
+    mountWith([]);
+    expect(
+      await screen.findByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/workspaces? you belong to/i)).toBeNull();
   });
 });

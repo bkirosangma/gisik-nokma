@@ -54,6 +54,42 @@ function sample(overrides: Partial<Notification> = {}): Notification {
   };
 }
 
+/** A `mention` row with a payload that actually satisfies its kind's schema. */
+function mentionSample(overrides: Partial<Notification> = {}): Notification {
+  return sample({
+    kind: 'mention',
+    dedupeKey: `mention:t1:${nextId()}`,
+    payload: {
+      ticketId: 't1',
+      ticketTitle: 'Renew the DLT registration',
+      mentionedBy: 'user_anselma',
+      eventId: nextId(),
+      source: 'comment',
+      excerpt: 'cc @user_kiro',
+      clientTime: '2026-08-19T10:00:00.000Z',
+      serverTime: '2026-08-19T10:00:01.000Z',
+    },
+    ...overrides,
+  });
+}
+
+/** An `assignment` row with a payload that actually satisfies its kind's schema. */
+function assignmentSample(overrides: Partial<Notification> = {}): Notification {
+  return sample({
+    kind: 'assignment',
+    dedupeKey: `assignment:t1:${nextId()}`,
+    payload: {
+      ticketId: 't1',
+      ticketTitle: 'Renew the DLT registration',
+      assignedBy: 'user_anselma',
+      eventId: nextId(),
+      clientTime: '2026-08-19T10:00:00.000Z',
+      serverTime: '2026-08-19T10:00:01.000Z',
+    },
+    ...overrides,
+  });
+}
+
 describe('insertNotification', () => {
   it('inserts a row and reports inserted', async () => {
     expect(await insertNotification(db.pool, sample())).toBe('inserted');
@@ -231,4 +267,51 @@ describe('rows outside the projection registry', () => {
   // are not claiming otherwise. A real test for that ruling needs a fixture
   // that can represent "visibility revoked", which does not exist at this
   // layer -- it belongs in whichever future task adds the join.
+});
+
+/**
+ * 11.200 — the read-side filter's three behaviours, in full below.
+ *
+ * `mutedKinds` (account/help-screens plan, Task 5) — muting hides a kind from
+ * what is READ, it never stops the row from being WRITTEN: `insertNotification`
+ * above gains no third argument, only the two read paths do. Every exclusion
+ * case below is paired with the SAME fixture read unmuted, so a query that
+ * silently returned nothing at all could not pass by coincidence — the
+ * `notifications` table's own `mutedKinds: []` default case restated as a
+ * positive control rather than assumed from `insertNotification`'s tests above.
+ */
+describe('unreadNotificationCount / listNotifications — muted kinds', () => {
+  it('unreadNotificationCount excludes a muted kind', async () => {
+    await insertNotification(db.pool, mentionSample());
+    await insertNotification(db.pool, assignmentSample());
+    // Positive control: unmuted, both rows count.
+    expect(await unreadNotificationCount(db.pool, 'user_kiro', [])).toBe(2);
+    expect(await unreadNotificationCount(db.pool, 'user_kiro', ['mention'])).toBe(1);
+  });
+
+  it('listNotifications excludes a muted kind entirely — not just marks it read', async () => {
+    await insertNotification(db.pool, mentionSample());
+    // Positive control in the SAME fixture: unmuted, the row is there.
+    const unmuted = await listNotifications(db.pool, 'user_kiro', { mutedKinds: [] });
+    expect(unmuted.notifications).toHaveLength(1);
+    const muted = await listNotifications(db.pool, 'user_kiro', { mutedKinds: ['mention'] });
+    expect(muted.notifications).toHaveLength(0);
+  });
+
+  it('listNotifications excludes a muted kind while leaving an unmuted kind\'s row visible', async () => {
+    await insertNotification(db.pool, mentionSample());
+    await insertNotification(db.pool, assignmentSample());
+    const page = await listNotifications(db.pool, 'user_kiro', { mutedKinds: ['mention'] });
+    expect(page.notifications).toHaveLength(1);
+    expect(page.notifications[0]?.kind).toBe('assignment');
+  });
+
+  it('an empty muted list changes nothing — the default', async () => {
+    await insertNotification(db.pool, mentionSample());
+    expect(await unreadNotificationCount(db.pool, 'user_kiro', [])).toBe(1);
+    // And omitting the argument entirely answers the same default.
+    expect(await unreadNotificationCount(db.pool, 'user_kiro')).toBe(1);
+    const page = await listNotifications(db.pool, 'user_kiro', {});
+    expect(page.notifications).toHaveLength(1);
+  });
 });

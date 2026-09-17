@@ -214,8 +214,15 @@ async function stubApi(page: Page): Promise<void> {
  * It was `sign-in offers all four passwordless methods`, and it asserted the two
  * that could not work: `Continue with Google` rendered while `GOOGLE_CLIENT_ID`
  * was unset, and `Sign in with a passkey` could not work for any user anywhere
- * because no registration flow exists. **A test whose NAME asserts a property is
- * a test that defends it**, and this one was defending the defect.
+ * because no registration flow existed ANYWHERE IN APP CODE at the time.
+ * **A test whose NAME asserts a property is a test that defends it**, and this
+ * one was defending the defect.
+ *
+ * **The passkey half of that history ENDED with the account/help-screens plan's
+ * Task 8**, which built registration on `/account` — so the button is back and
+ * the assertion at the foot of this case is now a positive one. The name of this
+ * case still holds, and holds better: the methods that can work are offered, and
+ * a passkey can now work.
  *
  * This file is Playwright and is NOT in the turbo gate, so it stayed green
  * through the whole change and only turned red when someone ran it directly —
@@ -225,10 +232,13 @@ async function stubApi(page: Page): Promise<void> {
  * `stubApi` does not stub `/v1/auth/methods`, so the page's availability request
  * goes unanswered here and no social button renders — and, since round 2c, no
  * phone tab either: an unanswered request leaves availability `null`, which the
- * page reads as "cannot work" for every gated method. That is the honest
- * expectation for a run with no server behind it. The BOTH-DIRECTIONS property
- * lives in `apps/web/test/sign-in.test.tsx` (13.326), where the answer can be
- * driven, and in `e2e-viewport/responsive.spec.ts` (13.292).
+ * page reads as "cannot work" for every GATED method. That is the honest
+ * expectation for a run with no server behind it, and it is what makes the
+ * passkey button's presence below discriminating rather than incidental — it is
+ * the one method NOT gated on that answer, because it needs no provider.
+ * The BOTH-DIRECTIONS property lives in `apps/web/test/sign-in.test.tsx`
+ * (13.326), where the answer can be driven, and in
+ * `e2e-viewport/responsive.spec.ts` (13.292).
  */
 test('sign-in offers the methods that can work, and no control that cannot', async ({ page }) => {
   await stubApi(page);
@@ -245,9 +255,31 @@ test('sign-in offers the methods that can work, and no control that cannot', asy
   await expect(page.getByLabel('Email')).toBeVisible();
   await expect(page.getByRole('tablist', { name: 'Sign-in method' })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Phone' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0);
+  /* THE SAME TRAP, SPRUNG IN THE OPPOSITE DIRECTION — and it caught this file a
+   * SECOND time, exactly as the docblock above predicted it would.
+   *
+   * This line read `…'Sign in with a passkey' }).toHaveCount(0)` until the
+   * account/help-screens plan's Task 8 put the button back (registration now
+   * exists on `/account`, so the offer has a population it can serve). Nothing
+   * in the turbo gate would have reddened for it: this file is Playwright,
+   * outside the gate, and the previous round's docblock says so in as many
+   * words. It was found by grepping `apps/web/e2e/` for `passkey` while
+   * auditing what a visible new control on `/sign-in` touches — not by a test
+   * run. **Updated in the same change set as the behaviour, deliberately,
+   * because the gate will not do it.**
+   *
+   * The assertion is now the sharpest one this file can make about the button,
+   * and it is not merely the negation of what was here. `stubApi` leaves
+   * `/v1/auth/methods` UNANSWERED, so availability stays `null` and every
+   * method gated on the server's answer vanishes — the tablist, the Phone tab
+   * and both social marks, all asserted absent immediately above. The passkey
+   * button surviving that is the whole property: **a passkey needs no provider
+   * and no server capability check, so it is deliberately NOT gated on that
+   * answer** — and this is the only place it is witnessed in a real browser
+   * rather than in jsdom. */
+  await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
 });
 
 /**

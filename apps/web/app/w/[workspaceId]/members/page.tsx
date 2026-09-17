@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Card } from '@gisik-nokma/ui';
+import { Button, Card, Select } from '@gisik-nokma/ui';
 import { formatDateTime, makeSubmittedFactory, type Actor } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
@@ -283,24 +283,30 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
         onChange={(event) => setAddress(event.target.value)}
       />
 
-      <label htmlFor="gn-invite-channel">Channel</label>
-      <select
-        id="gn-invite-channel"
+      <span>Channel</span>
+      <Select
+        options={[
+          { value: 'email', label: 'email' },
+          { value: 'sms', label: 'sms' },
+          { value: 'whatsapp', label: 'whatsapp' },
+        ]}
         value={channel}
-        onChange={(event) => setChannel(event.target.value)}
-      >
-        <option value="email">email</option>
-        <option value="sms">sms</option>
-        <option value="whatsapp">whatsapp</option>
-      </select>
+        onChange={setChannel}
+        aria-label="Channel"
+      />
 
-      <label htmlFor="gn-invite-role">Role</label>
-      <select id="gn-invite-role" value={role} onChange={(event) => setRole(event.target.value)}>
-        {/* No `owner`. The door refuses it and a picker offering it would lie. */}
-        <option value="admin">admin</option>
-        <option value="member">member</option>
-        <option value="guest">guest</option>
-      </select>
+      <span>Role</span>
+      {/* No `owner`. The door refuses it and a picker offering it would lie. */}
+      <Select
+        options={[
+          { value: 'admin', label: 'admin' },
+          { value: 'member', label: 'member' },
+          { value: 'guest', label: 'guest' },
+        ]}
+        value={role}
+        onChange={setRole}
+        aria-label="Role"
+      />
 
       {role === 'guest' ? null : (
         <>

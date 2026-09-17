@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
@@ -9,14 +9,24 @@ import {
 } from '../../src/views/transition-dialog.js';
 import { WF_ERRAND } from '../helpers/seed.js';
 
-describe('3.71 transitionOptions — only transitions the definition declares', () => {
+describe('3.71 transitionOptions — what the definition declares plus the universal Backlog edges, never an invented move', () => {
+  /**
+   * Since 2026-09-17 (backlog/closed spec §4) every non-terminal state also
+   * offers the universal Send-to-backlog edge, LAST — see 13.582 below for
+   * the dedicated coverage. This test's own targets grew a trailing
+   * `'backlog'` for that reason: `doing` and `todo` are both non-terminal.
+   */
   it('offers declared targets from the current state (from-state or *), excluding self', () => {
     expect(transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId)).toEqual([
       'todo',
       'waiting',
       'done',
+      'backlog',
     ]);
-    expect(transitionOptions(WF_ERRAND, 'todo').map((option) => option.toStateId)).toEqual(['doing']);
+    expect(transitionOptions(WF_ERRAND, 'todo').map((option) => option.toStateId)).toEqual([
+      'doing',
+      'backlog',
+    ]);
   });
 
   it("carries each transition's declared rules", () => {
@@ -27,8 +37,13 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
   it('PLANTED DEFECT: the wildcard edge is offered from everywhere EXCEPT the state it points at', () => {
     // `* → todo` is reachable from doing, waiting and done. Offering it from
     // `todo` itself would put a move on screen that changes nothing and that
-    // the engine has no edge for.
-    expect(transitionOptions(WF_ERRAND, 'waiting').map((o) => o.toStateId)).toEqual(['todo', 'doing']);
+    // the engine has no edge for. `waiting` is non-terminal (gains Backlog);
+    // `done` is terminal (does not — a finished ticket cannot be parked).
+    expect(transitionOptions(WF_ERRAND, 'waiting').map((o) => o.toStateId)).toEqual([
+      'todo',
+      'doing',
+      'backlog',
+    ]);
     expect(transitionOptions(WF_ERRAND, 'done').map((o) => o.toStateId)).toEqual(['todo', 'doing']);
     expect(transitionOptions(WF_ERRAND, 'todo').map((o) => o.toStateId)).not.toContain('todo');
   });
@@ -42,11 +57,13 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
       'todo',
       'waiting',
       'done',
+      'backlog',
     ]);
     expect(transitionOptions(dangling, 'doing').map((o) => o.name)).toEqual([
       'To do',
       'Waiting on counterparty',
       'Done',
+      'Backlog',
     ]);
   });
 
@@ -62,6 +79,10 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
     // declares the wildcard first. This case is kept because "never merged" is
     // a real property and still true; it is simply a weaker one than its old
     // name claimed.
+    //
+    // `twice` REPLACES `WF_ERRAND.transitions` wholesale — 'doing' stays
+    // non-terminal on `WF_ERRAND.states`, so the universal Send-to-backlog
+    // edge still applies and 'done' is not the only target (since 2026-09-17).
     const twice: WorkflowDef = {
       ...WF_ERRAND,
       transitions: [
@@ -70,8 +91,9 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
       ],
     };
     const options = transitionOptions(twice, 'doing');
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual([{ kind: 'require-comment' }]);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual([{ kind: 'require-comment' }]);
+    expect(options.find((o) => o.toStateId === 'backlog')?.rules).toEqual([]);
   });
 });
 
@@ -79,8 +101,8 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
  * Ruling P27. `transitionOptions` exists to predict the engine, so where a
  * wildcard and an exact edge both reach one target it must resolve them the way
  * the engine does: `find(exact) ?? find('*')`
- * (`packages/rule-engine/src/transition.ts:91-93`), which `precheck.ts`'s
- * `needsMembership` already mirrors at :375-378.
+ * (`packages/rule-engine/src/transition.ts:120-121`), which `precheck.ts`'s
+ * `needsMembership` already mirrors at :467-473.
  *
  * It did not. It kept the first matching edge in DECLARATION ORDER, so a
  * definition that happened to declare its wildcard first made the dialog
@@ -104,6 +126,13 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
     transitions,
   });
 
+  // Every `defWith(...)` here declares transitions to 'done' ONLY, from
+  // 'doing' — but 'doing' stays non-terminal on `WF_ERRAND.states`, so each
+  // also carries the universal Send-to-backlog edge (since 2026-09-17) beside
+  // the one edge to 'done' these cases are actually about. Asserted by
+  // finding 'done' explicitly rather than by `options[0]`, so the extra
+  // option cannot silently shift what index is being read.
+
   it('3.149 wildcard declared FIRST: the EXACT edge still supplies the rules', () => {
     const options = transitionOptions(
       defWith([
@@ -112,8 +141,8 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       ]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual(REQUIRE_EVIDENCE);
   });
 
   it('3.150 exact declared FIRST: the same answer — the control that makes 3.149 a divergence test', () => {
@@ -127,8 +156,8 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       ]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual(REQUIRE_EVIDENCE);
   });
 
   it('3.151 a target reachable ONLY by a wildcard still resolves to the wildcard edge', () => {
@@ -138,9 +167,59 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       defWith([{ from: '*', to: 'done', rules: REQUIRE_EVIDENCE }]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.toStateId).toBe('done');
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    const done = options.find((o) => o.toStateId === 'done');
+    expect(done?.rules).toEqual(REQUIRE_EVIDENCE);
+  });
+});
+
+/**
+ * 13.582 — the universal Backlog edges are offered like declared ones (spec
+ * §4, 2026-09-17): Start is the ONLY option from backlog — a controller
+ * ruling extending Task 6's brief, because a declared wildcard edge means
+ * "from any AUTHORED state" and backlog is universal rather than authored —
+ * and Send-to-backlog is appended after every non-terminal state's declared
+ * targets, never offered from a terminal one.
+ */
+describe('13.582 transitionOptions offers the universal Backlog edges like declared ones', () => {
+  it('from backlog: exactly the Start edge, with no rules', () => {
+    expect(transitionOptions(WF_ERRAND, 'backlog')).toEqual([
+      { toStateId: 'todo', name: 'To do', rules: [] },
+    ]);
+  });
+
+  /**
+   * The site-identifying case: a declared `* → done` would, without the
+   * backlog-only special case, resolve FROM backlog too (backlog matches a
+   * wildcard `from` exactly like any other state). It must not: Start is
+   * backlog's only exit.
+   */
+  it('a declared wildcard-to-done edge never resolves FROM backlog, even though backlog would otherwise match "*"', () => {
+    const withWildcardDone: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: [...WF_ERRAND.transitions, { from: '*', to: 'done', rules: [] }],
+    };
+    expect(transitionOptions(withWildcardDone, 'backlog')).toEqual([
+      { toStateId: 'todo', name: 'To do', rules: [] },
+    ]);
+  });
+
+  it('from a non-terminal state: Backlog is appended last, with no rules', () => {
+    expect(transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId)).toEqual([
+      'todo',
+      'waiting',
+      'done',
+      'backlog',
+    ]);
+    expect(transitionOptions(WF_ERRAND, 'doing').find((option) => option.toStateId === 'backlog')).toEqual({
+      toStateId: 'backlog',
+      name: 'Backlog',
+      rules: [],
+    });
+  });
+
+  it('from a terminal state: no Backlog option — a finished ticket cannot be parked', () => {
+    expect(transitionOptions(WF_ERRAND, 'done').map((option) => option.toStateId)).not.toContain('backlog');
   });
 });
 
@@ -156,6 +235,7 @@ function renderDialog(overrides: Partial<TransitionDialogProps> = {}) {
       onSubmit={onSubmit}
       precheck={async () => ({ kind: 'passed' })}
       serverRefusal={null}
+      transportError={null}
       {...overrides}
     />,
   );
@@ -166,7 +246,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
   it('requires a comment when the chosen transition declares require-comment', async () => {
     const user = userEvent.setup();
     const onSubmit = renderDialog();
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(screen.getByLabelText('Comment (required by this transition)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.type(
@@ -188,7 +269,10 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     // carries.
     const user = userEvent.setup();
     renderDialog();
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
     expect(screen.queryByLabelText('Comment (required by this transition)')).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
   });
@@ -202,7 +286,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Whoever moved this to Doing cannot also close it.',
       }),
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-different-user');
     expect(preview).toHaveTextContent('Whoever moved this to Doing cannot also close it.');
@@ -217,8 +302,12 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         return { kind: 'passed' };
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'waiting');
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(asked).toEqual(['waiting', 'done']);
     // A pre-check that passed says nothing: it is not a promise of acceptance,
     // and printing "looks fine" would make it one.
@@ -233,7 +322,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const serverBox = screen.getByRole('alert');
     expect(serverBox).toHaveTextContent('Refused by the server — restrict-to');
     expect(serverBox).toHaveTextContent(
@@ -257,7 +347,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const preview = await screen.findByText(/instant check/);
     expect(preview).toHaveTextContent('require-different-user');
     expect(screen.getByRole('alert')).toHaveTextContent('restrict-to');
@@ -274,7 +365,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(
       screen.getByText(
         'This transition requires an attachment as evidence. Evidence upload is not available in this build yet.',
@@ -294,7 +386,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(screen.queryByText(/Evidence upload is not available/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.upload(
@@ -323,7 +416,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
       },
       fromStateId: 'todo',
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     expect(screen.getByLabelText('dueDate (required before this transition)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
     await user.type(
@@ -361,7 +455,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         },
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'doing');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
     expect(screen.queryByLabelText('dueDate (required before this transition)')).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Move' }));
@@ -384,7 +479,8 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
         ),
       },
     });
-    await user.selectOptions(screen.getByLabelText('Move to'), 'done');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(
       screen.getByText(/This transition carries restrict-to rules — the server decides/),
     ).toBeInTheDocument();
@@ -393,5 +489,77 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
   it('renders nothing at all when closed', () => {
     renderDialog({ open: false });
     expect(screen.queryByLabelText('Move to')).toBeNull();
+  });
+
+  /**
+   * 3.166 — the Move-to control's own migration to the shared `Select`: before any state is picked the trigger shows the custom placeholder "Choose a state" rather than a blank or a stale prior value, preserved explicitly rather than falling back to the component's generic default.
+   */
+  it('shows "Choose a state" as the trigger placeholder before any state is picked', () => {
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
+  });
+});
+
+/**
+ * The two props the board's arrows need (owner request, 2026-09-17): the
+ * dialog only ever OFFERS what the gesture meant (`›` the forward list, `‹`
+ * the backward list, a drop the dropped column), and when that list has
+ * exactly one entry the arrow already chose it, so the dialog opens aimed
+ * at it rather than on "Choose a state". Both optional — `TicketSheet`'s
+ * "Move…" button passes neither and keeps the full list and the placeholder.
+ */
+describe('TransitionDialog — offerStateIds and initialToStateId', () => {
+  /**
+   * 13.527 — `offerStateIds` narrows the `<Select>` to that subset, in
+   * `transitionOptions`'s own order. From `doing` the full list is
+   * `todo, waiting, done`; offering `['waiting', 'done']` must drop `To do`
+   * — the negative is the point, a backward state must not appear in a
+   * dialog the `›` arrow opened.
+   */
+  it('offers ONLY the listed states, in declaration order, and drops the rest', async () => {
+    const user = userEvent.setup();
+    renderDialog({ offerStateIds: ['waiting', 'done'] });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Waiting on counterparty',
+      'Done',
+    ]);
+    expect(within(listbox).queryByRole('option', { name: 'To do' })).toBeNull();
+  });
+
+  /**
+   * 13.528 — `initialToStateId` opens the dialog already aimed: the trigger
+   * shows the state's NAME rather than the placeholder, and — the part that
+   * matters to a person — the rules of that edge are prompted for at once.
+   * `doing → done` requires a comment, so the comment box is on screen with
+   * no click into the select, and Move is disabled until it is filled.
+   */
+  it('opens already aimed at initialToStateId, with that edge\'s prompts visible at once', async () => {
+    const user = userEvent.setup();
+    const onSubmit = renderDialog({ initialToStateId: 'done' });
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Done');
+    expect(screen.getByRole('button', { name: /Move to/ })).not.toHaveTextContent('Choose a state');
+    expect(screen.getByLabelText('Comment (required by this transition)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'shipped');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    expect(onSubmit).toHaveBeenCalledWith({ toStateId: 'done', comment: 'shipped', fieldValues: {} });
+  });
+
+  /**
+   * 13.528b — the control: neither prop passed keeps today's narrowing
+   * behaviour unchanged (the full declared list, not `offerStateIds`'s
+   * subset) and the placeholder. The COUNT itself is not "unchanged": it grew
+   * from 3 to 4 when 13.582 added the universal Backlog option to every
+   * non-terminal state's list, `doing` (this dialog's default `fromStateId`)
+   * included.
+   */
+  it('without either prop, the placeholder is unchanged and the full (now Backlog-inclusive) list is offered', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    expect(within(await screen.findByRole('listbox')).getAllByRole('option')).toHaveLength(4);
   });
 });

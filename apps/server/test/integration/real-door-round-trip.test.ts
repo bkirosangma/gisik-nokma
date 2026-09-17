@@ -348,6 +348,9 @@ function expectedCard(over: {
       cause: null,
     },
     rollup: over.rollup,
+    // None of this file's tickets are ever closed (Task 4, backlog/closed
+    // spec §3.1/§3.3) — `TicketCard.closed` is required, never an absent key.
+    closed: null,
   };
 }
 
@@ -760,6 +763,10 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
             workflowVersion: 1,
           },
         ],
+        // `rowToTicketState` now writes this unconditionally (Task 4,
+        // backlog/closed spec §3.1) — this ticket was never closed, so `null`
+        // rather than an absent key.
+        closed: null,
       },
       title: 'Count the crates',
       stateProvenance: {

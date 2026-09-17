@@ -66,13 +66,80 @@ describe('WorkflowCanvas', () => {
   /**
    * 10.2 — the category picker on a node edits the def.
    */
+  /**
+   * 10.84 — the canvas node's Category picker renders as the shared Select (button trigger, portal panel) instead of a native `<select>` — the only call site embedded in a React Flow node.
+   */
   it('changes a state category through the node picker', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store);
-    const picker = within(screen.getByTestId('state-node-done')).getByRole('combobox', { name: 'Category' });
-    await user.selectOptions(picker, 'active');
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByRole('button', { name: /Category/ }));
+    const listbox = await screen.findByRole('listbox');
+    await user.click(within(listbox).getByRole('option', { name: 'active' }));
     expect(store.getState().def.states.find((state) => state.id === 'done')?.category).toBe('active');
+  });
+
+  /**
+   * Canvas-embedding-specific: the Category picker lives inside a React Flow
+   * node whose own onClick selects the node. `Select` has no className/onClick
+   * passthrough (see state-node.tsx), so nodrag and stopPropagation both move
+   * onto a wrapping <div> instead of the interactive element itself. These two
+   * tests assert the click that opens the picker, and a click on its label,
+   * do not ALSO select the node — mutation-tested (see task report) so each
+   * one is pinned to the mechanism it actually exercises, not the one its
+   * name suggests:
+   *
+   * - Clicking the Select's own trigger button: STAYS GREEN with the
+   *   wrapper's onClick stopPropagation removed. react-aria's `useSelect`
+   *   button already stops propagation of the click it handles by default
+   *   (documented behavior: interaction hooks don't bubble unless the handler
+   *   calls `continuePropagation()`, which `Select` doesn't). So this case
+   *   witnesses react-aria's own isolation, not the wrapper's onClick.
+   * - Clicking the "Category" label text instead of the button: this is the
+   *   one that actually exercises the wrapper's onClick — plain React
+   *   bubbling, no library involved, and REDDENS when that handler is
+   *   removed (confirmed by mutation test). `{ selector: 'span' }` is
+   *   load-bearing: react-aria's `HiddenSelect` renders its own hidden
+   *   `<label>Category</label>` for native-select semantics, and `getByText`
+   *   (unlike `getByRole`) doesn't respect that it's inert — same collision
+   *   already documented in select.tsx's multi-select branch.
+   *
+   * Neither test exercises `nodrag` — jsdom does no layout, so no React Flow
+   * drag gesture is ever live here. That claim is proven separately: with
+   * `nodrag` removed, BOTH these tests still pass, but the REWRITTEN case
+   * above ("changes a state category through the node picker") starts
+   * failing — `findByRole('listbox')` times out, the picker never opens at
+   * all. So `nodrag`'s necessity is real and proven here, just not by either
+   * of these two tests: empirically by that mutation, and structurally by
+   * reading node_modules/@xyflow/system's hasSelector(), which walks the DOM
+   * ancestor chain (parentElement) checking `.matches(selector)` at each
+   * level exactly like Element.closest() — so a wrapping-element `nodrag`
+   * class is checked the same as one on the exact target. See the task
+   * report for exact source lines and the full mutation-test transcript.
+   */
+  /**
+   * 10.85 — clicking the Select's own trigger does not also select the node — driven by react-aria's own default propagation-stopping, not the wrapper's onClick.
+   */
+  it('clicking the category picker does not also select the node', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderCanvas(store);
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByRole('button', { name: /Category/ }));
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+  });
+
+  /**
+   * 10.86 — clicking the "Category" label text (not the button) does not select the node either — the case that actually proves the wrapping `<div>`'s onClick stopPropagation.
+   */
+  it('clicking the Category label does not select the node', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderCanvas(store);
+    const node = screen.getByTestId('state-node-done');
+    await user.click(within(node).getByText('Category', { selector: 'span' }));
+    expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
   /**
@@ -242,7 +309,7 @@ describe('WorkflowCanvas', () => {
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store, testEnv({ session: { userId: newUlid(), role: 'member' }, canAuthor: false }));
     expect(
-      within(screen.getByTestId('state-node-done')).getByRole('combobox', { name: 'Category' }),
+      within(screen.getByTestId('state-node-done')).getByRole('button', { name: /Category/ }),
     ).toBeDisabled();
     expect(
       within(screen.getByTestId('state-node-done')).getByRole('checkbox', { name: 'Blocked' }),

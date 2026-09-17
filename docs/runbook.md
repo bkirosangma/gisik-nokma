@@ -234,6 +234,227 @@ worth stating because the mistake is easy to repeat:
   `reference/` *is* present in the DEV container — via a host mount App Platform has no equivalent of.
   Checking inside a running dev container answers a different question than checking the image.
 
+## Dev stack — hot-reload mode
+
+The dev `server` normally runs the image built by `apps/server/Dockerfile`, which bakes `dist` at
+build time. **Hot mode replaces that with the branch's SOURCE**: the container bind-mounts the source
+directories and restarts itself on save, so what is live on the API origin is what is in the checkout
+— no rebuild, no `restart`, no waiting.
+
+**Since 2026-09-18 the `web` is hot too**, so there are two of these: `server` on the API origin (:3000)
+and `web` on :3001, the one a browser talks to. Both serve the checkout you ran the command from. The
+`web` half has its own section below, because its watcher is a different one and behaves differently.
+
+    pnpm dev:stack
+
+That is the whole command. It composes `docker-compose.dev.yml` with `docker-compose.hot.yml`, and
+**run it from the checkout whose code should be live** — the mounts resolve relative to the directory
+of the **first `-f` file**, which for `pnpm dev:stack` is the checkout you run it from, so that
+worktree is the worktree the container serves. `docker-compose.dev.yml` itself is untouched by hot
+mode: the production image path and the compose contract suite read exactly what they read before.
+
+**`.env` must exist in that checkout** — copy it from wherever the owner keeps it. It is gitignored
+(`.gitignore:11`) and per-checkout by design, so a fresh worktree has none.
+
+What `--env-file .env` actually buys is worth stating precisely, because the intuitive reading is
+wrong and was measured wrong here. Compose **auto-loads `.env` from the project directory** even
+without the flag, so omitting `--env-file` does **not** empty `${GOOGLE_CLIENT_ID:-}` — measured:
+`docker compose -f docker-compose.dev.yml -f docker-compose.hot.yml config` with no `--env-file`
+renders `GOOGLE_CLIENT_ID` at its full 72 characters, while `env | grep -c GOOGLE_CLIENT_ID` in the
+shell returns 0, so the value can only have come from `.env`. The flag's real value is that it turns a
+**missing** `.env` from a silent empty substitution into a hard stop (`Couldn't find env file`,
+exit 1). The dangerous shape is therefore not "no flag" but **no `.env` in the project directory** —
+which is what the flag converts into a stop instead of a server that comes up looking healthy with
+**Google sign-in OFF**, as happened once on 2026-09-09.
+
+To point at a checkout other than the one you are standing in, the `-f` path must be **absolute** —
+a relative one resolves against your shell's cwd and picks up the wrong tree:
+
+    docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env \
+      -f /Users/kiro/my_projects/gisik-nokma/docker-compose.dev.yml \
+      -f /Users/kiro/my_projects/gisik-nokma/docker-compose.hot.yml up -d server web
+
+**Rebuild rule — the one case that needs `--build`.** The image carries the installed dependencies and
+the workspace packages' `dist`; hot mode refreshes source, not the lockfile. So:
+
+- source edits — **nothing to do**, the watchers pick them up;
+- **a NEW MIGRATION — `docker compose … restart server`.** `apps/server/migrations` is bind-mounted,
+  but nothing *watches* it: migrations run once, in the container command's first step, at start. A
+  developer who adds one and follows "source edits — nothing to do" gets the file present and
+  unapplied, on a database the server then queries as though it were current;
+- `pnpm-lock.yaml` or any `package.json` changed — re-run `pnpm dev:stack` **with `--build`**;
+- **`apps/web`'s TypeScript config changed — also `--build`.** It is deliberately NOT bind-mounted (Next
+  rewrites that file; see the web section), so the container keeps the image's copy and a host edit is
+  invisible;
+- **`apps/web/next.config.ts` changed — `docker compose … restart web`**, not a rebuild: it IS mounted, but
+  Next reads it when the dev server starts;
+- a NEW workspace package added — also needs a line in the `dev` stage's manifest `COPY` block in
+  **both** `apps/server/Dockerfile` and `apps/web/Dockerfile`. The install at the end of those stages runs
+  after `COPY . .`, so the importer is present by then; it is the earlier fetch step whose cache key the
+  manifest list sets, and a package missing from it surfaces as an offline-store miss.
+
+**One save shape is missed silently — and on THIS watcher it is not merely missed, it kills the watch.**
+A **rename-over** save — write a temp file, then `mv` it onto the path — delivers **no inotify event into
+the container at all**, so the watcher never fires and the edit never lands. An in-place write (truncate and
+write the same inode) is delivered normally. Timestamped `fs.watch` on one file: in-place → one event at
+3887 ms; rename-over → **zero events**. In-place reloads measured: a `apps/server/src` edit in
+**1.62 s**, a `packages/*/src` edit in **3.92 s** (via `dist`).
+
+**RE-MEASURED 2026-09-18 (Step 1b) — the shape mattered more than it looked, and the fix is in this file.**
+
+- **The assistant's own Edit tool writes by rename-over.** Host inode changes on every edit — measured three
+  times across two files (`204060486 → 204060616 → 204060679`, `204014631 → 204061084`). So the shape this
+  paragraph calls an occasional "atomic save" is what EVERY server-source edit by the assistant produces.
+- **The watch did not survive it.** After one such write to `src/index.ts`, neither a true in-place write
+  (host inode preserved, measured) nor a `touch` produced a `[tsx]` line in 15–20 s. The **positive control**
+  that makes those two a negative rather than an unread log: after `docker compose … restart server`, the
+  SAME in-place write produced `[tsx] change in ./src/index.ts Restarting...` in **0.5 s**. In between, the
+  live API kept serving stale code while `/healthz` answered 200 and the file on the mount was correct —
+  the 2026-09-09 shape, reachable with no rebuild involved.
+- **The first door was measured and is CLOSED.** `node --watch --import tsx src/index.ts` — Node's watch mode
+  watches each loaded module's parent directory rather than the inode, so it should be indifferent to the
+  save shape — did not restart on a host rename-over, a host in-place write, **or a write made inside the
+  container**. A container-local write crosses no mount at all, so that is the watcher not seeing its own
+  entry point, not virtiofs losing events.
+- **What is enabled instead: `CHOKIDAR_USEPOLLING=true` with `CHOKIDAR_INTERVAL=1000`** on the `server`
+  service. Witnessed in ONE container, not restarted between the halves: an Edit-tool write (rename-over,
+  inode verified changed) restarted it in **1.6 s** and its marker was served; a true in-place write AFTER
+  that restarted it again in **1.6 s**, so the watch survived the rename; and a `packages/domain/src` edit
+  reached `dist` and restarted the server, **2.6 s** end to end. Cost, settled `docker stats` in the same
+  session with the variable overridden back to empty: **CPU 6.05–6.47 % with polling on versus 2.39–3.73 %
+  off**, memory ~1.24 GiB versus ~1.22 GiB.
+
+Polling was not enabled on the evidence as it stood — it is justified only when events provably do not cross
+the Docker Desktop mount, and they do, partially. What changed is narrower and worse: the events that fail to
+cross are exactly the ones the assistant's editor produces, and on this watcher the first failure is
+permanent. The meter reading above is the price, taken rather than estimated.
+
+**What is deliberately not mounted.** Two things, and mounting either breaks the container rather than
+merely stale-ing it. `node_modules`: the host's are macOS-native and the container's are Linux, so
+`tsx` loses `@esbuild/linux-*` and the server stops booting. `dist`: the watchers write it *inside* the
+container, and a host `tsc --watch` writes the host's copy — sharing the path puts two writers on it.
+
+**Verify the container is the hot one, and separately that the process is on current code.** These are
+two different questions and one command cannot answer both:
+
+    docker exec gisik-nokma-dev-server-1 grep -c closed_at /repo/apps/server/src/read/ticket-cards.ts
+
+This reads the file **through the bind mount**, so it reports the host's content whatever the running
+process holds. It proves the container is the `dev` stage with the mount live — in the runtime image
+the path does not exist and `grep` exits 2 — and it does **not** prove the server reloaded. Do not
+read it as "the branch is live": after a rename-over save (below) it prints the same number while the
+process serves old code, which is precisely the 2026-09-09 stale-server shape in its new clothes. The
+control `collaborator_ids`, in the same file, makes the measurement valid rather than void.
+
+For the process itself, read the reload:
+
+    docker logs --since 5m gisik-nokma-dev-server-1 2>&1 | grep '\[tsx\]'
+
+No `[tsx] change in …` line after your edit means the watcher did not see the change — the failure
+13.651 measures, and the one that is silent rather than slow.
+
+**Watchers still alive — an operator check, because nothing inside the container will tell you.** A
+dead package watcher is invisible from outside: the container stays up, `/healthz` keeps answering,
+and `docker ps` still says healthy while package edits quietly stop reaching `dist`. This was not left
+to a guard, because the guard was written, shipped, and **measured not to fire** — see the note in
+`docker-compose.hot.yml`. So check it by hand:
+
+    docker exec gisik-nokma-dev-server-1 sh -c 'ps -o args= | grep -c "[t]ypescript/bin/tsc"'
+
+**Seven** is correct — one per workspace package. Fewer means a watcher died; restart the container.
+
+**The brackets are load-bearing, and the version of this check before 2026-09-18 omitted them.** Measured on
+a container with all seven alive: the unbracketed form prints **9**, and unbracketed `tsconfig.json --watch`
+prints **11** — because the `sh -c` command line and the `grep` process both contain the pattern and match
+THEMSELVES. That is a check whose stated value cannot be reached as written: an operator who counted
+correctly would read a false alarm. Bracket the first character and the self-matches disappear —
+`[t]ypescript/bin/tsc` → **7**, `[t]sconfig.json --watch` → **9** (the second number is why the paragraph above
+tells you to count the first pattern: the near-miss also matches the recursive parent process).
+
+### The `web` half — :3001, and where it differs from the server
+
+`pnpm dev:stack` brings up **both** containers: `web` on the host's **:3001** and `server` on **:3000**. The
+browser talks to :3001, and the `web` container proxies `/v1/*` and `/api/auth/*` to `server:3000` over the
+compose network. Both serve the source of the checkout the command ran from.
+
+**Taking :3001 over.** The `web` container binds the host's 3001, so whatever already holds it must go first,
+and the order that keeps the owner's view alive longest is: build the image, then stop theirs, then
+`up -d web`. Identify the listener before stopping it — it is `node` (`ps -o ucomm=`), titled `next-server`,
+and its parent's argv is `next dev -p 3001`:
+
+    lsof -nP -iTCP:3001 -sTCP:LISTEN
+    ps -o ucomm= -p <pid>
+    ps -o args= -p <ppid>
+
+Measured 2026-09-18: cold image build **68 s**; `up -d web` → first answer **40 s** (307, the sign-in
+redirect); kill → first answer **107 s**.
+
+**Verify it — and the second command is the one that matters.** These ask different questions:
+
+    curl -s -o /dev/null -w '%{http_code}\n' localhost:3001/    # 307: the app is serving
+    curl -s localhost:3001/v1/auth/methods                      # {"google":true,...}: the proxy reached the hot server
+
+With `SERVER_ORIGIN` unset or wrong the proxied path returns **500 after a 30-second hang** while everything
+else looks healthy — the app serves, the containers are Up, only /v1/* fails.
+
+**For whether an EDIT landed, read the compile line, not the curl:**
+
+    docker logs --since 5m gisik-nokma-dev-web-1 2>&1 | grep 'Compiled'
+
+**A first version of this paragraph said `docker logs` WITHOUT `--since` under-reports. That was WRONG, and
+the way it was wrong is worth keeping.** The reading behind it — 6 lines bare against 9 compile lines with
+`--since 30m` — compared a **summarised** read against a pass-through one: this machine's Bash hook routes
+commands through `rtk`, which can replace a bare `docker logs` result with its own summary. The tell was in
+the output and went unread — a trailing `[warn] 0 warnings (0 unique)` / `[info] 0 info messages`, which is
+rtk's footer, not the container's stdout. Re-run as a control, bare and `rtk proxy` agree exactly (**658
+lines each**), so docker's default is the complete log and `--since` only narrows it. **If a log read looks
+suspiciously short, suspect a summariser** — the footer is the evidence, and the container did not write it.
+
+**Both save shapes reach Next's watcher, unlike the server's — and the in-place half was measured late.**
+A true in-place write (host inode preserved, verified) compiled in **2.6 s**; a **rename-over** (`mv` a
+modified copy onto the path) compiled in **1.6 s**. An earlier version of this paragraph attributed
+"1.2 s / 1.5 s / 1.5 s" to in-place edits. **They were not in-place**: every write to that page in that pass
+was either the assistant's Edit tool or an `mv`, and both change the inode — which is what the paragraph
+above says the tool does. The numbers were right and the LABEL was wrong, and a reader would have taken it as
+licence not to care about save shape on the web. The shape that matters is the one the `server`'s tsx watcher
+permanently loses; Next's watcher takes it. One outlier was measured at **59.4 s**: it landed, but a
+30-second wait reads it as lost, so wait for the compile line rather than a stopwatch. Polling stays OFF here.
+
+**Package watchers.** The `web` container runs its own seven `tsc -p tsconfig.json --watch` processes — each
+container writes its OWN `dist`, because two writers on one path is the failure, not two readers on one source.
+Same operator check, same count, and the brackets are load-bearing (see the `server` paragraph above — the
+unbracketed form counts its own command line):
+
+    docker exec gisik-nokma-dev-web-1 sh -c 'ps -o args= | grep -c "[t]ypescript/bin/tsc"'   # 7
+
+**Those watchers can silently stop delivering, and a `touch` does not revive them.** Measured 2026-09-18:
+an in-place revert of a token in `packages/ui/src` was never compiled — 80 s later the container's
+`packages/ui/dist/tokens.js` still held the replaced value and the SERVED page still showed it, with all seven
+watchers alive, while the same edit an hour earlier had compiled in 6.7 s. A `touch` on the source changed
+nothing. **The reliable recovery is `docker compose … restart web`** (307 again in 10 s, palette correct on
+the first poll). This is the server's failure class on a different watcher — which is why the check for a
+package edit is the content of `dist`, not the fact that you saved:
+
+    docker exec gisik-nokma-dev-web-1 grep -c '<the new value>' /repo/packages/ui/dist/tokens.js
+
+**That cause is now NAMED and FIXED (2026-09-18, Step 2 Part 0), so the paragraph above is history
+rather than current advice.** `tsc`'s default watch strategy (`UseFsEvents`) watches the FILE, so it
+follows the inode — and the assistant's editor writes by rename-over, which replaces the inode at that
+path and leaves the watcher bound to a file that is no longer there. That is the 80-second stall
+above. Both hot services now set `TSC_WATCHFILE=UseFsEventsOnParentDirectory`, which watches the parent
+DIRECTORY instead. Witnessed in both containers, no restart between the halves: a rename-over save
+reached both `dist` copies in about a second, and an in-place save that followed reached both in about
+a second too. **So a stalled package watcher is no longer the expected consequence of a save shape** —
+but the operator check above still matters, because a watcher can still die for other reasons, and
+`restart web` remains the general recovery. What changed is the diagnosis you should reach for first:
+if `dist` is stale now, suspect a dead process before a lost watch.
+
+**Not mounted, and each for a reason.** `.next` (the dev compile cache — it must be the container's own;
+`.dockerignore` already keeps the host's out of the image), `tsconfig.json` (Next REWRITES this file, adding
+`next-env.d.ts` to `include`, so a read-write bind would let the container edit the host's tracked file), and
+`package.json` (a dependency change is a lockfile change). `apps/web/next.config.ts` IS mounted, but Next reads
+it when the dev server starts — so an edit to it needs `docker compose … restart web`, not a rebuild.
+
 ## MCP server
 
 The assistant-facing door. It runs on the PERSON'S machine, not on ours — there is nothing to deploy —

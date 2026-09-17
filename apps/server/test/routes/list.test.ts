@@ -1116,3 +1116,109 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
     ).toEqual([read.world.taskInEpicId]);
   });
 });
+
+/**
+ * 13.575 (backlog/closed spec §3.2/§3.3, 2026-09-17) — unlike the board, the
+ * list CARRIES both a backlog and a closed ticket rather than excluding
+ * either; `closed` is a filter TERM (`compileFilterSpec`), not a door.
+ *
+ * A project of its own, for the same reason `board.test.ts`'s own 13.574
+ * fixture is: `read.world.projectId` and `fixtures.*` above are exact-array
+ * fixtures this file's own docblock argues for, and a ticket added to any of
+ * them would change what an existing case measures.
+ */
+describe('GET /v1/projects/:projectId/tickets — backlog and closed (owner request, 2026-09-17)', () => {
+  let backlogClosedProjectId: string;
+  let backlogTicketId: string;
+  let closedTicketId: string;
+  let closeActorId: string;
+  let closeEventServerTime: string;
+
+  beforeAll(async () => {
+    backlogClosedProjectId = newUlid();
+    backlogTicketId = newUlid();
+    closedTicketId = newUlid();
+    closeActorId = read.world.owner;
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+
+    const closeEvent = makeCommitted({
+      ...ws,
+      actorId: closeActorId,
+      entity: { kind: 'ticket', id: closedTicketId },
+      type: 'ticket.closed',
+      payload: {},
+    });
+    closeEventServerTime = closeEvent.serverTime;
+
+    const events: LedgerEvent[] = [
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.created', payload: { name: 'List backlog and closed' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.member_added', payload: { userId: read.world.owner, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.member_added', payload: { userId: read.world.member, projectAdmin: false } }),
+
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: backlogTicketId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: backlogClosedProjectId, parentId: null, title: 'Born in backlog, listed anyway', start: 'backlog' },
+      }),
+
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedTicketId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: backlogClosedProjectId, parentId: null, title: 'Closed, listed anyway' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedTicketId }, type: 'ticket.transitioned', payload: { to: 'done' } }),
+      closeEvent,
+    ];
+    await applyCommitted(db.pool, events);
+  }, 60_000);
+
+  it('13.575 both the backlog and the closed ticket are in the flat list, with a real stateName and a real `closed` claim', async () => {
+    const all = await listOf('member', backlogClosedProjectId, { limit: 200 });
+    expect(ids(all)).toEqual([backlogTicketId, closedTicketId].sort());
+
+    const cards = all.groups.flatMap((group) => group.cards);
+    const backlogRow = cards.find((card) => card.ticketId === backlogTicketId);
+    expect(backlogRow?.stateId).toBe('backlog');
+    // The name and category of the UNIVERSAL state — not a slug, and not the
+    // done/open category of whatever this ticket's workflow happens to author
+    // as its initial state.
+    expect(backlogRow?.stateName).toBe('Backlog');
+    expect(backlogRow?.stateCategory).toBe('open');
+    expect(backlogRow?.closed).toBeNull();
+
+    const closedRow = cards.find((card) => card.ticketId === closedTicketId);
+    expect(closedRow?.closed).toEqual({ actorId: closeActorId, at: closeEventServerTime });
+  });
+
+  it('13.575 `filter: { closed: true }` answers only the closed row, `closed: false` excludes it', async () => {
+    expect(await idsOf('member', backlogClosedProjectId, { filter: { closed: true }, limit: 200 })).toEqual([
+      closedTicketId,
+    ]);
+    // The positive control for the narrowing above: the backlog ticket is
+    // NOT closed and is exactly what `closed: false` still admits, so the
+    // exclusion is about the closed flag and not about this project being
+    // empty under any filter.
+    expect(await idsOf('member', backlogClosedProjectId, { filter: { closed: false }, limit: 200 })).toEqual([
+      backlogTicketId,
+    ]);
+  });
+
+  /**
+   * 13.575b (backlog/closed spec §1.4/§3.2, 2026-09-17; fix round 2) — the
+   * `status` grouping's own label lookup (`case 'status'` in `groupCards`,
+   * distinct from 13.575's per-row `stateName` which `list-cards.ts` already
+   * fixed) resolves through `statesWithBacklog(def)`, not `def.states`, so a
+   * backlog group's label is the name `'Backlog'` rather than the bare id
+   * `'backlog'` its `?? stateId` fallback used to fall through to.
+   */
+  it('13.575b `groupBy=status` labels the backlog group `Backlog`, not the bare id it falls back to (fix round 2)', async () => {
+    const grouped = await listOf('member', backlogClosedProjectId, { groupBy: 'status', limit: 200 });
+    const groups = byKey(grouped);
+    const backlogKey = `${read.world.workflowId}:backlog`;
+    expect(groups[backlogKey], 'a backlog-keyed status group exists').toBeDefined();
+    expect(groups[backlogKey]?.cards).toEqual([backlogTicketId]);
+    expect(groups[backlogKey]?.label).toBe('Backlog');
+  });
+});

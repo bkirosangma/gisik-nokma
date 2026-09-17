@@ -89,6 +89,8 @@ type TicketRow = {
   collaborator_ids: string[];
   fields: TicketState['fields'];
   transitions: TicketState['transitions'];
+  closed_at: Date | null;
+  closed_by: string | null;
 };
 
 /**
@@ -113,7 +115,10 @@ type TicketRow = {
  * EXPORTED for `test/proj-tickets.test.ts`, which pins both through the real
  * check — a workspace-scoped reader cannot pin them, because the reader's own
  * predicate would refuse a foreign parent and the assertion would then pass
- * with `workspaceId` missing.
+ * with `workspaceId` missing. Also exported for
+ * `test/projections/tickets-closed.test.ts` (case 13.572), which reads
+ * `closed_at`/`closed_by` back through this same function rather than through
+ * a second, reimplemented mapping.
  *
  * Cast rather than parsed, unlike this repo's definition readers: `TicketState`
  * has no zod schema (it is a cross-plan TS type in `entity-state.ts`), and the
@@ -136,6 +141,17 @@ export function rowToTicketState(row: TicketRow): TicketState {
     collaboratorIds: row.collaborator_ids,
     fields: row.fields,
     transitions: row.transitions,
+    // Both NULL is the common case — every ticket that has never been closed,
+    // which is every row this table held before this migration (backlog/closed
+    // spec §3.1). `??` is not enough here on its own: a row holding one NULL
+    // and one attributed value cannot happen through `upsertTicket` (both
+    // columns are written from the same `next.closed`), but this reader does
+    // not assume that of every row it is ever handed and answers `null` unless
+    // BOTH columns agree there is a claim.
+    closed:
+      row.closed_at === null || row.closed_by === null
+        ? null
+        : { actorId: row.closed_by, at: row.closed_at.toISOString() },
   };
 }
 
@@ -183,8 +199,9 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
   await db.query(
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
-        state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
+        closed_at, closed_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -196,7 +213,9 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        assignee_id = EXCLUDED.assignee_id,
        collaborator_ids = EXCLUDED.collaborator_ids,
        fields = EXCLUDED.fields,
-       transitions = EXCLUDED.transitions`,
+       transitions = EXCLUDED.transitions,
+       closed_at = EXCLUDED.closed_at,
+       closed_by = EXCLUDED.closed_by`,
     [
       next.id,
       next.workspaceId,
@@ -211,6 +230,13 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       JSON.stringify(next.collaboratorIds),
       JSON.stringify(next.fields),
       JSON.stringify(next.transitions),
+      // Both from the SAME `next.closed`, on purpose (see `rowToTicketState`'s
+      // reading of this row): a close writes both, a reopen (which folds to
+      // `closed: null`) clears both, and the ON CONFLICT list above is what
+      // makes the clearing reach an existing row rather than leaving it
+      // holding a stale close forever.
+      next.closed?.at ?? null,
+      next.closed?.actorId ?? null,
     ],
   );
 }

@@ -169,6 +169,12 @@ export type TicketDueDate =
  *   see": restricted children are counted in `restrictedCount` and the rollup
  *   is non-null. Matches `rollupFor`, which answers null for a leaf on the same
  *   reasoning.
+ * - `closed: null` — this ticket has never been closed, or was reopened.
+ *   REQUIRED here (backlog/closed spec §3.3, 2026-09-17), unlike
+ *   `TicketState.closed?`, which predates the flag on 441 fixtures: every
+ *   producer of a card is this task's own code, so there is no legacy literal
+ *   to spare, and a reader spells `state.closed ?? null` at the boundary
+ *   rather than inheriting the optionality onto the wire type.
  */
 export type TicketCard = {
   ticketId: string;
@@ -186,6 +192,8 @@ export type TicketCard = {
   fields: Record<string, FieldClaim>;
   stateProvenance: StateProvenance;
   rollup: TicketRollup | null;
+  /** The closed flag (backlog/closed spec §3.3, 2026-09-17); see this type's own docblock. */
+  closed: { actorId: string; at: string } | null;
 };
 
 /**
