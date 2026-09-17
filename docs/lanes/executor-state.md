@@ -29,16 +29,34 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | HEAD | `fce3f159` — pushed to `origin/exec/step2c0-prototype-delta-audit`; **no PR yet** |
+> | HEAD | `952ae4b7` — pushed to `origin/exec/step2c0-prototype-delta-audit`; **no PR yet** |
 > | PR base | `owner/workspace-edits` — NEVER `main` |
 > | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
 > | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
 >
-> ## Verdicts landed so far — 14 of 25 screens
+> ## All 25 screens are decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
 >
-> `none`: isMobileDevice, isSignIn, isBoardView, isListView (done #419), isCalendarView, **isAccount**,
-> **isHelp**. `held`: isWorkspaces, isWork, isMembers, isInviteAdmin. `wire-gap`: isWorkspace, isInvite,
-> isMcpAuth, and **TOKENS (global)**. Pending: 11 unchanged screens (D and E).
+> | verdict | n | screens |
+> |---|---|---|
+> | **port** | **3** | `isTypeEditor` (M, blocked on a ruling), `isLegal` (M), `isNotFound` (S) |
+> | **wire-gap** | **8** | **TOKENS (global)**, `isInbox`, `isTypes`, `isWorkflows`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` |
+> | **held** | **5** | `isMembers`, `isInviteAdmin` (owner hold), `isBuilder`, `isWorkspaces`, `isWork` |
+> | **none** | **9** | `isAccount`, `isHelp`, `isTimelineView`, `isMyWork`, `isSettingsShell`, `isMobileDevice`, `isSignIn`, `isBoardView`, `isCalendarView` |
+> | **done** | **1** | `isListView` (#419) |
+>
+> **Recommended order lives in the queue table's first column**, not in block order. Row 1 is the token
+> layer (not a screen); rows 2–5 are `isLegal`, `isNotFound`, `isWorkflows`, `isTypeEditor`.
+>
+> **Three class families have NO CSS**, each swept with a control: `gn-members*`, `workflow-list__*`, and
+> the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group. Two sit on held screens;
+> the third is a ruling-independent M restyle.
+>
+> ## Reviewer in flight (the 6th and last subagent — the cap)
+>
+> It is asked to falsify: re-derive all 25 block deltas with its OWN tooling, re-derive five randomly
+> chosen product sections, and spot-check ≥12 citations **for whether the cited line says what the prose
+> claims** — the one thing the mechanical checker cannot do and the document's own stated weakest link.
+> **Do not merge on the strength of this document until its verdict is in.**
 >
 > ## The second finding, and it reframes the queue
 >
