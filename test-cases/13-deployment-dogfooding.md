@@ -6438,3 +6438,39 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   Mutation (dropping the new `setServerRefusal(null)`, `cp`/`sha256sum` restore): kills exactly this case
   on the "server notice gone" assertion and no other —
   (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.589** ✅ A card in `done` (`WF_ERRAND`'s only terminal state — verified against `helpers/seed.ts`,
+  not assumed) renders a **Close** button beside the two arrows: `aria-label` `` `Close ${card.title}` ``,
+  `disabled={submitting}` sharing the arrows' own latch. Clicking it ingests exactly one `ticket.closed`
+  with the empty payload spec §1.2 gives the envelope-only event (actor/origin carried the identical way
+  `submitDirect`'s own `{to}` transition already is), then calls `moves.onMoved()` — the SAME
+  `board.reload()` `submitDirect`'s `committed` branch calls; the server's own `getBoard` excludes closed
+  tickets (spec §3.2), so the reload, not a local delete, is what removes the card, and this case asserts
+  the ingest and the call rather than a disappearance `useBoard`'s own live-query hook would have to fake.
+  A card in `doing` (non-terminal, `stateCategory: 'active'`) renders no Close button at all — `MoveArrows`
+  derives the gate itself from `stateCategoryOf(workflow, fromStateId)` (Ruling 35, coordinator,
+  2026-09-17 — correcting this task's own brief, which had proposed threading a second `column.category`
+  prop down instead) rather than reading a second, driftable copy of a fact this component can derive with
+  no new data. A click on Close never opens the ticket sheet — the same `CARD_CLICK_BAIL_SELECTOR` bail
+  every arrow button already gets (`board-card-click.test.tsx`'s own "a click on a move arrow does NOT
+  open the ticket" proves the mechanism) — proven here PAIRED with a positive control in the same test (a
+  click on the card's own title button DOES call `onOpenTicket`), so the negative discriminates a real
+  bail from a button that merely does nothing. Mutation (forcing the terminal gate permanently true —
+  `{true || category === 'terminal' ? ...}` — `cp`/`sha256sum` restore): kills exactly the `doing`-negative
+  case and no other (`PASS (4) FAIL (1)`) —
+  (`packages/app-core/test/views/board-close.test.tsx`)
+- **13.590** ✅ A refused `ticket.closed` (rule `close-requires-terminal`, mirroring `ticket-sheet.tsx`'s
+  own `13.588` fixture verbatim) renders through the board's existing server-refusal notice —
+  `role="alert"`, `.gn-refusal--server`, the rule and reason carried VERBATIM, the same invariant every
+  other refusal on this board holds. A REJECTED `ingest` (a transport failure, never a server answer)
+  renders instead through `.gn-refusal--transport` with `closeCard`'s own "this close" wording ("We could
+  not reach the server for this close — …"), the words "Refused by the server" absent from the document —
+  mirroring case `13.504`'s two-branch shape and Ruling 27's split exactly, `closeCard` sharing
+  `submitDirect`'s identical `serverRefusal`/`transportError` channels rather than inventing its own. Both
+  branches leave **Close** and `‹` (a live, two-target picker from `done` — `arrowTargets` finds both
+  `doing` and `todo` declared backward from the last column, so the label reads "Move to previous state —
+  Doing or To do", never a bare "Move to Doing") re-enabled once the answer settles, proving the shared
+  `submitting` latch resets in `closeCard`'s own `finally` exactly as it already does in `submitDirect`'s.
+  `›` stays disabled throughout BOTH branches — structural (no forward edge is declared from `done` at
+  all), never a stuck latch — and is asserted as such rather than left for a reader to wonder whether the
+  latch missed it —
+  (`packages/app-core/test/views/board-close.test.tsx`)

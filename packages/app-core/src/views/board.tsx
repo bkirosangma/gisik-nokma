@@ -7,7 +7,12 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import { BACKLOG_STATE_ID, statesWithBacklog, type WorkflowDef } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE_ID,
+  stateCategoryOf,
+  statesWithBacklog,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -1016,6 +1021,19 @@ function MoveArrows({
 
   const previousTargets = arrowTargets(workflow, columnOrder, fromStateId, 'previous');
   const nextTargets = arrowTargets(workflow, columnOrder, fromStateId, 'next');
+  /**
+   * Backlog/closed spec §5.2 (2026-09-17) — "a card in a terminal column
+   * gains a Close button beside the arrows." Derived HERE, from `workflow`
+   * and `fromStateId` this component already holds, rather than threaded in
+   * as a `column.category` prop the way an earlier draft of this task's
+   * brief proposed — Ruling 35 (coordinator, 2026-09-17) corrected that:
+   * `stateCategoryOf` (the same function `entity-state.ts`'s reducer uses to
+   * stamp every `TicketState.stateCategory`) takes exactly the two
+   * arguments already in scope, so a second prop carrying the identical fact
+   * under a different name would be a second, driftable source for
+   * something this component can derive for itself with no new data.
+   */
+  const category = stateCategoryOf(workflow, fromStateId);
 
   const make = makeSubmittedFactory({ actorId: moves.currentUserId, origin: 'web' });
 
@@ -1085,6 +1103,93 @@ function MoveArrows({
       if (mountedRef.current) {
         const message = cause instanceof Error ? cause.message : String(cause);
         setTransportError(`We could not reach the server for this move — ${message}`);
+      }
+    } finally {
+      if (mountedRef.current) setSubmitting(false);
+    }
+  };
+
+  /**
+   * THE CLOSE PATH (backlog/closed spec §5.2, 2026-09-17) — the terminal
+   * column's own button, rendered beside the arrows (below, gated on
+   * `category === 'terminal'` computed above) rather than replacing either
+   * of them: the `›` arrow from a terminal state is already, always,
+   * genuinely disabled (`nextTargets` is empty — nothing is declared past
+   * the last column), so Close is the one control a terminal card actually
+   * offers for leaving that column.
+   *
+   * `closeCard` mirrors `submitDirect` immediately above almost exactly —
+   * same `make`/`ingest`/`results[0]` idiom, same `submitting` latch reset
+   * in a `finally` rather than only after a successful `await`, same
+   * Ruling-27 split of a real refusal (`serverRefusal`, carried verbatim)
+   * from a transport failure or a silent non-answer (`transportError`, this
+   * component's own plain-sentence channel, never dressed as the server's
+   * own verdict) — because it is the SAME shape `ticket-sheet.tsx`'s own
+   * `closeOrReopen` already proved out for this identical event
+   * (`ticket.closed`, `payload: {}` — spec §1.2, the envelope alone carries
+   * actor and time; cases `13.588a`–`13.588c` pin the latch, the transport
+   * split and the silence-clears-`serverRefusal` pairing there). Two things
+   * differ from `submitDirect`: the event itself (`ticket.closed`/`{}`
+   * rather than `ticket.transitioned`/`{to: toStateId}`), and what a
+   * `committed` answer does next — `submitDirect` leaves the card exactly
+   * where the server placed it; `closeCard` calls the SAME `moves.onMoved()`
+   * `submitDirect` calls, which reaches `board.reload()`. The server's own
+   * `getBoard` excludes closed tickets (spec §3.2) — the reload, not a local
+   * optimistic removal, is what makes the card leave the board, so this test
+   * suite asserts the ingest payload and the `onMoved` call rather than the
+   * card's disappearance (`useBoard`/`board.reload()` are not this
+   * component's to fake a refetch of). The copy strings say "this close",
+   * never "this move" — the two sentences `submitDirect` uses become "The
+   * server did not answer this close." and "We could not reach the server
+   * for this close — …", the same word substitution `ticket-sheet.tsx` made
+   * for its own "this change."
+   */
+  const closeCard = async (): Promise<void> => {
+    setSubmitting(true);
+    try {
+      const closed = make({
+        workspaceId: moves.workspaceId,
+        entity: { kind: 'ticket', id: card.ticketId },
+        type: 'ticket.closed',
+        payload: {},
+      });
+      const results = await moves.dataSource.ingest([closed]);
+      const result = results[0];
+      if (result === undefined) {
+        // Ruling 27/34: silence, not a refusal — `transportError`, and
+        // `serverRefusal` cleared alongside it (Ruling 34's own pairing,
+        // case `13.588c`): a REFUSED click followed by a SILENT one must not
+        // leave the earlier "Refused by the server — …" notice standing
+        // beside the new one, describing an answer that no longer holds.
+        if (mountedRef.current) {
+          setServerRefusal(null);
+          setTransportError('The server did not answer this close.');
+        }
+        return;
+      }
+      if (result.status === 'committed') {
+        if (mountedRef.current) {
+          setServerRefusal(null);
+          setTransportError(null);
+        }
+        moves.onMoved();
+        return;
+      }
+      if (mountedRef.current) {
+        setTransportError(null);
+        setServerRefusal(
+          result.status === 'refused'
+            ? { rule: result.rule, reason: result.reason }
+            : { rule: result.code, reason: result.message },
+        );
+      }
+    } catch (cause) {
+      // Ruling 27: a transport failure is not a refusal either — same
+      // `transportError` channel `submitDirect` uses, own sentence, never
+      // `serverRefusal`.
+      if (mountedRef.current) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setTransportError(`We could not reach the server for this close — ${message}`);
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1303,6 +1408,19 @@ function MoveArrows({
       >
         ›
       </button>
+      {/* Backlog/closed spec §5.2 — terminal columns only; `category` is
+          computed once above, alongside `previousTargets`/`nextTargets`. */}
+      {category === 'terminal' ? (
+        <button
+          type="button"
+          className="gn-board-card__close"
+          aria-label={`Close ${card.title}`}
+          disabled={submitting}
+          onClick={() => void closeCard()}
+        >
+          Close
+        </button>
+      ) : null}
       {/*
        * Ruling 28 (coordinator, 2026-09-16) — `ref={noticeRef}` on this
        * wrapper, never on any one notice individually, is what lets ONE

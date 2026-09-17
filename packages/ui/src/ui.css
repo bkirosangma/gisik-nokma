@@ -600,6 +600,33 @@
    (0.55 — `:79-82` above): the spec gives this control its own number, kept
    rather than folded into the shared default. */
 .gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Backlog/closed spec §5.2 (2026-09-17) — the terminal-column Close button,
+   beside the two arrows in the same `.gn-board-card__moves` flex row.
+   Reuses `.gn-board-card__move`'s own metrics verbatim (height, radius,
+   background/text tokens, font, focus ring, `:disabled` treatment) rather
+   than inventing a second control's worth of numbers — the only real
+   difference is horizontal `padding` in place of a fixed `min-width`,
+   since this button carries the word "Close" rather than one glyph. */
+.gn-board-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px — same tap-target floor as `.gn-board-card__move` */
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-board-card__close:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-board-card__close:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
