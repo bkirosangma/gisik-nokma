@@ -1072,9 +1072,22 @@ function MoveArrows({
       const results = await moves.dataSource.ingest([transition]);
       const result = results[0];
       if (result === undefined) {
-        // Ruling 27: silence, not a refusal — `transportError`, never
-        // `serverRefusal`, and never a hand-built `{rule, reason}` pair.
+        // Ruling 27/36: silence, not a refusal — `transportError`, and
+        // `serverRefusal` cleared alongside it, the same pairing `closeCard`
+        // (below) already carries from Ruling 34 (case `13.588c`). Found in
+        // review (Ruling 36, 2026-09-17) — this branch had never carried the
+        // clear, even though `closeCard` was built to mirror it, which made
+        // that docblock's "mirrors `submitDirect` almost exactly" claim not
+        // quite true. REDUNDANT on this component specifically (`13.590a`'s
+        // own docblock measures it): `attemptMove`, this function's one call
+        // site, already clears `serverRefusal` unconditionally before every
+        // new attempt, so a stale "Refused by the server — …" notice
+        // surviving into a later silent answer is not reachable through the
+        // arrows today either way. Kept for agreement with `closeCard` (which
+        // has no such wrapper and DOES rely on this line) and as a second
+        // line of defence if `attemptMove` ever stops clearing on its own.
         if (mountedRef.current) {
+          setServerRefusal(null);
           setTransportError('The server did not answer this move.');
         }
         return;

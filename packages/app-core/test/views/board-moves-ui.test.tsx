@@ -196,6 +196,72 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
     expect(screen.getByRole('button', { name: 'Move to Doing' })).not.toBeDisabled();
   });
 
+  /**
+   * 13.590a — Ruling 36 (coordinator, 2026-09-17; found reviewing Task 8's
+   * `closeCard`, which mirrors `submitDirect` almost exactly and already
+   * carried this pairing from Ruling 34, case `13.588c`): `submitDirect`'s
+   * `result === undefined` branch never itself cleared `serverRefusal`
+   * alongside `transportError`, unlike `closeCard`'s identical branch, so
+   * the ruling's own docblock claim ("mirrors `submitDirect` almost
+   * exactly") was not quite true and the two were brought back in line.
+   * Sequenced through the fake data source's own per-call closure — exactly
+   * `ticket-sheet.test.tsx`'s own `13.588c` technique — a `refused` answer
+   * on the first ingest, an empty `[]` on the second.
+   *
+   * **Measured, not assumed, and the measurement corrects the ruling's own
+   * predicted mutation**: on THIS component the arrow path is doubly
+   * guarded. `submitDirect` has exactly one call site, inside `attemptMove`
+   * (`grep -n 'submitDirect('` confirms it), which already runs its own
+   * unconditional `setServerRefusal(null)` synchronously, before the new
+   * attempt's `await`, on EVERY arrow/drop attempt — a guarantee `closeCard`
+   * has no equivalent of, since nothing wraps its `onClick`. Reverting ONLY
+   * the new line added for this ruling leaves this case GREEN (measured:
+   * `PASS (15) FAIL (0)`, the full file unchanged) because `attemptMove`'s
+   * own clear already does the job; reverting ONLY `attemptMove`'s own
+   * clear, with the new line left in place, is ALSO green for the identical
+   * reason in reverse. The case only reddens when BOTH are absent at once
+   * (measured: `PASS (14) FAIL (1)`, this case alone) — meaning the new
+   * line is real, correct, and brings `submitDirect` into textual and
+   * behavioural agreement with `closeCard`, but is REDUNDANT defense-in-depth
+   * on the arrows specifically, not the closing of a live, reachable gap the
+   * way the identical-looking line is for `closeCard`/`closeOrReopen`. Kept
+   * anyway, for the reason Ruling 36 gave: a future change to `attemptMove`
+   * that stops clearing on every attempt would make this the ONLY thing
+   * standing between a refused-then-silent sequence and a stale notice, and
+   * the two functions reading identically is worth more than the one saved
+   * line.
+   */
+  it('a refused arrow click followed by a silent one shows only the transport notice', async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    const { moves } = movesFor({}, WF_ERRAND, async (events) => {
+      calls += 1;
+      if (calls === 1) {
+        return events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'some-rule',
+          reason: 'Not allowed right now.',
+        }));
+      }
+      return [];
+    });
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    const moveButton = screen.getByRole('button', { name: 'Move to Doing' });
+    await user.click(moveButton);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveClass('gn-refusal--server'));
+
+    await user.click(moveButton);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveClass('gn-refusal--transport'));
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('The server did not answer this move.');
+    // The server notice must be GONE, not merely joined by the new one.
+    expect(document.querySelector('.gn-refusal--server')).toBeNull();
+    expect(moveButton).not.toBeDisabled();
+  });
+
   /** 13.500 — the capability itself absent ⇒ no move arrows at all, not merely disabled ones. */
   it('renders no move arrows whatsoever when the moves capability is not wired', async () => {
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);

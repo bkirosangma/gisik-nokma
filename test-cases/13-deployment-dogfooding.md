@@ -6474,3 +6474,23 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   all), never a stuck latch — and is asserted as such rather than left for a reader to wonder whether the
   latch missed it —
   (`packages/app-core/test/views/board-close.test.tsx`)
+- **13.590a** ✅ Ruling 36 (coordinator, 2026-09-17; found reviewing Task 8's `closeCard`, whose docblock
+  claimed to mirror `submitDirect` "almost exactly" while `submitDirect`'s own `result === undefined`
+  branch had never carried the Ruling-34 pairing `closeCard` already did) — `submitDirect`'s silence
+  branch now clears `serverRefusal` alongside `transportError`, proven by sequencing a `refused` answer on
+  the first arrow click and an empty `[]` on the second (the exact `13.588c` technique, over the fake data
+  source's own per-call closure): after the second click only the amber `.gn-refusal--transport` notice
+  reads, `.gn-refusal--server` is gone from the document, and the arrow re-enables. **Measured, not
+  assumed, and the measurement corrects the ruling's own predicted mutation**: `submitDirect` has exactly
+  one call site, inside `attemptMove`, which already runs its own unconditional `setServerRefusal(null)`
+  synchronously before every arrow/drop attempt — a wrapper `closeCard` has no equivalent of, since
+  nothing wraps its `onClick`. Reverting ONLY the new line this ruling adds leaves this case GREEN
+  (`PASS (15) FAIL (0)`, the whole file unchanged); reverting ONLY `attemptMove`'s own pre-existing clear,
+  with the new line left in place, is ALSO green, for the identical reason in reverse. The case only
+  reddens when BOTH are absent at once (`PASS (14) FAIL (1)`, this case alone) — so the new line is real,
+  correct, and brings `submitDirect` into textual and behavioural agreement with `closeCard`, but is
+  REDUNDANT defense-in-depth on the arrows specifically today, not the closing of a live, reachable gap
+  the way the identical-looking line is for `closeCard`/`closeOrReopen`. Kept for that agreement and as a
+  second line of defence if `attemptMove` ever stops clearing on its own; `cp`/`sha256sum` restore
+  performed after each of the three mutations above —
+  (`packages/app-core/test/views/board-moves-ui.test.tsx`)
