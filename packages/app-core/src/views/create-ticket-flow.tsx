@@ -23,7 +23,8 @@ export type CreateTicketFlowProps = {
   projectId: string;
   currentUserId: string;
   typeOptions: Array<{ id: string; name: string }>;
-  parentCandidates: Array<{ id: string; title: string }>;
+  /** See `NewTicketDialogProps.parentCandidates` — this flow only passes it through. */
+  parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
   /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */
   parentCandidatesUnavailable?: string;
   /** See `NewTicketDialogProps.parentCandidatesNarrowing`. */
@@ -40,6 +41,22 @@ type ReopenPrompt = {
   reopenStates: Array<{ id: string; name: string }>;
   refusal: Refusal;
   refusalOrigin: RefusalOrigin;
+  /**
+   * Whether the parent is CLOSED (backlog/closed spec §2, ruling 37) — never
+   * merely terminal. A closed ticket needs `ticket.reopened` ahead of the
+   * transition, in the SAME batch, so the person is asked once and the two
+   * events land or refuse together; a terminal-but-open parent (the v1 shape
+   * every case before this task exercised) needs only the transition, as
+   * before.
+   *
+   * `parentRead.ticket.closed` is `{actorId; at} | null | undefined` —
+   * optional on the domain `TicketState` because 441 fixtures predate the
+   * flag (dispatch-context's binding ruling) — so this reads it through the
+   * SAME `?? null` normalisation every other reader of the flag uses, rather
+   * than `!== null` alone, which would treat an undefined (pre-flag) ticket
+   * as closed.
+   */
+  parentClosed: boolean;
 };
 
 type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigin };
@@ -179,6 +196,7 @@ export function CreateTicketFlow({
       reopenStates: reopenStateOptions(def, parentRead.ticket.stateId),
       refusal,
       refusalOrigin,
+      parentClosed: (parentRead.ticket.closed ?? null) !== null,
     });
   };
 
@@ -193,6 +211,13 @@ export function CreateTicketFlow({
         projectId,
         parentId: draft.parentId,
         title: draft.title,
+        // Backlog/closed spec §1.3: ALWAYS sent, never left to the wire's own
+        // absence-means-focus fallback. That fallback exists for events
+        // written before this field did; this client was not, and a v2
+        // client leaving an additive field out is a choice, not a compatible
+        // silence. `NewTicketDraft.start` is itself required (never
+        // optional) for the identical reason, one layer up.
+        start: draft.start,
       },
     });
 
@@ -246,6 +271,7 @@ export function CreateTicketFlow({
         toStateId,
         childTicketId: reopenPrompt.childTicketId,
         childEvent: reopenPrompt.childEvent,
+        parentClosed: reopenPrompt.parentClosed,
       },
       make,
     );

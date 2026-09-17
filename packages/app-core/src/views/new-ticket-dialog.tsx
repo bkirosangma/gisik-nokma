@@ -1,12 +1,40 @@
 import { useState } from 'react';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
-export type NewTicketDraft = { title: string; typeId: string; parentId: string | null };
+export type NewTicketDraft = {
+  title: string;
+  typeId: string;
+  parentId: string | null;
+  /**
+   * Where the ticket is born (backlog/closed spec §5.4, 2026-09-17):
+   * `'backlog'` unless the checkbox below is shown AND left checked. ALWAYS
+   * present — never optional here, even though `ticketCreatedPayload` on the
+   * wire treats an absent `start` as `'focus'` for events older than this
+   * field. That absence-means-focus rule exists so a v1 event keeps its v1
+   * meaning; it says nothing about what THIS client, built after the field
+   * exists, is allowed to leave out. `create-ticket-flow.tsx`'s `create()`
+   * sends this value on every `ticket.created` it builds (see the comment on
+   * that payload), and this type keeping the field required is what makes an
+   * accidental omission upstream (in the state built below) a compile error
+   * rather than a silently-focused ticket nobody asked for.
+   */
+  start: 'backlog' | 'focus';
+};
 
 export type NewTicketDialogProps = {
   open: boolean;
   typeOptions: Array<{ id: string; name: string }>;
-  parentCandidates: Array<{ id: string; title: string }>;
+  /**
+   * `inFocus` (backlog/closed spec §5.4, 2026-09-17): whether THIS candidate,
+   * if chosen as parent, would show the "Start in focus" checkbox below — a
+   * candidate sitting outside the universal Backlog state and never closed.
+   * Computed by the caller from data this component does not have (a
+   * candidate's own `stateId`/`closed`, ruling: this dialog only ever sees
+   * `{id, title}` shapes otherwise) — the same division of labour
+   * `parentCandidatesUnavailable`/`parentCandidatesNarrowing` already draw:
+   * this component renders a caller's claim, it does not derive one.
+   */
+  parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
   /**
    * Why the parent list could not be loaded, when it could not be.
    *
@@ -68,12 +96,46 @@ export function NewTicketDialog({
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState(typeOptions[0]?.id ?? '');
   const [parentId, setParentId] = useState('');
+  // Checked by default (spec §5.4): the one state this control needs, since it
+  // is read only at the moment it MATTERS — when a chosen parent is in focus.
+  // It is not reset on every parent re-pick; nothing in this rollout's cases
+  // exercises picking an in-focus parent, changing the box, then picking a
+  // DIFFERENT in-focus parent in the same dialog session, and inventing a
+  // reset rule for a scenario nobody specified would be a second, unwitnessed
+  // claim about what this control does.
+  const [startInFocus, setStartInFocus] = useState(true);
+
+  // The SAME "no usable parent" test the submit boundary below already makes
+  // for `parentId` — reused, not re-derived, so the two can never disagree
+  // about what counts as a real parent. `undefined` here (the picker itself
+  // withheld) counts as "no usable parent" for the identical reason `parentId`
+  // leaves as `null` in that case: a withheld picker's `parentId` state may
+  // still hold a stale selection (3.157's own invariant), and this dialog must
+  // not read a chosen candidate's `inFocus` off state the payload itself
+  // refuses to send.
+  const noUsableParent = parentCandidatesUnavailable !== undefined || parentId === '';
+  const chosenParent = noUsableParent
+    ? undefined
+    : parentCandidates.find((candidate) => candidate.id === parentId);
+  // Spec §5.4: the checkbox exists ONLY when the parent actually chosen in
+  // THIS dialog is in focus — never for no parent, a withheld picker, or a
+  // backlog/closed one, which is exactly `chosenParent?.inFocus === true`.
+  const startCheckboxVisible = chosenParent?.inFocus === true;
+
   return (
     <Dialog open={open} title="New ticket" onClose={onClose}>
       <label className="gn-new-ticket__field">
         Title
         <input value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
+      {/*
+        Spec §5.4: this note is unconditional — every ticket this dialog can
+        create starts in the backlog UNLESS the checkbox below both exists and
+        stays checked. Placed under Title (spec's own words), ahead of the
+        Parent picker whose choice is what can turn the sentence into a
+        checkbox instead of leaving it standing alone.
+      */}
+      <p className="gn-new-ticket__note">Starts in the backlog</p>
       <label className="gn-new-ticket__field">
         Type
         <Select
@@ -161,6 +223,32 @@ export function NewTicketDialog({
           showing only {parentCandidatesNarrowing} — a ticket outside that is not offered here
         </span>
       ) : null}
+      {/*
+        Spec §5.4: exists ONLY while the parent actually chosen above is in
+        focus — `startCheckboxVisible` reads the SAME `chosenParent` the
+        submit boundary below reads, so this box can never be on screen while
+        the payload it claims to set is about to leave as `'backlog'` anyway,
+        or absent while a `'focus'` claim is about to leave with nothing on
+        screen to explain it.
+
+        Checked by default (spec: "checked by default, and sets
+        `start: 'focus'`") — the labelled `<input type="checkbox">` idiom this
+        codebase already uses (`account/notifications-section.tsx`), not the
+        text-first `<label>{text}<input/></label>` shape Title/Type/Parent use
+        above: those wrap a text CONTROL, this wraps a boolean one, and a
+        checkbox reading its own name from LEADING text is the established
+        pattern for that shape here.
+      */}
+      {startCheckboxVisible ? (
+        <label className="gn-new-ticket__field gn-new-ticket__start-focus">
+          <input
+            type="checkbox"
+            checked={startInFocus}
+            onChange={(event) => setStartInFocus(event.target.checked)}
+          />
+          Start in focus
+        </label>
+      ) : null}
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>
         <Button
@@ -181,8 +269,13 @@ export function NewTicketDialog({
               // doing another, which is the exact defect this component's docblock
               // exists to refuse. Witnessed at 3.157, with a control proving the
               // parent still travels when the picker IS shown.
-              parentId:
-                parentCandidatesUnavailable !== undefined || parentId === '' ? null : parentId,
+              parentId: noUsableParent ? null : parentId,
+              // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
+              // and checked. `startCheckboxVisible` already carries "a usable,
+              // in-focus parent is chosen" — re-testing `noUsableParent` here
+              // would be a second, driftable spelling of the same fact this
+              // component already computed once above.
+              start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
             })
           }
         >

@@ -6494,3 +6494,47 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   second line of defence if `attemptMove` ever stops clearing on its own; `cp`/`sha256sum` restore
   performed after each of the three mutations above —
   (`packages/app-core/test/views/board-moves-ui.test.tsx`)
+- **13.591** ✅ New tickets are born in the backlog, with one exception (backlog/closed spec §5.4,
+  2026-09-17) — `NewTicketDialog` states "Starts in the backlog" under the title field, UNCONDITIONALLY.
+  `NewTicketDraft` gains a REQUIRED `start: 'backlog' | 'focus'` (never optional here, even though the
+  wire's `ticketCreatedPayload.start` is optional and an absent value means focus for events written
+  before the field existed — a rule about legacy compatibility, not about what a client built after the
+  field exists is allowed to leave out). With NO parent chosen, no checkbox renders and the draft leaves
+  with `start: 'backlog'`. Choosing an IN-FOCUS parent (`parentCandidates` now carry `inFocus: boolean`
+  beside `id`/`title`, a claim the CALLER computes — this component derives nothing from a candidate's own
+  state) renders a **"Start in focus"** checkbox, CHECKED BY DEFAULT, and the draft leaves with
+  `start: 'focus'`; unticking it flips the SAME draft to `'backlog'` without touching the chosen parent.
+  Choosing a BACKLOG parent (`inFocus: false`) renders no checkbox at all and the draft stays `'backlog'`
+  — the checkbox's visibility (`startCheckboxVisible`) and the draft's `start` both read the SAME
+  `chosenParent`/`noUsableParent` values computed once, so a checkbox can never be on screen while the
+  payload it claims to set is about to leave as `'backlog'` anyway, or absent while a `'focus'` claim
+  leaves with nothing on screen to explain it —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.592** ✅ `CreateTicketFlow.create` never leaves `start` off the `ticket.created` payload it builds
+  (backlog/closed spec §1.3), whatever the draft's own value: a create with no parent sends
+  `payload.start: 'backlog'`, and choosing an in-focus parent with the checkbox left checked sends
+  `payload.start: 'focus'` — proving the value travels from the DRAFT rather than a hardcoded constant.
+  The load-bearing assertion is `Object.keys(payload)` containing `'start'`, not a value comparison: a
+  mutated `create()` that drops the `start:` line from its payload object literal produces a payload with
+  NO `start` key at all, and `toEqual`/`toBe`-style value checks treat a missing key the same as one
+  holding `undefined` — they would not catch that mutation; only reading the key set does. Mutation
+  (dropping the `start: draft.start,` line from `create-ticket-flow.tsx`'s payload literal,
+  `cp`/`sha256sum` restore): kills EXACTLY the two 13.592 cases (`PASS (16) FAIL (2)` of the file's 18)
+  and no other case in the file —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593** ✅ Ruling 37 — creating under a CLOSED terminal parent submits `ticket.reopened` for the
+  parent FIRST, then the reopening transition, then the child, and the first two travel in ONE
+  `source.ingest` batch call rather than two round trips (the owner decision: the person is asked once).
+  Split across two files (Ruling 38): `flows/guarded-child-event.test.ts` pins the UNIT behaviour — with
+  `ReopenPlan.parentClosed: true` the FIRST `ingest` call carries exactly `[ticket.reopened,
+  ticket.transitioned]` in that order, both on the parent, and the child rides only the SECOND call; a
+  committed outcome's `parentResult` names the TRANSITION's own result (the LAST element of the batch),
+  never the reopen's; a refusal of EITHER event in that batch — the reopen itself, or the transition after
+  a committed reopen — yields `parent-refused` and the child is never sent. With `parentClosed: false` the
+  batch stays the single-element array T13.3a–g already pinned, unchanged. `views/reopen-flow.test.tsx`
+  proves the same shape end to end: a CLOSED `PARENT_READ` (`ticket.closed` set) drives the reopen offer
+  through the dialog, and the confirm click's recorded `source.ingested` batches show the same
+  `[reopened, transitioned]` pair ahead of the child, exactly as the unit test pins. `CreateTicketFlow`
+  reads `parentClosed` off `parentRead.ticket.closed ?? null` — never `!== null` alone, which would
+  misread an unflagged legacy ticket (441 fixtures predate the flag) as closed —
+  (`packages/app-core/test/flows/guarded-child-event.test.ts`, `packages/app-core/test/views/reopen-flow.test.tsx`)

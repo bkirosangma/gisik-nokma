@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
@@ -639,9 +639,23 @@ function ProjectBoard() {
    *
    * `parentCandidates` is only ever built from rows that ARRIVED. Everything
    * else is a state the create control names out loud below.
+   *
+   * `inFocus` (backlog/closed spec §5.4, 2026-09-17) drives the New-ticket
+   * dialog's "Start in focus" checkbox: a candidate is in focus when it sits
+   * outside the universal Backlog state AND has never been closed (or was
+   * reopened) — `row.closed === null` reads exactly that, the same
+   * `state.closed ?? null` idiom every other reader of the flag spells,
+   * since `ListRow.closed` is REQUIRED (never the optional domain form this
+   * row was assembled from — `view-types.ts`).
    */
   const parentCandidates =
-    list.rows === null ? [] : list.rows.map((row) => ({ id: row.ticketId, title: row.title }));
+    list.rows === null
+      ? []
+      : list.rows.map((row) => ({
+          id: row.ticketId,
+          title: row.title,
+          inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null,
+        }));
 
   const typeOptions =
     ticketTypes.data === null

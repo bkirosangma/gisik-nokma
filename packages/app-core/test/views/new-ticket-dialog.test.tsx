@@ -67,7 +67,9 @@ async function openPicker(
  */
 describe('12.388 a narrowed parent picker names its narrowing', () => {
   const TYPES = [{ id: 'task', name: 'Task' }];
-  const CANDIDATES = [{ id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign' }];
+  const CANDIDATES = [
+    { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
+  ];
 
   it('the reason is beside the picker, and the picker still works', async () => {
     const user = userEvent.setup();
@@ -130,7 +132,13 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
     { id: 'epic', name: 'Epic' },
     { id: 'task', name: 'Task' },
   ];
-  const CANDIDATES = [{ id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign' }];
+  // `inFocus: false`: this describe block is about the WITHHELD-parent
+  // invariant, not the checkbox, so the candidate stays one that never shows
+  // it — every `onCreate` assertion below can then keep asserting a plain
+  // `start: 'backlog'` without a checkbox interaction in the way.
+  const CANDIDATES = [
+    { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
+  ];
 
   const draftFrom = async (
     user: ReturnType<typeof userEvent.setup>,
@@ -202,6 +210,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       title: 'Order the tent',
       typeId: 'epic',
       parentId: null,
+      start: 'backlog',
     });
   });
 
@@ -219,6 +228,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       title: 'Order the tent',
       typeId: 'epic',
       parentId: '01J9TICKET00000000000000EP',
+      start: 'backlog',
     });
   });
 });
@@ -244,7 +254,9 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
  */
 describe('3.164–3.165 the parent picker offers project root as a real, selectable option', () => {
   const TYPES = [{ id: 'task', name: 'Task' }];
-  const CANDIDATES = [{ id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign' }];
+  const CANDIDATES = [
+    { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
+  ];
 
   const renderDialog = () => {
     const onCreate = vi.fn();
@@ -275,6 +287,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       title: 'Order the tent',
       typeId: 'task',
       parentId: null,
+      start: 'backlog',
     });
   });
 
@@ -305,6 +318,123 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       title: 'Order the tent',
       typeId: 'task',
       parentId: null,
+      start: 'backlog',
+    });
+  });
+});
+
+/**
+ * 13.591 — NEW TICKETS ARE BORN IN THE BACKLOG (backlog/closed spec §5.4,
+ * 2026-09-17), with one exception: a child of a parent that is itself in
+ * focus may start there too, by explicit, undoable choice.
+ *
+ * Two candidates, told apart only by `inFocus` — the caller's own claim about
+ * each candidate's live state (this component derives nothing; see
+ * `NewTicketDialogProps.parentCandidates`'s own docblock). The checkbox's
+ * EXISTENCE is the thing every case but the first two is really about: it
+ * must track the CHOSEN candidate's `inFocus`, not some fixed truth about the
+ * dialog, and it must never leave the draft's `start` disagreeing with
+ * whether it was ever shown at all.
+ */
+describe('13.591 new tickets are born in the backlog; a child of an in-focus parent may start there', () => {
+  const TYPES = [{ id: 'task', name: 'Task' }];
+  const CANDIDATES = [
+    { id: 'parent_focus', title: 'In-focus parent', inFocus: true },
+    { id: 'parent_backlog', title: 'Backlog parent', inFocus: false },
+  ];
+
+  const renderDialog = () => {
+    const onCreate = vi.fn();
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={TYPES}
+        parentCandidates={CANDIDATES}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    return onCreate;
+  };
+
+  it('13.591a states "Starts in the backlog" under the title field, unconditionally', () => {
+    renderDialog();
+    expect(screen.getByText('Starts in the backlog')).toBeInTheDocument();
+  });
+
+  it('13.591b with no parent chosen, no checkbox renders and the draft leaves with start: "backlog"', () => {
+    const onCreate = renderDialog();
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: null,
+      start: 'backlog',
+    });
+  });
+
+  it('13.591c choosing an in-focus parent renders "Start in focus" checked, and submits start: "focus"', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
+    );
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Start in focus' });
+    expect(checkbox).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: 'parent_focus',
+      start: 'focus',
+    });
+  });
+
+  it('13.591d unticking "Start in focus" submits start: "backlog" instead', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
+    );
+    const checkbox = screen.getByRole('checkbox', { name: 'Start in focus' });
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: 'parent_focus',
+      start: 'backlog',
+    });
+  });
+
+  it('13.591e choosing a backlog parent renders no checkbox, and the draft leaves with start: "backlog"', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'Backlog parent' }),
+    );
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: 'parent_backlog',
+      start: 'backlog',
     });
   });
 });
