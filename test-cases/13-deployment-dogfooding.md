@@ -6035,3 +6035,122 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   already read unnarrowed `list.rows`) — a regression guard against a future narrowing reaching it, not a
   TDD RED/GREEN case for this task's own code.
 - `13.439`/`13.444` retired (their subject — the mirror note — no longer exists); their numbers stay unused.
+
+**Task 11 — final gate, catalogue checks, citation sweep, spec amendments (2026-09-17).** Node
+`v22.23.2` for every command below (`source ~/.nvm/nvm.sh && nvm use 22`, printed once per shell and
+re-confirmed before each run).
+
+*Gate (all EXIT 0):* `packages/app-core` — `pnpm exec vitest run`: **1353 passed (1353)**;
+`pnpm run typecheck`: clean. `packages/ui` — `pnpm exec vitest run`: **314 passed (314)**.
+`apps/web` — `pnpm exec vitest run`: **405 passed (405)**; `pnpm run typecheck`: clean. `apps/server`
+— `pnpm run typecheck` (`tsconfig.typecheck.json`): clean.
+
+*Catalogue checks:* `node scripts/check-case-ids.mjs` — real sweep 2106 sum / 2103 union across 12
+files; the only duplicates are `13.387` (three citations) and `13.413` (two), the known baseline,
+unchanged by this plan. `node scripts/check-case-citations.mjs` — 1997 checked ✅ ids across 12
+files, 1976 cited, 21 uncited; this file's own count is 444 cited / 3 uncited / 447 total, and the
+three uncited ids are exactly `13.401`, `13.476`, `13.477` — the pre-existing baseline, and every
+✅ id this plan minted (`13.538`–`13.561`, `13.556a`, `13.556b`) is cited. The ratchet also reports
+regressions in `03-foundation-ledger.md` (1), `10-workflow-builder.md` (15),
+`11-calendar-notifications.md` (1) and `15-in-app-help.md` (1) — pre-existing, in files this plan
+never touched, left as found per the dispatch brief.
+
+*Mutation summary, one line per task, read from each task's own catalogue entry:*
+
+- **Task 1** (`13.538`) — type-level only: an `@ts-expect-error` on `exclude.text` and `BoardIdAxes`'s
+  `Pick` stand in for a mutation; no runtime mutation is cited.
+- **Task 2** (`13.539`) — deleting the `typeIds` exclude line kills the type case and the
+  include+exclude composition case.
+- **Task 3** (`13.540`–`13.541`) — `13.540` is compile-time (`exclude.collaboratorIds` on
+  `BoardFilterSpec` is a type error, no runtime mutation); deleting the `stateIds` exclude line kills
+  `13.541`'s excluded-state case.
+- **Task 4** (`13.542`–`13.543`) — deleting the `dueAfter` line fails `13.542`'s due-bound case;
+  deleting the `projectIds` exclude line fails `13.542`'s project-exclude case; `13.543` is
+  compile-time (no runtime mutation).
+- **Task 5** (`13.544`) — no mutation cited; the refusal is asserted directly against the exact axes
+  named in the thrown error.
+- **Task 6** (`13.545`–`13.547`) — mutating `clearExclude` to clear the whole half instead of one axis
+  kills `13.546`'s only-that-axis case; `13.545`/`13.547` cite no mutation.
+- **Task 7** (`13.548`–`13.549`) — skipping the exclude-half removal in the repair step kills
+  `13.549`'s repair case; `13.548` cites no mutation.
+- **Task 8** (`13.550`–`13.551`) — no mutation cited; verified instead against the brief's own
+  rejected mechanism (the visually-hidden sibling span), which measured RED with the exact wrong
+  string before the `aria-label` fix.
+- **Task 9** (`13.552`–`13.555`, `13.556a`) — forcing `boardFilter.exclude` to `undefined` kills
+  `13.553`, `13.554` **and** `13.555` (the last only because its own "1 of 2 shown" precondition reads
+  the narrowed board, not because it independently exercises Clear-all); dropping `filter.exclude`
+  from `boardUnappliedAxes`'s dependency list in `page.tsx` kills `13.556a`'s THIRD-click assertion
+  specifically (the transition where `filter.collaboratorIds` itself does not change).
+- **Task 10** (`13.556`, `13.556b`, `13.557`–`13.561`, `13.517` flipped) — hard-coding `tabNoun` to
+  `'board'` kills `13.556b` (the note then names the board while rendered on the List tab); reverting
+  `dateInputs`/the tab's rows source back to `rows={list.rows}` (unnarrowed) kills `13.557` via its
+  row-absence assertion, and the SAME mutation also kills `13.517` and `13.560`; sourcing
+  `dateInputs` from `list.rows` instead of the narrowed rows kills `13.558`. `13.556` and `13.559`
+  cite no mutation; `13.561` is an explicit regression guard, not a TDD case, and was green
+  unmodified.
+
+*Citation sweep (`git diff --stat 5c8d1bd6..HEAD`'s seven touched basenames, grepped per the brief's
+exact command against `Features.md`, `test-cases/`, `docs/superpowers/specs/`,
+`packages/*/src`, `apps/web/src`, `apps/web/app`):*
+
+- **Re-pointed** (correct at `5c8d1bd6`, displaced by this plan, fixed by direct read at HEAD, never
+  by offset arithmetic): `page.tsx`'s own docblock citing `mappers.ts:838-853` → `:855-870`, and the
+  adjacent self-citation of its own `:180-184` → `:186-190` (both shifted by the Task 5 exclude-refusal
+  block inserted above them); the 2026-09-17 spec's own `mappers.ts:836-859` → `:837-876` and
+  `view-types.ts:159-200` (`ListRow`) → `:180-221` (shifted by the same refusal block and by `IdAxes`
+  being declared above `ListRow`, respectively); the 2026-09-16 board-prototype-port spec's
+  `view-types.ts:142-153` (the old single-block `FilterSpec`) → `:148-155` (the new standalone
+  `IdAxes`, the type that actually carries the "plural" claim being made) and its
+  `matches-filter.ts:25-56` → `:35-97` (the exclude checks appended to the function body).
+- **`board-filter.ts`** — zero citations of this basename exist anywhere in the searched tree; nothing
+  to check.
+- **`ui.css`** — this plan's only edit is a pure append after line 3612 (the new
+  `.gn-filters__choice[data-mode=…]` rules); every existing citation of `ui.css` in the searched tree
+  targets a line at or below 2596, so none are displaced by this plan. Left unchanged.
+- **Already-stale before this plan, left alone (not this plan's doing):** `page.tsx:1063` in this
+  file's own Task-4-era Finding (`13.467`'s note) already pointed at unrelated tab-button code at
+  `5c8d1bd6`, not the `<Board boardNarrowing.view>` handoff it describes; `mappers.ts:508` (cited
+  twice from `data-source-gateway.ts`) and `mappers.ts:906` (`builder-wiring.tsx`) were already
+  pointing at unrelated docblocks pre-plan; `view-types.ts:157`/`:180`/`:220` (`07-api-realtime-search.md`)
+  and `:183`/`:165` (`index.ts`, `contest-view-model.ts`) were already wrong pre-plan; `page.tsx:129`
+  and its four sibling line numbers in `12-offline-sync-apps.md` were already wrong pre-plan. None of
+  these sit in a file this plan touched for its own reasons, and re-pointing them was out of this
+  task's scope.
+- **Historical narrative, left as written:** the earlier "Finding 2 — 34 stale line-number citations
+  swept" paragraph above (2026-09-16, `board-prototype-port`) names `page.tsx:342` and
+  `board-search-scope.ts:59` as citations it fixed at the time; and this file's own 2026-09-02
+  planted-defect note names `mappers.ts:818`/`:822` and `view-types.ts:238`/`:239`. Both are frozen
+  records of a past verification, not live claims about current code shape, so re-pointing their
+  numbers to today's tip would misrepresent what those past events actually found — left as written,
+  per the same reasoning `03-foundation-ledger.md`'s other pre-existing issues are left alone.
+
+*Prose citations of pre-Task-6 names, re-pointed to the current names* (`board-search-scope.ts`,
+`filters-sheet.test.tsx`, `board-narrowing.test.tsx`): `buildBoardFilterChips` → `buildFilterChips`
+and `shouldRenderBoardNarrowingStrip` → `shouldRenderNarrowingStrip`, each marked
+"(renamed 2026-09-17)" where the surrounding sentence is itself historical (`board-narrowing.test.tsx:613`'s
+workflow-picker docblock; `filters-sheet.test.tsx:502`'s Ruling 13 paragraph;
+`board-search-scope.test.ts:93`/`:174`'s section headers), and left as a plain current-name swap where
+the sentence is a live "see also" pointer (`filters-sheet.test.tsx:245`). The `describe(...)` titles at
+`board-search-scope.test.ts:106`/`:185` are untouched — `13.442`/`13.443` are cited by those titles
+verbatim, and the catalogue names them historically. `apps/web/src/filter-edits.ts:7`'s citation of
+"the `toggledArray` convention" (deleted in Task 9) is rephrased to name it as the collapse convention
+`page.tsx`'s former `toggledArray` set, deleted 2026-09-17, with `withIdAxis` as its successor.
+
+*Spec amendments* (`docs/superpowers/specs/2026-09-17-filter-exclude-all-tabs-design.md`, new
+"Amendments during execution" section): (1) §4's accessible name is set via `aria-label` from a new
+`label: string` prop, not a visually-hidden suffix span — the sibling-span mechanism measured
+"Uma One , included" (a synthetic space between sibling contributions), so `.gn-visually-hidden` was
+never shipped and `13.551` does not assert it; (2) §3's scope note names its own tab via `TAB_NOUN`, a
+`Record` over the `view` union, so a fifth tab is a compile error rather than a silent `'board'`
+fallback (`13.556b`); (3) §2's wire refusal is reachable today through `toServerPreferences`
+(`online/mappers.ts:1018`, which maps every saved filter through `toServerFilterSpec`) for a saved
+filter carrying `exclude` — no code path writes one yet, since the project page mounts no saved-filter
+control, but whoever wires one owes it a catch/translate layer so the person sees a sentence about
+what their filter cannot express, not `UnexpressibleFilterError`'s developer-facing string.
+
+*Spec §8, named but not built, unchanged by this task:* server-side negation and plural axes on the
+wire (worth doing only past the 2000-row cap); filter state in the URL (a separate change — today's
+include-only filter isn't there either); date and field controls in the Filters sheet
+(`matchesListRow` already answers both axes, so a future control narrows every tab without touching
+the predicates); and State options' source moving from the board's rendered columns to the workflow
+definitions, deferred to the backlog/closed change set's own spec.

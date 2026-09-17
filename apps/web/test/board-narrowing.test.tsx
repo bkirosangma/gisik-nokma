@@ -610,14 +610,16 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  *
  * Narrows by dropping a whole GROUP, never by setting an axis on `filter`/
  * `boardFilter` — `matchesBoardCard` has no group in its signature, so no
- * chip built by `buildBoardFilterChips` could ever name this mechanism.
+ * chip built by `buildFilterChips` (renamed 2026-09-17; was
+ * `buildBoardFilterChips`) could ever name this mechanism.
  * These cases exercise the debt Task 4 named for the mechanism that could
  * eventually produce "narrowing with no filter axis set": before this task,
  * nothing could ever make `boardNarrowing.shown !== boardNarrowing.total`
- * true while `activeFilterChips` stayed empty, so `shouldRenderBoard
- * NarrowingStrip`'s third term was verified by reading the code, not by a
- * test that reaches it through real data. This file's own cases are that
- * test now (`13.470` below).
+ * true while `activeFilterChips` stayed empty, so
+ * `shouldRenderNarrowingStrip`'s (renamed 2026-09-17; was
+ * `shouldRenderBoardNarrowingStrip`) third term was verified by reading the
+ * code, not by a test that reaches it through real data. This file's own
+ * cases are that test now (`13.470` below).
  *
  * `defaultWorkflow`/`bugWorkflow` deliberately reuse the workflow's own
  * NAME ("Default"/"Bug triage") on BOTH the board's group heading

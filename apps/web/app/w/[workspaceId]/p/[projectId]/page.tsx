@@ -171,7 +171,8 @@ function ProjectBoard() {
    * **And the axis is `'active'` alone because the WIRE cannot say anything wider.**
    * The first version of this asked for `['open', 'active']` — *"hide done"*, which
    * is the narrowing a person would actually reach for. `toServerFilterSpec`
-   * (`mappers.ts:838-853`) throws `UnexpressibleFilterError` on it: the SIX
+   * (`mappers.ts:855-870`, re-pointed 2026-09-17 — the exclude-mode refusal
+   * above it shifted this block) throws `UnexpressibleFilterError` on it: the SIX
    * id-shaped axes are LISTS client-side — `assigneeIds`, `collaboratorIds`,
    * `typeIds`, `stateIds`, `stateCategories`, `projectIds` — while
    * `filterSpecSchema` takes exactly ONE value for each (`text`, `dueBefore`,

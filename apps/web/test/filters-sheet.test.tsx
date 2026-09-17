@@ -242,7 +242,7 @@ describe('13.449 picking a state chip narrows the board and discloses it', () =>
     // Every card sits in "Doing", so selecting it narrows nothing — but it
     // must still disclose via the chip (the narrowing strip's own three-term
     // gate opens on a chip existing, independent of whether it removed a
-    // card — see `shouldRenderBoardNarrowingStrip`).
+    // card — see `shouldRenderNarrowingStrip`).
     expect(await screen.findByTestId('board-filter-chip-stateIds')).toHaveTextContent('Doing');
     expect(screen.getByText('2 of 2 shown')).toBeInTheDocument();
   });
@@ -499,7 +499,8 @@ describe('13.458 absence: a failed board read refuses, never claiming it is mere
  * Ruling 12's own "clears all six" claim, and found a DIFFERENT six: the
  * fixed version included `collaboratorIds` (not a `BoardFilterSpec` axis,
  * produces no chip) while OMITTING `projectIds` (one of the six, with a
- * working chip via `buildBoardFilterChips`). Harmless only because nothing
+ * working chip via `buildFilterChips` (renamed 2026-09-17; was
+ * `buildBoardFilterChips`)). Harmless only because nothing
  * on this page sets `filter.projectIds` yet — which is exactly why it
  * needed fixing now rather than being left for the day some future control
  * writes it and finds "Clear all" silently does not clear it.

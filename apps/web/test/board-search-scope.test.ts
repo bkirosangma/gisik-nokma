@@ -90,7 +90,8 @@ describe('13.441 the combined case names all active axes, in a stable order', ()
 });
 
 /**
- * ## `buildBoardFilterChips` (Task 4 review, Important finding, remedy 1)
+ * ## `buildFilterChips` (renamed 2026-09-17; was `buildBoardFilterChips`)
+ * (Task 4 review, Important finding, remedy 1)
  *
  * The defect this replaces: the shipped chip builder only ever checked
  * `boardFilter.text`, because `text` was the only axis with a UI control at
@@ -171,7 +172,8 @@ describe('13.442 buildBoardFilterChips covers every BoardFilterSpec axis, not on
 });
 
 /**
- * ## `shouldRenderBoardNarrowingStrip` (Task 4 review, Important finding, remedy 2)
+ * ## `shouldRenderNarrowingStrip` (renamed 2026-09-17; was
+ * `shouldRenderBoardNarrowingStrip`) (Task 4 review, Important finding, remedy 2)
  *
  * `activeFilterChips.length > 0 || boardUnappliedAxes.length > 0` alone
  * cannot notice a mechanism that narrows the board WITHOUT setting any

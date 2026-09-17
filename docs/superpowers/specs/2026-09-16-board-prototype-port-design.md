@@ -161,8 +161,12 @@ The wire takes exactly one value per id-shaped axis
 `typeId`, `stateId`, `stateCategory`, plus scalar `blocked`, `text`, `dueBefore`,
 `dueAfter`). `toServerFilterSpec` throws `UnexpressibleFilterError` on a plural
 with more than one value. The client vocabulary
-(`packages/app-core/src/view-types.ts:142-153`) is plural and
-`matchesFilter` (`filter/matches-filter.ts:25-56`) already AND-combines it
+(`packages/app-core/src/view-types.ts:148-155`, re-pointed 2026-09-17 — the
+six axes were factored into a standalone `IdAxes` type at this range; was
+`FilterSpec`'s own `:142-153` before that split) is plural and
+`matchesFilter` (`filter/matches-filter.ts:35-97`, re-pointed 2026-09-17 —
+was `:25-56` before the exclude-mode checks were appended to the function)
+already AND-combines it
 locally — and its own docblock says a second declaration "would fork the filter
 vocabulary". This change adds no third vocabulary.
 

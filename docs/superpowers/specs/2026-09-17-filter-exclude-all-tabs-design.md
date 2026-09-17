@@ -30,10 +30,12 @@ because the second decides the shape of the first:
 
 - **The filter is client-side, and stays so.** The wire filter
   (`filterSpecSchema`) takes ONE value per axis and has no negation term at
-  all; `toServerFilterSpec` (`packages/app-core/src/online/mappers.ts:836-859`)
-  refuses anything wider rather than sending a narrower question. `page.tsx`'s
-  own docblock (`:180-184`) already records this: "'not done' needs either a
-  plural `stateCategory` on the route or a negation term, and today it has
+  all; `toServerFilterSpec` (`packages/app-core/src/online/mappers.ts:837-876`,
+  re-pointed 2026-09-17 — was `:836-859` before this plan's own exclude
+  refusal shifted the block) refuses anything wider rather than sending a
+  narrower question. `page.tsx`'s own docblock (`:186-190`, re-pointed
+  2026-09-17 — was `:180-184`) already records this: "'not done' needs either
+  a plural `stateCategory` on the route or a negation term, and today it has
   neither."
 - **Every tab already holds the complete project.** The server list route is
   paginated (cursor, 200 rows a page), but the client walks every page and
@@ -48,7 +50,8 @@ because the second decides the shape of the first:
   unreachable from this state today — the refusal it gains below is a fence
   for a future caller, not a live path.
 - **List rows can answer more axes than board cards.** `ListRow`
-  (`view-types.ts:159-200`) carries `assignee`, `typeId`, `stateId`,
+  (`view-types.ts:180-221`, re-pointed 2026-09-17 — was `:159-200` before
+  `IdAxes` was declared above it) carries `assignee`, `typeId`, `stateId`,
   `stateCategory`, `title`, `dueDate` and `fields`; it lacks collaborators.
   `BoardCard` carries no collaborators, no dates and no fields.
 - **The disclosure machinery exists and is reused, not duplicated.**
@@ -332,3 +335,31 @@ every gate.
   own spec, next) adds states the board does not show; that spec moves the
   source to the workflow definitions. Nothing here depends on which.
 - **Wildcard-only workflows and `stateIds`** — unchanged.
+
+## Amendments during execution (2026-09-17)
+
+1. **§4's accessible name is set via `aria-label`, not a visually-hidden
+   suffix span.** `TriStateChoice` builds its accessible name from a new
+   `label: string` prop; `children` stays `ReactNode`, free to carry the
+   person row's avatar beside the name. The brief's original mechanism — a
+   visible label span plus a visually-hidden sibling span carrying the state
+   suffix — measured RED on its own test: the accessible-name-from-content
+   algorithm joins sibling text contributions with a synthetic space, so
+   "Uma One" + ", included" computes to "Uma One , included", not the exact
+   string §4 requires. `aria-label` is the only mechanism that yields the
+   exact string, so the `.gn-visually-hidden` utility named in the original
+   design was never shipped, and 13.551 does not assert it.
+2. **§3's scope note names the tab it renders on.** "Not applied on the
+   board/list/calendar/timeline: …" reads its noun from `TAB_NOUN`, a
+   `Record` over the `view` union — TypeScript requires an entry for every
+   member, so a fifth tab added later without a matching noun is a compile
+   error rather than a silent fallback (13.556b).
+3. **§2's wire refusal is reachable today, through `toServerPreferences`.**
+   `toServerPreferences` maps every saved filter through `toServerFilterSpec`
+   (`online/mappers.ts:1018`); a `SavedFilter` carrying a non-empty `exclude`
+   throws `UnexpressibleFilterError` uncaught. No code path writes such a
+   saved filter today — the project page mounts no saved-filter control — so
+   this is not a live bug, but whoever wires a save-filter control onto a
+   filter that can now exclude owes that control a catch/translate layer, so
+   the person who triggers it sees a sentence about what their filter cannot
+   express, not `UnexpressibleFilterError`'s developer-facing string.
