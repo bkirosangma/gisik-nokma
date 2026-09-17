@@ -604,7 +604,7 @@ in the product.
 **Port verdict.** `held` — the block cannot be ported as drawn: its right column invents controls that live on the node and it omits the product's entire left column, so the mapping needs a ruling. Independently actionable: the three-class family with no CSS is a bounded **M** restyle.
 
 ### `isLegal` — `desktop.dc.html@6d7b67c0a52c:1720-1755`
-**Product route(s) + files.** `/privacy` → `apps/web/app/privacy/page.tsx:28`; `/terms` → `apps/web/app/terms/page.tsx:28`. Both render `<main className="gn-shell gn-legal">` with `<BackButton />` (`apps/web/src/back-button.tsx:33`).
+**Product route(s) + files.** `/privacy` → `apps/web/app/privacy/page.tsx:30`; `/terms` → `apps/web/app/terms/page.tsx:30`. Both render `<main className="gn-shell gn-legal">` with `<BackButton />` (`apps/web/src/back-button.tsx:33`).
 **Prototype delta (old→new).** `none` — normalised block diff, old `:1655-1690` vs new `:1720-1755`, 36 lines each.
 **Product gap (new prototype → product).**
 - *structure:* chrome — the prototype draws **its own top nav bar** (`--navBg` shadow) with a brand tile, the "Gisik Nokma" wordmark and a "Sign in" link; the product has no nav on these routes, using `BackButton` instead, styled `.gn-legal__back` (`apps/web/app/globals.css:1899`), whose docblock (`apps/web/src/back-button.tsx:6-21`) records why.
