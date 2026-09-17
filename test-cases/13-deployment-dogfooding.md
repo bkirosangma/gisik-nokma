@@ -11,6 +11,18 @@ then-highest id rather than renumbering. **Never renumber**: when Task 16, or an
 they continue from this file's then-highest id in turn, exactly as `09-editor-attachments.md` and
 `12-offline-sync-apps.md` did for the reservation gaps they each recorded.
 
+**AND THE PLANS COUNT TOO — added 2026-09-18, after a real collision.** ids reserved by a plan under
+`docs/superpowers/plans/` count as minted — recount BOTH the catalogue and the plans
+(`git grep -hoE '13\.[0-9]{3}' -- docs/superpowers/plans test-cases | sort -u | tail`) before allocating.
+The trap is exact: a plan reserves its range when it is WRITTEN, a catalogue mint reads the CATALOGUE
+when it runs, and the two see the same numbers as free. Step 1's hot-reload block did that on 2026-09-18
+(13.613–13.616 against the second-wave plan's 13.613–13.649, reserved since `5039209c` — before it) and
+was re-minted to 13.650–13.653; the block's own note at the end of this file carries the detail. **Keep
+the `{3}` width in that command.** It is load-bearing twice over, and both halves are measured on this
+tree rather than argued: widening it to `[0-9]+` puts `13.99` above `13.649` (lexical sort on
+variable-width numbers) and admits `13.9999`/`13.632866`, which are this file's truncation traps rather
+than case ids.
+
 **IDS IN §13 ARE ALLOCATED, NOT DISCOVERED — the same collision class §12 recorded, one file over: Lane D
 independently minted its own 13.1–13.36 for Tasks 7/8 against this file's 13.1–13.6, from a fork point
 that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane C 13.1–13.40** (Tasks 14
@@ -7208,14 +7220,25 @@ un-hedge now.
   verbatim and appends nothing —
   (`apps/server/test/routes/builder-reads.test.ts`)
 
-**Block 13.613–13.616 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
+**Block 13.650–13.653 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
 the property under test is that a CONTAINER, started by compose, picks up HOST edits — there is no test
 runner on either side of a Docker Desktop bind mount, and a unit test of the compose file would assert
 YAML rather than prove the reload. Numbers below were measured once, on this machine, at the head of
 this change's PR; they are readings, not guarantees. (The branch's high-water mark was **13.612**;
 `13.632`/`13.999` are this file's documented truncation traps, not free ids.)
 
-- 🧪 **13.613 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
+**These four were minted as 13.613–13.616 and RE-MINTED here on the controller's ruling of 2026-09-18.**
+Renumbering is otherwise forbidden in this catalogue; it is done once, for this block, because the four
+ids were not free when they were taken. `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+— on the branch since `5039209c`, which is BEHIND this change — reserves `13.613–13.649` for its twelve
+tasks and names `13.613`/`13.614`/`13.615`/`13.616` in its own test names. That plan was written when
+this file's high-water mark was 13.612, so "the next free id here" and "the next reserved id there"
+pointed at the same four numbers, and only this file was consulted. Nothing was red: the plan's ids are
+not in the catalogue yet, so no duplicate id existed to trip `check-case-ids`. It is fixed now rather
+than left because the second wave would otherwise mint twelve tasks on top of these rows, and a plan's
+reservation is a reservation. The allocation note at the top of this file now carries the rule.
+
+- 🧪 **13.650 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
   baked image.** `docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml
   up -d --build server` run from the executor's worktree: cold build **94 s**, container healthy
   **~24 s** after start, `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,
@@ -7237,7 +7260,7 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   `/repo/reference`, which this override declares itself. All eleven resolve under the worktree
   (`docker inspect --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}'`).
   (`docker-compose.hot.yml`, `apps/server/Dockerfile`)
-- 🧪 **13.614 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
+- 🧪 **13.651 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
   `console.log("HOT-WITNESS-SERVER")` added at the top of `apps/server/src/index.ts` appeared in
   `docker logs` and a `[tsx] change in ./src/index.ts` restart line followed in **1.93 s** —
   re-measured after the container command gained the watcher supervisor; it was **1.62 s** before
@@ -7262,7 +7285,38 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   a count — `ps -o args= | grep -c "typescript/bin/tsc"` → **7**, one per package; the near-miss
   pattern `tsconfig.json --watch` matches **9** because the container's own command line and the
   `pnpm -r` parent both contain it. (`docker-compose.hot.yml`, `docs/runbook.md`)
-- 🧪 **13.615 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
+
+  **AMENDED 2026-09-18 (Step 1b) — the save shape of the tool that does the editing, the watcher change it
+  forced, and a correction to the count at the end of this case.** The in-place measurement above was true
+  and incomplete. `tsx watch` is still what runs; what changed is that it now POLLS, and both halves of that
+  sentence are measured:
+  **the assistant's Edit tool writes by RENAME-OVER, not in place** — the host inode changes on every edit,
+  measured three times across two files (`apps/web/app/sign-in/page.tsx` `204060486 → 204060616 → 204060679`,
+  `apps/server/src/index.ts` `204014631 → 204061084`), which makes the rename-over shape this case calls an
+  occasional "atomic save" the shape EVERY assistant-written server edit has. **And that shape does not
+  merely get missed — it kills the watch.** After one such write to `src/index.ts`, neither a true in-place
+  write (inode preserved, measured) nor a `touch` produced a `[tsx]` line in 15–20 s, while the same in-place
+  write on a freshly restarted container produced `[tsx] change in ./src/index.ts Restarting...` in **0.5 s**.
+  In between, the API served stale code with `/healthz` answering 200 and the correct file on the mount.
+  **Door one was measured and is closed:** `node --watch --import tsx src/index.ts` — Node's watch mode
+  watches each loaded module's parent DIRECTORY rather than the inode, so it should be indifferent to the
+  save shape — did not restart on a host rename-over, a host in-place write, or a write made INSIDE the
+  container. The last of those crosses no mount at all, so it is the watcher not seeing its own entry point,
+  not virtiofs losing events. **Door two ships:** `CHOKIDAR_USEPOLLING=true` with `CHOKIDAR_INTERVAL=1000`.
+  Witnessed in ONE container, not restarted between the halves — an Edit-tool write (rename-over, inode
+  verified changed) restarts it in **1.6 s** and its marker is served; a true in-place write AFTER that
+  restarts it again in **1.6 s**, so the watch survived the rename; and a `packages/domain/src` edit reached
+  `dist` and restarted the server **2.6 s** end to end. Cost, settled `docker stats` with the variable
+  overridden back to empty in the same session: CPU **6.05–6.47 %** with polling on versus **2.39–3.73 %**
+  off, memory ~1.24 GiB versus ~1.22 GiB.
+  **The correction:** the two operator counts at the end of this case cannot be produced by the commands as
+  written. Measured on a container with all seven watchers alive — unbracketed
+  `ps -o args= | grep -c "typescript/bin/tsc"` prints **9** and unbracketed `"tsconfig.json --watch"` prints
+  **11**, because the `sh -c` line and the `grep` process match themselves. Bracketing the first character
+  (`"[t]ypescript/bin/tsc"` → **7**, `"[t]sconfig.json --watch"` → **9**) reproduces the numbers this case
+  claims. The runbook's copy of the check is corrected in the same change set.
+  (`docker-compose.hot.yml`, `docs/runbook.md`)
+- 🧪 **13.652 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
   watcher SHAPE.** `export const HOT_WITNESS = "domain-hot";` appended to
   `packages/domain/src/index.ts`, plus `console.log(HOT_WITNESS)` in the server entry importing it from
   `@gisik-nokma/domain` (by package name, so it resolves through `./dist`): the marker appeared in
@@ -7271,7 +7325,7 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   showing both restarts — `change in ./src/index.ts` and `change in
   ./../../packages/domain/dist/index.js`. Total watchers on a settle: seven `tsc -p tsconfig.json
   --watch` (one per package), `tsx watch`, and the server process. (`docker-compose.hot.yml`)
-- 🧪 **13.616 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
+- 🧪 **13.653 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
   container.** `docker compose … up -d server` with **no** `--build`: container id
   `df98f7588bf5…` identical before and after, and zero build/export/name lines in the output. And the
   plain path still reads what it read before: `docker compose --env-file .env -f docker-compose.dev.yml
@@ -7281,3 +7335,76 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   `["node","dist/index.js"]` — the check that the new `dev` stage did not become the default build,
   which it would have if it had been appended after `runtime` instead of placed before it.
   (`docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`)
+
+**Block 13.654–13.657 — hot-reload dev mode for the compose `web`, 2026-09-18.** All four are `🧪`, for the
+reason the block above gives: the property under test is that a CONTAINER, started by compose, picks up HOST
+edits, and there is no test runner on either side of a Docker Desktop bind mount. Numbers were measured once,
+on this machine, at the head of this change's PR — readings, not guarantees.
+
+- 🧪 **13.654 — the hot `web` comes up from the worktree, serves the BRANCH's source, and proxies to the hot
+  server.** Cold image build **68 s**. `up -d web` (no `--build`) → `curl :3001/` answers **307** (the sign-in
+  redirect) **40 s** later, and `curl :3001/v1/auth/methods` returns
+  `{"google":true,"apple":false,"phone":false}` in **139 ms** — the load-bearing half, because with
+  `SERVER_ORIGIN` unset or wrong the same proxied path returns **500 after a 30-second hang** while the app
+  itself still serves. All **11** mounts resolve under the executor's worktree (4 under `apps/web/`, 7 package
+  `src` trees, none of them `node_modules`, `dist` or `.next`), and the `server` container was **not**
+  recreated by that command (same id, `Up 19 minutes` at the reading).
+  **The :3001 handover, as it happened.** The listener was pid **26954**, `ucomm=node`, executable
+  `/Users/kiro/.nvm/versions/node/v22.22.2/bin/node`, thread titled `next-server (v15.5.25)`; its parent
+  26946's argv was `.../next/dist/bin/next dev -p 3001`, grandparent `pnpm --filter @gisik-nokma/web dev`,
+  cwd the owner's primary checkout. The whole tree was stopped, not just the socket holder, because
+  `next dev` respawns its server child. 3001 was free **1 s** later, and the first 307 came **107 s** after the
+  kill. **A second, unplanned recovery is part of this case:** at ~01:35 the Docker engine restarted on its own
+  (every container `Exited`, the `dev` ones 137), and `up -d server web` brought both back with the **same
+  container ids** in **7 s**, `google:true` included.
+  (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
+- 🧪 **13.655 — a web-source edit is live in seconds, in BOTH save shapes, with the executor's own tool.** A
+  `data-hot-witness` marker added to `apps/web/app/sign-in/page.tsx` via the Edit tool was served by
+  `curl :3001/sign-in` (and gone again after the revert), restarting the compile in **1.2 s / 1.5 s / 1.5 s**;
+  a **rename-over** (`mv` a modified copy onto the path) compiled in **1.6 s**; and a **true in-place write**
+  (host inode verified UNCHANGED, `204060733 → 204060733`) compiled in **2.6 s** and was served within 4 s.
+  That last one was measured on a SECOND pass, and the correction matters: the first pass labelled the three
+  Edit-tool timings "in-place edits", and **they were not** — the Edit tool writes by rename-over (host inode
+  changed on every edit: `204060486 → 204060616 → 204060679`), so the entire first pass was the rename-over
+  shape, which is what the case four sentences later says. The numbers were right and the label was wrong, and
+  a reader would have taken "both shapes" as licence not to care which one a save uses. The rename-over half
+  is the load-bearing one either way: it is the shape 13.651 records the SERVER's watcher permanently losing
+  its watch over, and Next's webpack watcher takes it without complaint.
+  **One outlier is recorded rather than smoothed: 59.4 s** between a write and its compile; it landed, but a
+  30-second wait reads it as lost, which is how the first pass mis-read it. **The instrument matters:** the
+  Edit tool's round-trip precedes any curl poll, so a curl-based stopwatch starts ~17 s late; the write's own
+  mtime against the compile line is the measurement.
+  **A claim in this case was retracted, and the retraction is the more useful half.** The first version said
+  `docker logs` WITHOUT `--since` under-reports (6 lines against 9). It does not: that reading compared a
+  **summarised** result against a pass-through one — this machine's Bash hook routes commands through `rtk`,
+  which can replace a bare `docker logs` output with its own summary, and the tell was a trailing
+  `[warn] 0 warnings (0 unique)` / `[info] 0 info messages` footer that is rtk's and not the container's.
+  As a control, bare and `rtk proxy` agree exactly (**658 lines each**). The surviving rule is the inverse one:
+  a suspiciously short log read is evidence about the READER, not about the container.
+  (`docker-compose.hot.yml`, `docs/runbook.md`)
+- 🧪 **13.656 — a PACKAGE edit reaches the web through `dist`, and the package watcher can silently stop.**
+  `packages/ui/src/tokens.ts`: `blue600` `#3a6db0` → `#abcdef`. The web container's own
+  `packages/ui/dist/tokens.js` gained the new hex, and the SERVED HTML carried it **4 times** with the old hex
+  at **0** — `themeStylesheet()` reads the palette through `dist`, so a token edit is visible on :3001 without
+  a rebuild. Compile **6.7 s** after the write (20:19:21 → 20:19:27.7). **The revert is the finding:** the
+  in-place write that put the old hex back was **not** seen by the web container's `tsc --watch` — 80 s later
+  `dist` was still stale and the served page still `#abcdef`, and a `touch` did not wake it either. Only
+  restarting the container restored it (307 again in **10 s**, palette back on the first poll). So the
+  package watchers share the server's failure class even though Next's own watcher does not, and the reliable
+  recovery is a restart rather than a save-shape change. Cost of the settled pair, one reading with polling
+  on: `server` **8.03 %** CPU / 1.686 GiB, `web` **1.80 %** CPU / 2.685 GiB — the web holds its own `dist`
+  and `.next`, which is why its memory is the larger of the two. (`docker-compose.hot.yml`)
+- 🧪 **13.657 — the un-hot path is intact, a no-`--build` `up` neither rebuilds nor replaces, and the prod
+  stages are unchanged — proven by CHECKSUM, not by reading a diff.** `docker compose … up -d server web`
+  with no `--build`: exit 0, **zero** build/export/name lines, and `web`'s container id `daac60fe23a7`
+  identical before and after. `docker-compose.dev.yml` is byte-identical to the base
+  (sha256 `4af45990c8cd57052562fb794f64c5bbc84ce3b930ab592a2a5d68f0b4bf4a38` on both sides, and that is the
+  proof — the `git diff` for it prints nothing at all, which is also what a typo'd command prints);
+  `apps/web/Dockerfile` is **67 added / 0 deleted**, and its `runtime` stage extracted from the first
+  `FROM … AS runtime` hashes identically to the base's (`c66cc6f9f59f…`). And the un-targeted build is still
+  the production one: `docker build -f apps/web/Dockerfile .` with no target produces an image whose
+  `CMD` is `["node","apps/web/server.js"]` with `WORKDIR=/app` (digest `34e65c7a…`) — the check that the new
+  `dev` stage did not become the default, which it would have if it had been appended after `runtime`. **One
+  caveat on the instrument:** the FIRST attempt at that build was killed by the engine restart above, and the
+  background wrapper reported `exit code 0` while its own log said `EXIT=1` — the log is the reading.
+  (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)

@@ -1,20 +1,29 @@
-# Hot-reload dev mode for the compose `server` service.
+# Hot-reload dev mode for the compose `server` and `web` services.
 #
 # NOT usable on its own. It is an OVERRIDE, always composed with the base file:
 #
 #   docker compose --env-file .env \
-#     -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server
+#     -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server web
 #
 # `docker-compose.dev.yml` is deliberately UNCHANGED by this file's introduction
 # — the prod-parity image path and the compose contract suite keep reading it
-# exactly as before, and the prod `server` image is still the un-targeted build.
+# exactly as before, and the prod images are still the un-targeted builds.
 # `pnpm dev:stack` (root package.json) is that command.
 #
-# What changes here: the `server` container runs the branch's SOURCE from bind
-# mounts instead of the baked `dist`, with watchers that restart it on save. So
-# the code the owner sees live on :3001 is the code in the checkout this file is
-# invoked from — for the serial executor, `/Users/kiro/my_projects/gisik-nokma-exec`,
-# on whatever branch that worktree is on.
+# What changes here: the `server` and `web` containers run the branch's SOURCE
+# from bind mounts instead of the baked artifacts, with watchers that reload them
+# on save. So the code the owner sees live — the browser on :3001 (the `web`
+# container), proxied to the API on :3000 (the `server` container) — is the code
+# in the checkout this file is invoked from: for the serial executor,
+# `/Users/kiro/my_projects/gisik-nokma-exec`, on whatever branch that worktree is
+# on.
+#
+# THE `web` HALF ARRIVED SECOND, and it retires a sentence this header used to
+# carry. Until it did, ":3001" was the owner's own `next dev` and the only live
+# process here was the server on :3000; the header named :3001 as where "the
+# owner sees" the hot code, which was true of the browser and misleading about
+# the container. Now that both halves are hot, the two ports are named above and
+# neither is the other's shorthand.
 #
 # Compose MERGES the `volumes` list with the base file's, so the base's
 # `./reference:/app/reference:ro` survives alongside the mounts below. That is
@@ -46,9 +55,48 @@ services:
     # `rootDir: src`), and consumers import workspace packages BY NAME
     # (`@gisik-nokma/domain` resolves through `./dist`), so a source edit here
     # reaches the server by way of `dist` — which is exactly what witness W3
-    # measures. Polling is NOT enabled: if inotify events were provably not
+    # measures.
+    #
+    # [SUPERSEDED 2026-09-18 by the note below — polling IS enabled now. This
+    # paragraph is kept, not deleted, because its BAR is the right one and the
+    # note below clears it: the fix was applied only after the missing event was
+    # named and measured, not on suspicion. Read the two together.]
+    # Polling is NOT enabled: if inotify events were provably not
     # crossing the Docker Desktop mount, the fix would be stated with the
     # measurement that showed the missing event, not applied on suspicion.
+    #
+    # THE SERVER'S WATCHER POLLS, AND THAT WAS NOT THE FIRST CHOICE — 2026-09-18.
+    #
+    # The defect this answers: `tsx watch` uses chokidar, which does not merely
+    # MISS a rename-over save — the atomic-save shape, which is also exactly what
+    # the assistant's own Edit tool writes (the host inode changes on every edit;
+    # measured three times across two files) — it PERMANENTLY LOSES its watch on
+    # that file. After one such write to `src/index.ts`, neither a true in-place
+    # write (host inode preserved, measured) nor a `touch` produced a `[tsx]`
+    # line in 15-20 s, while the SAME in-place write on a freshly restarted
+    # container produced `[tsx] change in ./src/index.ts Restarting...` in 0.5 s.
+    # Consequence: the live API serves STALE code while `/healthz` answers 200,
+    # `docker ps` says healthy, and the file on the mount is correct — the
+    # 2026-09-09 shape this whole file exists to prevent, reachable with no
+    # rebuild involved.
+    #
+    # `node --watch --import tsx src/index.ts` WAS MEASURED FIRST, because Node's
+    # watch mode watches each loaded module's PARENT DIRECTORY rather than the
+    # inode and so should be indifferent to the save shape. IT DID NOT WORK HERE,
+    # and not for the expected reason: with the entry point running under it, a
+    # host rename-over, a host IN-PLACE write, and a write made INSIDE the
+    # container all failed to restart the process — 0 `Restarting` lines, child
+    # pid unchanged, marker never printed. A container-local write crosses no
+    # mount at all, so that is the watcher not seeing its own entry point rather
+    # than virtiofs losing events. The first door is therefore closed by
+    # measurement, not by preference.
+    #
+    # What is enabled instead is the fallback the earlier note rejected on the
+    # evidence then available — that in-place writes DO cross the mount. That
+    # stopped being sufficient once the writer that matters turned out to be a
+    # rename. tsx 4.23.12 carries chokidar's `usePolling` (measured); the CPU
+    # cost is recorded in the PR body as `docker stats` settled, polling on
+    # versus off.
     # `sh -c` IS LOAD-BEARING, not decoration. Compose v2 does NOT run a
     # string-form `command` through a shell: it shell-word-SPLITS it and execs
     # the result. Measured on this file before this fix — `config` rendered
@@ -79,6 +127,15 @@ services:
     # none, because it is trusted. The failure is therefore DOCUMENTED as an
     # operator check instead (`docs/runbook.md`, "watchers still alive"), which
     # is the honest form -- a check someone runs beats a guard that lies.
+    environment:
+      # POLLING, and only because the measured default misses the save shape the
+      # assistant's editor writes — see the watcher note above for the measurement
+      # and for why the first door (node --watch) was closed instead.
+      # `CHOKIDAR_INTERVAL` is milliseconds; 1000 is chokidar's own default and is
+      # stated rather than left implicit so the reload latency it implies (~1 s)
+      # is a documented choice rather than a surprise.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
     volumes:
       # SOURCE ONLY. Two things are deliberately absent and both would break the
       # container if mounted:
@@ -98,3 +155,107 @@ services:
       - ./packages/sync-client/src:/repo/packages/sync-client/src
       - ./packages/ui/src:/repo/packages/ui/src
       - ./reference:/repo/reference:ro
+
+  # ---------------------------------------------------------------------------
+  # THE `web` HALF OF HOT MODE. Added 2026-09-18, one step after the `server`
+  # half above, and it retires the owner's own `next dev` on :3001 — the process
+  # whose absence the Step 1 header called "the server I was running".
+  #
+  # `ports: "3001:3000"` is INHERITED from docker-compose.dev.yml and not
+  # restated here, which is why `next dev` runs on 3000 INSIDE: the browser's
+  # :3001 is the host side of that mapping. `depends_on: server: service_healthy`
+  # is inherited the same way — compose merges the map — so the proxy target is
+  # answering before this starts serving.
+  web:
+    build:
+      # `context`, `dockerfile` and the base file's two build args are inherited;
+      # only the stage is added. The stage MUST be named, because the web
+      # Dockerfile's un-targeted default is the production `runtime` stage — the
+      # same trap the `server` service above documents, in the same shape.
+      target: dev
+    command:
+      # `sh -c` explicitly, for the measured reason given at `server` above:
+      # compose v2 shell-word-SPLITS a string-form `command` and execs the
+      # result, so without this the container would die on a program named
+      # `set` and the `&` would be lost.
+      #
+      # THE SAME `tsc --watch` LOOP AS `server`, and deliberately not a shared
+      # watcher: two containers reading one host source tree is fine, two
+      # WRITERS on one `dist` is not, so each container writes its own. That
+      # costs a second set of seven watchers — measured rather than waved at:
+      # `docker stats --no-stream` on the settled pair appears in case 13.656.
+      #
+      # NO SUPERVISOR HERE EITHER, and for the same measured reason the `server`
+      # service records at length: `kill -0` succeeds on an exited-but-unreaped
+      # background child in busybox ash, so a liveness guard there cannot fire.
+      # A dead package watcher is checked by hand, in the runbook's web
+      # paragraph, which carries the same operator command.
+      - sh
+      - -c
+      - |
+        set -e
+        echo 'hot-web: starting package watchers'
+        pnpm -r --parallel --filter './packages/*' exec tsc -p tsconfig.json --watch --preserveWatchOutput &
+        echo 'hot-web: starting next dev on :3000 (host :3001)'
+        pnpm --filter @gisik-nokma/web exec next dev -p 3000 -H 0.0.0.0
+    environment:
+      # The prod image takes its two load-bearing knobs as BUILD args, because
+      # `next build` serialises them into .next. `next dev` does not: it loads
+      # next.config.ts at start and reads process.env, so in hot mode they are
+      # RUNTIME environment and that is the whole difference between this block
+      # and the base file's `args:`.
+      #
+      # SERVER_ORIGIN must be the compose service name, and what the wrong value
+      # does was measured against a live stack rather than predicted: with
+      # `http://localhost:3000` inside this container the proxied path returns
+      # **HTTP 500 after a 30-second hang** (EADDRNOTAVAIL on 127.0.0.1:3000),
+      # while every other signal looks healthy — the server is up, the web
+      # container is Up, and `GET :3001/` still answers 307. Only /v1/* fails.
+      SERVER_ORIGIN: http://server:3000
+      # NEXT_PUBLIC_ means "baked into the browser bundle", so this one names
+      # the host-published port and NOT the service: the browser dials it
+      # directly for the /v1/stream socket, which the rewrites deliberately do
+      # not cover.
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Declared for parity with the prod image's three remaining build args, and
+      # they are EMPTY for the same reason those are: `apps/web/Dockerfile`
+      # records that all three have ZERO readers in apps/ or packages/ (swept,
+      # with a positive control), and the primary checkout's `.env` carries
+      # `GOOGLE_CLIENT_ID`, not these names. Named here so the knobs a future
+      # Drive-picker wiring would reach for exist in hot mode too — and so that
+      # nobody reads their absence as evidence the wiring is elsewhere.
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: "${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}"
+      NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: "${NEXT_PUBLIC_GOOGLE_PICKER_API_KEY:-}"
+      NEXT_PUBLIC_GOOGLE_APP_ID: "${NEXT_PUBLIC_GOOGLE_APP_ID:-}"
+    volumes:
+      # SOURCE ONLY, and the same two absences as `server` for the same reasons:
+      #   node_modules — the host's are macOS-native and the container's are
+      #                  Linux, so mounting them breaks the container rather
+      #                  than merely stale-ing it.
+      #   dist         — written IN each container by its own watchers.
+      # Plus a third that is specific to this container:
+      #   .next        — the dev compile cache, and it MUST be the container's
+      #                  own. A host `.next` is a macOS build of a different
+      #                  platform; `.dockerignore` already keeps it out of the
+      #                  image (`**/.next`), and mounting it would put a foreign
+      #                  cache in the compiler's path.
+      #
+      # NOT MOUNTED, and each for a reason rather than by omission: `tsconfig.json`
+      # (Next REWRITES this file when it needs to — for example to add
+      # `next-env.d.ts` to `include` — so a read-write bind mount would let the
+      # container edit the host's tracked file) and `package.json` (a dependency
+      # change is a lockfile change, and the runbook's rebuild rule already
+      # covers that path). Neither is read per-request, so a host edit to one
+      # needs a `--build`, the same as a new package.
+      - ./apps/web/app:/repo/apps/web/app
+      - ./apps/web/src:/repo/apps/web/src
+      - ./apps/web/public:/repo/apps/web/public
+      - ./apps/web/next.config.ts:/repo/apps/web/next.config.ts
+      - ./packages/app-core/src:/repo/packages/app-core/src
+      - ./packages/domain/src:/repo/packages/domain/src
+      - ./packages/editor/src:/repo/packages/editor/src
+      - ./packages/mcp-server/src:/repo/packages/mcp-server/src
+      - ./packages/rule-engine/src:/repo/packages/rule-engine/src
+      - ./packages/sync-client/src:/repo/packages/sync-client/src
+      - ./packages/ui/src:/repo/packages/ui/src
