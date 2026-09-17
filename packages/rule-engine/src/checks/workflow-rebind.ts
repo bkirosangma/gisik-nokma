@@ -1,5 +1,5 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
-import { BACKLOG_STATE_ID, ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, stateCategoryOf, ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
@@ -128,6 +128,24 @@ export async function checkTicketWorkflowRebound(
     }
   } else if (!target.states.some((state) => state.id === p.toStateId)) {
     return refuse('ticket.rebound-unknown-state', reboundUnknownStateRefusal(target.name, p.toStateId, ticket.id));
+  }
+
+  // Ruling 53(i), Finding 5 (final whole-branch review, 2026-09-17): closed
+  // ⇒ terminal is an invariant the CLOSE/REOPEN checks hold (`checks/close.ts`)
+  // but this one never asked about at all — a closed ticket in a terminal
+  // state could be rebound onto a target's ACTIVE or OPEN state with nothing
+  // to stop it, landing `closed_at IS NOT NULL` beside `state_category` that
+  // is not terminal, which `close-requires-terminal` exists to forbid and
+  // which the sheet, the board and every closed-implies-terminal reader
+  // (spec §2, `ticket-sheet.tsx`) never expected to see. `stateCategoryOf` is
+  // BACKLOG-AWARE (`statesWithBacklog`), so this reads the target's category
+  // uniformly whether `p.toStateId` is a declared state or (for an
+  // already-parked ticket, per Ruling 52(b) above) backlog itself — and
+  // backlog's own category is `open`, never terminal, so a closed ticket can
+  // never be "rebound to parked" either, which is the correct answer: a
+  // closed ticket has no legal move at all except to another terminal state.
+  if ((ticket.closed ?? null) !== null && stateCategoryOf(target, p.toStateId) !== 'terminal') {
+    return refuse(REFUSAL_RULES.closedTicket, 'This ticket is closed; a migration may only move it to a terminal state.');
   }
 
   return ACCEPT;

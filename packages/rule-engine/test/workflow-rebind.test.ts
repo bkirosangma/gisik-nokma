@@ -4,6 +4,7 @@ import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketWorkflowRebound } from '../src/checks/workflow-rebind.js';
 import { evaluateEvent } from '../src/evaluate.js';
+import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import type { EngineContext } from '../src/engine.js';
 import { OTHER_WS, PROJECT, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
@@ -58,9 +59,11 @@ function rebind(ticketId: string, toWorkflowId: string, toStateId: string): Even
 /** One task on `wf-basic`, with `wf-ops` defined and available to migrate onto. */
 const ctx = () => buildMemoryContext([WF, WF_OPS], [typeDefined(TASK), created(T, 'task', null)]);
 
-/** `ticket.transitioned`, in the domain's own dialect — `close.test.ts`'s pattern, needed here too for Ruling 52(b): parking a ticket via the universal Send-to-backlog edge. */
+/** `ticket.transitioned`/`ticket.closed`, in the domain's own dialect — `close.test.ts`'s pattern, needed here too for Rulings 52(b) and 53(i). */
 const move = (to: string): EventEnvelope =>
   makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: T }, workspaceId: WS, payload: { to } });
+const close = (): EventEnvelope =>
+  makeEnvelope({ type: 'ticket.closed', entity: { kind: 'ticket', id: T }, workspaceId: WS, payload: {} });
 
 /**
  * Literal rule ids and literal, fully-interpolated reasons — never the builder
@@ -331,5 +334,49 @@ describe('checkTicketWorkflowRebound — Ruling 52(b): a parked ticket rebinds o
       rule: 'ticket.rebound-unknown-state',
       reason: 'The workflow "Operations" has no state "backlog", so ticket 01J9GTKT000000000000000000 cannot be placed there.',
     });
+  });
+});
+
+/**
+ * 13.608 — Ruling 53(i), Finding 5 (final whole-branch review, 2026-09-17):
+ * closed ⇒ terminal must survive a rebind, not only an ordinary transition.
+ * `checkTicketWorkflowRebound` never read `ticket.closed` at all before this
+ * fix, so a closed ticket in a terminal state could be rebound onto an
+ * ACTIVE state of the target workflow with nothing to stop it —
+ * `close-requires-terminal`'s own invariant, breached through the one door
+ * that never asked. `WF_OPS_V2` (already declared above, for the
+ * "latest, not pinned" case) is reused rather than duplicated: it carries
+ * both an active state (`triage`) and a terminal one (`shipped`) at the
+ * SAME version, which is exactly what these two cases need side by side.
+ */
+describe('checkTicketWorkflowRebound — Ruling 53(i): closed tickets may only migrate to a terminal state', () => {
+  /** `wf-basic`'s ticket, moved to `done` (terminal) and closed. */
+  const closedCtx = () => buildMemoryContext([WF, WF_OPS, WF_OPS_V2], [typeDefined(TASK), created(T, 'task', null), move('done'), close()]);
+
+  it('13.608 refuses a closed ticket mapped to a non-terminal (active) target state, naming the reason verbatim', async () => {
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'triage'), closedCtx())).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.closedTicket,
+      reason: 'This ticket is closed; a migration may only move it to a terminal state.',
+    });
+  });
+
+  it('13.608 accepts a closed ticket mapped to ANOTHER terminal target state, and it commits still closed', async () => {
+    const before = closedCtx();
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), before)).toEqual({ refused: false });
+
+    // Committed and still closed: a SECOND context that also folds the
+    // accepted rebind (prior events are folded unconditionally, exactly as
+    // `checkTicketWorkflowRebound` above just approved), read back through
+    // `getEntityState` rather than assumed from the accept alone.
+    const after = buildMemoryContext(
+      [WF, WF_OPS, WF_OPS_V2],
+      [typeDefined(TASK), created(T, 'task', null), move('done'), close(), rebind(T, 'wf-ops', 'shipped')],
+    );
+    const ticket = (await after.getEntityState('ticket', T)) as TicketState;
+    expect(ticket.workflowId).toBe('wf-ops');
+    expect(ticket.stateId).toBe('shipped');
+    expect(ticket.stateCategory).toBe('terminal');
+    expect(ticket.closed).toEqual({ actorId: expect.any(String), at: expect.any(String) });
   });
 });

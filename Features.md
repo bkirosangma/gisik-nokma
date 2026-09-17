@@ -789,9 +789,12 @@ reason on record, not an oversight:*
   reach the internal append path (`AppDeps.ingest` is narrowed to `ClientIngest` for exactly that
   reason). What ships is the achievable half — every question that could refuse the batch is asked
   UP FRONT over the whole ticket set, so a refusal appends nothing and the answered count equals the
-  events appended. Three such refusals, each `422 {status:'refused', rule, reason}`:
-  `migration.same-workflow`, `migration.unknown-target-state`, and `migration.unmapped-state`
-  naming the states that have no target.
+  events appended. Four such refusals, each `422 {status:'refused', rule, reason}`:
+  `migration.same-workflow`, `migration.unknown-target-state`, `migration.unmapped-state` naming
+  the states that have no target, and `migration.closed-to-non-terminal` (Ruling 53(ii), 2026-09-17)
+  naming the count and the non-terminal state(s) a closed row would otherwise land on — the same
+  closed-⇒-terminal invariant `ticket.workflow_rebound`'s own engine check holds, asked here up
+  front so a batch that would trip it per-event is refused before any event is built.
   **Parked tickets carry as parked** (Ruling 52(a), Finding 2, 2026-09-17): a `backlog` row is
   implicitly mapped to the universal Backlog state regardless of what `stateMap` says — the dialog
   builds its map from the source workflow's OWN declared states only, so backlog (never declared)

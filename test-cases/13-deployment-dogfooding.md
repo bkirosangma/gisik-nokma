@@ -7059,10 +7059,8 @@ ticket sheet" bullet describes `TicketSheet` reading `state.closed ?? null`
 false at the mapper layer 13.603 fixes, so it needed no hedge and needs no
 un-hedge now.
 
-
-**Final whole-branch review, fix wave B (2026-09-17) — Findings 2 and 4
-(the engine/server half of the review's Finding 2 and 4; Finding 5's
-engine/server/validator fixes land in this wave's second commit).**
+**Final whole-branch review, fix wave B (2026-09-17) — Findings 2, 4 and 5
+(the engine/server/validator half; the client half shipped in fix wave A).**
 
 - **13.605** ✅ Ruling 52(b), Finding 2 (2026-09-17) — `checkTicketWorkflowRebound`
   (`packages/rule-engine/src/checks/workflow-rebind.ts:106`) refused
@@ -7112,3 +7110,58 @@ engine/server/validator fixes land in this wave's second commit).**
   seeds under `apps/server/src/seed/*` are unaffected — deliberately: they
   populate boards on purpose and are not a production creation path —
   (`packages/mcp-server/test/write-tools.test.ts`)
+- **13.608** ✅ Ruling 53(i), Finding 5 (2026-09-17) — `checkTicketWorkflowRebound`
+  never read `ticket.closed` at all, so a closed ticket in a terminal state
+  could be rebound onto an ACTIVE (or open) state of the target workflow
+  with nothing to stop it — `close-requires-terminal`'s own invariant,
+  breached through the one door that never asked. Fix: when the ticket is
+  closed and the target state's category (`stateCategoryOf`, backlog-aware)
+  is not `terminal`, refuse `REFUSAL_RULES.closedTicket` with the reason
+  "This ticket is closed; a migration may only move it to a terminal
+  state." Two cases, reusing `WF_OPS_V2` (already declared for the
+  "latest, not pinned" case) rather than a new fixture, since it carries an
+  active state (`triage`) and a terminal one (`shipped`) at the same
+  version: a closed ticket (moved to `done`, then `ticket.closed`) mapped to
+  `triage` refuses with the reason verbatim; mapped to `shipped` (a
+  DIFFERENT terminal state) commits, and a second context that also folds
+  the accepted rebind confirms — via `getEntityState`, not assumed from the
+  accept alone — the ticket lands on `shipped`/`terminal` still carrying its
+  `closed` claim —
+  (`packages/rule-engine/test/workflow-rebind.test.ts`)
+- **13.609** ✅ Ruling 53(ii), Finding 5 (2026-09-17) — the bulk rebind route
+  had no gate at all for a closed row: the SELECT never read `closed_at`, so
+  a closed ticket's own occupied state could be mapped onto a non-terminal
+  target and commit, landing `closed_at IS NOT NULL` beside an active
+  `state_category` — the same invariant breach as 13.608, reached through
+  the route instead of a single event. Fix: the SELECT gains `closed_at`,
+  and BEFORE any event is built, a closed row (`closed_at IS NOT NULL`)
+  whose mapped target's category is not terminal refuses the whole request
+  with `migration.closed-to-non-terminal`, naming the count and the
+  non-terminal state(s), following `migration.unmapped-state`'s own
+  refusal shape. Own workflow pair, type and two tickets seeded (one open,
+  one moved to `done` then closed): mapping the closed ticket's `done` onto
+  a declared ACTIVE target refuses with the reason verbatim and appends
+  NOTHING (ledger unchanged, `proj_tickets` unmoved); the identical batch
+  with `done` mapped onto a DIFFERENT terminal state instead commits
+  (`count: 2`) and the ticket lands there still closed —
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- **13.610** ✅ Ruling 53(iii), Finding 5 (2026-09-17) — `workflow.defined`'s
+  republish check validated a `stateMapping`'s target only for EXISTING
+  (`unknownTargetState`) and DROPPED-not-current (`stillExists`), never for
+  CATEGORY — so a dropped TERMINAL state could be remapped to a non-terminal
+  survivor, and `foldTicketToWorkflowVersion` (which spreads `...state`)
+  would carry a closed ticket's `closed` claim onto that non-terminal
+  `stateId` with no event in its history ever having touched it. Fix: for
+  each `stateMapping` entry, when the OLD state's category (in `latest`) is
+  `terminal` and the TARGET's category (in `payload.states`) is not, refuse
+  `REFUSAL_RULES.workflowStateMapping` with the reason "The stateMapping
+  sends terminal state "<old>" to "<target>", which is not terminal; closed
+  tickets must stay in a terminal state, so a dropped terminal state may
+  only map to another terminal state." New fixture `wf_two_terminal` (two
+  terminal states in v1, `done`/`archived`) so v2 can drop one and still
+  satisfy `validateWorkflowDef`'s own "no terminal state" gate on the
+  survivor — needed for this case to reach the stateMapping category check
+  at all rather than refusing `workflow-structure` first: `done` (terminal,
+  dropped) mapped to `doing` (active, survives) refuses, naming both
+  states; mapped to `archived` (the OTHER terminal survivor) accepts —
+  (`packages/rule-engine/test/engine.test.ts`)

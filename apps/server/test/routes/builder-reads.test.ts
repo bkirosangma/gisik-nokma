@@ -1336,3 +1336,168 @@ describe('POST …/migrate — a parked (backlog) row carries across as parked (
     });
   });
 });
+
+/**
+ * Ruling 53(ii), Finding 5 (final whole-branch review, 2026-09-17): closed ⇒
+ * terminal must survive a bulk migration exactly as it must survive a single
+ * `ticket.workflow_rebound` (Ruling 53(i), `checkTicketWorkflowRebound`) — the
+ * route's own pre-flight over the whole ticket set, so a refusal here also
+ * appends nothing (case 7.45's own contract).
+ */
+describe('POST …/migrate — a closed ticket may only migrate to a terminal state (Ruling 53(ii))', () => {
+  it('13.609 refuses migration.closed-to-non-terminal for a closed row mapped to a non-terminal target, appends nothing, and a terminal target still commits', async () => {
+    const workflowId = 'wf-closeguard-src';
+    const targetWorkflowId = 'wf-closeguard-dst';
+    const typeId = 'closeguard-type';
+    const openTicketId = newUlid();
+    const closedTicketId = newUlid();
+    const { rows: seqRows } = await db.pool.query<{ ws_seq: number | null }>(
+      'SELECT max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = $1',
+      [read.world.workspaceId],
+    );
+    let workspaceSeq = (seqRows[0]?.ws_seq ?? 0) + 1;
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.userIds.owner };
+    const next = (): number => workspaceSeq++;
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: workflowId,
+          version: 1,
+          name: 'Closeguard source',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'doing', name: 'Doing', category: 'active' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'todo', rules: [] },
+            { from: '*', to: 'doing', rules: [] },
+            { from: '*', to: 'done', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: targetWorkflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: targetWorkflowId,
+          version: 1,
+          name: 'Closeguard destination',
+          initialStateId: 'todo2',
+          states: [
+            { id: 'todo2', name: 'To do', category: 'open' },
+            { id: 'doing2', name: 'Doing', category: 'active' },
+            { id: 'done2', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'todo2', rules: [] },
+            { from: '*', to: 'doing2', rules: [] },
+            { from: '*', to: 'done2', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        workspaceSeq: next(),
+        payload: { id: typeId, name: 'Closeguard type', icon: 'lock', rank: 5, workflowId, fields: [] },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: openTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Stays open, on a declared state' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Finished and closed' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedTicketId },
+        type: 'ticket.transitioned',
+        workspaceSeq: next(),
+        payload: { to: 'done' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedTicketId },
+        type: 'ticket.closed',
+        workspaceSeq: next(),
+        payload: {},
+      }),
+    ]);
+
+    // The world is as described: the second ticket sits in `done` WITH
+    // `closed_at` set — read from the table, not assumed from the seed.
+    const { rows: seeded } = await db.pool.query<{ state_id: string; closed_at: Date | null }>(
+      'SELECT state_id, closed_at FROM proj_tickets WHERE ticket_id = $1',
+      [closedTicketId],
+    );
+    expect(seeded[0]?.state_id).toBe('done');
+    expect(seeded[0]?.closed_at).not.toBeNull();
+
+    const before = await ledgerRows();
+    const refused = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      // `done` (the closed ticket's own state) mapped onto `doing2` — ACTIVE,
+      // not terminal.
+      payload: {
+        fromWorkflowId: workflowId,
+        toWorkflowId: targetWorkflowId,
+        stateMap: { todo: 'todo2', doing: 'doing2', done: 'doing2' },
+      },
+    });
+    expect(refused.statusCode).toBe(422);
+    const body = refused.json() as { status: string; rule: string; reason: string };
+    expect(body.status).toBe('refused');
+    expect(body.rule).toBe('migration.closed-to-non-terminal');
+    expect(body.reason).toBe(
+      '1 closed ticket is mapped to a non-terminal state ("doing2"); a closed ticket may only migrate to a terminal state.',
+    );
+    // NOTHING APPENDED, and the closed ticket never moved.
+    expect(await ledgerRows()).toBe(before);
+    const { rows: unmoved } = await db.pool.query<{ workflow_id: string; state_id: string }>(
+      'SELECT workflow_id, state_id FROM proj_tickets WHERE ticket_id = $1',
+      [closedTicketId],
+    );
+    expect(unmoved[0]).toEqual({ workflow_id: workflowId, state_id: 'done' });
+
+    // POSITIVE CONTROL: the identical batch, `done` mapped onto `done2` — a
+    // DIFFERENT terminal state — commits, and the ticket stays closed.
+    const accepted = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      payload: {
+        fromWorkflowId: workflowId,
+        toWorkflowId: targetWorkflowId,
+        stateMap: { todo: 'todo2', doing: 'doing2', done: 'done2' },
+      },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toEqual({ status: 'migrated', count: 2 });
+    const { rows: moved } = await db.pool.query<{ workflow_id: string; state_id: string; closed_at: Date | null }>(
+      'SELECT workflow_id, state_id, closed_at FROM proj_tickets WHERE ticket_id = $1',
+      [closedTicketId],
+    );
+    expect(moved[0]?.workflow_id).toBe(targetWorkflowId);
+    expect(moved[0]?.state_id).toBe('done2');
+    expect(moved[0]?.closed_at).not.toBeNull();
+  });
+});

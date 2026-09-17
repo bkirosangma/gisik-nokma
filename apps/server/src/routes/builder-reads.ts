@@ -445,6 +445,17 @@ export const MIGRATION_RULES = {
   unknownTargetState: 'migration.unknown-target-state',
   /** An occupied state the `stateMap` does not cover — the dialog's contract. */
   unmappedState: 'migration.unmapped-state',
+  /**
+   * Backlog/closed spec §2.4 (Ruling 53(ii)): a closed row whose mapped
+   * target (or, for a parked row, `BACKLOG_STATE_ID` itself) is not a
+   * TERMINAL state. Answered up front, over the whole ticket set, for the
+   * same reason `unmappedState` is — a closed ticket that lost its terminal
+   * category through a migration is exactly the invariant
+   * `checkTicketWorkflowRebound` (Ruling 53(i)) refuses per event; this is
+   * the route's own pre-flight so a batch this door would let through does
+   * not have to be built and refused one row at a time.
+   */
+  closedToNonTerminal: 'migration.closed-to-non-terminal',
 } as const;
 
 export function registerBuilderReadRoutes(
@@ -738,6 +749,7 @@ export function registerBuilderReadRoutes(
       }
 
       const targetStates = new Set(target.states.map((state) => state.id));
+      const targetCategoryOf = new Map(target.states.map((state) => [state.id, state.category]));
       const unknownTargets = [...new Set(stateMap.values())].filter((id) => !targetStates.has(id)).sort();
       if (unknownTargets[0] !== undefined) {
         return refuse(
@@ -747,8 +759,8 @@ export function registerBuilderReadRoutes(
         );
       }
 
-      const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string }>(
-        `SELECT ticket_id, state_id
+      const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string; closed_at: Date | null }>(
+        `SELECT ticket_id, state_id, closed_at
            FROM proj_tickets
           WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3
           ORDER BY ticket_id`,
@@ -791,6 +803,35 @@ export function registerBuilderReadRoutes(
        */
       function toStateIdFor(row: { state_id: string }): string {
         return row.state_id === BACKLOG_STATE_ID ? BACKLOG_STATE_ID : (stateMap.get(row.state_id) as string);
+      }
+
+      // Backlog/closed spec §2.4 (Ruling 53(ii), Finding 5): closed ⇒ terminal
+      // must survive a migration exactly as it must survive a rebind
+      // (`checkTicketWorkflowRebound`, Ruling 53(i)) — the two are the same
+      // invariant reached through the two mechanisms that move a ticket
+      // across workflow versions without an ordinary transition. Asked here,
+      // before a single event is built, for the same reason `unmappedState`
+      // is: a closed row whose destination is not terminal is a refusal
+      // `checkTicketWorkflowRebound` would give one event at a time, and this
+      // route's whole contract (case 7.45) is that a refusal appends nothing.
+      // A parked row's destination (`BACKLOG_STATE_ID`) is category `open`,
+      // never terminal, but a closed ticket can never actually BE parked
+      // (closing requires a terminal state, §2), so this can only fire on a
+      // genuinely declared-state target — the category map covers both
+      // shapes uniformly rather than special-casing one.
+      const closedToNonTerminal = tickets.filter((row) => {
+        if (row.closed_at === null) return false;
+        const toStateId = toStateIdFor(row);
+        const category = toStateId === BACKLOG_STATE_ID ? 'open' : targetCategoryOf.get(toStateId);
+        return category !== 'terminal';
+      });
+      if (closedToNonTerminal.length > 0) {
+        const states = [...new Set(closedToNonTerminal.map((row) => toStateIdFor(row)))].sort();
+        return refuse(
+          reply,
+          MIGRATION_RULES.closedToNonTerminal,
+          `${closedToNonTerminal.length} closed ticket${closedToNonTerminal.length === 1 ? ' is' : 's are'} mapped to a non-terminal state (${states.map((id) => `"${id}"`).join(', ')}); a closed ticket may only migrate to a terminal state.`,
+        );
       }
 
       const events: SubmittedEvent[] = tickets.map((row) => ({

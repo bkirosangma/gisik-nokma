@@ -105,6 +105,30 @@ export async function evaluateWorkflowDefined(
         reason: `The stateMapping sends "${oldId}" to "${target}", but "${target}" is not a state in version ${payload.version}.`,
       };
     }
+
+    // Backlog/closed spec §2.4 (Ruling 53(iii), Finding 5, final
+    // whole-branch review, 2026-09-17): closed ⇒ terminal must survive a
+    // republish exactly as it must survive a rebind (Ruling 53(i),
+    // `checkTicketWorkflowRebound`) — the fold this mapping drives
+    // (`foldTicketToWorkflowVersion`) spreads `...state`, so a closed
+    // ticket's `closed` claim rides along unconditionally while `stateId`
+    // moves to whatever `oldId` maps to. If `oldId` was TERMINAL in the
+    // version being dropped, every ticket left in it may be closed, and a
+    // mapping that sends it somewhere NON-terminal stamps `closed_at IS NOT
+    // NULL` beside an active or open `state_category` — the exact state
+    // `close-requires-terminal` exists to forbid, reached through a publish
+    // instead of a `ticket.closed` event. A dropped state that was NOT
+    // terminal carries no such risk (nothing closed can be sitting in it),
+    // so only the terminal case is gated.
+    const oldCategory = latest.states.find((state) => state.id === oldId)?.category;
+    const targetCategory = payload.states.find((state) => state.id === target)?.category;
+    if (oldCategory === 'terminal' && targetCategory !== 'terminal') {
+      return {
+        refused: true,
+        rule: REFUSAL_RULES.workflowStateMapping,
+        reason: `The stateMapping sends terminal state "${oldId}" to "${target}", which is not terminal; closed tickets must stay in a terminal state, so a dropped terminal state may only map to another terminal state.`,
+      };
+    }
   }
 
   return { refused: false };

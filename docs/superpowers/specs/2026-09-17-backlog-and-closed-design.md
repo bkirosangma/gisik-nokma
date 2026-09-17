@@ -203,6 +203,25 @@ true, a retry with a different target sends the transition ALONE — resending
 `not-closed` and mask the real answer. The reopen stands either way; only
 the transition is retried.
 
+**§2.4 addition (2026-09-17, see Amendments — Ruling 53):** closed ⇒
+terminal must survive every path that changes a ticket's workflow or state
+mapping, not only an ordinary transition. `checkTicketWorkflowRebound`
+(`packages/rule-engine/src/checks/workflow-rebind.ts`) refuses
+`ticket.workflow_rebound` for a closed ticket when the target state's
+category is not terminal (`REFUSAL_RULES.closedTicket`, reason "This ticket
+is closed; a migration may only move it to a terminal state."); the
+corresponding pre-flight in the bulk rebind route
+(`apps/server/src/routes/builder-reads.ts`) refuses the whole request before
+any event is built when a closed row's mapped target is non-terminal
+(`migration.closed-to-non-terminal`); and `workflow.defined`'s republish
+check (`packages/rule-engine/src/workflow-defined.ts`) refuses a
+`stateMapping` that sends a dropped TERMINAL state to a non-terminal
+survivor in the new version, for the same reason. All three exist because
+`foldTicketToWorkflowVersion` and the rebind fold both spread `...state`, so
+a closed ticket's `closed` claim rides along unconditionally while `stateId`
+moves — a mapping is the one kind of move `ticket.closed`/`ticket.reopened`
+never gate, because neither event is emitted when a mapping does it.
+
 ## 3. Server
 
 ### 3.1 Projection
@@ -522,7 +541,7 @@ Rulings 1–30 belong to earlier, unrelated plans (`board-prototype-port`,
 `filter-exclude-all-tabs`) and are recorded in their own specs. This
 section starts from this plan's own controller rulings — the unnumbered
 Task 1/3/4/6 ones, then the numbered series a same-day coordinator picked
-up starting at 31 (30 was the prior plan's own last number). Seven body
+up starting at 31 (30 was the prior plan's own last number). Eight body
 sentences are rewritten above, each marked "(amended 2026-09-17, see
 Amendments)": §2's hierarchy-reopen-offer paragraph (Ruling 39), §5.1's
 Start description (Ruling 41 — the brief's own dispatch text called this
@@ -534,10 +553,11 @@ Close/Reopen bullets and dismiss-control bullet (Rulings 31–34), §5.4's
 — found stale by the final whole-branch review's Finding 6, 2026-09-17: the
 appendix's own "five rewritten" count had missed that its OWN Ruling 5 was
 one of the sentences requiring a body rewrite, not only an additive
-amendment), and §1.3/§5.4's creation-path sentences naming MCP as a second
+amendment), §1.3/§5.4's creation-path sentences naming MCP as a second
 producer (Ruling 51, Finding 4, final whole-branch review fix wave B,
-2026-09-17). Every other ruling here is additive and did not require a body
-rewrite.
+2026-09-17), and §2.4's new closed-⇒-terminal-across-migrations paragraph
+(Ruling 53, Finding 5, same review, same wave). Every other ruling here is
+additive and did not require a body rewrite.
 
 1. **Wildcard edges never resolve FROM backlog (Task 1 ruling).** §1.1's
    `universalTransitions` gives every workflow `backlog → def.initialStateId`
@@ -841,6 +861,32 @@ rewrite.
     `apps/server/src/routes/builder-reads.ts`,
     `packages/rule-engine/src/checks/workflow-rebind.ts:106`, cases 13.605
     (engine), 13.606 (server).
+
+27. **Amendment — Ruling 53(i–iii) (Finding 5, same review, same wave):
+    closed ⇒ terminal is enforced at every path that can move a ticket
+    across workflows or workflow versions, not only at close/reopen.** Three
+    gates, one invariant, spec §2.4 states it in full: (i)
+    `checkTicketWorkflowRebound` refuses a closed ticket whose target
+    state's category is not terminal (`REFUSAL_RULES.closedTicket`); (ii) the
+    bulk rebind route's own pre-flight refuses the whole migration before any
+    event is built when a closed row's mapped target is non-terminal
+    (`migration.closed-to-non-terminal`); (iii) `workflow.defined`'s
+    republish check refuses a `stateMapping` that sends a dropped TERMINAL
+    state to a non-terminal survivor. All three were needed because
+    `foldTicketToWorkflowVersion` and the rebind fold both spread `...state`,
+    carrying a closed ticket's `closed` claim across a `stateId` change
+    neither `ticket.closed` nor `ticket.reopened` ever gates. The sheet's own
+    docblock claim that "closed never survives a fold that also changes
+    `stateId`" was already corrected to the true, smaller claim in fix wave A
+    (Ruling 53(iv)); this wave supplies the invariant that claim pointed at.
+    Cost if wrong: a closed ticket could surface as "active" or "open" on a
+    board/list/my-work read while still carrying its close claim — silently,
+    since nothing crashes and every existing engine check stays
+    self-consistent on its own terms. Where it lives:
+    `packages/rule-engine/src/checks/workflow-rebind.ts`,
+    `apps/server/src/routes/builder-reads.ts`,
+    `packages/rule-engine/src/workflow-defined.ts`, cases 13.608 (i), 13.609
+    (ii), 13.610 (iii).
 
 ### Follow-ons named during execution
 
