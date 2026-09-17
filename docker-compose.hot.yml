@@ -58,6 +58,39 @@ services:
     # measures. Polling is NOT enabled: if inotify events were provably not
     # crossing the Docker Desktop mount, the fix would be stated with the
     # measurement that showed the missing event, not applied on suspicion.
+    #
+    # THE SERVER'S WATCHER POLLS, AND THAT WAS NOT THE FIRST CHOICE — 2026-09-18.
+    #
+    # The defect this answers: `tsx watch` uses chokidar, which does not merely
+    # MISS a rename-over save — the atomic-save shape, which is also exactly what
+    # the assistant's own Edit tool writes (the host inode changes on every edit;
+    # measured three times across two files) — it PERMANENTLY LOSES its watch on
+    # that file. After one such write to `src/index.ts`, neither a true in-place
+    # write (host inode preserved, measured) nor a `touch` produced a `[tsx]`
+    # line in 15-20 s, while the SAME in-place write on a freshly restarted
+    # container produced `[tsx] change in ./src/index.ts Restarting...` in 0.5 s.
+    # Consequence: the live API serves STALE code while `/healthz` answers 200,
+    # `docker ps` says healthy, and the file on the mount is correct — the
+    # 2026-09-09 shape this whole file exists to prevent, reachable with no
+    # rebuild involved.
+    #
+    # `node --watch --import tsx src/index.ts` WAS MEASURED FIRST, because Node's
+    # watch mode watches each loaded module's PARENT DIRECTORY rather than the
+    # inode and so should be indifferent to the save shape. IT DID NOT WORK HERE,
+    # and not for the expected reason: with the entry point running under it, a
+    # host rename-over, a host IN-PLACE write, and a write made INSIDE the
+    # container all failed to restart the process — 0 `Restarting` lines, child
+    # pid unchanged, marker never printed. A container-local write crosses no
+    # mount at all, so that is the watcher not seeing its own entry point rather
+    # than virtiofs losing events. The first door is therefore closed by
+    # measurement, not by preference.
+    #
+    # What is enabled instead is the fallback the earlier note rejected on the
+    # evidence then available — that in-place writes DO cross the mount. That
+    # stopped being sufficient once the writer that matters turned out to be a
+    # rename. tsx 4.23.12 carries chokidar's `usePolling` (measured); the CPU
+    # cost is recorded in the PR body as `docker stats` settled, polling on
+    # versus off.
     # `sh -c` IS LOAD-BEARING, not decoration. Compose v2 does NOT run a
     # string-form `command` through a shell: it shell-word-SPLITS it and execs
     # the result. Measured on this file before this fix — `config` rendered
@@ -88,6 +121,15 @@ services:
     # none, because it is trusted. The failure is therefore DOCUMENTED as an
     # operator check instead (`docs/runbook.md`, "watchers still alive"), which
     # is the honest form -- a check someone runs beats a guard that lies.
+    environment:
+      # POLLING, and only because the measured default misses the save shape the
+      # assistant's editor writes — see the watcher note above for the measurement
+      # and for why the first door (node --watch) was closed instead.
+      # `CHOKIDAR_INTERVAL` is milliseconds; 1000 is chokidar's own default and is
+      # stated rather than left implicit so the reload latency it implies (~1 s)
+      # is a documented choice rather than a surprise.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
     volumes:
       # SOURCE ONLY. Two things are deliberately absent and both would break the
       # container if mounted:

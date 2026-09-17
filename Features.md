@@ -2461,7 +2461,22 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   flag does not change the substituted values (`GOOGLE_CLIENT_ID` renders its full 72 characters with
   the flag omitted) — it converts a **missing** `.env` from a silent empty substitution into a hard
   stop, which is the shape that once brought the server up looking healthy with Google sign-in OFF.
-  `docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`, `docs/runbook.md`,
+  **Since 2026-09-18 the `web` is hot too**: the same override carries a `web` service on :3001, the port a
+  browser actually talks to, and `apps/web/Dockerfile` gained its own `dev` stage before `runtime` for the
+  same last-stage reason. Both origins are now the checkout. **The web's watcher is not the server's** —
+  measured, Next's webpack watcher sees BOTH save shapes (in-place 1.2–1.5 s, rename-over 1.6 s), with a
+  59.4 s outlier recorded rather than smoothed over.
+  **The server's watcher now POLLS (`CHOKIDAR_USEPOLLING=true`, `CHOKIDAR_INTERVAL=1000`), and the reason is
+  a measured defect rather than caution.** `tsx watch` did not merely miss the rename-over save — the shape
+  the assistant's own edit tool produces, its host inode changing on every edit — it **permanently lost its
+  watch on that file**, so the live API served stale code while `/healthz` answered 200 and the mounted file
+  was correct: the 2026-09-09 incident's shape, reachable with no rebuild at all. `node --watch --import tsx`
+  was measured first and is closed (it did not restart even on a write made inside the container, where no
+  mount is involved). Polling was previously rejected on the evidence then available — that in-place writes
+  cross the mount — which stopped being sufficient once the writer that matters turned out to be a rename.
+  Cost, settled in one session: CPU **6.05–6.47 % polling on versus 2.39–3.73 % off**, memory unchanged.
+  `docker-compose.hot.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile`, `package.json`,
+  `docs/runbook.md`,
   `test-cases/13-deployment-dogfooding.md` (cases 13.650–13.653, the witness record — re-minted from
   13.613–13.616, which a plan had reserved first; see that block's note),
   `docs/lanes/executor-state.md`

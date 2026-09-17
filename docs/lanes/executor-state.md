@@ -20,9 +20,89 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~00:5x IST. **STEP 1 OF THE 2026-09-18 MISSION: THE
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:0x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
+> # SERVER'S WATCHER NOW POLLS. ONE PR IN FLIGHT, base `owner/workspace-edits`.**
+>
+> ## Branch and the invariant that replaces a tip sha
+>
+> `exec/step1b-web-hot-reload`, cut with `git checkout --no-track -b exec/step1b-web-hot-reload
+> origin/owner/workspace-edits` at **`f3d36f93`** (`--no-track` because a branch cut from that ref inherits
+> it as its upstream, and a bare `git push` would then push to the OWNER's branch). `git branch --contains`
+> at the time of writing includes this branch; **re-verify, and if it is empty the sha is orphaned** —
+> `git cat-file` passes on reflog-only commits and lies.
+>
+> **The tip sha is deliberately not named**, for the reason the older blocks give: writing it here creates a
+> commit, so the number is stale the instant it saves. The invariant instead — **every commit on this branch
+> belongs to the Step 1b change set**: `docker-compose.hot.yml` (header, the server's watcher + polling
+> environment, the new `web` service), the `dev` stage in `apps/web/Dockerfile`, the root `dev:stack` script,
+> `docs/runbook.md`, `Features.md`, `test-cases/13-deployment-dogfooding.md`, this file.
+>
+> ## What Step 1b is
+>
+> Step 1 made the `server` hot. Step 1b does the same for the `web` and retires the owner's own `next dev` on
+> :3001 — the browser's origin is now the checkout. `docker-compose.dev.yml` stays byte-unchanged
+> (sha256 `4af45990c8cd57052562fb794f64c5bbc84ce3b930ab592a2a5d68f0b4bf4a38` on both sides of the diff), and
+> the web image's `runtime` stage is byte-identical (its extracted sha is `c66cc6f9f59f…` both sides) — the
+> new `dev` stage sits BEFORE it for the reason Step 1 recorded.
+>
+> ## THE FINDING THAT CHANGED THIS STEP'S SHAPE
+>
+> **The assistant's own Edit tool writes by RENAME-OVER, not in place** — the host inode changes on every edit
+> (measured three times: `apps/web/app/sign-in/page.tsx` `204060486 → 204060616 → 204060679`,
+> `apps/server/src/index.ts` `204014631 → 204061084`). And `tsx watch` does not merely MISS that shape: **it
+> permanently loses its watch on the file.** After one such write to `src/index.ts`, neither a true in-place
+> write (inode preserved) nor a `touch` produced a `[tsx]` line in 15–20 s, while the same in-place write on a
+> freshly restarted container produced one in **0.5 s**. In between, the API served stale code with `/healthz`
+> 200 and the correct file on the mount — the 2026-09-09 incident's shape, reachable with no rebuild.
+>
+> That went to the controller as `gisik-nokma-lanes/EXEC-2026-09-18-step1b-finding-edit-tool-vs-tsx.md`;
+> **AMENDMENT 2 ruled it fixed in this PR, door (e) first.** Door (e) — `node --watch --import tsx src/index.ts`
+> — **was measured and is CLOSED**: it restarted on none of a host rename-over, a host in-place write, or a
+> write made INSIDE the container, and the last of those crosses no mount at all, so it is the watcher not
+> seeing its own entry point rather than virtiofs losing events. Door (a) ships instead:
+> **`CHOKIDAR_USEPOLLING=true` + `CHOKIDAR_INTERVAL=1000`** on the `server` service. Witnessed in one
+> container, not restarted between the halves: rename-over restarts it in **1.6 s** with its marker served;
+> a true in-place write after that restarts it again in **1.6 s** (the watch survived the rename); a
+> `packages/domain/src` edit reached `dist` and restarted it **2.6 s** end to end. Cost, settled, in the same
+> session with the variable overridden back to empty: CPU **6.05–6.47 %** on versus **2.39–3.73 %** off,
+> memory ~1.24 vs ~1.22 GiB.
+>
+> **The web half does not share that failure.** Next's webpack watcher saw both shapes (in-place 1.2/1.5/1.5 s,
+> rename-over 1.6 s); one outlier took **59.4 s**, which is why the recorded instrument is the compile line in
+> `docker logs --since …` and not a curl stopwatch — the Edit tool's round-trip alone delays a curl poll by
+> ~17 s. **The package watchers (`tsc --watch`) DO share it**: an in-place revert of a token in
+> `packages/ui/src` never compiled (80 s stale, `dist` and the served page both wrong), and a `touch` did not
+> wake it either — only `restart web` did.
+>
+> ## Case ids — the controller's AMENDMENT 1, applied
+>
+> The dispatch allocated 13.617–13.620; recounting found the **second-wave plan**
+> (`docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`, on the branch since `5039209c`,
+> BEFORE Step 1) reserves **13.613–13.649** and names 13.617–13.620 in its own text. Ruling: the plan wins.
+> **Step 1's four cases were re-minted 13.613→13.650 … 13.616→13.653** everywhere on this branch
+> (`test-cases/13`, `Features.md`, the runbook, this file), **and Step 1b's block is 13.654–13.657**.
+> `13.65x` was re-measured unused at this tip, catalogue AND plans. The allocation note at the top of
+> `test-cases/13` now carries the rule, including why that command's `{3}` width is load-bearing.
+>
+> ## Open items
+>
+> - **No ruling is outstanding.** Amendment 2 is implemented and witnessed; nothing is waiting on the owner.
+> - **For the reviewer, deliberately not fixed:** the `web` container serves `/sign-in` etc. from :3001 while
+>   `SERVER_ORIGIN` points at `server:3000` — unchanged from the prod-shape split, recorded rather than
+>   altered.
+> - **Both hot containers are UP from this worktree** at the end of the step, which the dispatch requires.
+>
+> ## The checks, at this head
+>
+> Six checks: `check:env`, `check:runbook`, `check:help` **exit 0**. `check:tasks` (90 plan tasks with no
+> ledger row), `check:citations` (21 uncited ids) and `check:case-ids` (13.387 ×3, 13.413 ×2) are RED — and
+> **identical in both halves to a pristine extraction of `origin/owner/workspace-edits`**: the uncited id sets
+> diff clean, the plan-task count is 90 on both, the duplicate id sets are the same two ids. Proven, not
+> assumed; the base was extracted to a temporary worktree and the three checks run there.
+
+> # ▣ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~00:5x IST. **STEP 1 OF THE 2026-09-18 MISSION: THE
 > # COMPOSE `server` RUNS THE BRANCH'S SOURCE WITH HOT RELOAD. ONE PR IN FLIGHT, base
-> # `owner/workspace-edits`.**
+> # `owner/workspace-edits`.** *(Merged as PR #415; keep for the reasoning, not for the position.)*
 >
 > ## Branch — a NEW one, cut from the OWNER's branch, not from `main`
 >
