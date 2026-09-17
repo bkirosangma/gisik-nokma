@@ -26,8 +26,49 @@ held. All 25 block ranges in the delta table were re-derived from these two blob
 
 **Citation convention.** Prototype citations are written `desktop.dc.html@<blob-sha12>:<line>`, never
 bare, so they survive the next refresh. Resolve one with
-`git show 6d7b67c0a52c > /tmp/new.dc.html` (or `c9f852a2c243` for the old file). Task/product citations
-are `path:line` at the branch tip.
+`git show 6d7b67c0a52c > /tmp/new.dc.html` (or `c9f852a2c243` for the old file). Task and product
+citations are `path:line` at the branch tip.
+
+---
+
+## The queue
+
+**Row 0 is the one item that is not a screen and not optional.** The refresh moved the design tokens
+under all 25 blocks (§ *The largest change*), so it precedes everything else: porting a screen to the new
+prototype while the tokens stay old ports it to a target that no longer exists.
+
+Ordering below is biggest-owner-visible-change first, with the **Members family and `isInviteAdmin` last**
+— they sit under the owner hold on the sign-in look unless the owner lifts it. `isListView` is marked
+🟢 **done** (#419).
+
+| # | screen | verdict | size | product files | proposed order |
+|---|---|---|---|---|---|
+| — | **TOKENS (every screen)** | **wire-gap** | **L** | `packages/ui/src/tokens.ts` (`:95`, `:151`, `:281`, `:282`); emitter `themeStylesheet()` `:1292-1315` | **1** |
+| 20 | `isAccount` | *pending* | | | |
+| 21 | `isHelp` | *pending* | | | |
+| 12 | `isMembers` | *pending* | | | |
+| 13 | `isInviteAdmin` | *pending* (owner hold) | | | |
+| 9 | `isTimelineView` | *pending* | | | |
+| 10 | `isMyWork` | *pending* | | | |
+| 11 | `isInbox` | *pending* | | | |
+| 14 | `isSettingsShell` | *pending* | | | |
+| 15 | `isTypes` | *pending* | | | |
+| 16 | `isWorkflows` | *pending* | | | |
+| 17 | `isTypeEditor` | *pending* | | | |
+| 18 | `isMcpTokens` | *pending* | | | |
+| 19 | `isBuilder` | *pending* | | | |
+| 22 | `isLegal` | *pending* | | | |
+| 25 | `isNotFound` | *pending* | | | |
+| 23 | `isInvite` | wire-gap | M | `apps/web/app/invite/[token]/page.tsx`; `packages/app-core/src/online/invites.ts:3-7` | |
+| 24 | `isMcpAuth` | wire-gap | L | `apps/web/app/mcp/authorize/page.tsx`; `apps/server/src/routes/mcp-device.ts:60,78,105` | |
+| 4 | `isWorkspace` | wire-gap | M | `apps/web/app/w/[workspaceId]/page.tsx`; `packages/app-core/src/view-types.ts:15-23` | |
+| 3 | `isWorkspaces` | held | — | `apps/web/app/workspaces/page.tsx` | |
+| 5 | `isWork` | held | — | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1202` | |
+| 1 | `isMobileDevice` | none | — | responsive shell, three media queries | |
+| 2 | `isSignIn` | none | — | `apps/web/app/sign-in/page.tsx:462` | |
+| 6 | `isBoardView` | none | — | `packages/app-core/src/views/board.tsx` | |
+| 7 | `isListView` | 🟢 **done** (#419) | — | `packages/app-core/src/views/ticket-list.tsx` | |
+| 8 | `isCalendarView` | none | — | `packages/app-core/src/calendar/calendar-view.tsx` | |
 
 ---
 
@@ -339,9 +380,9 @@ in the product.
 **Product route(s) + files.** `/w/[workspaceId]/p/[projectId]` — `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`; all four nested views below render inside it. Title class `.gn-project__title` at `packages/ui/src/ui.css:3658`.
 **Prototype delta (old→new).** CONFIRMED, both fragments, exactly as recorded above: OLD `:319` `Sprint 14` → NEW `:323` `{{ projectTitle }}`, and OLD `:341` `Delivery v4` → NEW `:345` `{{ wfPick }}`. The `<select>` is **not** new: OLD `:324` `<select value="{{ wfPick }}" …>` → NEW `:328` `<sc-raw-select value="{{ wfPick }}" sc-camel-on-change="{{ setWfPick }}" …>` — same binding, same `sc-for list="{{ wfOptions }}"`, only the form rewrites.
 **Product gap (new prototype → product).**
-- *structure:* title row `matches` — prototype `:323` → `page.tsx:1202` (`{projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}`); crumb `:320` → `page.tsx:1199-1201`.
-- *structure:* the `Workflow · <name> · <count>` meta line is **not present** — `grep` for `Workflow ·` over `apps/web/app`, `packages/app-core/src`, `packages/ui/src` = 0 hits. Its two facts exist only as a `<select>` gated on more than one workflow (`page.tsx:1297-1311`) and a count inside the narrowing strip, which renders only when narrowed (`page.tsx:1545`). The prototype's unnarrowed arm (`desktop.dc.html@6d7b67c0a52c:2767`, `all.length + " tickets"`) has no counterpart, nor does the `goWorkflows` link (`:345`).
-- *strings:* `{projectTitle}` = `projectName` (`:2762`) → `page.tsx:1202` `matches`. `{wfPick}`'s default `"Delivery v4"` (`:2783`) has no product equivalent — the product defaults to `'all'` by **Ruling 20(b)** (`page.tsx:377`, `:912`).
+- *structure:* title row `matches` — prototype `:323` → `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1202` (`{projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}`); crumb `:320` → `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1199-1201`.
+- *structure:* the `Workflow · <name> · <count>` meta line is **not present** — `grep` for `Workflow ·` over `apps/web/app`, `packages/app-core/src`, `packages/ui/src` = 0 hits. Its two facts exist only as a `<select>` gated on more than one workflow (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1297-1311`) and a count inside the narrowing strip, which renders only when narrowed (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1545`). The prototype's unnarrowed arm (`desktop.dc.html@6d7b67c0a52c:2767`, `all.length + " tickets"`) has no counterpart, nor does the `goWorkflows` link (`:345`).
+- *strings:* `{projectTitle}` = `projectName` (`:2762`) → `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1202` `matches`. `{wfPick}`'s default `"Delivery v4"` (`:2783`) has no product equivalent — the product defaults to `'all'` by **Ruling 20(b)** (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:377`, `:912`).
 - *tokens:* `matches` — the inline `font-size:34px;line-height:41px;font-weight:700;letter-spacing:-0.4px` ≡ `.gn-project__title` `{ font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; }` (`packages/ui/src/ui.css:3658`); `--label2` → `--gn-text-muted` on the crumb.
 **Port verdict.** `held` — both binding substitutions are already live in the product; the unported meta line is a recorded ruling, not a refresh item.
 
@@ -349,11 +390,11 @@ in the product.
 **Product route(s) + files.** `packages/app-core/src/views/board.tsx` (`Board`, `BoardGroupSection`, `BoardCardView`, `MoveArrows`); rendered by `page.tsx` (board arm); styles `.gn-board__*` at `packages/ui/src/ui.css:310-440`.
 **Prototype delta (old→new).** `none — identical after normalising the bundler form rewrites`.
 **Product gap (new prototype → product).**
-- *structure:* column header is a **pre-existing ruled deviation** — the prototype renders `{{ col.name }}` as a 17px `<p>` (`:366`) with a separate `col.blockedChip` pill; the product renders `<Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>` plus a count (`board.tsx:414-416`), **Ruling 14** recorded at `packages/ui/src/ui.css:359-367`, blocked state riding **Ruling 16**'s tone (`ui.css:357-364`).
-- *structure:* empty column `matches` in substance — prototype `:381-388` → `board.tsx:473-475` (`EMPTY_COLUMN_COPY` at `board.tsx:168` + `<Button onClick={onCreateTicket}>Add a ticket</Button>`).
-- *structure:* the prototype's `{{ t.chips }}` (`:375`) and `{{ t.meta }}` (`:377`) have **no wire fields** — **WIRE GAP**: `BoardCard` (`packages/app-core/src/view-types.ts:105-114`) is `{ticketId, title, typeId, assignee, stateProvenance, cause, rollup, pending}` with no `chips` array and no `meta` string. The product substitutes real per-card chips and `formatRollup` progress (`board.tsx:743-771`).
-- *structure:* extra product element — `MoveArrows` renders a `Close` button for terminal columns (`board.tsx:1420-1451`), a recorded §5.2 addition.
-- *strings:* `matches` — `'Add a ticket'` `:387` → `board.tsx:475`; empty copy `{{ col.emptyText }}` → `board.tsx:168`/`:473`.
+- *structure:* column header is a **pre-existing ruled deviation** — the prototype renders `{{ col.name }}` as a 17px `<p>` (`:366`) with a separate `col.blockedChip` pill; the product renders `<Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>` plus a count (`packages/app-core/src/views/board.tsx:414-416`), **Ruling 14** recorded at `packages/ui/src/ui.css:359-367`, blocked state riding **Ruling 16**'s tone (`ui.css:357-364`).
+- *structure:* empty column `matches` in substance — prototype `:381-388` → `packages/app-core/src/views/board.tsx:473-475` (`EMPTY_COLUMN_COPY` at `packages/app-core/src/views/board.tsx:168` + `<Button onClick={onCreateTicket}>Add a ticket</Button>`).
+- *structure:* the prototype's `{{ t.chips }}` (`:375`) and `{{ t.meta }}` (`:377`) have **no wire fields** — **WIRE GAP**: `BoardCard` (`packages/app-core/src/view-types.ts:106-116`) is `{ticketId, title, typeId, assignee, stateProvenance, cause, rollup, pending}` with no `chips` array and no `meta` string. The product substitutes real per-card chips and `formatRollup` progress (`packages/app-core/src/views/board.tsx:743-771`).
+- *structure:* extra product element — `MoveArrows` renders a `Close` button for terminal columns (`packages/app-core/src/views/board.tsx:1420-1451`), a recorded §5.2 addition.
+- *strings:* `matches` — `'Add a ticket'` `:387` → `packages/app-core/src/views/board.tsx:475`; empty copy `{{ col.emptyText }}` → `packages/app-core/src/views/board.tsx:168`/`:473`.
 - *tokens:* `matches` — `.gn-board__column` `--gn-surface-sunken` + `--gn-shadow-sunken` + `--gn-radius-card` (`ui.css:326` ff.) against `trayBg`/`trayShadow`/`cardR`; count `ui.css:392`; empty circle `ui.css:397-436`.
 **Port verdict.** `none` — no refresh delta; the three visible deltas are ruled pre-existing deviations plus one wire gap.
 
@@ -361,20 +402,20 @@ in the product.
 **Product route(s) + files.** `packages/app-core/src/views/ticket-list.tsx` (`TicketList`, `ListTable`, `ListCell`) via `page.tsx`'s list arm; styles `.gn-list__*` at `packages/ui/src/ui.css:652-963`. Ported by `1a403378` (PR #419, merged `63ffe930`).
 **Prototype delta (old→new).** `none — identical after normalising the bundler form rewrites`.
 **Product gap (new prototype → product).**
-- *structure:* controls row `matches` — `{{ listCount }}` `:413` → `ticket-list.tsx:248` `data-testid="list-summary"`; Group by `:414-419` → `ticket-list.tsx:280-291` (`Select aria-label="Group by"`); `{{ columnsCaret }} Columns` `:421` → `:296` `.gn-list__columns-toggle` (caret in CSS; accessible name stays "Columns").
-- *structure:* columns tray, container, band and rows all `match` — `{{ columnToggles }}` `:415-418` → `ticket-list.tsx:353`; container `:425-427` → `.gn-list__table-wrap` (`ui.css:995-1000`, `.gn-list__table { min-width: 51.25rem; }`); thead `:449` → `ListTable` (`ticket-list.tsx:620-660`); depth indent → `ticket-list.tsx:529` `paddingLeft: ${16 + node.depth * 22}px`.
+- *structure:* controls row `matches` — `{{ listCount }}` `:413` → `packages/app-core/src/views/ticket-list.tsx:248` `data-testid="list-summary"`; Group by `:414-419` → `packages/app-core/src/views/ticket-list.tsx:280-291` (`Select aria-label="Group by"`); `{{ columnsCaret }} Columns` `:421` → `:296` `.gn-list__columns-toggle` (caret in CSS; accessible name stays "Columns").
+- *structure:* columns tray, container, band and rows all `match` — `{{ columnToggles }}` `:415-418` → `packages/app-core/src/views/ticket-list.tsx:353`; container `:425-427` → `.gn-list__table-wrap` (`ui.css:995-1000`, `.gn-list__table { min-width: 51.25rem; }`); thead `:449` → `ListTable` (`packages/app-core/src/views/ticket-list.tsx:620-660`); depth indent → `packages/app-core/src/views/ticket-list.tsx:529` `paddingLeft: ${16 + node.depth * 22}px`.
 - *structure:* **the no-results block is NOT present** — prototype `:471-477` (`{{ noResults }}`, off `:2932`) renders "Nothing matches those filters" / "…are hidden. Nothing was deleted." / "Clear the filters"; `grep` for all three over the product = 0 hits. This part was outside PR #419's "controls and row table" scope.
 - *structure:* **header sorting is NOT ported** — `{{ listHeaders }}` carries a per-key `sort` and draws `↑`/`↓` (`:2809`); `grep -iE "sort|aria-sort"` over `ticket-list.tsx` and `packages/ui/src/components/table.tsx` finds neither a handler nor `aria-sort`.
-- *strings:* `matches` — `:413` binding `:2805` `"N ticket(s) · M done"` → `ticket-list.tsx:248` region.
+- *strings:* `matches` — `:413` binding `:2805` `"N ticket(s) · M done"` → `packages/app-core/src/views/ticket-list.tsx:248` region.
 - *tokens:* `matches` — `cardBg`/`cardShadow`/`cardR` → `--gn-surface-raised`/`--gn-shadow-raised`/`--gn-radius-card` (`ui.css:995-1000`); `label2`→`--gn-text-muted`, `trayBg`→`--gn-surface-sunken`, `fill4`→`--gn-fill-quaternary`.
-- **WIRE GAP:** the prototype's Group-by offers `workflow` and its columns include `Workflow`/`Priority`; the product's `GROUPING_OPTIONS` (`ticket-list.tsx:31`) is `['epic','status','assignee','type','flat']` and `AVAILABLE_COLUMNS` (`:32`) is `['status','assignee','dueDate','type','progress']` — 5 of 8. `ListRow` carries no `workflowId` and no `priority`.
+- **WIRE GAP:** the prototype's Group-by offers `workflow` and its columns include `Workflow`/`Priority`; the product's `GROUPING_OPTIONS` (`packages/app-core/src/views/ticket-list.tsx:31`) is `['epic','status','assignee','type','flat']` and `AVAILABLE_COLUMNS` (`:32`) is `['status','assignee','dueDate','type','progress']` — 5 of 8. `ListRow` carries no `workflowId` and no `priority`.
 **Port verdict.** `none` (already matches). Residue — no-results block, header sorting — is unported but out of the refresh's scope.
 
 ### `isCalendarView` — `desktop.dc.html@6d7b67c0a52c:481-508`
 **Product route(s) + files.** `packages/app-core/src/calendar/calendar-view.tsx` via `page.tsx`'s calendar arm; styles `.gn-calendar__*` at `packages/ui/src/ui.css:1822-1990`.
 **Prototype delta (old→new).** `none — identical after normalising the bundler form rewrites`.
 **Product gap (new prototype → product).**
-- *structure:* header DOM order differs — prototype `:484-487` is prev `‹` → month → next `›` → Today; product `calendar-view.tsx:265-288` is prev `:268` → **Today** `:277` → next `:282` → `<h2 class="gn-calendar__month">` `:288`. **Pre-existing** — set by board-prototype-port Task 10, docblock at `:269-272`.
+- *structure:* header DOM order differs — prototype `:484-487` is prev `‹` → month → next `›` → Today; product `packages/app-core/src/calendar/calendar-view.tsx:265-288` is prev `:268` → **Today** `:277` → next `:282` → `<h2 class="gn-calendar__month">` `:288`. **Pre-existing** — set by board-prototype-port Task 10, docblock at `:269-272`.
 - *structure:* legend — prototype `:489-495` is unconditional with three swatches; product gates it on `model.customDateFields.length > 0` (**Ruling R4**) and renders real named field rows `{field.fieldName} ({field.count})` (`:318`, `--custom` swatch `:328`) plus the two read-only built-ins (`:350`, `:357`). The prototype's generic "Workspace date field" is replaced by named fields — **the product carries strictly more data than the prototype**, so this is not a gap.
 - *structure:* extra product element — `+n more` / `show fewer` week folding (`MAX_VISIBLE_PER_WEEK = 4`), not in the prototype.
 - *strings:* `matches` — `‹`/`›`/`Today`/`Due date`/`In transit`. The month is an `<h2>` in the product (`:288`) vs a `<p>` in the prototype — a heading-level fix, not a string change.
