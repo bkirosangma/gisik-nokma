@@ -35,8 +35,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## What is established, and how — do not re-derive any of this
 >
-> **1. The refresh changed SIX blocks, not sixteen.** `Part 0b`'s "sixteen CHANGED at equal size" is
-> *bundler spelling*, not design. Method: extract each `sc-if` block whole from both exports (the two
+> **1. The refresh changed SIX blocks, and Part 0b flagged sixteen — fourteen of them were a fourth
+> mechanical rewrite Part 0b had not mapped.** That table (this file, `:216`, "Prototype delta
+> 2026-09-18") normalised the three rewrites it knew and closed with the caveat that a residual
+> "CHANGED" on a size-identical block *"could be a fourth mechanical rewrite I did not map rather than a
+> design change"*, calling itself *"a porting seed, not a changelog."* **The fourth rewrite is named
+> entities + the dropped self-closing slash.** Undo it too and 14 of the 16 collapse to identical. The
+> table named five of the remaining six (the `isSignIn` mark, the `isMembers` split, the new
+> `isInviteAdmin`, `isAccount` +22, `isHelp` +28); the one it missed is **`isWork`** — the exact case its
+> caveat anticipated. Method: extract each `sc-if` block whole from both exports (the two
 > files are blobs `6d7b67c0a52c…` new and `c9f852a2c243…` old), undo the four form rewrites — `sc-raw-*`
 > prefixes, `sc-camel-*` attributes, named entities, the dropped self-closing slash — **on both sides**,
 > then diff. Controls: the five blocks Part 0b calls unchanged diff empty; and under the *least* tolerant

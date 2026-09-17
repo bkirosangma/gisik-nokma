@@ -18,6 +18,12 @@ pair or a cited product line.
 | Product | `apps/web/app/**` (routes), `packages/app-core/src/**` (views), `packages/ui/src/ui.css` (the `[data-style="neo"]` tokens) |
 | Export provenance | `design-system/interactive/PROVENANCE.md` — bundle sha256 `bf64cc446880…` |
 
+**Byte-integrity of the thing being audited.** `git show 6d7b67c0a52c` hashes to
+`2cda054b4320ebb6b379d290a6e8dba69ac45cd1eabe0da100b5425e45b6d90c` — **exactly the sha256
+`PROVENANCE.md` records** for the file its unpacker wrote from the owner's export. So the block ranges and
+every quoted fragment below are tied to the recorded artefact, not merely to whatever the working tree
+held. All 25 block ranges in the delta table were re-derived from these two blobs, not from the checkout.
+
 **Citation convention.** Prototype citations are written `desktop.dc.html@<blob-sha12>:<line>`, never
 bare, so they survive the next refresh. Resolve one with
 `git show 6d7b67c0a52c > /tmp/new.dc.html` (or `c9f852a2c243` for the old file). Task/product citations
@@ -45,20 +51,28 @@ rewrites above were undone **on both sides**, and the normalised texts were diff
 and all five do**. A normaliser that hid real edits would have to still show those five clean, and one
 that was too weak would show churn in them — so the control moves in both directions.
 
-**What the control caught, on the third pass.** The first normaliser undid only the two tag/attribute
-rewrites and reported **16 blocks "CHANGED at equal size"** — reproducing the Part 0b table's own count.
-That count is an artifact. Inspecting the blocks showed every one of those 16 differing *only* in named
-entities and the self-closing slash: `Nothing was deleted &mdash; this filter…` → `Nothing was deleted —
-this filter…`, `&lsaquo;` → `‹`, `&rsaquo;` → `›`, `<input … />` → `<input … >`. With those two rewrites
-normalised too, **14 of the 16 collapse to identical**, and the real count is **six**. Verified the hard
-way as well: under the *least* tolerant normalisation (tag + attribute rewrites only, no entity
-tolerance), the four largest "changed" blocks — `isSettingsShell`, `isMcpTokens`, `isBuilder`,
-`isTypeEditor` — show 22, 4, 4 and 12 changed lines and **every single one is an entity or a
-self-closing slash**. Not one is a content change.
+**What the control caught, on the third pass — and what it does not overturn.** The first normaliser
+undid only the two tag/attribute rewrites and reported **16 blocks "CHANGED at equal size"**, which is
+the Part 0b table's own count. Inspecting them showed every one differing *only* in named entities and
+the self-closing slash: `Nothing was deleted &mdash; this filter…` → `Nothing was deleted — this
+filter…`, `&lsaquo;` → `‹`, `&rsaquo;` → `›`, `<input … />` → `<input … >`. Undo those two as well and
+**14 of the 16 collapse to identical**; the real count is **six**. Cross-checked the hard way: under the
+*least* tolerant normalisation (tag + attribute rewrites only, no entity tolerance) the four largest
+"changed" blocks — `isSettingsShell`, `isMcpTokens`, `isBuilder`, `isTypeEditor` — show 22, 4, 4 and 12
+changed lines, and **every single one is an entity or a self-closing slash**. Not one is a content change.
 
-> **So the Part 0b table's "sixteen CHANGED at equal size" does not mean sixteen screens need work.**
-> It means sixteen blocks differ *in spelling* between two bundler versions. The screens whose design
-> actually moved on 2026-09-18 are six.
+> **Credit where it is due, because the framing matters.** The Part 0b table
+> (`docs/lanes/executor-state.md:216`, "Prototype delta 2026-09-18") did not claim sixteen screens need
+> work, and it was not careless: it normalised the three rewrites it had mapped, and it closed with the
+> caveat that *"a residual 'CHANGED' on a size-identical block could be a fourth mechanical rewrite I did
+> not map rather than a design change"* — adding that the table is **"a porting seed, not a changelog."**
+> **This document supplies that fourth rewrite** (named entities + the dropped self-closing slash) and
+> therefore *resolves* the table's stated open caveat rather than overturning its verdicts. The table got
+> `isSignIn`, the `isMembers` split, `isAccount` +22 and `isHelp` +28 right. What changes is the answer to
+> its own hedge: of the sixteen it flagged, **fourteen were the fourth rewrite**. The table named five of
+> my six (the `isSignIn` mark, the `isMembers` split, the new `isInviteAdmin`, `isAccount` +22, `isHelp`
+> +28) — the one it missed is **`isWork`**, whose two literal-to-binding edits sit inside a size-identical
+> block and are exactly the case that caveat anticipated.
 
 ---
 
@@ -203,6 +217,15 @@ screen renders through. Five distinct movements:
 | T5 | neo light selector | `body[data-style="neo"]` (`:53`) | `body[data-theme="light"][data-style="neo"]` (`:54`) |
 | T5 | neo light surfaces | `#EDE4DB` (`:54-60`) | `#F1EAE3` (`:55-63`) |
 | T5 | neo light semantics | *(unset — inherited the `:root` values)* | `--danger:#9E2A20`, `--warning:#8C4708`, `--pink:#9A3054`, `--success:#25644A`, `--purple:#413F7C` (`:57-58`) |
+
+**Checked with a second, unrelated instrument.** Rather than a line diff, the two `<style>` blocks were
+parsed into `{(selector, variable): value}` maps and the maps compared. It reproduces every row above and
+finds nothing further — 136 declarations old, 142 new, **69 of them differing**, and every one accounted
+for by T1–T5. It also settles two things the line diff left implicit: the **neo-dark** block
+(`body[data-theme="dark"][data-style="neo"]`) is **untouched**, so only the light-neo arm moved; and the
+light-neo block did not lose its shadows, radii or fills — those declarations were *relocated* to the new
+selector with identical values (`--cardR:20px`, `--chipPad:5px 12px`, both neumorphic shadow pairs). What
+actually changed in it is the surface hex and the five new semantic colours.
 
 Three consequences worth naming:
 
