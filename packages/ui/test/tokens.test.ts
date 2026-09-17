@@ -961,3 +961,188 @@ describe('brand — Round 2d (2026-09-09)', () => {
     expect(CONTRAST_PAIRS.some((pair) => pair.fg === 'brand' || pair.bg === 'brand')).toBe(false);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Step 2c-1 (2026-09-18) — the refreshed export's token layer.
+ *
+ * Cases 13.675–13.681. The prototype's `<style>` block moved five things
+ * (T1–T5, `docs/design/prototype-delta-2026-09-18.md`); three of them reach
+ * this product, and three deliberately do NOT. A case per movement, one for
+ * each refusal, and one for the floors — because "we did not port that" is a
+ * property that decays silently if nothing asserts it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
+  /** 13.675 — T1: the light accent moved, and the four roles resolving through it followed. */
+  it('13.675 T1: the light accent carries the refreshed hex and every role that resolves through it follows', () => {
+    expect(primitives.blue600).toBe('#33629f');
+    // The three roles that point straight at the primitive in light...
+    for (const role of ['accent', 'focusRing', 'categoryActive'] as const) {
+      expect(colorOf('light', role), `light/${role}`).toBe('#33629f');
+    }
+    // ...and the DARK arm did not move: the export's `--accentDark` is untouched
+    // by this refresh, so a change here would be drift, not a port.
+    expect(primitives.blue300).toBe('#7fa9e4');
+    expect(colorOf('dark', 'accent')).toBe('#7fa9e4');
+    // The derived text role is darker than either accent, so it still clears
+    // every background it was derived against — re-measured after T1 moved the
+    // accent, rather than assumed because it passed before.
+    expect(contrastRatio(colorOf('light', 'textAccent'), colorOf('light', 'surface'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('light', 'textAccent'), colorOf('light', 'surfaceSunken'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('light', 'textAccent'), primitives.neoPaper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('dark', 'textAccent'), colorOf('dark', 'surfaceSunken'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  /**
+   * 13.676 — T2 is NOT ported, and this is the negative case that says so.
+   *
+   * The export moved its `--accent` ALIAS out of `:root` onto the bare `body`
+   * rule. There is nothing to port: this file emits `--gn-accent` per style AND
+   * theme from `declarationsFor`, so the relationship the export expresses with
+   * a `var()` indirection is already structural here. The hazard this guards is
+   * a future reader noticing the export has a `--accent` and adding one.
+   */
+  it('13.676 T2 is NOT ported: --gn-accent is emitted per style x theme and no bare --accent alias exists', () => {
+    const css = themeStylesheet();
+    // `--gn-accent` is not `--accent`: the guard below is only meaningful
+    // because that substring relationship does NOT hold. Asserted, not assumed.
+    expect('--gn-accent').not.toContain('--accent');
+    expect(css).not.toContain('--accent:');
+    // Positive control, same run: the search shape DOES find the real alias, so
+    // the two `not.toContain` checks above are not passing on a broken needle.
+    expect(css).toContain('--gn-accent:');
+    expect(css).toContain('--gn-accent-text:');
+    // One accent per style x theme, each resolving — six colour arms.
+    for (const style of ['hig', 'minimal', 'neo'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        expect(colorOf(theme, 'accent', style), `${style}/${theme}`).toMatch(/^#[0-9a-f]{6}$/);
+      }
+    }
+  });
+
+  /** 13.677 — T3: the tint washes halved, and `tintWarning` is the only one that exists. */
+  it('13.677 T3: the warning tint halves in both themes, and it is the product\'s only tint role', () => {
+    // Alpha 0x1a = 26/255 = 0.102, the export's 0.10 by this file's
+    // round-half-up convention (the same arithmetic that gave the old
+    // 0.141 -> 0x24 and 0.115 -> 0x1d).
+    expect(primitives.tintWarmWarning).toBe('#f07c341a');
+    expect(primitives.tintNavyWarning).toBe('#f7a9611a');
+    // Hue unchanged in both — only the alpha moved. A hue change would be a
+    // different port wearing this case's name.
+    expect(primitives.tintWarmWarning.slice(0, 7)).toBe('#f07c34');
+    expect(primitives.tintNavyWarning.slice(0, 7)).toBe('#f7a961');
+    // The export moved FIVE tints; this product has ONE role for them. The
+    // other four are unported by an existing, documented refusal
+    // (`ui.css`'s "no --gn-tint-purple role exists or is added here"), so the
+    // mapping T3's dispatch asks for is four absences and one movement.
+    expect(TOKEN_ROLES.filter((role) => role.startsWith('tint'))).toEqual(['tintWarning']);
+    // Both themes resolve it; neither fell back to a bare primitive name.
+    expect(themes.light.tintWarning).toBe('tintWarmWarning');
+    expect(themes.dark.tintWarning).toBe('tintNavyWarning');
+  });
+
+  /** 13.678 — T4 is NOT ported: the export derived a role this product does not have. */
+  it('13.678 T4 is NOT ported: no tintAccent role exists and no consumer is left unserved', () => {
+    const css = themeStylesheet();
+    expect(TOKEN_ROLES.some((role) => /tintAccent/i.test(role))).toBe(false);
+    expect(css).not.toContain('--gn-tint-accent');
+    // Positive control: the tint role that DOES exist is emitted, so the two
+    // negative assertions above are not passing because the sweep is broken.
+    expect(css).toContain('--gn-tint-warning:');
+  });
+
+  /** 13.679 — T5: the neo light surface and the five semantic colours the export newly declares for it. */
+  it('13.679 T5: neo light moves to the refreshed surface and gains five semantic colours that no other style takes', () => {
+    expect(primitives.neoPaper).toBe('#f1eae3');
+    for (const role of ['surface', 'surfaceRaised', 'surfaceSunken'] as const) {
+      expect(colorOf('light', role, 'neo'), `neo/light ${role}`).toBe('#f1eae3');
+    }
+    // The five, mapped by MEANING: the export's `--pink` is this product's
+    // `contested` and its `--purple` is `restricted`. `customMarker` follows
+    // `restricted` because it is documented as sharing that primitive.
+    expect(colorOf('light', 'danger', 'neo')).toBe('#9e2a20');
+    expect(colorOf('light', 'warning', 'neo')).toBe('#8c4708');
+    expect(colorOf('light', 'success', 'neo')).toBe('#25644a');
+    expect(colorOf('light', 'contested', 'neo')).toBe('#9a3054');
+    expect(colorOf('light', 'restricted', 'neo')).toBe('#413f7c');
+    expect(colorOf('light', 'customMarker', 'neo')).toBe('#413f7c');
+    // The style is the ONLY axis these move on: `hig` and `minimal` must NOT
+    // have followed, or the port would have been a product-wide palette change
+    // wearing a neo-specific one's name.
+    expect(colorOf('light', 'danger', 'hig')).toBe('#d70015');
+    expect(colorOf('light', 'danger', 'minimal')).toBe('#d70015');
+    expect(colorOf('light', 'contested', 'hig')).toBe('#d30f45');
+    expect(colorOf('light', 'restricted', 'hig')).toBe('#8944ab');
+    // And the dark-neo arm is untouched by this refresh.
+    expect(colorOf('dark', 'surface', 'neo')).toBe('#1b2340');
+    expect(colorOf('dark', 'danger', 'neo')).toBe('#ff6961');
+  });
+
+  /**
+   * 13.680 — the export's new SELECTOR is NOT ported. This is the case the
+   * dispatch calls for by name, and it is a NEGATIVE case in the strict sense:
+   * what must be true is that the light-neo tokens are reachable with NO
+   * `data-theme` attribute anywhere, which is precisely what the export's
+   * literal selector would have prevented.
+   */
+  it('13.680 the light-neo token set is reachable with NO data-theme attribute, and the export\'s literal selector is absent', () => {
+    const css = themeStylesheet();
+    // The export's compound selector — the thing that must not appear.
+    expect(css).not.toContain('[data-theme="light"][data-style="neo"]');
+    // The light-neo arm as this product ships it: keyed on `data-style` ALONE.
+    const bareNeoLight = css.match(/\[data-style="neo"\] \{([^}]*)\}/);
+    expect(bareNeoLight, 'the bare [data-style="neo"] arm should be emitted').not.toBeNull();
+    expect(bareNeoLight![1]).toContain('--gn-surface: #f1eae3;');
+    // So a user who has never chosen a theme — no `data-theme` at all, the
+    // DEFAULT state — still gets the light-neo set. That is the behaviour the
+    // literal port would have silently removed.
+    expect(colorOf('light', 'surface', 'neo')).toBe('#f1eae3');
+    // The dark arm still reaches dark-neo both ways it always did: explicit
+    // attribute, and OS preference for an unchosen theme.
+    expect(css).toContain('[data-style="neo"][data-theme="dark"]');
+    expect(css).toContain('[data-style="neo"]:not([data-theme="light"])');
+  });
+
+  /** 13.681 — the floors re-cleared on the re-derived palette, and none lowered to get there. */
+  it('13.681 every contrast floor clears on the re-derived palette and the roster was not weakened', () => {
+    let checked = 0;
+    for (const style of ['hig', 'minimal', 'neo'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        for (const pair of CONTRAST_PAIRS) {
+          checked += 1;
+          expect(
+            contrastRatio(colorOf(theme, pair.fg, style), colorOf(theme, pair.bg, style)),
+            `${style}/${theme}: ${pair.fg} on ${pair.bg}`,
+          ).toBeGreaterThanOrEqual(pair.minimum);
+        }
+      }
+    }
+    expect(checked).toBe(CONTRAST_PAIRS.length * 6);
+    // The roster is unchanged in SIZE by this change — a floor removed is a
+    // guarantee removed, and it would show up here first. (Features.md states
+    // the same 33.)
+    expect(CONTRAST_PAIRS.length).toBe(33);
+    // And no minimum sits below the floor these rows exist to state, so
+    // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
+    expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
+    // The five roles T5 added are GROUNDS (chips, banners), which no
+    // CONTRAST_PAIRS row names — so their obligation is measured here rather
+    // than left as an unstated assumption.
+    for (const role of ['danger', 'warning', 'success'] as const) {
+      const text = `${role}Text` as const;
+      expect(
+        contrastRatio(colorOf('light', text, 'neo'), colorOf('light', role, 'neo')),
+        `neo/light: ${text} on ${role}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    // `contested`/`restricted`/`customMarker` carry no text role — they are
+    // never a ground for text — so they owe the 3:1 a non-text boundary owes.
+    for (const role of ['contested', 'restricted', 'customMarker'] as const) {
+      expect(
+        contrastRatio(colorOf('light', role, 'neo'), colorOf('light', 'surface', 'neo')),
+        `neo/light: ${role} against surface`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
