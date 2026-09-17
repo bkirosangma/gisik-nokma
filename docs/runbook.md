@@ -317,7 +317,7 @@ For the process itself, read the reload:
     docker logs --since 5m gisik-nokma-dev-server-1 2>&1 | grep '\[tsx\]'
 
 No `[tsx] change in …` line after your edit means the watcher did not see the change — the failure
-13.614 measures, and the one that is silent rather than slow.
+13.651 measures, and the one that is silent rather than slow.
 
 **Watchers still alive — an operator check, because nothing inside the container will tell you.** A
 dead package watcher is invisible from outside: the container stays up, `/healthz` keeps answering,

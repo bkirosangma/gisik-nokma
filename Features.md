@@ -2462,7 +2462,8 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   the flag omitted) — it converts a **missing** `.env` from a silent empty substitution into a hard
   stop, which is the shape that once brought the server up looking healthy with Google sign-in OFF.
   `docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`, `docs/runbook.md`,
-  `test-cases/13-deployment-dogfooding.md` (cases 13.613–13.616, the witness record),
+  `test-cases/13-deployment-dogfooding.md` (cases 13.650–13.653, the witness record — re-minted from
+  13.613–13.616, which a plan had reserved first; see that block's note),
   `docs/lanes/executor-state.md`
 - ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
   found** — three specs drive the REAL stack (a Next container proxying to a real API server, real

@@ -11,6 +11,18 @@ then-highest id rather than renumbering. **Never renumber**: when Task 16, or an
 they continue from this file's then-highest id in turn, exactly as `09-editor-attachments.md` and
 `12-offline-sync-apps.md` did for the reservation gaps they each recorded.
 
+**AND THE PLANS COUNT TOO — added 2026-09-18, after a real collision.** ids reserved by a plan under
+`docs/superpowers/plans/` count as minted — recount BOTH the catalogue and the plans
+(`git grep -hoE '13\.[0-9]{3}' -- docs/superpowers/plans test-cases | sort -u | tail`) before allocating.
+The trap is exact: a plan reserves its range when it is WRITTEN, a catalogue mint reads the CATALOGUE
+when it runs, and the two see the same numbers as free. Step 1's hot-reload block did that on 2026-09-18
+(13.613–13.616 against the second-wave plan's 13.613–13.649, reserved since `5039209c` — before it) and
+was re-minted to 13.650–13.653; the block's own note at the end of this file carries the detail. **Keep
+the `{3}` width in that command.** It is load-bearing twice over, and both halves are measured on this
+tree rather than argued: widening it to `[0-9]+` puts `13.99` above `13.649` (lexical sort on
+variable-width numbers) and admits `13.9999`/`13.632866`, which are this file's truncation traps rather
+than case ids.
+
 **IDS IN §13 ARE ALLOCATED, NOT DISCOVERED — the same collision class §12 recorded, one file over: Lane D
 independently minted its own 13.1–13.36 for Tasks 7/8 against this file's 13.1–13.6, from a fork point
 that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane C 13.1–13.40** (Tasks 14
@@ -7208,14 +7220,25 @@ un-hedge now.
   verbatim and appends nothing —
   (`apps/server/test/routes/builder-reads.test.ts`)
 
-**Block 13.613–13.616 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
+**Block 13.650–13.653 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
 the property under test is that a CONTAINER, started by compose, picks up HOST edits — there is no test
 runner on either side of a Docker Desktop bind mount, and a unit test of the compose file would assert
 YAML rather than prove the reload. Numbers below were measured once, on this machine, at the head of
 this change's PR; they are readings, not guarantees. (The branch's high-water mark was **13.612**;
 `13.632`/`13.999` are this file's documented truncation traps, not free ids.)
 
-- 🧪 **13.613 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
+**These four were minted as 13.613–13.616 and RE-MINTED here on the controller's ruling of 2026-09-18.**
+Renumbering is otherwise forbidden in this catalogue; it is done once, for this block, because the four
+ids were not free when they were taken. `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+— on the branch since `5039209c`, which is BEHIND this change — reserves `13.613–13.649` for its twelve
+tasks and names `13.613`/`13.614`/`13.615`/`13.616` in its own test names. That plan was written when
+this file's high-water mark was 13.612, so "the next free id here" and "the next reserved id there"
+pointed at the same four numbers, and only this file was consulted. Nothing was red: the plan's ids are
+not in the catalogue yet, so no duplicate id existed to trip `check-case-ids`. It is fixed now rather
+than left because the second wave would otherwise mint twelve tasks on top of these rows, and a plan's
+reservation is a reservation. The allocation note at the top of this file now carries the rule.
+
+- 🧪 **13.650 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
   baked image.** `docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml
   up -d --build server` run from the executor's worktree: cold build **94 s**, container healthy
   **~24 s** after start, `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,
@@ -7237,7 +7260,7 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   `/repo/reference`, which this override declares itself. All eleven resolve under the worktree
   (`docker inspect --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}'`).
   (`docker-compose.hot.yml`, `apps/server/Dockerfile`)
-- 🧪 **13.614 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
+- 🧪 **13.651 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
   `console.log("HOT-WITNESS-SERVER")` added at the top of `apps/server/src/index.ts` appeared in
   `docker logs` and a `[tsx] change in ./src/index.ts` restart line followed in **1.93 s** —
   re-measured after the container command gained the watcher supervisor; it was **1.62 s** before
@@ -7262,7 +7285,7 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   a count — `ps -o args= | grep -c "typescript/bin/tsc"` → **7**, one per package; the near-miss
   pattern `tsconfig.json --watch` matches **9** because the container's own command line and the
   `pnpm -r` parent both contain it. (`docker-compose.hot.yml`, `docs/runbook.md`)
-- 🧪 **13.615 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
+- 🧪 **13.652 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
   watcher SHAPE.** `export const HOT_WITNESS = "domain-hot";` appended to
   `packages/domain/src/index.ts`, plus `console.log(HOT_WITNESS)` in the server entry importing it from
   `@gisik-nokma/domain` (by package name, so it resolves through `./dist`): the marker appeared in
@@ -7271,7 +7294,7 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   showing both restarts — `change in ./src/index.ts` and `change in
   ./../../packages/domain/dist/index.js`. Total watchers on a settle: seven `tsc -p tsconfig.json
   --watch` (one per package), `tsx watch`, and the server process. (`docker-compose.hot.yml`)
-- 🧪 **13.616 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
+- 🧪 **13.653 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
   container.** `docker compose … up -d server` with **no** `--build`: container id
   `df98f7588bf5…` identical before and after, and zero build/export/name lines in the output. And the
   plain path still reads what it read before: `docker compose --env-file .env -f docker-compose.dev.yml
