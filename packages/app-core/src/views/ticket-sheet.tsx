@@ -378,8 +378,15 @@ export function TicketSheet({
       const results = await dataSource.ingest([event]);
       const result = results[0];
       if (result === undefined) {
-        // Ruling 27/33: silence is not a refusal — `transportError`, never a
-        // hand-built `{rule, reason}` pair standing in for one.
+        // Ruling 27/33/34: silence is not a refusal — `transportError`, never
+        // a hand-built `{rule, reason}` pair standing in for one. `serverRefusal`
+        // is cleared here too, the same pairing the `catch` branch below
+        // already does: without it, a REFUSED answer followed by a SILENT one
+        // (two separate clicks, two separate ingests) would leave the old
+        // "Refused by the server — …" notice on screen alongside the new
+        // transport one — two notices for one click's outcome, the earlier one
+        // describing an answer that is no longer what happened.
+        setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }

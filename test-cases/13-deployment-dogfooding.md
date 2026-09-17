@@ -6425,3 +6425,16 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `setSubmitting(false)` out of the `finally` to after the committed reload only, `cp`/`sha256sum`
   restore): kills exactly this case (Close stays disabled forever after a rejection) and no other —
   (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588c** ✅ Ruling 34 (fix round 3, 2026-09-17) — the `results[0] === undefined` ("silence")
+  branch clears `serverRefusal` too, the same pairing the `catch` branch already carries (13.588b): a
+  wording gap in Ruling 33 itself left this one branch setting `transportError` without clearing
+  `serverRefusal`, so a REFUSED click followed by a SILENT one rendered BOTH notices at once — the
+  earlier "Refused by the server — …" describing an answer that no longer holds. Proven by sequencing
+  two different answers through the fake data source's ordinary per-call closure (no test-helper change
+  needed): `refused` (rule `close-requires-terminal`) on the first `ingest`, an empty `[]` on the second.
+  First click shows the server notice with the reason; second click shows ONLY the transport notice
+  ("The server did not answer this change.") — the server notice's class (`gn-refusal--server`) and its
+  reason text are both confirmed ABSENT, not merely joined by the new one — and Close re-enables.
+  Mutation (dropping the new `setServerRefusal(null)`, `cp`/`sha256sum` restore): kills exactly this case
+  on the "server notice gone" assertion and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)

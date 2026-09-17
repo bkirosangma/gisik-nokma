@@ -1036,4 +1036,64 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(document.body.textContent).not.toContain('Refused by the server');
     await waitFor(() => expect(closeButton).toBeEnabled());
   });
+
+  /**
+   * 13.588c — Ruling 34 (fix round 3, 2026-09-17): the `result === undefined`
+   * branch clears `serverRefusal` too, the same pairing the `catch` branch
+   * already carries (case 13.588b). Without it, a REFUSED click followed by a
+   * SILENT one leaves the earlier "Refused by the server — …" notice on
+   * screen ALONGSIDE the new transport one — two notices for one click's
+   * outcome, the older one describing an answer that no longer holds.
+   *
+   * The fake data source's `ingestScript` is an ordinary closure per call,
+   * not a fixed, one-shot script — `createFakeDataSource`'s `ingest` invokes
+   * it fresh on every call — so it sequences two different answers across two
+   * clicks (`refused`, then an empty `[]` — `results[0]` undefined) with NO
+   * change to the test helper.
+   */
+  it('13.588c a refused click followed by a silent one shows only the transport notice, never both', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    let calls = 0;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) => {
+        calls += 1;
+        if (calls === 1) {
+          return events.map((event) => ({
+            status: 'refused' as const,
+            eventId: event.id,
+            rule: 'close-requires-terminal',
+            reason: 'A ticket can only be closed from a terminal state; "Done" is not one.',
+          }));
+        }
+        // The second click's answer: silence — no result for the one event
+        // submitted, `results[0] === undefined`.
+        return [];
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+
+    await user.click(closeButton);
+    const serverNotice = await screen.findByText(/close-requires-terminal/);
+    expect(serverNotice.className).toBe('gn-refusal gn-refusal--server');
+    await waitFor(() => expect(closeButton).toBeEnabled());
+
+    await user.click(closeButton);
+    const transportNotice = await screen.findByText('The server did not answer this change.');
+    expect(transportNotice.className).toBe('gn-refusal gn-refusal--transport');
+    // The earlier server notice must be GONE, not merely joined by the new one.
+    expect(screen.queryByText(/close-requires-terminal/)).toBeNull();
+    expect(document.querySelector('.gn-refusal--server')).toBeNull();
+    await waitFor(() => expect(closeButton).toBeEnabled());
+  });
 });
