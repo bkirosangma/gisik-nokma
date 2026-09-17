@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
@@ -949,5 +949,54 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(alert).toHaveTextContent(
       'Refused by the server — close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
     );
+  });
+
+  /**
+   * 13.588a — Ruling 32 (fix round 1): the double-submit latch.
+   * `closeOrReopen` mirrors `board.tsx`'s `submitDirect` (`:1029-1035`'s own
+   * docblock explains why `finally`, not after the `await`): a rapid
+   * double-click on Close would otherwise fire two overlapping `ticket.closed`
+   * ingests before the first one's `committed`/`refused` answer ever comes
+   * back. `Close` (and, symmetrically, `Reopen`) is `disabled={submitting}`
+   * for the lifetime of its own ingest and re-enabled once it settles,
+   * regardless of outcome — a REJECTED ingest must not leave the button
+   * bricked forever, which is exactly what `finally` (vs. resetting only on
+   * the happy path) buys.
+   */
+  it('13.588a Close is disabled while its ingest is in flight, and enabled again once it settles', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    // A DEFERRED ingest: resolved by hand, below, so the test controls
+    // exactly how long "in flight" lasts rather than racing a microtask.
+    let resolveIngest!: (results: IngestResult[]) => void;
+    const pendingIngest = new Promise<IngestResult[]>((resolve) => {
+      resolveIngest = resolve;
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => pendingIngest,
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+    expect(closeButton).toBeEnabled();
+
+    await user.click(closeButton);
+    await waitFor(() => expect(closeButton).toBeDisabled());
+    // Still in flight: a second click must not queue a second ingest.
+    await user.click(closeButton);
+    expect(source.ingested).toHaveLength(1);
+
+    resolveIngest([
+      { status: 'committed', eventId: 'evt_close_1', seq: 99, serverTime: '2026-08-20T09:00:00.000Z' },
+    ]);
+    await waitFor(() => expect(closeButton).toBeEnabled());
   });
 });

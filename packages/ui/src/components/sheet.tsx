@@ -25,7 +25,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
       >
         <header className="gn-sheet__header">
           <h2 className="gn-sheet__title">{title}</h2>
-          <button type="button" className="gn-sheet__close" aria-label="Close" onClick={onClose}>
+          <button type="button" className="gn-sheet__close" aria-label="Close sheet" onClick={onClose}>
             ×
           </button>
         </header>

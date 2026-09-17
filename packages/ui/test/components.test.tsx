@@ -94,7 +94,7 @@ describe('Sheet', () => {
       </Sheet>,
     );
     expect(screen.getByRole('dialog', { name: 'GST registration' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close sheet' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

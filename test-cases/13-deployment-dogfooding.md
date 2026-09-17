@@ -6400,3 +6400,12 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   gated on `!moveOpen` so the two never both render: the Move dialog's own `onClose` already clears
   `serverRefusal` when it closes, and `submitTransition` never sets it while `moveOpen` is false —
   (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588a** ✅ Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch. Close/Reopen mirror
+  `board.tsx`'s `MoveArrows.submitting` (`:956`, `finally`-reset per `:1029-1035`'s own docblock): both
+  buttons carry `disabled={submitting}` for the lifetime of their own ingest, re-enabled once it settles
+  regardless of outcome. Proven with a DEFERRED ingest (a promise the test resolves by hand): Close is
+  enabled before the click, disabled while the promise is pending, a second click in that window queues
+  no second `ingest` call, and resolving the promise re-enables it. `Move…` is deliberately untouched — it
+  opens a dialog with its own submit path. Mutation (dropping the `finally` reset, `cp`/`sha256sum`
+  restore): kills exactly this case (Close never re-enables) and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)

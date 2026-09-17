@@ -170,6 +170,17 @@ export function TicketSheet({
   const [tab, setTab] = useState<'details' | 'history'>('details');
   const [moveOpen, setMoveOpen] = useState(false);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  /**
+   * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
+   * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
+   * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
+   * rapid double-click fires a second `ticket.closed`/`ticket.reopened`
+   * ingest before the first one's answer returns — this sheet has no arrow
+   * pair to double-click through, but the same click-then-await window
+   * exists on ONE button. Scoped to Close/Reopen only: `Move…` opens a
+   * dialog with its own submit and its own concerns, untouched here.
+   */
+  const [submitting, setSubmitting] = useState(false);
 
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
     dataSource.query.getTicket(workspaceId, ticketId),
@@ -304,7 +315,14 @@ export function TicketSheet({
    * `submitTransition` is left unguarded (see that function's docblock,
    * cited by `board.tsx`): this file tracks no mounted-ness anywhere else, and
    * adding one guard for this call alone would be a second convention beside
-   * the existing unguarded one rather than a fix to it.
+   * the existing unguarded one rather than a fix to it. **This is a DIFFERENT
+   * concern from the `submitting` latch below** — unmount-safety is about a
+   * setState landing after this component is gone; the latch is about a
+   * second click landing while THIS component is still very much mounted and
+   * still waiting on the first click's answer. `board.tsx`'s `MoveArrows`
+   * needs both guards because it can unmount mid-flight (a sibling card's
+   * move can reload the board out from under it); nothing here reloads this
+   * sheet out from under itself, so only the latch applies.
    *
    * The one case `submitTransition` has no answer for at all is a REJECTED
    * `ingest` — the promise throwing rather than answering `invalid`. Ruling
@@ -315,33 +333,46 @@ export function TicketSheet({
    * `serverRefusal` slot, under a rule name that says what happened
    * (`ingest-rejected`) rather than inventing a `{rule, reason}` pair that
    * reads as the engine's own answer.
+   *
+   * Ruling 32 (fix round 1) — `submitting` is set BEFORE the `ingest` call and
+   * reset in a `finally`, mirroring `board.tsx`'s `submitDirect`
+   * (`:1029-1035`'s own docblock on why `finally` rather than after the
+   * `await`): a REJECTED ingest must not leave Close/Reopen disabled forever,
+   * which resetting only on the happy path would do. The early `if
+   * (submitting) return` guards against a second click landing on the same
+   * render pass as the first, before React has re-rendered the `disabled`
+   * attribute onto the DOM (`userEvent`'s own await notwithstanding, this is
+   * belt-and-braces for a synchronous double-invoke, not the primary defence
+   * — the `disabled` attribute is).
    */
   const closeOrReopen = async (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> => {
-    const event = make({
-      workspaceId,
-      entity: { kind: 'ticket', id: ticketId },
-      type,
-      payload: {},
-    });
-    let results;
+    if (submitting) return;
+    setSubmitting(true);
     try {
-      results = await dataSource.ingest([event]);
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type,
+        payload: {},
+      });
+      const results = await dataSource.ingest([event]);
+      const failed = results.find((result) => result.status !== 'committed');
+      if (failed === undefined) {
+        setServerRefusal(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
+      else setServerRefusal({ rule: failed.code, reason: failed.message });
     } catch (error) {
       setServerRefusal({
         rule: 'ingest-rejected',
         reason: error instanceof Error ? error.message : String(error),
       });
-      return;
+    } finally {
+      setSubmitting(false);
     }
-    const failed = results.find((result) => result.status !== 'committed');
-    if (failed === undefined) {
-      setServerRefusal(null);
-      read.reload();
-      history.reload();
-      return;
-    }
-    if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
-    else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
 
   const state = ticketRead.ticket;
@@ -397,10 +428,14 @@ export function TicketSheet({
               ticket stays terminal and the two buttons never both show.
             */}
             {state.stateCategory === 'terminal' && closed === null ? (
-              <Button onClick={() => void closeOrReopen('ticket.closed')}>Close</Button>
+              <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
+                Close
+              </Button>
             ) : null}
             {closed !== null ? (
-              <Button onClick={() => void closeOrReopen('ticket.reopened')}>Reopen</Button>
+              <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
+                Reopen
+              </Button>
             ) : null}
             {/*
               Opening Move… clears any standing Close/Reopen refusal first: the
