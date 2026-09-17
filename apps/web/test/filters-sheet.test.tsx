@@ -1,7 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { Actor, BoardCard, BoardView, ClaimProvenance, FilterSpec } from '@gisik-nokma/app-core';
+import type {
+  Actor,
+  BoardCard,
+  BoardView,
+  ClaimProvenance,
+  FilterSpec,
+  ListRow,
+  TicketListView,
+} from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -801,5 +809,138 @@ describe('13.556a an excluded collaborator is disclosed by the scope note, not s
 
     expect(screen.queryByTestId('board-scope-note')).not.toBeInTheDocument();
     expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * A `ListRow` exactly as `view-types.ts` declares it — `closed` REQUIRED
+ * (Task 4), matching `board-narrowing.test.tsx`'s own `listRow` fixture.
+ * Titles deliberately avoid `twoCards`'s own ("Carve the new workflow",
+ * "Restock the cold shelf") so a query made after switching to the List tab
+ * can never accidentally match a leftover Board-tab element.
+ */
+function listRow(overrides: Partial<ListRow> = {}): ListRow {
+  const base: ListRow = {
+    ticketId: 'lt_1',
+    title: 'A list row',
+    typeId: 'task',
+    typeRank: 3,
+    parentId: null,
+    epicId: null,
+    stateId: 'doing',
+    stateName: 'Doing',
+    stateCategory: 'active',
+    stateProvenance: claim(),
+    assignee: null,
+    assignedProvenance: null,
+    dueDate: null,
+    fields: {},
+    rollup: null,
+    hasRestrictedParent: false,
+    pending: false,
+    closed: null,
+  };
+  return { ...base, ...overrides };
+}
+
+/**
+ * 13.600 — the Closed control (Task 11, Ruling 44/45, spec §5.5): cycles
+ * with the names `Closed` / `Closed, included` / `Closed, excluded`;
+ * "Closed only" on the List tab shows only the closed row, "Not closed"
+ * hides it; the State chips include `Backlog` (Ruling 45 — no second def
+ * fetch, the universal state appended after the board's own columns).
+ */
+describe('13.600 the Closed control cycles and narrows the List tab; Backlog joins the State chips', () => {
+  const rows: ListRow[] = [
+    listRow({ ticketId: 'lt_open', title: 'Ship the roadmap' }),
+    listRow({
+      ticketId: 'lt_closed',
+      title: 'Archive the sunset feature',
+      closed: { actorId: 'user_kiro', at: '2026-09-17T00:00:00.000Z' },
+    }),
+  ];
+
+  function servedWithRows() {
+    return servedBoard(twoCards, {
+      getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows }),
+    });
+  }
+
+  it('cycles through the three accessible names, off -> included -> excluded -> off', async () => {
+    render(
+      <Providers services={servedWithRows()}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Closed' });
+    const control = within(group).getByRole('button', { name: 'Closed' });
+    expect(control).not.toHaveAttribute('aria-pressed');
+
+    await userEvent.click(control);
+    expect(within(group).getByRole('button', { name: 'Closed, included' })).toHaveAttribute('data-mode', 'include');
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed, included' }));
+    expect(within(group).getByRole('button', { name: 'Closed, excluded' })).toHaveAttribute('data-mode', 'exclude');
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed, excluded' }));
+    expect(within(group).getByRole('button', { name: 'Closed' })).toHaveAttribute('data-mode', 'off');
+  });
+
+  it('"Closed only" shows only the closed row on the List tab, under a "Closed: only" chip', async () => {
+    render(
+      <Providers services={servedWithRows()}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    await screen.findByText('Archive the sunset feature');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Closed' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByTestId('board-filter-chip-closed')).toHaveTextContent('Closed: only');
+    expect(screen.getByText('Archive the sunset feature')).toBeInTheDocument();
+    expect(screen.queryByText('Ship the roadmap')).not.toBeInTheDocument();
+  });
+
+  it('"Not closed" hides the closed row on the List tab, under a "Closed: hidden" chip', async () => {
+    render(
+      <Providers services={servedWithRows()}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    await screen.findByText('Archive the sunset feature');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'Closed' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed, included' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByTestId('board-filter-chip-closed')).toHaveTextContent('Closed: hidden');
+    expect(screen.getByText('Ship the roadmap')).toBeInTheDocument();
+    expect(screen.queryByText('Archive the sunset feature')).not.toBeInTheDocument();
+  });
+
+  it('Backlog appears exactly once among the State chips', async () => {
+    render(
+      <Providers services={servedWithRows()}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const group = within(dialog).getByRole('group', { name: 'State' });
+    // The board fixture (`twoCards`) has exactly one column, "Doing" — Backlog
+    // is the universal state Ruling 45 appends, never a real column.
+    expect(within(group).getAllByRole('button', { name: 'Backlog' })).toHaveLength(1);
+    expect(within(group).getByRole('button', { name: 'Doing' })).toBeInTheDocument();
   });
 });

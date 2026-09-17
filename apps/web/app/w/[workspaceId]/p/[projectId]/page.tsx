@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
+  BACKLOG_STATE,
   BACKLOG_STATE_ID,
   BUILTIN_TICKET_TYPE_SEEDS,
   type StateCategory,
@@ -41,7 +42,7 @@ import {
   shouldRenderNarrowingStrip,
   type BoardFilterChip,
 } from '../../../../../src/board-search-scope.js';
-import { choiceMode, withCycledId } from '../../../../../src/filter-cycle.js';
+import { choiceMode, closedMode, withCycledClosed, withCycledId } from '../../../../../src/filter-cycle.js';
 import { listNarrowingWord } from '../../../../../src/list-narrowing-word.js';
 import { ChoiceGlyph, TriStateChoice } from '../../../../../src/tri-state-choice.js';
 import { istToday } from '../../../../../src/ist-today.js';
@@ -256,6 +257,24 @@ function ProjectBoard() {
   }, []);
 
   /**
+   * RULING 44 — how "hidden by default" and its own removable chip coexist
+   * on Calendar/Timeline. The spec's own mapping (`closed: undefined | true |
+   * false`, Calendar/Timeline passing `closed: false` when unset) has no
+   * fourth state: with `filter.closed` doing double duty as both "the
+   * person's explicit choice" and "the default is in force", picking All on
+   * those two tabs could never distinguish itself from having never touched
+   * the control at all, so the mandated `Closed: hidden` chip could never be
+   * removed. This page-level flag is the fourth state the spec's mapping
+   * lacks: `false` (its own default) means the two date tabs still hide
+   * closed tickets nobody asked to see; `true` means the person removed that
+   * default's own chip, and the date tabs now show every state `filter.closed`
+   * itself allows. An EXPLICIT `filter.closed` (either value) overrides this
+   * flag in both directions — see `datesNarrowing`'s own `effectiveClosed`
+   * below — so this only ever matters while `filter.closed` is unset.
+   */
+  const [showClosedOnDates, setShowClosedOnDates] = useState(false);
+
+  /**
    * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
    * field list, restated here exactly once. `boardNarrowing` below and
    * `activeFilterChips` further down BOTH read this SAME value; before the
@@ -458,6 +477,11 @@ function ProjectBoard() {
       dueBefore: filter.dueBefore,
       dueAfter: filter.dueAfter,
       fields: filter.fields,
+      // Task 11 (spec §5.5): the List tab honours the Closed control's
+      // EXPLICIT choice only — `filter.closed` itself, never defaulted to
+      // `false` the way Calendar/Timeline's own `datesNarrowing` does below.
+      // An unset control shows every ticket on the List tab, open or closed.
+      closed: filter.closed,
       exclude:
         filter.exclude === undefined
           ? undefined
@@ -488,6 +512,33 @@ function ProjectBoard() {
     const rows = list.rows.filter((row) => matchesListRow(row, projectId, listFilterSpec));
     return { rows, shown: rows.length, total: list.rows.length };
   }, [list.rows, listFilterSpec, projectId]);
+
+  /**
+   * THE DATES NARROWING (Task 11, Ruling 44) — Calendar and Timeline's own
+   * further cut of `listNarrowing.rows`, layering the "closed hidden by
+   * default" rule the List tab never applies. `listFilterSpec.closed` above
+   * already carries the Closed control's EXPLICIT choice into `listNarrowing`
+   * for every tab alike, so when the person has set the control this memo's
+   * own re-filter is a no-op — `effectiveClosed` below reduces to
+   * `filter.closed` exactly, matching what `listNarrowing.rows` already is.
+   * Only while `filter.closed` is UNSET does it diverge: `showClosedOnDates`
+   * (off by default) decides whether these two tabs additionally hide closed
+   * tickets nobody asked to see. This is Ruling 44's own formula.
+   *
+   * `total` is `list.rows.length` — the SAME value `listNarrowing.total`
+   * already reads, from the unnarrowed source rather than a prior stage
+   * (`listNarrowing`'s own docblock explains why) — so `shown !== total`
+   * answers "did Calendar/Timeline hide anything, for any reason", the same
+   * disclosure invariant `listNarrowing`/`backlogNarrowing` already keep.
+   */
+  const datesNarrowing = useMemo(() => {
+    if (list.rows === null || listNarrowing === null) return null;
+    const effectiveClosed = filter.closed ?? (showClosedOnDates ? undefined : false);
+    const rows = listNarrowing.rows.filter((row) =>
+      matchesListRow(row, projectId, { ...listFilterSpec, closed: effectiveClosed }),
+    );
+    return { rows, shown: rows.length, total: list.rows.length };
+  }, [list.rows, listNarrowing, listFilterSpec, filter.closed, showClosedOnDates, projectId]);
 
   const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
 
@@ -688,25 +739,29 @@ function ProjectBoard() {
    * gated on `list.rows !== null` themselves. The gate is the guarantee; this
    * expression never carries an empty array into a view.
    *
-   * Reads `listNarrowing.rows`, not `list.rows`, since 2026-09-17
-   * (exclude-mode spec §3): the Calendar and Timeline tabs draw from the SAME
-   * narrowed rows the List tab's own count and strip report, rather than the
-   * complete unnarrowed set — the whole point of the filter reaching every
-   * tab. `listNarrowing` is non-null exactly when `list.rows` is (see its own
-   * docblock above), so this mirrors the old gate precisely.
+   * Read `listNarrowing.rows` from 2026-09-17 to Task 11 (exclude-mode spec
+   * §3): the Calendar and Timeline tabs drew from the SAME narrowed rows the
+   * List tab's own count and strip report, rather than the complete
+   * unnarrowed set — the whole point of the filter reaching every tab.
+   *
+   * Reads `datesNarrowing.rows` since Task 11 (Ruling 44): one further cut of
+   * exactly those rows, applying the "closed hidden by default" rule the List
+   * tab does not — see `datesNarrowing`'s own docblock above. `datesNarrowing`
+   * is non-null exactly when `list.rows`/`listNarrowing` are (its own
+   * docblock says so), so this still mirrors the old gate precisely.
    */
   const dateInputs = useMemo<TicketDatesInput[]>(
     () =>
-      listNarrowing === null
+      datesNarrowing === null
         ? []
-        : listNarrowing.rows.map((row) =>
+        : datesNarrowing.rows.map((row) =>
             toTicketDatesInput(
               row,
               { workspaceId, projectId },
               dateFieldsByType.get(row.typeId) ?? [],
             ),
           ),
-    [listNarrowing, workspaceId, projectId, dateFieldsByType],
+    [datesNarrowing, workspaceId, projectId, dateFieldsByType],
   );
 
   /**
@@ -763,6 +818,18 @@ function ProjectBoard() {
           names.set(column.stateId, column.name);
         }
       }
+      /**
+       * RULING 45 — the universal Backlog state joins the State options, NO
+       * second def fetch: `BACKLOG_STATE_ID`/`BACKLOG_STATE` are the same
+       * reserved id/name every workflow already carries implicitly
+       * (`workflow.ts`'s own `statesWithBacklog`), so this needs nothing
+       * beyond what `board.data` already answers. Appended LAST — mirroring
+       * `statesWithBacklog`'s own "always last" rule — so it can never
+       * collide with a real column: the id is RESERVED, `validateWorkflowDef`
+       * refuses any definition that declares it, so the loop above can never
+       * already hold this key.
+       */
+      names.set(BACKLOG_STATE_ID, BACKLOG_STATE.name);
     }
     return names;
   }, [board.data]);
@@ -869,6 +936,64 @@ function ProjectBoard() {
     () => (workflowChip !== null ? [...activeFilterChips, workflowChip] : activeFilterChips),
     [activeFilterChips, workflowChip],
   );
+
+  /**
+   * THE LIST/CALENDAR/TIMELINE/BACKLOG CHIP LIST (Task 11, spec §5.5) —
+   * `activeFilterChips` plus the one axis those four tabs can apply that the
+   * Board cannot at all: `closed` (§5.2 — Board is "unchanged" by this task).
+   * A SEPARATE call into `buildFilterChips`, spreading `boardFilter`'s own
+   * six fields rather than folding `closed` onto `boardFilter` itself —
+   * `boardFilter`'s own docblock is exact about why it stops at those six
+   * ("the axes a board can answer"), and `closed` is a SEVENTH `BoardCard`
+   * cannot represent AT ALL (no field for it, unlike the four
+   * `describeUnappliedBoardAxes` already discloses as merely board-blind).
+   * Folding it in there would make `activeFilterChips` — which
+   * `narrowingChips` above spreads onto the BOARD tab's own strip — show a
+   * "Closed: …" chip on a tab where clicking it changes nothing, exactly the
+   * disclosure lie `buildFilterChips`'s own docblock (Task 4 review) was
+   * written to stop. Reusing `boardFilter` via a spread, rather than
+   * hand-listing the six fields a second time, is what keeps this list from
+   * drifting from `activeFilterChips` on the axes the two DO share.
+   */
+  const listFilterChips = useMemo(
+    () =>
+      buildFilterChips(
+        { ...boardFilter, closed: filter.closed },
+        {
+          assigneeName: nameOf,
+          typeName: (id) => typeNameById.get(id) ?? id,
+          stateName: (id) => boardStateNames.get(id) ?? id,
+        },
+        setFilter,
+      ),
+    [boardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
+  );
+
+  /**
+   * THE DEFAULT-HIDE CHIP (Ruling 44) — synthetic, not one of
+   * `buildFilterChips`'s own: it discloses a PAGE-LEVEL default
+   * (`showClosedOnDates`), not an axis set on `filter` at all, so it has no
+   * natural home inside a function that enumerates `FilterSpec` fields.
+   * Present exactly when the default is actually IN FORCE on a date tab —
+   * `filter.closed === undefined` (the person has not overridden it) AND
+   * `!showClosedOnDates` (they have not lifted it either) — mirroring
+   * `workflowChip`'s own "resting state discloses nothing" rule (R3): once
+   * `filter.closed` is set explicitly, `listFilterChips`'s own "Closed: …"
+   * chip takes over and this one stands down, matching Ruling 44's "an
+   * explicit filter.closed overrides both ways" — never both chips at once,
+   * for the same reason `closedMode`/`buildFilterChips`'s closed branch is an
+   * `if`/`else if` rather than two independent conditions.
+   */
+  const closedDefaultInForce = filter.closed === undefined && !showClosedOnDates;
+  const closedDefaultChip: BoardFilterChip | null =
+    (view === 'calendar' || view === 'timeline') && closedDefaultInForce
+      ? {
+          key: 'closed-default',
+          label: 'Closed: hidden',
+          mode: 'exclude',
+          onRemove: () => setShowClosedOnDates(true),
+        }
+      : null;
 
   /**
    * Why the create control is GATED rather than mounted with a disabled picker.
@@ -1341,9 +1466,32 @@ function ProjectBoard() {
               // Backlog tab shares the List tab's filter vocabulary exactly
               // (same `FilterSpec`, same `matchesListRow`-driven axes) —
               // `board` is the only OTHER special case either needs.
-              const narrowing = view === 'board' ? boardNarrowing : view === 'backlog' ? backlogNarrowing : listNarrowing;
+              //
+              // `narrowing` gained a FOURTH branch in Task 11: Calendar and
+              // Timeline read `datesNarrowing`, not `listNarrowing` — the
+              // further cut that applies the "closed hidden by default" rule
+              // those two tabs alone carry (Ruling 44). `unapplied` needs no
+              // new branch (`describeUnappliedListAxes` already covers all
+              // four non-board tabs identically); `chips` does, to add the
+              // Closed axis's own disclosure — see `listFilterChips`/
+              // `closedDefaultChip`'s own docblocks above for why that is a
+              // SEPARATE list from `activeFilterChips` rather than a change
+              // to it.
+              const narrowing =
+                view === 'board'
+                  ? boardNarrowing
+                  : view === 'backlog'
+                    ? backlogNarrowing
+                    : view === 'calendar' || view === 'timeline'
+                      ? datesNarrowing
+                      : listNarrowing;
               const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
-              const chips = view === 'board' ? narrowingChips : activeFilterChips;
+              const chips =
+                view === 'board'
+                  ? narrowingChips
+                  : closedDefaultChip !== null
+                    ? [...listFilterChips, closedDefaultChip]
+                    : listFilterChips;
               // Controller ruling, Task 10 fix round 1 (amended fix round 2):
               // the scope note names the tab it is actually on, rather than
               // always saying "the board" for List/Calendar/Timeline too. A
@@ -1373,7 +1521,17 @@ function ProjectBoard() {
               if (
                 narrowing === null ||
                 !shouldRenderNarrowingStrip({
-                  chipCount: activeFilterChips.length,
+                  // `activeFilterChips.length` on the BOARD tab, UNCHANGED
+                  // (see `narrowingChips`'s own docblock on why `workflowChip`
+                  // is deliberately not counted here). `chips.length`
+                  // everywhere else — Task 11's own `closedDefaultChip` is a
+                  // MANDATED disclosure (Ruling 44) that can be present while
+                  // `shown === total` (nothing in this project happens to be
+                  // closed today), so unlike `workflowChip` it is not always
+                  // covered by the gate's third term on its own; counting it
+                  // here is what guarantees a chip this render actually
+                  // building is a chip the strip actually shows.
+                  chipCount: view === 'board' ? activeFilterChips.length : chips.length,
                   unappliedAxisCount: unapplied.length,
                   shown: narrowing.shown,
                   total: narrowing.total,
@@ -2079,6 +2237,27 @@ function FiltersSheet({
                 ))}
               </div>
             ) : null}
+          </fieldset>
+
+          {/**
+           * THE CLOSED CONTROL (Task 11, spec §5.5): ONE `TriStateChoice`,
+           * not a person row or a chip list — `closed` is a single boolean
+           * with no per-value list the way Assignee/Type/State/Category each
+           * have, so there is exactly one control to render, cycling
+           * `filter.closed` itself through `closedMode`/`withCycledClosed`
+           * (`filter-cycle.ts`) rather than `choiceMode`/`withCycledId`,
+           * which have nothing to add a VALUE to here. Placed after State,
+           * before Category, matching the brief's own ordering.
+           */}
+          <fieldset className="gn-filters__section">
+            <legend className="gn-filters__section-label">Closed</legend>
+            <div className="gn-filters__chip-list">
+              <TriStateChoice
+                label="Closed"
+                mode={closedMode(filter)}
+                onCycle={() => setFilter(withCycledClosed)}
+              />
+            </div>
           </fieldset>
 
           <fieldset className="gn-filters__section">

@@ -914,3 +914,104 @@ describe('13.473 an unresolvable picked workflow falls back to All, not a phanto
     expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 13.601 — Calendar and Timeline hide closed tickets by default (Task 11,
+ * Ruling 44, spec §5.5): a closed ticket with a due date is absent from both
+ * tabs until the mandated "Closed: hidden" chip (key `closed-default`,
+ * distinct from the EXPLICIT control's own `closed` chip) is removed; an
+ * explicit "Closed only" overrides the default in the other direction.
+ * `AMENDED` per Ruling 44's own text: "removing the Closed: hidden chip shows
+ * the closed ticket on the Calendar; the List tab is unaffected; the Timeline
+ * likewise" — the List-tab check below is that amendment, exercised directly.
+ */
+describe('13.601 Calendar and Timeline hide closed tickets by default, disclosed by their own chip', () => {
+  const datedRows: ListRow[] = [
+    listRow({
+      ticketId: 'lt_open',
+      title: 'Ship the board',
+      fields: { title: fieldClaim('Ship the board'), dueDate: fieldClaim({ date: '2026-09-18' }) },
+    }),
+    listRow({
+      ticketId: 'lt_closed',
+      title: 'Archive the old workflow',
+      closed: { actorId: 'user_kiro', at: '2026-09-17T00:00:00.000Z' },
+      fields: { title: fieldClaim('Archive the old workflow'), dueDate: fieldClaim({ date: '2026-09-18' }) },
+    }),
+  ];
+
+  it('hides the closed ticket on the Calendar tab by default; removing the chip shows it', async () => {
+    render(
+      <Providers services={servedBoard(threeCards, datedRows)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Calendar' }));
+
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-closed-default')).toHaveTextContent('Closed: hidden');
+
+    await userEvent.click(screen.getByRole('button', { name: /Remove filter.*Closed: hidden/i }));
+
+    // `CalendarView` renders a due-only marker's LABEL, never the ticket's
+    // title (13.558's own discriminator), so there is no title text to query
+    // for on this tab. The strip vanishing ENTIRELY — the same proof
+    // `13.437`/`13.471` use for "everything reset" — is what it means for
+    // `shown` to have become `total` again: nothing left active (no explicit
+    // chip, the default no longer in force) and nothing left hidden.
+    expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();
+  });
+
+  it('the Timeline tab hides the same closed ticket by default, at ticket level; the List tab is unaffected', async () => {
+    render(
+      <Providers services={servedBoard(threeCards, datedRows)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
+
+    // Due-only rows land in Timeline's own "Undated or partially dated" side
+    // list, which renders titles directly (13.558's own discriminator) — a
+    // real presence/absence check, not only a count.
+    await screen.findByText('Ship the board');
+    expect(screen.queryByText('Archive the old workflow')).not.toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-closed-default')).toHaveTextContent('Closed: hidden');
+
+    await userEvent.click(screen.getByRole('button', { name: /Remove filter.*Closed: hidden/i }));
+    expect(await screen.findByText('Archive the old workflow')).toBeInTheDocument();
+
+    // THE AMENDMENT: the List tab never applied this default at all —
+    // `listFilterSpec.closed` carries only the EXPLICIT control, so the
+    // closed row is visible there regardless of `showClosedOnDates`.
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    expect(await screen.findByText('Archive the old workflow')).toBeInTheDocument();
+    expect(screen.getByText('Ship the board')).toBeInTheDocument();
+    expect(screen.queryByTestId('board-filter-chip-closed-default')).not.toBeInTheDocument();
+  });
+
+  it('an explicit "Closed only" on the Calendar tab overrides the default and shows only the closed ticket', async () => {
+    render(
+      <Providers services={servedBoard(threeCards, datedRows)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Calendar' }));
+    await screen.findByText('1 of 2 shown');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    const group = within(dialog).getByRole('group', { name: 'Closed' });
+    await userEvent.click(within(group).getByRole('button', { name: 'Closed' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    // Same numeric shape as the default (1 of 2), but the SURVIVING ticket is
+    // the opposite one — the explicit control, not the default, is now
+    // driving the narrowing, and only one "Closed: …" chip is present.
+    expect(await screen.findByText('1 of 2 shown')).toBeInTheDocument();
+    expect(screen.getByTestId('board-filter-chip-closed')).toHaveTextContent('Closed: only');
+    expect(screen.queryByTestId('board-filter-chip-closed-default')).not.toBeInTheDocument();
+  });
+});

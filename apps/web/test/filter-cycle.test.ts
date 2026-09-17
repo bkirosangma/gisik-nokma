@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FilterSpec } from '@gisik-nokma/app-core';
-import { choiceMode, nextMode, withCycledId } from '../src/filter-cycle.js';
+import { choiceMode, closedMode, nextMode, withCycledClosed, withCycledId } from '../src/filter-cycle.js';
 
 /** 13.548 — the tri-state cycle (exclude-mode spec §4): off → include → exclude → off. */
 describe('13.548 choiceMode and nextMode', () => {
@@ -67,5 +67,47 @@ describe('13.549 withCycledId', () => {
       stateCategories: undefined,
       exclude: { stateCategories: ['active'] },
     });
+  });
+});
+
+/**
+ * 13.598 — the Closed axis's own cycle (backlog/closed spec §5.5, amended by
+ * Ruling 44/45): `closed: undefined | true | false` in `ChoiceMode`'s own
+ * three terms (`off`/`include`/`exclude`), cycling through `nextMode`
+ * UNCHANGED rather than a second three-state vocabulary. `closed` is a
+ * single boolean, not an id axis, so `withCycledClosed` writes/deletes
+ * `filter.closed` directly instead of going through `withIdAxis`.
+ */
+describe('13.598 closedMode and withCycledClosed', () => {
+  it('reads all/only/hidden as off/include/exclude', () => {
+    expect(closedMode({})).toBe('off');
+    expect(closedMode({ closed: true })).toBe('include');
+    expect(closedMode({ closed: false })).toBe('exclude');
+  });
+
+  it('cycles off -> include -> exclude -> off, over filter.closed directly', () => {
+    let filter: FilterSpec = {};
+
+    filter = withCycledClosed(filter);
+    expect(filter).toEqual({ closed: true });
+    expect(closedMode(filter)).toBe('include');
+
+    filter = withCycledClosed(filter);
+    expect(filter).toEqual({ closed: false });
+    expect(closedMode(filter)).toBe('exclude');
+
+    filter = withCycledClosed(filter);
+    expect(filter).toEqual({});
+    expect(closedMode(filter)).toBe('off');
+    // Off DELETES the key (Ruling 44) rather than writing `closed: undefined`
+    // the way `withIdAxis`'s own collapse rule does — `toEqual` treats the
+    // two the same, so the key's actual presence is checked directly.
+    expect('closed' in filter).toBe(false);
+  });
+
+  it('a full cycle leaves every other axis on the filter untouched', () => {
+    const withOtherAxes: FilterSpec = { text: 'restock', assigneeIds: ['u1'] };
+    const cycled = withCycledClosed(withCycledClosed(withCycledClosed(withOtherAxes)));
+    expect(cycled).toEqual({ text: 'restock', assigneeIds: ['u1'] });
   });
 });

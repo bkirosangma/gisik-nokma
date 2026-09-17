@@ -299,3 +299,49 @@ describe('13.547 unapplied axes name the exclude half too, per tab', () => {
     expect(describeUnappliedListAxes({ dueBefore: '2026-09-30', fields: { priority: 'high' } })).toEqual([]);
   });
 });
+
+/**
+ * 13.599 — the Closed axis's own chip (Task 11, Ruling 44/45, spec §5.5):
+ * "Closed: only" for `closed: true`, "Closed: hidden" for `closed: false`,
+ * neither for unset — ONE chip, never two, since `closed` is a single
+ * boolean with no include/exclude halves the way every other axis has.
+ * `onRemove` clears it back to unset, the same `clear({ axis: undefined })`
+ * idiom every include-half chip in this file already uses.
+ */
+describe('13.599 buildFilterChips emits the Closed chip from an explicit filter.closed', () => {
+  it('emits no chip when closed is unset', () => {
+    expect(buildFilterChips({}, RESOLVERS, vi.fn())).toEqual([]);
+  });
+
+  it('"Closed: only" for closed: true, removable back to unset', () => {
+    const setFilter = vi.fn();
+    const chips = buildFilterChips({ closed: true }, RESOLVERS, setFilter);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toMatchObject({ key: 'closed', label: 'Closed: only', mode: 'include' });
+
+    chips[0]?.onRemove();
+    expect(setFilter).toHaveBeenCalledTimes(1);
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    expect(updater({ closed: true, text: 'x' })).toEqual({ closed: undefined, text: 'x' });
+  });
+
+  it('"Closed: hidden" for closed: false, removable back to unset', () => {
+    const setFilter = vi.fn();
+    const chips = buildFilterChips({ closed: false }, RESOLVERS, setFilter);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toMatchObject({ key: 'closed', label: 'Closed: hidden', mode: 'exclude' });
+
+    chips[0]?.onRemove();
+    const updater = setFilter.mock.calls[0]?.[0] as (current: FilterSpec) => FilterSpec;
+    expect(updater({ closed: false })).toEqual({ closed: undefined });
+  });
+
+  it('joins the chip list directly after the category chips, before projectIds', () => {
+    const chips = buildFilterChips(
+      { stateCategories: ['active'], closed: true, projectIds: ['p_1'] },
+      RESOLVERS,
+      vi.fn(),
+    );
+    expect(chips.map((chip) => chip.key)).toEqual(['stateCategories', 'closed', 'projectIds']);
+  });
+});

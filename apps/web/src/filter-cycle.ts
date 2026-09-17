@@ -25,6 +25,54 @@ export function nextMode(mode: ChoiceMode): ChoiceMode {
 }
 
 /**
+ * `filter.closed` in `ChoiceMode`'s own three terms (backlog/closed spec
+ * §5.5, Ruling 45): `undefined → 'off'` (All), `true → 'include'` (Closed
+ * only), `false → 'exclude'` (Not closed/hidden). Closed is a single boolean,
+ * not an `IdAxes` member — `FilterSpec.closed`'s own docblock says so, and it
+ * has no `exclude`-half key to read the way `choiceMode` reads one of two
+ * lists for an id axis — so this is a small, direct reader rather than a
+ * generic-over-`IdAxes` call into `choiceMode`.
+ *
+ * Task 11's own brief named this `closedMode(filter): 'all' | 'only' |
+ * 'hidden'` alongside `nextClosedMode`/`withClosedMode`; Ruling 44/45
+ * replaces that three-word vocabulary with `ChoiceMode` itself, so the one
+ * cycling control every other value in the Filters sheet already uses
+ * (`TriStateChoice`, `choiceMode`/`nextMode`/`withCycledId`) reads Closed
+ * exactly like it reads any other axis, rather than inventing a second
+ * three-state spelling for `TriStateChoice` to translate.
+ */
+export function closedMode(filter: FilterSpec): ChoiceMode {
+  if (filter.closed === true) return 'include';
+  if (filter.closed === false) return 'exclude';
+  return 'off';
+}
+
+/**
+ * One click on the Closed control — cycles through `nextMode` UNCHANGED (the
+ * same off → include → exclude → off every other control in this file
+ * drives), writing `filter.closed` directly rather than through
+ * `withIdAxis`'s per-axis list machinery, which has nothing to add or remove
+ * an item from here.
+ *
+ * `off` DELETES the key (Ruling 44) rather than writing `closed: undefined`
+ * the way `withIdAxis`'s own collapse rule does for an emptied id-axis list.
+ * The two read identically through `toEqual` (which treats an `undefined`
+ * property as absent) and through `closedMode` (`undefined` either way), so
+ * nothing UP THE CHAIN can tell them apart — but Ruling 44 asked for the key
+ * itself gone, not merely emptied, and `delete` is what makes that literally
+ * true rather than merely equivalent under one particular comparison.
+ */
+export function withCycledClosed(filter: FilterSpec): FilterSpec {
+  const next = nextMode(closedMode(filter));
+  if (next === 'off') {
+    const result = { ...filter };
+    delete result.closed;
+    return result;
+  }
+  return { ...filter, closed: next === 'include' };
+}
+
+/**
  * One click on one value: removed from BOTH halves first, then added to the
  * half the next mode names (or neither, for `off`). Two `withIdAxis` writes
  * so the collapse rule is never restated here. Removing from both halves —

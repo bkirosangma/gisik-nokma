@@ -6659,3 +6659,77 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   THE SECTIONS", not "exactly once on the page"), which would double-count `rowAction` and double-render
   the Closed chip, passing either assertion by accident —
   (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.598** ✅ Task 11 (spec §5.5, Ruling 45) — the Closed axis's own cycle. `closedMode(filter):
+  ChoiceMode`/`withCycledClosed(filter): FilterSpec` (`filter-cycle.ts`) read/write `filter.closed`
+  directly (`undefined → 'off'`, `true → 'include'`, `false → 'exclude'`) rather than through
+  `withIdAxis`'s per-axis list machinery — `closed` is a single boolean, not an `IdAxes` member, so there
+  is no list to add or remove a value from. The cycle itself reuses `nextMode` UNCHANGED: off → include →
+  exclude → off, the same three states every other control in the Filters sheet already drives, which is
+  why `TriStateChoice` needs no new prop shape to render it. **Ruling 44/45 replaces the brief's own
+  names** (`closedMode(filter): 'all' | 'only' | 'hidden'`, `nextClosedMode`, `withClosedMode`) with this
+  `ChoiceMode`-shaped pair — a second three-word vocabulary alongside `ChoiceMode` would be two spellings
+  of the one cycle the control renders. `off` DELETES the `closed` key (verified via `'closed' in filter'`
+  being `false`, not merely `toEqual({})`, since `toEqual` cannot distinguish a deleted key from one
+  written `undefined`) rather than writing `closed: undefined` the way `withIdAxis`'s own collapse rule
+  does for an emptied id-axis list —
+  (`apps/web/test/filter-cycle.test.ts`)
+- **13.599** ✅ Task 11 (spec §5.5, Ruling 44) — the Closed axis's own chip in `buildFilterChips`
+  (`board-search-scope.ts`): `spec.closed === true` → `Closed: only` (mode `include`); `spec.closed ===
+  false` → `Closed: hidden` (mode `exclude`); unset → no chip. ONE chip, never two — unlike every axis
+  `buildFilterChips` already covers, `closed` is a single boolean with no include/exclude halves that
+  could both be set at once, so this is an `if`/`else if`, not two independent `has()` checks. Joins the
+  chip list directly after the category chips, before `projectIds` — pinned by asserting the exact key
+  order on a spec that sets all three. `spec`'s own parameter type widens `BoardFilterSpec` with an
+  optional `closed` rather than `closed` joining `BoardFilterSpec` itself: a `BoardCard` cannot answer it
+  at all (no field for it, unlike the four axes `describeUnappliedBoardAxes` already discloses as merely
+  board-blind), so `page.tsx`'s own Board-tab call into this function (bare `boardFilter`) never sets it
+  and this branch never fires there — see 13.600/13.601 for the List/Calendar/Timeline call that does.
+  `onRemove` clears it back to unset via the same `clear({ axis: undefined })` idiom every include-half
+  chip in this file already uses —
+  (`apps/web/test/board-search-scope.test.ts`)
+- **13.600** ✅ Task 11 (spec §5.5, Ruling 44/45) — the Closed control in the Filters sheet, and Backlog
+  joining the State chips. ONE `TriStateChoice`, not a person row or a chip list (`closed` has no
+  per-value set the way Assignee/Type/State/Category each do), placed in its own fieldset directly after
+  State: cycles with the accessible names `Closed` / `Closed, included` / `Closed, excluded`, the SAME
+  `TriStateChoice`/`ChoiceMode` contract 13.552 already proved for a person row, now driven by
+  `closedMode`/`withCycledClosed` instead of `choiceMode`/`withCycledId`. On the List tab, "Closed only"
+  narrows to exactly the closed row under a `Closed: only` chip; "Not closed" (the next click) hides it
+  under a `Closed: hidden` chip — `listFilterSpec.closed = filter.closed` (`page.tsx`) is what reaches
+  `matchesListRow`'s own `closed` clause for real, not merely a control that renders. **Ruling 45 — no
+  second def fetch**: the State section's options are the board's own column states (already read for the
+  board's moves) PLUS the universal `{ id: BACKLOG_STATE_ID, name: BACKLOG_STATE.name }` from
+  `@gisik-nokma/domain`, appended LAST in `boardStateNames` (mirroring `statesWithBacklog`'s own "always
+  last" rule) — `Backlog` appears exactly once among the State chips, never duplicated with a real column,
+  because the id is RESERVED and `validateWorkflowDef` refuses any definition that declares it. The
+  brief's own "via `getWorkflowDef`" is dropped: nothing here fetches a definition `page.tsx` was not
+  already holding —
+  (`apps/web/test/filters-sheet.test.tsx`)
+- **13.601** ✅ Task 11 (spec §5.5, Ruling 44) — Calendar and Timeline hide closed tickets by default.
+  **The coexistence problem Ruling 44 exists to solve**: the spec's own mapping (`closed: undefined | true
+  | false`, the two date tabs passing `closed: false` when unset) has no fourth state, so "All" could
+  never show a closed ticket on those tabs and the mandated `Closed: hidden` chip could never be removed.
+  **The fix**: a page-level `const [showClosedOnDates, setShowClosedOnDates] = useState(false)`; the
+  effective clause Calendar/Timeline's own `datesNarrowing` (`page.tsx`) applies is `filter.closed ??
+  (showClosedOnDates ? undefined : false)` — an EXPLICIT `filter.closed` (either value) always wins;
+  only while it is unset does `showClosedOnDates` decide anything. `datesNarrowing` is a FURTHER cut of
+  `listNarrowing.rows` (not a fork of it), and `dateInputs` reads `datesNarrowing.rows`, not
+  `listNarrowing.rows`, from this task on. Proven: a closed ticket with a due date is absent from both the
+  Calendar's own count (`1 of 2 shown`, not `2 of 2`) and the Timeline's own ticket-level rendering (its
+  "Undated or partially dated" side list, 13.558's own discriminator — the title is genuinely gone, not
+  merely uncounted) while the default is in force; the strip carries a `Closed: hidden` chip (key
+  `closed-default`, distinct from the EXPLICIT control's own `closed` chip so the two can never collide)
+  whenever `filter.closed === undefined && !showClosedOnDates`, gated to the calendar/timeline tabs only;
+  its `onRemove` calls only `setShowClosedOnDates(true)` — never touches `filter` — and removing it
+  restores the ticket. **AMENDED per Ruling 44's own text** ("removing the `Closed: hidden` chip shows the
+  closed ticket on the Calendar; the List tab is unaffected; the Timeline likewise"): the List tab is
+  proven unaffected directly — `listFilterSpec.closed` carries only the explicit control
+  (`page.tsx`'s own `listFilterSpec`), so the closed row is visible there throughout, regardless of
+  `showClosedOnDates`. An explicit `Closed only` set on the Calendar overrides the default in the other
+  direction, surviving to show only the closed ticket (same `1 of 2 shown` shape, opposite surviving
+  ticket, one `closed` chip and no `closed-default` chip). The strip's gate counts the mandated default
+  chip (`chipCount: chips.length` on these tabs, not the Board-only `activeFilterChips.length`) because,
+  unlike the workflow picker's own chip, it is not always covered by `shown !== total` on its own — a
+  project with zero closed tickets today would otherwise compute the chip and never render it. Mutation
+  (`filter.closed ?? (...)` → `filter.closed` on `datesNarrowing`'s own clause, `cp`/`cmp` restore): kills
+  exactly this case's three assertions and no other (`PASS (17) FAIL (3)` of the file's 20) —
+  (`apps/web/test/board-narrowing.test.tsx`)

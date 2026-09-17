@@ -93,7 +93,7 @@ function capitalizeWord(word: string): string {
  * already words, only needing a capital letter.
  */
 export function buildFilterChips(
-  spec: BoardFilterSpec,
+  spec: BoardFilterSpec & { closed?: boolean },
   resolvers: BoardFilterChipResolvers,
   setFilter: (updater: (current: FilterSpec) => FilterSpec) => void,
 ): BoardFilterChip[] {
@@ -133,6 +133,23 @@ export function buildFilterChips(
   }
   if (has(exclude.stateCategories)) {
     chips.push({ key: 'exclude.stateCategories', label: `Not category: ${exclude.stateCategories.map(capitalizeWord).join(', ')}`, mode: 'exclude', onRemove: clearExclude('stateCategories') });
+  }
+  /**
+   * `closed` (Task 11, Ruling 44/45, spec §5.5) — ONE chip, never two: unlike
+   * every axis above, `closed` is a single boolean with no include/exclude
+   * halves (`FilterSpec.closed`'s own docblock), so `true`/`false` are
+   * mutually exclusive states rather than two halves that could both be set.
+   * `spec`'s own type widens `BoardFilterSpec` with an optional `closed`
+   * rather than `closed` joining `BoardFilterSpec` itself — a `BoardCard`
+   * cannot answer it at all (no field for it, unlike the four axes
+   * `describeUnappliedBoardAxes` already discloses as merely board-blind), so
+   * the Board tab's own call into this function (still bare `boardFilter`,
+   * `page.tsx`) never sets it and this branch never fires for that tab.
+   */
+  if (spec.closed === true) {
+    chips.push({ key: 'closed', label: 'Closed: only', mode: 'include', onRemove: clear({ closed: undefined }) });
+  } else if (spec.closed === false) {
+    chips.push({ key: 'closed', label: 'Closed: hidden', mode: 'exclude', onRemove: clear({ closed: undefined }) });
   }
   if (has(spec.projectIds)) {
     chips.push({ key: 'projectIds', label: `Project: ${spec.projectIds.length} selected`, mode: 'include', onRemove: clear({ projectIds: undefined }) });
