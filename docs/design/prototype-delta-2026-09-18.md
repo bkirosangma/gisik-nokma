@@ -94,9 +94,29 @@ spelling. The newer runtime:
 | event attribute | `onClick` | `sc-camel-on-click` |
 | named entity | `&mdash;`, `&rsaquo;`, `&uarr;`, `&middot;`, `&rsquo;` | `—`, `›`, `↑`, `·`, `’` |
 | void element | `<input … />` | `<input … >` |
+| boolean attribute | `data-dc-script` | `data-dc-script=""` |
 
-Every block was extracted whole (opening `<sc-if>` to its matching `</sc-if>` at equal indent), the four
+The fifth row was found last, while checking that a component *outside* the 25 blocks (the `hasToast`
+overlay, `@6d7b67c0a52c:1864`) had not been missed — it is byte-identical apart from that one attribute
+form, which is why it took a direct block-to-block diff to see. **The six-block result above is stable
+with it normalised**: re-running with all five rewrites gives `isSignIn` 2, `isWork` 4, `isMembers` 23,
+`isInviteAdmin` new, `isAccount` 22, `isHelp` 54 — still six of 25.
+
+Every block was extracted whole (opening `<sc-if>` to its matching `</sc-if>` at equal indent), the five
 rewrites above were undone **on both sides**, and the normalised texts were diffed.
+
+**Completeness — nothing was left unexamined.** A per-block diff can only speak for the blocks it was
+given, and the 25-screen framing is itself a choice, so the whole file was also diffed once and every
+changed line attributed to a region. The result is a total partition: `STYLE` 40 lines, `isHelp` 54,
+`isMembers` 23, `isAccount` 22, `isWork` 4, `isSignIn` 2, the shell's one nav line 2, and the
+data/script tail 428 — **and no other region has a single changed line.** The three largest buckets are
+the three this document already analyses (the token layer, the data-layer additions, `isHelp`). Two
+caveats, stated so the numbers are not read as more than they are: the region counts come from a
+*whole-file* diff and so carry alignment artifacts wherever blocks shifted (the data tail's 428 includes
+the relocations the per-block pass resolves properly), and the tail's real additions are enumerated in
+`isAccount`/`isHelp`/the token section rather than counted here. **This is what establishes that a
+component outside the 25 blocks — the `hasToast` overlay at `:1864-1875`, present in both exports and
+byte-identical but for the fifth rewrite — was not silently skipped.**
 
 **The control.** Five blocks are called *unchanged* by the PR #419 Part 0b table — `isListView`,
 `isMyWork`, `isWorkflows`, `isLegal`, `isMobileDevice`. Under the normaliser **all five must diff empty,
