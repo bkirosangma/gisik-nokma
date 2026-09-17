@@ -6237,3 +6237,15 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   with `unknown-state`; a second mutation (dropping the backlog-only branch in `transition.ts`'s edge
   resolution) kills the wildcard-from-backlog case by wrongly accepting `move('done')` —
   (`packages/rule-engine/test/transition-backlog.test.ts`)
+- **13.572** ✅ `proj_tickets.closed_at` / `closed_by` (backlog/closed spec §3.1, 2026-09-17): a created
+  ticket has both NULL; a `ticket.closed` fills both from the event (`closed_by` the actor, `closed_at`
+  the event's server time); a `ticket.reopened` clears both back to NULL — proven through a real
+  `ticket.created` → two `ticket.transitioned` → `ticket.closed` → `ticket.reopened` sequence, one
+  `applyCommitted` per step, reading the row after each. `rowToTicketState` maps the pair to
+  `TicketState.closed` and null to null. Mutation (`rowToTicketState` returning `closed: null`
+  unconditionally) kills the second case only, and only that case —
+  (`apps/server/test/projections/tickets-closed.test.ts`)
+- **13.573** ✅ A card `assembleTicketCards` produces from a closed row carries `closed: { actorId, at }`;
+  from an open row `closed: null` — both assertions in the same call, so a reader that answered `null`
+  unconditionally cannot pass the closed half (backlog/closed spec §3.1/§3.3, 2026-09-17) —
+  (`apps/server/test/read/ticket-cards.test.ts`)
