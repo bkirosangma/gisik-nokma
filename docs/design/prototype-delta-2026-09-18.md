@@ -41,13 +41,24 @@ Ordering below is biggest-owner-visible-change first, with the **Members family 
 — they sit under the owner hold on the sign-in look unless the owner lifts it. `isListView` is marked
 🟢 **done** (#419).
 
+**Read the verdicts with one fact in hand: on at least two screens the export is catching up to the
+product, not ahead of it.** `/account` was ported on **2026-09-15** (`3bb823dc`, *"/account: port the
+screen from the DESKTOP prototype, not the mobile one"*) and `/help` on **2026-09-15** (`7cce93e2`,
+*"/help takes the prototype's surfaces, its 17px body and its third text dimness"*) — **three days before
+this export was made.** So when the 2026-09-18 `isAccount` card and `isHelp` sidebar are checked against
+the product, they match: the owner refreshed the prototype from work that had already shipped. That
+inverts the dispatch's premise for those screens (*"every screen the product has is to be brought to the
+refreshed prototype"*) — here the prototype was brought to the product. It also means **a "CHANGED"
+verdict in the delta table is not by itself evidence of outstanding work**; it is evidence that the two
+artefacts differ, and the direction has to be established per screen.
+
 | # | screen | verdict | size | product files | proposed order |
 |---|---|---|---|---|---|
 | — | **TOKENS (every screen)** | **wire-gap** | **L** | `packages/ui/src/tokens.ts` (`:95`, `:151`, `:281`, `:282`); emitter `themeStylesheet()` `:1292-1315` | **1** |
-| 20 | `isAccount` | *pending* | | | |
-| 21 | `isHelp` | *pending* | | | |
-| 12 | `isMembers` | *pending* | | | |
-| 13 | `isInviteAdmin` | *pending* (owner hold) | | | |
+| 20 | `isAccount` | **none** | — | `apps/web/src/account/appearance-section.tsx:24-35` | already ships (`3bb823dc`, 2026-09-15) |
+| 21 | `isHelp` | **none** | — | `packages/app-core/src/help/help-browser.tsx:463, 511-579` | already ships (`7cce93e2`, 2026-09-15) |
+| 12 | `isMembers` | **held** | L | `packages/app-core/src/online/mappers.ts:405-408` drops `role` | owner hold; needs wire first |
+| 13 | `isInviteAdmin` | **held** | S | `apps/web/app/w/[workspaceId]/members/page.tsx:202-210` | owner hold; panel exists, gate does not |
 | 9 | `isTimelineView` | *pending* | | | |
 | 10 | `isMyWork` | *pending* | | | |
 | 11 | `isInbox` | *pending* | | | |
@@ -327,8 +338,8 @@ in the product.
   **The new element's four `d` values and viewBox are byte-identical to the asset the product already ships** (`apps/web/public/google-mark.svg:2-5`) — the same file the old `<img>` pointed at. The refresh changed the prototype's *authoring form*, not the rendered mark.
 **Product gap (new prototype → product).**
 - *structure:* `matches` — the product renders the same four paths from the same asset: `apps/web/app/sign-in/page.tsx:462` (`<img src="/google-mark.svg" alt="" width={18} height={18} />`). The product **cannot adopt the inline form in place**: `apps/web/app` is a scanned root (`packages/ui/test/helpers/colour-scan.ts:CLIENT_SOURCE_ROOTS`) and the asset's own docblock records the measurement — `findColourLiterals(..., 'script')` reports `["#4285F4"]` for the exact string `<path fill="#4285F4" …/>` (`apps/web/public/google-mark.svg:7-12`, restated at `apps/web/app/sign-in/page.tsx:135-138`).
-- *strings:* `matches` for the hint — `apps/web/app/sign-in/page.tsx:377` is verbatim `desktop.dc.html@6d7b67c0a52c:158`.
-- *tokens:* `matches` by translation — `--brand`/`--onColor` → `--gn-brand`/`--gn-text-inverted` (`packages/ui/src/ui.css:3588-3590`); `--cardBg`/`--cardR`/`--cardShadow` → `--gn-surface-raised`/`--gn-radius-card`/`--gn-shadow-raised` (`packages/ui/src/ui.css:160-165`); `min-width:56px;min-height:44px` → `min-width: 3.5rem; min-height: 2.75rem` (`apps/web/app/globals.css:1831`). Apple's mark matches shape-for-shape: `apps/web/app/sign-in/page.tsx:147` `viewBox="0 0 24 24" fill="currentColor"` = `desktop.dc.html@6d7b67c0a52c:168`.
+- *strings:* `matches` for the hint — `apps/web/app/sign-in/page.tsx:377` renders identical text to `desktop.dc.html@6d7b67c0a52c:158` (*"We'll email you a link that signs you in. It expires in 15 minutes."*). Identical **as rendered**, not byte-for-byte as source: the product writes the apostrophe `&rsquo;`, the prototype the literal `’`.
+- *tokens:* `matches` by translation — `--brand`/`--onColor` → `--gn-brand`/`--gn-text-inverted` (`packages/ui/src/ui.css:3587-3588`); `--cardBg`/`--cardR`/`--cardShadow` → `--gn-surface-raised`/`--gn-radius-card`/`--gn-shadow-raised` (`packages/ui/src/ui.css:160-165`); `min-width:56px;min-height:44px` → `min-width: 3.5rem; min-height: 2.75rem` (`apps/web/app/globals.css:1831`). Apple's mark matches shape-for-shape: `apps/web/app/sign-in/page.tsx:147` `viewBox="0 0 24 24" fill="currentColor"` = `desktop.dc.html@6d7b67c0a52c:168`.
 - Standing **pre-refresh** divergences, not caused by this refresh: no `linkSent` success block (prototype `:137-147`) — the product renders one line, `Check your inbox — the link signs you in.` (`apps/web/app/sign-in/page.tsx:373`); no "Open the link"/"Use a different address" (0 hits); the error is a card-foot `role="alert"` (`:484-488`) not an inline field line (prototype `:155-157`); the product adds a full phone form (`:303-351`) where the prototype's Phone tab only fires `phoneRefused` (`:128`); the product adds a passkey button (`:429`).
 **Port verdict.** `none` — the refresh's only delta is a mark the product already draws identically from the same asset. Nothing here is portable.
 
@@ -422,6 +433,48 @@ in the product.
 - *tokens:* `matches` — `--trayBg` grid → `.gn-calendar__grid` `--gn-surface-sunken` + `--gn-radius-card`; nav, weekday heads, today button and the 14×9 radius-3 legend swatch all map (`.gn-calendar__legend-swatch`, `--accent` / `--pending` dashed / `--custom`).
 **Port verdict.** `none`.
 
----
+### `isMembers` — `desktop.dc.html@6d7b67c0a52c:651-798`
+**Product route(s) + files.** `/w/[workspaceId]/members` → `apps/web/app/w/[workspaceId]/members/page.tsx:174-213` (the whole screen; roster `:183-190`, gate `:192-211`). No `app-core` view — the page is self-contained.
+**Prototype delta (old→new).**
+- Role cell, OLD `c9f852a2c243:674-681` → NEW `6d7b67c0a52c:679-689`. OLD `:675` is one bare `<select>`; NEW `:679` wraps it in `<sc-if value="{{ m.canEditRole }}">` (select at NEW `:680`) and NEW `:687` adds `<sc-if value="{{ m.cannotEditRole }}">` → NEW `:688` `<span …>{{ m.role }}</span>`. **Both branches are new**; the old export had no chip and no gate.
+- New notice: NEW `:718` `<sc-if value="{{ inviteAdminOnly }}">` → NEW `:719` `<p …>{{ inviteAdminOnly }}</p>`.
+- Invite panel relocated: OLD `:709` was an unconditional child of the members column; NEW `:722` `<sc-if value="{{ isInviteAdmin }}">` now wraps it, panel grid at NEW `:723`.
+**Product gap (new prototype → product).**
+- The **whole roster table is absent**. The product renders names only — `members/page.tsx:185-187` `<li key={member.id} className="gn-members__row">{member.name}</li>` under `<h1 className="gn-page-title">People</h1>` (`:176`).
+- **WIRE GAP for `m.role`:** the server carries it (`apps/server/src/routes/builder-reads.ts:247` `SELECT m.user_id, u."name" AS display_name, m.role`; `:259` `role: row.role`) but **the mapper drops it** — `packages/app-core/src/online/mappers.ts:405-408` returns only `{ id: userId, name: displayName }`, and `packages/app-core/src/view-types.ts:3` is `export type Actor = { id: string; name: string };`. So `m.role`, `m.assigned`, `m.seen`, `m.scopeLabel` and the `m.canEditRole`/`m.cannotEditRole` pair are unavailable to the UI. The last two are *derived* in the prototype (`desktop.dc.html@6d7b67c0a52c:3061` `canEditRole: myRoleIsAdmin, cannotEditRole: !myRoleIsAdmin`) and no product read exposes the caller's own role either.
+- `memberSummary` (`:655`, data `:3032`) and the ticket-only block (`:700-717`) have no product counterpart. `inviteAdminOnly`'s sentence **does** match verbatim (prototype data `:3057` vs `members/page.tsx:97`), but the product renders it only in the member branch (`:200`, `<p className="gn-members__not-admin">`), and **that class has no CSS rule anywhere** — absent from `apps/web/app/globals.css` and `packages/ui/src/ui.css`; repo-wide only `members/page.tsx:183,185,200` use `gn-members*`.
+- On *"may I change this person's role?"*: the product has **no per-member role control and no per-member role data**. The only role question it asks is the caller's own, asked of the invite door — `members/page.tsx:85-107` (`invitesAdmin.listPending`, 403 → `{kind:'member'}`, anything else → `{kind:'failed'}`), with `:33-35` naming why. The invite panel **does exist here** (`:203-204`), gated by that 403 rather than by `isInviteAdmin`.
+**Port verdict.** `held` — under the owner hold, and not a bounded UI change anyway: the role cell needs a wire field the mapper drops.
 
-## The queue
+### `isInviteAdmin` — `desktop.dc.html@6d7b67c0a52c:722-796`
+**Product route(s) + files.** Same route and file — `apps/web/app/w/[workspaceId]/members/page.tsx:202-210` (`MintForm` `:236-350`, `PendingList` `:361-387`). Not a route of its own, matching the prototype's nesting (block closes `:796`, `isMembers` `:798`).
+**Prototype delta (old→new).** Not a delta — a **new block**. The old export has no `isInviteAdmin` at all; its panel sat unconditionally inside `isMembers` at OLD `:709-780`. Gate at NEW `:722`; the same panel body reappears one level deeper at NEW `:723-795`. Data: NEW `:3056` `isInviteAdmin: myRoleIsAdmin`, NEW `:3057` `inviteAdminOnly: myRoleIsAdmin ? "" : "Only a workspace owner or admin can see or manage this workspace's invitations."` — both new (OLD `:2885` has only `inviteHeading`).
+**Product gap (new prototype → product).** Structure broadly matches on different strings and classes. Heading: NEW `:747` `Invite someone` vs `members/page.tsx:277` `Invite somebody`. Empty state: NEW `:741` `No invitations are outstanding.` matches verbatim `members/page.tsx:369`. `Withdraw`: NEW `:736` vs `:382` — matches. Expiry/`meta` line: the prototype's two arms (data `:3098`) match verbatim at `members/page.tsx:379-380`, but the product renders `formatDateTime(row.expiresAt)` rather than the prototype's pre-formatted string (one clock, IST). Channel and role pickers match; guest hides the project field in both (prototype `inviteTakesProjects` `:765` vs `members/page.tsx:311`). The product adds a withdraw-refusal path, a minted-link card and `COPY_IT_NOW` (`:22`, `:328`). **No wire gap for this block** — every field it reads is on `PendingInvite`/`MintedInvite` (`packages/app-core/src/online/invites.ts`). The gate is a **ruling, not a gap**: the product asks the door's 403 instead of reading a role (`members/page.tsx:28-54`).
+**Port verdict.** `held` — the owner hold names `isInviteAdmin` explicitly, the panel already exists, and the delta is the *gate*, which `members/page.tsx:33-35` says cannot be sourced on this branch.
+
+### `isAccount` — `desktop.dc.html@6d7b67c0a52c:1486-1566`
+**Product route(s) + files.** `/account` → `apps/web/app/account/page.tsx:234-308`; the Appearance card is `apps/web/src/account/appearance-section.tsx:24-35`, composed at `account/page.tsx:265`.
+**Prototype delta (old→new).** The `+22` lines are a new card between the Profile and Notifications cards: NEW `:1506` card `<div …>`, NEW `:1507` `<h2 …>Appearance</h2>`, NEW `:1511` `<sc-for list="{{ acctStyles }}" as="o" hint-placeholder-count="3">` → NEW `:1512` `<span sc-camel-on-click="{{ o.set }}" …>`, NEW `:1515` `{{ acctStyleNote }}`, NEW `:1520` `<sc-for list="{{ acctThemes }}" … hint-placeholder-count="2">` → NEW `:1521`, NEW `:1525` the per-device footnote. Data: NEW `:3507-3508` `acctStyles` (`hig`/`minimal`/`neo`), NEW `:3520` `acctThemes` (`light`/`dark`). **None of these strings appears anywhere in the old export.**
+**Where the toggles live.** They live **only** under the Appearance card on `/account` — so yes, the Account screen exposes them. `account/page.tsx:265` renders `<AppearanceSection />` unconditionally; `apps/web/src/account/appearance-section.tsx:28-29` composes `<StyleToggle />` and `<ThemeToggle />`; the docblock at `:7-8` records the move (*"`ThemeToggle` moved here from `AppNav` (Step 4)"*). `packages/ui/src/tokens.ts:1278` names the contract — set on `document.documentElement`, never `<body>`.
+**Product gap (new prototype → product).** Card title, order, control shape, style labels and the footnote: **matches**. The footnote is verbatim (NEW `:1525` vs `apps/web/src/account/appearance-section.tsx:30-32`); style labels match `apps/web/src/style-toggle.tsx:12-14`; group labels `Style`/`Theme` match `apps/web/src/style-toggle.tsx:73` / `apps/web/src/theme-toggle.tsx:63`. Two divergences, **both pre-existing rulings, not refresh items**: the theme control ships **three** segments (`System|Light|Dark`, `apps/web/src/theme-toggle.tsx:29-33`) against the prototype's two, with its reasoning and a stated one-line revert at `apps/web/src/theme-toggle.tsx:8-27`; and two of the three style notes are worded differently (`apps/web/src/style-toggle.tsx:27-29`, whose own docblock `:17-25` records they were checked against `tokens.ts`, with `apps/web/src/account/appearance-section.tsx:13-16` noting the card *"has no counterpart in the desktop prototype's own `isAccount` screen"*). Tokens: the prototype drives both axes off `document.body.dataset` (`:3513`, `:3524`); the product off `document.documentElement.dataset` (`apps/web/src/style-toggle.tsx:67`, `apps/web/src/theme-toggle.tsx:53-57`) — the product's choice is the documented one.
+**Port verdict.** `none` — the card already ships, landed **2026-09-15** (`3bb823dc`, *"/account: port the screen from the DESKTOP prototype, not the mobile one"*), **three days BEFORE this export**, and matches it on title, order, shape, labels and footnote.
+
+### `isHelp` — `desktop.dc.html@6d7b67c0a52c:1638-1718`
+**Product route(s) + files.** `/help` → `apps/web/app/help/page.tsx:16-23` (`<HelpBrowser />` at `:20`); the screen is `packages/app-core/src/help/help-browser.tsx` — sidebar `:448-582`, column `:618-694`.
+**Prototype delta (old→new).** Four structural moves, all quoted:
+- Layout inversion: OLD `:1602` centered `flex:1…justify-content:center` → NEW `:1639` `align-items:stretch`, with `<aside style="width:274px;…">` opened at NEW `:1640` and closed NEW `:1669`, and the column re-wrapped at NEW `:1670`.
+- Tabs move into the aside: OLD `:1633` body-level `display:inline-flex;align-self:flex-start;…` → NEW `:1641` inside the aside; the `{{ helpTabs }}` loop survives at NEW `:1642`.
+- TOC **removed**: OLD `:1639` `<nav style="display:flex;flex-wrap:wrap;gap:7px 20px">` and OLD `:1640` `<sc-for list="{{ helpToc }}" …>` have no NEW counterpart (`helpToc` survives only in the OLD data layer at `c9f852a2c243:3640`).
+- Group accordion added: NEW `:1646` `<p …>Topics</p>`, NEW `:1648` `<sc-for list="{{ helpGroups }}" as="g" hint-placeholder-count="5">`. Eyebrow added at NEW `:1702` (`{{ helpSectionGroup }}`, data `:3894-3897`). Next footer added at NEW `:1709` (`<sc-if value="{{ helpNext }}">` → NEW `:1711` label, NEW `:1712` link; data `:3898-3906`).
+- `style-hover` introduced here: NEW `:1650` (group toggle), NEW `:1660` (nav item) — **zero occurrences in the old export**, the third at NEW `:110` outside this block.
+**Product gap (new prototype → product).** **All four structural items already ship**, landed **2026-09-15** (`7cce93e2`, *"/help takes the prototype's surfaces, its 17px body and its third text dimness"*) — three days before the export:
+- aside `matches` — `packages/app-core/src/help/help-browser.tsx:463` `<aside className="gn-help__sidebar">`, styled `packages/ui/src/ui.css:2958`;
+- tabs-in-aside `matches` — `packages/app-core/src/help/help-browser.tsx:494-502` `<SegmentedControl />` as the aside's first child, with the prototype's own `helpTabs` quoted as source at `:474`;
+- group accordion `matches` — `packages/app-core/src/help/help-browser.tsx:511-579` (caret `:550-563`, count `:565`);
+- TOC removal `matches` — recorded at `packages/app-core/src/help/help-browser.tsx:680-691`;
+- eyebrow `matches` — `packages/app-core/src/help/help-browser.tsx:167-169`; Next pager `matches` — `packages/app-core/src/help/help-browser.tsx:189-196`, styled `ui.css:3307-3330`;
+- `style-hover` `matches` — the two sites are live hover rules: `ui.css:3069` (prototype `:1650`) and `ui.css:3166` (prototype `:1660`).
+- Two divergences, both pre-existing rulings: the prototype draws ONE section at a time where the product renders the whole document (`packages/app-core/src/help/help-browser.tsx:419-426`, *"the one item of its design deliberately not adopted"*); and the search placeholder differs (`packages/app-core/src/help/help-browser.tsx:658` vs the prototype's unchanged `e.g. contested claim`, OLD `:1608` = NEW `:1676`, **unchanged across the refresh**). **No wire gap** — every new binding is derived from the prototype's own static content, which the product carries as `HELP_CONTENT` (`packages/app-core/src/help/help-browser.tsx:8`, `:146`).
+**Port verdict.** `none` — the 2026-09-18 export describes what `/help` already renders.
+
+---
