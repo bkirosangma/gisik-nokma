@@ -904,9 +904,15 @@ if __name__ == "__main__":
     assert layer["neo"]["dark"]["--tintDanger"] == layer["hig"]["dark"]["--tintDanger"], (
         "dark-neo inherited light-neo's tint — the light arm leaked into the dark merge"
     )
-    # (3) `color-mix` must have resolved, or T4 is reported as unmeasurable
-    #     rather than measured.
-    assert layer["neo"]["light"]["--tintAccent"] is not None, "color-mix did not resolve — T4 is unmeasured"
+    # (3) `color-mix` must have resolved to a COLOUR. The obvious form of this
+    #     check — `value is not None` — is VACUOUS, and was caught here rather
+    #     than shipped: every resolved var is stored as its raw STRING, so an
+    #     unresolved `color-mix(...)` is a perfectly non-None value that no
+    #     measurement can read. It has to be parsed, not merely present.
+    #     Proved falsifiable by disabling the resolver and watching this redden.
+    assert parse_color(layer["neo"]["light"]["--tintAccent"]) is not None, (
+        "color-mix did not resolve to a colour — T4 is unmeasured, and the raw string would read as a value"
+    )
     print(
         "controls: light-neo tint override visible =", layer["neo"]["light"]["--tintDanger"],
         "| dark-neo uncontaminated =", layer["neo"]["dark"]["--tintDanger"],
