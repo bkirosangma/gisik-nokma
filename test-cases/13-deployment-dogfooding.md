@@ -6167,3 +6167,29 @@ include-only filter isn't there either); date and field controls in the Filters 
 (`matchesListRow` already answers both axes, so a future control narrows every tab without touching
 the predicates); and State options' source moving from the board's rendered columns to the workflow
 definitions, deferred to the backlog/closed change set's own spec.
+
+## Backlog and closed (owner request, 2026-09-17)
+
+*Owner's words (brainstorm, 2026-09-17): "lets have another status for tickets (this status is default
+in all workflows) - backlog. have a separate tab for backlogs. so that board is only populated by
+tickets which need to be in focus. another status on the other side should be closed. closed tickets
+are also not shown on the board." Then: "backlog by default. and lets actually have closed be a flag
+instead of a status. but you can only close a ticket in a terminal state. so that we can see the final
+state of the ticket easily, and maybe even filter to see things." Then: "explicit reopen." Spec:
+`docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md`. Every task below is TDD with mutation.*
+
+- **13.562** ✅ `statesWithBacklog` appends the one universal Backlog state (category open) after the
+  declared states; `universalTransitions` declares Start (`backlog → initialStateId`) and Send-to-backlog
+  from every declared NON-terminal state, no rules, and never from a terminal one; `transitionsWithBacklog`
+  is the declared edges followed by the universal ones with declared rules intact; `stateCategoryOf(def,
+  'backlog')` reads `'open'`; both helpers are pure — the def is never mutated. Mutation (dropping the
+  `state.category !== 'terminal'` filter in `universalTransitions`) kills the "no edge from done"
+  assertion — (`packages/domain/test/backlog.test.ts`)
+- **13.563** ✅ `foldStateIdForward('backlog', …)` folds forward across a version that dropped a declared
+  state, with no mapping required — the exemption is for backlog alone; a dropped DECLARED state with no
+  mapping still refuses. Mutation (dropping the early-return in `foldStateIdForward`) kills the backlog
+  case only — (`packages/domain/test/backlog.test.ts`)
+- **13.564** ✅ `validateWorkflowDef` refuses `backlog` as a reserved id — as a declared state and as a
+  transition endpoint even when no state declares it — with the message "`backlog` is reserved — every
+  workflow has it without declaring it."; a clean def carries no such issue —
+  (`packages/domain/test/validate-workflow.test.ts`)

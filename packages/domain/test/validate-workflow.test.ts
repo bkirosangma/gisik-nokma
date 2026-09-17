@@ -337,3 +337,23 @@ describe('validateWorkflowDef — issue order and the branches nothing else pins
     expect(codes(d)).toEqual([]);
   });
 });
+
+/** 13.564 — the reserved id (backlog/closed spec §1.1): `backlog` cannot be declared, as a state or as a transition endpoint. */
+describe('validateWorkflowDef — the reserved backlog id', () => {
+  it('as a state', () => {
+    const d = def({ states: [...def({}).states, { id: 'backlog', name: 'Mine', category: 'open' }] });
+    expect(validateWorkflowDef(d)).toContainEqual({
+      code: 'reserved-state-id',
+      message: '`backlog` is reserved — every workflow has it without declaring it.',
+    });
+  });
+
+  it('as a transition endpoint, even when no state declares it', () => {
+    const d = def({ transitions: [...def({}).transitions, { from: 'backlog', to: 'todo', rules: [] }] });
+    expect(codes(d)).toContain('reserved-state-id');
+  });
+
+  it('a clean def has no such issue', () => {
+    expect(codes(def({}))).not.toContain('reserved-state-id');
+  });
+});

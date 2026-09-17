@@ -1,8 +1,10 @@
 import type { StateCategory, WorkflowDef } from './workflow.js';
+import { statesWithBacklog } from './workflow.js';
 
 /**
  * The category a workflow definition gives one of its state ids, or `undefined`
- * when the definition has no such state.
+ * when the definition has no such state — including the universal Backlog,
+ * category open — spec §1.1.
  *
  * `TicketState.stateCategory` is denormalized from the ticket's workflow so the
  * parent-terminal invariant needs no per-child workflow lookup
@@ -17,5 +19,5 @@ import type { StateCategory, WorkflowDef } from './workflow.js';
  * says so in its own words. A throw here would flatten three faults into one.
  */
 export function stateCategoryOf(def: WorkflowDef, stateId: string): StateCategory | undefined {
-  return def.states.find((state) => state.id === stateId)?.category;
+  return statesWithBacklog(def).find((state) => state.id === stateId)?.category;
 }
