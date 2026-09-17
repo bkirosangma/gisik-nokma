@@ -73,6 +73,9 @@ describe('TicketTypeListScreen', () => {
   /**
    * 10.41 — list with rank, field count, Built-in badges.
    */
+  /**
+   * 10.79 — clicking the Built-in badge — a plain `<span>` with no handler of its own — still opens the type: "the whole row is the door", not "an element with the right name exists somewhere in it".
+   */
   it('lists types with rank, field count and a Built-in badge on the seeds', async () => {
     const user = userEvent.setup();
     const custom: TicketTypeDef = {
@@ -277,6 +280,9 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
    * coverage rather than close the gap those cases cannot see — that a given
    * screen's inputs use the shared class at all.
    */
+  /**
+   * 10.77 — the Type name, Hierarchy rank and Workflow controls carry the shared `.gn-field__input` class — all three were bare `<input>`/`<select>` with no class at all before this.
+   */
   it('the Type name, Hierarchy rank and Workflow controls carry the shared field-input class', async () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'task')!);
     expect(await screen.findByRole('textbox', { name: 'Type name' })).toHaveClass('gn-field__input');
@@ -297,6 +303,9 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
    * The same gap, one level down: `FieldsEditor`'s per-row name/type controls
    * were equally bare, and its Remove/Add buttons were plain `<button>`s with
    * no class reaching `.gn-button` at all.
+   */
+  /**
+   * 10.78 — a field row's name and type controls carry `.gn-field__input`, and its Remove/Add controls are real `.gn-button`s — the same gap one level down in `FieldsEditor`.
    */
   it('a field row’s name and type controls carry the shared field-input class, and its buttons are real gn-buttons', async () => {
     const user = userEvent.setup();
@@ -391,6 +400,9 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(screen.queryByRole('button', { name: `Move them to "${errandPublished.name}"…` })).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.89 — the workflow-rebind dialog's target-state select migrated to the shared Select — a genuinely SEPARATE component that authors a one-shot map between two UNRELATED workflows, never a `stateMapping` keyed inside one workflow's own version chain.
+   */
   it('authors one cross-workflow map and hands the server one migration — never a stateMapping', async () => {
     const { user, gateway } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));

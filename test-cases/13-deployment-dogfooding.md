@@ -43,6 +43,11 @@ serial mode has one executor and therefore no competing claimant, and an id that
 still be renumbered. ~~**The next free BLOCK is `13.281`, controller-allocated ON REQUEST ONLY.**~~ **`13.281`–`13.320` is ALLOCATED to the serial executor (controller, 2026-09-08) — `13.281`–`13.284` minted by the HIG palette adoption and the border sweep, `13.285`–`13.287` minted by Task 0 of the HIG per-screen plan, `13.288`–`13.294` by Tasks 1 and 2, `13.295`–`13.319` reserved by the per-screen plan for Tasks 3–11, `13.320` reserved and deliberately unused. `13.321`–`13.326` is ALLOCATED to the owner's sign-in feedback round (controller, 2026-09-08): `13.321`–`13.323` minted by items 1 and 3, `13.324`–`13.326` by item 2. `13.327`–`13.333` is ALLOCATED to Task 12 (passkey registration), of which `13.333` is the rate-limit property. `13.334`–`13.336` is ALLOCATED to round 2c, the phone gating (controller, 2026-09-08). ~~The next free BLOCK after that is `13.337`, controller-allocated ON REQUEST ONLY.~~** **`13.337`–`13.356` is ALLOCATED to the neomorphism-amendment's Tasks 14 and 15 (AMENDMENT 2026-09-09 to `docs/superpowers/plans/2026-09-08-hig-per-screen.md`) — `13.337`–`13.347` minted by Task 14 (the style axis, the toggle, and the shared-pieces restyle; this PR), `13.348`–`13.356` reserved for Task 15 (the sign-in/workspaces/invite neo restyle, not yet landed). The next free BLOCK is `13.357`, controller-allocated ON REQUEST ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount
 the MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
+**Line citations into the prototype are dated, not timeless.** Every `desktop.dc.html:<line>` citation
+written before 2026-09-18 refers to the PRE-refresh file, readable at `git show
+b6d76a90:design-system/interactive/desktop.dc.html`; historical plans and anchors are NOT rewritten,
+and a live citation is re-measured by whoever next touches its line.
+
 > **A NEXT-FREE POINTER IS A CACHE, AND THIS ONE WENT STALE SILENTLY** — the same shape as
 > `11-calendar-notifications.md`'s pointer corrected on 2026-09-08, one file over. It is written once
 > and read by every later lane, and nothing re-derives it, so it is wrong from the first allocation
@@ -3727,7 +3732,7 @@ three fixed columns on `/workspaces`' own breakpoints, Archive/Restore gains a h
 dimming moves from the card onto its door, and the four section cards trade a background swap for the
 same brightness pair.
 
-- **13.413** ✅ **REVERSED, not deleted** — the archived cards now sort to the END of the disclosed grid
+- **13.674** ✅ **REVERSED, not deleted** — the archived cards now sort to the END of the disclosed grid
   (owner: "always sort the archived projects to the end"), where Round 20 asserted the served order.
   `[...live, ...archived]` was the implementation Round 20 named as the thing to rule out; it is the
   requirement now, and the single filter it replaced is what this case rules out. **The cost Round 20
@@ -3739,7 +3744,7 @@ same brightness pair.
   direction; had the case been written against the shared `workspaceAs` fixture (p3 archived, already
   last) it would have been vacuous before and after, and the reversal would have been invisible. —
   (`workspace-home.test.tsx`)
-- **13.387** ✅ **REVISED from five doors to four.** `/mcp/tokens` left this nav for `/account`, and its
+- **13.672** ✅ **REVISED from five doors to four.** `/mcp/tokens` left this nav for `/account`, and its
   absence is now asserted by name rather than left to the length check, so restoring the link reddens the
   case with a sentence instead of "expected 5 to be 4". The case's ARGUMENT survives the removal, which
   is why the literals stay: `/mcp/tokens` was the obvious non-`/w/<id>/…` door, but Ticket types is still
@@ -3776,7 +3781,7 @@ the obvious way to "move it back" is to restore the old target along with the ol
 was put to the owner and DECLINED (below), so nothing shipped for it. Only 13.387 changed, and only in its expected set — the other three
 shipped items are CSS-only and mint nothing, the same treatment Round 21's four CSS-only items got.
 
-- **13.387** ✅ **REVISED AGAIN — Workflows joined Ticket types as a query-scoped door**
+- **13.673** ✅ **REVISED AGAIN — Workflows joined Ticket types as a query-scoped door**
   (`/settings?workspaceId=<id>&tab=workflows`), so the split is now two path-segment doors and two
   query-scoped ones rather than three and one. Owner: "clicking workflows from the project screen opens
   up a separate page. it should open up the workflows tab in the settings page." Round 19e had left it
@@ -3785,7 +3790,7 @@ shipped items are CSS-only and mint nothing, the same treatment Round 21's four 
   shell with no way back. The case's argument is untouched and now has two doors supporting it instead
   of one. — (`workspace-home.test.tsx`)
 
-**A false claim was removed from 13.387's docblock in the same edit, and it is worth recording because
+**A false claim was removed from 13.673's docblock (13.387's live revision, re-minted above) in the same edit, and it is worth recording because
 it is the kind that reads as measured.** The docblock asserted "The paths are also checked against the
 app directory itself, in the same run: a link is only proven live by a `page.tsx` existing at the route
 it names." A grep for `existsSync` across `apps/web/test` finds exactly one such check — 13.392's, in
@@ -4894,10 +4899,10 @@ failures earlier this session (a different pair each of three prior runs) are no
 environmental flakes rather than anything this work touched, since the identical suite is clean here with
 no `apps/server` changes at all.
 
-- **13.477** ✅ The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
+- **13.477** ❌ The Timeline's "Row title" metric (`padding 6px 12px; 15px/20px`, the spec table's fourth
   row, dropped by the plan before reaching this task's brief) lands on `.gn-timeline__title`. All eight
   Timeline spec rows re-checked row by row against the shipped CSS and confirmed matching. Not verified
-  by a live render in any style or theme. — (`packages/ui/src/ui.css`)
+  by a live render in any style or theme. — (`packages/ui/src/ui.css`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits d958ab8f. `timeline-view.test.tsx` uses `.gn-timeline__title` only for DOM structure (`closest()`), never for its padding, and no test reads that rule out of `ui.css`.
 
 ## Task 9: List restyle — geometry only, ONE ruling deferred, 2026-09-16
 
@@ -5041,14 +5046,14 @@ both packages (Node v22.23.2). `pnpm turbo run test` at the repo root: `apps/des
 the prior two runs, consistent with a pre-existing environmental flake, not a regression this change
 introduced).
 
-- **13.476** ✅ The five metrics `13.475` deferred now land through `Table`'s new optional class hooks:
+- **13.476** ❌ The five metrics `13.475` deferred now land through `Table`'s new optional class hooks:
   `.gn-list__table` (min-width:820px), `.gn-list__table-header` (13px/18px/600/label2/trayBg/padding/
   nowrap, uniform across every column), `.gn-list__table-row:nth-child(odd)` (fill4 zebra), `.gn-list__
   table-cell--data` (12px 16px padding/15px/nowrap), and `.gn-list__table-cell--title` (min-width:260px
   plus the pixel-exact static padding third). `Table`'s own test (`components.test.tsx`) and the seven
   shared do-not-edit selectors confirmed unedited by a full-diff grep. Not verified by a live render in
   any style or theme. — (`packages/ui/src/components/table.tsx`, `packages/ui/src/ui.css`,
-  `packages/app-core/src/views/ticket-list.tsx`)
+  `packages/app-core/src/views/ticket-list.tsx`) — uncited on 2026-09-18: no test found; was ✅ on owner/workspace-edits 9dd3574b. None of its five selectors (`gn-list__table`, `__table-header`, `__table-row:nth-child(odd)`, `__table-cell--data`, `__table-cell--title`) appears in any test file; `ticket-list.test.tsx:1432` names `.gn-list__table-wrap`, a different class.
 
 ## Task 12 — the transition gate, as a pure function (board-prototype-port plan, 2026-09-16)
 
@@ -7480,6 +7485,17 @@ proof is a comparison, so the case is written as one.
   (`design-system/tools/unpack-bundle.mjs`, `design-system/interactive/PROVENANCE.md`,
   `design-system/interactive/desktop.dc.html`, `design-system/interactive/support.js`,
   `design-system/MASTER.md`)
+
+**The mobile entry is written too, and it took a flag to say so.** `ext_resources` names TWO entries
+under one id (`./Gisik%20Nokma%20-%20Mobile.dc.html`), so the tool holds rather than picking: with no
+flag it prints both and writes neither, which is how this refresh was first filed. `--mobile-entry 1`
+now NAMES one, and the refresh wrote `interactive/mobile.dc.html` (227,232 B, sha256 `7316062b5bb3…`)
+from entry #1 — the one that inlines the Google mark as `<svg>`, consistent with the same change the
+2026-09-18 desktop template made to its own `isSignIn`. Entry #2 (226,533 B, sha256 `14ca5b8d89ab…`)
+is not written; the two differ only at line 153, and which export is NEWER is still not derivable from
+the bundle (`page_order` is empty, no timestamps), so the choice is recorded as a choice rather than a
+determination. Both halves of the flag are witnessed: no flag → nothing written; `--mobile-entry 3` →
+exit 1, *"this bundle has 2 mobile entries"*.
 
 
 **Block 13.659–13.671 — the List tab restyled to the desktop prototype, 2026-09-18.** ✅ for the thirteen

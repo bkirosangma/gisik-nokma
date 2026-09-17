@@ -66,6 +66,9 @@ describe('WorkflowCanvas', () => {
   /**
    * 10.2 — the category picker on a node edits the def.
    */
+  /**
+   * 10.84 — the canvas node's Category picker renders as the shared Select (button trigger, portal panel) instead of a native `<select>` — the only call site embedded in a React Flow node.
+   */
   it('changes a state category through the node picker', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -115,6 +118,9 @@ describe('WorkflowCanvas', () => {
    * class is checked the same as one on the exact target. See the task
    * report for exact source lines and the full mutation-test transcript.
    */
+  /**
+   * 10.85 — clicking the Select's own trigger does not also select the node — driven by react-aria's own default propagation-stopping, not the wrapper's onClick.
+   */
   it('clicking the category picker does not also select the node', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -124,6 +130,9 @@ describe('WorkflowCanvas', () => {
     expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
+  /**
+   * 10.86 — clicking the "Category" label text (not the button) does not select the node either — the case that actually proves the wrapping `<div>`'s onClick stopPropagation.
+   */
   it('clicking the Category label does not select the node', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));

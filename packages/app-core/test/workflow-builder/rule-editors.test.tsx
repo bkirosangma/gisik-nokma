@@ -111,6 +111,9 @@ describe('RequireFieldEditor', () => {
   /**
    * 10.13 — require-field is picker-only: built-ins plus bound types' fields.
    */
+  /**
+   * 10.87 — both rule-editor pickers render as the shared non-searchable Select (button trigger, portal listbox) instead of native `<select>`s, each carrying the `string` -> `string | null` unset treatment so an unrecognised value shows the component's own placeholder. The sibling tests below cover the placeholder-fallback and the Earlier-move picker.
+   */
   it('offers built-ins plus the bound types fields, and picks into the rule', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));

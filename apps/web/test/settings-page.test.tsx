@@ -63,6 +63,9 @@ afterEach(() => {
 });
 
 describe('the ticket-type editor is inlined on /settings, not a separate route', () => {
+  /**
+   * 10.71 — clicking `Edit <type>` on `/settings` pushes a URL whose PATHNAME stays `/settings` and carries `typeId` — the assertion that discriminates the fix from "an editor appeared somewhere", which the old separate-route push would satisfy too.
+   */
   it('clicking Edit on a ticket type pushes a URL that stays on /settings and carries typeId', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types' });
     render(
@@ -95,6 +98,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(pushed.searchParams.get('typeId')).toBe('defect');
   });
 
+  /**
+   * 10.72 — clicking `New ticket type` does the same, with `typeId=new`.
+   */
   it('clicking New ticket type pushes typeId=new on the same route', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types' });
     render(
@@ -122,6 +128,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(pushed.searchParams.get('typeId')).toBe('new');
   });
 
+  /**
+   * 10.73 — a `typeId` in the query renders the editor WITH the settings sidebar still present (`nav[aria-label="Settings sections"]`) — "still inside the shell" is the claim under test, and the form alone is not proof of that.
+   */
   it('a typeId in the query renders the editor WITH the settings sidebar still present', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types', typeId: 'defect' });
     render(
@@ -151,6 +160,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(within(sidebar).getByRole('link', { name: 'Workflows' })).toBeInTheDocument();
   });
 
+  /**
+   * 10.74 — `typeId=new` opens a blank editor inline, the same shape as editing an existing type.
+   */
   it('typeId=new opens a blank editor inline, same shape as an existing type', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types', typeId: 'new' });
     render(
@@ -174,6 +186,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeInTheDocument();
   });
 
+  /**
+   * 10.75 — CONTROL carrying 10.67's milder gate into the inline pane: a MEMBER hitting `typeId=new` inline still gets the read-only sentence and a link back, never a blank form.
+   */
   it('a MEMBER hitting typeId=new inline still gets the read-only sentence, not a blank form', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types', typeId: 'new' });
     render(
@@ -199,6 +214,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     expect(screen.queryByRole('textbox', { name: 'Type name' })).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.76 — a `typeId` left over in the query from a prior visit is INERT on any other tab (`tab=workflows`) — read only inside the `tab === 'ticket-types'` branch, so the sidebar's links can never resurrect a stale editor.
+   */
   it('a leftover typeId is inert on any OTHER tab — the sidebar links never carry it forward', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'workflows', typeId: 'defect' });
     render(
