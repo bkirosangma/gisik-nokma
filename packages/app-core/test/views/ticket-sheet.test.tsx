@@ -798,3 +798,148 @@ describe('3.116 TicketSheet — the "Who can see this" section is mounted', () =
     expect(within(section).getByRole('status')).toHaveTextContent('not being served yet');
   });
 });
+
+/**
+ * THE CLOSE/REOPEN ROUND-TRIP (backlog/closed spec §5.3, 2026-09-17).
+ *
+ * `TicketSheet` reads `TicketState.closed` (`{actorId, at} | null | undefined`,
+ * spec §1.2) straight off `read.data.ticket` — `state.closed ?? null`, the
+ * same optional chain every other reader in this plan spells — never a
+ * separate flag this view invents. Close and Reopen are each other's
+ * complement over that value, gated by `stateCategory`, so this block proves
+ * both the gating and the one wire fact that matters: the SHIPPED payload for
+ * both events is `{}` (the envelope alone carries actor and time, spec §1.2),
+ * never a client-invented shape.
+ */
+describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3, 2026-09-17)', () => {
+  /**
+   * `Sheet`'s own dismiss button (`packages/ui/src/components/sheet.tsx`)
+   * carries `aria-label="Close"`, so its ACCESSIBLE NAME is "Close" too —
+   * identical to this feature's button text. `within` the state row keeps
+   * `getByRole('button', { name: 'Close' })` pointed at this sheet's own
+   * button rather than colliding with the header's dismiss control.
+   */
+  function stateRow(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__state') as HTMLElement;
+  }
+
+  /**
+   * 13.585 — a terminal, not-closed ticket shows Close and not Reopen;
+   * clicking it ingests exactly one `ticket.closed` with `payload {}`, and the
+   * sheet reloads — `getTicket` asked again, off the SAME `read.reload()`
+   * `submitTransition`'s own committed branch calls for a move.
+   */
+  it('13.585 shows Close (not Reopen) on a terminal, not-closed ticket, and closing it ingests {} and reloads', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    let getTicketCalls = 0;
+    const source = createFakeDataSource({
+      getTicket: async () => {
+        getTicketCalls += 1;
+        return read;
+      },
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    expect(within(stateRow()).queryByRole('button', { name: 'Reopen' })).toBeNull();
+    await waitFor(() => expect(getTicketCalls).toBe(1));
+
+    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.closed');
+    expect(batch[0]!.payload).toEqual({});
+    expect(batch[0]!.actorId).toBe('user_kiro');
+    expect(batch[0]!.origin).toBe('web');
+    // The sheet reloads: `read.reload()` re-asks `getTicket`.
+    await waitFor(() => expect(getTicketCalls).toBe(2));
+  });
+
+  /**
+   * 13.586 — a closed ticket shows the badge with the roster-resolved name
+   * and the IST-formatted date, shows Reopen (not Close), disables Move… with
+   * the sentence beside it as TEXT (never a tooltip), and clicking Reopen
+   * ingests one `ticket.reopened` with `payload {}`.
+   */
+  it('13.586 shows the closed badge, Reopen, a disabled Move… with its note, and reopening ingests {}', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        stateId: 'done',
+        stateCategory: 'terminal',
+        closed: { actorId: 'user_anselma', at: '2026-08-20T10:00:00.000Z' },
+      }),
+    });
+    const source = sheetSource(read);
+    renderSheet(read, source);
+    await waitFor(() =>
+      expect(within(stateRow()).getByRole('button', { name: 'Reopen' })).toBeInTheDocument(),
+    );
+    expect(within(stateRow()).queryByRole('button', { name: 'Close' })).toBeNull();
+    // The roster resolves the name through the SAME `actorLabel` join every
+    // other claim in this sheet goes through; the date is the one IST
+    // formatter (`formatDate`), never a raw ISO slice.
+    expect(screen.getByText('Closed by Anselma Marak on 20 Aug 2026')).toBeInTheDocument();
+    expect(within(stateRow()).getByRole('button', { name: 'Move…' })).toBeDisabled();
+    const note = screen.getByText('Closed — reopen it first');
+    expect(note.className).toBe('gn-sheet__closed-note');
+    expect(note.getAttribute('title')).toBeNull();
+
+    await user.click(within(stateRow()).getByRole('button', { name: 'Reopen' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.reopened');
+    expect(batch[0]!.payload).toEqual({});
+  });
+
+  /** 13.587 — a non-terminal ticket shows neither button. */
+  it('13.587 shows neither Close nor Reopen on a non-terminal ticket', async () => {
+    renderSheet(ticketRead()); // default fixture: stateId 'doing', category 'active'
+    await settled();
+    expect(within(stateRow()).queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(within(stateRow()).queryByRole('button', { name: 'Reopen' })).toBeNull();
+  });
+
+  /**
+   * 13.588 — a refused close renders the rule and reason verbatim in the
+   * sheet's refusal slot. `TransitionDialog`'s own `serverRefusal` copy is
+   * invisible while `moveOpen` is false (`Dialog` returns `null` whenever
+   * `open` is false), so this proves the slot Close/Reopen actually render
+   * through, not the dialog's unreachable one.
+   */
+  it('13.588 a refused close renders the rule and reason verbatim', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'close-requires-terminal',
+          reason: 'A ticket can only be closed from a terminal state; "Done" is not one.',
+        })),
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Refused by the server — close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
+    );
+  });
+});

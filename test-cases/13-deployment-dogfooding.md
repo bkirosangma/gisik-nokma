@@ -6365,3 +6365,31 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `closed` filter term rather than dropped outright, so the replica's `getTickets` matches the server's LIST
   behaviour while its `getBoard` now matches the server's BOARD behaviour (backlog/closed spec §1.3/§3.2,
   2026-09-17) — (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.585** ✅ `TicketSheet` shows **Close** (not **Reopen**) on a terminal, not-closed ticket (backlog/closed
+  spec §5.3, 2026-09-17): `state.stateCategory === 'terminal' && closed === null` gates the button, and
+  clicking it ingests exactly one `ticket.closed` with `payload {}` through the same `make`/`ingest` idiom
+  `submitTransition` uses for a move — the envelope alone carries actor and time (spec §1.2). A `committed`
+  answer clears any refusal and reloads BOTH live reads this sheet holds (`read.reload()` AND
+  `history.reload()`, mirroring `submitTransition`'s own committed branch, since closing writes a ledger
+  line too) — proven here by asserting `getTicket` is asked a second time, off the same `read.reload()`
+  every other transition in this file refreshes through — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.586** ✅ A closed ticket shows the header badge — `Closed by <name> on <date>`, the name resolved
+  through the SAME `actorLabel`/roster join every other claim in this sheet uses, the date through the one
+  IST formatter (`formatDate`) — shows **Reopen** (not **Close**), disables **Move…**
+  (`disabled={closed !== null}`), and shows the sentence "Closed — reopen it first" beside it as a
+  `<span className="gn-sheet__closed-note">` — TEXT, never a `title=` tooltip (spec §5.3). Clicking Reopen
+  ingests exactly one `ticket.reopened` with `payload {}`. The badge reuses `Chip` tone `terminal`
+  (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.587** ✅ A non-terminal ticket shows neither **Close** nor **Reopen** — the two buttons' gates
+  (`stateCategory === 'terminal' && closed === null`, and `closed !== null`) both read false for an active
+  or open ticket, so this sheet offers no closing affordance at all outside a terminal state
+  (backlog/closed spec §5.3, 2026-09-17) — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588** ✅ A refused `ticket.closed` (answered `refused` with rule `close-requires-terminal`, the
+  rule-engine id from spec §2's table) renders its rule and reason VERBATIM in the sheet's refusal slot —
+  carried without paraphrase, the same invariant `submitTransition`'s own refusal handling holds. The slot
+  is a NEW render block beside the action row rather than `TransitionDialog`'s own `serverRefusal` copy:
+  `Dialog` (`packages/ui/src/components/dialog.tsx:15`) returns `null` whenever `open` is false, so that
+  copy is unreachable while the Move dialog is closed — exactly when Close/Reopen fire. The new block is
+  gated on `!moveOpen` so the two never both render: the Move dialog's own `onClose` already clears
+  `serverRefusal` when it closes, and `submitTransition` never sets it while `moveOpen` is false —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)

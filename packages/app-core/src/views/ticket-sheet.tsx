@@ -289,6 +289,61 @@ export function TicketSheet({
     else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
 
+  /**
+   * Close / Reopen — the same `make`/`ingest`/result idiom `submitTransition`
+   * uses above, collapsed to the one-event case: `ticket.closed` and
+   * `ticket.reopened` both carry `payload: {}` (spec §1.2, 2026-09-17), the
+   * envelope alone naming the actor and the server time the badge later
+   * reads. A `committed` answer clears any standing refusal and reloads both
+   * the ticket and its ledger — the same pair `submitTransition` refreshes,
+   * because a close/reopen writes a ledger line too. A `refused` or `invalid`
+   * answer is carried without paraphrase into `serverRefusal`, exactly as
+   * `submitTransition` carries a move's.
+   *
+   * UNGUARDED against unmount mid-flight, on purpose and for the same reason
+   * `submitTransition` is left unguarded (see that function's docblock,
+   * cited by `board.tsx`): this file tracks no mounted-ness anywhere else, and
+   * adding one guard for this call alone would be a second convention beside
+   * the existing unguarded one rather than a fix to it.
+   *
+   * The one case `submitTransition` has no answer for at all is a REJECTED
+   * `ingest` — the promise throwing rather than answering `invalid`. Ruling
+   * 27's docblock (below, on `TransitionDialog`'s `transportError` prop) notes
+   * that path is left as an unhandled rejection there because this sheet has
+   * no transport-error slot to hand it to. Rather than repeat that silently
+   * for Close/Reopen too, a throw here is caught and reported through the same
+   * `serverRefusal` slot, under a rule name that says what happened
+   * (`ingest-rejected`) rather than inventing a `{rule, reason}` pair that
+   * reads as the engine's own answer.
+   */
+  const closeOrReopen = async (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> => {
+    const event = make({
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type,
+      payload: {},
+    });
+    let results;
+    try {
+      results = await dataSource.ingest([event]);
+    } catch (error) {
+      setServerRefusal({
+        rule: 'ingest-rejected',
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    const failed = results.find((result) => result.status !== 'committed');
+    if (failed === undefined) {
+      setServerRefusal(null);
+      read.reload();
+      history.reload();
+      return;
+    }
+    if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
+    else setServerRefusal({ rule: failed.code, reason: failed.message });
+  };
+
   const state = ticketRead.ticket;
   // `statesWithBacklog`, not `workflow.data?.states` (backlog/closed spec
   // §1.4, 2026-09-17): a ticket in the universal Backlog state has no row in
@@ -298,6 +353,9 @@ export function TicketSheet({
     workflow.data == null
       ? state.stateId
       : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
+  // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
+  // 2026-09-17); every reader spells the same `?? null`.
+  const closed = state.closed ?? null;
 
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>
@@ -327,8 +385,64 @@ export function TicketSheet({
             <span className="gn-ticket-sheet__provenance">
               {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
             </span>
-            <Button onClick={() => setMoveOpen(true)}>Move…</Button>
+            {closed !== null ? (
+              <span className="gn-sheet__closed-badge">
+                <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
+              </span>
+            ) : null}
+            {/*
+              Spec §5.3: Close only from a terminal, not-yet-closed state;
+              Reopen only once closed. `closed` never survives a fold that
+              also changes `stateId` (closing never touches it), so a closed
+              ticket stays terminal and the two buttons never both show.
+            */}
+            {state.stateCategory === 'terminal' && closed === null ? (
+              <Button onClick={() => void closeOrReopen('ticket.closed')}>Close</Button>
+            ) : null}
+            {closed !== null ? (
+              <Button onClick={() => void closeOrReopen('ticket.reopened')}>Reopen</Button>
+            ) : null}
+            {/*
+              Opening Move… clears any standing Close/Reopen refusal first: the
+              two now share one `serverRefusal` slot, and without this a
+              `close-requires-terminal` reason left over from a prior Close
+              click would carry into the Move dialog's OWN refusal copy,
+              naming a rule that has nothing to do with the move being
+              attempted.
+            */}
+            <Button
+              onClick={() => {
+                setServerRefusal(null);
+                setMoveOpen(true);
+              }}
+              disabled={closed !== null}
+            >
+              Move…
+            </Button>
+            {closed !== null ? (
+              <span className="gn-sheet__closed-note">Closed — reopen it first</span>
+            ) : null}
           </div>
+
+          {/*
+            Close/Reopen's own refusal, shown OUTSIDE `TransitionDialog`.
+            `serverRefusal` is the same state `submitTransition` fills, and
+            `TransitionDialog` renders it too (`gn-refusal--server`, spec
+            citation on that prop) — but `Dialog` returns `null` whenever
+            `open` is false (`packages/ui/src/components/dialog.tsx:15`), so
+            that copy is invisible while `moveOpen` is false, which is exactly
+            when Close/Reopen fire. Gating this copy on `!moveOpen` keeps the
+            two from ever both being on screen: the Move dialog's `onClose`
+            already clears `serverRefusal` when it closes, and `submitTransition`
+            never sets it while `moveOpen` is false (the dialog does not close
+            itself on a refusal), so the two conditions are mutually exclusive
+            rather than a duplicate render of the same fact.
+          */}
+          {serverRefusal !== null && !moveOpen ? (
+            <p role="alert" className="gn-refusal gn-refusal--server">
+              {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            </p>
+          ) : null}
 
           {/*
             Three different facts, three different sentences. A RESTRICTED

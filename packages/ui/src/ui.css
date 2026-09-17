@@ -280,6 +280,15 @@
 .gn-dialog__body,
 .gn-sheet__body { padding: 1rem 1.1rem; overflow-y: auto; }
 
+/* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
+   wraps a `Chip` (tone `terminal`) rather than restyling it, so its colour
+   comes from `.gn-chip--terminal` alone — this rule is layout only, nothing
+   to add to the token scan. The note beside the disabled Move… button is
+   TEXT, never a `title=` tooltip (spec §5.3), and carries the one token this
+   sentence needs. */
+.gn-sheet__closed-badge { display: inline-flex; align-items: center; }
+.gn-sheet__closed-note { color: var(--gn-text-muted); font-size: 0.8125rem; }
+
 .gn-table__scroll { overflow-x: auto; }
 .gn-table {
   border-collapse: collapse;
