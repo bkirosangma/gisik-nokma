@@ -20,8 +20,85 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:4x IST. **STEP 2 — PART 0 IS DONE AND PUSHED; PART 1
-> # (THE LIST TAB, TO THE PROTOTYPE) IS IN FLIGHT, WITH ONE RULING REQUESTED.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a IS DONE AND COMMITTED; ONE PR OPEN
+> # AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE. QUEUE EMPTY — HOLD.**
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2a-catalogue-green.md`. All four Parts are
+> in one commit. **Nothing is in flight; the next task is the controller's to name.**
+>
+> ## Live anchors — measured at this block
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2a-catalogue-green`, cut from `origin/owner/workspace-edits` at `63ffe930` |
+> | **HEAD at gate** | `4d88f878d0f3c0cb5db5ce44d7f10b18f70970f8` — the Step 2a change set. **The gate below was run at THIS sha**, so it is the number to quote. |
+> | branch tip | this commit and no other: the handoff block alone. **No source file differs from `4d88f878`** — re-measure with `git diff 4d88f878 HEAD --stat`, which must name this file only. |
+> | pushed | `origin/exec/step2a-catalogue-green` |
+> | tree | clean |
+> | PR base | `owner/workspace-edits` — NEVER `main`; the product lives on the owner's branch |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33, 0 cached**, 1m37s, **EXIT 0**. Interpreter **v22.22.2** (probed with `pnpm exec node -e`, not read off turbo's launcher path); case **6.128** (`apps/server/test/node-version.test.ts`) green INSIDE the run, which is what names the workers' Node. Per package: domain 486 · ui 315 · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped**. Zero `failed` lines in the log. |
+>
+> ## All six checks raw 0, quoted from this head
+>
+> `check:env` 0 · `check:tasks` **0** → `306 tasks across 24 plan files, 306 ledger rows` ·
+> `check:runbook` 0 · `check:citations` **0** → `2058 checked (✅) ids … 2058 cited, 0 uncited`,
+> ratchet exact on every file · `check:help` 0 · `check-case-ids` **0** → `2189 unique ids`.
+> Three of these were red at every head since the SDD sessions began writing plans.
+>
+> ## ⚠ THE ONE FINDING: the dispatch's Part 1 premise is FALSE for 13 of its 90 rows
+>
+> The dispatch said "90 rows, status `in-flight`". **77 are in-flight; 12 are NOT STARTED and 1 is
+> STRUCK.** `backlog-and-closed-second-wave`'s twelve tasks have no work on any branch: its declared
+> artefacts (`rankBetween`, `isRankKey`, `ticketRankedPayload`, `reopenedAt`, `system-actors`,
+> `autoCloseAfterDays`) return **zero source files** against a positive control that fires
+> (`ticket.closed` 11 files · `proj_tickets` 37 · `Backlog` 17), and cases 13.617–13.625 and
+> 13.630–13.648 are absent from the catalogue — which says so itself, at the hot-reload block:
+> that plan *"would otherwise mint twelve tasks on top of these rows"*. The ledger defines
+> `in-flight` as **"Committed on a branch that has not merged"** and `todo` as **"Not started"**, so
+> those twelve are `todo` with the measurement in the note. Writing `in-flight` would have made
+> Step 4's promotion sweep record **twelve completions that never happened** — the exact class of
+> false record this ledger exists to prevent. `board-prototype-port/1` is the thirteenth: STRUCK
+> 2026-09-16 by the plan's own text ("DO NOT IMPLEMENT THIS TASK"), so it is neither done nor in
+> flight; `todo` is the least-wrong of four statuses and its note says so.
+>
+> **A SECOND, SMALLER ONE the controller should rule on.** By the dispatch's rule "the FIRST
+> occurrence keeps its number", `13.387` still names the **SUPERSEDED** five-door description while
+> the live four-door behaviour now lives at **13.673** (the test was re-pointed by sentence). The
+> gate is green either way — `13.387` remains cited — but a reader looking up the canonical id gets
+> text that is no longer true of the product. One line in the catalogue fixes it (absorb `13.387`
+> into `13.673`); it is the controller's call, not the executor's, because the ordering was the
+> controller's ruling.
+>
+> ## Part 2 and Part 3, in one line each
+>
+> **18 of the 21 uncited ✅ cases were (b)** — the witness existed and only the citation was
+> missing; the §10 fifteen each name their test AND that test's title verbatim in their own text.
+> **3 were (c) and are flipped to ❌ with a dated reason**: `11.212`, `13.476`, `13.477`. The union
+> of every selector any test reads out of `ui.css` is enumerated in the PR: none of `.gn-segmented`,
+> `.gn-list__table*` or `.gn-timeline__title` is in it. **Part 3**: the 13.387×3 and 13.413×2
+> duplicates are REVISION CHAINS; re-minted to `13.672` / `13.673` / `13.674`, each with the witness
+> it never had, re-pointed by SENTENCE rather than by id.
+>
+> ## Prototype refresh — `mobile.dc.html` is no longer HELD
+>
+> `unpack-bundle.mjs` gains **`--mobile-entry <N>`**. The bundle names TWO entries under one id, so
+> the tool still holds with no flag (control run: both printed, neither written) and writes only
+> what the caller NAMES. **Entry #1 is written** (227,232 B, sha256 `7316062b5bb3…`) — it inlines
+> the Google mark as `<svg>`, the same change the 2026-09-18 desktop template made to its own
+> `isSignIn`. Entry #2 (`14ca5b8d89ab…`) is not written; the two differ only at line 153, and which
+> export is NEWER remains underivable (`page_order` is empty, no timestamps) — the choice is
+> recorded as a choice, in `PROVENANCE.md` and in case 13.658. Guards witnessed: no flag → nothing
+> written; `--mobile-entry 3` → exit 1.
+>
+> ## Standing rules unchanged
+>
+> Never compose without the primary checkout's `--env-file`; never `AskUserQuestion`; never pipe a
+> test run into `head`; every PR in this mission targets `owner/workspace-edits`, never `main`;
+> shas in NARRATIVE prose anywhere in this repo are facts about the moment they were written, and
+> the anchors TABLE above is the only thing here checked for reachability.
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~02:4x IST. **STEP 2 — PART 0 IS DONE AND PUSHED; PART 1
+> # (THE LIST TAB, TO THE PROTOTYPE) IS IN FLIGHT, WITH ONE RULING REQUESTED.** *(Merged as #419.)*
 >
 > ## Live anchors — measured at this block, `git branch --contains` clean
 >
