@@ -33,7 +33,7 @@ because the second decides the shape of the first:
   all; `toServerFilterSpec` (`packages/app-core/src/online/mappers.ts:837-876`,
   re-pointed 2026-09-17 — was `:836-859` before this plan's own exclude
   refusal shifted the block) refuses anything wider rather than sending a
-  narrower question. `page.tsx`'s own docblock (`:186-190`, re-pointed
+  narrower question. `page.tsx`'s own docblock (`:187-191`, re-pointed
   2026-09-17 — was `:180-184`) already records this: "'not done' needs either
   a plural `stateCategory` on the route or a negation term, and today it has
   neither."

@@ -6095,7 +6095,7 @@ exact command against `Features.md`, `test-cases/`, `docs/superpowers/specs/`,
 
 - **Re-pointed** (correct at `5c8d1bd6`, displaced by this plan, fixed by direct read at HEAD, never
   by offset arithmetic): `page.tsx`'s own docblock citing `mappers.ts:838-853` → `:855-870`, and the
-  adjacent self-citation of its own `:180-184` → `:186-190` (both shifted by the Task 5 exclude-refusal
+  adjacent self-citation of its own `:180-184` → `:187-191` (both shifted by the Task 5 exclude-refusal
   block inserted above them); the 2026-09-17 spec's own `mappers.ts:836-859` → `:837-876` and
   `view-types.ts:159-200` (`ListRow`) → `:180-221` (shifted by the same refusal block and by `IdAxes`
   being declared above `ListRow`, respectively); the 2026-09-16 board-prototype-port spec's
