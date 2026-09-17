@@ -20,16 +20,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:0x IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
-> # IN FLIGHT. DOCS-ONLY. NO PR YET, SO `main` AND `owner/workspace-edits` CARRY NOTHING OF THIS.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:xx IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
+> # DONE. PR #424 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
 >
 > Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c0-prototype-delta-audit.md`.
-> Deliverable: `docs/design/prototype-delta-2026-09-18.md` (new, untracked at this writing).
+> Deliverable: `docs/design/prototype-delta-2026-09-18.md`. **Docs-only: no source, no `Features.md`, no
+> `test-cases/` change.** Independent reviewer ran (falsification brief) and its three findings are fixed.
 >
 > | | |
 > |---|---|
 > | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | HEAD | `952ae4b7` — pushed to `origin/exec/step2c0-prototype-delta-audit`; **no PR yet** |
+> | **PR** | **#424, base `owner/workspace-edits`** — never `main` |
+> | HEAD | `b784326b` (the reviewed head, before this handoff block) — **the PR is frozen there; the handoff update is the only commit after it** |
 > | PR base | `owner/workspace-edits` — NEVER `main` |
 > | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
 > | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
@@ -51,12 +53,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group. Two sit on held screens;
 > the third is a ruling-independent M restyle.
 >
-> ## Reviewer in flight (the 6th and last subagent — the cap)
+> ## Reviewer: DONE. It confirmed the central result and found three real defects, all fixed
 >
-> It is asked to falsify: re-derive all 25 block deltas with its OWN tooling, re-derive five randomly
-> chosen product sections, and spot-check ≥12 citations **for whether the cited line says what the prose
-> claims** — the one thing the mechanical checker cannot do and the document's own stated weakest link.
-> **Do not merge on the strength of this document until its verdict is in.**
+> It re-derived every block from the raw blobs with its own tooling and reproduced the six-block result,
+> the 16 → 14 → six arithmetic, and the whole-file partition, with a mutation control proving its
+> normaliser was not blanket-collapsing. Verdict: **the central claim is safe to act on.** It then found:
+>
+> 1. **The doc's rewrite table stated a rule the export never emits** — `<input … />` → `<input … >`,
+>    keeping a space the new export does not emit (` />` appears **0** times in it, 18 in the old). The
+>    doc's *results* were right because its code used the correct rule; its *instructions* were wrong, and
+>    **a reader re-running them gets eleven blocks, not six.** Fixed, and the trap is now written down.
+> 2. **"The four largest" was not the four largest** (`isWork` 20 and `isSignIn` 6 outrank two of them).
+> 3. **Prototype-side bare `:NNN` citations had drifted ~45%** (16 of ~35 sampled, 1–10 lines). Every
+>    drifted citation's *claim* was true, so no verdict changed. All 16 corrected to verified lines.
+>
+> **The gap this exposed in the document's own checking, now stated in it:** the product-side resolver
+> covers 222 citations and all resolve, but it **never covered prototype-side citations**, and an attempt
+> to add one produced **240 false positives** (a bare `:NNN` is ambiguous between "the prototype" and "the
+> product file named earlier in the sentence"). The doc now says so and rules that **quoted fragments are
+> authoritative, line numbers a search starting point.** **Fixing the citation style is the first thing the
+> next pass on this document should do.**
 >
 > ## The second finding, and it reframes the queue
 >
