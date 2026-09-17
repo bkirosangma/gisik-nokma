@@ -20,7 +20,96 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — WEDNESDAY 2026-09-09 ~18:0x IST. **ROUND 19b — WORK COMPLETE, RE-FROZEN AFTER REVIEW FIX.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~00:5x IST. **STEP 1 OF THE 2026-09-18 MISSION: THE
+> # COMPOSE `server` RUNS THE BRANCH'S SOURCE WITH HOT RELOAD. ONE PR IN FLIGHT, base
+> # `owner/workspace-edits`.**
+>
+> ## Branch — a NEW one, cut from the OWNER's branch, not from `main`
+>
+> `exec/step1-server-hot-reload`, cut with `git checkout -b exec/step1-server-hot-reload
+> origin/owner/workspace-edits` at **`5039209c`**. Verified at handoff:
+> `git rev-parse origin/owner/workspace-edits` → `5039209ccde5412ea083aa1b5fbf49a2b8872490`, and
+> `git rev-list --left-right --count origin/main...origin/owner/workspace-edits` → **`4 277`**.
+> **Every PR in this mission targets base `owner/workspace-edits`, NEVER `main`** — the product lives
+> on the owner's branch, which is 277 commits ahead of `main`; a PR opened against `main` by reflex
+> carries all 277 and is closed unmerged. `exec/task12-passkeys` still exists and is untouched; Step 3
+> of the mission deletes it (its work was redone under `account-help-screens` Task 8).
+>
+> **The tip sha is deliberately NOT named**, for the reason the older blocks give: writing it here
+> creates a commit, so the number is stale the instant it saves. The invariant instead — **every
+> commit on this branch belongs to the Step 1 change set**: `docker-compose.hot.yml` (new),
+> the `dev` stage in `apps/server/Dockerfile`, the root `dev:stack` script, `docs/runbook.md`,
+> `Features.md`, `test-cases/13-deployment-dogfooding.md`.
+>
+> ## What Step 1 is, and the two things that would have failed silently
+>
+> The owner's Backlog tab read `list.groups[0].cards[0].closed: expected an object` because the
+> running `server` image was built **2026-09-09T12:32Z** and the first `closed` fold reached
+> `apps/server/src/read/ticket-cards.ts` on **2026-09-17T11:25** — eight days later. The wire card had
+> no `closed` key; `mapClosed` refused an absent key, correctly. The owner asked for hot reload rather
+> than a one-off rebuild, so the deliverable is a mode, not a fix. `docker-compose.dev.yml` is
+> byte-unchanged; hot mode is an OVERRIDE composed on top of it.
+>
+> 1. **The `dev` Dockerfile stage sits BEFORE `runtime`.** Docker builds the LAST stage when no target
+>    is named and neither compose file names one, so appending it would have silently made it the
+>    production image.
+> 2. **The container command is `sh -c` explicitly.** Compose v2 does NOT run a string-form `command`
+>    through a shell — it shell-word-splits it. Measured before the build: the first version rendered
+>    `set`, `-e`, `echo`, … as nine separate argv entries and would have died exec'ing `set`.
+>
+> ## Witnesses — measured, not carried (all four are cases 13.613–13.616)
+>
+> - **W1** cold build **94 s**; healthy **~24 s**; `{"google":true,"apple":false,"phone":false}`;
+>   source read through the MOUNT gives `closed_at` **4** against the same-file control
+>   `collaborator_ids` **3** — where the stale image measured **0** with control 2 (a valid
+>   measurement). Idle **1.602 GiB / 7.667 GiB, 2.30 % CPU**. All nine mounts resolve under this
+>   worktree.
+> - **W2** server-source round-trip **1.62 s** — **with a measured negative half that matters more
+>   than the positive one**: a RENAME-OVER save (`mv`, the atomic-save shape) delivers **no inotify
+>   event into the container at all** and is missed SILENTLY. A timestamped `fs.watch` on the same
+>   file saw one event at 3887 ms for an in-place write and zero for the rename-over. **Polling was
+>   NOT enabled**: the dispatch's condition is that events provably do not cross the Docker Desktop
+>   mount, and they do — partially. Recording the limitation is the honest move; enabling
+>   `CHOKIDAR_USEPOLLING` would have hidden which shape was broken.
+> - **W3** package round-trip through `dist` **3.92 s**, with both restarts in the log
+>   (`change in ./src/index.ts` and `change in ./../../packages/domain/dist/index.js`) and
+>   `HOT_WITNESS` counted **1** in the container's `packages/domain/dist/index.js`. This is the
+>   witness for the WATCHER SHAPE.
+> - **W4/W5** a no-`--build` `up` reuses the same container id `df98f7588bf5…` with zero build
+>   activity; the un-hot path is intact — `config --services` still lists all six including `server`
+>   and `web`, and `git diff origin/owner/workspace-edits -- docker-compose.dev.yml apps/web/` is empty.
+>
+> ## THREE THINGS A RESUMED SESSION MUST KNOW
+>
+> - **The Docker VM's disk hit 100 % and killed the prod-image build with `ENOSPC`** — the disk, not
+>   the code, and the failing step is in the PRE-EXISTING `build` stage that this change does not
+>   touch. `docker builder prune -f` freed **10.38 GB** of zero-active build cache; images and volumes
+>   were deliberately left alone because they hold other lanes' work. To re-measure:
+>   `docker run --rm --entrypoint sh gisik-nokma-dev-server:latest -c 'df -h /'` — the HOST's free
+>   space says nothing about the VM's, which is the one that fills.
+> - **`.env` was copied into this worktree** (mode 600), per Amendment 2. Verified safe BEFORE the
+>   copy, not assumed: `git check-ignore -v .env` → `.gitignore:11`, and `git status` does not see it.
+>   It is a file read of the owner's tree — never a git command run there.
+> - **The `dev` stage's manifest `COPY` block is hand-listed.** A new workspace package needs a line
+>   added there or `pnpm install --frozen-lockfile` fails on the missing importer. Named here because
+>   it is a silent-until-it-isn't coupling, not because it is likely.
+>
+> ## Live state at handoff
+>
+> The hot `server` container is **UP from THIS worktree** (`gisik-nokma-dev-server-1`, compose project
+> `gisik-nokma-dev`), so the owner's Backlog tab works from now on. The mounts point at
+> `gisik-nokma-exec` and **stay that way** — Amendment 1, owner verbatim: *"the image needs to be made
+> from where the code is being written."* Port **3001 was never touched** and `web` was never brought
+> up: the owner's `next dev` still holds it.
+>
+> **One dispatch instruction could not be carried out as written:** it asked for the Task 12 pause
+> block to stay below this one with a one-line superseded note at its top. That block is **not in this
+> branch's copy of this file** — it lives on `exec/task12-passkeys` (confirmed: one match there, zero
+> here). Nothing was fabricated to satisfy it; this note is the substitution.
+>
+> ---
+>
+> # ▣ SUPERSEDED — WEDNESDAY 2026-09-09 ~18:0x IST. **ROUND 19b — WORK COMPLETE, RE-FROZEN AFTER REVIEW FIX.**
 >
 > **Branch `exec/19b-workspace-feedback`, HEAD `5628edda`, five commits, cut from `origin/main` at
 > `b47f0253`** (`git checkout -b exec/19b-workspace-feedback origin/main`, NOT from

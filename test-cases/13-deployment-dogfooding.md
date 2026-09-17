@@ -7207,3 +7207,52 @@ un-hedge now.
   no entry." A request naming `backlog` as a key refuses with that reason
   verbatim and appends nothing —
   (`apps/server/test/routes/builder-reads.test.ts`)
+
+**Block 13.613–13.616 — hot-reload dev mode for the compose `server`, 2026-09-18.** All four are `🧪`:
+the property under test is that a CONTAINER, started by compose, picks up HOST edits — there is no test
+runner on either side of a Docker Desktop bind mount, and a unit test of the compose file would assert
+YAML rather than prove the reload. Numbers below were measured once, on this machine, at the head of
+this change's PR; they are readings, not guarantees. (The branch's high-water mark was **13.612**;
+`13.632`/`13.999` are this file's documented truncation traps, not free ids.)
+
+- 🧪 **13.613 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
+  baked image.** `docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml
+  up -d --build server` run from the executor's worktree: cold build **94 s**, container healthy
+  **~24 s** after start, `curl -s localhost:3000/v1/auth/methods` → `{"google":true,"apple":false,
+  "phone":false}` (the OAuth pair reached the container, so `--env-file` was honoured). Then the check
+  that the 2026-09-09 incident was: `docker exec gisik-nokma-dev-server-1 grep -c closed_at
+  /repo/apps/server/src/read/ticket-cards.ts` → **4**, with the same-file control `collaborator_ids` →
+  **3**. Read through the mount, so it is the branch's source rather than a compiled-in value — against
+  the stale image it was **0** (control 2, i.e. a valid measurement), and the owner's Backlog tab was
+  failing at exactly that. Idle cost once the watchers settle: **1.602 GiB / 7.667 GiB, 2.30 % CPU**.
+  All nine declared mounts resolve under the worktree (`docker inspect --format '{{range .Mounts}}…'`).
+  (`docker-compose.hot.yml`, `apps/server/Dockerfile`)
+- 🧪 **13.614 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
+  `console.log("HOT-WITNESS-SERVER")` added at the top of `apps/server/src/index.ts` appeared in
+  `docker logs` and a `[tsx] change in ./src/index.ts` restart line followed in **1.62 s**. **The
+  measurement carries a negative half that matters more than the positive one:** the same edit written
+  as a RENAME-OVER (`mv` a temp file onto the path — the atomic-save shape) produced **NO inotify event
+  in the container at all** and never reloaded, measured with a timestamped `fs.watch` on the same file
+  (in-place append → one event at 3887 ms; rename-over → zero events). So host→container events cross
+  the Docker Desktop mount for in-place writes and NOT for rename-over, and a save that uses the latter
+  is missed silently rather than slowly. Recorded rather than papered over with polling: the dispatch's
+  condition for enabling `CHOKIDAR_USEPOLLING` is that inotify events provably do not cross, and this
+  measurement shows they do, partially. (`docs/runbook.md`)
+- 🧪 **13.615 — a PACKAGE-source edit reaches the server through `dist`, which is the witness for the
+  watcher SHAPE.** `export const HOT_WITNESS = "domain-hot";` appended to
+  `packages/domain/src/index.ts`, plus `console.log(HOT_WITNESS)` in the server entry importing it from
+  `@gisik-nokma/domain` (by package name, so it resolves through `./dist`): the marker appeared in
+  **3.92 s**, with `HOT_WITNESS` counted **1** in `/repo/packages/domain/dist/index.js` and the log
+  showing both restarts — `change in ./src/index.ts` and `change in
+  ./../../packages/domain/dist/index.js`. Total watchers on a settle: seven `tsc -p tsconfig.json
+  --watch` (one per package), `tsx watch`, and the server process. (`docker-compose.hot.yml`)
+- 🧪 **13.616 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
+  container.** `docker compose … up -d server` with **no** `--build`: container id
+  `df98f7588bf5…` identical before and after, and zero build/export/name lines in the output. And the
+  plain path still reads what it read before: `docker compose --env-file .env -f docker-compose.dev.yml
+  config --services` lists all six services including `server` and `web`; `git diff
+  origin/owner/workspace-edits -- docker-compose.dev.yml apps/web/` is **empty**; and `docker build -f
+  apps/server/Dockerfile .` with no target still produces an image whose `CMD` is
+  `["node","dist/index.js"]` — the check that the new `dev` stage did not become the default build,
+  which it would have if it had been appended after `runtime` instead of placed before it.
+  (`docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`)
