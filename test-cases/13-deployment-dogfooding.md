@@ -7443,3 +7443,40 @@ on this machine, at the head of this change's PR — readings, not guarantees.
   caveat on the instrument:** the FIRST attempt at that build was killed by the engine restart above, and the
   background wrapper reported `exit code 0` while its own log said `EXIT=1` — the log is the reading.
   (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
+
+**Block 13.658 — the interactive prototype refresh, 2026-09-18.** 🧪, for the block's usual reason: the
+property under test is that an UNPACK is faithful, and there is no test runner on either side of it. The
+proof is a comparison, so the case is written as one.
+
+- 🧪 **13.658 — the owner's 2026-09-18 export unpacks deterministically and the unpacked page renders what
+  the bundle renders.** `design-system/tools/unpack-bundle.mjs` reads the self-extracting "Bundled Page"
+  (`__bundler/manifest` `:371`, `ext_resources` `:375`, `page_order` `:379`, `template` `:383` of the
+  565,271-byte snapshot, sha256 `bf64cc44…`) and writes `interactive/desktop.dc.html` (320,109 B, sha256
+  `2cda054b…`) plus the runtime `interactive/support.js` (69,150 B, sha256 `8fe7df74…`), which the repo has
+  never contained — **so the committed prototype was previously un-runnable and is now runnable**. It
+  prints every file it wrote with its byte count and hash, and refuses a bundle whose three required blocks
+  are absent. **The faithfulness witness is a CONTROL, not an assertion:** the bundle is itself
+  self-extracting, so it renders the same page from its own inline payload, and the two were loaded side
+  by side (`python3 -m http.server 8777` for the unpack, `:8788` for the bundle — never 3001/3021). Both
+  produced `#dc-root` with **identical visible text** ("Gisik Nokma The keeper of memory Phone Email link
+  …", 213 chars) and **zero** surviving `{{ }}` placeholders; the rendered DOM dumps differ by exactly one
+  attribute, the runtime's own `data-sc-name`, derived from the page's filename (`desktop` vs
+  `2026-09-18-gisik-nokma-desktop-1.bundle`). Everything else is byte-identical. The List screen was then
+  reached through the prototype's own sign-in flow and screenshotted
+  (`refs/2026-09-18-desktop-unpacked-list.png`): controls row, the `epic · 4 tickets` group band,
+  hierarchy rows, status pills, due-date sentences and `N of M done` all match the owner's screenshot.
+  **Two instruments lied inside this case.** (a) The first version asserted `customElements.get('x-dc')`
+  is defined and `querySelector('x-dc')` is non-null — **both are FALSE on success**: the runtime finds the
+  raw tag, injects `x-dc{display:none}`, and REPLACES it with `<div id="dc-root">`, so that check could
+  never have passed. (b) A shell `diff` reported the two DOM dumps **"identical"** while they differed by
+  32 bytes — the same false-"identical" this repo has recorded before; `cmp` and a raw byte comparison in
+  Node found the difference immediately. **And one real difference from the bundle is recorded rather than
+  smoothed:** the unpacked page emits 5 console errors + 2 warnings the bundle does not — parse-time
+  failures on `{{ n.iconPath }}`-style bindings inside inline `<svg><path d=…>` — because the bundle keeps
+  its template inert inside a `<script>` while the committed form is the template as live HTML. The final
+  DOM is unaffected (the dumps match), so this is parse-time noise inherent to committing the template as
+  a page, not a loss of fidelity; it is named here because the dispatch's bar was "zero console errors"
+  and the measurement is 7.
+  (`design-system/tools/unpack-bundle.mjs`, `design-system/interactive/PROVENANCE.md`,
+  `design-system/interactive/desktop.dc.html`, `design-system/interactive/support.js`,
+  `design-system/MASTER.md`)

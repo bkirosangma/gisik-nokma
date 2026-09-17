@@ -61,22 +61,88 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > first of those had already been written into the compose file as a conclusion that the directory
 > door failed its in-place half, and had to be retracted.** A check that cannot pass is not evidence.
 >
-> ## OPEN RULING — Step 2's column set. This is the only thing blocked.
+> ## RULING — Step 2's column set: ANSWERED 2026-09-18. **Build the five; file the rest.**
 >
-> `gisik-nokma-lanes/EXEC-2026-09-18-step2-column-gap.md` (sent to the controller session as well).
-> The prototype's chip tray has **eight** columns and its Group by has **six** keys; the product has
-> **five** and **five**. Measured: Status/Assignee/Due date/Progress/Type are on the wire; **Ticket**
-> has `ListRow.ticketId` but no `ListColumnId`; **Workflow** is not on `ListRow` at all and has no
-> `Grouping`; **Priority** returns **zero matches** anywhere in `domain`/`app-core`/`server` src.
-> `Grouping` is `'epic'|'status'|'assignee'|'type'|'flat'` (`view-types.ts:183`); `ListColumnId` is the
-> five plus an unused `` `field:${string}` `` hatch (`:185`). That is the dispatch's own
-> "if a column's data is not on the wire, STOP-AND-ASK".
+> Raised as `gisik-nokma-lanes/EXEC-2026-09-18-step2-column-gap.md`; the controller ruled it the same
+> hour. **The controller's ruling confirmed the hold on all three, and supplied a fourth fact for
+> `Ticket` that the executor did not have:** ticket ids are ULIDs and the tree carries **no**
+> human-readable key (`ticketKey`/`ticketNumber`/`shortId`/`displayId` → zero matches; re-verified here
+> with a positive control, along with `seedUlid('ticket', …)` → 14 live sites and `mappers.ts:1684`
+> reading `ticketId` as a string). So the prototype's short `t.id` has no product counterpart at all.
 >
-> **Held:** the three unbacked chips. **Not held:** everything else — Part 1 proceeds on the five
-> columns. **A restart should not re-ask this; it should check for the answer in
-> `controller-state.md`, and if there is none, continue on the five and keep the gap visible.**
-> Case-id block **13.658–13.669** was re-measured free at this tip with a positive control in the same
-> run (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`) in the catalogue, the plans and the tree.
+> 1. Five columns, five Group-by keys, exactly as built. `flat` keeps its shipped label (the copy
+>    rule). **The tray shows FIVE chips: no inert chip, no invented field.**
+> 2. The gap is filed in three places in the same commit — this block, the `Features.md` List bullet,
+>    and the chip-tray catalogue case (which states the count is five and why).
+> 3. **Not executor work, listed for the owner:** the `workflow` column + grouping axis is a `ListRow`
+>    widening plus a workflow-name lookup (a candidate next step); `Priority` and a human ticket key
+>    are PRODUCT decisions, i.e. a brainstorm.
+>
+> ## Known gaps — the prototype is a design, not a spec of what exists
+>
+> **The List tab ships five columns and five Group-by keys where `design-system/interactive/desktop.dc.html`
+> draws eight and six.** Workflow, Priority and Ticket are NOT rendered and NOT built; the `workflow`
+> grouping axis is absent with them. Reasons, each measured rather than assumed: **Workflow** —
+> `ListRow` drops `workflowId` and nothing resolves a workflow name for a row; **Priority** — no such
+> field anywhere in `domain`/`app-core`/`server`; **Ticket** — the id is a ULID and there is no human
+> key. **A restart should NOT re-ask this and should NOT build the three**; the ruling above is the
+> answer, and the gap is recorded in `Features.md`'s List bullet and in the catalogue so it cannot
+> quietly disappear.
+>
+> ## Prototype delta 2026-09-18 — every screen block, for the port queue
+>
+> The refresh replaced `interactive/desktop.dc.html` (3,773 → 4,050 lines) and supplied the missing
+> `support.js`, so the prototype is now RUNNABLE for the first time. **One mechanical rewrite touches
+> every block**, and it is not a design change: the new bundler's runtime spells raw HTML elements
+> `<sc-raw-*>` and events `sc-camel-on-*` (so `<select>`→`<sc-raw-select>`, `onClick`→`sc-camel-on-click`,
+> `colSpan`→`sc-camel-col-span`), and adds a `style-hover="{{ … }}"` binding. The table below is the
+> verdict AFTER normalising those away; "same" means nothing else differs.
+>
+> | screen | old | new | Δ | verdict |
+> |---|---|---|---|---|
+> | isMobileDevice | 17 | 17 | 0 | same |
+> | isSignIn | 60 | 60 | 0 | CHANGED — Google mark inlined as `<svg>` (was `<img src="./apps/web/public/google-mark.svg">`); `&rsquo;` → literal |
+> | isWorkspaces | 57 | 57 | 0 | CHANGED |
+> | isWorkspace | 81 | 81 | 0 | CHANGED |
+> | isWork | 40 | 40 | 0 | CHANGED |
+> | isBoardView | 47 | 47 | 0 | CHANGED |
+> | **isListView** | 76 | 76 | 0 | **same** — the List spec did NOT change; only line numbers moved |
+> | isCalendarView | 29 | 29 | 0 | CHANGED |
+> | isTimelineView | 44 | 44 | 0 | CHANGED |
+> | isMyWork | 53 | 53 | 0 | same |
+> | isInbox | 44 | 44 | 0 | CHANGED |
+> | isMembers | 138 | 71 | −67 | CHANGED — SPLIT (see below) |
+> | **isInviteAdmin** | — | 78 | new | **ADDED — a screen the old file did not have** |
+> | isSettingsShell | 17 | 17 | 0 | CHANGED |
+> | isTypes | 24 | 24 | 0 | CHANGED |
+> | isWorkflows | 30 | 30 | 0 | same |
+> | isTypeEditor | 88 | 88 | 0 | CHANGED |
+> | isMcpTokens | 54 | 54 | 0 | CHANGED |
+> | isBuilder | 473 | 473 | 0 | CHANGED |
+> | isAccount | 130 | 152 | +22 | CHANGED |
+> | isHelp | 54 | 82 | +28 | CHANGED |
+> | isLegal | 37 | 37 | 0 | same |
+> | isInvite | 40 | 40 | 0 | CHANGED |
+> | isMcpAuth | 47 | 47 | 0 | CHANGED |
+> | isNotFound | 35 | 35 | 0 | CHANGED |
+>
+> **The one structural change is `isMembers` splitting into `isMembers` + `isInviteAdmin`** (138 = 71 +
+> 78 − 11): the 2026-09-18 export draws the invite-admin surface as its own screen. `isAccount` (+22)
+> and `isHelp` (+28) genuinely grew. Everything else is the same size.
+>
+> **Caveat, stated because it bounds the table:** the verdicts come from one normaliser that strips the
+> three rewrites above; a residual "CHANGED" on a size-identical block could be a fourth mechanical
+> rewrite I did not map rather than a design change. `isSignIn`'s residual was read line by line and does
+> contain a real change, so the verdict is not vacuous — but the table is a **porting seed, not a
+> changelog**, and each screen still needs its own read before it is ported. Line numbers are the NEW
+> file's; the offset from the old file is **not constant** (176→180, 477→481, 1827→1905, 2584→2779), so
+> every existing `desktop.dc.html:<line>` citation must be re-measured, never shifted by a delta.
+>
+> Case-id block **13.658–13.670** is now the live range: **13.658 is the refresh witness** (the dispatch
+> reserves one of the block for it) and the List work takes **13.659–13.670**. The original allocation
+> 13.658–13.669 was re-measured free at this tip (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`);
+> **13.670–13.679 was then measured free too** (14 hits for `13.66[0-9]` as the live positive control,
+> zero for `13.67[0-9]`), because the List implementer had already claimed all twelve ids.
 >
 > ## ⛔ AND THE THING THAT WILL COST A RESTART IF IT IS MISSED
 >
