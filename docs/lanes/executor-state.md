@@ -29,9 +29,34 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | HEAD at cut | `3831bb49` — the audit doc is the only change so far, and it is not yet committed |
+> | HEAD | `9b0fddd4` — four commits, docs-only; **no PR yet** |
 > | PR base | `owner/workspace-edits` — NEVER `main` |
-> | gate | NOT RUN. Docs-only: the dispatch's stated bar is `pnpm turbo run check:*` raw 0 + `typecheck --force`; the controller runs the full forced gate at the tip |
+> | gate | Checks NOT yet re-run at this head. Docs-only: the dispatch's stated bar is the six checks raw 0 + `typecheck --force`; the controller runs the full forced gate at the tip |
+> | subagents | A (isSignIn, isWorkspaces, isWorkspace, isInvite, isMcpAuth) · B (+isMobileDevice, isWork, isBoardView, isListView, isCalendarView) · C (isMembers, isInviteAdmin, isAccount, isHelp) · D in flight. **Serial, one at a time**; 5 workers + 1 reviewer = the cap |
+>
+> ## Verdicts landed so far — 14 of 25 screens
+>
+> `none`: isMobileDevice, isSignIn, isBoardView, isListView (done #419), isCalendarView, **isAccount**,
+> **isHelp**. `held`: isWorkspaces, isWork, isMembers, isInviteAdmin. `wire-gap`: isWorkspace, isInvite,
+> isMcpAuth, and **TOKENS (global)**. Pending: 11 unchanged screens (D and E).
+>
+> ## The second finding, and it reframes the queue
+>
+> **On at least two screens the export is catching up to the product, not ahead of it.** `/account` was
+> ported 2026-09-15 (`3bb823dc`) and `/help` 2026-09-15 (`7cce93e2`) — **three days before the export's
+> own date.** Their refreshed blocks match what the product already renders (verified: commit dates read
+> with `git log -1 --format=%cI` and ancestry with `--is-ancestor`). So **a "CHANGED" verdict in the delta
+> table is not by itself evidence of outstanding work** — it is evidence the two artefacts differ, and the
+> direction must be established per screen. The dispatch's premise ("every screen the product has is to be
+> brought to the refreshed prototype") holds for some screens and is inverted for others.
+>
+> ## And one portable-check finding worth keeping
+>
+> A citation resolver (`path:line` → open the file → fail on missing file, out-of-range line, or blank
+> line) runs over the deliverable: **104 citations, 104 resolve, 0 problems**. It caught
+> `packages/ui/src/style-toggle.tsx` as FILE NOT FOUND — the toggles live at `apps/web/src/` — and 40
+> short-form citations (`page.tsx:1202`) that are ambiguous in a repo with 24 `page.tsx` files. **Build
+> this for any doc of this size; a wrong path reads exactly like a right one.**
 >
 > ## What is established, and how — do not re-derive any of this
 >
