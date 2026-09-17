@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FieldClaim, TicketState } from '@gisik-nokma/domain';
 import { matchesFilter } from '../../src/filter/matches-filter.js';
 import { matchesListRow, type ListFilterSpec } from '../../src/filter/list-filter.js';
+import type { BoardFilterSpec } from '../../src/filter/board-filter.js';
 import type { ListRow } from '../../src/view-types.js';
 
 function claim(value: unknown): FieldClaim {
@@ -18,8 +19,11 @@ const row: ListRow = {
   assignee: { id: 'u1', name: 'Ada' }, assignedProvenance: provenance,
   dueDate: { date: '2026-09-20', claim: provenance },
   fields: { title: claim('Ship the board'), amount: claim(4200), priority: claim('high') },
-  rollup: null, hasRestrictedParent: false, pending: false,
+  rollup: null, hasRestrictedParent: false, pending: false, closed: null,
 };
+
+/** The same row, closed — for the `closed` axis pair below (backlog/closed spec §4, 2026-09-17). */
+const closedRow: ListRow = { ...row, closed: { actorId: 'u1', at: '2026-09-17T00:00:00.000Z' } };
 
 /** …and as `matchesFilter` sees it. */
 const equivalent: TicketState = {
@@ -34,7 +38,13 @@ const equivalent: TicketState = {
     priority: claim('high'),
   },
   transitions: [],
+  // No `closed` key at all — `TicketState.closed?` predates the flag on 441
+  // fixtures, and this one is the LEGACY case: `state.closed ?? null` reads
+  // it as not closed, same as an explicit `closed: null`.
 };
+
+/** The same ticket, closed — `TicketState.closed?` is optional, this fixture sets it. */
+const closedEquivalent: TicketState = { ...equivalent, closed: { actorId: 'u1', at: '2026-09-17T00:00:00.000Z' } };
 
 /**
  * 13.542 — the list predicate agrees with `matchesFilter` on every axis it
@@ -71,6 +81,8 @@ describe('13.542 matchesListRow agrees with matchesFilter on every axis it serve
     ['excluded category', { exclude: { stateCategories: ['active'] } }],
     ['excluded project', { exclude: { projectIds: ['p1'] } }],
     ['included and excluded on one axis', { assigneeIds: ['u1'], exclude: { assigneeIds: ['u1'] } }],
+    ['closed:false matches a row that is not closed', { closed: false }],
+    ['closed:true rejects a row that is not closed', { closed: true }],
   ];
 
   for (const [name, spec] of cases) {
@@ -98,6 +110,45 @@ describe('13.542 matchesListRow agrees with matchesFilter on every axis it serve
   });
 });
 
+/**
+ * 13.581 (extension) — the `closed` axis over a row/state pair with `closed`
+ * SET, the half the shared `cases` corpus above cannot cover with one row: it
+ * asserts against `row` (not closed) alone, so `closed: true` matching would
+ * go unnoticed there. Same agreement discipline — both sides decide alike —
+ * over the pair that actually has something to match.
+ */
+describe('13.581 (extension) matchesListRow honours closed the same way matchesFilter does', () => {
+  const closedCases: Array<[string, ListFilterSpec]> = [
+    ['empty spec', {}],
+    ['closed:true', { closed: true }],
+    ['closed:false', { closed: false }],
+  ];
+
+  for (const [name, spec] of closedCases) {
+    it(`a closed row/state pair, ${name}: both sides decide alike`, () => {
+      expect(matchesListRow(closedRow, 'p1', spec)).toBe(matchesFilter(closedEquivalent, spec));
+    });
+  }
+
+  it('closed:true matches only the closed row; closed:false matches only the not-closed one', () => {
+    expect(matchesListRow(closedRow, 'p1', { closed: true })).toBe(true);
+    expect(matchesListRow(row, 'p1', { closed: true })).toBe(false);
+    expect(matchesListRow(closedRow, 'p1', { closed: false })).toBe(false);
+    expect(matchesListRow(row, 'p1', { closed: false })).toBe(true);
+  });
+
+  it('absent closed matches both a closed and a not-closed row', () => {
+    expect(matchesListRow(closedRow, 'p1', {})).toBe(true);
+    expect(matchesListRow(row, 'p1', {})).toBe(true);
+  });
+
+  /** A legacy `TicketState` with no `closed` key at all counts as not closed (`equivalent` carries none). */
+  it('a TicketState fixture with no closed field at all counts as not closed', () => {
+    expect(matchesFilter(equivalent, { closed: false })).toBe(true);
+    expect(matchesFilter(equivalent, { closed: true })).toBe(false);
+  });
+});
+
 describe('13.543 the axis a ListRow cannot answer is unrepresentable in both halves', () => {
   it('rejects collaboratorIds at compile time', () => {
     // @ts-expect-error a ListRow carries no collaborators.
@@ -107,6 +158,18 @@ describe('13.543 the axis a ListRow cannot answer is unrepresentable in both hal
   it('rejects exclude.collaboratorIds at compile time', () => {
     // @ts-expect-error same axis, exclude half.
     const spec: ListFilterSpec = { exclude: { collaboratorIds: ['u9'] } };
+    expect(spec).toBeDefined();
+  });
+
+  /**
+   * 13.581 (extension) — `BoardFilterSpec`'s `Pick` does not name `closed`
+   * (unlike `ListFilterSpec`'s): a `BoardCard` carries no `closed` field for
+   * the same reason it carries no collaborators or claimed dates, so the axis
+   * must be a compile error there rather than a silent no-op.
+   */
+  it('rejects closed on BoardFilterSpec at compile time', () => {
+    // @ts-expect-error a BoardCard carries no closed field.
+    const spec: BoardFilterSpec = { closed: true };
     expect(spec).toBeDefined();
   });
 });

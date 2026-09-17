@@ -7,7 +7,7 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import { statesWithBacklog, type WorkflowDef } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -766,9 +766,16 @@ function BoardCardView({
   );
 }
 
-/** `WorkflowDef.states[].name`, falling back to the raw id — the same fallback `EMPTY_COLUMN_COPY`'s sibling components use rather than a blank. */
+/**
+ * `statesWithBacklog(workflow)[].name`, falling back to the raw id — the same
+ * fallback `EMPTY_COLUMN_COPY`'s sibling components use rather than a blank.
+ * `statesWithBacklog`, not `workflow.states` (backlog/closed spec §1.4,
+ * 2026-09-17): since 13.582 the universal Backlog is a real `transitionOptions`
+ * target, and `refusalCopy` below names alternatives straight off that list,
+ * so a call naming `backlog` must resolve "Backlog" and not the bare id.
+ */
 function stateNameOf(workflow: WorkflowDef, stateId: string): string {
-  return workflow.states.find((state) => state.id === stateId)?.name ?? stateId;
+  return statesWithBacklog(workflow).find((state) => state.id === stateId)?.name ?? stateId;
 }
 
 /**

@@ -357,15 +357,18 @@ describe('Board move arrows — the refusal path names the real alternatives', (
     const outcome = moveOutcome(WF_ERRAND, 'todo', 'waiting', {});
     expect(outcome.kind).toBe('refused');
     if (outcome.kind !== 'refused') throw new Error('expected a refusal');
-    // The one real alternative from `todo` in WF_ERRAND is `doing` — proven
-    // by `moveOutcome`'s own test suite; this test's job is only the copy.
-    expect(outcome.available).toEqual(['doing']);
+    // The two real alternatives from `todo` in WF_ERRAND are `doing` and,
+    // since 2026-09-17 (backlog/closed spec §4), the universal `backlog`
+    // Send-to-backlog edge (`todo` is non-terminal) — proven by
+    // `moveOutcome`'s own test suite; this test's job is only the copy.
+    expect(outcome.available).toEqual(['doing', 'backlog']);
 
     render(<MoveRefusalNotice workflow={WF_ERRAND} available={outcome.available} />);
     const notice = screen.getByRole('alert');
     expect(notice).toHaveTextContent('Doing');
+    expect(notice).toHaveTextContent('Backlog');
     expect(notice).not.toHaveTextContent('doing,'); // no raw, untranslated id leaking through
-    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there — try Doing.");
+    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there — try Doing or Backlog.");
   });
 
   /** 13.503 — the zero-alternatives sentence is still an honest one, not "try ." */

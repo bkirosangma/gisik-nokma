@@ -117,7 +117,11 @@ describe('3.77 · T13.1 reopenStateOptions — structurally reachable, non-termi
       ...WF_ERRAND,
       transitions: [{ from: '*', to: 'doing', rules: [] }, { from: 'doing', to: 'todo', rules: [] }],
     };
-    expect(reopenStateOptions(selfWildcard, 'doing').map((state) => state.id)).toEqual(['todo']);
+    // `'backlog'` joined the list since 2026-09-17 (backlog/closed spec §4):
+    // `'doing'` stays non-terminal on `WF_ERRAND.states`, so the universal
+    // Send-to-backlog edge is a genuine, non-terminal reopen destination —
+    // the self-loop exclusion this case is actually about is unaffected.
+    expect(reopenStateOptions(selfWildcard, 'doing').map((state) => state.id)).toEqual(['todo', 'backlog']);
   });
 
   it('T13.1f keeps a rule-bearing target on the list — the server, not this client, refuses it', () => {

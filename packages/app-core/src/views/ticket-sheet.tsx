@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import { statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Button, Chip, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -290,8 +290,14 @@ export function TicketSheet({
   };
 
   const state = ticketRead.ticket;
+  // `statesWithBacklog`, not `workflow.data?.states` (backlog/closed spec
+  // §1.4, 2026-09-17): a ticket in the universal Backlog state has no row in
+  // the published definition's own `states`, and the sheet must still say
+  // "Backlog" rather than the bare id.
   const currentStateName =
-    workflow.data?.states.find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
+    workflow.data == null
+      ? state.stateId
+      : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
 
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>

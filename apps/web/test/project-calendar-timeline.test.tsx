@@ -98,6 +98,7 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     // This shell is online-only, so nothing is ever in transit for it — the
     // same reason `online/mappers.ts` fills `BoardCard.pending` with `false`.
     pending: false,
+    closed: null,
   };
   return { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } };
 }

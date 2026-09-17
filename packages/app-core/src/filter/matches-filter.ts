@@ -80,6 +80,14 @@ export function matchesFilter(state: TicketState, spec: FilterSpec): boolean {
     if (claimText(state.fields[fieldId]?.value) !== wanted) return false;
   }
   /**
+   * `closed` (backlog/closed spec §4, 2026-09-17): a single boolean, not an
+   * id axis — `true` matches only a closed ticket, `false` only one that is
+   * not, absent narrows nothing. `state.closed ?? null` reads a legacy
+   * fixture with no `closed` key (`TicketState.closed?` predates the flag) as
+   * not closed, same as an explicit `null`.
+   */
+  if (spec.closed !== undefined && ((state.closed ?? null) !== null) !== spec.closed) return false;
+  /**
    * The exclude half (exclude-mode spec §1-2), after every include check: a
    * ticket matching ANY listed value on an axis is out. `excludedBy` answers
    * `false` for an absent or empty list and for a null value, so unassigned

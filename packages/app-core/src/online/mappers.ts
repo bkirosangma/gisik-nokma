@@ -817,6 +817,13 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
     });
     spec.fields = fields;
   }
+  // `closed` (backlog/closed spec §3.2/§4, 2026-09-17): the wire and the
+  // client spell it the same, a plain carry rather than a rename — but a
+  // REQUIRED boolean read as one (`asBoolean`'s own docblock): a `'true'`
+  // string silently becoming `true` is the exact failure that guard exists
+  // to catch, and it applies here the same as everywhere else this module
+  // reads a wire boolean.
+  if (record['closed'] !== undefined) spec.closed = asBoolean(record['closed'], `${path}.closed`);
   return spec;
 }
 
@@ -895,6 +902,10 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   if (fields.length > 0) {
     spec['fields'] = fields.map(([fieldId, value]) => ({ fieldId, op: 'eq', value }));
   }
+  // `closed` — the wire and the client spell it the same (`filterSpecSchema`
+  // already carries the term server-side), so this is a plain carry and not
+  // a narrowing like the plural axes above.
+  if (filter.closed !== undefined) spec['closed'] = filter.closed;
   return spec;
 }
 
@@ -1225,6 +1236,23 @@ function mapDueDate(
   };
 }
 
+/**
+ * `TicketCard.closed` → `ListRow.closed`, unchanged: REQUIRED on both sides
+ * (backlog/closed spec §1.2/§3.3, 2026-09-17), `null` meaning never closed or
+ * reopened. The same shape `mapCause` takes — `null` survives as the truth,
+ * an ABSENT key is a different claim left to `asRecord` to refuse, and the
+ * two members are read rather than cast so a garbled claim (no actor, no
+ * clock) cannot render as one somebody made.
+ */
+function mapClosed(raw: unknown, path: string): { actorId: string; at: string } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    actorId: asString(record['actorId'], `${path}.actorId`),
+    at: asString(record['at'], `${path}.at`),
+  };
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1275,6 +1303,7 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
     // concept of this client's outbox, so a `pending` on the body would be the
     // server asserting something only the client can know.
     pending: false,
+    closed: mapClosed(record['closed'], `${path}.closed`),
   };
 }
 

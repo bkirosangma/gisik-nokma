@@ -15,19 +15,23 @@ const NO_FIELDS: Record<string, FieldClaim> = {};
 
 describe('13.478-13.488 moveOutcome — the transition gate, built over transitionOptions', () => {
   it('13.478 refuses an undeclared target, and names what is available', () => {
+    // `'backlog'` joined the available list since 2026-09-17 (backlog/closed
+    // spec §4): `todo` is non-terminal, so it also carries the universal
+    // Send-to-backlog edge alongside its one declared move.
     expect(moveOutcome(WF_ERRAND, 'todo', 'done', NO_FIELDS)).toEqual({
       kind: 'refused',
-      available: ['doing'],
+      available: ['doing', 'backlog'],
     });
   });
 
   it('13.479 names EVERY available move when refusing from a state with several declared edges', () => {
     // From 'doing' three edges are declared (todo via the wildcard, waiting,
     // done). A refusal that named only one of them, or an empty list, would
-    // still "refuse" — the person would still be stuck guessing.
+    // still "refuse" — the person would still be stuck guessing. `'doing'`
+    // is non-terminal, so 'backlog' is now a fourth, universal alternative.
     expect(moveOutcome(WF_ERRAND, 'doing', 'nowhere', NO_FIELDS)).toEqual({
       kind: 'refused',
-      available: ['todo', 'waiting', 'done'],
+      available: ['todo', 'waiting', 'done', 'backlog'],
     });
   });
 
@@ -86,10 +90,11 @@ describe('13.478-13.488 moveOutcome — the transition gate, built over transiti
   it('13.485 a move back onto the current state refuses — there is no edge to itself', () => {
     // `transitionOptions` already excludes `to === fromStateId`, even for a
     // wildcard edge that would otherwise reach it, so a drop back onto the
-    // origin column is an undeclared move like any other.
+    // origin column is an undeclared move like any other. Same 'backlog'
+    // ripple as 13.478 (`todo` is non-terminal).
     expect(moveOutcome(WF_ERRAND, 'todo', 'todo', NO_FIELDS)).toEqual({
       kind: 'refused',
-      available: ['doing'],
+      available: ['doing', 'backlog'],
     });
   });
 

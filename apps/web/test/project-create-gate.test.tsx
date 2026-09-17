@@ -131,6 +131,7 @@ const LIST: TicketListView = {
       // This shell is online-only, so nothing is ever in transit — the same
       // `false` the board card above carries, for the same reason.
       pending: false,
+      closed: null,
     },
   ],
 };

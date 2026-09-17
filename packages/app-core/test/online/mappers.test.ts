@@ -634,6 +634,14 @@ describe('3.38 preferences — ruling P24 both ways', () => {
     ]);
   });
 
+  /** 13.580 — `toClientFilterSpec` reads `closed` as a REQUIRED-boolean wire term, not a passthrough (`asBoolean`'s own docblock: a `'true'` string must not silently become `true`). */
+  it('13.580 toClientFilterSpec round-trips closed, and refuses a non-boolean', () => {
+    expect(toClientFilterSpec({ closed: true }, 'f')).toEqual({ closed: true });
+    expect(toClientFilterSpec({ closed: false }, 'f')).toEqual({ closed: false });
+    expect(toClientFilterSpec({}, 'f')).toEqual({});
+    expect(() => toClientFilterSpec({ closed: 'true' }, 'f')).toThrow(MappingError);
+  });
+
   it('3.38 refuses a contains clause and a duplicated field id, which Record cannot hold', () => {
     expect(() =>
       toClientFilterSpec({ fields: [{ fieldId: 'amount', op: 'contains', value: '42' }] }, 'f'),
@@ -788,6 +796,20 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
   it('13.544 does NOT throw on an empty exclude object or on empty exclude lists — they exclude nothing', () => {
     expect(toServerFilterSpec({ text: 'gst', exclude: {} })).toEqual({ text: 'gst' });
     expect(toServerFilterSpec({ text: 'gst', exclude: { typeIds: [] } })).toEqual({ text: 'gst' });
+  });
+
+  /**
+   * 13.580 — `closed` (backlog/closed spec §3.2/§4, 2026-09-17): the wire and
+   * the client spell it the same, so this is a plain carry, not a rename —
+   * the same shape `text` gets above, and unlike the plural axes there is no
+   * singular/plural disagreement to refuse over.
+   */
+  it('13.580 carries closed through unchanged, true and false alike', () => {
+    expect(toServerFilterSpec({ closed: true })).toEqual({ closed: true });
+    expect(toServerFilterSpec({ closed: false })).toEqual({ closed: false });
+    // Absent contributes no key — the same "caller named nothing" rule every
+    // other optional axis follows here.
+    expect(toServerFilterSpec({})).toEqual({});
   });
 });
 
@@ -1302,6 +1324,42 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // null — both documented absence values, neither an invented name.
     expect(row?.assignee).toEqual({ id: ANSELMA, name: ANSELMA });
     expect(row?.assignedProvenance?.actorName).toBeNull();
+  });
+
+  /**
+   * 13.580 — `ListRow.closed` (backlog/closed spec §1.2/§3.3, 2026-09-17):
+   * REQUIRED on the wire (`TicketCard.closed`, read-models.ts) and read onto
+   * the row unchanged, both when the wire names an actor and clock and when
+   * it is `null` — the same "present and null" pair `serverCard()`'s own
+   * default already exercises for every other `3.4x` case in this file.
+   */
+  it('13.580 mapListPage carries the wire card\'s closed flag onto the row, present and null', () => {
+    const bodyClosed: ListResponse = {
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [
+        {
+          key: 'all',
+          label: 'All',
+          cards: [
+            serverListCard({
+              ticketId: 't-closed',
+              closed: { actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' },
+            }),
+          ],
+        },
+      ],
+      nextCursor: null,
+    };
+    expect(mapListPage(bodyClosed).rows[0]?.closed).toEqual({ actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' });
+
+    const bodyOpen: ListResponse = {
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-open', closed: null })] }],
+      nextCursor: null,
+    };
+    expect(mapListPage(bodyOpen).rows[0]?.closed).toBeNull();
   });
 
   it('flattens groups in order and loses no card', () => {

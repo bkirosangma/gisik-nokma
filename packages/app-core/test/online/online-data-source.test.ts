@@ -127,6 +127,7 @@ function listCard(ticketId: string) {
     stateName: 'Doing',
     assignedProvenance: null,
     hasRestrictedParent: false,
+    closed: null,
   };
 }
 

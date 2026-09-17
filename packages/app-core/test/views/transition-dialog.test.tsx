@@ -10,13 +10,23 @@ import {
 import { WF_ERRAND } from '../helpers/seed.js';
 
 describe('3.71 transitionOptions — only transitions the definition declares', () => {
+  /**
+   * Since 2026-09-17 (backlog/closed spec §4) every non-terminal state also
+   * offers the universal Send-to-backlog edge, LAST — see 13.582 below for
+   * the dedicated coverage. This test's own targets grew a trailing
+   * `'backlog'` for that reason: `doing` and `todo` are both non-terminal.
+   */
   it('offers declared targets from the current state (from-state or *), excluding self', () => {
     expect(transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId)).toEqual([
       'todo',
       'waiting',
       'done',
+      'backlog',
     ]);
-    expect(transitionOptions(WF_ERRAND, 'todo').map((option) => option.toStateId)).toEqual(['doing']);
+    expect(transitionOptions(WF_ERRAND, 'todo').map((option) => option.toStateId)).toEqual([
+      'doing',
+      'backlog',
+    ]);
   });
 
   it("carries each transition's declared rules", () => {
@@ -27,8 +37,13 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
   it('PLANTED DEFECT: the wildcard edge is offered from everywhere EXCEPT the state it points at', () => {
     // `* → todo` is reachable from doing, waiting and done. Offering it from
     // `todo` itself would put a move on screen that changes nothing and that
-    // the engine has no edge for.
-    expect(transitionOptions(WF_ERRAND, 'waiting').map((o) => o.toStateId)).toEqual(['todo', 'doing']);
+    // the engine has no edge for. `waiting` is non-terminal (gains Backlog);
+    // `done` is terminal (does not — a finished ticket cannot be parked).
+    expect(transitionOptions(WF_ERRAND, 'waiting').map((o) => o.toStateId)).toEqual([
+      'todo',
+      'doing',
+      'backlog',
+    ]);
     expect(transitionOptions(WF_ERRAND, 'done').map((o) => o.toStateId)).toEqual(['todo', 'doing']);
     expect(transitionOptions(WF_ERRAND, 'todo').map((o) => o.toStateId)).not.toContain('todo');
   });
@@ -42,11 +57,13 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
       'todo',
       'waiting',
       'done',
+      'backlog',
     ]);
     expect(transitionOptions(dangling, 'doing').map((o) => o.name)).toEqual([
       'To do',
       'Waiting on counterparty',
       'Done',
+      'Backlog',
     ]);
   });
 
@@ -62,6 +79,10 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
     // declares the wildcard first. This case is kept because "never merged" is
     // a real property and still true; it is simply a weaker one than its old
     // name claimed.
+    //
+    // `twice` REPLACES `WF_ERRAND.transitions` wholesale — 'doing' stays
+    // non-terminal on `WF_ERRAND.states`, so the universal Send-to-backlog
+    // edge still applies and 'done' is not the only target (since 2026-09-17).
     const twice: WorkflowDef = {
       ...WF_ERRAND,
       transitions: [
@@ -70,8 +91,9 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
       ],
     };
     const options = transitionOptions(twice, 'doing');
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual([{ kind: 'require-comment' }]);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual([{ kind: 'require-comment' }]);
+    expect(options.find((o) => o.toStateId === 'backlog')?.rules).toEqual([]);
   });
 });
 
@@ -104,6 +126,13 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
     transitions,
   });
 
+  // Every `defWith(...)` here declares transitions to 'done' ONLY, from
+  // 'doing' — but 'doing' stays non-terminal on `WF_ERRAND.states`, so each
+  // also carries the universal Send-to-backlog edge (since 2026-09-17) beside
+  // the one edge to 'done' these cases are actually about. Asserted by
+  // finding 'done' explicitly rather than by `options[0]`, so the extra
+  // option cannot silently shift what index is being read.
+
   it('3.149 wildcard declared FIRST: the EXACT edge still supplies the rules', () => {
     const options = transitionOptions(
       defWith([
@@ -112,8 +141,8 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       ]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual(REQUIRE_EVIDENCE);
   });
 
   it('3.150 exact declared FIRST: the same answer — the control that makes 3.149 a divergence test', () => {
@@ -127,8 +156,8 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       ]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    expect(options.find((o) => o.toStateId === 'done')?.rules).toEqual(REQUIRE_EVIDENCE);
   });
 
   it('3.151 a target reachable ONLY by a wildcard still resolves to the wildcard edge', () => {
@@ -138,9 +167,59 @@ describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolv
       defWith([{ from: '*', to: 'done', rules: REQUIRE_EVIDENCE }]),
       'doing',
     );
-    expect(options).toHaveLength(1);
-    expect(options[0]?.toStateId).toBe('done');
-    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+    expect(options).toHaveLength(2);
+    const done = options.find((o) => o.toStateId === 'done');
+    expect(done?.rules).toEqual(REQUIRE_EVIDENCE);
+  });
+});
+
+/**
+ * 13.582 — the universal Backlog edges are offered like declared ones (spec
+ * §4, 2026-09-17): Start is the ONLY option from backlog — a controller
+ * ruling extending Task 6's brief, because a declared wildcard edge means
+ * "from any AUTHORED state" and backlog is universal rather than authored —
+ * and Send-to-backlog is appended after every non-terminal state's declared
+ * targets, never offered from a terminal one.
+ */
+describe('13.582 transitionOptions offers the universal Backlog edges like declared ones', () => {
+  it('from backlog: exactly the Start edge, with no rules', () => {
+    expect(transitionOptions(WF_ERRAND, 'backlog')).toEqual([
+      { toStateId: 'todo', name: 'To do', rules: [] },
+    ]);
+  });
+
+  /**
+   * The site-identifying case: a declared `* → done` would, without the
+   * backlog-only special case, resolve FROM backlog too (backlog matches a
+   * wildcard `from` exactly like any other state). It must not: Start is
+   * backlog's only exit.
+   */
+  it('a declared wildcard-to-done edge never resolves FROM backlog, even though backlog would otherwise match "*"', () => {
+    const withWildcardDone: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: [...WF_ERRAND.transitions, { from: '*', to: 'done', rules: [] }],
+    };
+    expect(transitionOptions(withWildcardDone, 'backlog')).toEqual([
+      { toStateId: 'todo', name: 'To do', rules: [] },
+    ]);
+  });
+
+  it('from a non-terminal state: Backlog is appended last, with no rules', () => {
+    expect(transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId)).toEqual([
+      'todo',
+      'waiting',
+      'done',
+      'backlog',
+    ]);
+    expect(transitionOptions(WF_ERRAND, 'doing').find((option) => option.toStateId === 'backlog')).toEqual({
+      toStateId: 'backlog',
+      name: 'Backlog',
+      rules: [],
+    });
+  });
+
+  it('from a terminal state: no Backlog option — a finished ticket cannot be parked', () => {
+    expect(transitionOptions(WF_ERRAND, 'done').map((option) => option.toStateId)).not.toContain('backlog');
   });
 });
 
@@ -465,12 +544,19 @@ describe('TransitionDialog — offerStateIds and initialToStateId', () => {
     expect(onSubmit).toHaveBeenCalledWith({ toStateId: 'done', comment: 'shipped', fieldValues: {} });
   });
 
-  /** 13.528b — the control: neither prop passed keeps today's behaviour, the full list and the placeholder. */
-  it('without either prop, the full list and the placeholder are unchanged', async () => {
+  /**
+   * 13.528b — the control: neither prop passed keeps today's narrowing
+   * behaviour unchanged (the full declared list, not `offerStateIds`'s
+   * subset) and the placeholder. The COUNT itself is not "unchanged": it grew
+   * from 3 to 4 when 13.582 added the universal Backlog option to every
+   * non-terminal state's list, `doing` (this dialog's default `fromStateId`)
+   * included.
+   */
+  it('without either prop, the placeholder is unchanged and the full (now Backlog-inclusive) list is offered', async () => {
     const user = userEvent.setup();
     renderDialog();
     expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
     await user.click(screen.getByRole('button', { name: /Move to/ }));
-    expect(within(await screen.findByRole('listbox')).getAllByRole('option')).toHaveLength(3);
+    expect(within(await screen.findByRole('listbox')).getAllByRole('option')).toHaveLength(4);
   });
 });

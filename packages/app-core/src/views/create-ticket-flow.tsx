@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { newUlid, statesWithBacklog, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -163,8 +163,12 @@ export function CreateTicketFlow({
       });
       return;
     }
+    // `statesWithBacklog`, not `def.states` (backlog/closed spec §1.4,
+    // 2026-09-17): a parent parked in the universal Backlog state has no row
+    // in its own published definition, and the reopen prompt must still name
+    // it "Backlog" rather than the bare id.
     const parentStateName =
-      def.states.find((state) => state.id === parentRead.ticket.stateId)?.name ??
+      statesWithBacklog(def).find((state) => state.id === parentRead.ticket.stateId)?.name ??
       parentRead.ticket.stateId;
     setReopenPrompt({
       childEvent,

@@ -17,7 +17,7 @@ import { claimText, excludedBy, narrowsTo } from './id-axes.js';
  * exactly the five id axes a board card does, and a second `Pick` naming the
  * same five would be one more list to keep in step.
  */
-export type ListFilterSpec = Pick<FilterSpec, 'text' | 'dueBefore' | 'dueAfter' | 'fields'> &
+export type ListFilterSpec = Pick<FilterSpec, 'text' | 'dueBefore' | 'dueAfter' | 'fields' | 'closed'> &
   BoardIdAxes & { exclude?: BoardIdAxes };
 
 /**
@@ -44,6 +44,9 @@ export function matchesListRow(row: ListRow, projectId: string, spec: ListFilter
   for (const [fieldId, wanted] of Object.entries(spec.fields ?? {})) {
     if (claimText(row.fields[fieldId]?.value) !== wanted) return false;
   }
+  // `closed` — `matchesFilter`'s own rule, over `row.closed` directly: `ListRow`
+  // makes it REQUIRED, so there is no legacy-fixture case to fold with `?? null`.
+  if (spec.closed !== undefined && (row.closed !== null) !== spec.closed) return false;
   const exclude = spec.exclude ?? {};
   if (excludedBy(exclude.assigneeIds, assigneeId)) return false;
   if (excludedBy(exclude.typeIds, row.typeId)) return false;

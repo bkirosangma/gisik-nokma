@@ -42,6 +42,14 @@ function transitionTo(to: string, extras: Record<string, unknown> = {}) {
   });
 }
 
+function closeTicket() {
+  return make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.closed', payload: {} });
+}
+
+function reopenTicket() {
+  return make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.reopened', payload: {} });
+}
+
 function reparentUnder(newParentId: string | null) {
   return make({
     workspaceId: WS,
@@ -250,6 +258,110 @@ describe('precheckEvent — instant named-reason previews from the same engine t
     const cache = readyCache({ assigneeId: OTHER_ACTOR }, def);
     const result = await precheckEvent(transitionTo('done'), cache);
     expect(ruleOf(result)).toBe(REFUSAL_RULES.restrictTo);
+  });
+});
+
+/**
+ * 13.583 — `ticket.closed`/`ticket.reopened` mirrored from
+ * `checks/close.ts` (backlog/closed spec §2, 2026-09-17), hand-rolled rather
+ * than routed through the shared engine — the same shape `precheckParentTerminal`
+ * takes, for a DIFFERENT reason: `evaluate.ts` is a flat switch with exactly
+ * one check per event type, and neither `checkTicketClosed` nor
+ * `checkTicketReopened` reads a ticket-type definition, so gate 4 (the reason
+ * `ticket.created`/`.reparented` can never answer `passed`) does not apply
+ * here — a genuine `passed` is reachable once every fact it rests on is one
+ * this cache already holds.
+ */
+describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticket.reopened', () => {
+  it('a ticket.closed for a doing (non-terminal) ticket previews close-requires-terminal, naming the state', async () => {
+    const result = await precheckEvent(closeTicket(), readyCache());
+    expect(result).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.closeRequiresTerminal,
+      reason: 'A ticket can only be closed from a terminal state; "Doing" is not one.',
+    });
+  });
+
+  /**
+   * The fix the brief names explicitly: the state name is resolved over
+   * `statesWithBacklog(def)`, which appends the synthetic Backlog state —
+   * `def.states` alone does not declare it, and would fall back to the bare
+   * id `backlog` instead of the name a person reads.
+   */
+  it('a ticket.closed for a ticket sitting in backlog names "Backlog", not the bare id', async () => {
+    const result = await precheckEvent(closeTicket(), readyCache({ stateId: 'backlog', stateCategory: 'open' }));
+    expect(result).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.closeRequiresTerminal,
+      reason: 'A ticket can only be closed from a terminal state; "Backlog" is not one.',
+    });
+  });
+
+  it('a ticket.closed for a terminal, not-yet-closed ticket passes', async () => {
+    const result = await precheckEvent(
+      closeTicket(),
+      readyCache({ stateId: 'done', stateCategory: 'terminal' }),
+    );
+    expect(result).toEqual({ kind: 'passed' });
+  });
+
+  it('a ticket.closed for an already-closed ticket previews already-closed', async () => {
+    const cache = readyCache({
+      stateId: 'done',
+      stateCategory: 'terminal',
+      closed: { actorId: OTHER_ACTOR, at: '2026-08-20T00:00:00.000Z' },
+    });
+    expect(await precheckEvent(closeTicket(), cache)).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.alreadyClosed,
+      reason: 'This ticket is already closed.',
+    });
+  });
+
+  /**
+   * A transition on a closed ticket previews `closed-ticket` — decided BEFORE
+   * the def/version-chain gates the ordinary transition branch runs, exactly
+   * where the real engine decides it (`transition.ts:72`, ahead of
+   * `getWorkflowDef` at `:76`): no workflow definition is cached here at all,
+   * and the refusal still fires, because it reads only the flag this client
+   * already holds.
+   */
+  it('a transition on a closed ticket previews closed-ticket, decided before the def/version gates', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(
+      ticketStateSeed({
+        id: TICKET,
+        stateId: 'done',
+        stateCategory: 'terminal',
+        closed: { actorId: ACTOR, at: '2026-08-20T00:00:00.000Z' },
+      }),
+    );
+    expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.closedTicket,
+      reason: 'This ticket is closed — reopen it first.',
+    });
+  });
+
+  it('a ticket.reopened on a ticket that is not closed previews not-closed', async () => {
+    const result = await precheckEvent(
+      reopenTicket(),
+      readyCache({ stateId: 'done', stateCategory: 'terminal' }),
+    );
+    expect(result).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.notClosed,
+      reason: 'This ticket is not closed.',
+    });
+  });
+
+  it('a ticket.reopened on a closed ticket passes', async () => {
+    const cache = readyCache({
+      stateId: 'done',
+      stateCategory: 'terminal',
+      closed: { actorId: ACTOR, at: '2026-08-20T00:00:00.000Z' },
+    });
+    expect(await precheckEvent(reopenTicket(), cache)).toEqual({ kind: 'passed' });
   });
 });
 

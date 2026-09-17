@@ -168,3 +168,39 @@ describe('13.539 matchesFilter honours the exclude half on every id axis', () =>
     ).toBe(false);
   });
 });
+
+/**
+ * 13.581 — the `closed` axis (backlog/closed spec §4, 2026-09-17): `true`
+ * closed only, `false` not closed, absent all — a single boolean, not an id
+ * axis, so it has no include/exclude halves (`view-types.ts`'s own docblock
+ * for `FilterSpec.closed`).
+ */
+describe('13.581 matchesFilter honours the closed axis', () => {
+  const closedTicket = ticket({ closed: { actorId: 'user_kiro', at: '2026-09-17T00:00:00.000Z' } });
+
+  it('closed:true matches only a closed ticket', () => {
+    expect(matchesFilter(closedTicket, { closed: true })).toBe(true);
+    expect(matchesFilter(ticket(), { closed: true })).toBe(false);
+  });
+
+  it('closed:false matches only a ticket that is not closed', () => {
+    expect(matchesFilter(ticket(), { closed: false })).toBe(true);
+    expect(matchesFilter(closedTicket, { closed: false })).toBe(false);
+  });
+
+  it('absent closed matches both', () => {
+    expect(matchesFilter(ticket(), {})).toBe(true);
+    expect(matchesFilter(closedTicket, {})).toBe(true);
+  });
+
+  /** `TicketState.closed?` is optional and predates the flag on 441 fixtures — `ticket()` carries no key at all. */
+  it('a legacy TicketState fixture with no closed field counts as not closed', () => {
+    expect(matchesFilter(ticket(), { closed: false })).toBe(true);
+    expect(matchesFilter(ticket(), { closed: true })).toBe(false);
+  });
+
+  it('composes with another axis — closed:true AND a matching type', () => {
+    expect(matchesFilter(closedTicket, { closed: true, typeIds: ['task'] })).toBe(true);
+    expect(matchesFilter(closedTicket, { closed: true, typeIds: ['epic'] })).toBe(false);
+  });
+});

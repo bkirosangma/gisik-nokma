@@ -161,6 +161,13 @@ export type FilterSpec = IdAxes & {
   dueAfter?: string;
   fields?: Record<string, string>;
   /**
+   * `true` closed only, `false` not closed, absent all (backlog/closed spec
+   * §4, 2026-09-17) — NOT an id axis: a single boolean has no include/exclude
+   * halves, unlike everything in `IdAxes`, so it carries no matching key under
+   * `exclude` below.
+   */
+  closed?: boolean;
+  /**
    * The exclude half (exclude-mode spec §1): a ticket matching ANY listed
    * value on an axis is dropped. Evaluated after the include half — a ticket
    * must match one of the includes (when any are set) AND none of the
@@ -211,6 +218,16 @@ export type ListRow = {
    * transit for it.
    */
   pending: boolean;
+  /**
+   * REQUIRED here — the row is assembled by one mapper — while the domain
+   * `TicketState.closed?` keeps it optional, because 441 fixtures predate the
+   * flag and have no legacy literal to spare (backlog/closed spec §1.2,
+   * 2026-09-17). Every producer of a row is this task's own code (the online
+   * mapper, the replica), so there is no such debt here; a reader spells
+   * `state.closed ?? null` at the boundary rather than inheriting the
+   * optionality onto this type. `null` means never closed, or reopened.
+   */
+  closed: { actorId: string; at: string } | null;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };

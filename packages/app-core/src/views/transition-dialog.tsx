@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FieldClaim, WorkflowDef } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE_ID,
+  statesWithBacklog,
+  transitionsWithBacklog,
+  type FieldClaim,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 import type { PrecheckResult } from '../precheck.js';
 import { fieldAlreadyClaimed } from './field-claims.js';
@@ -38,11 +44,34 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * A target the definition names but has no state for is dropped rather than
  * rendered as a bare id: a select option a user cannot read is not an option.
+ *
+ * ## The universal Backlog edges, since 2026-09-17 (backlog/closed spec §4)
+ *
+ * Start (`backlog → def.initialStateId`) and Send to backlog (every declared
+ * non-terminal state → backlog) are offered like declared ones — read off the
+ * SAME `statesWithBacklog`/`transitionsWithBacklog` helpers the engine itself
+ * resolves edges over (`packages/rule-engine/src/transition.ts:106-121`), so
+ * this function still predicts the engine rather than keeping a second,
+ * driftable copy of the universal set.
+ *
+ * Backlog is a special case within that, not an ordinary member of it
+ * (controller ruling, Task 6): a declared `from: '*'` edge means "from any
+ * AUTHORED state" — the author who wrote it never knew about the universal
+ * Backlog — so a wildcard edge never resolves FROM backlog; its only exit is
+ * Start. Without this, a template declaring `* → done` would let a backlog
+ * ticket jump straight to Done, skipping Start entirely — the exact hazard
+ * `transition.ts`'s own docblock names for the engine, mirrored here.
  */
 export function transitionOptions(def: WorkflowDef, fromStateId: string): TransitionOption[] {
+  if (fromStateId === BACKLOG_STATE_ID) {
+    const start = statesWithBacklog(def).find((state) => state.id === def.initialStateId);
+    return start === undefined ? [] : [{ toStateId: start.id, name: start.name, rules: [] }];
+  }
+
+  const allTransitions = transitionsWithBacklog(def);
   // Which targets are reachable at all, in declaration order of first mention.
   const targets: string[] = [];
-  for (const transition of def.transitions) {
+  for (const transition of allTransitions) {
     if (transition.from !== fromStateId && transition.from !== '*') continue;
     if (transition.to === fromStateId) continue;
     if (!targets.includes(transition.to)) targets.push(transition.to);
@@ -51,9 +80,9 @@ export function transitionOptions(def: WorkflowDef, fromStateId: string): Transi
     .map((toStateId) => {
       // The engine's resolution, in the engine's order.
       const edge =
-        def.transitions.find((t) => t.from === fromStateId && t.to === toStateId) ??
-        def.transitions.find((t) => t.from === '*' && t.to === toStateId);
-      const state = def.states.find((candidate) => candidate.id === toStateId);
+        allTransitions.find((t) => t.from === fromStateId && t.to === toStateId) ??
+        allTransitions.find((t) => t.from === '*' && t.to === toStateId);
+      const state = statesWithBacklog(def).find((candidate) => candidate.id === toStateId);
       if (edge === undefined || state === undefined) return null;
       return { toStateId, name: state.name, rules: edge.rules };
     })

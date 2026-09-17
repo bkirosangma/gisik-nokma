@@ -6303,3 +6303,65 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   own docblock is corrected from "the other four slots" to "the other five", naming `closed` beside
   `blocked` as the boolean that needs no NUL guard (backlog/closed spec §3.2, 2026-09-17) —
   (`packages/domain/test/filter-spec.test.ts`)
+- **13.580** ✅ The client vocabulary carries `closed`: `mapListPage` reads the wire card's `closed` onto
+  `ListRow.closed` unchanged, present and null; `toServerFilterSpec`/`toClientFilterSpec` carry the term
+  through unchanged (no plural/singular disagreement to refuse over, unlike the id axes); `toClientFilterSpec`
+  reads it as a REQUIRED boolean (`asBoolean`), refusing a `'true'` string rather than silently coercing it
+  (backlog/closed spec §1.2/§3.2/§4, 2026-09-17) — (`packages/app-core/test/online/mappers.test.ts`)
+- **13.581** ✅ `matchesFilter`/`matchesListRow` honour `closed` (backlog/closed spec §4, 2026-09-17): `true`
+  closed only, `false` not closed, absent all — a single boolean, not an id axis, so it has no
+  include/exclude halves; a legacy `TicketState` fixture with no `closed` key at all (`TicketState.closed?`
+  predates the flag on 441 fixtures) counts as not closed, same as an explicit `null`. `ListFilterSpec`'s
+  `Pick` names `closed`; `BoardFilterSpec`'s does not — a `BoardCard` carries no `closed` field, so the axis
+  is a compile error there rather than a silent no-op —
+  (`packages/app-core/test/filter/matches-filter.test.ts`, `packages/app-core/test/filter/list-filter.test.ts`)
+- **13.582** ✅ `transitionOptions` offers the universal Backlog edges like declared ones (backlog/closed
+  spec §4, 2026-09-17), read off `statesWithBacklog`/`transitionsWithBacklog` — the SAME helpers the engine
+  itself resolves edges over — rather than a second, driftable copy of the universal set: Start is the ONLY
+  option from backlog (controller ruling, Task 6, extending the brief: a declared wildcard edge means "from
+  any AUTHORED state" and backlog is universal rather than authored, so a wildcard edge never resolves FROM
+  it), and Send to backlog is appended LAST from every declared non-terminal state, never offered from a
+  terminal one. The site-identifying assertion adds `{ from: '*', to: 'done' }` to `WF_ERRAND` and proves
+  `transitionOptions(def, 'backlog')` is still exactly `[{ toStateId: 'todo', name: 'To do', rules: [] }]` —
+  the wildcard edge never resolves from backlog even though backlog would otherwise match `'*'` like any
+  other state. Mutation (dropping the `fromStateId === BACKLOG_STATE_ID` branch) kills exactly that one
+  assertion and no other: under plain `WF_ERRAND` the Start edge and the (harmless) wildcard-to-`todo`
+  resolution agree, so only a def whose wildcard reaches a DIFFERENT target than Start can tell the two
+  implementations apart. Ripples into every other caller of `transitionOptions` over a non-terminal
+  `fromStateId` — `moveOutcome`'s `available` lists, `MoveRefusalNotice`/`refusalCopy`'s rendered
+  alternatives, and `reopenStateOptions` (`flows/guarded-child-event.ts`) all now include `backlog` as a
+  genuine non-terminal destination, and the existing tests naming those lists were updated in place rather
+  than left to rot green over a wrong assertion —
+  (`packages/app-core/test/views/transition-dialog.test.tsx`, `packages/app-core/test/views/board-moves.test.ts`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`, `packages/app-core/test/flows/guarded-child-event.test.ts`)
+- **13.583** ✅ `precheckEvent` mirrors `checks/close.ts` for `ticket.closed`/`ticket.reopened`
+  (backlog/closed spec §2, 2026-09-17), hand-rolled rather than routed through the shared engine like
+  `precheckParentTerminal` — but UNLIKE that function, these two can answer `passed`: `evaluate.ts` is a
+  flat switch with exactly one check per event type, and neither `checkTicketClosed` nor
+  `checkTicketReopened` reads a ticket-type definition, so gate 4 does not apply. A `ticket.closed` for a
+  `doing` ticket previews `close-requires-terminal` naming "Doing"; the SAME refusal for a ticket sitting in
+  `backlog` names "Backlog" rather than the bare id — proving the state name is resolved over
+  `statesWithBacklog`, which `def.states` alone does not declare — and an already-closed ticket previews
+  `already-closed`. A transition on a closed ticket previews `closed-ticket`, decided with NO workflow
+  definition cached at all, mirroring the engine's own order (`transition.ts:72`, ahead of `getWorkflowDef`
+  at `:76`): the refusal reads only the flag this client already holds. A `ticket.reopened` on a ticket that
+  is not closed previews `not-closed`; on a closed ticket it passes. The transition branch's own
+  `acceptRestsOnUnseenChildren` (`~:351`) and `needsMembership` (`~:377-378`) now resolve states/edges over
+  `statesWithBacklog`/`transitionsWithBacklog`, with the same backlog-only Start rule `transitionOptions`
+  takes — a destination or a ticket sitting in backlog is not the raw-`def` miss it used to be —
+  (`packages/app-core/test/precheck.test.ts`)
+- **13.584** ✅ `ticket.closed`/`ticket.reopened` fold through the SAME shared reducer (`applyTicketEvent`)
+  every other ticket event does, and `start: 'backlog'` folds to the universal state — both landed on
+  `TICKET_EVENT_TYPES`/`FOLDING_TICKET_TYPES` before this task (Task 1) and are confirmed here rather than
+  re-derived: a ticket created with `start: 'backlog'` is served at `stateId: 'backlog'` by the replica's
+  `getTicket` AND by `getTickets` (whose row also carries `closed: null`, and whose `stateName` now reads
+  "Backlog" via `stateNameFrom`'s own `statesWithBacklog` fix); after `ticket.closed` both doors report
+  `closed: { actorId, at }`. `getBoard` gains the SAME two bound conjuncts the server's `readBoard` applies
+  (case 13.574) — `stateId !== BACKLOG_STATE_ID`, `(closed ?? null) === null` — proven against both a
+  closed ticket and a confirmed backlog-born one, straggler path included (without the fix a backlog ticket
+  has no row in any published definition's `states` and falls into the straggler path as a stray column
+  literally named `backlog`). `getTickets` deliberately does NOT gain the same exclusion: 13.575 already
+  settled that the LIST carries a backlog and a closed ticket alongside every other row, narrowable by the
+  `closed` filter term rather than dropped outright, so the replica's `getTickets` matches the server's LIST
+  behaviour while its `getBoard` now matches the server's BOARD behaviour (backlog/closed spec §1.3/§3.2,
+  2026-09-17) — (`packages/app-core/test/replica/replica-data-source.test.ts`)

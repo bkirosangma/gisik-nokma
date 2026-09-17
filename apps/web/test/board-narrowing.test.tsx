@@ -169,6 +169,7 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
     rollup: null,
     hasRestrictedParent: false,
     pending: false,
+    closed: null,
   };
   return { ...base, ...overrides };
 }
