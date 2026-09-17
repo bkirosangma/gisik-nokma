@@ -134,17 +134,17 @@ reader that must be complete.
 
 ### 1.3 Creation
 
-`ticketCreatedPayload` — the schema the ingest DOOR validates new events with
-— gains `start: z.enum(['backlog', 'focus'])`, **required**: a client must
-say where the ticket starts, and "backlog by default" is the CLIENT's default
-(§5.4), refused at the door if omitted rather than silently defaulted. The
-reducer reads a lenient sibling, `ticketCreatedPayloadStored` (the same
-schema with `start` optional), and falls back to `'focus'` when the field is
-absent — because an event written before this change WAS born in focus, and
-a replay must reproduce what happened, not what the rule is now. So: new
-tickets land in `BACKLOG_STATE` (`stateId: 'backlog'`, `stateCategory: 'open'`)
-unless `start === 'focus'`; every ticket that already exists keeps the state
-it has, on the live projection AND on a rebuild. No state migration (§3.4).
+`ticketCreatedPayload` gains `start: z.enum(['backlog', 'focus']).optional()`,
+and its ABSENCE means what the v1 payload always meant: born in focus at
+`wf.initialStateId`. That is the additive-field rule for an event vocabulary
+— an old ledger replays to the same head state, and no fixture that predates
+the field changes meaning (measured: ~150 `ticket.created` builders across
+~30 test files, one production builder). "Backlog by default" is therefore
+the CLIENT's rule, and the product's one creation path (`create-ticket-flow.tsx`,
+§5.4) always sends `start` explicitly — `'backlog'` unless the in-focus
+exception applies — pinned by a test that fails if the field is ever
+omitted. The reducer: `start === 'backlog'` → `BACKLOG_STATE`; otherwise
+`wf.initialStateId` as today. No state migration (§3.4).
 
 ### 1.4 The fold on republish
 
@@ -216,7 +216,7 @@ ticket read shapes. `BoardCard` needs nothing — the board never sees these.
 
 No state migration and no retroactive reading of "backlog by default": a
 ticket in `todo` stays in `todo`, and a projection rebuild agrees, because
-the reducer reads a legacy `ticket.created` (no `start`) as `focus` (§1.3).
+the reducer reads a `ticket.created` without `start` as focus (§1.3).
 The only schema change is the two nullable `closed_*` columns, both `NULL`
 for every existing row. The owner's own workspace is the only data that
 exists today, and nothing in it moves.
