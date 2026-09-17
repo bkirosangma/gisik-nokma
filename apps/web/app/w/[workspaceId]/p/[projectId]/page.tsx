@@ -1934,7 +1934,20 @@ const STATE_CATEGORY_LABELS: Record<StateCategory, string> = {
  * sheet's one board-blind axis, which discloses through the scope note
  * rather than a chip — see `FiltersSheet`'s own docblock) — plus `exclude`
  * (exclude-mode spec §4, 2026-09-17): the whole exclude half, so "Clear all"
- * clears what the tri-state controls set in EITHER direction.
+ * clears what the tri-state controls set in EITHER direction. `closed`
+ * (Task 11) joined the same list for the same reason as every other member:
+ * the set's own criterion is "every axis the narrowing strip's chips can
+ * represent" (Ruling 12), and `board-filter-chip-closed`'s own "Remove
+ * filter — Closed: …" button is exactly that since `buildFilterChips` grew
+ * a `closed` branch — without it, "Clear all" would leave an explicit
+ * `filter.closed` in place, the control would still read
+ * `Closed, included`/`Closed, excluded`, and the chip would survive: Ruling
+ * 12's own defect, on the one axis added since Ruling 13 had to re-fix it.
+ * `clearFilterAxes` writes `closed: undefined` here, not the cycler's own
+ * delete-the-key idiom (`withCycledClosed`'s "off" branch) — no special case
+ * needed, since `closedMode` maps `undefined` to `'off'` either way and every
+ * other axis in this array is already reset the same "set to undefined"
+ * way, never deleted.
  */
 export const FILTERS_SHEET_CLEARABLE_AXES = [
   'text',
@@ -1944,6 +1957,7 @@ export const FILTERS_SHEET_CLEARABLE_AXES = [
   'stateCategories',
   'projectIds',
   'collaboratorIds',
+  'closed',
   'exclude',
 ] as const satisfies readonly (keyof FilterSpec)[];
 

@@ -520,9 +520,14 @@ describe('13.458 absence: a failed board read refuses, never claiming it is mere
  * way to prove the exact axis this ruling was about, independent of what
  * any control can currently produce.
  */
-describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus collaboratorIds', () => {
-  it('lists the axes as the six BoardFilterSpec fields plus collaboratorIds, nothing else', () => {
+describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus collaboratorIds and closed', () => {
+  it('lists the axes as the six BoardFilterSpec fields plus collaboratorIds and closed, nothing else', () => {
     // Order-independent: the SET is what Ruling 13 is about, not the sequence.
+    // `closed` joined this set in Task 11 (advisor review) — the array's own
+    // criterion is "every axis the strip's chips can represent", and
+    // `board-filter-chip-closed` is exactly that since `buildFilterChips`
+    // grew a `closed` branch; this test and the array share one source, so a
+    // future regression here is exactly what Ruling 13 found the hard way.
     expect(new Set(FILTERS_SHEET_CLEARABLE_AXES)).toEqual(
       new Set([
         'text',
@@ -532,6 +537,7 @@ describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus co
         'stateCategories',
         'projectIds',
         'collaboratorIds',
+        'closed',
         'exclude',
       ]),
     );
@@ -548,6 +554,7 @@ describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus co
       stateCategories: undefined,
       projectIds: undefined,
       collaboratorIds: undefined,
+      closed: undefined,
       exclude: undefined,
       dueBefore: '2026-01-01',
     });
@@ -562,6 +569,7 @@ describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus co
       stateCategories: ['active'],
       projectIds: ['p1', 'p2'],
       collaboratorIds: ['u9'],
+      closed: true,
       // Untouched by `clearAll` on purpose — not one of `BoardFilterSpec`'s
       // six and not settable by this sheet either.
       dueBefore: '2026-01-01',
@@ -584,6 +592,7 @@ describe('13.460 "Clear all" clears exactly the six BoardFilterSpec axes plus co
     expect(cleared.stateCategories).toBeUndefined();
     expect(cleared.projectIds).toBeUndefined();
     expect(cleared.collaboratorIds).toBeUndefined();
+    expect(cleared.closed).toBeUndefined();
     // The negative control: an axis outside the clearable set must survive,
     // proving this function narrows rather than wiping the whole filter.
     expect(cleared.dueBefore).toBe('2026-01-01');

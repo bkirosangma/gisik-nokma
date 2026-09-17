@@ -6668,7 +6668,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   why `TriStateChoice` needs no new prop shape to render it. **Ruling 44/45 replaces the brief's own
   names** (`closedMode(filter): 'all' | 'only' | 'hidden'`, `nextClosedMode`, `withClosedMode`) with this
   `ChoiceMode`-shaped pair — a second three-word vocabulary alongside `ChoiceMode` would be two spellings
-  of the one cycle the control renders. `off` DELETES the `closed` key (verified via `'closed' in filter'`
+  of the one cycle the control renders. `off` DELETES the `closed` key (verified via `'closed' in filter`
   being `false`, not merely `toEqual({})`, since `toEqual` cannot distinguish a deleted key from one
   written `undefined`) rather than writing `closed: undefined` the way `withIdAxis`'s own collapse rule
   does for an emptied id-axis list —
