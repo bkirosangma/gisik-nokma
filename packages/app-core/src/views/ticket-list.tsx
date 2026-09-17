@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Avatar, Chip, Select, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
@@ -81,6 +81,49 @@ export type TicketListProps = {
   prefsEditable?: boolean;
   labels: GroupLabels;
   onOpenTicket: (ticketId: string) => void;
+  /**
+   * A trailing, per-row slot (Task 10, backlog/closed spec §5.4) — the Backlog
+   * tab's per-row **Start** button rides here (`apps/web/src/backlog-start-button.tsx`),
+   * called once per row and rendered in a trailing `<td>` of `ListTable`'s own
+   * table, with a matching empty header cell.
+   *
+   * OPTIONAL, and absence means NO trailing column at all — not one rendered
+   * with empty cells. The List, Calendar and Timeline arms of the project page
+   * pass nothing here and render byte-identical markup to before this prop
+   * existed (13.597 pins the negative: `queryAllByRole('button', {name: /^Row
+   * action /})` is empty with no `rowAction` passed).
+   *
+   * Threaded to BOTH `ListTable` mounts below (the pinned "Recently assigned"
+   * section and every grouped section) — a row assigned to `currentUserId`
+   * legitimately renders TWICE on screen (invariant 1, this component's own
+   * docblock), so its `rowAction` renders twice too, with whatever
+   * distinguishes two occurrences of the same entity left to the caller (an
+   * `aria-label` keyed only by title, for instance, would collide — see the
+   * Backlog tab's own row fixtures, which are deliberately unassigned).
+   */
+  rowAction?: (row: ListRow) => ReactNode;
+  /**
+   * The sentence a zero-row set shows in place of the table. OPTIONAL, and
+   * absence means NO sentence — this is the ENTIRE pre-Task-10 behaviour,
+   * carried forward rather than replaced: before this prop existed,
+   * `TicketList` rendered nothing at all beneath its controls bar for a
+   * zero-row set (`groupRows([], grouping, labels)` answers `[]` for every
+   * grouping but `flat`, so `sections.map` has nothing to iterate; `flat`
+   * itself answers one section holding zero rows, which renders an empty
+   * table with no message either). Measured by reading the component, not
+   * assumed — see 13.596 (`ticket-list.test.tsx`) for the pinned default.
+   *
+   * A DEFAULT sentence was considered and refused: `rows.length === 0` means
+   * "the project truly holds none" on one tab and "a filter hid all of them"
+   * on another (`listNarrowing`'s own docblock in `apps/web`, and Ruling 19's
+   * `isNarrowed` one layer up in `board.tsx`), and this component cannot tell
+   * the two apart — only a caller holding the narrowing context can. So the
+   * List tab passes nothing and keeps its silence; the Backlog tab
+   * (`apps/web`'s project page) passes "Nothing in the backlog — new tickets
+   * land here." — a sentence that is TRUE of that tab specifically, not a
+   * generic one this component would have had to invent.
+   */
+  emptyCopy?: string;
 };
 
 /**
@@ -120,6 +163,8 @@ export function TicketList({
   labels,
   onOpenTicket,
   narrowing,
+  rowAction,
+  emptyCopy,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const counts = countRows(rows); // ALWAYS from the flat set — sections cannot alter it
@@ -254,6 +299,7 @@ export function TicketList({
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onOpenTicket={onOpenTicket}
+            rowAction={rowAction}
           />
         </section>
       ) : null}
@@ -269,10 +315,27 @@ export function TicketList({
               collapsed={collapsed}
               onToggleCollapse={toggleCollapse}
               onOpenTicket={onOpenTicket}
+              rowAction={rowAction}
             />
           </section>
         );
       })}
+
+      {/*
+        Task 10 (backlog/closed spec §5.4) — see `emptyCopy`'s own docblock on
+        `TicketListProps` for why this is gated on the CALLER supplying a
+        sentence rather than a component-owned default: `rows.length === 0`
+        is ambiguous between "the project has none" and "a filter hid them
+        all", and only the caller holds enough context to say which. Reads
+        `rows`, the raw prop, never a section or `pinned` count — the exact
+        set this component was asked to show, before grouping or collapsing
+        touch it.
+      */}
+      {rows.length === 0 && emptyCopy !== undefined ? (
+        <p className="gn-list__empty" data-testid="list-empty">
+          {emptyCopy}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -331,12 +394,14 @@ function ListTable({
   collapsed,
   onToggleCollapse,
   onOpenTicket,
+  rowAction,
 }: {
   nodes: ListRowNode[];
   columns: ListColumnId[];
   collapsed: ReadonlySet<string>;
   onToggleCollapse: (ticketId: string) => void;
   onOpenTicket: (ticketId: string) => void;
+  rowAction?: (row: ListRow) => ReactNode;
 }) {
   const tableColumns: TableColumn<ListRowNode>[] = [
     {
@@ -390,6 +455,22 @@ function ListTable({
       cellClassName: 'gn-list__table-cell--data',
       cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} />,
     })),
+    // Task 10 (backlog/closed spec §5.4) — a TRAILING column, present only
+    // when a caller supplies `rowAction`. An empty header cell (`header:
+    // ''`) rather than omitting the header row's cell entirely: `Table`
+    // renders one `<th>` per entry in `columns`, so a mismatched column
+    // count between `<thead>` and every `<tbody>` row would be the bug, not
+    // the fix.
+    ...(rowAction === undefined
+      ? []
+      : [
+          {
+            id: 'row-action',
+            header: '',
+            headerClassName: 'gn-list__table-header',
+            cell: (node: ListRowNode) => rowAction(node.row),
+          },
+        ]),
   ];
   return (
     <div className="gn-list__table-wrap">
@@ -408,12 +489,30 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
   switch (columnId) {
     case 'status':
       return (
-        <Chip
-          tone={row.stateCategory}
-          title={`marked ${row.stateName} by ${actorLabel(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
-        >
-          {row.stateName}
-        </Chip>
+        <>
+          <Chip
+            tone={row.stateCategory}
+            title={`marked ${row.stateName} by ${actorLabel(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
+          >
+            {row.stateName}
+          </Chip>
+          {/*
+            Task 10 (backlog/closed spec §5.4/§1.2) — BESIDE the state chip,
+            never replacing it: `closed` and `stateId` are independent facts
+            (spec §1.2 — a closed ticket keeps the state it was closed FROM),
+            so a card closed out of "Doing" still reads "Doing" — the Closed
+            chip is what says it will not move again without a reopen. `row.closed`
+            is REQUIRED on `ListRow` (unlike the optional domain `TicketState.closed?`
+            441 fixtures predate — `view-types.ts:223-230`), so this reads it
+            directly rather than through the `?? null` idiom readers of the
+            optional form use.
+          */}
+          {row.closed !== null ? (
+            <Chip tone="neutral" title={`closed by ${actorLabel(row.closed.actorId, null)} on ${formatDate(row.closed.at)}`}>
+              Closed
+            </Chip>
+          ) : null}
+        </>
       );
     case 'assignee':
       return row.assignee === null ? (

@@ -6591,3 +6591,71 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   covers this file's own "states the note unconditionally" case, a different, already-cited behaviour;
   continuing the block's own lettering avoids one checkmark covering two unrelated assertions —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.594** ✅ Task 10 (backlog/closed spec §5.4, 2026-09-17) — the Backlog tab. A FIFTH tab, `Backlog`,
+  joins the project page's segmented rail FIRST — ahead of `Board`, since a ticket sits in the backlog
+  BEFORE the board in its lifecycle (spec §1.3) — while `view`'s own default stays `'board'`: the rail's
+  ORDER and the page's DEFAULT SELECTION are independent facts, and this task changes only the first
+  (pinned by asserting `aria-selected` still opens on `Board`, not `Backlog`). `backlogNarrowing`
+  (`page.tsx`) is `listNarrowing.rows` (the shell's own exclude-mode-filtered set) further cut to rows
+  whose `stateId` is the universal `BACKLOG_STATE_ID`; `total` counts backlog rows in the UNFILTERED
+  `list.rows`, never in `listNarrowing.rows`, for the same "a count computed after a filter has run
+  is a count of the filter, not of the project" reason `listNarrowing`'s own docblock gives. Clicking the
+  Backlog tab shows ONLY backlog-state rows; the List tab is UNCHANGED (spec §5.5: "the List shows
+  everything") and keeps showing both a project's backlog and focused tickets, same `TicketList`, same
+  narrowing word (see 13.595 below) —
+  (`apps/web/test/backlog-tab.test.tsx`)
+- **13.595** ✅ Task 10, Ruling 41/42 (coordinator, backlog-and-closed-core dispatch, 2026-09-17) — the
+  per-row **Start** button and the target it resolves. **Ruling 41 struck the brief's "a gated initial
+  edge still asks" branch**: spec §1.2 says the universal Start edge (`backlog → def.initialStateId`)
+  "carries no rules, ever", and `universalTransitions` (`packages/domain/src/workflow.ts:71`) builds it
+  with `rules: []` — `moveOutcome` could only ever answer `direct`, so no page-level `TransitionDialog`
+  and no `MoveArrows` extraction exist for it (the brief's own "choose the smaller diff and say which" is
+  resolved as neither). `BacklogStartButton` (`apps/web/src/backlog-start-button.tsx`) submits
+  `ticket.transitioned { to: toStateId }` straight through `dataSource.ingest`, mirroring `board.tsx`'s
+  `submitDirect` idiom (`submitting` latch reset in a `finally`, a `committed` answer calling the page's
+  `list.reload()`, a real refusal rendered as `role="alert" className="gn-refusal gn-refusal--server"`
+  reading `Refused by the server — <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
+  `ingest` rendered as `gn-refusal--transport`, never the word "Refused"). Proven end to end: Start
+  ingests `ticket.transitioned` with `to` equal to the fixture workflow's `initialStateId` (the exact
+  payload captured and asserted, not merely "an event fired"), and the row leaves the Backlog tab once a
+  CALL-COUNT-DRIVEN `getTickets` stub answers, on its second read, that the ticket's state moved — a
+  fixed answer could not have falsified `list.reload()` firing. A refused Start renders the reason and
+  re-enables the button; the transport wording never appears for a refusal. **Ruling 42's target
+  resolution**: `ListRow` carries no `workflowId` (`view-types.ts:188-220` — `typeId`/`stateId` only), so
+  `startTargetFor(row, types, defs)` (`apps/web/src/backlog-start.ts`) joins `row.typeId` through the
+  workspace's own `TicketTypeDef[]` to a `workflowId`, then reads that `WorkflowDef`'s `initialStateId`
+  from a `Map` the page fetches ONE `getWorkflowDef` per DISTINCT workflow among the backlog rows on
+  screen (never one per row) — unit-tested directly (known type+def → the initial state; unknown type →
+  null; known type, def not yet arrived → null); a `null` target disables Start rather than submitting
+  `{to: null}`. **Addition beyond Ruling 42's literal prop list**: `BacklogStartButton` also takes
+  `currentUserId`, undeclared in the ruling's `{row, toStateId, dataSource, workspaceId, onStarted}` —
+  `makeSubmittedFactory` needs an `actorId` and nothing else in that list supplies one; the page gates the
+  whole `rowAction` capability on `session.kind === 'signed-in'` (mirroring `board.tsx`'s own `moves`
+  gate, case 3.144's "the write door is never offered an empty actor"), so it is never `''` when a click
+  can reach it. Mutation (submitting `to: row.stateId` instead of `toStateId`, `cp`/`sha256sum` restore):
+  kills exactly this case's ingest-payload assertion (`PASS (3) FAIL (1)` of the file's 4) and no other —
+  (`apps/web/test/backlog-tab.test.tsx`, `apps/web/test/backlog-start.test.ts`)
+- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog — new tickets land here.`,
+  passed to `TicketList`'s new `emptyCopy?` prop. **`emptyCopy` defaults to ABSENCE, not a new sentence**:
+  before this task `TicketList` rendered NOTHING beneath its controls bar for a zero-row set (`groupRows([],
+  DEFAULT_GROUPING, labels)` answers `[]` for every grouping but `flat`, and `sections.map` over `[]`
+  iterates nothing; `flat` itself answers one section holding zero rows, an empty table with no message
+  either) — measured by reading the component, not assumed. A component-owned default sentence was
+  considered and refused: `rows.length === 0` means "the project truly holds none" on one tab and "a
+  filter hid all of them" on another (`listNarrowing`'s own docblock; Ruling 19's `isNarrowed` one layer
+  up in `board.tsx`), and `TicketList` cannot tell the two apart — only a caller holding the narrowing
+  context can. So the List tab passes nothing and keeps its pre-Task-10 silence (pinned directly); only
+  the Backlog tab passes a sentence true of itself —
+  (`packages/app-core/test/views/ticket-list.test.tsx`, `apps/web/test/backlog-tab.test.tsx`)
+- **13.597** ✅ Task 10 — `TicketList`'s two new Backlog-tab-facing seams, neither exclusive to the Backlog
+  tab. `rowAction?: (row: ListRow) => ReactNode` renders once per row in a trailing `<td>` (a matching
+  empty `<th>` in the header row), threaded to BOTH `ListTable` mounts (the "Recently assigned" pin and
+  every grouped section) — absent, no trailing column renders at all, byte-identical to before this task
+  (pinned directly). A second `<Chip tone="neutral">Closed</Chip>` renders BESIDE the existing state chip
+  (`ListCell`'s `'status'` case, `:411-416` pre-task) when `row.closed !== null` — beside, never replacing,
+  since `closed` and `stateId` are independent facts (spec §1.2: a closed ticket keeps the state it was
+  closed FROM). Both fixture rows in the pinning case carry `assignee: null` deliberately: a row assigned
+  to `currentUserId` legitimately renders TWICE (this component's own invariant 1 — "exactly once ACROSS
+  THE SECTIONS", not "exactly once on the page"), which would double-count `rowAction` and double-render
+  the Closed chip, passing either assertion by accident —
+  (`packages/app-core/test/views/ticket-list.test.tsx`)

@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 // export that survives `verbatimModuleSyntax` — settled at
 // packages/ui/test/components.test.tsx and again in board.test.tsx.
 import { userEvent } from '@testing-library/user-event';
-import { act, useState } from 'react';
+import { act, useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_GROUPING,
@@ -50,6 +50,20 @@ const ROWS: ListRow[] = [
 ];
 
 /**
+ * Task 10 (backlog/closed spec §5.4) fixtures for 13.596/13.597 — module scope
+ * because both case numbers' `describe` blocks read them. `assignee: null` (the
+ * seed default) on both, deliberately: see 13.597's own docblock for why an
+ * assigned row would render its `rowAction`/`Closed` chip a second time in the
+ * "Recently assigned" pin and pass either case by accident.
+ */
+const OPEN_ROW: ListRow = listRowSeed({ ticketId: 'ra_open', title: 'Row one' });
+const CLOSED_ROW: ListRow = listRowSeed({
+  ticketId: 'ra_closed',
+  title: 'Row two',
+  closed: { actorId: 'anselma', at: '2026-09-17T09:00:00.000Z' },
+});
+
+/**
  * A `ProjectViewPrefs` whose BOTH halves the user chose, from plain values.
  *
  * The plain literal `{ columns: [...], grouping: '...' }` no longer typechecks,
@@ -84,6 +98,11 @@ function ControlledList({
   // unnarrowed arm is the one every existing case exercises, and defaulting it
   // here would leave that arm untested by all of them.
   narrowing,
+  // Task 10 (backlog/closed spec §5.4) — undefaulted for the same reason
+  // `narrowing` is: every existing case exercises `TicketList`'s own
+  // no-trailing-column default, and defaulting it here would leave that
+  // default untested.
+  rowAction,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
@@ -91,6 +110,7 @@ function ControlledList({
   onOpenTicket?: (ticketId: string) => void;
   onChange?: (prefs: ProjectViewPrefs) => void;
   narrowing?: string;
+  rowAction?: (row: ListRow) => ReactNode;
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -106,6 +126,7 @@ function ControlledList({
       labels={LABELS}
       onOpenTicket={onOpenTicket}
       {...(narrowing === undefined ? {} : { narrowing })}
+      {...(rowAction === undefined ? {} : { rowAction })}
     />
   );
 }
@@ -912,5 +933,99 @@ describe('TicketList — entity-keyed data-testid hooks (Plan 11 T13)', () => {
     expect(epicCard).not.toBe(t3Card);
     expect(within(epicCard).getByText('Registrations')).toBeInTheDocument();
     expect(within(t3Card).getByText('Chase the vendor')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.597 — Task 10's two `TicketList` additions, both used by the Backlog tab
+ * and neither exclusive to it: a per-row trailing slot (`rowAction`) a page can
+ * fill with whatever a row's own tab wants to offer (the Backlog tab's Start,
+ * here a plain probe button so this file does not depend on `apps/web`), and a
+ * second `Closed` chip beside the state chip for a row whose `closed` is set.
+ *
+ * Both fixture rows carry `assignee: null` (the seed default) so `pinned`
+ * (`recentlyAssignedRows`) is empty and neither renders twice — see
+ * `TicketList`'s own docblock, invariant 1: "exactly once ACROSS THE
+ * SECTIONS", never "exactly once on the page". A row assigned to `currentUserId`
+ * here would pass this case by accident, rendering `rowAction` — and the
+ * `Closed` chip — a second time in the pin, which `getAllByRole` would then
+ * over-count and a page mounting one Start button per row would ambiguously
+ * duplicate (two identical `aria-label`s on one ticket).
+ */
+describe('13.597 the rowAction slot and the Closed chip (packages/app-core/src/views/ticket-list.tsx)', () => {
+  it('rowAction renders once per row, not once per pinned+sectioned occurrence', () => {
+    render(
+      <ControlledList
+        rows={[OPEN_ROW, CLOSED_ROW]}
+        initial={chose([], 'flat')}
+        rowAction={(row) => <button aria-label={`Row action ${row.ticketId}`}>Act</button>}
+      />,
+    );
+    expect(screen.getAllByRole('button', { name: /^Row action / })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Row action ra_open' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Row action ra_closed' })).toBeInTheDocument();
+  });
+
+  it('a closed row shows a Closed chip beside the state chip; a non-closed row does not', () => {
+    render(<ControlledList rows={[OPEN_ROW, CLOSED_ROW]} initial={chose(['status'], 'flat')} />);
+    const openRow = screen.getByTestId('ticket-card-ra_open').closest('tr');
+    const closedRow = screen.getByTestId('ticket-card-ra_closed').closest('tr');
+    if (openRow === null || closedRow === null) throw new Error('row <tr> not found');
+    expect(within(closedRow).getByText('Closed')).toBeInTheDocument();
+    expect(within(openRow).queryByText('Closed')).not.toBeInTheDocument();
+    // The state chip itself is still there, unreplaced — Closed is BESIDE it.
+    expect(within(openRow).getByText(OPEN_ROW.stateName)).toBeInTheDocument();
+    expect(within(closedRow).getByText(CLOSED_ROW.stateName)).toBeInTheDocument();
+  });
+
+  it('with no rowAction passed, no trailing column renders — byte-identical to before Task 10', () => {
+    render(<ControlledList rows={[OPEN_ROW]} initial={chose([], 'flat')} />);
+    expect(screen.queryAllByRole('button', { name: /^Row action / })).toHaveLength(0);
+  });
+});
+
+/**
+ * 13.596 (list half) — `emptyCopy` defaults to ABSENCE, not a new sentence.
+ * `TicketList` rendered NOTHING beneath its controls bar for a zero-row set
+ * before Task 10 (`groupRows([], DEFAULT_GROUPING, labels)` answers `[]` for
+ * every non-flat grouping, and `sections.map` over `[]` renders no section at
+ * all) — measured by reading the component, not assumed. Introducing visible
+ * copy for every `TicketList` mount by DEFAULT would be a behaviour change on
+ * a surface outside this task, and the wrong ONE at that: `rows.length === 0`
+ * here can mean "the project truly has none" or "a filter hid all of them"
+ * (`listNarrowing`'s own docblock, and Ruling 19's `isNarrowed` one layer up),
+ * and a flat sentence picks the first without knowing which is true. So the
+ * List tab (which passes no `emptyCopy`) gets exactly what it got before: silence.
+ * Only a caller that HANDS a sentence — the Backlog tab, `apps/web/test/backlog-tab.test.tsx`
+ * case 13.596 — gets one.
+ */
+describe('13.596 emptyCopy renders only when a caller passes one, over a zero-row set', () => {
+  it('renders nothing for a zero-row set with no emptyCopy — the pre-Task-10 default', () => {
+    const { container } = render(<ControlledList rows={[]} initial={chose([], 'flat')} />);
+    expect(screen.queryByTestId('list-empty')).not.toBeInTheDocument();
+    // Belt and braces: no table row of any kind either.
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(0);
+  });
+
+  it('renders the caller-supplied sentence for a zero-row set once emptyCopy is passed', () => {
+    render(
+      <TicketList
+        rows={[]}
+        currentUserId="me"
+        prefs={DEFAULT_VIEW_PREFS}
+        onPrefsChange={vi.fn()}
+        labels={LABELS}
+        onOpenTicket={vi.fn()}
+        emptyCopy="Nothing in the backlog — new tickets land here."
+      />,
+    );
+    expect(screen.getByTestId('list-empty')).toHaveTextContent(
+      'Nothing in the backlog — new tickets land here.',
+    );
+  });
+
+  it('does not render emptyCopy once rows arrive', () => {
+    render(<ControlledList rows={[OPEN_ROW]} initial={chose([], 'flat')} />);
+    expect(screen.queryByTestId('list-empty')).not.toBeInTheDocument();
   });
 });

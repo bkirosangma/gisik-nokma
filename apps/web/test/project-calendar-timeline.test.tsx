@@ -11,6 +11,14 @@ import { stubServices } from './helpers/stub-services.js';
  * 11.160–11.166 — the four-way `Board | List | Calendar | Timeline` chain, which
  * is Plan 6's Step 5b landed late by Plan 9's Task 14.
  *
+ * FIVE-WAY as of Task 10 (backlog/closed spec §5.4, 2026-09-17): `Backlog`
+ * joined the rail, FIRST, ahead of `Board`. 11.160 and 13.430 below are the
+ * only two cases in this file that name the tabs by fixed array position
+ * (`viewTabs()`'s own callers) — both updated in place for the new count and
+ * order rather than renumbered; every other case in this file addresses a
+ * tab by NAME (`findByRole('tab', {name: …})`) and needed no change.
+ *
+
  * The two questions this file exists for are the two the plan's snippet gets
  * wrong. First, `(list.rows ?? []).map(...)`: a REFUSED `getTickets` renders as
  * a complete month grid with nothing in it — a page saying no ticket here has a
@@ -165,15 +173,19 @@ async function viewTabs(): Promise<HTMLElement[]> {
 }
 
 describe('the project page mounts four views over one list read', () => {
-  it('11.160 offers all four tabs, with Board selected and each tab selected alone', async () => {
+  it('11.160 offers all five tabs (Backlog first), with Board selected and each tab selected alone', async () => {
     render(
       <Providers services={servedList([row()])}>
         <ProjectPage />
       </Providers>,
     );
     const tabs = await viewTabs();
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Board', 'List', 'Calendar', 'Timeline']);
+    // Task 10 (backlog/closed spec §5.4): Backlog joined the rail, FIRST — Board
+    // stays the DEFAULT SELECTION regardless (the rail's order and the page's
+    // default are independent facts; `page.tsx`'s own docblock on `view` says so).
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Backlog', 'Board', 'List', 'Calendar', 'Timeline']);
     expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
       'true',
       'false',
       'false',
@@ -182,6 +194,7 @@ describe('the project page mounts four views over one list read', () => {
 
     await openTab('Timeline');
     expect((await viewTabs()).map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
       'false',
       'false',
       'false',
@@ -209,10 +222,11 @@ describe('the project page mounts four views over one list read', () => {
     const onFlags = (tabs: HTMLElement[]) =>
       tabs.map((tab) => tab.classList.contains('gn-segmented__item--on'));
 
-    expect(onFlags(await viewTabs())).toEqual([true, false, false, false]);
+    // Order is Backlog, Board, List, Calendar, Timeline (Task 10) — Board (index 1) starts selected.
+    expect(onFlags(await viewTabs())).toEqual([false, true, false, false, false]);
 
     await openTab('Calendar');
-    expect(onFlags(await viewTabs())).toEqual([false, false, true, false]);
+    expect(onFlags(await viewTabs())).toEqual([false, false, false, true, false]);
   });
 
   /**

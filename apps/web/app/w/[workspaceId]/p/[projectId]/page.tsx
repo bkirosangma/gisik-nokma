@@ -2,7 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { BACKLOG_STATE_ID, BUILTIN_TICKET_TYPE_SEEDS, type StateCategory } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE_ID,
+  BUILTIN_TICKET_TYPE_SEEDS,
+  type StateCategory,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
@@ -22,10 +27,13 @@ import {
   type FilterSpec,
   type GroupLabels,
   type ListFilterSpec,
+  type ListRow,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { Avatar } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
+import { startTargetFor } from '../../../../../src/backlog-start.js';
+import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
 import {
   buildFilterChips,
   describeUnappliedBoardAxes,
@@ -152,7 +160,12 @@ function ProjectBoard() {
    */
   const workspaceName = useWorkspaceName(workspaceId);
   const projectName = useProjectName(workspaceId, projectId);
-  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
+  // Task 10 (backlog/closed spec §5.4, 2026-09-17) adds `'backlog'` to this
+  // union. The default stays `'board'` — Backlog is the FIRST tab in the
+  // rail below (it precedes the board in a ticket's lifecycle), not the
+  // first one a person lands on; nothing about the union's own default
+  // changes.
+  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline' | 'backlog'>('board');
   /**
    * The list's narrowing, and the reason there is one at all.
    *
@@ -479,6 +492,40 @@ function ProjectBoard() {
   const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
 
   /**
+   * THE BACKLOG NARROWING (Task 10, backlog/closed spec §5.4) — the Backlog
+   * tab's own further cut of `listNarrowing.rows`: every row that already
+   * survived the shell's exclude-mode filter (`listNarrowing`, immediately
+   * above) whose `stateId` is the universal `BACKLOG_STATE_ID`. `null` while
+   * `list.rows`/`listNarrowing` have not answered, mirroring both their own
+   * gates.
+   *
+   * `total` counts backlog rows in the UNFILTERED `list.rows` — never
+   * `listNarrowing.rows` — for the same reason `listNarrowing`'s own `total`
+   * counts from `list.rows` rather than from whatever a narrower stage
+   * already dropped: a `total` computed after a filter has run is a count OF
+   * the filter, not of the project, and 12.258/12.384's own defect is a
+   * partial set presented as whole under exactly this kind of silent
+   * substitution. `shown` is the same rows the Backlog tab actually renders.
+   *
+   * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
+   * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
+   * backlog ticket's category is `open`, so that toggle strips every backlog
+   * row out of `list.rows` before this memo ever sees them. With the toggle
+   * on, the Backlog tab reads "Nothing in the backlog — new tickets land
+   * here." over a project that may hold plenty; both `shown` and `total`
+   * read 0, so nothing here can tell the two apart from inside this memo,
+   * and nothing on the Backlog tab today says the toggle is why. Owner:
+   * whoever next revisits the toggle's own scope (its docblock already notes
+   * it predates this tab).
+   */
+  const backlogNarrowing = useMemo(() => {
+    if (list.rows === null || listNarrowing === null) return null;
+    const rows = listNarrowing.rows.filter((row) => row.stateId === BACKLOG_STATE_ID);
+    const total = list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).length;
+    return { rows, shown: rows.length, total };
+  }, [list.rows, listNarrowing]);
+
+  /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
    *
    * `useLiveQuery` and not a bare `useEffect` so a `ticket-type.defined` landing
@@ -490,6 +537,45 @@ function ProjectBoard() {
    */
   const ticketTypes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:ticket-types`, () =>
     dataSource.query.getTicketTypes(workspaceId),
+  );
+
+  /**
+   * THE DISTINCT WORKFLOWS BEHIND THE BACKLOG'S OWN ROWS (Ruling 42) —
+   * sorted and joined into one `useLiveQuery` key, so the page fetches ONE
+   * `getWorkflowDef` per DISTINCT workflow among the rows on screen rather
+   * than one per row: a project with forty backlog tickets sharing three
+   * workflows opens three round trips, not forty.
+   */
+  const backlogWorkflowIds = useMemo(() => {
+    if (backlogNarrowing === null || ticketTypes.data === null) return [];
+    const typeById = new Map(ticketTypes.data.map((type) => [type.id, type]));
+    const ids = new Set<string>();
+    for (const row of backlogNarrowing.rows) {
+      const type = typeById.get(row.typeId);
+      if (type !== undefined) ids.add(type.workflowId);
+    }
+    return Array.from(ids).sort();
+  }, [backlogNarrowing, ticketTypes.data]);
+
+  const backlogWorkflowDefs = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${workspaceId}:backlog-workflow-defs:${backlogWorkflowIds.join(',')}`,
+    async () => {
+      const entries = await Promise.all(
+        backlogWorkflowIds.map(
+          async (workflowId): Promise<readonly [string, WorkflowDef | null]> => [
+            workflowId,
+            await dataSource.query.getWorkflowDef(workspaceId, workflowId),
+          ],
+        ),
+      );
+      const defs = new Map<string, WorkflowDef>();
+      for (const [workflowId, def] of entries) {
+        if (def !== null) defs.set(workflowId, def);
+      }
+      return defs;
+    },
   );
 
   // Every read on this page, one rule, one author — see `src/expired-session.tsx`.
@@ -1143,10 +1229,18 @@ function ProjectBoard() {
               `.gn-segmented` (Task 2), and a stale rule is one thing but a
               comment misstating the file it sits in is the thing this repo
               punishes hardest.
+
+              `['backlog', 'Backlog']` (Task 10, backlog/closed spec §5.4) is
+              FIRST — Backlog precedes the board in a ticket's LIFECYCLE
+              (spec §1.3: every ticket is born there), even though `view`'s
+              own default stays `'board'` (declared above) — the rail's
+              ORDER and the page's DEFAULT SELECTION are independent facts,
+              and this task changes only the first.
             */}
             <div className="gn-segmented" role="tablist">
               {(
                 [
+                  ['backlog', 'Backlog'],
                   ['board', 'Board'],
                   ['list', 'List'],
                   ['calendar', 'Calendar'],
@@ -1234,7 +1328,20 @@ function ProjectBoard() {
               more certainty than that.
             */}
             {(() => {
-              const narrowing = view === 'board' ? boardNarrowing : listNarrowing;
+              // Task 10 — THE HAZARD THE PARAGRAPH BELOW WARNS ABOUT,
+              // MATERIALIZED. `view` gained a fifth member (`'backlog'`) and
+              // this ternary chain — unlike `TAB_NOUN`'s `Record` two lines
+              // down — has no compiler to catch a missing arm: without this
+              // explicit branch, `'backlog'` would silently fall into the
+              // `: listNarrowing` default and the disclosure strip would
+              // report the LIST's own narrowing while the Backlog tab was on
+              // screen. `unapplied`/`chips` need no matching branch: both
+              // already resolve correctly for `'backlog'` through their
+              // existing `view === 'board' ? … : …` shape, because the
+              // Backlog tab shares the List tab's filter vocabulary exactly
+              // (same `FilterSpec`, same `matchesListRow`-driven axes) —
+              // `board` is the only OTHER special case either needs.
+              const narrowing = view === 'board' ? boardNarrowing : view === 'backlog' ? backlogNarrowing : listNarrowing;
               const unapplied = view === 'board' ? boardUnappliedAxes : listUnappliedAxes;
               const chips = view === 'board' ? narrowingChips : activeFilterChips;
               // Controller ruling, Task 10 fix round 1 (amended fix round 2):
@@ -1246,14 +1353,17 @@ function ProjectBoard() {
               // unchanged and silently inherit `'timeline'`'s noun, the exact
               // "names the wrong place" defect this note exists to prevent.
               // `view`'s own type is an inline union (`useState<'board' |
-              // 'list' | 'calendar' | 'timeline'>` above), not a named alias,
-              // so `typeof view` is what keys this `Record` to it — a
-              // `Record<K, V>` requires EVERY member of `K` as a property, so
-              // a tab added to that union without a matching entry here fails
-              // `typecheck`, not silently at runtime. Proven, not asserted:
-              // fix round 2 deleted the `timeline` entry and watched `tsc`
-              // reject it.
+              // 'list' | 'calendar' | 'timeline' | 'backlog'>` above), not a
+              // named alias, so `typeof view` is what keys this `Record` to
+              // it — a `Record<K, V>` requires EVERY member of `K` as a
+              // property, so a tab added to that union without a matching
+              // entry here fails `typecheck`, not silently at runtime.
+              // Proven, not asserted: fix round 2 deleted the `timeline`
+              // entry and watched `tsc` reject it; Task 10 is the first REAL
+              // addition since, and omitting `backlog` here does fail
+              // `tsc` exactly as promised — confirmed by trying it.
               const TAB_NOUN: Record<typeof view, string> = {
+                backlog: 'backlog',
                 board: 'board',
                 list: 'list',
                 calendar: 'calendar',
@@ -1460,6 +1570,83 @@ function ProjectBoard() {
                           onMoved: board.reload,
                           cache,
                         },
+                      }
+                    : {})}
+                />
+              ) : (
+                <p>Loading…</p>
+              )
+            ) : view === 'backlog' ? (
+              // Task 10 (backlog/closed spec §5.4) — the Backlog tab. Same
+              // refusal/loading shape every other arm on this page uses;
+              // `backlogNarrowing !== null` implies `list.rows !== null` and
+              // `listNarrowing !== null` (its own docblock, above), so this
+              // gate is complete on its own.
+              list.error !== null ? (
+                <ShellRefusal what="The backlog" message={list.error} />
+              ) : backlogNarrowing !== null ? (
+                <TicketList
+                  // THE SAME NARROWING WORD THE LIST TAB PASSES — not a
+                  // Backlog-specific vocabulary. The brief's own words
+                  // ("narrowing word as the List's"): the Backlog tab shares
+                  // the List tab's `FilterSpec` and its `matchesListRow`-driven
+                  // axes exactly, so whether "your filters" is in force is one
+                  // fact, not two — this is the identical expression the List
+                  // arm below computes, read against `listNarrowing` (not
+                  // `backlogNarrowing`) on purpose, so the word names what the
+                  // FILTER did, the same word on both tabs, while `rows` still
+                  // narrows each tab to its own subset.
+                  {...(() => {
+                    const word = listNarrowingWord(
+                      activeOnly,
+                      shouldRenderNarrowingStrip({
+                        chipCount: activeFilterChips.length,
+                        unappliedAxisCount: listUnappliedAxes.length,
+                        shown: listNarrowing?.shown ?? 0,
+                        total: listNarrowing?.total ?? 0,
+                      }),
+                    );
+                    return word === undefined ? {} : { narrowing: word };
+                  })()}
+                  rows={backlogNarrowing.rows}
+                  currentUserId={currentUserId}
+                  prefs={list.prefs}
+                  onPrefsChange={list.setPrefs}
+                  prefsEditable={list.canSetPrefs}
+                  labels={labels}
+                  onOpenTicket={openTicket}
+                  emptyCopy="Nothing in the backlog — new tickets land here."
+                  /*
+                    THE START CAPABILITY, gated on `session.kind ===
+                    'signed-in'` — the same precedent `createRegion` and the
+                    board's own `moves` prop already set (`currentUserId`'s
+                    own declaration, above): a click landing before the
+                    session resolves, or from a signed-out viewer, would
+                    build an event with an empty `actorId`
+                    (`BacklogStartButton`'s own docblock on why it takes
+                    `currentUserId` at all). Omitted entirely rather than
+                    passed with a blank actor — no trailing column renders
+                    for a signed-out viewer, matching `TicketList`'s own
+                    `rowAction`-absent default.
+
+                    `startTargetFor` resolves the target PER ROW (Ruling 42);
+                    `backlogWorkflowDefs.data ?? new Map()` is the empty
+                    answer while that fetch is in flight, which
+                    `startTargetFor` reads as `null` — Start renders
+                    disabled, never as licence to submit `{to: null}`.
+                  */
+                  {...(session.kind === 'signed-in'
+                    ? {
+                        rowAction: (row: ListRow) => (
+                          <BacklogStartButton
+                            row={row}
+                            toStateId={startTargetFor(row, ticketTypes.data ?? [], backlogWorkflowDefs.data ?? new Map())}
+                            dataSource={dataSource}
+                            workspaceId={workspaceId}
+                            currentUserId={currentUserId}
+                            onStarted={list.reload}
+                          />
+                        ),
                       }
                     : {})}
                 />

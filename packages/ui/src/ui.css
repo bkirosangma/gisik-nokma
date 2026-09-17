@@ -606,8 +606,18 @@
    background/text tokens, font, focus ring, `:disabled` treatment) rather
    than inventing a second control's worth of numbers — the only real
    difference is horizontal `padding` in place of a fixed `min-width`,
-   since this button carries the word "Close" rather than one glyph. */
-.gn-board-card__close {
+   since this button carries the word "Close" rather than one glyph.
+   Task 10 (backlog/closed spec §5.4, 2026-09-17) — `.gn-row-action`, an ALIAS
+   of `.gn-board-card__close` with byte-identical declarations, declared as its
+   own selector rather than reused by name. The Backlog tab's per-row Start
+   button (`apps/web/src/backlog-start-button.tsx`) sits in a `TicketList`
+   table row, not a board card, and `.gn-board-card__close` names a component
+   this button is not part of — applying that class to it would be true only
+   of the METRICS, not of the DOM it actually sits in. Kept as one rule body
+   (not a copy) so the two can never drift: any future change to this
+   word-sized button's own numbers changes both consumers at once. */
+.gn-board-card__close,
+.gn-row-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -622,11 +632,13 @@
   font-weight: 600;
   cursor: pointer;
 }
-.gn-board-card__close:focus-visible {
+.gn-board-card__close:focus-visible,
+.gn-row-action:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-.gn-board-card__close:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-board-card__close:disabled,
+.gn-row-action:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
