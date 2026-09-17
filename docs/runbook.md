@@ -437,6 +437,18 @@ package edit is the content of `dist`, not the fact that you saved:
 
     docker exec gisik-nokma-dev-web-1 grep -c '<the new value>' /repo/packages/ui/dist/tokens.js
 
+**That cause is now NAMED and FIXED (2026-09-18, Step 2 Part 0), so the paragraph above is history
+rather than current advice.** `tsc`'s default watch strategy (`UseFsEvents`) watches the FILE, so it
+follows the inode — and the assistant's editor writes by rename-over, which replaces the inode at that
+path and leaves the watcher bound to a file that is no longer there. That is the 80-second stall
+above. Both hot services now set `TSC_WATCHFILE=UseFsEventsOnParentDirectory`, which watches the parent
+DIRECTORY instead. Witnessed in both containers, no restart between the halves: a rename-over save
+reached both `dist` copies in about a second, and an in-place save that followed reached both in about
+a second too. **So a stalled package watcher is no longer the expected consequence of a save shape** —
+but the operator check above still matters, because a watcher can still die for other reasons, and
+`restart web` remains the general recovery. What changed is the diagnosis you should reach for first:
+if `dist` is stale now, suspect a dead process before a lost watch.
+
 **Not mounted, and each for a reason.** `.next` (the dev compile cache — it must be the container's own;
 `.dockerignore` already keeps the host's out of the image), `tsconfig.json` (Next REWRITES this file, adding
 `next-env.d.ts` to `include`, so a read-write bind would let the container edit the host's tracked file), and

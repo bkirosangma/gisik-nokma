@@ -14,6 +14,7 @@ Built 2026-09-08 from `origin/main` @ `5df5d28`, in worktree `.claude/worktrees/
 | Colour, spacing, type in the shipping product | `packages/ui/src/tokens.ts` + `ui.css` — the code, always |
 | What HIG adoption would make those | `tokens.json` here |
 | Screens | `prototypes/*.dc.html` here |
+| Where the interactive prototypes CAME FROM | `interactive/PROVENANCE.md` — the owner export each file was unpacked from, its sha256, and the one command that reproduces it. `interactive/*.dc.html` is generated, never hand-edited |
 | The argument, with measurements | `docs/hig-adoption-brief.md` in the repo |
 | The measurements themselves | `docs/hig-probe-verbatim.py`, `docs/hig-probe-accessible.py` |
 

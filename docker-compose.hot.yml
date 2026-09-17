@@ -128,6 +128,54 @@ services:
     # operator check instead (`docs/runbook.md`, "watchers still alive"), which
     # is the honest form -- a check someone runs beats a guard that lies.
     environment:
+      # THE PACKAGE WATCHERS' SAVE SHAPE — 2026-09-18, Step 2 Part 0.
+      #
+      # The `tsc --watch` loop in `command` above carries the SAME inode bug the
+      # long note above records for `tsx watch`, and #417 measured it as case
+      # 13.656: a `packages/ui/src` edit stopped reaching `dist` and no `touch`
+      # revived it — only `restart web` did. The cause is the default watch
+      # strategy. `tsc`'s default is `UseFsEvents`, which in the 5.9.3 bundle
+      # (case 4) is `fsWatch(fileName, File, ...)` — a watch on the FILE, which
+      # follows the inode and so goes blind on the rename-over save the
+      # assistant's Edit tool writes (inode measured changing on every edit).
+      #
+      # `UseFsEventsOnParentDirectory` (case 5) is what ships. It watches the
+      # parent DIRECTORY (`fsWatch(dirName, Directory, ...)`) instead of the
+      # file's inode, so a rename onto that name is an event it sees. Witnessed
+      # in BOTH containers, no restart between the halves: a rename-over Edit
+      # reached both `dist` copies in ~1 s (host write 1789679099, compile line
+      # 2:35:00); an in-place append that followed reached both `dist` copies in
+      # ~1 s (host inode 204132254 before AND after, so provably not a rename;
+      # write 1789679122, compile line 2:35:22); and the revert put both back to
+      # zero. Settled `docker stats` for the pair: 3.99-6.69 % (server) and
+      # 1.55-1.69 % (web), beside #417's chokidar figure of 6.05-6.47 % on
+      # versus 2.39-3.73 % off for the server.
+      #
+      # TWO INSTRUMENTS THAT LIED, recorded because each produced a confident
+      # false "the watcher is blind" reading before it was caught — and the
+      # second of them was written into this comment as a conclusion:
+      #   1. **A marker the EMITTER does not carry measures nothing.** A marker
+      #      comment placed before an elided declaration (`export type {
+      #      PrefsOrigin }` — a type-only re-export, absent from the JS output)
+      #      is dropped along with it, and a bare `//` comment appended at EOF is
+      #      dropped too, while a STATEMENT marker at that same EOF position is
+      #      emitted. Both read as `0 in dist` and look exactly like a watcher
+      #      failure. The marker must be one the emitter actually carries; a
+      #      statement is the safe choice.
+      #   2. **A poll timed from the operator's own tool call measures the
+      #      OPERATOR.** The write is often already compiled before the first
+      #      poll runs, so the loop reports "0 s" and measures nothing; and a
+      #      broken marker's "0 in dist" is then read as a watcher verdict. The
+      #      honest instrument is the compile line in `docker logs --since …`
+      #      read against the host file's mtime, which is what the figures above
+      #      quote.
+      #
+      # The env var is read RAW (`process.env.TSC_WATCHFILE` in the 5.9.3
+      # bundle), so the spelling below is load-bearing and is the exact string
+      # the `TSC_WATCHFILE` switch compares against — a lowercased or
+      # hyphenated variant falls through to the default and silently changes
+      # nothing.
+      TSC_WATCHFILE: UseFsEventsOnParentDirectory
       # POLLING, and only because the measured default misses the save shape the
       # assistant's editor writes — see the watcher note above for the measurement
       # and for why the first door (node --watch) was closed instead.
@@ -199,6 +247,14 @@ services:
         echo 'hot-web: starting next dev on :3000 (host :3001)'
         pnpm --filter @gisik-nokma/web exec next dev -p 3000 -H 0.0.0.0
     environment:
+      # THE SAME PACKAGE-WATCHER FIX AS `server` ABOVE, and stated here rather
+      # than pointed at because a reader of this service should not have to
+      # travel: this container runs its OWN copy of the identical
+      # `tsc -p tsconfig.json --watch` loop (see `command`), so it has its own
+      # instance of the same inode bug and needs its own instance of the fix.
+      # Both halves are witnessed together in case 13.656 — one write, both
+      # `dist` copies — which is why the two lines must not drift apart.
+      TSC_WATCHFILE: UseFsEventsOnParentDirectory
       # The prod image takes its two load-bearing knobs as BUILD args, because
       # `next build` serialises them into .next. `next dev` does not: it loads
       # next.config.ts at start and reads process.env, so in hot mode they are

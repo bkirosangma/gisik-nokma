@@ -20,7 +20,180 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:4x IST. **STEP 2 — PART 0 IS DONE AND PUSHED; PART 1
+> # (THE LIST TAB, TO THE PROTOTYPE) IS IN FLIGHT, WITH ONE RULING REQUESTED.**
+>
+> ## Live anchors — measured at this block, `git branch --contains` clean
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2-list-controls` |
+> | HEAD | `6549a4149c9cddd9f35e50b2d6cbc6e6fd84d91d` — `Step 2 Part 0: the package watchers watch a directory, not an inode` |
+> | pushed | yes — `origin/exec/step2-list-controls` is the same sha |
+> | merge-base with `origin/owner/workspace-edits` | `b6d76a90dcf071baae289df560dd3c31bbdf39ca` (the #417 merge commit) |
+> | ahead / behind that base | **1 / 0** |
+> | tree | clean at last check; the Part 1 implementer is editing `ticket-list.tsx` and its tests now, so a dirty tree is expected — re-measure, do not trust this row |
+> | gate composition | UNCHANGED from #417; no gate has been run on this branch yet |
+>
+> `origin/owner/workspace-edits` was `b6d76a90` when this was written — a real merge commit with
+> parents `f3d36f93` and `e57e7d5d`, *not* a squash. **A trap worth naming:** this machine's Bash hook
+> routes `git log` through `rtk`, and that rewritten `git log` **omits merge commits**, so
+> `git log -1 origin/owner/workspace-edits` printed `e57e7d5d` while `git rev-parse` printed `b6d76a90`.
+> Both are true of different objects. Use plumbing (`rev-parse`, `--is-ancestor`) for refs.
+>
+> ## What Part 0 was, and what it found
+>
+> Both hot containers run their own `tsc -p tsconfig.json --watch` per package, and `tsc`'s default
+> strategy (`UseFsEvents`) watches the FILE — so those loops carried the same inode blindness #417
+> recorded for `tsx watch`, which is case 13.656's 80-second stale revert. Both services now set
+> `TSC_WATCHFILE=UseFsEventsOnParentDirectory`. Witnessed in both containers in one run, no restart
+> between the halves: rename-over **~1 s**, in-place append **~1 s** (host inode verified unchanged),
+> revert back to zero in both `dist` copies. Settled CPU 3.99–6.69 % (server) / 1.55–1.69 % (web).
+> The three pre-existing reds (`check:tasks`, `check:citations`, `check-case-ids`) are **byte-identical**
+> to a pristine extraction of the base in a separate worktree; `check:env`, `check:runbook`,
+> `check:help` exit 0.
+>
+> **Two instruments of mine lied before those numbers were trusted, and both are recorded in the
+> compose comment and in 13.652 — because each produced a confident "the watcher is blind" verdict.**
+> A marker the emitter does not carry never appears in `dist` (a comment before an elided
+> `export type`, and a bare `//` appended at EOF, while a STATEMENT at that same position is emitted);
+> and a poll timed from the operator's own tool call measures the operator, not the watcher. **The
+> first of those had already been written into the compose file as a conclusion that the directory
+> door failed its in-place half, and had to be retracted.** A check that cannot pass is not evidence.
+>
+> ## RULING — Step 2's column set: ANSWERED 2026-09-18. **Build the five; file the rest.**
+>
+> Raised as `gisik-nokma-lanes/EXEC-2026-09-18-step2-column-gap.md`; the controller ruled it the same
+> hour. **The controller's ruling confirmed the hold on all three, and supplied a fourth fact for
+> `Ticket` that the executor did not have:** ticket ids are ULIDs and the tree carries **no**
+> human-readable key (`ticketKey`/`ticketNumber`/`shortId`/`displayId` → zero matches; re-verified here
+> with a positive control, along with `seedUlid('ticket', …)` → 14 live sites and `mappers.ts:1684`
+> reading `ticketId` as a string). So the prototype's short `t.id` has no product counterpart at all.
+>
+> 1. Five columns, five Group-by keys, exactly as built. `flat` keeps its shipped label (the copy
+>    rule). **The tray shows FIVE chips: no inert chip, no invented field.**
+> 2. The gap is filed in three places in the same commit — this block, the `Features.md` List bullet,
+>    and the chip-tray catalogue case (which states the count is five and why).
+> 3. **Not executor work, listed for the owner:** the `workflow` column + grouping axis is a `ListRow`
+>    widening plus a workflow-name lookup (a candidate next step); `Priority` and a human ticket key
+>    are PRODUCT decisions, i.e. a brainstorm.
+>
+> ## Known gaps — the prototype is a design, not a spec of what exists
+>
+> **The List tab ships five columns and five Group-by keys where `design-system/interactive/desktop.dc.html`
+> draws eight and six.** Workflow, Priority and Ticket are NOT rendered and NOT built; the `workflow`
+> grouping axis is absent with them. Reasons, each measured rather than assumed: **Workflow** —
+> `ListRow` drops `workflowId` and nothing resolves a workflow name for a row; **Priority** — no such
+> field anywhere in `domain`/`app-core`/`server`; **Ticket** — the id is a ULID and there is no human
+> key. **A restart should NOT re-ask this and should NOT build the three**; the ruling above is the
+> answer, and the gap is recorded in `Features.md`'s List bullet and in the catalogue so it cannot
+> quietly disappear.
+>
+> ## Prototype delta 2026-09-18 — every screen block, for the port queue
+>
+> The refresh replaced `interactive/desktop.dc.html` (3,773 → 4,050 lines) and supplied the missing
+> `support.js`, so the prototype is now RUNNABLE for the first time. **One mechanical rewrite touches
+> every block**, and it is not a design change: the new bundler's runtime spells raw HTML elements
+> `<sc-raw-*>` and events `sc-camel-on-*` (so `<select>`→`<sc-raw-select>`, `onClick`→`sc-camel-on-click`,
+> `colSpan`→`sc-camel-col-span`), and adds a `style-hover="{{ … }}"` binding. The table below is the
+> verdict AFTER normalising those away; "same" means nothing else differs.
+>
+> | screen | old | new | Δ | verdict |
+> |---|---|---|---|---|
+> | isMobileDevice | 17 | 17 | 0 | same |
+> | isSignIn | 60 | 60 | 0 | CHANGED — Google mark inlined as `<svg>` (was `<img src="./apps/web/public/google-mark.svg">`); `&rsquo;` → literal |
+> | isWorkspaces | 57 | 57 | 0 | CHANGED |
+> | isWorkspace | 81 | 81 | 0 | CHANGED |
+> | isWork | 40 | 40 | 0 | CHANGED |
+> | isBoardView | 47 | 47 | 0 | CHANGED |
+> | **isListView** | 76 | 76 | 0 | **same** — the List spec did NOT change; only line numbers moved |
+> | isCalendarView | 29 | 29 | 0 | CHANGED |
+> | isTimelineView | 44 | 44 | 0 | CHANGED |
+> | isMyWork | 53 | 53 | 0 | same |
+> | isInbox | 44 | 44 | 0 | CHANGED |
+> | isMembers | 138 | 71 | −67 | CHANGED — SPLIT (see below) |
+> | **isInviteAdmin** | — | 78 | new | **ADDED — a screen the old file did not have** |
+> | isSettingsShell | 17 | 17 | 0 | CHANGED |
+> | isTypes | 24 | 24 | 0 | CHANGED |
+> | isWorkflows | 30 | 30 | 0 | same |
+> | isTypeEditor | 88 | 88 | 0 | CHANGED |
+> | isMcpTokens | 54 | 54 | 0 | CHANGED |
+> | isBuilder | 473 | 473 | 0 | CHANGED |
+> | isAccount | 130 | 152 | +22 | CHANGED |
+> | isHelp | 54 | 82 | +28 | CHANGED |
+> | isLegal | 37 | 37 | 0 | same |
+> | isInvite | 40 | 40 | 0 | CHANGED |
+> | isMcpAuth | 47 | 47 | 0 | CHANGED |
+> | isNotFound | 35 | 35 | 0 | CHANGED |
+>
+> **The one structural change is `isMembers` splitting into `isMembers` + `isInviteAdmin`** (138 = 71 +
+> 78 − 11): the 2026-09-18 export draws the invite-admin surface as its own screen. `isAccount` (+22)
+> and `isHelp` (+28) genuinely grew. Everything else is the same size.
+>
+> **Caveat, stated because it bounds the table:** the verdicts come from one normaliser that strips the
+> three rewrites above; a residual "CHANGED" on a size-identical block could be a fourth mechanical
+> rewrite I did not map rather than a design change. `isSignIn`'s residual was read line by line and does
+> contain a real change, so the verdict is not vacuous — but the table is a **porting seed, not a
+> changelog**, and each screen still needs its own read before it is ported. Line numbers are the NEW
+> file's; the offset from the old file is **not constant** (176→180, 477→481, 1827→1905, 2584→2779), so
+> every existing `desktop.dc.html:<line>` citation must be re-measured, never shifted by a delta.
+>
+> ## Part 1 status — gate GREEN, review done, fixes landed, second gate in flight
+>
+> The reviewer returned **no Critical and three Important**, all now fixed and re-verified:
+>
+> 1. **A false coverage claim, hiding a rule no suite could fail on.** The test docblock and the
+>    catalogue both asserted the visual metrics were "held by `packages/ui/test/components.test.tsx`
+>    (declaration-level) and `apps/web/e2e-viewport/` (computed style)". **Neither names a single
+>    `.gn-list__*` selector** — measured with a working control (`.gn-board-card` appears 14× in
+>    `packages/ui/test`, `.gn-list` 0×; `e2e-viewport` never opens the List tab). So
+>    `.gn-list__columns-tray[hidden] { display: none }` could be deleted with every suite green while
+>    the tray stays permanently open in a browser — the exact hazard the rule's own comment names.
+>    Claim retracted in both places, and **case 13.671** (new file `ticket-list-css-binding.test.tsx`)
+>    now holds it with five paired arms and four mutation witnesses.
+> 2. **An unconstrained assertion and a fabricated citation.** 13.662's "counts its own rows" survived
+>    `section.rows.length` → `nodes.length`, and its comment cited a prototype expression that does not
+>    exist (`const n = g.items.length` is the real one, `desktop.dc.html:2920`). Fixed with a collapsed
+>    arm that reddens on exactly that mutation, and the **divergence is now declared** rather than
+>    asserted away: this model counts the epic row, the prototype draws it as the header, so the same
+>    two rendered rows read `1 ticket` there and `2 tickets` here.
+> 3. **The five chips had lost their visible focus ring** — the real checkbox went to `opacity: 0` and
+>    nothing in `ui.css` targeted its focus, against 43 `:focus-visible` rules elsewhere. Rule added at
+>    `ui.css:870`, mutation-witnessed.
+>
+> **An instrument trap worth carrying:** `grep -n "…" file | wc -l` returned **1** where the true count
+> was **0**, because this machine's Bash hook proxies `grep` and `wc` counted the proxy's own summary
+> header. A COUNT taken through the proxy is not a count of matches. It nearly made a true review
+> finding look false.
+>
+> `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 tasks, exit 0**, 1m35s.
+> Per package: domain 486, ui 315, rule-engine 306, editor 178, sync-client 90, **app-core 1442**, desktop
+> 9, mobile 29, web 430, mcp-server 44, **server 1534 passed / 5 skipped**. **The `--concurrency=2` is not
+> decoration: the SAME tree at turbo's default concurrency went RED** on `test/seed/seed-dev.test.ts >
+> lands, and a re-run is a no-op` with a bare `Test timed out in 30000ms` — and that test passes in
+> isolation in **1.8 s**. A load-induced timeout, proven by the isolated run, not assumed.
+> **The Node is proven from inside the run, not from the launcher:** turbo's failure line named
+> `node/v24.11.1/bin/pnpm`, which is the LAUNCHER's path and not the interpreter's (the trap the
+> coordination doc records). What settles it is case **6.128**, which asserts the worker Node satisfies
+> the root `package.json`'s `engines` range (`>=22.0.0 <23`) from inside a vitest worker — it is in
+> `server`'s 150 green files, so the workers ran under Node 22.
+>
+> Case-id block **13.658–13.670** is now the live range: **13.658 is the refresh witness** (the dispatch
+> reserves one of the block for it) and the List work takes **13.659–13.670**. The original allocation
+> 13.658–13.669 was re-measured free at this tip (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`);
+> **13.670–13.679 was then measured free too** (14 hits for `13.66[0-9]` as the live positive control,
+> zero for `13.67[0-9]`), because the List implementer had already claimed all twelve ids.
+>
+> ## ⛔ AND THE THING THAT WILL COST A RESTART IF IT IS MISSED
+>
+> **Never run any compose command without the primary checkout's env file:**
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml -f docker-compose.hot.yml <up|build|…>`.
+> This worktree has no `.env`, so the flag omitted substitutes `${GOOGLE_CLIENT_ID:-}` as EMPTY and
+> brings the server up with Google sign-in OFF while everything still looks healthy. After ANY compose
+> action touching `server`, `curl -s localhost:3000/v1/auth/methods` must still answer `"google":true`.
+> **Both hot containers are UP from this worktree right now and the owner is watching :3001.**
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
 > # SERVER'S WATCHER NOW POLLS. Branch PUSHED (`origin/exec/step1b-web-hot-reload`); the PR against base
 > # `owner/workspace-edits` opens immediately after this commit — it did NOT exist when this block was
 > # first written, and a restart surface that names an event which has not happened sends its reader to
