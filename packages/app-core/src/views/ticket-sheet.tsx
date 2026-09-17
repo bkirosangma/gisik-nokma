@@ -171,6 +171,18 @@ export function TicketSheet({
   const [moveOpen, setMoveOpen] = useState(false);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
+   * Ruling 33 (fix round 2, 2026-09-17) — Close/Reopen's OWN transport-error
+   * slot, separate from `serverRefusal`. Ruling 27 (board-prototype-port,
+   * cited on `board.tsx`'s identical pair) is the reason the two must stay
+   * apart: `serverRefusal` carries only what the engine actually adjudicated
+   * — a real `{rule, reason}` pair the door or the rule engine wrote — and a
+   * silence or a dropped connection is not that, however much it might read
+   * the same wrapped in the "Refused by the server — …" sentence. Filed here
+   * (fix round 1) as `serverRefusal` under a synthetic `ingest-rejected` rule
+   * name until this ruling gave it a proper slot.
+   */
+  const [transportError, setTransportError] = useState<string | null>(null);
+  /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
    * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
@@ -324,15 +336,23 @@ export function TicketSheet({
    * move can reload the board out from under it); nothing here reloads this
    * sheet out from under itself, so only the latch applies.
    *
-   * The one case `submitTransition` has no answer for at all is a REJECTED
-   * `ingest` — the promise throwing rather than answering `invalid`. Ruling
-   * 27's docblock (below, on `TransitionDialog`'s `transportError` prop) notes
-   * that path is left as an unhandled rejection there because this sheet has
-   * no transport-error slot to hand it to. Rather than repeat that silently
-   * for Close/Reopen too, a throw here is caught and reported through the same
-   * `serverRefusal` slot, under a rule name that says what happened
-   * (`ingest-rejected`) rather than inventing a `{rule, reason}` pair that
-   * reads as the engine's own answer.
+   * Ruling 33 (fix round 2, 2026-09-17) — SUPERSEDES fix round 1's own
+   * rationale here, which read: "this sheet has no transport-error slot to
+   * hand [a rejection] to," and so folded a rejected `ingest` into
+   * `serverRefusal` under a synthetic `ingest-rejected` rule name. That was
+   * caught in review as the exact defect Ruling 27 removed from `board.tsx`
+   * (case 13.504): a rejection or a silent non-answer is NOT the server's own
+   * verdict, however it is worded, and dressing it in the "Refused by the
+   * server — …" sentence claims an adjudication that never happened. This
+   * sheet now HAS a transport slot (`transportError`, declared beside
+   * `serverRefusal` above), and the three outcomes below are told apart by
+   * which slot they fill, never by wording alone: `results[0] === undefined`
+   * (the door answered nothing for the one event submitted — a typed case,
+   * not an expected one) and a REJECTED promise both go to `transportError`;
+   * only a real `refused`/`invalid` answer goes to `serverRefusal`. `results[0]`,
+   * not `results.find(...)`, because exactly one event is ingested here — the
+   * result at index 0 IS the result, and searching implies a batch this call
+   * never sends.
    *
    * Ruling 32 (fix round 1) — `submitting` is set BEFORE the `ingest` call and
    * reset in a `finally`, mirroring `board.tsx`'s `submitDirect`
@@ -356,20 +376,30 @@ export function TicketSheet({
         payload: {},
       });
       const results = await dataSource.ingest([event]);
-      const failed = results.find((result) => result.status !== 'committed');
-      if (failed === undefined) {
+      const result = results[0];
+      if (result === undefined) {
+        // Ruling 27/33: silence is not a refusal — `transportError`, never a
+        // hand-built `{rule, reason}` pair standing in for one.
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
         setServerRefusal(null);
+        setTransportError(null);
         read.reload();
         history.reload();
         return;
       }
-      if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
-      else setServerRefusal({ rule: failed.code, reason: failed.message });
+      setTransportError(null);
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
     } catch (error) {
-      setServerRefusal({
-        rule: 'ingest-rejected',
-        reason: error instanceof Error ? error.message : String(error),
-      });
+      // Ruling 27/33: a transport failure is not a refusal either — same
+      // `transportError` channel `board.tsx`'s `submitDirect` (`:1082-1088`)
+      // uses, own sentence, never `serverRefusal`.
+      setServerRefusal(null);
+      const message = error instanceof Error ? error.message : String(error);
+      setTransportError(`We could not reach the server for this change — ${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -438,16 +468,18 @@ export function TicketSheet({
               </Button>
             ) : null}
             {/*
-              Opening Move… clears any standing Close/Reopen refusal first: the
-              two now share one `serverRefusal` slot, and without this a
-              `close-requires-terminal` reason left over from a prior Close
-              click would carry into the Move dialog's OWN refusal copy,
-              naming a rule that has nothing to do with the move being
+              Opening Move… clears any standing Close/Reopen refusal AND
+              transport error first (Ruling 33 adds the second clear): a
+              `close-requires-terminal` reason, or a "could not reach the
+              server" notice, left over from a prior Close/Reopen click would
+              otherwise carry into — or reappear behind — the Move dialog,
+              naming a fact that has nothing to do with the move being
               attempted.
             */}
             <Button
               onClick={() => {
                 setServerRefusal(null);
+                setTransportError(null);
                 setMoveOpen(true);
               }}
               disabled={closed !== null}
@@ -476,6 +508,20 @@ export function TicketSheet({
           {serverRefusal !== null && !moveOpen ? (
             <p role="alert" className="gn-refusal gn-refusal--server">
               {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            </p>
+          ) : null}
+          {/*
+            Ruling 33 (fix round 2) — Close/Reopen's OWN transport slot,
+            never the same sentence or class as `serverRefusal` above (Ruling
+            27's own rule, repeated at the site that dropped it): a silence or
+            a dropped connection is not an adjudication. Gated identically to
+            `serverRefusal`'s copy, and for the identical reason — invisible
+            while the Move dialog is open, since that is not where this state
+            is set.
+          */}
+          {transportError !== null && !moveOpen ? (
+            <p role="alert" className="gn-refusal gn-refusal--transport">
+              {transportError}
             </p>
           ) : null}
 
@@ -570,6 +616,7 @@ export function TicketSheet({
           onClose={() => {
             setMoveOpen(false);
             setServerRefusal(null);
+            setTransportError(null);
           }}
           onSubmit={(submission) => void submitTransition(submission)}
           precheck={precheck}

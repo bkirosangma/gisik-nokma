@@ -999,4 +999,41 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     ]);
     await waitFor(() => expect(closeButton).toBeEnabled());
   });
+
+  /**
+   * 13.588b — Ruling 33 (fix round 2, 2026-09-17): a REJECTED `ingest` is a
+   * transport failure, not a refusal, and gets its OWN slot and sentence —
+   * never `serverRefusal`'s "Refused by the server — …", which would claim
+   * an adjudication the door/engine never made (Ruling 27, case 13.504,
+   * `board.tsx`'s identical distinction). Close re-enables once the rejection
+   * settles, same as any other outcome (the `finally` reset doesn't care
+   * which branch ran).
+   */
+  it('13.588b a rejected ingest renders the transport notice, never "Refused by the server", and Close re-enables', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new Error('socket hung up');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+    const closeButton = within(stateRow()).getByRole('button', { name: 'Close' });
+
+    await user.click(closeButton);
+    const notice = await screen.findByRole('alert');
+    expect(notice.className).toBe('gn-refusal gn-refusal--transport');
+    expect(notice).toHaveTextContent('We could not reach the server for this change — socket hung up');
+    expect(document.body.textContent).not.toContain('Refused by the server');
+    await waitFor(() => expect(closeButton).toBeEnabled());
+  });
 });

@@ -6409,3 +6409,19 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   opens a dialog with its own submit path. Mutation (dropping the `finally` reset, `cp`/`sha256sum`
   restore): kills exactly this case (Close never re-enables) and no other —
   (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.588b** ✅ Ruling 33 (fix round 2, 2026-09-17) — a REJECTED `ingest` is a transport failure, never
+  a refusal, and gets its OWN slot: `transportError`, rendered as `<p role="alert"
+  className="gn-refusal gn-refusal--transport">`, gated on `!moveOpen` identically to `serverRefusal`'s
+  own copy. Fix round 1 had folded a rejected `ingest` into `serverRefusal` under a synthetic
+  `ingest-rejected` rule name — caught in review as the exact defect Ruling 27 removed from `board.tsx`
+  (case 13.504, "never claims to be the server's own verdict"): a dropped connection is not an
+  adjudication, however the sentence is worded. Proven with a fake data source whose `ingest` throws
+  (`socket hung up`): clicking **Close** shows the amber transport notice with the message carried
+  verbatim (`We could not reach the server for this change — socket hung up`), the text "Refused by the
+  server" is absent from the document, and **Close** re-enables once the rejection settles — the
+  `finally` reset does not care which branch ran. `results[0]` (not `results.find(...)`) is THE result,
+  since exactly one event is ingested; a `result === undefined` (the door answering nothing) shares the
+  same `transportError` slot with the message "The server did not answer this change." Mutation (moving
+  `setSubmitting(false)` out of the `finally` to after the committed reload only, `cp`/`sha256sum`
+  restore): kills exactly this case (Close stays disabled forever after a rejection) and no other —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
