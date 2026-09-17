@@ -419,3 +419,15 @@ enabled-only-when-all-terminal rule. Every guard by mutation;
 - `apps/web`: `page.tsx` (fifth tab, Backlog view, Closed control, State
   options from defs, Calendar/Timeline default hide), `board-search-scope.ts`
   (Closed chip).
+- Second wave (§8): `packages/domain` — `rank.ts` (`rankBetween`, the key
+  alphabet), `events/ticket-events.ts` (`ticket.ranked`), `entity-state.ts`
+  (`rank`, `reopenedAt`), `events/workspace-settings.ts` (`autoCloseAfterDays`),
+  `actors.ts` (`SYSTEM_ACTOR_AUTO_CLOSE`); `packages/rule-engine` — `rank.ts`
+  refusal; `apps/server` — a second migration (`rank`, `reopened_at`),
+  `routes/list.ts` ordering, `ops/auto-close-sweep.ts` + its registration in
+  `ops/backup-daemon-main.ts`, the settings route's new key;
+  `packages/app-core` — `views/backlog-list.tsx` (rows, drag, Move up/down),
+  `views/close-many-dialog.tsx` (shared by the column header and the List),
+  `views/board.tsx` (Close all on terminal column headers),
+  `views/ticket-list.tsx` (row checkboxes, Close selected); `apps/web` —
+  the Settings page's auto-close control.
