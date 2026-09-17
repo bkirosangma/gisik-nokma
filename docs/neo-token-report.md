@@ -15,7 +15,7 @@ The desktop file's `:root` reads `--surface:#EFE7DF` (warm paper) where the ship
 | hig | light | surface | `#EFE7DF` | `#f2f2f7` | (-3,-11,-24) |
 | hig | light | raised | `#FBF7F3` | `#ffffff` | (-4,-8,-12) |
 | hig | light | sunken | `#E4D8CC` | `#e5e5ea` | (-1,-13,-30) |
-| hig | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| hig | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | hig | dark | surface | `#141A2E` | `#000000` | (+20,+26,+46) |
 | hig | dark | raised | `#20294A` | `#1c1c1e` | (+4,+13,+44) |
 | hig | dark | sunken | `#2A3560` | `#2c2c2e` | (-2,+9,+50) |
@@ -23,15 +23,15 @@ The desktop file's `:root` reads `--surface:#EFE7DF` (warm paper) where the ship
 | minimal | light | surface | `#EFE7DF` | `#f2f2f7` | (-3,-11,-24) |
 | minimal | light | raised | `#FBF7F3` | `#ffffff` | (-4,-8,-12) |
 | minimal | light | sunken | `#E4D8CC` | `#e5e5ea` | (-1,-13,-30) |
-| minimal | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| minimal | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | minimal | dark | surface | `#141A2E` | `#000000` | (+20,+26,+46) |
 | minimal | dark | raised | `#20294A` | `#1c1c1e` | (+4,+13,+44) |
 | minimal | dark | sunken | `#2A3560` | `#2c2c2e` | (-2,+9,+50) |
 | minimal | dark | accent | `#7FA9E4` | `#409cff` | (+63,+13,-27) |
-| neo | light | surface | `#EDE4DB` | `#f2f2f7` | (-5,-14,-28) |
-| neo | light | raised | `#EDE4DB` | `#ffffff` | (-18,-27,-36) |
-| neo | light | sunken | `#EDE4DB` | `#e5e5ea` | (+8,-1,-15) |
-| neo | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| neo | light | surface | `#F1EAE3` | `#f2f2f7` | (-1,-8,-20) |
+| neo | light | raised | `#F1EAE3` | `#ffffff` | (-14,-21,-28) |
+| neo | light | sunken | `#F1EAE3` | `#e5e5ea` | (+12,+5,-7) |
+| neo | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | neo | dark | surface | `#1B2340` | `#000000` | (+27,+35,+64) |
 | neo | dark | raised | `#1B2340` | `#1c1c1e` | (-1,+7,+34) |
 | neo | dark | sunken | `#1B2340` | `#2c2c2e` | (-17,-9,+18) |
@@ -44,7 +44,7 @@ The desktop file's `:root` reads `--surface:#EFE7DF` (warm paper) where the ship
 | hig | light | surface | `#EFE7DF` | `#f2f2f7` | (-3,-11,-24) |
 | hig | light | raised | `#FBF7F3` | `#ffffff` | (-4,-8,-12) |
 | hig | light | sunken | `#E4D8CC` | `#e5e5ea` | (-1,-13,-30) |
-| hig | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| hig | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | hig | dark | surface | `#141A2E` | `#000000` | (+20,+26,+46) |
 | hig | dark | raised | `#20294A` | `#1c1c1e` | (+4,+13,+44) |
 | hig | dark | sunken | `#2A3560` | `#2c2c2e` | (-2,+9,+50) |
@@ -52,15 +52,15 @@ The desktop file's `:root` reads `--surface:#EFE7DF` (warm paper) where the ship
 | minimal | light | surface | `#EFE7DF` | `#f2f2f7` | (-3,-11,-24) |
 | minimal | light | raised | `#FBF7F3` | `#ffffff` | (-4,-8,-12) |
 | minimal | light | sunken | `#E4D8CC` | `#e5e5ea` | (-1,-13,-30) |
-| minimal | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| minimal | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | minimal | dark | surface | `#141A2E` | `#000000` | (+20,+26,+46) |
 | minimal | dark | raised | `#20294A` | `#1c1c1e` | (+4,+13,+44) |
 | minimal | dark | sunken | `#2A3560` | `#2c2c2e` | (-2,+9,+50) |
 | minimal | dark | accent | `#7FA9E4` | `#409cff` | (+63,+13,-27) |
-| neo | light | surface | `#EDE4DB` | `#f2f2f7` | (-5,-14,-28) |
-| neo | light | raised | `#EDE4DB` | `#ffffff` | (-18,-27,-36) |
-| neo | light | sunken | `#EDE4DB` | `#e5e5ea` | (+8,-1,-15) |
-| neo | light | accent | `#3A6DB0` | `#0040dd` | (+58,+45,-45) |
+| neo | light | surface | `#F1EAE3` | `#f2f2f7` | (-1,-8,-20) |
+| neo | light | raised | `#F1EAE3` | `#ffffff` | (-14,-21,-28) |
+| neo | light | sunken | `#F1EAE3` | `#e5e5ea` | (+12,+5,-7) |
+| neo | light | accent | `#33629F` | `#0040dd` | (+51,+34,-62) |
 | neo | dark | surface | `#1B2340` | `#000000` | (+27,+35,+64) |
 | neo | dark | raised | `#1B2340` | `#1c1c1e` | (-1,+7,+34) |
 | neo | dark | sunken | `#1B2340` | `#2c2c2e` | (-17,-9,+18) |
@@ -68,9 +68,37 @@ The desktop file's `:root` reads `--surface:#EFE7DF` (warm paper) where the ship
 
 **Every role in every style is offset from the shipped palette, in both themes — not only the light-mode warm-paper case the dispatch named as the visible instance.** The dark-theme delta is the larger one: shipped dark `surface` is pure black `#000000`; the export's `hig`/`minimal` dark surface is a navy `#141A2E` (Δ +20,+26,+46) and `neo` dark surface is `#1B2340` (Δ +27,+35,+64) — a full hue shift, not a brightness adjustment.
 
-**`accent` also differs, in every style and both themes** — this contradicts the amendment's reading of the design session ("the accent palette is unchanged"). Measured: light `#3A6DB0` vs shipped `#0040DD` (a blue-grey vs a saturated blue, Δ +58,+45,−45); dark `#7FA9E4` vs shipped `#409CFF` (Δ +63,+13,−27). This is present identically in `hig` and `minimal`, not only `neo` — so it is not a neo-specific decision, it is a property of the whole exported base.
+**`accent` also differs, in every style and both themes** — this contradicts the amendment's reading of the design session ("the accent palette is unchanged"). Measured (desktop/`hig`, the value every style shares): light `#33629F` vs shipped `#0040dd` (Δ +51,+34,-62); dark `#7FA9E4` vs shipped `#409cff` (Δ +63,+13,-27). This is present identically in `hig` and `minimal`, not only `neo` — so it is not a neo-specific decision, it is a property of the whole exported base.
 
 **Verdict, stated and not resolved:** every style in this export is a **palette change** from the shipped code — surface, raised, sunken AND accent all move, in both themes, uniformly across all three styles (neo changes nothing about surface/accent beyond what hig/minimal already changed — neo's *additional* delta is confined to introducing shadow as the elevation signal and flattening surface/raised/sunken to one value). Whether this is adopted as the new palette, treated as this export's own drift from an unstated separate palette decision, or reconciled back to `#353`'s increased-contrast set is the controller's call.
+
+## The tint layer — the variables T3 and T4 moved
+
+Every `--tint*` variable the export declares, per style and theme, as authored (`var()` references and `color-mix()` resolved). **This section was added 2026-09-18**, with the refresh that moved T3 and T4: before it this report had no tint row of any kind, so a halving of all five base tints and `--tintAccent` becoming derived could not have appeared in this file's own diff — the movement the 2026-09-18 prototype-delta audit named as the largest in the base had no instrument behind it.
+
+### desktop
+
+| style | theme | `--tintAccent` | `--tintDanger` | `--tintWarning` | `--tintPink` | `--tintPurple` | `--tintSuccess` |
+|---|---|---|---|---|---|---|---|
+| hig | light | rgba(51,98,159,0.07) | rgba(185,51,39,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| hig | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+| minimal | light | rgba(51,98,159,0.07) | rgba(185,51,39,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| minimal | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+| neo | light | rgba(51,98,159,0.07) | rgba(158,42,32,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| neo | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+
+### mobile
+
+| style | theme | `--tintAccent` | `--tintDanger` | `--tintWarning` | `--tintPink` | `--tintPurple` | `--tintSuccess` |
+|---|---|---|---|---|---|---|---|
+| hig | light | rgba(51,98,159,0.07) | rgba(185,51,39,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| hig | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+| minimal | light | rgba(51,98,159,0.07) | rgba(185,51,39,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| minimal | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+| neo | light | rgba(51,98,159,0.07) | rgba(158,42,32,0.07) | rgba(240,124,52,0.10) | rgba(176,58,98,0.07) | rgba(76,74,143,0.07) | rgba(44,115,85,0.07) |
+| neo | dark | rgba(127,169,228,0.1) | rgba(247,144,134,0.10) | rgba(247,169,97,0.10) | rgba(244,154,183,0.10) | rgba(183,180,244,0.10) | rgba(123,211,170,0.10) |
+
+These are RESOLVED cascade values, not per-arm declarations: a style/theme that does not override a tint shows the value it inherits. The distinction is visible in the table rather than asserted — `neo`/light's `--tintDanger` reads `rgba(158,42,32,0.07)` where `hig`/`minimal`/light read `rgba(185,51,39,0.07)`, because the light-neo arm is the only one that declares it. `--tintAccent` is likewise derived, not stored: it tracks `--accent` through `color-mix`, so the light row reads `rgba(51,98,159,…)` — the NEW accent — and would have followed the accent anywhere it moved. No cell is empty, which is the expected result here and the reason this table cannot be used to prove a variable is undeclared; `allResolvedVars` carries the merge, not the arm.
 
 ## Rule (a) — sunken input, shadow-edge contrast (owner-accepted waiver, still measured)
 
@@ -84,7 +112,7 @@ Owner ruling: the neo empty input takes the pure sunken/no-border look even wher
 | hig | dark | fill (`fieldBg` vs `surface`) — no shadow declared | 1.24 | FAIL |
 | minimal | light | fill (`fieldBg` vs `surface`) — no shadow declared | 1.1 | FAIL |
 | minimal | dark | fill (`fieldBg` vs `surface`) — no shadow declared | 1.24 | FAIL |
-| neo | light | shadow edge (worst of 2 layers) | **1.24** | FAIL |
+| neo | light | shadow edge (worst of 2 layers) | **1.18** | FAIL |
 | neo | dark | shadow edge (worst of 2 layers) | **1.16** | FAIL |
 
 ### mobile
@@ -95,7 +123,7 @@ Owner ruling: the neo empty input takes the pure sunken/no-border look even wher
 | hig | dark | fill (`fieldBg` vs `surface`) — no shadow declared | 1.24 | FAIL |
 | minimal | light | fill (`fieldBg` vs `surface`) — no shadow declared | 1.15 | FAIL |
 | minimal | dark | fill (`fieldBg` vs `surface`) — no shadow declared | 1.24 | FAIL |
-| neo | light | shadow edge (worst of 2 layers) | **1.24** | FAIL |
+| neo | light | shadow edge (worst of 2 layers) | **1.18** | FAIL |
 | neo | dark | shadow edge (worst of 2 layers) | **1.16** | FAIL |
 
 `hig` and `minimal` declare `--fieldShadow: none` in both files — they have **no shadow to measure**; their own fill-only boundary (`fieldBg` vs `surface`) is reported instead and is itself below 3:1 in every case measured (**pre-existing, not introduced by this amendment** — reported as a gap, not in this task's scope to fix).
@@ -162,9 +190,9 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 | light | label2 on surface | 6.11 | PASS |
 | light | label2 on raised | 6.65 | PASS |
 | light | label3 on surface | 2.99 | FAIL |
-| light | accent on surface | 4.3 | FAIL |
-| light | accent on raised | 4.93 | PASS |
-| light | onColor on accent | 4.93 | PASS |
+| light | accent on surface | 5.07 | PASS |
+| light | accent on raised | 5.81 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 14.4 | PASS |
 | dark | label on raised | 11.86 | PASS |
 | dark | label on sunken | 9.86 | PASS |
@@ -185,9 +213,9 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 | light | label2 on surface | 6.11 | PASS |
 | light | label2 on raised | 6.65 | PASS |
 | light | label3 on surface | 2.99 | FAIL |
-| light | accent on surface | 4.3 | FAIL |
-| light | accent on raised | 4.93 | PASS |
-| light | onColor on accent | 4.93 | PASS |
+| light | accent on surface | 5.07 | PASS |
+| light | accent on raised | 5.81 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 14.4 | PASS |
 | dark | label on raised | 11.86 | PASS |
 | dark | label on sunken | 9.86 | PASS |
@@ -202,15 +230,15 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 
 | theme | pair | ratio | pass |
 |---|---|---|---|
-| light | label on surface | 11.12 | PASS |
-| light | label on raised | 11.12 | PASS |
-| light | label on sunken | 11.12 | PASS |
-| light | label2 on surface | 6.02 | PASS |
-| light | label2 on raised | 6.02 | PASS |
-| light | label3 on surface | 2.96 | FAIL |
-| light | accent on surface | 4.19 | FAIL |
-| light | accent on raised | 4.19 | FAIL |
-| light | onColor on accent | 4.93 | PASS |
+| light | label on surface | 11.72 | PASS |
+| light | label on raised | 11.72 | PASS |
+| light | label on sunken | 11.72 | PASS |
+| light | label2 on surface | 6.21 | PASS |
+| light | label2 on raised | 6.21 | PASS |
+| light | label3 on surface | 3.01 | FAIL |
+| light | accent on surface | 5.2 | PASS |
+| light | accent on raised | 5.2 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 12.87 | PASS |
 | dark | label on raised | 12.87 | PASS |
 | dark | label on sunken | 12.87 | PASS |
@@ -233,9 +261,9 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 | light | label2 on surface | 6.11 | PASS |
 | light | label2 on raised | 6.65 | PASS |
 | light | label3 on surface | 2.99 | FAIL |
-| light | accent on surface | 4.3 | FAIL |
-| light | accent on raised | 4.93 | PASS |
-| light | onColor on accent | 4.93 | PASS |
+| light | accent on surface | 5.07 | PASS |
+| light | accent on raised | 5.81 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 14.4 | PASS |
 | dark | label on raised | 11.86 | PASS |
 | dark | label on sunken | 9.86 | PASS |
@@ -256,9 +284,9 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 | light | label2 on surface | 6.11 | PASS |
 | light | label2 on raised | 6.65 | PASS |
 | light | label3 on surface | 2.99 | FAIL |
-| light | accent on surface | 4.3 | FAIL |
-| light | accent on raised | 4.93 | PASS |
-| light | onColor on accent | 4.93 | PASS |
+| light | accent on surface | 5.07 | PASS |
+| light | accent on raised | 5.81 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 14.4 | PASS |
 | dark | label on raised | 11.86 | PASS |
 | dark | label on sunken | 9.86 | PASS |
@@ -273,15 +301,15 @@ Measured as the control fill (`ctlBg`/`chipBg`) composited over `surface`, WCAG 
 
 | theme | pair | ratio | pass |
 |---|---|---|---|
-| light | label on surface | 11.12 | PASS |
-| light | label on raised | 11.12 | PASS |
-| light | label on sunken | 11.12 | PASS |
-| light | label2 on surface | 6.02 | PASS |
-| light | label2 on raised | 6.02 | PASS |
-| light | label3 on surface | 2.96 | FAIL |
-| light | accent on surface | 4.19 | FAIL |
-| light | accent on raised | 4.19 | FAIL |
-| light | onColor on accent | 4.93 | PASS |
+| light | label on surface | 11.72 | PASS |
+| light | label on raised | 11.72 | PASS |
+| light | label on sunken | 11.72 | PASS |
+| light | label2 on surface | 6.21 | PASS |
+| light | label2 on raised | 6.21 | PASS |
+| light | label3 on surface | 3.01 | FAIL |
+| light | accent on surface | 5.2 | PASS |
+| light | accent on raised | 5.2 | PASS |
+| light | onColor on accent | 5.81 | PASS |
 | dark | label on surface | 12.87 | PASS |
 | dark | label on raised | 12.87 | PASS |
 | dark | label on sunken | 12.87 | PASS |

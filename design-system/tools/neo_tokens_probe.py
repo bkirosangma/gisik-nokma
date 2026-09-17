@@ -32,8 +32,26 @@ BLOCK_SELECTORS = [
     ("root", r':root'),
     ("dark", r'body\[data-theme="dark"\]'),
     ("minimal", r'body\[data-style="minimal"\]'),
-    ("neo", r'body\[data-style="neo"\]'),
+    # 2026-09-18 refresh (`@6d7b67c0a52c`): the bare `body[data-style="neo"]`
+    # this instrument was written against NO LONGER EXISTS. The export moved it
+    # to `body[data-theme="light"][data-style="neo"]`, so the light-neo arm
+    # became explicit about its theme. This is measured, not assumed: with the
+    # old pattern the positive control below fails outright
+    # (`selector body\[data-style="neo"\] not found`), which is the failure the
+    # 2026-09-18 prototype-delta audit predicted for this instrument.
+    ("neo", r'body\[data-theme="light"\]\[data-style="neo"\]'),
     ("darkneo", r'body\[data-theme="dark"\]\[data-style="neo"\]'),
+    # 2026-09-18 refresh, the other half of the same movement (T2 of the
+    # 2026-09-18 prototype-delta audit): the `--accent` ALIAS left `:root` and
+    # now lives on the bare `body` rule. Without this block `--accent` is
+    # declared NOWHERE the instrument reads, and the positive control below
+    # fails with `accent on surface` = None — the instrument reports "cannot
+    # tell colours apart" rather than "I lost the variable", which is the
+    # silent-empty shape this file's own docstring warns about. The bare
+    # selector cannot collide with `body[data-theme="dark"]{`: `re.search`
+    # appends `\s*\{` to every pattern here, and the attribute bracket is not
+    # `{`, so that rule is not a match for this one.
+    ("body", r'body'),
 ]
 
 STYLES = ["hig", "minimal", "neo"]
@@ -60,14 +78,24 @@ def extract_style_block(html_text, device_label):
 
 def parse_declarations(body_text):
     """`--a:1px; --b:rgba(...)` -> {'--a': '1px', '--b': 'rgba(...)'}. Box-shadow
-    layers use commas, never semicolons, so splitting on ';' is safe."""
+    layers use commas, never semicolons, so splitting on ';' is safe.
+
+    Only CUSTOM PROPERTIES are kept. Every selector this instrument read before
+    2026-09-18 declared nothing else, so this filter was a no-op then; the bare
+    `body` block it now reads (the `--accent` alias, T2) is ordinary CSS with
+    `margin`/`background`/`font-family` beside the one custom property, and
+    letting those through would put non-colour keys into the resolved set that
+    `allResolvedVars` and the delta tables walk."""
     out = {}
     for chunk in body_text.split(";"):
         chunk = chunk.strip()
         if not chunk or ":" not in chunk:
             continue
         name, value = chunk.split(":", 1)
-        out[name.strip()] = value.strip()
+        name = name.strip()
+        if not name.startswith("--"):
+            continue
+        out[name] = value.strip()
     return out
 
 
@@ -84,7 +112,17 @@ def resolve_cascade(blocks, style, theme):
     """Cascade order matches the source file: root, dark, minimal, neo, darkneo.
     Two attribute selectors (darkneo) outrank one (dark/minimal/neo alone), and
     that block is applied last regardless, so this order is correct for every
-    combination the file defines."""
+    combination the file defines.
+
+    2026-09-18 refresh: the light-neo block is now `body[data-theme="light"]
+    [data-style="neo"]`, which matches ONLY when the theme is exactly `light`.
+    It is therefore applied on the light arm ALONE. Applying it for dark as
+    well (which the old bare `body[data-style="neo"]` justified, since darkneo
+    then overrode it) would be wrong in a way this file would not report: the
+    dark-neo block does not re-declare the five semantic colours, so
+    light-neo's `--danger`/`--warning`/`--pink`/`--success`/`--purple` would
+    leak into the dark-neo merge and every dark-neo reading would be taken
+    against light-theme semantics."""
     merged, source = {}, {}
 
     def apply(block_key, label):
@@ -93,12 +131,16 @@ def resolve_cascade(blocks, style, theme):
             source[k] = label
 
     apply("root", ":root")
+    # The `--accent` alias (T2). `body` (0,0,1) sits below every block that
+    # overrides it, so it is applied FIRST among the theme/style arms and the
+    # dark arm's own `--accent` (0,1,1) then wins by both specificity and order.
+    apply("body", "body")
     if theme == "dark":
         apply("dark", 'body[data-theme="dark"]')
     if style == "minimal":
         apply("minimal", 'body[data-style="minimal"]')
-    if style == "neo":
-        apply("neo", 'body[data-style="neo"]')
+    if style == "neo" and theme == "light":
+        apply("neo", 'body[data-theme="light"][data-style="neo"]')
     if theme == "dark" and style == "neo":
         apply("darkneo", 'body[data-theme="dark"][data-style="neo"]')
     return merged, source
@@ -130,7 +172,45 @@ def resolve_var_refs(merged, depth=0):
                 resolved[k] = VAR_REF.sub(sub, v)
         if not changed:
             break
+    for k, v in list(resolved.items()):
+        resolved[k] = resolve_color_mix(v)
     return resolved
+
+
+# The ONE `color-mix` form the 2026-09-18 export uses (T4 of the 2026-09-18
+# prototype-delta audit): an opaque colour mixed with `transparent` at a
+# percentage. Added because the refresh moved `--tintAccent` from a stored
+# literal `rgba(58,109,176,0.14)` to a DERIVED `color-mix(...)`, and the
+# previous run's `parse_color` returned None for it — the instrument would have
+# reported "no colour" for a movement it was supposed to measure.
+COLOR_MIX_RE = re.compile(
+    r"color-mix\(\s*in\s+srgb\s*,\s*(?P<c1>[^,]+?)\s+(?P<p1>[\d.]+)%\s*,\s*(?P<c2>[^)]+?)\s*\)"
+)
+# The only second operand this export ever mixes against. Named so an
+# unrecognised `color-mix` is left verbatim rather than resolved to a guess.
+TRANSPARENT_OPERANDS = {"transparent", "rgba(0,0,0,0)", "rgba(0, 0, 0, 0)"}
+
+
+def resolve_color_mix(value):
+    """`color-mix(in srgb, C P%, transparent)` -> `rgba(r,g,b,P/100)`.
+
+    Alpha, not tinting: sRGB mixing against `transparent` (= rgba(0,0,0,0))
+    contributes no colour weight, so the result keeps C's own channels and
+    scales its alpha. This is deliberately NOT a general `color-mix`
+    implementation — a form it does not recognise is returned UNCHANGED, so an
+    unresolved mix shows up as an unparseable value downstream rather than as a
+    plausible wrong colour.
+    """
+    m = COLOR_MIX_RE.search(value)
+    if m is None:
+        return value
+    if m.group("c2").strip().lower() not in TRANSPARENT_OPERANDS:
+        return value
+    rgb = parse_color(m.group("c1"))
+    if rgb is None:
+        return value
+    r, g, b, _ = rgb
+    return f"rgba({int(r)},{int(g)},{int(b)},{round(float(m.group('p1')) / 100.0, 4)})"
 
 
 # ── Colour + contrast (ported, not reinvented) ──────────────────────────────
@@ -443,13 +523,40 @@ def palette_delta(combo):
     return out
 
 
+# ── The tint layer ────────────────────────────────────────────────────────
+#
+# Added 2026-09-18 with the refresh that moved T3/T4. Before it, this
+# instrument had NO row for any `--tint*` variable, so the largest single
+# movement in the light/dark base (`--tintDanger`/`--tintWarning`/`--tintPink`/
+# `--tintPurple`/`--tintSuccess` halving, and `--tintAccent` becoming derived)
+# could not appear in this report's diff at all. That is the gap this closes:
+# the audit's T3/T4 rows had no instrument behind them.
+TINT_VARS = ["--tintAccent", "--tintDanger", "--tintWarning", "--tintPink", "--tintPurple", "--tintSuccess"]
+
+
+def tint_table(combo):
+    """Per style/theme, the export's six tint variables, exactly as authored
+    (var-refs and `color-mix` resolved). `None` means the combination does not
+    declare the variable — which is itself a measurement, and is why this
+    returns `None` rather than falling back to the `:root` value."""
+    out = {}
+    for style in STYLES:
+        out[style] = {}
+        for theme in THEMES:
+            v = combo[style][theme]["allResolvedVars"]
+            out[style][theme] = {
+                name: (v.get(name, {}).get("value") if name in v else None) for name in TINT_VARS
+            }
+    return out
+
+
 # ── Markdown report (generated, not hand-transcribed) ───────────────────
 
 def fmt(v):
     return "—" if v is None else v
 
 
-def render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas):
+def render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas, tints):
     lines = []
     lines.append("# Task 13 — neo-token measurement report")
     lines.append("")
@@ -506,14 +613,22 @@ def render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas):
         "(Δ +27,+35,+64) — a full hue shift, not a brightness adjustment."
     )
     lines.append("")
+    def delta_phrase(device, style, theme, role):
+        row = deltas[device][style][theme][role]
+        d = row["delta"]
+        return (
+            f"`{row['exported']}` vs shipped `{row['shipped']}` "
+            f"(Δ {d['dR']:+d},{d['dG']:+d},{d['dB']:+d})"
+        )
+
     lines.append(
         "**`accent` also differs, in every style and both themes** — this contradicts "
         "the amendment's reading of the design session (\"the accent palette is "
-        "unchanged\"). Measured: light `#3A6DB0` vs shipped `#0040DD` (a blue-grey vs "
-        "a saturated blue, Δ +58,+45,−45); dark `#7FA9E4` vs shipped `#409CFF` "
-        "(Δ +63,+13,−27). This is present identically in `hig` and `minimal`, not only "
-        "`neo` — so it is not a neo-specific decision, it is a property of the whole "
-        "exported base."
+        "unchanged\"). Measured (desktop/`hig`, the value every style shares): light "
+        f"{delta_phrase('desktop', 'hig', 'light', 'accent')}; dark "
+        f"{delta_phrase('desktop', 'hig', 'dark', 'accent')}. This is present identically "
+        "in `hig` and `minimal`, not only `neo` — so it is not a neo-specific decision, "
+        "it is a property of the whole exported base."
     )
     lines.append("")
     lines.append(
@@ -526,6 +641,45 @@ def render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas):
         "this is adopted as the new palette, treated as this export's own drift from "
         "an unstated separate palette decision, or reconciled back to `#353`'s "
         "increased-contrast set is the controller's call."
+    )
+    lines.append("")
+
+    # ── The tint layer (T3/T4) ──
+    lines.append("## The tint layer — the variables T3 and T4 moved")
+    lines.append("")
+    lines.append(
+        "Every `--tint*` variable the export declares, per style and theme, as authored "
+        "(`var()` references and `color-mix()` resolved). **This section was added "
+        "2026-09-18**, with the refresh that moved T3 and T4: before it this report had "
+        "no tint row of any kind, so a halving of all five base tints and `--tintAccent` "
+        "becoming derived could not have appeared in this file's own diff — the movement "
+        "the 2026-09-18 prototype-delta audit named as the largest in the base had no "
+        "instrument behind it."
+    )
+    lines.append("")
+    for device_label in DEVICES:
+        lines.append(f"### {device_label}")
+        lines.append("")
+        lines.append("| style | theme | " + " | ".join(f"`{t}`" for t in TINT_VARS) + " |")
+        lines.append("|---|---|" + "---|" * len(TINT_VARS))
+        for style in STYLES:
+            for theme in THEMES:
+                row = tints[device_label][style][theme]
+                lines.append(
+                    f"| {style} | {theme} | " + " | ".join(fmt(row[t]) for t in TINT_VARS) + " |"
+                )
+        lines.append("")
+    lines.append(
+        "These are RESOLVED cascade values, not per-arm declarations: a style/theme that "
+        "does not override a tint shows the value it inherits. The distinction is visible "
+        "in the table rather than asserted — `neo`/light's `--tintDanger` reads "
+        "`rgba(158,42,32,0.07)` where `hig`/`minimal`/light read `rgba(185,51,39,0.07)`, "
+        "because the light-neo arm is the only one that declares it. `--tintAccent` is "
+        "likewise derived, not stored: it tracks `--accent` through `color-mix`, so the "
+        "light row reads `rgba(51,98,159,…)` — the NEW accent — and would have followed "
+        "the accent anywhere it moved. No cell is empty, which is the expected result "
+        "here and the reason this table cannot be used to prove a variable is undeclared; "
+        "`allResolvedVars` carries the merge, not the arm."
     )
     lines.append("")
 
@@ -684,7 +838,7 @@ def render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas):
 
 def main():
     all_devices = {}
-    rule_a, rule_b, rule_c, pairs, deltas = {}, {}, {}, {}, {}
+    rule_a, rule_b, rule_c, pairs, deltas, tints = {}, {}, {}, {}, {}, {}
     for device_label, path in DEVICES.items():
         combo = measure_device(device_label, path)
         all_devices[device_label] = combo
@@ -693,8 +847,9 @@ def main():
         rule_c[device_label] = rule_c_dark_fill_separation(combo)
         pairs[device_label] = text_pairs(combo)
         deltas[device_label] = palette_delta(combo)
+        tints[device_label] = tint_table(combo)
 
-    report_text = render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas)
+    report_text = render_report(all_devices, rule_a, rule_b, rule_c, pairs, deltas, tints)
     out_md = REPO_ROOT / "docs" / "neo-token-report.md"
     out_md.write_text(report_text, encoding="utf-8")
     print(f"wrote {out_md.relative_to(REPO_ROOT)} ({out_md.stat().st_size} bytes)")
@@ -713,6 +868,7 @@ def main():
         "ruleC_darkFillSeparation": rule_c,
         "textSurfacePairs": pairs,
         "paletteDelta": deltas,
+        "tintLayer": tints,
     }
 
     out_json = REPO_ROOT / "design-system" / "neo-tokens.json"
@@ -732,4 +888,28 @@ if __name__ == "__main__":
     accent_row = next(r for r in control if r["pair"] == "accent on surface")
     assert accent_row["ratio"] is not None and accent_row["ratio"] > 1, "positive control failed — instrument cannot tell colours apart"
     print("positive control: accent-on-surface (desktop/hig/light) =", accent_row["ratio"])
+
+    # 2026-09-18 extensions, each with the control that would catch it failing.
+    # (1) The moved light-neo selector must still be SEEN: the arm overrides
+    #     --tintDanger, so its resolved value must differ from the arms that
+    #     inherit `:root`'s.
+    layer = result["tintLayer"]["desktop"]
+    assert layer["neo"]["light"]["--tintDanger"] != layer["hig"]["light"]["--tintDanger"], (
+        "light-neo tint override is not visible — the moved selector is not being read"
+    )
+    # (2) That arm must NOT leak into dark. It declares no --tintDanger for the
+    #     dark merge to re-declare, so an unconditional application shows up
+    #     here as light-neo's value under a dark theme — the exact silent-wrong
+    #     -answer this run's cascade change exists to prevent.
+    assert layer["neo"]["dark"]["--tintDanger"] == layer["hig"]["dark"]["--tintDanger"], (
+        "dark-neo inherited light-neo's tint — the light arm leaked into the dark merge"
+    )
+    # (3) `color-mix` must have resolved, or T4 is reported as unmeasurable
+    #     rather than measured.
+    assert layer["neo"]["light"]["--tintAccent"] is not None, "color-mix did not resolve — T4 is unmeasured"
+    print(
+        "controls: light-neo tint override visible =", layer["neo"]["light"]["--tintDanger"],
+        "| dark-neo uncontaminated =", layer["neo"]["dark"]["--tintDanger"],
+        "| tintAccent resolved =", layer["neo"]["light"]["--tintAccent"],
+    )
     sys.exit(0)
