@@ -444,4 +444,8 @@ describe('13.551 — tri-state choice rules', () => {
   it('the row variant keeps the 44px floor', () => {
     expect(rule('.gn-filters__choice--row')).toMatch(/min-height:\s*2\.75rem/);
   });
+  it('an excluded person row keeps the ROW ground, not the chip-level exclude ground (spec §4)', () => {
+    expect(rule(".gn-filters__choice[data-mode='exclude']")).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(rule(".gn-filters__choice--row[data-mode='exclude']")).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+  });
 });

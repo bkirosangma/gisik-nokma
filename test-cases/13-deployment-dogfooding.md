@@ -6132,12 +6132,16 @@ workflow-picker docblock; `filters-sheet.test.tsx:502`'s Ruling 13 paragraph;
 `board-search-scope.test.ts:93`/`:174`'s section headers), and left as a plain current-name swap where
 the sentence is a live "see also" pointer (`filters-sheet.test.tsx:245`). The `describe(...)` titles at
 `board-search-scope.test.ts:106`/`:185` are untouched — `13.442`/`13.443` are cited by those titles
-verbatim, and the catalogue names them historically. `Features.md` (lines 75, 83, 85) had six mentions
-of the two pre-Task-6 names, all six re-pointed, and every one of the six carries the full
+verbatim, and the catalogue names them historically. `Features.md` (lines 75, 83, 85) had seven mentions
+of the two pre-Task-6 names, all seven re-pointed, and every one of the seven carries the full
 "(renamed 2026-09-17; was `...`)" annotation — none of them is a bare, unannotated swap, including the
 two inside the live `- ✅` workflow-picker bullet at line 85. Commit `e282fa96`'s own message describes
-two of those six as plain renames with no annotation; that description is wrong — all six carry the
-annotation — and this paragraph, not the commit message, is the record. `apps/web/src/filter-edits.ts:7`'s
+two of those seven as plain renames with no annotation; that description is wrong — all seven carry the
+annotation — and this paragraph, not the commit message, is the record. **Final review fix wave
+(2026-09-17) correction: this paragraph itself previously undercounted — a seventh, bare mention (the
+`13.443` gate-expression sentence on line 75, quoting `13.443`'s own unrenamed describe title) survived
+the round this paragraph describes, contradicting its own "none of them is a bare, unannotated swap."
+Now annotated, and the count above is the corrected seven, not the original six.** `apps/web/src/filter-edits.ts:7`'s
 citation of "the `toggledArray` convention" (deleted in Task 9) is rephrased to name it as the collapse convention
 `page.tsx`'s former `toggledArray` set, deleted 2026-09-17, with `withIdAxis` as its successor.
 
@@ -6152,6 +6156,10 @@ fallback (`13.556b`); (3) §2's wire refusal is reachable today through `toServe
 filter carrying `exclude` — no code path writes one yet, since the project page mounts no saved-filter
 control, but whoever wires one owes it a catch/translate layer so the person sees a sentence about
 what their filter cannot express, not `UnexpressibleFilterError`'s developer-facing string.
+`toServerPreferences` builds a WHOLE-DOCUMENT PUT — one `.map()` over every `SavedFilter` feeds a
+single request body that also carries `listColumns` and `grouping` for every project — so an uncaught
+throw here fails the entire preferences save, not just the one filter; the follow-on catch/translate
+layer must scope the failure to the one filter.
 
 *Spec §8, named but not built, unchanged by this task:* server-side negation and plural axes on the
 wire (worth doing only past the 2000-row cap); filter state in the URL (a separate change — today's

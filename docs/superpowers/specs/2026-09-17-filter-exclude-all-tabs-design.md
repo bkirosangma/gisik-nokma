@@ -364,4 +364,15 @@ every gate.
    this is not a live bug, but whoever wires a save-filter control onto a
    filter that can now exclude owes that control a catch/translate layer, so
    the person who triggers it sees a sentence about what their filter cannot
-   express, not `UnexpressibleFilterError`'s developer-facing string.
+   express, not `UnexpressibleFilterError`'s developer-facing string. The blast
+   radius if it stays uncaught is total, not scoped to the one filter:
+   `toServerPreferences` builds a single WHOLE-DOCUMENT PUT — its `.map()` over
+   every `SavedFilter` runs before `putPreferences` issues one request, and
+   that same request body also carries `listColumns` and `grouping` for every
+   project — so a throw from one unexpressible filter aborts the object
+   construction entirely and the PUT is never sent, failing the save of
+   columns, groupings, and every OTHER saved filter along with it. The
+   follow-on catch/translate layer must therefore scope the failure to the
+   one filter, not merely translate its message, or a single bad exclude
+   clause silently blocks every other preference the user changed in the
+   same sitting.

@@ -3643,8 +3643,7 @@
 }
 /* Exclude is a choice, not an error: the OFF ground, explicitly, and no
    danger tone anywhere in this rule (13.551 reads exactly this body). The
-   strike is on the LABEL span, so the glyph and the hidden suffix stay
-   legible. */
+   strike is on the LABEL span, so the glyph stays legible. */
 .gn-filters__choice[data-mode='exclude'] {
   background: var(--gn-fill-tertiary);
   color: var(--gn-text);
@@ -3669,5 +3668,9 @@
   background: var(--gn-accent);
   box-shadow: none;
 }
+/* Exclude keeps the ROW's own ground (spec §4's table: off and exclude share a
+   ground) — without this, the chip-level exclude rule above wins on specificity
+   and an excluded row shifts one alpha step from an off row. */
+.gn-filters__choice--row[data-mode='exclude'] { background: var(--gn-fill-quaternary); }
 /* The strip's exclude chip carries the same ⊘ glyph before "Not …". */
 .gn-project__filter-chip--exclude .gn-filters__choice-glyph { color: var(--gn-text-muted); }
