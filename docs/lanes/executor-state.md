@@ -20,8 +20,121 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a IS DONE AND COMMITTED; ONE PR OPEN
-> # AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE. QUEUE EMPTY — HOLD.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:xx IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
+> # DONE. PR #424 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c0-prototype-delta-audit.md`.
+> Deliverable: `docs/design/prototype-delta-2026-09-18.md`. **Docs-only: no source, no `Features.md`, no
+> `test-cases/` change.** Independent reviewer ran (falsification brief) and its three findings are fixed.
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
+> | **PR** | **#424, base `owner/workspace-edits`** — never `main` |
+> | HEAD | `b784326b` (the reviewed head, before this handoff block) — **the PR is frozen there; the handoff update is the only commit after it** |
+> | PR base | `owner/workspace-edits` — NEVER `main` |
+> | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
+> | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
+>
+> ## All 25 screens are decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
+>
+> | verdict | n | screens |
+> |---|---|---|
+> | **port** | **3** | `isTypeEditor` (M, blocked on a ruling), `isLegal` (M), `isNotFound` (S) |
+> | **wire-gap** | **8** | **TOKENS (global)**, `isInbox`, `isTypes`, `isWorkflows`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` |
+> | **held** | **5** | `isMembers`, `isInviteAdmin` (owner hold), `isBuilder`, `isWorkspaces`, `isWork` |
+> | **none** | **9** | `isAccount`, `isHelp`, `isTimelineView`, `isMyWork`, `isSettingsShell`, `isMobileDevice`, `isSignIn`, `isBoardView`, `isCalendarView` |
+> | **done** | **1** | `isListView` (#419) |
+>
+> **Recommended order lives in the queue table's first column**, not in block order. Row 1 is the token
+> layer (not a screen); rows 2–5 are `isLegal`, `isNotFound`, `isWorkflows`, `isTypeEditor`.
+>
+> **Three class families have NO CSS**, each swept with a control: `gn-members*`, `workflow-list__*`, and
+> the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group. Two sit on held screens;
+> the third is a ruling-independent M restyle.
+>
+> ## Reviewer: DONE. It confirmed the central result and found three real defects, all fixed
+>
+> It re-derived every block from the raw blobs with its own tooling and reproduced the six-block result,
+> the 16 → 14 → six arithmetic, and the whole-file partition, with a mutation control proving its
+> normaliser was not blanket-collapsing. Verdict: **the central claim is safe to act on.** It then found:
+>
+> 1. **The doc's rewrite table stated a rule the export never emits** — `<input … />` → `<input … >`,
+>    keeping a space the new export does not emit (` />` appears **0** times in it, 18 in the old). The
+>    doc's *results* were right because its code used the correct rule; its *instructions* were wrong, and
+>    **a reader re-running them gets eleven blocks, not six.** Fixed, and the trap is now written down.
+> 2. **"The four largest" was not the four largest** (`isWork` 20 and `isSignIn` 6 outrank two of them).
+> 3. **Prototype-side bare `:NNN` citations had drifted ~45%** (16 of ~35 sampled, 1–10 lines). Every
+>    drifted citation's *claim* was true, so no verdict changed. All 16 corrected to verified lines.
+>
+> **The gap this exposed in the document's own checking, now stated in it:** the product-side resolver
+> covers 222 citations and all resolve, but it **never covered prototype-side citations**, and an attempt
+> to add one produced **240 false positives** (a bare `:NNN` is ambiguous between "the prototype" and "the
+> product file named earlier in the sentence"). The doc now says so and rules that **quoted fragments are
+> authoritative, line numbers a search starting point.** **Fixing the citation style is the first thing the
+> next pass on this document should do.**
+>
+> ## The second finding, and it reframes the queue
+>
+> **On at least two screens the export is catching up to the product, not ahead of it.** `/account` was
+> ported 2026-09-15 (`3bb823dc`) and `/help` 2026-09-15 (`7cce93e2`) — **three days before the export's
+> own date.** Their refreshed blocks match what the product already renders (verified: commit dates read
+> with `git log -1 --format=%cI` and ancestry with `--is-ancestor`). So **a "CHANGED" verdict in the delta
+> table is not by itself evidence of outstanding work** — it is evidence the two artefacts differ, and the
+> direction must be established per screen. The dispatch's premise ("every screen the product has is to be
+> brought to the refreshed prototype") holds for some screens and is inverted for others.
+>
+> ## And one portable-check finding worth keeping
+>
+> A citation resolver (`path:line` → open the file → fail on missing file, out-of-range line, or blank
+> line) runs over the deliverable: **104 citations, 104 resolve, 0 problems**. It caught
+> `packages/ui/src/style-toggle.tsx` as FILE NOT FOUND — the toggles live at `apps/web/src/` — and 40
+> short-form citations (`page.tsx:1202`) that are ambiguous in a repo with 24 `page.tsx` files. **Build
+> this for any doc of this size; a wrong path reads exactly like a right one.**
+>
+> ## What is established, and how — do not re-derive any of this
+>
+> **1. The refresh changed SIX blocks, and Part 0b flagged sixteen — fourteen of them were a fourth
+> mechanical rewrite Part 0b had not mapped.** That table (this file, `:216`, "Prototype delta
+> 2026-09-18") normalised the three rewrites it knew and closed with the caveat that a residual
+> "CHANGED" on a size-identical block *"could be a fourth mechanical rewrite I did not map rather than a
+> design change"*, calling itself *"a porting seed, not a changelog."* **The fourth rewrite is named
+> entities + the dropped self-closing slash.** Undo it too and 14 of the 16 collapse to identical. The
+> table named five of the remaining six (the `isSignIn` mark, the `isMembers` split, the new
+> `isInviteAdmin`, `isAccount` +22, `isHelp` +28); the one it missed is **`isWork`** — the exact case its
+> caveat anticipated. Method: extract each `sc-if` block whole from both exports (the two
+> files are blobs `6d7b67c0a52c…` new and `c9f852a2c243…` old), undo the four form rewrites — `sc-raw-*`
+> prefixes, `sc-camel-*` attributes, named entities, the dropped self-closing slash — **on both sides**,
+> then diff. Controls: the five blocks Part 0b calls unchanged diff empty; and under the *least* tolerant
+> normalisation the four largest "changed" blocks show 22 / 4 / 4 / 12 changed lines, **every one of them
+> an entity or a self-closing slash**. The six that moved: `isSignIn`, `isWork`, `isMembers`
+> (+ `isInviteAdmin`, new), `isAccount`, `isHelp`.
+>
+> **2. The largest change is in no block at all — the token layer moved.** Light accent
+> `#3A6DB0` → `#33629F`; all five light tints halved (`--tintDanger` 0.13 → 0.07, `--tintWarning`
+> 0.20 → 0.10, …); dark tints 0.14 → 0.10; `--tintAccent` became a `color-mix(...)` **derived** from
+> `--accent`; and the neo-light selector became `body[data-theme="light"][data-style="neo"]`, which
+> matches only if `data-theme="light"` is stamped explicitly. The export's own accent picker was
+> rewritten into a WCAG solver that uses those 0.07/0.10 alphas as inputs, so this is one scheme, not
+> three coincidences. **The product still holds the old values** — `packages/ui/src/tokens.ts:95`
+> (`blue600: '#3a6db0'`), `:151` (`neoPaper: '#ede4db'`), pinned by a test at
+> `apps/web/e2e-viewport/responsive.spec.ts:1939`. It touches every screen, which is exactly why a
+> per-screen audit cannot see it, and its port target is a derivation engine, not a stylesheet.
+>
+> ## Two things learned the hard way this session, both machine-local
+>
+> - **`grep -n` output on this machine is stripped of leading whitespace.** The 25 screen blocks are at
+>   **indent 2**, not column 0 — the proxy made them *look* top-level and a column-0 extractor silently
+>   returned zero blocks. An empty result that is well-formed is the failure mode; the fix is to read the
+>   bytes (`python3`), never the grepped line.
+> - **`git log` is rewritten here and omits merge commits.** `git log -1 3831bb49` printed `76432f4a`.
+>   Use `git rev-parse` / `--is-ancestor` for refs. Under this trap I briefly believed #421 had dropped
+>   its handoff commit; the merge's parents are `63ffe930` + `76432f4a`, so **it landed** — the
+>   hypothesis was mine and was wrong.
+
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a WAS DONE AND COMMITTED; ONE PR OPENED
+> # AGAINST `owner/workspace-edits`, AND THE CONTROLLER MERGED IT AS `3831bb49` — THE MERGE'S PARENTS ARE `63ffe930` + `76432f4a`, SO THE HANDOFF COMMIT IS IN IT.**
 >
 > Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2a-catalogue-green.md`. All four Parts are
 > in one commit. **Nothing is in flight; the next task is the controller's to name.**
