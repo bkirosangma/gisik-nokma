@@ -7324,7 +7324,32 @@ reservation is a reservation. The allocation note at the top of this file now ca
   in `/repo/packages/domain/dist/index.js` and the log
   showing both restarts — `change in ./src/index.ts` and `change in
   ./../../packages/domain/dist/index.js`. Total watchers on a settle: seven `tsc -p tsconfig.json
-  --watch` (one per package), `tsx watch`, and the server process. (`docker-compose.hot.yml`)
+  --watch` (one per package), `tsx watch`, and the server process.
+  **AMENDED 2026-09-18 (Step 2 Part 0) — the package watchers' OWN save shape.** The `tsc --watch` loops
+  behind this case watched each FILE: `tsc`'s default strategy is `UseFsEvents`, which in the 5.9.3
+  bundle is `fsWatch(fileName, File, …)` — a watch on the inode, so it carries the same blindness this
+  case records for `tsx watch`. Both hot services now set
+  **`TSC_WATCHFILE=UseFsEventsOnParentDirectory`** (case 5 of the same bundle), which watches the parent
+  DIRECTORY rather than the file. Witnessed in BOTH containers with no restart between the halves: a
+  rename-over Edit of a marker reached both `dist` copies in **~1 s** (host write `1789679099`, compile
+  line `2:35:00`); an in-place append of a STATEMENT marker that followed reached both in **~1 s**
+  (host inode `204132254` before **and** after, so provably not a rename; write `1789679122`, compile
+  line `2:35:22`); and the revert put both back to zero. Settled `docker stats` for the pair: `server`
+  **3.99–6.69 %** CPU / 1.266 GiB, `web` **1.55–1.69 %** / 1.332 GiB, beside this file's chokidar
+  figure for the server's own watcher.
+  **Two instruments lied before these numbers were trusted, and both are recorded because both read as
+  a watcher verdict.** (a) *A marker the emitter does not carry measures nothing.* A marker comment
+  placed before an elided declaration (`export type { PrefsOrigin }` — a type-only re-export, absent
+  from the JS output) is dropped with it, and a bare `//` comment appended at EOF is dropped too, while
+  a STATEMENT marker at that same EOF position is emitted; both silent shapes read as `0 in dist`.
+  (b) *A poll timed from the operator's own tool call measures the OPERATOR* — the write is often
+  already compiled before the loop's first iteration, so it reports `0 s` and measures nothing, and a
+  broken marker's `0 in dist` then gets read as a watcher failure. The instrument that actually
+  measures is the compile line in `docker logs --since …` against the host file's mtime. **This case's
+  own amendment was first written the other way round** — a "the directory door fails the in-place
+  half" conclusion drawn entirely from instrument (a) — and is corrected here rather than deleted,
+  because the false reading was confident enough to have shipped.
+  (`docker-compose.hot.yml`)
 - 🧪 **13.653 — the un-hot path is intact and a no-`--build` `up` neither rebuilds nor replaces the
   container.** `docker compose … up -d server` with **no** `--build`: container id
   `df98f7588bf5…` identical before and after, and zero build/export/name lines in the output. And the
@@ -7393,7 +7418,17 @@ on this machine, at the head of this change's PR — readings, not guarantees.
   package watchers share the server's failure class even though Next's own watcher does not, and the reliable
   recovery is a restart rather than a save-shape change. Cost of the settled pair, one reading with polling
   on: `server` **8.03 %** CPU / 1.686 GiB, `web` **1.80 %** CPU / 2.685 GiB — the web holds its own `dist`
-  and `.next`, which is why its memory is the larger of the two. (`docker-compose.hot.yml`)
+  and `.next`, which is why its memory is the larger of the two.
+  **AMENDED 2026-09-18 (Step 2 Part 0).** The web container's package watcher is the one this case caught
+  going stale (the 80 s revert above). Its cause is now named rather than inferred: the default
+  `UseFsEvents` strategy watches the file's INODE, so a rename-over save — the shape the assistant's own
+  Edit tool writes — leaves it watching a file that no longer exists at that path. Both hot services now
+  carry `TSC_WATCHFILE=UseFsEventsOnParentDirectory`; the `web` half was witnessed in the same run as
+  13.652's amendment, one write reaching both containers' `dist` copies in ~1 s, in both save shapes,
+  with the inode checked to have survived the in-place half. **So the remedy this case records — restart
+  the container — is no longer the remedy for a LOST watch**; a `restart web` is still what a dependency
+  or `package.json` change needs. Cost of the settled pair after the change is in 13.652.
+  (`docker-compose.hot.yml`)
 - 🧪 **13.657 — the un-hot path is intact, a no-`--build` `up` neither rebuilds nor replaces, and the prod
   stages are unchanged — proven by CHECKSUM, not by reading a diff.** `docker compose … up -d server web`
   with no `--build`: exit 0, **zero** build/export/name lines, and `web`'s container id `daac60fe23a7`

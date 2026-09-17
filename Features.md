@@ -2475,6 +2475,15 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   mount is involved). Polling was previously rejected on the evidence then available — that in-place writes
   cross the mount — which stopped being sufficient once the writer that matters turned out to be a rename.
   Cost, settled in one session: CPU **6.05–6.47 % polling on versus 2.39–3.73 % off**, memory unchanged.
+  **The PACKAGE watchers inside each hot container are a THIRD watcher, and they carried the same inode
+  blindness — fixed 2026-09-18 with `TSC_WATCHFILE=UseFsEventsOnParentDirectory` on BOTH services.** Each
+  container runs its own `tsc -p tsconfig.json --watch` per package, and `tsc`'s default strategy
+  (`UseFsEvents`) watches the FILE, so a rename-over save left it watching an inode that no longer existed
+  at that path — the 80 s stale revert case 13.656 caught. The strategy now set watches the parent
+  DIRECTORY instead. Witnessed in both containers in one run with no restart between the halves: a
+  rename-over Edit of a marker reached both `dist` copies in **~1 s**, an in-place append that followed
+  (host inode verified unchanged) also reached both in **~1 s**, and the revert returned both to zero.
+  Cost of the settled pair: `server` **3.99–6.69 %** CPU / 1.266 GiB, `web` **1.55–1.69 %** / 1.332 GiB.
   `docker-compose.hot.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile`, `package.json`,
   `docs/runbook.md`,
   `test-cases/13-deployment-dogfooding.md` (Step 1's witness record is **13.650–13.653**, re-minted from
