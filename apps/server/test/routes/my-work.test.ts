@@ -1381,18 +1381,23 @@ describe('GET /v1/me/work — the door', () => {
  * 13.576 (backlog/closed spec §3.2, 2026-09-17) — a closed ticket assigned to
  * the caller is gone from every group; a backlog ticket assigned to them is
  * in `open`, exactly where `bucketFor`'s existing `open`/`active`/`terminal`
- * switch already sends every other `open`-category ticket.
+ * switch already sends every other `open`-category ticket. A closed ticket
+ * merely HANDED to the caller (explicit, never assigned) is gone from
+ * `shared` too — the second `where` array, `sharedWithMeRows`'s own, carries
+ * the identical `t.closed_at IS NULL` conjunct and this is the only case that
+ * exercises it.
  *
  * DECLARED LAST and MUTATING, following this file's own rule for cases that
  * change the shared world's assignment state (7.26's second case, 7.107,
  * 7.108): every case above that reads `member`'s groups by an EXACT array has
- * already run by the time this one seeds two more tickets assigned to
- * `member`, so neither of those arrays gains an unexpected third element.
+ * already run by the time this one seeds more tickets assigned to `member`,
+ * so neither of those arrays gains an unexpected third element.
  */
 describe('GET /v1/me/work — backlog and closed (owner request, 2026-09-17)', () => {
-  it('13.576 the closed ticket is in no group; the backlog ticket is, in `open`', async () => {
+  it('13.576 the closed ticket is in no group and not in `shared`; the backlog ticket is, in `open`', async () => {
     const backlogId = newUlid();
     const closedId = newUlid();
+    const sharedClosedId = newUlid();
     const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
 
     await applyCommitted(db.pool, [
@@ -1413,6 +1418,24 @@ describe('GET /v1/me/work — backlog and closed (owner request, 2026-09-17)', (
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedId }, type: 'ticket.assigned', payload: { assigneeId: read.world.member } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedId }, type: 'ticket.transitioned', payload: { to: 'done' } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedId }, type: 'ticket.closed', payload: {} }),
+
+      // HANDED to the member, never assigned — the `shared` half, exercising
+      // `sharedWithMeRows`'s own copy of the `closed_at` conjunct rather than
+      // `readMyWork`'s.
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: sharedClosedId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: read.world.projectId, parentId: null, title: 'Handed, then closed' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: sharedClosedId },
+        type: 'visibility.set',
+        payload: { ticketId: sharedClosedId, mode: 'explicit', userIds: [read.world.owner, read.world.member] },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: sharedClosedId }, type: 'ticket.transitioned', payload: { to: 'done' } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: sharedClosedId }, type: 'ticket.closed', payload: {} }),
     ]);
 
     // The positive controls, read back before the route is asked anything —
@@ -1420,16 +1443,23 @@ describe('GET /v1/me/work — backlog and closed (owner request, 2026-09-17)', (
     // asserting it absent from an answer.
     const rows = await db.pool.query<{ ticket_id: string; assignee_id: string | null; state_category: string; closed_at: Date | null }>(
       'SELECT ticket_id, assignee_id, state_category, closed_at FROM proj_tickets WHERE ticket_id = ANY ($1::text[])',
-      [[backlogId, closedId]],
+      [[backlogId, closedId, sharedClosedId]],
     );
     const byId = new Map(rows.rows.map((row) => [row.ticket_id, row]));
     expect(byId.get(backlogId)).toMatchObject({ assignee_id: read.world.member, state_category: 'open' });
     expect(byId.get(closedId)?.assignee_id).toBe(read.world.member);
     expect(byId.get(closedId)?.closed_at).not.toBeNull();
+    expect(byId.get(sharedClosedId)?.assignee_id).toBeNull();
+    expect(byId.get(sharedClosedId)?.closed_at).not.toBeNull();
 
     const groups = await groupIds('member');
     expect(groups.open).toContain(backlogId);
     const everyGroup = [...groups.open, ...groups.active, ...groups.terminal];
     expect(everyGroup).not.toContain(closedId);
+
+    const response = await myWork('member');
+    expect(response.statusCode).toBe(200);
+    const shared = (response.json() as MyWorkResponse).shared.map((card) => card.ticketId);
+    expect(shared).not.toContain(sharedClosedId);
   });
 });
