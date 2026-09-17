@@ -9,7 +9,7 @@ import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * `/w/[workspaceId]` — the workspace home (Task 19), cases 13.384–13.387.
+ * `/w/[workspaceId]` — the workspace home (Task 19), cases 13.384–13.387, 13.673.
  *
  * ## WHAT COULD MAKE EVERY CASE IN THIS FILE PASS FOR THE WRONG REASON
  *
@@ -415,7 +415,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
 });
 
 /**
- * 13.387 — the four doors out of this page resolve to the routes that exist.
+ * 13.673 — the four doors out of this page resolve to the routes that exist.
  *
  * **Asserted as four LITERAL paths, and that is the whole case.** Two of the
  * four live under `app/w/[workspaceId]/`; Ticket types and Workflows do NOT —
@@ -476,7 +476,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * name rather than folded into it) — see `page.tsx`'s own docblock on
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
-describe('13.387 the workspace-section links resolve to the real routes', () => {
+describe('13.673 the workspace-section links resolve to the real routes', () => {
   it('carries four links, two workspace-scoped and two query-scoped', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
@@ -501,6 +501,11 @@ describe('13.387 the workspace-section links resolve to the real routes', () => 
     // Round 21: MCP tokens is GONE from this workspace-scoped nav. Asserted
     // rather than left to the length check above, so the failure names the
     // reason instead of reading "expected 5 to be 4".
+    //
+    // 13.672 — the superseded middle revision of this case ("REVISED from five
+    // doors to four"), re-minted out of the 13.387 triple. Its own claim is
+    // exactly this line: /mcp/tokens left the nav for /account, and its
+    // absence is asserted BY NAME rather than left to the length check.
     expect(within(nav).queryByRole('link', { name: 'MCP tokens' })).toBeNull();
   });
 
@@ -719,6 +724,14 @@ describe('13.413 each project card is one door, with the admin control outside t
     expect(archiveButton.closest('a')).toBeNull();
   });
 
+  /**
+   * 13.674 — REVERSED, not deleted: the archived cards now sort to the END of
+   * the disclosed grid (owner: "always sort the archived projects to the end").
+   * `[...live, ...archived]` was the implementation Round 20 named as the thing
+   * to rule out; it is the requirement now. The other assertions in 13.413
+   * (exactly one link per card; Archive/Restore not nested in the anchor) stay
+   * with 13.413 itself, which the test above carries.
+   */
   it('sorts a revealed archived project to the END, after every live one', async () => {
     // Archived in the MIDDLE — see the docblock. Under `[...live, ...archived]`
     // the disclosed grid reads p1, p3, p2; under a single filter over the served

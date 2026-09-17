@@ -1840,6 +1840,13 @@ test('13.298 — a 401 on /workspaces settles the REAL browser on /sign-in', asy
  * live under `data-style="neo"`, the way Task 14's own 13.347 witnesses a
  * rendered value rather than trusting two numbers that only differ in memory.
  *
+ * 13.401 (2026-09-15) is witnessed by the SAME test, at the track-background
+ * read below. The owner removed `background: var(--gn-fill-tertiary)` from
+ * `.gn-segmented`, and `trackBackground` is the direct measurement that the
+ * track paints `rgba(0, 0, 0, 0)` — a claim the `--gn-surface-sunken` read
+ * above does not make, since that token is what the SELECTED SEGMENT composes
+ * against rather than what the track paints.
+ *
  * ## Why this is a STANDALONE test, not another row in the `UNAUTHED_ROUTES` loop
  *
  * That loop's `/v1/auth/methods` stub is DELIBERATELY `phone:false` (see the

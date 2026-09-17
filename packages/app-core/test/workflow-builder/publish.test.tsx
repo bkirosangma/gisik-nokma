@@ -256,6 +256,9 @@ describe('PublishControls — the state-mapping dialog', () => {
   /**
    * 10.32 — the mapping dialog lists every stranded state with in-flight counts; confirm gated on full mapping.
    */
+  /**
+   * 10.88 — the state-mapping dialog's target-state select renders as the shared Select (button trigger, portal listbox): the confirm button stays disabled until every row is picked, and the submitted payload reflects exactly what was picked.
+   */
   it('lists every stranded state with its in-flight count and requires a target for each', async () => {
     const user = userEvent.setup();
     const workflowId = newUlid();

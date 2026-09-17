@@ -13,12 +13,12 @@
       --surface:#EFE7DF; --raised:#FBF7F3; --sunken:#E4D8CC; --overlay:rgba(39,58,99,0.34);
       --fill1:rgba(39,58,99,0.20); --fill3:rgba(39,58,99,0.11); --fill4:rgba(39,58,99,0.06);
       --label:#202B49; --label2:rgba(32,43,73,0.78); --label3:rgba(32,43,73,0.52);
-      --accentPick:#3A6DB0; --accent:var(--accentPick); --danger:#B93327; --warning:#A2540B; --success:#2C7355;
+      --accentPick:#33629F; --danger:#B93327; --warning:#A2540B; --success:#2C7355;
       --gray:#6C6E7A; --purple:#4C4A8F; --pink:#B03A62; --onColor:#FBF7F3;
       --shadow:rgba(39,58,99,0.16);
-      --tintDanger:rgba(185,51,39,0.13); --tintWarning:rgba(240,124,52,0.20);
-      --tintPink:rgba(176,58,98,0.12); --tintPurple:rgba(76,74,143,0.13);
-      --tintSuccess:rgba(44,115,85,0.13); --tintAccent:rgba(58,109,176,0.14);
+      --tintDanger:rgba(185,51,39,0.07); --tintWarning:rgba(240,124,52,0.10);
+      --tintPink:rgba(176,58,98,0.07); --tintPurple:rgba(76,74,143,0.07);
+      --tintSuccess:rgba(44,115,85,0.07); --tintAccent:color-mix(in srgb, var(--accent) 7%, transparent);
       --cardBg:var(--raised); --cardR:12px; --cardShadow:0 1px 3px rgba(39,58,99,0.16);
       --chipBg:var(--fill3); --chipShadow:none; --chipPad:3px 9px;
       --ctlBg:var(--fill3); --ctlShadow:none; --ctlR:8px;
@@ -35,9 +35,9 @@
       --accent:var(--accentDark,#7FA9E4); --danger:#F79086; --warning:#F7A961; --success:#7BD3AA;
       --gray:#9AA0B4; --purple:#B7B4F4; --pink:#F49AB7; --onColor:#141A2E;
       --shadow:rgba(6,10,22,0.66);
-      --tintDanger:rgba(247,144,134,0.14); --tintWarning:rgba(247,169,97,0.14);
-      --tintPink:rgba(244,154,183,0.13); --tintPurple:rgba(183,180,244,0.14);
-      --tintSuccess:rgba(123,211,170,0.13); --tintAccent:rgba(127,169,228,0.14);
+      --tintDanger:rgba(247,144,134,0.10); --tintWarning:rgba(247,169,97,0.10);
+      --tintPink:rgba(244,154,183,0.10); --tintPurple:rgba(183,180,244,0.10);
+      --tintSuccess:rgba(123,211,170,0.10); --tintAccent:color-mix(in srgb, var(--accent) 10%, transparent);
       --cardShadow:0 1px 3px rgba(6,10,22,0.66); --barShadow:0 -1px 12px rgba(6,10,22,0.55);
       --segOnShadow:0 3px 8px rgba(6,10,22,0.66);
       --cardBg:#20294A; --navBg:#20294A; --barBg:#20294A; --trayBg:#2A3560;
@@ -49,18 +49,20 @@
       --cardShadow:none; --chipBg:transparent; --chipPad:3px 0;
       --ctlBg:transparent; --trayBg:transparent; --segOnShadow:none; --barShadow:none;
     }
-    body[data-style="neo"]{
-      --surface:#EDE4DB; --raised:#EDE4DB; --sunken:#EDE4DB; --cardBg:#EDE4DB;
+    body[data-theme="light"][data-style="neo"]{
+      --surface:#F1EAE3; --raised:#F1EAE3; --sunken:#F1EAE3; --cardBg:#F1EAE3;
       --fill4:rgba(176,152,132,0.10); --fill3:rgba(176,152,132,0.16);
+      --danger:#9E2A20; --tintDanger:rgba(158,42,32,0.07);
+      --warning:#8C4708; --pink:#9A3054; --success:#25644A; --purple:#413F7C;
       --cardR:18px; --ctlR:14px;
       --cardShadow:6px 6px 13px rgba(176,152,132,0.55),-6px -6px 13px rgba(255,255,255,0.95);
-      --chipBg:#EDE4DB; --chipPad:4px 10px;
+      --chipBg:#F1EAE3; --chipPad:4px 10px;
       --chipShadow:inset 2px 2px 4px rgba(176,152,132,0.55),inset -2px -2px 4px rgba(255,255,255,0.95);
-      --ctlBg:#EDE4DB; --ctlShadow:5px 5px 10px rgba(176,152,132,0.55),-5px -5px 10px rgba(255,255,255,0.95);
-      --fieldBg:#EDE4DB; --fieldShadow:inset 4px 4px 8px rgba(176,152,132,0.6),inset -4px -4px 8px rgba(255,255,255,0.95);
-      --trayBg:#EDE4DB; --trayShadow:inset 4px 4px 8px rgba(176,152,132,0.45),inset -4px -4px 8px rgba(255,255,255,0.9);
-      --barBg:#EDE4DB; --barShadow:0 -6px 14px rgba(176,152,132,0.4);
-      --segBg:#EDE4DB; --segOnBg:#EDE4DB;
+      --ctlBg:#F1EAE3; --ctlShadow:5px 5px 10px rgba(176,152,132,0.55),-5px -5px 10px rgba(255,255,255,0.95);
+      --fieldBg:#F1EAE3; --fieldShadow:inset 4px 4px 8px rgba(176,152,132,0.6),inset -4px -4px 8px rgba(255,255,255,0.95);
+      --trayBg:#F1EAE3; --trayShadow:inset 4px 4px 8px rgba(176,152,132,0.45),inset -4px -4px 8px rgba(255,255,255,0.9);
+      --barBg:#F1EAE3; --barShadow:0 -6px 14px rgba(176,152,132,0.4);
+      --segBg:#F1EAE3; --segOnBg:#F1EAE3;
       --segOnShadow:inset 3px 3px 6px rgba(176,152,132,0.55),inset -3px -3px 6px rgba(255,255,255,0.95);
       --bezel:rgba(176,152,132,0.35); --overlay:rgba(176,152,132,0.45);
     }
@@ -76,7 +78,8 @@
       --segOnShadow:inset 3px 3px 6px rgba(0,0,0,0.55),inset -3px -3px 6px rgba(255,255,255,0.05);
       --bezel:rgba(255,255,255,0.10); --overlay:rgba(0,0,0,0.6);
     }
-    body{margin:0;background:var(--surface);color:var(--label);
+    body{--accent:var(--accentPick,#33629F);
+      margin:0;background:var(--surface);color:var(--label);
       font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
       font-size:17px;line-height:22px;-webkit-font-smoothing:antialiased;}
     a{color:var(--accent);text-decoration:none;transition:opacity .15s ease,filter .15s ease}
@@ -147,7 +150,7 @@
                 <button onClick="{{ sendLink }}" style="width:100%;min-height:44px;border:none;border-radius:var(--ctlR);background:var(--accent);color:var(--onColor);box-shadow:var(--ctlShadow);font-weight:600;cursor:pointer">Send magic link</button>
                 <div style="display:flex;gap:10px;justify-content:center">
                   <button onClick="{{ ssoGoogle }}" style="min-height:44px;min-width:54px;border:none;border-radius:var(--ctlR);background:var(--ctlBg);box-shadow:var(--ctlShadow);display:inline-flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Continue with Google">
-                    <img src="./apps/web/public/google-mark.svg" alt="" width="18" height="18">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18" aria-hidden="true" style="flex:none"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"></path><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"></path><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"></path><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"></path></svg>
                   </button>
                   <button onClick="{{ ssoApple }}" style="min-height:44px;min-width:54px;border:none;border-radius:var(--ctlR);background:var(--ctlBg);box-shadow:var(--ctlShadow);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--label)" aria-label="Continue with Apple">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.8-3.33.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.3-3.51zM14.88 5.6c.6-.74 1.01-1.76.9-2.78-.87.04-1.93.58-2.56 1.31-.56.65-1.06 1.69-.92 2.69.97.07 1.97-.49 2.58-1.22z"></path></svg>
@@ -261,8 +264,8 @@
           <div style="padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px;flex:none">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
               <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
-                <p style="font-size:12px;line-height:16px;margin:0;color:var(--label2)">Meghalaya Rollout</p>
-                <h2 style="font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.3px;margin:0">Sprint 14</h2>
+                <p style="font-size:12px;line-height:16px;margin:0;color:var(--label2)">{{ wsName }}</p>
+                <h2 style="font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.3px;margin:0">{{ projectTitle }}</h2>
               </div>
               <button onClick="{{ goMore }}" style="width:36px;height:36px;border-radius:999px;border:none;background:var(--fill1);font-size:14px;font-weight:600;cursor:pointer;flex:none">AK</button>
             </div>
@@ -834,8 +837,8 @@
               <div style="{{ m.style }}">
                 <span style="width:36px;height:36px;border-radius:999px;background:var(--fill1);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex:none">{{ m.k }}</span>
                 <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:17px;line-height:22px;font-weight:600">{{ m.name }}</span><span style="font-size:12px;line-height:16px;color:var(--label2)">{{ m.meta }}</span><span style="font-size:12px;line-height:16px;color:var(--label2)">{{ m.scopeLabel }}</span></span>
-                <sc-if value="{{ m.isOwner }}">
-                  <span style="display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:600;background:var(--chipBg);box-shadow:var(--chipShadow);flex:none">Owner</span>
+                <sc-if value="{{ m.showBadge }}">
+                  <span style="display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:600;background:var(--chipBg);box-shadow:var(--chipShadow);flex:none">{{ m.roleBadge }}</span>
                 </sc-if>
                 <sc-if value="{{ m.notOwner }}">
                   <select value="{{ m.role }}" onChange="{{ m.setRole }}" style="min-height:36px;padding:0 8px;border:none;border-radius:var(--ctlR);background:var(--ctlBg);box-shadow:var(--ctlShadow);font-size:13px;font-weight:600;cursor:pointer;flex:none">
@@ -845,6 +848,10 @@
               </div>
             </sc-for>
           </div>
+          <sc-if value="{{ inviteAdminOnly }}">
+            <p style="font-size:15px;line-height:20px;margin:0;color:var(--label2);background:var(--fill4);border-radius:var(--ctlR);padding:12px 13px;text-wrap:pretty">{{ inviteAdminOnly }}</p>
+          </sc-if>
+          <sc-if value="{{ isInviteAdmin }}">
           <div style="display:flex;flex-direction:column;gap:9px">
             <p style="font-size:13px;line-height:18px;margin:0;color:var(--label2);text-transform:uppercase;letter-spacing:0.6px">{{ inviteHeading }}</p>
             <div style="background:var(--cardBg);box-shadow:var(--cardShadow);border-radius:var(--cardR);overflow:hidden">
@@ -870,6 +877,7 @@
             </select>
             <button onClick="{{ sendInvite }}" style="min-height:44px;border:none;border-radius:var(--ctlR);background:var(--accent);color:var(--onColor);box-shadow:var(--ctlShadow);font-weight:600;cursor:pointer">Send invitation</button>
           </div>
+          </sc-if>
         </div>
       </sc-if>
 
@@ -1245,17 +1253,30 @@
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;signin&quot;,&quot;workspaces&quot;,&quot;workspace&quot;,&quot;board&quot;,&quot;list&quot;,&quot;calendar&quot;,&quot;timeline&quot;,&quot;ticket&quot;,&quot;mywork&quot;,&quot;inbox&quot;,&quot;more&quot;,&quot;members&quot;,&quot;types&quot;,&quot;typeeditor&quot;,&quot;workflows&quot;,&quot;builder&quot;,&quot;mcptokens&quot;,&quot;mcpauth&quot;,&quot;help&quot;,&quot;invite&quot;,&quot;legal&quot;,&quot;notfound&quot;],&quot;default&quot;:&quot;board&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;styleName&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hig&quot;,&quot;minimal&quot;,&quot;neo&quot;],&quot;default&quot;:&quot;hig&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#3A6DB0&quot;,&quot;#EE7733&quot;,&quot;#B93327&quot;,&quot;#273A63&quot;],&quot;default&quot;:&quot;#3A6DB0&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;signin&quot;,&quot;workspaces&quot;,&quot;workspace&quot;,&quot;board&quot;,&quot;list&quot;,&quot;calendar&quot;,&quot;timeline&quot;,&quot;ticket&quot;,&quot;mywork&quot;,&quot;inbox&quot;,&quot;more&quot;,&quot;members&quot;,&quot;types&quot;,&quot;typeeditor&quot;,&quot;workflows&quot;,&quot;builder&quot;,&quot;mcptokens&quot;,&quot;mcpauth&quot;,&quot;help&quot;,&quot;invite&quot;,&quot;legal&quot;,&quot;notfound&quot;],&quot;default&quot;:&quot;board&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;styleName&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hig&quot;,&quot;minimal&quot;,&quot;neo&quot;],&quot;default&quot;:&quot;hig&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#3A6DB0&quot;,&quot;#273A63&quot;,&quot;#B93327&quot;,&quot;#2C7355&quot;],&quot;default&quot;:&quot;#3A6DB0&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
 function applyAccent(hex) {
   const st = document.body.style;
   if (!hex) { st.removeProperty("--accentPick"); st.removeProperty("--accentDark"); return; }
-  st.setProperty("--accentPick", hex);
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  // lift the picked hue toward the cream ink so it clears 4.5:1 on the dark navy ground
-  const mix = (c, t) => Math.round(c + (t - c) * 0.46);
-  const to = (n) => n.toString(16).padStart(2, "0");
-  st.setProperty("--accentDark", "#" + to(mix(r, 242)) + to(mix(g, 233)) + to(mix(b, 225)));
+  const parse = (h) => { const s = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(s.substr(i, 2), 16)); };
+  const lum = (c) => {
+    const a = c.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+  };
+  const hexOf = (c) => "#" + c.map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0")).join("");
+  const ratio = (f, g) => { const a = lum(f) + 0.05, b = lum(g) + 0.05; return a > b ? a / b : b / a; };
+  // the accent also tints its own chip, so solve against that composited ground, not the bare card
+  const solve = (rgb, target, card, alpha, want) => {
+    let out = rgb;
+    for (let m = 0; m <= 100; m += 2) {
+      out = rgb.map((c, i) => Math.round(c + (target[i] - c) * (m / 100)));
+      const ground = card.map((c, i) => Math.round(out[i] * alpha + c * (1 - alpha)));
+      if (ratio(out, ground) >= want) break;
+    }
+    return out;
+  };
+  const rgb = parse(hex);
+  st.setProperty("--accentPick", hexOf(solve(rgb, [32, 43, 73], [241, 234, 227], 0.07, 4.6)));
+  st.setProperty("--accentDark", hexOf(solve(rgb, [242, 233, 225], [32, 41, 74], 0.10, 4.6)));
 }
 
 const CATS = { open: "var(--gray)", active: "var(--accent)", terminal: "var(--success)" };
@@ -1318,28 +1339,37 @@ const SEED = [
   { id: "GN-1181", title: "Docker VM disk full \u2014 postgres crash loop", col: "done", type: "Incident", pri: "P1", who: null, due: "2026-09-08", closed: "8 Sep", sub: [], desc: "Builder cache filled the volume." },
   { id: "GN-1140", epicId: "GN-1099", title: "Owner-scoped tokens in the storage layer", col: "done", type: "Feature", pri: "P2", who: "RS", due: "2026-09-02", closed: "2 Sep", sub: [1, 1, 1], desc: "Groundwork for per-owner storage tokens." },
   { id: "GN-1133", title: "Docker builder prune should be scheduled", col: "triage", type: "Task", pri: "P3", who: "AK", due: "2026-09-04", start: "2026-09-20", sub: [], desc: "Prune runs by hand; it should be a schedule." },
-  { id: "GN-1210", wf: "Field ops v2", epicId: "GN-1101", title: "Williamnagar site walk", col: "onsite", type: "Field visit", pri: "P2", who: "TM", due: "2026-09-14", start: "2026-09-12", sub: [], desc: "Confirm mast clearances and access." },
-  { id: "GN-1211", wf: "Field ops v2", epicId: "GN-1101", title: "Baghmara site walk", col: "scheduled", type: "Field visit", pri: "P3", who: null, due: "2026-09-11", sub: [], desc: "First visit of the wave." },
-  { id: "GN-1212", wf: "Field ops v2", epicId: "GN-1101", title: "Tura depot sign-off", col: "signoff", type: "Field visit", pri: "P1", who: "RS", due: "2026-09-09", start: "2026-09-04", sub: [], desc: "Waiting on the district engineer." },
-  { id: "GN-1215", wf: "Incident v1", title: "Sign-in outage \u2014 8 Sep 11:02", col: "mitigating", type: "Incident", pri: "P1", who: "AK", due: "2026-09-08", start: "2026-09-08", sub: [], desc: "The shared bucket exhausted the window for everyone." },
+  { id: "GN-1210", wf: "Field ops v2", project: "site", epicId: "GN-1101", title: "Williamnagar site walk", col: "onsite", type: "Field visit", pri: "P2", who: "TM", due: "2026-09-14", start: "2026-09-12", sub: [], desc: "Confirm mast clearances and access." },
+  { id: "GN-1211", wf: "Field ops v2", project: "site", epicId: "GN-1101", title: "Baghmara site walk", col: "scheduled", type: "Field visit", pri: "P3", who: null, due: "2026-09-11", sub: [], desc: "First visit of the wave." },
+  { id: "GN-1212", wf: "Field ops v2", project: "site", epicId: "GN-1101", title: "Tura depot sign-off", col: "signoff", type: "Field visit", pri: "P1", who: "RS", due: "2026-09-09", start: "2026-09-04", sub: [], desc: "Waiting on the district engineer." },
+  { id: "GN-1215", wf: "Incident v1", project: "delivery", title: "Sign-in outage \u2014 8 Sep 11:02", col: "mitigating", type: "Incident", pri: "P1", who: "AK", due: "2026-09-08", start: "2026-09-08", sub: [], desc: "The shared bucket exhausted the window for everyone." },
   { id: "GN-1189", wf: "Delivery v4", parentId: "GN-1188", epicId: "GN-1100", title: "Key the limiter on the forwarded-for header", col: "done", type: "Task", pri: "P1", who: "AK", due: "2026-09-09", closed: "9 Sep", sub: [], desc: "Read the proxy header, and fall back to the socket address only when it is absent." },
   { id: "GN-1191", wf: "Delivery v4", parentId: "GN-1188", epicId: "GN-1100", title: "Per-client buckets in the limiter store", col: "progress", type: "Task", pri: "P1", who: "AK", due: "2026-09-10", start: "2026-09-09", sub: [], desc: "One bucket per resolved client, not one for the process." },
   { id: "GN-1192", wf: "Delivery v4", parentId: "GN-1188", epicId: "GN-1100", title: "Regression test: five attempts from one client", col: "triage", type: "Task", pri: "P2", who: "MS", due: null, sub: [], desc: "Prove the window is per-client." },
-  { id: "GN-1165", wf: "Delivery v4", parentId: "GN-1164", epicId: "GN-1099", title: "Mint owner-scoped tokens", col: "blocked", type: "Task", pri: "P2", who: "RS", due: "2026-09-10", sub: [], desc: "Blocked with its parent." }
+  { id: "GN-1165", wf: "Delivery v4", parentId: "GN-1164", epicId: "GN-1099", title: "Mint owner-scoped tokens", col: "blocked", type: "Task", pri: "P2", who: "RS", due: "2026-09-10", sub: [], desc: "Blocked with its parent." },
+  { id: "GN-1301", wf: "Field ops v2", project: "callouts", title: "Mast light out \u2014 Nongstoin relay", col: "onsite", type: "Field visit", pri: "P1", who: "RS", due: "2026-09-09", start: "2026-09-08", sub: [], desc: "Reported by the district office; crew on site." },
+  { id: "GN-1302", wf: "Field ops v2", project: "callouts", title: "Generator won\u2019t hold load at Mawkyrwat", col: "scheduled", type: "Field visit", pri: "P2", who: "TM", due: "2026-09-12", sub: [], desc: "Second callout this month." },
+  { id: "GN-1303", wf: "Field ops v2", project: "callouts", title: "Antenna alignment after the storm", col: "signoff", type: "Field visit", pri: "P2", who: "RS", due: "2026-09-08", start: "2026-09-05", sub: [], desc: "Work done, waiting on the engineer\u2019s sign-off." },
+  { id: "GN-1304", wf: "Field ops v2", project: "callouts", title: "Cable theft report \u2014 Sohra spur", col: "complete", type: "Field visit", pri: "P1", who: "MS", due: "2026-09-04", closed: "4 Sep", sub: [], desc: "Replaced and re-buried." },
+  { id: "GN-1310", wf: "Field ops v2", project: "standing", title: "Quarterly tower inspection \u2014 East Khasi", col: "scheduled", type: "Field visit", pri: "P3", who: "TM", due: "2026-09-21", start: "2026-09-18", sub: [], desc: "Recurring: every quarter." },
+  { id: "GN-1311", wf: "Field ops v2", project: "standing", title: "Battery bank check \u2014 Tura depot", col: "onsite", type: "Field visit", pri: "P2", who: "RS", due: "2026-09-10", start: "2026-09-09", sub: [], desc: "Cells reading low on two strings." },
+  { id: "GN-1312", wf: "Field ops v2", project: "standing", title: "Fuel log reconciliation", col: "complete", type: "Task", pri: "P3", who: "MS", due: "2026-09-02", closed: "2 Sep", sub: [], desc: "Closed for August." },
+  { id: "GN-1290", wf: "Field ops v2", project: "pilot", title: "2025 pilot \u2014 closing report", col: "complete", type: "Task", pri: "P3", who: "MS", due: "2025-12-19", closed: "19 Dec 2025", sub: [], desc: "Kept because the programme\u2019s events cite it." },
+  { id: "GN-1291", wf: "Field ops v2", project: "pilot", title: "2025 pilot \u2014 handover to Field Support", col: "complete", type: "Task", pri: "P3", who: "RS", due: "2025-12-20", closed: "20 Dec 2025", sub: [], desc: "Archived with the project." }
 ];
 const TYPES = ["Epic", "Defect", "Feature", "Task", "Field visit", "Change request", "Incident"];
 const WS = [
-  { id: "mr", name: "Meghalaya Rollout", initials: "MR", bg: "#EE7733", role: "admin", members: 12, projects: [
-    { id: "delivery", name: "Delivery", desc: "Sprint work for the rollout", tickets: 28, blocked: 2, archived: false },
-    { id: "site", name: "Site readiness", desc: "Pre-visit checks per site", tickets: 9, blocked: 0, archived: false }
+  { id: "mr", name: "Meghalaya Rollout", initials: "MR", bg: "#EE7733", projects: [
+    { id: "delivery", name: "Delivery", desc: "Sprint work for the rollout", archived: false },
+    { id: "site", name: "Site readiness", desc: "Pre-visit checks per site", archived: false }
   ] },
-  { id: "fs", name: "Field Support", initials: "FS", bg: "#3A6DB0", role: "member", members: 7, projects: [
-    { id: "callouts", name: "Callouts", desc: "Unplanned visits", tickets: 9, blocked: 0, archived: false },
-    { id: "standing", name: "Standing maintenance", desc: "Recurring checks", tickets: 6, blocked: 1, archived: false },
-    { id: "pilot", name: "2025 pilot", desc: "Closed programme", tickets: 41, blocked: 0, archived: true }
+  { id: "fs", name: "Field Support", initials: "FS", bg: "#3A6DB0", projects: [
+    { id: "callouts", name: "Callouts", desc: "Unplanned visits", archived: false },
+    { id: "standing", name: "Standing maintenance", desc: "Recurring checks", archived: false },
+    { id: "pilot", name: "2025 pilot", desc: "Closed programme", archived: true }
   ] },
-  { id: "nk", name: "Nokma Internal", initials: "NK", bg: "#273A63", role: "guest", members: 3, projects: [
-    { id: "restricted", name: "Restricted project", desc: "You are not named on this project", tickets: 0, blocked: 0, archived: false, hidden: true }
+  { id: "nk", name: "Nokma Internal", initials: "NK", bg: "#273A63", projects: [
+    { id: "restricted", name: "Restricted project", desc: "You are not named on this project", archived: false, hidden: true }
   ] }
 ];
 const HELP_SECTIONS = [
@@ -1468,17 +1498,36 @@ class Component extends DCLogic {
       { id: "n6", kind: "mention", title: "Meena mentioned you on GN-1149", body: "\u201cThe 24px floor applies to the TOC too.\u201d", time: "09:12", read: true, ticket: "GN-1149" }
     ],
     inboxFilter: "all",
-    members: [
-      { k: "AK", role: "Owner", scope: "all", seen: "Now" },
-      { k: "RS", role: "Member", scope: "all", seen: "14 min ago" },
-      { k: "MS", role: "Admin", scope: "all", seen: "2 hours ago" },
-      { k: "PD", role: "Guest", scope: [], seen: "Yesterday" },
-      { k: "TM", role: "Member", scope: ["site"], seen: "3 days ago" }
-    ],
-    invites: [
-      { id: "i1", email: "sarah@example.com", role: "Member", scope: "site", channel: "email", by: "Meena", expires: "12 Sep 2026, 15:30 IST", urgent: false },
-      { id: "i2", email: "dev@example.com", role: "Guest", scope: null, channel: "whatsapp", by: "Anjali", expires: null, urgent: true }
-    ],
+    rosters: {
+      mr: [
+        { k: "AK", role: "Owner", scope: "all", seen: "Now" },
+        { k: "RS", role: "Member", scope: "all", seen: "14 min ago" },
+        { k: "MS", role: "Admin", scope: "all", seen: "2 hours ago" },
+        { k: "PD", role: "Guest", scope: [], seen: "Yesterday" },
+        { k: "TM", role: "Member", scope: ["site"], seen: "3 days ago" }
+      ],
+      fs: [
+        { k: "MS", role: "Owner", scope: "all", seen: "2 hours ago" },
+        { k: "AK", role: "Member", scope: "all", seen: "Now" },
+        { k: "RS", role: "Member", scope: ["callouts"], seen: "14 min ago" },
+        { k: "TM", role: "Member", scope: ["standing"], seen: "3 days ago" }
+      ],
+      nk: [
+        { k: "MS", role: "Owner", scope: "all", seen: "2 hours ago" },
+        { k: "RS", role: "Admin", scope: "all", seen: "14 min ago" },
+        { k: "AK", role: "Guest", scope: [], seen: "Now" }
+      ]
+    },
+    invitesByWs: {
+      mr: [
+        { id: "i1", email: "sarah@example.com", role: "Member", scope: "site", channel: "email", by: "Meena", expires: "12 Sep 2026, 15:30 IST", urgent: false },
+        { id: "i2", email: "dev@example.com", role: "Guest", scope: null, channel: "whatsapp", by: "Anjali", expires: null, urgent: true }
+      ],
+      fs: [
+        { id: "i3", email: "crew@example.com", role: "Member", scope: "callouts", channel: "sms", by: "Meena", expires: "14 Sep 2026, 15:30 IST", urgent: false }
+      ],
+      nk: []
+    },
     inviteForm: { email: "", role: "Member" },
     types: [
       { id: "epic", name: "Epic", wf: "Delivery v4", builtin: true },
@@ -1589,16 +1638,49 @@ class Component extends DCLogic {
   }
 
   visible() {
-    const q = this.state.query.trim().toLowerCase();
-    return this.state.tickets.filter((t) => !q || (t.id + " " + t.title + " " + (t.desc || "")).toLowerCase().indexOf(q) >= 0);
+    const s = this.state, q = s.query.trim().toLowerCase();
+    const project = s.projectId || "delivery";
+    return s.tickets.filter((t) => (t.project || "delivery") === project
+      && (!q || (t.id + " " + t.title + " " + (t.desc || "")).toLowerCase().indexOf(q) >= 0));
+  }
+
+  setRoster(next, extra) {
+    this.setState((s) => {
+      const rosters = Object.assign({}, s.rosters);
+      rosters[s.wsId] = next;
+      return Object.assign({ rosters: rosters }, extra || {});
+    });
+  }
+
+  rosterUndo(before) {
+    const rosters = Object.assign({}, this.state.rosters);
+    rosters[this.state.wsId] = before;
+    return { rosters: rosters };
+  }
+
+  setInvites(next, extra) {
+    this.setState((s) => {
+      const byWs = Object.assign({}, s.invitesByWs);
+      byWs[s.wsId] = next;
+      return Object.assign({ invitesByWs: byWs }, extra || {});
+    });
+  }
+
+  invitesUndo(before) {
+    const byWs = Object.assign({}, this.state.invitesByWs);
+    byWs[this.state.wsId] = before;
+    return { invitesByWs: byWs };
   }
 
   renderVals() {
-    const s = this.state, self = this;
+    const st0 = this.state, self = this;
+    const s = Object.assign({}, st0, { members: (st0.rosters[st0.wsId] || []), invites: (st0.invitesByWs[st0.wsId] || []) });
     const vis = this.visible();
     const sheet = s.tickets.filter((t) => t.id === s.sheetId)[0] || null;
     const unread = s.notifs.filter((n) => !n.read).length;
     const ws = s.wsData.filter((w) => w.id === s.wsId)[0] || s.wsData[0];
+    const myRole = ((s.rosters[s.wsId] || []).filter((x) => x.k === "AK")[0] || {}).role || "Member";
+    const myRoleIsAdmin = myRole === "Owner" || myRole === "Admin";
     const labels = {
       signin: "Sign in", workspaces: "Workspaces", workspace: ws.name, invite: "Invitation", board: "Board", list: "List",
       calendar: "Calendar", timeline: "Timeline", ticket: "Ticket", mywork: "My work", inbox: "Inbox",
@@ -1611,6 +1693,9 @@ class Component extends DCLogic {
     const seg = (active) => "flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:36px;border-radius:7px;font-size:15px;cursor:pointer;" + (active ? "font-weight:600;background:var(--segOnBg);box-shadow:var(--segOnShadow)" : "font-weight:500");
     const pill = (active) => "display:inline-flex;align-items:center;min-height:36px;padding:0 13px;border:none;border-radius:999px;font-size:15px;white-space:nowrap;flex:none;cursor:pointer;" + (active ? "background:var(--accent);color:var(--onColor);font-weight:600" : "background:var(--chipBg);box-shadow:var(--chipShadow);color:var(--label);font-weight:500");
 
+    const projectId = s.projectId || "delivery";
+    const projectName = (ws.projects.filter((p) => p.id === projectId)[0] || { name: "Delivery" }).name;
+    const activeProjects = ws.projects.filter((p) => !p.archived).length;
     const boardWf = s.wfPick || "Delivery v4";
     const boardStates = WF_STATES[boardWf] || COLS;
     const colKey = boardStates.filter((c) => c.key === s.col)[0] ? s.col : boardStates[0].key;
@@ -1717,36 +1802,47 @@ class Component extends DCLogic {
 
       workspaces: s.wsData.map((w) => {
         const live = w.projects.filter((p) => !p.archived);
-        const chips = [self.chip(live.reduce((n, p) => n + p.tickets, 0) + " active", "var(--accent)", null)];
-        const blocked = live.reduce((n, p) => n + p.blocked, 0);
+        const ids = live.map((p) => p.id);
+        const own = s.tickets.filter((x) => ids.indexOf(x.project || "delivery") >= 0);
+        const myRoleThere = ((s.rosters[w.id] || []).filter((x) => x.k === "AK")[0] || {}).role || "Member";
+        const withheld = myRoleThere === "Guest" || live.every((p) => p.hidden);
+        const chips = withheld ? [] : [self.chip(own.length + (own.length === 1 ? " ticket" : " tickets"), "var(--accent)", null)];
+        const blocked = withheld ? 0 : own.filter((x) => x.col === "blocked").length;
         if (blocked) chips.push(self.chip(blocked + " blocked", "var(--danger)", "var(--tintDanger)"));
         if (w.role === "guest") chips.push(self.chip("Restricted", "var(--purple)", "var(--tintPurple)"));
         return {
           name: w.name, initials: w.initials, chips: chips,
-          meta: w.members + " members \u00b7 " + live.length + (live.length === 1 ? " project" : " projects"),
+          meta: (s.rosters[w.id] || []).length + " members \u00b7 " + live.length + (live.length === 1 ? " project" : " projects"),
           avatarStyle: "width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:600;flex:none;background:" + w.bg,
-          roleLine: "You\u2019re " + (w.role === "admin" ? "an" : "a") + " " + w.role + " here.",
+          roleLine: "You\u2019re " + (myRoleThere === "Owner" || myRoleThere === "Admin" ? "an " + myRoleThere.toLowerCase() : "a " + myRoleThere.toLowerCase()) + " here.",
           openWs: () => self.setState((st) => ({ stack: st.stack.concat([st.screen]), screen: "workspace", wsId: w.id }))
         };
       }),
 
       isWorkspace: s.screen === "workspace",
-      wsName: ws.name, wsInitials: ws.initials,
+      wsName: ws.name, wsInitials: ws.initials, projectTitle: projectName,
       wsAvatarStyle: "width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:600;flex:none;background:" + ws.bg,
-      wsMeta: ws.members + " members \u00b7 " + ws.projects.filter((p) => !p.archived).length + " projects \u00b7 you\u2019re " + (ws.role === "admin" ? "an admin" : "a " + ws.role),
-      wsRoleNote: ws.role === "admin"
+      wsMeta: s.members.length + " members \u00b7 " + activeProjects + (activeProjects === 1 ? " project \u00b7 you\u2019re " : " projects \u00b7 you\u2019re ") + (myRoleIsAdmin ? "an " + myRole.toLowerCase() : "a " + myRole.toLowerCase()),
+      wsRoleNote: myRole === "Owner"
+        ? "As the owner you can change this workspace\u2019s types, workflows and membership, and transfer ownership."
+        : myRole === "Admin"
         ? "As an admin you can change this workspace\u2019s types, workflows and membership."
-        : ws.role === "member"
+        : myRole === "Member"
           ? "As a member you can work on tickets. Changing types or workflows is an admin action."
           : "As a guest you see only the tickets that name you. Projects you are not named on are listed as restricted, not hidden.",
       archivedLabel: s.showArchived ? "Hide archived" : (ws.projects.filter((p) => p.archived).length + " archived"),
       toggleArchived: () => self.setState((st) => ({ showArchived: !st.showArchived })),
       wsProjects: ws.projects.filter((p) => s.showArchived || !p.archived).map((p) => {
+        const own = s.tickets.filter((x) => (x.project || "delivery") === p.id);
+        const blockedN = own.filter((x) => {
+          const st3 = (WF_STATES[x.wf || "Delivery v4"] || COLS).filter((y) => y.key === x.col)[0];
+          return x.col === "blocked" || (st3 && st3.name === "Awaiting sign-off");
+        }).length;
         const chips = [];
         if (p.hidden) chips.push(self.chip("Restricted", "var(--purple)", "var(--tintPurple)"));
         else {
-          chips.push(self.chip(p.tickets + " tickets", "var(--accent)", null));
-          if (p.blocked) chips.push(self.chip(p.blocked + " blocked", "var(--danger)", "var(--tintDanger)"));
+          chips.push(self.chip(own.length + (own.length === 1 ? " ticket" : " tickets"), "var(--accent)", null));
+          if (blockedN) chips.push(self.chip(blockedN + " blocked", "var(--danger)", "var(--tintDanger)"));
         }
         return {
           name: p.hidden ? "Project \u00b7 name restricted" : p.name, desc: p.desc, chips: chips,
@@ -1757,9 +1853,13 @@ class Component extends DCLogic {
           openStyle: "flex:1;min-height:40px;border:none;border-radius:var(--ctlR);font-size:15px;font-weight:600;cursor:pointer;" + (p.hidden ? "background:var(--ctlBg);box-shadow:var(--ctlShadow);color:var(--accent)" : "background:var(--accent);color:var(--onColor);box-shadow:var(--ctlShadow)"),
           open: () => {
             if (p.hidden) { self.toast("This project doesn\u2019t name you \u2014 an admin has to add you", { tone: "warning" }); return; }
-            self.tab("board");
+            const own = s.tickets.filter((x) => (x.project || "delivery") === p.id);
+            const tally = {};
+            own.forEach((x) => { const k = x.wf || "Delivery v4"; tally[k] = (tally[k] || 0) + 1; });
+            const wf = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0] || "Delivery v4";
+            self.setState({ screen: "board", stack: [], projectId: p.id, wfPick: wf, col: (WF_STATES[wf] || COLS)[0].key });
           },
-          canArchive: ws.role === "admin" && !p.hidden,
+          canArchive: myRoleIsAdmin && !p.hidden,
           archiveLabel: p.archived ? "Restore" : "Archive",
           archive: () => {
             self.setState((st) => ({ wsData: st.wsData.map((w) => (w.id === st.wsId ? Object.assign({}, w, { projects: w.projects.map((x) => (x.id === p.id ? Object.assign({}, x, { archived: !x.archived }) : x)) }) : w)) }));
@@ -1767,8 +1867,8 @@ class Component extends DCLogic {
           }
         };
       }),
-      canAddProject: ws.role === "admin", cannotAddProject: ws.role !== "admin",
-      addProjectRefusal: ws.role === "guest" ? "Guests cannot create projects." : "Only an admin can create a project here.",
+      canAddProject: myRoleIsAdmin, cannotAddProject: !myRoleIsAdmin,
+      addProjectRefusal: myRole === "Guest" ? "Guests cannot create projects." : "Only an admin can create a project here.",
       newProject: s.newProject,
       setNewProject: (e) => self.setState({ newProject: e.target.value }),
       addProject: () => {
@@ -1782,7 +1882,7 @@ class Component extends DCLogic {
       },
       wsLinks: [
         { label: "My work", note: "Assigned to you across this workspace", k: "mywork" },
-        { label: "Members", note: ws.members + " people \u00b7 roles and invitations", k: "members" },
+        { label: "Members", note: s.members.length + " people \u00b7 roles and invitations", k: "members" },
         { label: "Ticket types", note: "Fields and the workflow each follows", k: "types" },
         { label: "Workflows", note: "States, transitions, versions", k: "workflows" },
         { label: "MCP tokens", note: "Let an assistant act as you", k: "mcptokens" }
@@ -1809,7 +1909,7 @@ class Component extends DCLogic {
         return { label: c.name + " \u00b7 " + n, style: pill(colKey === c.key), go: () => self.setState({ col: c.key }) };
       }),
       wfPick: boardWf,
-      wfOptions: WF_NAMES.map((n) => ({ value: n, label: n + " \u00b7 " + s.tickets.filter((t) => (t.wf || "Delivery v4") === n).length })),
+      wfOptions: WF_NAMES.map((n) => ({ value: n, label: n + " \u00b7 " + s.tickets.filter((t) => (t.wf || "Delivery v4") === n && (t.project || "delivery") === projectId).length })),
       setWfPick: (e) => { const v = e.target.value; self.setState({ wfPick: v, col: (WF_STATES[v] || COLS)[0].key }); },
       viewChips: [{ k: "board", l: "Board" }, { k: "list", l: "List" }, { k: "calendar", l: "Calendar" }, { k: "timeline", l: "Timeline" }].map((v) => ({
         label: v.l, style: pill(s.screen === v.k),
@@ -1888,15 +1988,20 @@ class Component extends DCLogic {
             if (c.key === "progress") {
               const ch = s.tickets.filter((x) => x.parentId === t.id);
               if (ch.length) bits.push(ch.filter((x) => stateOf(x).cat === "terminal").length + " of " + ch.length + " done");
+              else if (t.type === "Epic") {
+                const mem = pool.filter((x) => x.epicId === t.id && !x.parentId);
+                bits.push(mem.filter((x) => stateOf(x).cat === "terminal").length + " of " + mem.length + " done");
+              }
             }
           });
           return bits.join(" \u00b7 ");
         };
         const out = [];
         let i = 0;
-        const pushRow = (t, depth) => {
+        const pushRow = (t, depth, memberCount) => {
           i++;
           const ch = kids(t.id);
+          const hasKids = ch.length > 0 || (memberCount || 0) > 0;
           const open2 = expanded[t.id] !== false;
           const di = self.dueInfo(t);
           const showDue = shown.filter((c) => c.key === "due").length > 0;
@@ -1904,7 +2009,7 @@ class Component extends DCLogic {
             isHeader: false, isRow: true, title: t.title,
             titleStyle: "font-size:17px;line-height:22px;font-weight:" + (t.type === "Epic" ? "600" : depth ? "400" : "500"),
             meta: metaFor(t),
-            caret: ch.length ? (open2 ? "\u25be" : "\u25b8") : "",
+            caret: hasKids ? (open2 ? "\u25be" : "\u25b8") : "",
             caretLabel: (open2 ? "Collapse " : "Expand ") + t.title,
             toggle: (e) => {
               e.stopPropagation();
@@ -1945,13 +2050,13 @@ class Component extends DCLogic {
           push(t.who || "__un", t.who ? PEOPLE[t.who].full : "Unassigned", "assignee").items.push(t);
         });
         groups.forEach((g) => {
-          const n = g.items.length + (g.epic ? 1 : 0);
+          const n = g.items.length;
           out.push({
             isHeader: true, isRow: false, title: g.title, meta: g.meta + " \u00b7 " + n,
             style: "display:flex;gap:10px;align-items:baseline;padding:9px 13px;background:var(--trayBg);box-shadow:var(--trayShadow)"
           });
-          if (g.epic) pushRow(g.epic, 0);
-          g.items.forEach((t) => pushRow(t, g.epic ? 1 : 0));
+          if (g.epic) pushRow(g.epic, 0, g.items.length);
+          if (!g.epic || expanded[g.epic.id] !== false) g.items.forEach((t) => pushRow(t, g.epic ? 1 : 0));
         });
         return out;
       })(),
@@ -2048,8 +2153,10 @@ class Component extends DCLogic {
       sheetCrumbs: (() => {
         if (!sheet) return [];
         const chain = [];
+        const tp = sheet.project || "delivery";
+        const tpName = (ws.projects.filter((p) => p.id === tp)[0] || { name: tp }).name;
         chain.push({ label: ws.name, go: () => self.setState({ screen: "workspace", stack: [] }) });
-        chain.push({ label: "Sprint 14", go: () => self.tab("board") });
+        chain.push({ label: tpName, go: () => self.setState({ screen: "board", stack: [], projectId: tp, wfPick: sheet.wf || "Delivery v4" }) });
         if (sheet.epicId) {
           const e = s.tickets.filter((t) => t.id === sheet.epicId)[0];
           if (e) chain.push({ label: e.title, go: () => self.setState({ sheetId: e.id, sheetTab: "details" }) });
@@ -2361,36 +2468,43 @@ class Component extends DCLogic {
         else { self.setState({ online: true, queued: 0 }); self.toast(s.queued + " claims acknowledged", { tone: "success" }); }
       },
 
+      isInviteAdmin: myRoleIsAdmin,
+      inviteAdminOnly: myRoleIsAdmin ? "" : "Only a workspace owner or admin can see or manage this workspace\u2019s invitations.",
       memberSummary: (() => {
         const a = s.members.filter((x) => x.role === "Admin").length;
         return s.members.length + " people \u00b7 one owner, " + a + (a === 1 ? " admin." : " admins.");
       })(),
       memberRows: s.members.map((m, i) => ({
         k: m.k, name: PEOPLE[m.k].full, role: m.role,
-        isOwner: m.role === "Owner", notOwner: m.role !== "Owner",
+        isOwner: m.role === "Owner", notOwner: m.role !== "Owner" && myRoleIsAdmin, roleBadge: m.role,
+        showBadge: m.role === "Owner" || !myRoleIsAdmin,
         scopeLabel: m.role === "Guest" ? "Named tickets only" : (m.role === "Owner" || m.role === "Admin") ? "All projects" : (m.scope === "all" ? "All projects" : (m.scope.length ? m.scope.map((id) => (ws.projects.filter((p) => p.id === id)[0] || { name: id }).name).join(", ") : "No project yet")),
         meta: (() => {
-          const n = s.tickets.filter((t) => t.who === m.k).length;
+          const ids = ws.projects.map((p) => p.id);
+          const n = s.tickets.filter((t) => t.who === m.k && ids.indexOf(t.project || "delivery") >= 0).length;
           return n + (n === 1 ? " ticket" : " tickets") + " \u00b7 " + m.seen;
         })(),
         style: "display:flex;gap:11px;align-items:center;padding:11px 13px" + (i % 2 ? ";background:var(--fill4)" : ""),
         setRole: (e) => {
           const v = e.target.value;
-          self.setState((st) => ({ members: st.members.map((x) => (x.k === m.k ? Object.assign({}, x, { role: v }) : x)) }));
-          self.toast(PEOPLE[m.k].name + " is now " + (v === "Admin" ? "an admin" : "a " + v.toLowerCase()), { tone: "success", undo: { members: s.members } });
+          self.setRoster(s.members.map((x) => (x.k === m.k ? Object.assign({}, x, { role: v }) : x)));
+          self.toast(PEOPLE[m.k].name + " is now " + (v === "Admin" ? "an admin" : "a " + v.toLowerCase()), { tone: "success", undo: self.rosterUndo(s.members) });
         }
       })),
       inviteHeading: "Pending invitations \u00b7 " + s.invites.length,
       noInvites: s.invites.length === 0,
       inviteRows: s.invites.map((iv, i) => ({
         email: iv.email,
-        meta: (iv.role === "Guest" ? "Guest \u00b7 named tickets only" : (iv.scope && iv.scope !== "all" ? "only " + ((ws.projects.filter((p) => p.id === iv.scope)[0] || {}).name || iv.scope) : "all projects")) + " \u00b7 " + (iv.channel || "email") + " \u00b7 " + (iv.expires === null ? "No link behind this one \u2014 withdraw it and invite again." : "Lapses " + iv.expires),
+        meta: (iv.role === "Guest" ? "Guest \u00b7 named tickets only" : (() => {
+          const named = iv.scope && iv.scope !== "all" ? ws.projects.filter((p) => p.id === iv.scope)[0] : null;
+          return named ? "only " + named.name : "all projects";
+        })()) + " \u00b7 " + (iv.channel || "email") + " \u00b7 " + (iv.expires === null ? "No link behind this one \u2014 withdraw it and invite again." : "Lapses " + iv.expires),
         metaStyle: "font-size:12px;line-height:16px;margin:0;color:" + (iv.expires === null ? "var(--danger)" : iv.urgent ? "var(--warning)" : "var(--label2)"),
         style: "display:flex;flex-direction:column;gap:9px;padding:12px 13px" + (i % 2 ? ";background:var(--fill4)" : ""),
 
         revoke: () => {
-          self.setState((st) => ({ invites: st.invites.filter((x) => x.id !== iv.id) }));
-          self.toast("Withdrawn \u00b7 the link no longer signs anyone in", { tone: "danger", undo: { invites: s.invites } });
+          self.setInvites(s.invites.filter((x) => x.id !== iv.id));
+          self.toast("Withdrawn \u00b7 the link no longer signs anyone in", { tone: "danger", undo: self.invitesUndo(s.invites) });
         }
       })),
       inviteEmail: s.inviteForm.email, inviteRole: s.inviteForm.role,
@@ -2399,10 +2513,9 @@ class Component extends DCLogic {
       sendInvite: () => {
         const v = s.inviteForm.email.trim();
         if (!v || v.indexOf("@") < 1) { self.toast("That doesn\u2019t look like an email address", { tone: "danger" }); return; }
-        self.setState((st) => ({
-          invites: st.invites.concat([{ id: "i" + Date.now(), email: v, role: st.inviteForm.role, by: "you", expires: "in 7 days", urgent: false }]),
-          inviteForm: { email: "", role: st.inviteForm.role }
-        }));
+        self.setInvites(s.invites.concat([{ id: "i" + Date.now(), email: v, role: s.inviteForm.role, scope: null, channel: "email", by: "you", expires: "15 Sep 2026, 15:30 IST", urgent: false }]), {
+          inviteForm: { email: "", role: s.inviteForm.role }
+        });
         self.toast("Invitation sent to " + v, { tone: "success" });
       },
 

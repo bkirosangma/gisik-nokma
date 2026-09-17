@@ -106,17 +106,28 @@ function main() {
   const args = process.argv.slice(2);
   const positional = [];
   let outDir = DEFAULT_OUT;
+  let mobileEntry = null;
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === '--out') {
       index += 1;
       outDir = resolve(args[index] ?? DEFAULT_OUT);
+    } else if (args[index] === '--mobile-entry') {
+      index += 1;
+      const raw = args[index];
+      if (raw === undefined || !/^[1-9]\d*$/.test(raw)) {
+        fail(`--mobile-entry takes a 1-based entry number; got ${JSON.stringify(raw ?? null)}`);
+      }
+      mobileEntry = Number(raw);
     } else {
       positional.push(args[index]);
     }
   }
   const bundlePath = positional[0];
   if (bundlePath === undefined) {
-    fail('usage: node design-system/tools/unpack-bundle.mjs <bundle.html> [--out <dir>]');
+    fail(
+      'usage: node design-system/tools/unpack-bundle.mjs <bundle.html> [--out <dir>] ' +
+        '[--mobile-entry <N>]',
+    );
   }
 
   const source = readFileSync(resolve(bundlePath), 'utf8');
@@ -197,6 +208,20 @@ function main() {
   } else {
     const [first, ...rest] = mobile;
     const identical = rest.every((entry) => entry.bytes.equals(first.bytes));
+    // An entry is written only when the CALLER NAMED it. There is no default:
+    // this whole block exists because two byte strings claim one filename, and
+    // picking one silently on the tool's own initiative would drop the other
+    // without anybody having said so. `--mobile-entry` is that "somebody".
+    let chosen = null;
+    if (mobileEntry !== null) {
+      if (mobileEntry > mobile.length) {
+        fail(
+          `--mobile-entry ${mobileEntry}, but this bundle has ${mobile.length} mobile ` +
+            `entr${mobile.length === 1 ? 'y' : 'ies'}`,
+        );
+      }
+      chosen = mobile[mobileEntry - 1];
+    }
     const scratch = mkdtempSync(join(tmpdir(), 'unpack-mobile-'));
     try {
       const scratchPaths = mobile.map((entry, index) => {
@@ -223,7 +248,7 @@ function main() {
       mobileNotes.push(
         `scratch copies: ${scratchPaths.join(', ')} (kept for the diff below; the temp dir is left in place)`,
       );
-      if (!identical) {
+      if (!identical && chosen === null) {
         const a = first.bytes.toString('utf8').split('\n');
         const b = rest[0].bytes.toString('utf8').split('\n');
         let firstDifference = -1;
@@ -238,17 +263,33 @@ function main() {
             `first difference at line ${firstDifference}. Entry #1 line ${firstDifference}: ` +
             `${JSON.stringify((a[firstDifference - 1] ?? '').slice(0, 120))} | entry #2 line ` +
             `${firstDifference}: ${JSON.stringify((b[firstDifference - 1] ?? '').slice(0, 120))}. ` +
-            'Resolve which export is newer, then re-run — this tool will not choose.',
+            'Resolve which export is newer, then re-run with `--mobile-entry <N>` to NAME one — ' +
+            'this tool will not choose.',
         );
-      } else if (committed !== null && committed.equals(first.bytes)) {
-        mobileNotes.push(`identical to the committed ${MOBILE_FILE} — left unchanged`);
       } else {
-        write(MOBILE_FILE, first.bytes);
-        mobileNotes.push(
-          committed === null
-            ? `no committed ${MOBILE_FILE} to compare against`
-            : `DIFFERS from the committed ${MOBILE_FILE} (${committed.length} B) — replaced`,
-        );
+        const selected = chosen ?? first;
+        if (chosen !== null && !identical) {
+          mobileNotes.push(
+            `CHOSEN by --mobile-entry ${mobileEntry}: entry #${chosen.index + 1} ` +
+              `(${chosen.uuid}) ${chosen.bytes.length} B sha256 ` +
+              `${sha256(chosen.bytes).slice(0, 12)}. Not written: ` +
+              rest
+                .filter((entry) => entry !== chosen)
+                .map((entry) => `entry #${entry.index + 1} sha256 ${sha256(entry.bytes).slice(0, 12)}`)
+                .join(', ') +
+              '. The reason for the choice belongs in PROVENANCE.md, not here.',
+          );
+        }
+        if (committed !== null && committed.equals(selected.bytes)) {
+          mobileNotes.push(`identical to the committed ${MOBILE_FILE} — left unchanged`);
+        } else {
+          write(MOBILE_FILE, selected.bytes);
+          mobileNotes.push(
+            committed === null
+              ? `no committed ${MOBILE_FILE} to compare against`
+              : `DIFFERS from the committed ${MOBILE_FILE} (${committed.length} B) — replaced`,
+          );
+        }
       }
     } finally {
       // The scratch dir is deliberately NOT cleaned: the held case's whole

@@ -87,6 +87,9 @@ describe('token structure', () => {
  * previously `hig` was the only style and this suite could not have caught
  * `minimal`/`neo` breaking a declared pair.
  */
+/**
+ * 15.26 — the third dim text role (`textSubtle`) clears 4.5:1 on every surface, in every style AND theme. Covered by this loop at runtime, which is why all THREE rows (surface / surfaceRaised / surfaceSunken) were declared and not just the one `/help` uses — the loop only checks what the array declares.
+ */
 describe('declared contrast pairs meet their minimums (the base test case 1.1, reborn)', () => {
   for (const style of STYLE_NAMES) {
     for (const theme of THEME_NAMES) {

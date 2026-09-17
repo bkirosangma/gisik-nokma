@@ -491,6 +491,9 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.queryByLabelText('Move to')).toBeNull();
   });
 
+  /**
+   * 3.166 — the Move-to control's own migration to the shared `Select`: before any state is picked the trigger shows the custom placeholder "Choose a state" rather than a blank or a stale prior value, preserved explicitly rather than falling back to the component's generic default.
+   */
   it('shows "Choose a state" as the trigger placeholder before any state is picked', () => {
     renderDialog();
     expect(screen.getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
