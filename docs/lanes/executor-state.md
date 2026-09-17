@@ -20,7 +20,74 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:4x IST. **STEP 2 — PART 0 IS DONE AND PUSHED; PART 1
+> # (THE LIST TAB, TO THE PROTOTYPE) IS IN FLIGHT, WITH ONE RULING REQUESTED.**
+>
+> ## Live anchors — measured at this block, `git branch --contains` clean
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2-list-controls` |
+> | HEAD | `6549a4149c9cddd9f35e50b2d6cbc6e6fd84d91d` — `Step 2 Part 0: the package watchers watch a directory, not an inode` |
+> | pushed | yes — `origin/exec/step2-list-controls` is the same sha |
+> | merge-base with `origin/owner/workspace-edits` | `b6d76a90dcf071baae289df560dd3c31bbdf39ca` (the #417 merge commit) |
+> | ahead / behind that base | **1 / 0** |
+> | tree | clean at last check; the Part 1 implementer is editing `ticket-list.tsx` and its tests now, so a dirty tree is expected — re-measure, do not trust this row |
+> | gate composition | UNCHANGED from #417; no gate has been run on this branch yet |
+>
+> `origin/owner/workspace-edits` was `b6d76a90` when this was written — a real merge commit with
+> parents `f3d36f93` and `e57e7d5d`, *not* a squash. **A trap worth naming:** this machine's Bash hook
+> routes `git log` through `rtk`, and that rewritten `git log` **omits merge commits**, so
+> `git log -1 origin/owner/workspace-edits` printed `e57e7d5d` while `git rev-parse` printed `b6d76a90`.
+> Both are true of different objects. Use plumbing (`rev-parse`, `--is-ancestor`) for refs.
+>
+> ## What Part 0 was, and what it found
+>
+> Both hot containers run their own `tsc -p tsconfig.json --watch` per package, and `tsc`'s default
+> strategy (`UseFsEvents`) watches the FILE — so those loops carried the same inode blindness #417
+> recorded for `tsx watch`, which is case 13.656's 80-second stale revert. Both services now set
+> `TSC_WATCHFILE=UseFsEventsOnParentDirectory`. Witnessed in both containers in one run, no restart
+> between the halves: rename-over **~1 s**, in-place append **~1 s** (host inode verified unchanged),
+> revert back to zero in both `dist` copies. Settled CPU 3.99–6.69 % (server) / 1.55–1.69 % (web).
+> The three pre-existing reds (`check:tasks`, `check:citations`, `check-case-ids`) are **byte-identical**
+> to a pristine extraction of the base in a separate worktree; `check:env`, `check:runbook`,
+> `check:help` exit 0.
+>
+> **Two instruments of mine lied before those numbers were trusted, and both are recorded in the
+> compose comment and in 13.652 — because each produced a confident "the watcher is blind" verdict.**
+> A marker the emitter does not carry never appears in `dist` (a comment before an elided
+> `export type`, and a bare `//` appended at EOF, while a STATEMENT at that same position is emitted);
+> and a poll timed from the operator's own tool call measures the operator, not the watcher. **The
+> first of those had already been written into the compose file as a conclusion that the directory
+> door failed its in-place half, and had to be retracted.** A check that cannot pass is not evidence.
+>
+> ## OPEN RULING — Step 2's column set. This is the only thing blocked.
+>
+> `gisik-nokma-lanes/EXEC-2026-09-18-step2-column-gap.md` (sent to the controller session as well).
+> The prototype's chip tray has **eight** columns and its Group by has **six** keys; the product has
+> **five** and **five**. Measured: Status/Assignee/Due date/Progress/Type are on the wire; **Ticket**
+> has `ListRow.ticketId` but no `ListColumnId`; **Workflow** is not on `ListRow` at all and has no
+> `Grouping`; **Priority** returns **zero matches** anywhere in `domain`/`app-core`/`server` src.
+> `Grouping` is `'epic'|'status'|'assignee'|'type'|'flat'` (`view-types.ts:183`); `ListColumnId` is the
+> five plus an unused `` `field:${string}` `` hatch (`:185`). That is the dispatch's own
+> "if a column's data is not on the wire, STOP-AND-ASK".
+>
+> **Held:** the three unbacked chips. **Not held:** everything else — Part 1 proceeds on the five
+> columns. **A restart should not re-ask this; it should check for the answer in
+> `controller-state.md`, and if there is none, continue on the five and keep the gap visible.**
+> Case-id block **13.658–13.669** was re-measured free at this tip with a positive control in the same
+> run (21 hits for `13.65[0-7]`, zero for `13.658`–`13.669`) in the catalogue, the plans and the tree.
+>
+> ## ⛔ AND THE THING THAT WILL COST A RESTART IF IT IS MISSED
+>
+> **Never run any compose command without the primary checkout's env file:**
+> `docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env -f docker-compose.dev.yml -f docker-compose.hot.yml <up|build|…>`.
+> This worktree has no `.env`, so the flag omitted substitutes `${GOOGLE_CLIENT_ID:-}` as EMPTY and
+> brings the server up with Google sign-in OFF while everything still looks healthy. After ANY compose
+> action touching `server`, `curl -s localhost:3000/v1/auth/methods` must still answer `"google":true`.
+> **Both hot containers are UP from this worktree right now and the owner is watching :3001.**
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
 > # SERVER'S WATCHER NOW POLLS. Branch PUSHED (`origin/exec/step1b-web-hot-reload`); the PR against base
 > # `owner/workspace-edits` opens immediately after this commit — it did NOT exist when this block was
 > # first written, and a restart surface that names an event which has not happened sends its reader to
