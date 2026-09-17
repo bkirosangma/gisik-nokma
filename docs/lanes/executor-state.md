@@ -29,10 +29,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | HEAD | `9b0fddd4` — four commits, docs-only; **no PR yet** |
+> | HEAD | `fce3f159` — pushed to `origin/exec/step2c0-prototype-delta-audit`; **no PR yet** |
 > | PR base | `owner/workspace-edits` — NEVER `main` |
-> | gate | Checks NOT yet re-run at this head. Docs-only: the dispatch's stated bar is the six checks raw 0 + `typecheck --force`; the controller runs the full forced gate at the tip |
-> | subagents | A (isSignIn, isWorkspaces, isWorkspace, isInvite, isMcpAuth) · B (+isMobileDevice, isWork, isBoardView, isListView, isCalendarView) · C (isMembers, isInviteAdmin, isAccount, isHelp) · D in flight. **Serial, one at a time**; 5 workers + 1 reviewer = the cap |
+> | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
+> | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
 >
 > ## Verdicts landed so far — 14 of 25 screens
 >

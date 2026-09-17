@@ -52,34 +52,34 @@ refreshed prototype"*) — here the prototype was brought to the product. It als
 verdict in the delta table is not by itself evidence of outstanding work**; it is evidence that the two
 artefacts differ, and the direction has to be established per screen.
 
-| # | screen | verdict | size | product files | proposed order |
-|---|---|---|---|---|---|
-| — | **TOKENS (every screen)** | **wire-gap** | **L** | `packages/ui/src/tokens.ts` (`:95`, `:151`, `:281`, `:282`); emitter `themeStylesheet()` `:1292-1315` | **1** |
-| 20 | `isAccount` | **none** | — | `apps/web/src/account/appearance-section.tsx:24-35` | already ships (`3bb823dc`, 2026-09-15) |
-| 21 | `isHelp` | **none** | — | `packages/app-core/src/help/help-browser.tsx:463, 511-579` | already ships (`7cce93e2`, 2026-09-15) |
-| 12 | `isMembers` | **held** | L | `packages/app-core/src/online/mappers.ts:405-408` drops `role` | owner hold; needs wire first |
-| 13 | `isInviteAdmin` | **held** | S | `apps/web/app/w/[workspaceId]/members/page.tsx:202-210` | owner hold; panel exists, gate does not |
-| 9 | `isTimelineView` | none | S* | `packages/app-core/src/timeline/timeline-view.tsx` | *corner word + window title only, if wanted |
-| 10 | `isMyWork` | none | S* | `packages/app-core/src/views/my-work.tsx` | *missing summary line only, derivable |
-| 11 | `isInbox` | **wire-gap** | M | `packages/app-core/src/inbox/gateway.ts:49,53` | no filter param, no bulk route |
-| 14 | `isSettingsShell` | none | — | `apps/web/app/settings/page.tsx:211-215` | |
-| 15 | `isTypes` | **wire-gap** | M | `packages/app-core/src/workflow-builder/gateway.ts:56-94` | no reorder op, no type count |
-| 16 | `isWorkflows` | **wire-gap** | M | `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:7` | status badge + 2nd action; **class family unstyled** |
-| 17 | `isTypeEditor` | *pending* | | | |
-| 18 | `isMcpTokens` | *pending* | | | |
-| 19 | `isBuilder` | *pending* | | | |
-| 22 | `isLegal` | *pending* | | | |
-| 25 | `isNotFound` | *pending* | | | |
-| 23 | `isInvite` | wire-gap | M | `apps/web/app/invite/[token]/page.tsx`; `packages/app-core/src/online/invites.ts:3-7` | |
-| 24 | `isMcpAuth` | wire-gap | L | `apps/web/app/mcp/authorize/page.tsx`; `apps/server/src/routes/mcp-device.ts:60,78,105` | |
-| 4 | `isWorkspace` | wire-gap | M | `apps/web/app/w/[workspaceId]/page.tsx`; `packages/app-core/src/view-types.ts:15-23` | |
-| 3 | `isWorkspaces` | held | — | `apps/web/app/workspaces/page.tsx` | |
-| 5 | `isWork` | held | — | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1202` | |
-| 1 | `isMobileDevice` | none | — | responsive shell, three media queries | |
-| 2 | `isSignIn` | none | — | `apps/web/app/sign-in/page.tsx:462` | |
-| 6 | `isBoardView` | none | — | `packages/app-core/src/views/board.tsx` | |
-| 7 | `isListView` | 🟢 **done** (#419) | — | `packages/app-core/src/views/ticket-list.tsx` | |
-| 8 | `isCalendarView` | none | — | `packages/app-core/src/calendar/calendar-view.tsx` | |
+| order | screen | verdict | size | product files / gate |
+|---|---|---|---|---|
+| **1** | **TOKENS (every screen)** | **wire-gap** | **L** | `packages/ui/src/tokens.ts` (`:95`, `:151`, `:281`, `:282`); emitter `themeStylesheet()` `:1292-1315` |
+| **2** | `isLegal` | **port** | M | `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx`, `apps/web/src/back-button.tsx`, `globals.css` — nav bar + tabs/TOC + title scale; no wire |
+| **3** | `isNotFound` | **port** | S | `apps/web/app/not-found.tsx:36-87` — icon tile, 3rd link to `/help`, title scale; **copy must not change** |
+| **4** | `isWorkflows` | **wire-gap** | M | card grid + state chips + counts are derivable; only badge & 2nd action need wire. **Carries unstyled family #2** |
+| **5** | `isTypeEditor` | **port** | M | `ticket-type-editor-screen.tsx` — **blocked**: field `required` toggle is a schema gap needing a ruling |
+| **6** | `isInbox` | **wire-gap** | M | `apps/web/app/inbox/page.tsx`; `packages/app-core/src/inbox/gateway.ts:49,53` — no filter param, no bulk route |
+| **7** | `isMcpTokens` | **wire-gap** | M | `apps/server/src/mcp/token-store.ts:154-167` — rows need `name`+badge. **Do NOT build issue-token** (ruled out) |
+| **8** | `isTypes` | **wire-gap** | M | `packages/app-core/src/workflow-builder/gateway.ts:56-94` — no reorder op, no per-type count |
+| **9** | `isWorkspace` | **wire-gap** | M | `apps/web/app/w/[workspaceId]/page.tsx`; `packages/app-core/src/view-types.ts:15-23` — no project desc/chips, no delete |
+| **10** | `isInvite` | **wire-gap** | M | `apps/web/app/invite/[token]/page.tsx`; `packages/app-core/src/online/invites.ts:3-7` — 3 fields on the read |
+| **11** | `isMcpAuth` | **wire-gap** | L | `apps/server/src/routes/mcp-device.ts:60,78,105` — scopes, client name, displayed code, **no deny route** |
+| — | `isMembers` | held | L | `packages/app-core/src/online/mappers.ts:405-408` drops `role`; **owner hold**. Carries unstyled family #1 |
+| — | `isInviteAdmin` | held | S | `apps/web/app/w/[workspaceId]/members/page.tsx:202-210` — panel exists, gate does not; **owner hold** |
+| — | `isBuilder` | held | M* | cannot port as drawn (invented node controls, missing left column). **Carries unstyled family #3** — M, ruling-independent |
+| — | `isWorkspaces` | held | — | `apps/web/app/workspaces/page.tsx` — no refresh delta; deviations already argued in-file |
+| — | `isWork` | held | — | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1202` — both bindings already live |
+| — | `isMobileDevice` | none | — | responsive shell; three media queries, no mobile document |
+| — | `isSignIn` | none | — | `apps/web/app/sign-in/page.tsx:462` — same mark, same asset |
+| — | `isBoardView` | none | — | `packages/app-core/src/views/board.tsx` |
+| — | `isCalendarView` | none | — | `packages/app-core/src/calendar/calendar-view.tsx` — carries *more* than the prototype |
+| — | `isTimelineView` | none | S* | `timeline-view.tsx` — *corner word + window title only, if wanted |
+| — | `isMyWork` | none | S* | `packages/app-core/src/views/my-work.tsx` — *missing summary line only, derivable |
+| — | `isSettingsShell` | none | — | `apps/web/app/settings/page.tsx:211-215` |
+| — | `isAccount` | none | — | `apps/web/src/account/appearance-section.tsx:24-35` — already ships (`3bb823dc`, 2026-09-15) |
+| — | `isHelp` | none | — | `packages/app-core/src/help/help-browser.tsx:463, 511-579` — already ships (`7cce93e2`, 2026-09-15) |
+| ✓ | `isListView` | **done** (#419) | — | `packages/app-core/src/views/ticket-list.tsx` — no-results block & sorting remain unported, outside #419's scope |
 
 ---
 
@@ -563,8 +563,65 @@ in the product.
 - *structure:* the prototype renders a **grid of cards** (`repeat(auto-fit,minmax(320px,1fr))`, `:849`), each with name, status badge, a row of **per-state chips each carrying a 4px category colour bar**, a meta line and **two** actions (`:850-865`). The product renders a flat `<ul>` of `<li class="workflow-list__row">` with name, `v{version}`, `"{n} states"` and a single "Open" button (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:51-66`) — no card, no badge, no state chips, no second action. The product adds an empty arm the prototype lacks (`"No workflows published yet."`, `:49`), a failure arm (`:33`) and a loading arm (`:35`).
 - *strings:* the prototype header has a subtitle — `"Publishing records a version. Nothing already recorded is rewritten."` (`:846`); the product's `<header>` is the title and the action button alone (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:39-46`) and **that sentence appears nowhere in the product**. The button `"New workflow"` (`:847`) `matches` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:43`).
 - *tokens:* the primary action renders a bare `<button>` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:42-44`) — no class — so it resolves to the UA default plus the element-level rule at `apps/web/app/globals.css:45-50` rather than `.gn-button--primary` (`ui.css:71-74`). The entire card vocabulary the prototype uses (`cardBg`, `cardShadow`, `cardR`, `trayBg`/`trayShadow` on chips, the 4px category bars, the `12px/16px` badge with `--tintSuccess`/`--tintWarning`) is unrepresented.
-- **`workflow-list__*` HAS NO CSS AT ALL — swept with a control.** Every `*.css` in the repo contains exactly one `workflow-list` occurrence, and it is a **comment** listing `.workflow-list__new` among *"unclassed-control offenders"* (`apps/web/app/globals.css:44`); there are **zero rules**. Control: the same search finds **31** `.ticket-type-list__` rules in `packages/ui/src/ui.css` — so the instrument reaches CSS rules, and this family is absent from them. **This is the third such family found in this audit** — see also `gn-members*` (`isMembers`) and the unstyled `<button>` here.
+- **`workflow-list__*` HAS NO CSS AT ALL — swept with a control.** Every `*.css` in the repo contains exactly one `workflow-list` occurrence, and it is a **comment** listing `.workflow-list__new` among *"unclassed-control offenders"* (`apps/web/app/globals.css:44`); there are **zero rules**. Control: the same search finds **31** `.ticket-type-list__` rules in `packages/ui/src/ui.css` — so the instrument reaches CSS rules, and this family is absent from them. **This is the second of three such families found in this audit** — the others are `gn-members*` (`isMembers`) and the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group (see `isBuilder`). The workflows screen also renders its primary action as a bare `<button>` with no class at all (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:42-44`).
 - **WIRE GAP — the badge:** `PublishedWorkflowDef` is `{id,version,name,initialStateId,states,transitions,stateMapping?}` (`packages/domain/src/workflow.ts:83-116`) — no status. `"Published"` is derivable (the list serves only published defs) but `"Superseded"` and the builder's `"Draft · N issues"` (data `:3176-3183`) are not on this read. **WIRE GAP — the second action:** `"Duplicate"`, `"Discard draft"` and `"View history"` (data `:3174-3188`) have no gateway method (`packages/app-core/src/workflow-builder/gateway.ts:56-94`). *Not* a gap: the state chips and `"N states · N transitions"` are derivable — `WorkflowState` carries `category` (`packages/domain/src/workflow.ts:83-90`; `workflowStateSchema` `:6-14`) and `transitions` is on the def.
 **Port verdict.** `wire-gap` — the card layout is a real absence and the classes are unstyled, but the two elements carrying new information need wire surface that does not exist; the card body is derivable, so the render-only part alone would be M.
+
+### `isTypeEditor` — `desktop.dc.html@6d7b67c0a52c:871-957`
+**Product route(s) + files.** `/w/[workspaceId]/settings/ticket-types/[typeId]` → `apps/web/app/w/[workspaceId]/settings/ticket-types/[typeId]/page.tsx:15`, rendering `TicketTypeEditorPane` at `apps/web/src/ticket-type-editor-pane.tsx:61` wrapping `TicketTypeEditorScreen` at `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:78`; also inlined in-shell at `apps/web/app/settings/page.tsx:9`.
+**Prototype delta (old→new).** `none` — verified by normalised block diff, old `c9f852a2c243:856-942` vs new `6d7b67c0a52c:871-957`, 87 lines either side; the only raw difference is `&rsaquo;` → `›`.
+**Product gap (new prototype → product).**
+- *structure:* header — prototype h2 at 22px with Cancel + Save in that row; product renders `<Heading className="gn-page-title">` at `2.125rem` (`apps/web/src/ticket-type-editor-pane.tsx:109`) with Cancel only (`:110`), Save at the form's foot (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:365-372`).
+- *structure:* card grouping — product is a **superset** (splits Type name + IconPicker + Hierarchy rank `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:213-247` from Workflow `:248-260`); no gap.
+- *structure:* **WIRE GAP — the required toggle.** The prototype's field rows carry `f.toggleReq`/`f.reqLabel`; `customFieldDefSchema` is `{ id, name, type, options }` (`packages/domain/src/ticket-types.ts:11-16`) with **no `required`** at schema, wire, or `FieldsEditor` layer (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:20-71`).
+- *structure:* field kinds — prototype offers `Text / Date / Number / Attachment`; product is `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`), rendered as raw lowercase labels (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:45`). Vocabulary **and** casing differ.
+- *structure:* add-field — prototype is an explicit row; product appends a seed row in place (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:74-83`).
+- *structure:* the divergence card — prototype puts it in a separate right-hand `--tintWarning` card; the product keeps it **inside** the Workflow card (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:261-346`) headed `"Existing tickets stay where they are"` (`:276`), with `Move them to "${incomingWorkflow.name}"…` (`:311`) and `Leave them on "${outgoingWorkflow.name}"` (`:320`). The **data is carried** (`gateway.getTypeWorkflowPopulation` `:131`, `gateway.migrateTypeToWorkflow` `:169`) — not a wire gap.
+- *strings:* the prototype's `"Neither choice is recommended over the other — leaving them is a decision, not a deferral."` has no product string (exact-string search over `apps/` + `packages/`: 0 hits); the product encodes the thought as a comment at `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:313`. The prototype's `"Choose again"` reopen control has no counterpart — the product's migrated branch (`:262-273`) is terminal. The prototype's static three-item implications list exists nowhere; the product generates one paragraph from the hierarchy rank (`packages/app-core/src/workflow-builder/ticket-types/rank.ts:35-42`). The prototype's `"Move them to Scheduled"` names a *state*; the product names the *workflow*, never a state.
+**Port verdict.** `port (M)` — most of the delta is placement and copy over data the gateway already carries; the one blocker is the field `required` toggle, a schema-level wire gap needing a ruling first.
+
+### `isMcpTokens` — `desktop.dc.html@6d7b67c0a52c:959-1006`
+**Product route(s) + files.** `/mcp/tokens` → `apps/web/app/mcp/tokens/page.tsx:27` rendering `McpTokensScreen` at `apps/web/src/mcp-tokens-screen.tsx:89`; the same component is mounted on `/account` (the screen's own docblock, `apps/web/src/mcp-tokens-screen.tsx:59-60`).
+**Prototype delta (old→new).** `none` — normalised block diff, old `:944-991` vs new `:959-1006`, 48 lines each.
+**Product gap (new prototype → product).**
+- *strings:* heading/lead differ in wording, not kind — prototype `"MCP tokens"` + `"Tokens let an assistant read and write tickets as you."`; product `Connected assistants` (`apps/web/src/mcp-tokens-screen.tsx:156`) with its lead at `:168-172`.
+- **The prototype's "Token name" input, "Issue token" button and show-once `freshToken` card are deliberately absent and must NOT be built.** There is no create route — `apps/server/src/routes/mcp-tokens.ts` registers only `GET /v1/me/mcp-tokens` (`:44`) and `DELETE /v1/me/mcp-tokens/:id` (`:49`); minting is the device-code flow (`apps/web/app/mcp/authorize/page.tsx:67+`). The product states the opposite position in its own source at `apps/web/src/mcp-tokens-screen.tsx:208-216` — *"The connection itself is never shown — only a one-way hash of it is stored, so there is nothing here to copy or leak."* **Pre-existing product ruling.**
+- *structure:* **WIRE GAP — `t.name` and `t.badge`.** `listMcpTokens` returns exactly `{ id, createdAt, lastUsedAt }` (`apps/server/src/mcp/token-store.ts:154-167`), mirrored by `TokenRow` (`apps/web/src/mcp-tokens-screen.tsx:29`); `id` is the `token_hash` itself. No name, no status.
+- *structure:* the prototype prints `https://gisik-nokma.app/mcp` and offers "Preview the consent screen" — the endpoint string exists nowhere in `apps/` or `packages/` (0 hits), and `McpTokensScreen` does not link to `/mcp/authorize`.
+- *matches:* per-row Revoke ↔ `:196-202`; `"Stored as a hash…"` ↔ `:211-216`; "Last used" ↔ `:190-194`.
+**Port verdict.** `wire-gap` — the row's name and badge have no field on the read, and the issue-token block is ruled out by a shipped decision rather than a styling gap.
+
+### `isBuilder` — `desktop.dc.html@6d7b67c0a52c:1013-1093`
+**Product route(s) + files.** `/w/[workspaceId]/settings/workflows/[workflowId]` → `apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/page.tsx:24`, rendering `WorkflowBuilderScreen` at `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:52`.
+**Prototype delta (old→new).** `none` — normalised block diff, old `:998-1078` vs new `:1013-1093`, 81 lines each; only `&rsaquo;` → `›`.
+**Product gap (new prototype → product).**
+- **A third unstyled class family — proven with a controlled sweep.** `workflow-builder-screen*`, `state-inspector*` and `inspector-panel*` have **no CSS at all**: a `--include='*.css'` sweep across the repo (excluding `node_modules`, `.next`, `dist`, `reference`) returns **0 hits for each**, while the same command shape returns `gn-legal__title` (`apps/web/app/globals.css:1902`) and `gn-workflow-canvas` (`packages/ui/src/ui.css:1203`). Sibling selectors **inside the same components** *are* styled — `.ticket-type-editor` (`ui.css:1679`), `.gn-state-node` (`:1205`), `.fields-editor` (`:1413`), and `.issues-panel*` / `.advisories-panel*` / `.publish-controls*` / `.system-rules-panel*` all resolve. So `workflow-builder-screen__header|__layout|__left|__canvas|__right` (`packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:107-124`), `state-inspector__*` (`packages/app-core/src/workflow-builder/ui/state-inspector.tsx:10-36`) and `inspector-panel__hint` (`packages/app-core/src/workflow-builder/ui/inspector-panel.tsx:9`) render with user-agent defaults. There is no Tailwind layer (`@tailwind`/`@import` absent from globals.css) and no second CSS file to fall back on.
+- *structure:* header — prototype has a breadcrumb, an h1 carrying the workflow name and a status line; product renders only `WorkflowNameField`, an `<input>` (`packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:26-34`), `AddStateButton` (`:37-50`) and `PublishControls` (`:111`). `last saved` / `lastSaved` / `wfStatus` = 0 hits repo-wide.
+- *structure:* layout — prototype is canvas + **one** right column (`grid-template-columns:minmax(0,1fr) minmax(0,320px)`); product is **three** columns (left `SystemRulesPanel` + `IssuesPanel`, canvas, right inspector — `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:113-124`). The prototype has no left column, so adopting it as drawn would drop `SystemRulesPanel` (`packages/app-core/src/workflow-builder/ui/system-rules-panel.tsx:15-33`).
+- *structure:* inspector — prototype draws one card with State name + Category select + "Blocks the ticket" + "Initial state" + Delete; the product's inspector is state name, "Set as start", "Delete state" (`packages/app-core/src/workflow-builder/ui/state-inspector.tsx:9-36`), while **Category and Blocked live on the node** (`packages/app-core/src/workflow-builder/ui/state-node.tsx:29-57`). The prototype's toggles are invented — the same call recorded at `docs/hig-reconciliation-audit.md:703`.
+- *strings:* `"Ready to publish"` / `"Every state is reachable and no blocked state is a dead end."` vs `No issues — this workflow can be published.` (`packages/app-core/src/workflow-builder/ui/issues-panel.tsx:60`); advisory heading/footer vs `Worth a look — none of these block publishing` (`:82`) and `Advisories describe a workflow that is legal but may not do what you meant.` (`:96-98`).
+- *matches in kind:* publish exists, disabled on issues (`packages/app-core/src/workflow-builder/ui/publish-controls.tsx:108-116`); the prototype's `"Publishing records a new version…"` has no pre-publish counterpart — the product prints `Version N published.` only after success (`:131`).
+**Port verdict.** `held` — the block cannot be ported as drawn: its right column invents controls that live on the node and it omits the product's entire left column, so the mapping needs a ruling. Independently actionable: the three-class family with no CSS is a bounded **M** restyle.
+
+### `isLegal` — `desktop.dc.html@6d7b67c0a52c:1720-1755`
+**Product route(s) + files.** `/privacy` → `apps/web/app/privacy/page.tsx:28`; `/terms` → `apps/web/app/terms/page.tsx:28`. Both render `<main className="gn-shell gn-legal">` with `<BackButton />` (`apps/web/src/back-button.tsx:33`).
+**Prototype delta (old→new).** `none` — normalised block diff, old `:1655-1690` vs new `:1720-1755`, 36 lines each.
+**Product gap (new prototype → product).**
+- *structure:* chrome — the prototype draws **its own top nav bar** (`--navBg` shadow) with a brand tile, the "Gisik Nokma" wordmark and a "Sign in" link; the product has no nav on these routes, using `BackButton` instead, styled `.gn-legal__back` (`apps/web/app/globals.css:1899`), whose docblock (`apps/web/src/back-button.tsx:6-21`) records why.
+- *structure:* navigation model — the prototype has a segmented `legalTabs` control and a `legalToc` anchor nav; the product has neither, only footer cross-links (`privacy/page.tsx:142-144`; `terms/page.tsx:149-151`).
+- *tokens:* heading scale and measure — prototype `34px/41px/700/-0.4px` at `max-width:72ch` centred; product `.gn-legal__title { max-width: 68ch; font-size: 1.6rem; line-height: 1.25; }` (`apps/web/app/globals.css:1901-1907`) inside the 80rem `.gn-shell` (`:1884-1888`). Both size and measure differ.
+- *strings:* the prototype's `Last updated 8 September 2026` = **0 product hits**. The product ships real prose with bracketed placeholders (`privacy/page.tsx:33-36` — `[DATE]`, `[ENTITY NAME]`, `[JURISDICTION]`), which is a **pre-existing product ruling**: both files open with a deliberate boilerplate warning that the brackets must be replaced before legal review (`privacy/page.tsx:1-24`, `terms/page.tsx:1-24`). Not a refresh item.
+- The legal surface **is** styled: 18 `gn-legal` rules (`apps/web/app/globals.css:1884-2083`).
+**Port verdict.** `port (M)` — adopting the nav bar, the tabs/TOC navigation and the larger title is bounded UI across `privacy/page.tsx`, `terms/page.tsx`, `apps/web/src/back-button.tsx` and `globals.css`; the bracketed content is a standing ruling and must be left alone.
+
+### `isNotFound` — `desktop.dc.html@6d7b67c0a52c:1844-1862`
+**Product route(s) + files.** `apps/web/app/not-found.tsx:36` — the global Next 404, `:36-87`, styled by 20 `gn-notfound` rules (`apps/web/app/globals.css:1884-2036`).
+**Prototype delta (old→new).** `none` — normalised block diff, old `:1779-1797` vs new `:1844-1862`, 19 lines each.
+**Product gap (new prototype → product).** **The prototype is thinner than the product, not ahead of it.**
+- *structure:* prototype is an icon tile, an h1, one lead, three action rows and one aside; the product is h1 (`apps/web/app/not-found.tsx:39`), lead (`:41-44`), a three-item `<ul>` of causes (`:46-62`), a "Why it will not say" panel (`:64-71`), two action links (`:73-80`) and a closing aside (`:82-85`).
+- *strings:* copy is entirely different and deliberate — prototype `"This page isn't here"` / `"Nothing was deleted."` vs product `"This address does not match a page."` (`:39`). Exact-string searches for `This page isn’t here` and `Nothing was deleted` = **0 hits**. The docblock (`apps/web/app/not-found.tsx:15-29`) records the wording as load-bearing: the API answers the same 404 for absent and not-yours **by design**. **Pre-existing product ruling — do not reword to the prototype's copy.**
+- *tokens:* prototype is a centred 520px column with a 72px icon tile; product is left-aligned inside `.gn-shell` at a 68ch measure with no icon (`.gn-notfound__title` `apps/web/app/globals.css:1901-1907`).
+- *structure:* prototype offers **three** action links (workspaces / manual / inbox); the product offers two (`apps/web/app/not-found.tsx:74-79`), omitting the manual. `/help` exists as a route, so that third link is a bounded addition, **not** a wire gap.
+**Port verdict.** `port (S)` — the portable delta is an icon tile, a third link to `/help`, and the heading scale/measure; the copy differences are the product's own ruling and must not be replaced.
 
 ---
