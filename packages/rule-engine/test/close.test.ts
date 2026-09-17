@@ -14,6 +14,11 @@ const reopen = (): EventEnvelope =>
   makeEnvelope({ type: 'ticket.reopened', entity: { kind: 'ticket', id: T }, workspaceId: WS, payload: {} });
 const ctx = (...after: EventEnvelope[]) =>
   buildMemoryContext([WF], [typeDefined(TASK), created(T, 'task', null, PROJECT), ...after]);
+/** A misfiled entity kind for each event type — a legitimate `EntityKind` other than 'ticket'. */
+const closeWrongKind = (): EventEnvelope =>
+  makeEnvelope({ type: 'ticket.closed', entity: { kind: 'ticket-type', id: T }, workspaceId: WS, payload: {} });
+const reopenWrongKind = (): EventEnvelope =>
+  makeEnvelope({ type: 'ticket.reopened', entity: { kind: 'ticket-type', id: T }, workspaceId: WS, payload: {} });
 
 /** 13.568 — closing (spec §2). */
 describe('13.568 checkTicketClosed', () => {
@@ -34,6 +39,13 @@ describe('13.568 checkTicketClosed', () => {
   it('is reachable through evaluateEvent', async () => {
     expect(await evaluateEvent(close(), ctx(move('doing')))).toMatchObject({ rule: 'close-requires-terminal' });
   });
+  /** Fix round 1 (review, Important 1): a misfiled kind is refused, not accepted. */
+  it('refuses a misfiled kind, naming it, rather than accepting it', async () => {
+    expect(await checkTicketClosed(closeWrongKind(), ctx())).toEqual({
+      refused: true, rule: 'malformed-payload',
+      reason: 'This ticket.closed event does not point at a ticket; it points at a ticket-type.',
+    });
+  });
 });
 
 /** 13.569 — reopening (spec §2). */
@@ -44,12 +56,30 @@ describe('13.569 checkTicketReopened', () => {
       refused: true, rule: 'not-closed', reason: 'This ticket is not closed.',
     });
   });
+  /** Fix round 1 (review, Minor 4): reopen's own dispatch was untested. */
+  it('is reachable through evaluateEvent', async () => {
+    expect(await evaluateEvent(reopen(), ctx(move('done'), close()))).toEqual({ refused: false });
+  });
+  /** Fix round 1 (review, Important 1): a misfiled kind is refused, not accepted. */
+  it('refuses a misfiled kind, naming it, rather than accepting it', async () => {
+    expect(await checkTicketReopened(reopenWrongKind(), ctx())).toEqual({
+      refused: true, rule: 'malformed-payload',
+      reason: 'This ticket.reopened event does not point at a ticket; it points at a ticket-type.',
+    });
+  });
 });
 
 /** 13.570 — a closed ticket cannot move (spec §2: explicit reopen). */
 describe('13.570 transitions are refused while closed', () => {
   it('refuses before any edge is looked at', async () => {
     expect(await evaluateEvent(move('doing'), ctx(move('done'), close()))).toEqual({
+      refused: true, rule: 'closed-ticket', reason: 'This ticket is closed — reopen it first.',
+    });
+    // Fix round 1 (review, Minor 3): a destination that is not even a real
+    // state still answers closed-ticket, not unknown-state — proof the closed
+    // check runs before the workflow is even consulted, not merely before one
+    // particular legal move.
+    expect(await evaluateEvent(move('nowhere'), ctx(move('done'), close()))).toEqual({
       refused: true, rule: 'closed-ticket', reason: 'This ticket is closed — reopen it first.',
     });
   });

@@ -6210,12 +6210,22 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
 - **13.568** ✅ `checkTicketClosed` accepts closing a ticket sitting in a terminal state and refuses two
   ways: a non-terminal state names it (`close-requires-terminal`, `A ticket can only be closed from a
   terminal state; "Doing" is not one.`), and a second close on an already-closed ticket refuses
-  `already-closed`; both are reachable through `evaluateEvent` — (`packages/rule-engine/test/close.test.ts`)
+  `already-closed`; both are reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a
+  misfiled entity kind is REFUSED `malformed-payload` naming the kind, not silently accepted — the shape
+  every sibling check already has (`transition.ts`, `workflow-rebind.ts`, `fields.ts`). Mutation (reverting
+  the split guard to its original `env.type !== … || env.entity.kind !== 'ticket') return ACCEPT`) kills
+  the misfiled-kind case only, and only that case — (`packages/rule-engine/test/close.test.ts`)
 - **13.569** ✅ `checkTicketReopened` accepts reopening a closed ticket and refuses `not-closed` on one that
-  is not — (`packages/rule-engine/test/close.test.ts`)
+  is not, reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a misfiled entity kind is
+  refused `malformed-payload` naming the kind, not silently accepted, mirroring 13.568's mutation —
+  (`packages/rule-engine/test/close.test.ts`)
 - **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed —
-  reopen it first.") before any edge is looked at; after a `ticket.reopened` the same move is judged by the
-  workflow again — (`packages/rule-engine/test/close.test.ts`)
+  reopen it first.") before any edge is looked at — proven not merely against a legal destination but
+  against `move('nowhere')`, a destination that is not even a real state, which still answers
+  `closed-ticket` rather than `unknown-state` (fix round 1, review, Minor 3: the earlier case proved the
+  closed check beats one legal move, not that it runs before the workflow is consulted at all); after a
+  `ticket.reopened` the same move is judged by the workflow again —
+  (`packages/rule-engine/test/close.test.ts`)
 - **13.571** ✅ The universal edges are legal through the real engine without being declared: Start
   (`backlog → initialStateId`) is accepted and a non-initial destination from backlog is still
   `illegal-transition`; Send-to-backlog is accepted from a non-terminal state and refused
