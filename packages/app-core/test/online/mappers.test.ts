@@ -71,6 +71,7 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
       cause: null,
     },
     rollup: null,
+    closed: null,
     ...overrides,
   };
 }

@@ -169,6 +169,7 @@ const BOARD: BoardResponse = {
             cause: null,
           },
           rollup: null,
+          closed: null,
         },
       ],
     },

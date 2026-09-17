@@ -6243,7 +6243,10 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `ticket.created` → two `ticket.transitioned` → `ticket.closed` → `ticket.reopened` sequence, one
   `applyCommitted` per step, reading the row after each. `rowToTicketState` maps the pair to
   `TicketState.closed` and null to null. Mutation (`rowToTicketState` returning `closed: null`
-  unconditionally) kills the second case only, and only that case —
+  unconditionally) kills the second case only, and only that case. Reconciled against the brief's
+  "three server test literals" needing `closed: null`: they were the shared `expectedCard()` factory
+  plus one inline `ticketState` literal, both in `real-door-round-trip.test.ts` — two edits covered
+  them (no third was found, and `apps/server` typecheck agrees) —
   (`apps/server/test/projections/tickets-closed.test.ts`)
 - **13.573** ✅ A card `assembleTicketCards` produces from a closed row carries `closed: { actorId, at }`;
   from an open row `closed: null` — both assertions in the same call, so a reader that answered `null`
