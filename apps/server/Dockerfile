@@ -63,8 +63,11 @@ RUN rm -rf /out/src /out/test
 # `pnpm fetch` reads the lockfile alone, so this layer's cache key is the
 # lockfile plus the manifests. Copying the whole tree first would invalidate it
 # on every source edit and rebuilds would stop being rare — which is the entire
-# point of the stage. CONSEQUENCE: a NEW workspace package needs a line here, or
-# `pnpm install --frozen-lockfile` below fails on the missing importer.
+# point of the stage. CONSEQUENCE: a NEW workspace package needs a line here.
+# Not because the install below would miss an importer — `COPY . .` runs first,
+# so every manifest is present by then — but because `pnpm fetch` above is the
+# step whose cache key this list sets, and a package absent from it surfaces as
+# an offline-store miss at the install.
 FROM node:22-alpine AS dev
 RUN corepack enable
 RUN apk add --no-cache postgresql16-client

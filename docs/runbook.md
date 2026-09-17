@@ -244,41 +244,93 @@ directories and restarts itself on save, so what is live on the API origin is wh
     pnpm dev:stack
 
 That is the whole command. It composes `docker-compose.dev.yml` with `docker-compose.hot.yml`, and
-**run it from the checkout whose code should be live** — the mounts are resolved relative to the
-directory the command runs in, so the worktree you run it from is the worktree the container serves.
-`docker-compose.dev.yml` itself is untouched by hot mode: the production image path and the compose
-contract suite read exactly what they read before.
+**run it from the checkout whose code should be live** — the mounts resolve relative to the directory
+of the **first `-f` file**, which for `pnpm dev:stack` is the checkout you run it from, so that
+worktree is the worktree the container serves. `docker-compose.dev.yml` itself is untouched by hot
+mode: the production image path and the compose contract suite read exactly what they read before.
 
-**`.env` must exist in the checkout you run this from** — copy it from wherever the owner keeps it.
-It is gitignored (`.gitignore:11`) and per-checkout by design, so a fresh worktree has none. The
-script passes `--env-file .env`, and without that file compose does not silently fall back — it stops
-with *"Couldn't find env file"*. That failure is the good one. The dangerous shape is dropping
-`--env-file`, which lets `${GOOGLE_CLIENT_ID:-}` substitute to EMPTY and brings the server up with
-**Google sign-in OFF** while looking healthy; this happened once on 2026-09-09 and the owner noticed
-only by asking why the button was gone. To point at a checkout other than the one you are standing in:
+**`.env` must exist in that checkout** — copy it from wherever the owner keeps it. It is gitignored
+(`.gitignore:11`) and per-checkout by design, so a fresh worktree has none.
+
+What `--env-file .env` actually buys is worth stating precisely, because the intuitive reading is
+wrong and was measured wrong here. Compose **auto-loads `.env` from the project directory** even
+without the flag, so omitting `--env-file` does **not** empty `${GOOGLE_CLIENT_ID:-}` — measured:
+`docker compose -f docker-compose.dev.yml -f docker-compose.hot.yml config` with no `--env-file`
+renders `GOOGLE_CLIENT_ID` at its full 72 characters, while `env | grep -c GOOGLE_CLIENT_ID` in the
+shell returns 0, so the value can only have come from `.env`. The flag's real value is that it turns a
+**missing** `.env` from a silent empty substitution into a hard stop (`Couldn't find env file`,
+exit 1). The dangerous shape is therefore not "no flag" but **no `.env` in the project directory** —
+which is what the flag converts into a stop instead of a server that comes up looking healthy with
+**Google sign-in OFF**, as happened once on 2026-09-09.
+
+To point at a checkout other than the one you are standing in, the `-f` path must be **absolute** —
+a relative one resolves against your shell's cwd and picks up the wrong tree:
 
     docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env \
-      -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server
+      -f /Users/kiro/my_projects/gisik-nokma/docker-compose.dev.yml \
+      -f /Users/kiro/my_projects/gisik-nokma/docker-compose.hot.yml up -d server
 
 **Rebuild rule — the one case that needs `--build`.** The image carries the installed dependencies and
 the workspace packages' `dist`; hot mode refreshes source, not the lockfile. So:
 
 - source edits — **nothing to do**, the watchers pick them up;
+- **a NEW MIGRATION — `docker compose … restart server`.** `apps/server/migrations` is bind-mounted,
+  but nothing *watches* it: migrations run once, in the container command's first step, at start. A
+  developer who adds one and follows "source edits — nothing to do" gets the file present and
+  unapplied, on a database the server then queries as though it were current;
 - `pnpm-lock.yaml` or any `package.json` changed — re-run `pnpm dev:stack` **with `--build`**;
 - a NEW workspace package added — also needs a line in the `dev` stage's manifest `COPY` block in
-  `apps/server/Dockerfile`, or the install fails on the missing importer.
+  `apps/server/Dockerfile`. The install at the end of that stage runs after `COPY . .`, so the
+  importer is present by then; it is the earlier fetch step whose cache key the manifest list sets,
+  and a package missing from it surfaces as an offline-store miss.
+
+**One save shape is missed silently, and it is measured rather than suspected.** A **rename-over**
+save — write a temp file, then `mv` it onto the path — delivers **no inotify event into the container
+at all**, so the watcher never fires and the edit never lands. An in-place write (truncate and write
+the same inode) is delivered normally. Timestamped `fs.watch` on one file: in-place → one event at
+3887 ms; rename-over → **zero events**. In-place reloads measured: a `apps/server/src` edit in
+**1.62 s**, a `packages/*/src` edit in **3.92 s** (via `dist`). If your editor saves atomically and a
+change does not appear, this is why — poll the `[tsx]` line above, and save in place (or `touch` the
+file) to force it. Polling was deliberately NOT enabled: it is only justified when events provably do
+not cross the Docker Desktop mount, and they do, partially — enabling it would have hidden *which*
+shape was broken instead of naming it.
 
 **What is deliberately not mounted.** Two things, and mounting either breaks the container rather than
 merely stale-ing it. `node_modules`: the host's are macOS-native and the container's are Linux, so
 `tsx` loses `@esbuild/linux-*` and the server stops booting. `dist`: the watchers write it *inside* the
 container, and a host `tsc --watch` writes the host's copy — sharing the path puts two writers on it.
 
-**Verify it is actually serving the branch** (the check that the 2026-09-09 stale-image incident was):
+**Verify the container is the hot one, and separately that the process is on current code.** These are
+two different questions and one command cannot answer both:
 
     docker exec gisik-nokma-dev-server-1 grep -c closed_at /repo/apps/server/src/read/ticket-cards.ts
 
-A `0` there means the container is running an old image, not the branch. `collaborator_ids`, in the
-same file, is the control — if it is also `0` the measurement is void rather than negative.
+This reads the file **through the bind mount**, so it reports the host's content whatever the running
+process holds. It proves the container is the `dev` stage with the mount live — in the runtime image
+the path does not exist and `grep` exits 2 — and it does **not** prove the server reloaded. Do not
+read it as "the branch is live": after a rename-over save (below) it prints the same number while the
+process serves old code, which is precisely the 2026-09-09 stale-server shape in its new clothes. The
+control `collaborator_ids`, in the same file, makes the measurement valid rather than void.
+
+For the process itself, read the reload:
+
+    docker logs --since 5m gisik-nokma-dev-server-1 2>&1 | grep '\[tsx\]'
+
+No `[tsx] change in …` line after your edit means the watcher did not see the change — the failure
+13.614 measures, and the one that is silent rather than slow.
+
+**Watchers still alive — an operator check, because nothing inside the container will tell you.** A
+dead package watcher is invisible from outside: the container stays up, `/healthz` keeps answering,
+and `docker ps` still says healthy while package edits quietly stop reaching `dist`. This was not left
+to a guard, because the guard was written, shipped, and **measured not to fire** — see the note in
+`docker-compose.hot.yml`. So check it by hand:
+
+    docker exec gisik-nokma-dev-server-1 sh -c 'ps -o args= | grep -c "typescript/bin/tsc"'
+
+**Seven** is correct — one per workspace package. Fewer means a watcher died; restart the container.
+Count `typescript/bin/tsc` and not `tsconfig.json --watch`: the latter matches **nine** lines,
+because the container's own `sh -c` command line and the recursive-watcher parent both contain it,
+which is a self-match rather than a live watcher.
 
 ## MCP server
 

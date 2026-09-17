@@ -29,7 +29,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `exec/step1-server-hot-reload`, cut with `git checkout -b exec/step1-server-hot-reload
 > origin/owner/workspace-edits` at **`5039209c`**. Verified at handoff:
 > `git rev-parse origin/owner/workspace-edits` → `5039209ccde5412ea083aa1b5fbf49a2b8872490`, and
-> `git rev-list --left-right --count origin/main...origin/owner/workspace-edits` → **`4 277`**.
+> `git rev-list --left-right --count origin/main...origin/owner/workspace-edits` → **`5 277`** — the
+> left figure was `4` when this block was first written and is a **reading of a remote-tracking ref**,
+> which moved under it (`origin/main` gained the controller's mission anchor `c8602573`); re-measure
+> rather than trusting either number. The load-bearing figure is the right one, `277`.
 > **Every PR in this mission targets base `owner/workspace-edits`, NEVER `main`** — the product lives
 > on the owner's branch, which is 277 commits ahead of `main`; a PR opened against `main` by reflex
 > carries all 277 and is closed unmerged. `exec/task12-passkeys` still exists and is untouched; Step 3
@@ -64,7 +67,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >   `collaborator_ids` **3** — where the stale image measured **0** with control 2 (a valid
 >   measurement). Cost at two moments: **1.602 GiB / 7.667 GiB, 2.30 % CPU** just after `up` (the
 >   watchers still emitting their first `dist`) and **1.194 GiB, 2.24 % CPU** settled — the second is
->   the steady state. The override declares nine mounts; the container reports eleven, the extra two
+>   the steady state. The override declares ten mounts; the container reports eleven, the extra one
 >   being the base file's own `./reference` mount surviving the merge. All eleven resolve under this
 >   worktree.
 > - **W2** server-source round-trip **1.62 s** — **with a measured negative half that matters more
@@ -94,16 +97,30 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >   copy, not assumed: `git check-ignore -v .env` → `.gitignore:11`, and `git status` does not see it.
 >   It is a file read of the owner's tree — never a git command run there.
 > - **The `dev` stage's manifest `COPY` block is hand-listed.** A new workspace package needs a line
->   added there or `pnpm install --frozen-lockfile` fails on the missing importer. Named here because
->   it is a silent-until-it-isn't coupling, not because it is likely.
+>   added there. Not because the install would miss an importer — `COPY . .` precedes it — but because
+>   `pnpm fetch` is the step that list keys, and a package absent from it surfaces as an offline-store
+>   miss. Named here because it is a silent-until-it-isn't coupling, not because it is likely.
+> - **The hot container runs `NODE_ENV=development`, and the suites build the production stage.**
+>   `apps/server/src/auth/auth.ts` documents two security defaults (better-auth's `rateLimit.enabled`,
+>   the CSRF/origin check) whose values key off `NODE_ENV` and had to be pinned explicitly for exactly
+>   that reason. They ARE pinned, so nothing differs today — but the next `NODE_ENV`-sensitive default
+>   will resolve two ways, and the divergent one is in the stack no suite tests.
 >
 > ## Live state at handoff
 >
 > The hot `server` container is **UP from THIS worktree** (`gisik-nokma-dev-server-1`, compose project
-> `gisik-nokma-dev`), so the owner's Backlog tab works from now on. The mounts point at
-> `gisik-nokma-exec` and **stay that way** — Amendment 1, owner verbatim: *"the image needs to be made
-> from where the code is being written."* Port **3001 was never touched** and `web` was never brought
-> up: the owner's `next dev` still holds it.
+> `gisik-nokma-dev`), so the owner's Backlog tab works **while that container lives**. The mounts point
+> at `gisik-nokma-exec` and **stay that way** — Amendment 1, owner verbatim: *"the image needs to be
+> made from where the code is being written."* Port **3001 was never touched** and `web` was never
+> brought up: the owner's `next dev` still holds it.
+>
+> **Hot mode is a property of the CONTAINER, not of the checkout — do not over-read the sentence
+> above.** Same compose project and service name as the plain stack, so anything that recomputes the
+> config replaces this container: `docker-compose.dev.yml:2` documents the ordinary bring-up as
+> `docker compose -f docker-compose.dev.yml up -d --build`, which names no `target`, resolves to the
+> production image, and reverts this whole change. That is also why the W4 witness is deliberately the
+> `up` WITHOUT `--build` — the path on which the container survives. Anyone who wants the branch live
+> must go through `pnpm dev:stack` (or the equivalent two-file `-f` command).
 >
 > **One dispatch instruction could not be carried out as written:** it asked for the Task 12 pause
 > block to stay below this one with a one-line superseded note at its top. That block is **not in this

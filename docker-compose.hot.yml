@@ -66,6 +66,19 @@ services:
         echo 'hot-dev: migrations current; starting watchers'
         pnpm -r --parallel --filter './packages/*' exec tsc -p tsconfig.json --watch --preserveWatchOutput &
         pnpm --filter @gisik-nokma/server exec tsx watch src/index.ts
+    # NO SUPERVISOR HERE, AND IT WAS TRIED RATHER THAN OMITTED. `set -e` does not
+    # cover a backgrounded job, so if the package watcher dies the container
+    # stays up and /healthz keeps answering while package edits silently stop
+    # reaching `dist`. A supervisor that watches it was written, shipped to a
+    # running container, and MEASURED NOT TO FIRE: `pkill` on the tsc processes
+    # left the container healthy and `restarts=0`. Two reasons it cannot work in
+    # this shell, both measured -- busybox ash has no `wait -n` (a job exiting 7
+    # reported status 0), and `kill -0` on a backgrounded child that has exited
+    # but not been reaped still SUCCEEDS, so the liveness test never turns false.
+    # It is removed rather than left in: a guard that cannot fire is worse than
+    # none, because it is trusted. The failure is therefore DOCUMENTED as an
+    # operator check instead (`docs/runbook.md`, "watchers still alive"), which
+    # is the honest form -- a check someone runs beats a guard that lies.
     volumes:
       # SOURCE ONLY. Two things are deliberately absent and both would break the
       # container if mounted:
