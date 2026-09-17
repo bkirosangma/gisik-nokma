@@ -51,8 +51,10 @@ because the second decides the shape of the first:
   for a future caller, not a live path.
 - **List rows can answer more axes than board cards.** `ListRow`
   (`view-types.ts:180-221`, re-pointed 2026-09-17 — was `:159-200` before
-  `IdAxes` was declared above it) carries `assignee`, `typeId`, `stateId`,
-  `stateCategory`, `title`, `dueDate` and `fields`; it lacks collaborators.
+  `IdAxes` was declared above it; the same range shifted by the inserted
+  lines, it already ran past the type's closing brace before this plan)
+  carries `assignee`, `typeId`, `stateId`, `stateCategory`, `title`,
+  `dueDate` and `fields`; it lacks collaborators.
   `BoardCard` carries no collaborators, no dates and no fields.
 - **The disclosure machinery exists and is reused, not duplicated.**
   `describeUnappliedBoardAxes`, `buildBoardFilterChips`,

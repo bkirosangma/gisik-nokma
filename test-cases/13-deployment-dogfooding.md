@@ -6125,15 +6125,20 @@ exact command against `Features.md`, `test-cases/`, `docs/superpowers/specs/`,
   per the same reasoning `03-foundation-ledger.md`'s other pre-existing issues are left alone.
 
 *Prose citations of pre-Task-6 names, re-pointed to the current names* (`board-search-scope.ts`,
-`filters-sheet.test.tsx`, `board-narrowing.test.tsx`): `buildBoardFilterChips` → `buildFilterChips`
-and `shouldRenderBoardNarrowingStrip` → `shouldRenderNarrowingStrip`, each marked
+`filters-sheet.test.tsx`, `board-narrowing.test.tsx`, `Features.md`): `buildBoardFilterChips` →
+`buildFilterChips` and `shouldRenderBoardNarrowingStrip` → `shouldRenderNarrowingStrip`, each marked
 "(renamed 2026-09-17)" where the surrounding sentence is itself historical (`board-narrowing.test.tsx:613`'s
 workflow-picker docblock; `filters-sheet.test.tsx:502`'s Ruling 13 paragraph;
 `board-search-scope.test.ts:93`/`:174`'s section headers), and left as a plain current-name swap where
 the sentence is a live "see also" pointer (`filters-sheet.test.tsx:245`). The `describe(...)` titles at
 `board-search-scope.test.ts:106`/`:185` are untouched — `13.442`/`13.443` are cited by those titles
-verbatim, and the catalogue names them historically. `apps/web/src/filter-edits.ts:7`'s citation of
-"the `toggledArray` convention" (deleted in Task 9) is rephrased to name it as the collapse convention
+verbatim, and the catalogue names them historically. `Features.md` (lines 75, 83, 85) had six mentions
+of the two pre-Task-6 names, all six re-pointed, and every one of the six carries the full
+"(renamed 2026-09-17; was `...`)" annotation — none of them is a bare, unannotated swap, including the
+two inside the live `- ✅` workflow-picker bullet at line 85. Commit `e282fa96`'s own message describes
+two of those six as plain renames with no annotation; that description is wrong — all six carry the
+annotation — and this paragraph, not the commit message, is the record. `apps/web/src/filter-edits.ts:7`'s
+citation of "the `toggledArray` convention" (deleted in Task 9) is rephrased to name it as the collapse convention
 `page.tsx`'s former `toggledArray` set, deleted 2026-09-17, with `withIdAxis` as its successor.
 
 *Spec amendments* (`docs/superpowers/specs/2026-09-17-filter-exclude-all-tabs-design.md`, new
