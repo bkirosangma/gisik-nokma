@@ -1,9 +1,28 @@
-import { ticketTransitionedPayloadSchema, type EventEnvelope } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE_ID,
+  statesWithBacklog,
+  ticketTransitionedPayloadSchema,
+  transitionsWithBacklog,
+  universalTransitions,
+  type EventEnvelope,
+} from '@gisik-nokma/domain';
 import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
+/**
+ * Since 2026-09-17 the state and edge sets include the universal Backlog
+ * (spec §1.1) — Start and Send to backlog are legal without being declared,
+ * and the engine learns them from the same two helpers the client's
+ * `transitionOptions` reads. Backlog is a special case within that, not an
+ * ordinary member of it: a declared wildcard edge (`from: '*'`) means "from
+ * any AUTHORED state" — the author who wrote it never knew about the
+ * universal Backlog — so a wildcard edge never applies FROM backlog; its
+ * only exit is Start (backlog/closed spec §1.1 as amended 2026-09-17).
+ * Without that guard `* → done` would let a backlog ticket jump straight to
+ * Done, skipping Start entirely.
+ */
 export async function evaluateTicketTransitioned(
   env: EventEnvelope,
   ctx: EngineContext,
@@ -48,6 +67,12 @@ export async function evaluateTicketTransitioned(
   }
   const ticket = entity;
 
+  // Explicit reopen (spec §2): a closed ticket has no legal move at all, so
+  // this is decided before any edge is looked at.
+  if ((ticket.closed ?? null) !== null) {
+    return { refused: true, rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed — reopen it first.' };
+  }
+
   const latest = await ctx.getWorkflowDef(env, ticket.workflowId);
   if (latest === null) {
     return {
@@ -78,7 +103,7 @@ export async function evaluateTicketTransitioned(
     };
   }
 
-  const toState = latest.states.find((state) => state.id === payload.to);
+  const toState = statesWithBacklog(latest).find((state) => state.id === payload.to);
   if (toState === undefined) {
     return {
       refused: true,
@@ -87,10 +112,13 @@ export async function evaluateTicketTransitioned(
     };
   }
 
-  const fromName = latest.states.find((state) => state.id === resolved.stateId)?.name ?? resolved.stateId;
+  const fromName = statesWithBacklog(latest).find((state) => state.id === resolved.stateId)?.name ?? resolved.stateId;
+  const edges = transitionsWithBacklog(latest);
   const transition =
-    latest.transitions.find((t) => t.from === resolved.stateId && t.to === payload.to) ??
-    latest.transitions.find((t) => t.from === '*' && t.to === payload.to);
+    resolved.stateId === BACKLOG_STATE_ID
+      ? universalTransitions(latest).find((t) => t.from === BACKLOG_STATE_ID && t.to === payload.to)
+      : (edges.find((t) => t.from === resolved.stateId && t.to === payload.to) ??
+         edges.find((t) => t.from === '*' && t.to === payload.to));
   if (transition === undefined) {
     return {
       refused: true,

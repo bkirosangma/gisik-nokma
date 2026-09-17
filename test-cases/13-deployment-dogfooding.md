@@ -6207,3 +6207,23 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   other value; `ticketClosedPayload` and `ticketReopenedPayload` are `z.object({}).strict()` — an empty
   claim accepted, an extra key refused; both event types are registered on the ticket entity at version 1
   — (`packages/domain/test/ticket-events.test.ts`)
+- **13.568** ✅ `checkTicketClosed` accepts closing a ticket sitting in a terminal state and refuses two
+  ways: a non-terminal state names it (`close-requires-terminal`, `A ticket can only be closed from a
+  terminal state; "Doing" is not one.`), and a second close on an already-closed ticket refuses
+  `already-closed`; both are reachable through `evaluateEvent` — (`packages/rule-engine/test/close.test.ts`)
+- **13.569** ✅ `checkTicketReopened` accepts reopening a closed ticket and refuses `not-closed` on one that
+  is not — (`packages/rule-engine/test/close.test.ts`)
+- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed —
+  reopen it first.") before any edge is looked at; after a `ticket.reopened` the same move is judged by the
+  workflow again — (`packages/rule-engine/test/close.test.ts`)
+- **13.571** ✅ The universal edges are legal through the real engine without being declared: Start
+  (`backlog → initialStateId`) is accepted and a non-initial destination from backlog is still
+  `illegal-transition`; Send-to-backlog is accepted from a non-terminal state and refused
+  `illegal-transition` from a terminal one; the parent-terminal invariant counts a backlog child as open;
+  and — controller ruling extending this task's brief — a declared wildcard edge (`from: '*'`) never
+  resolves FROM backlog under `WF` (every state reachable via `* →` edges): `move('done')` from backlog is
+  refused `illegal-transition` and only `move('todo')`, backlog's Start edge, is accepted. Mutation
+  (reverting `statesWithBacklog(latest)` to `latest.states` for `toState`) kills the Send-to-backlog case
+  with `unknown-state`; a second mutation (dropping the backlog-only branch in `transition.ts`'s edge
+  resolution) kills the wildcard-from-backlog case by wrongly accepting `move('done')` —
+  (`packages/rule-engine/test/transition-backlog.test.ts`)

@@ -22,6 +22,10 @@ export const REFUSAL_RULES = {
   requireEvidence: 'require-evidence',
   requireField: 'require-field',
   requireDifferentUser: 'require-different-user',
+  closeRequiresTerminal: 'close-requires-terminal',
+  alreadyClosed: 'already-closed',
+  notClosed: 'not-closed',
+  closedTicket: 'closed-ticket',
 } as const;
 
 /**
